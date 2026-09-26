@@ -1780,7 +1780,7 @@
     "toUrlPath": "To URL / Path",
     "preservePath": "Keep path",
     "notes": "Notes",
-    "notesHelp": "Anything worth remembering about this host. Only people who can see it can read these",
+    "notesHelp": "Anything worth remembering about this host. Only people who can see the host can read them.",
     "preservePathNone": "No",
     "preservePathFull": "Full path",
     "preservePathSuffix": "After prefix",
