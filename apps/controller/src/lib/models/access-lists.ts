@@ -455,14 +455,16 @@ export async function getAccessListUsageMap(): Promise<Map<number, AccessListUsa
     } catch {
       // Unreadable meta names no lists.
     }
+    if (listIds.size === 0) continue;
+    const usage = {
+      id: row.id,
+      name: row.name,
+      domains: JSON.parse(row.domains),
+      enabled: row.enabled,
+    };
     for (const listId of listIds) {
       const bucket = map.get(listId) ?? [];
-      bucket.push({
-        id: row.id,
-        name: row.name,
-        domains: JSON.parse(row.domains),
-        enabled: row.enabled,
-      });
+      bucket.push(usage);
       map.set(listId, bucket);
     }
   }
