@@ -6,7 +6,7 @@
 # and the version stops floating. Pinned to an exact tag for that second reason; it selects the Go
 # toolchain and xcaddy only - what gets compiled is pinned in docker/caddy/go.mod. The two are
 # allowed to drift: this tag is the xcaddy pin, go.mod is the Caddy and plugin pin.
-FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder@sha256:401121e61853cb9c7df83cba43e532e49a68e30f32921c7bdcb7a4912168c067 AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder@sha256:369218c81ca6d6af249981221b3a5c764d886dd5b058f51d144066de13f2418d AS builder
 
 ARG TARGETOS
 ARG TARGETARCH

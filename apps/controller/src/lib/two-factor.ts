@@ -7,6 +7,7 @@
  * failures against the same per-account budget, so the two sign-ins can't drift apart.
  */
 
+// Pinned in package.json to the exact version better-auth depends on, so both check codes alike.
 import { createOTP } from "@better-auth/utils/otp";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";

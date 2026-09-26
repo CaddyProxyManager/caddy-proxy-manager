@@ -305,7 +305,7 @@ test.describe('Access Lists - rail interaction', () => {
     await search.fill('zzz-nonexistent-zzz');
     await expect(page.getByText(/no lists match/i)).toBeVisible();
 
-    await page.getByText('Clear search').click();
+    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     await expect(search).toHaveValue('');
     await expect(rail.getByText(listA.name)).toBeVisible();
     await expect(rail.getByText(listB.name)).toBeVisible();

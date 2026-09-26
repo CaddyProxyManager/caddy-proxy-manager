@@ -395,7 +395,7 @@ services:
   # the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
-    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
@@ -422,7 +422,7 @@ services:
   # in COMPOSE_PROFILES is only needed on a deployment with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:26.8.7.19-alpine@sha256:2bece7c646f08865eadc2000a60427e2964adf2b46908a6d476dfa7cc5408720
+    image: clickhouse/clickhouse-server:26.8.12.53-alpine@sha256:7f30b4a043809529fde991aaab4c35bba2c9b167b2a5653df8c9694f30329b20
     profiles: [clickhouse]
     restart: always
     environment:
