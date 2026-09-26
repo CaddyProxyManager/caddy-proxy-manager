@@ -212,7 +212,6 @@ export function wsHandshake(
   });
 }
 
-/** Inject hidden form fields into #create-host-form before submitting. */
 /** Turns off Force HTTPS in the open host dialog, so the spec can talk plain HTTP to the host. */
 export async function turnOffForceHttps(page: Page): Promise<void> {
   const toggle = page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' });
@@ -221,6 +220,7 @@ export async function turnOffForceHttps(page: Page): Promise<void> {
   await expect(toggle).not.toBeChecked();
 }
 
+/** Inject hidden form fields into #create-host-form before submitting. */
 export async function injectFormFields(page: Page, fields: Record<string, string>): Promise<void> {
   await page.evaluate((f) => {
     const form = document.getElementById('create-host-form');
