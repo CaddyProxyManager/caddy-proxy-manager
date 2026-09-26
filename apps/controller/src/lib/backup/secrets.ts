@@ -12,7 +12,7 @@
  */
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { config } from "../config";
-import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
+import { decryptSecret, encryptSecret, isEncryptedSecret, sealSecretColumn } from "../secret";
 
 const MARKER = "cpmbak-secret:";
 /** Better Auth encrypts these with the auth secret, not with `enc:v1:`. */
@@ -74,8 +74,13 @@ export async function importRow(
     } else if (BETTER_AUTH_ENCRYPTED[table]?.includes(column) && value.startsWith(MARKER)) {
       out[column] = await symmetricEncrypt({ key: config.sessionSecret, data: fromMarker(value) });
     } else {
-      out[column] = mapTextColumn(value, MARKER, (text) =>
-        text.startsWith(MARKER) ? encryptSecret(fromMarker(text)) : text,
+      // A backup from before a column was encrypted carries it in plain text, with no marker.
+      out[column] = sealSecretColumn(
+        table,
+        column,
+        mapTextColumn(value, MARKER, (text) =>
+          text.startsWith(MARKER) ? encryptSecret(fromMarker(text)) : text,
+        ),
       );
     }
   }

@@ -14,7 +14,8 @@
  *
  * Two shapes have to be handled, because two shapes exist in the schema:
  *
- * - A column that *is* a secret - `certificates.privateKeyPem`, `agents.secret`.
+ * - A column that *is* a secret - `certificates.privateKeyPem`, `ca_certificates.privateKeyPem`,
+ *   `agents.secret`. Old releases kept the key columns in plain text; `SECRET_COLUMNS` seals those.
  * - A column holding JSON with secrets inside it - the `settings` rows, where a registry secret is
  *   a JSON-encoded string and the Tailscale blob is an object with an `authKey` field.
  *

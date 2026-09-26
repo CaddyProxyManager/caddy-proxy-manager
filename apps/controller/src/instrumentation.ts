@@ -71,8 +71,10 @@ export async function register() {
     // Imported keys and provider options could contain plaintext secrets in
     // older releases. Repair them before any request handler reads the rows.
     const { migrateLegacyCertificateStorage } = await import("./lib/models/certificates");
+    const { migrateLegacyCaCertificateStorage } = await import("./lib/models/ca-certificates");
     try {
-      const migrated = await migrateLegacyCertificateStorage();
+      const migrated =
+        (await migrateLegacyCertificateStorage()) + (await migrateLegacyCaCertificateStorage());
       if (migrated > 0) {
         console.log(`Hardened ${migrated} legacy certificate record(s)`);
       }

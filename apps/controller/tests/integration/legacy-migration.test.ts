@@ -119,6 +119,7 @@ beforeEach(async () => {
   invalidateSettingsCache();
   directory = mkdtempSync(join(tmpdir(), 'cpm-legacy-'));
   for (const table of [
+    schemaModule.caCertificates,
     schemaModule.accounts,
     schemaModule.apiTokens,
     schemaModule.proxyHosts,
@@ -275,6 +276,24 @@ describe('import', () => {
     // Reporting the batch size rather than the rows actually written would claim a second run had
     // migrated everything again.
     expect(second.totalRows).toBe(0);
+  });
+
+  it('encrypts a CA private key the old release kept in plain text', async () => {
+    const path = buildLegacyDatabase();
+    const raw = new Database(path);
+    raw.run(
+      `INSERT INTO ca_certificates (id, name, certificatePem, privateKeyPem, createdBy, createdAt,
+                                    updatedAt)
+       VALUES (1, 'root', 'CERT', 'PLAIN CA KEY', 1, ?, ?)`,
+      [NOW, NOW],
+    );
+    raw.close(true);
+
+    await importLegacyDatabase(path);
+    const [ca] = await ctx.db.select().from(schemaModule.caCertificates);
+    expect(ca.privateKeyPem?.startsWith('enc:v1:')).toBe(true);
+    expect(decryptSecret(ca.privateKeyPem!)).toBe('PLAIN CA KEY');
+    expect(ca.certificatePem).toBe('CERT');
   });
 
   it('inserts users before the accounts that reference them', async () => {

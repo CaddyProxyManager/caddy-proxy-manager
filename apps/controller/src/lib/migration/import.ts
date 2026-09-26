@@ -24,6 +24,7 @@ import db from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
+import { sealSecretColumn } from "../secret";
 import {
   ALL_MIGRATION_GROUP_IDS,
   MIGRATION_GROUPS,
@@ -163,6 +164,7 @@ function sqliteColumns(source: Database, table: string): Set<string> {
  * carried, because an id pointing into a table that stayed behind is a foreign key violation.
  */
 function convertRow(
+  table: string,
   row: Record<string, unknown>,
   columns: Described["columns"],
   available: Set<string>,
@@ -184,7 +186,11 @@ function convertRow(
     // Ciphertext bound to the old deployment's SESSION_SECRET is re-encrypted under this one's.
     // Applied to every text column rather than to a named list: `rekey` keys off the `enc:v1:`
     // marker, so it is a no-op on the columns that hold no secret.
-    converted[column.name] = typeof value === "string" ? rekey(value) : (value ?? null);
+    // A pre-3.0 database kept some keys in plain text, which the marker never finds.
+    converted[column.name] =
+      typeof value === "string"
+        ? sealSecretColumn(table, column.name, rekey(value))
+        : (value ?? null);
   }
   return converted;
 }
@@ -291,7 +297,7 @@ export async function importLegacyDatabase(
         table,
         rows: rows.map((row) => {
           try {
-            const converted = convertRow(row, table.columns, available, cleared, rekey);
+            const converted = convertRow(table.name, row, table.columns, available, cleared, rekey);
             // Mirrors migration 0015: a list from before "Pass auth to host" always forwarded it.
             if (table.name === "access_lists" && !available.has("passAuth")) {
               converted.passAuth = true;

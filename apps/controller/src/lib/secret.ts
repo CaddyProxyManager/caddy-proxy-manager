@@ -46,6 +46,20 @@ export function isEncryptedSecret(value: string): boolean {
   return value.startsWith(PREFIX);
 }
 
+/**
+ * Columns that are a secret in full, by table and SQL name. Older releases, and backups taken by
+ * them, stored some in plain text, so anything copying rows in seals these on the way.
+ */
+export const SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  certificates: ["privateKeyPem"],
+  ca_certificates: ["privateKeyPem"],
+};
+
+/** `value` encrypted if `table.column` is a secret column; anything else as it came. */
+export function sealSecretColumn(table: string, column: string, value: string): string {
+  return SECRET_COLUMNS[table]?.includes(column) ? encryptSecret(value) : value;
+}
+
 export function encryptSecret(value: string): string {
   if (!value) return "";
   if (isEncryptedSecret(value)) return value;
