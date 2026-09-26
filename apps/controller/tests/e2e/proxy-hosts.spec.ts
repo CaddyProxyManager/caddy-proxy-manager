@@ -68,7 +68,7 @@ test.describe('Proxy Hosts', () => {
    * the server action expected snake_case.
    */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
-    // Create a host (defaults: HSTS Subdomains ON, Skip HTTPS OFF)
+    // Create a host (defaults: HSTS Subdomains OFF, as in the schema; Skip HTTPS OFF)
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -95,7 +95,7 @@ test.describe('Proxy Hosts', () => {
       }>;
       const created = hosts.find((h) => h.name === 'Advanced Options Test');
       expect(created).toBeDefined();
-      expect(created!.hstsSubdomains).toBe(true);
+      expect(created!.hstsSubdomains).toBe(false);
       expect(created!.skipHttpsHostnameValidation).toBe(false);
 
       // Open edit dialog for the host
@@ -115,14 +115,14 @@ test.describe('Proxy Hosts', () => {
         .getByRole('switch');
 
       // Verify initial state matches what was saved
-      await expect(hstsSwitch).toBeChecked();
+      await expect(hstsSwitch).not.toBeChecked();
       await expect(skipSwitch).not.toBeChecked();
 
-      // Toggle HSTS Subdomains OFF and Skip HTTPS Validation ON
+      // Toggle HSTS Subdomains ON and Skip HTTPS Validation ON
       await hstsSwitch.click();
       await skipSwitch.click();
 
-      await expect(hstsSwitch).not.toBeChecked();
+      await expect(hstsSwitch).toBeChecked();
       await expect(skipSwitch).toBeChecked();
 
       // Save the changes
@@ -135,7 +135,7 @@ test.describe('Proxy Hosts', () => {
         hstsSubdomains: boolean;
         skipHttpsHostnameValidation: boolean;
       };
-      expect(after.hstsSubdomains).toBe(false);
+      expect(after.hstsSubdomains).toBe(true);
       expect(after.skipHttpsHostnameValidation).toBe(true);
 
       // Reopen edit dialog and verify UI reflects saved state
@@ -151,7 +151,7 @@ test.describe('Proxy Hosts', () => {
         .locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])')
         .getByRole('switch');
 
-      await expect(hstsSwitch2).not.toBeChecked();
+      await expect(hstsSwitch2).toBeChecked();
       await expect(skipSwitch2).toBeChecked();
 
       await dialog2
