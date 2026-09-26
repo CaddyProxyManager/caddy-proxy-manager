@@ -92,7 +92,7 @@ const SETTINGS: ToggleSetting[] = [
 export function SettingsToggles({
   sslForced = true,
   hstsEnabled = true,
-  hstsSubdomains = true,
+  hstsSubdomains = false,
   allowWebsocket = true,
   preserveHostHeader = true,
   skipHttpsValidation = false,
