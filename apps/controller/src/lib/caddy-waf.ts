@@ -424,18 +424,9 @@ export function resolveEffectiveWaf(
   return null;
 }
 
-/** Caddy matcher for a WebSocket upgrade, mirroring the built-in `@websockets`. */
-export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
-  header: {
-    Connection: ["*Upgrade*"],
-    Upgrade: ["websocket"],
-  },
-};
-
 /**
- * Anything that could become a WebSocket, for refusing them. Wider than the matcher above, which
- * only has to recognise real browsers: the token is case-insensitive in HTTP/1.1, and HTTP/2
- * opens one with an extended CONNECT that carries no Upgrade header at all.
+ * Anything that could become a WebSocket, for refusing them: the token is case-insensitive in
+ * HTTP/1.1, and HTTP/2 opens one with an extended CONNECT that carries no Upgrade header at all.
  */
 export const WEBSOCKET_ATTEMPT_MATCHERS: Record<string, unknown>[] = [
   { header_regexp: { Upgrade: { pattern: "(?i)websocket" } } },
@@ -576,50 +567,4 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
 
   if (inMemoryLimit === null || inMemoryLimit <= requestLimit) return directives;
   return `${directives}\nSecRequestBodyInMemoryLimit ${requestLimit}`;
-}
-
-/**
- * The handler-chain entry applying the WAF for a proxy route.
- *
- * When allowWebsocket is true the WAF handler is wrapped in a non-terminal
- * subroute that only runs for NON-WebSocket requests.  WebSocket upgrades must
- * bypass the coraza handler ENTIRELY - not merely have the rule engine turned
- * off via `ctl:ruleEngine=off` (issue #195):
- *
- *   The coraza-caddy middleware wraps the response writer to inspect the
- *   upstream response (SecLang phase 3/4 rules).  That wrapper does not pass
- *   through the connection hijack that a `101 Switching Protocols` upgrade
- *   performs, so the raw WebSocket bytes leak out without the HTTP status line.
- *   The client sees a corrupt "HTTP/0.9" response and the handshake fails.
- *   Disabling only the rule engine leaves the response wrapper in place, so the
- *   connection is still mangled - routing around the handler is the only fix.
- *
- * Because a Caddy `subroute` compiles its inner routes with the OUTER `next`
- * handler as their continuation, the WAF handler still wraps the downstream
- * `reverse_proxy` for ordinary requests (response inspection preserved); only
- * the matched-out WebSocket upgrade skips it and falls straight through to the
- * next handler in the chain.
- *
- * With allowWebsocket the handler sits in a non-terminal subroute that skips upgrades. They must
- * bypass coraza entirely, not just disable the rule engine (#195): coraza-caddy wraps the response
- * writer, breaking the `101 Switching Protocols` hijack - raw bytes leak out with no status line.
- * A `subroute` compiles inner routes with the OUTER `next`, so ordinary requests still get the WAF.
- */
-export function buildWafHandlerEntry(
-  waf: WafSettings,
-  allowWebsocket = false,
-  presets: ReadonlyMap<number, string> = new Map(),
-  plugins: ReadonlyMap<number, CrsPluginRules> = new Map(),
-): Record<string, unknown> {
-  const wafHandler = buildWafHandler(waf, presets, plugins);
-  if (!allowWebsocket) return wafHandler;
-  return {
-    handler: "subroute",
-    routes: [
-      {
-        match: [{ not: [WEBSOCKET_UPGRADE_MATCHER] }],
-        handle: [wafHandler],
-      },
-    ],
-  };
 }

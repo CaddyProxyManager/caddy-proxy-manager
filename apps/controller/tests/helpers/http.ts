@@ -212,6 +212,70 @@ export function wsHandshake(
   });
 }
 
+/**
+ * Opens a WebSocket, sends one text frame and returns the text of the first frame back - a 101
+ * alone doesn't prove the hijacked connection carries frames.
+ */
+export function wsEcho(domain: string, path: string, message: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(80, '127.0.0.1');
+    let buf = Buffer.alloc(0);
+    let upgraded = false;
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(
+        new Error(
+          `no echo from "${domain}${path}" (raw: ${JSON.stringify(buf.toString('latin1').slice(0, 200))})`,
+        ),
+      );
+    }, 10_000);
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      socket.destroy();
+      fn();
+    };
+
+    socket.on('connect', () => {
+      socket.write(
+        [
+          `GET ${path} HTTP/1.1`,
+          `Host: ${domain}`,
+          'Upgrade: websocket',
+          'Connection: Upgrade',
+          `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}`,
+          'Sec-WebSocket-Version: 13',
+          '',
+          '',
+        ].join('\r\n'),
+      );
+    });
+
+    socket.on('data', (chunk: Buffer) => {
+      buf = Buffer.concat([buf, chunk]);
+      if (!upgraded) {
+        const end = buf.indexOf('\r\n\r\n');
+        if (end === -1) return;
+        const statusLine = buf.subarray(0, buf.indexOf('\r\n')).toString('latin1');
+        if (!/^HTTP\/1\.1 101/.test(statusLine)) return done(() => reject(new Error(statusLine)));
+        upgraded = true;
+        buf = buf.subarray(end + 4);
+        // Client frames must be masked (RFC 6455 5.3); short text frames only.
+        const payload = Buffer.from(message);
+        const mask = crypto.randomBytes(4);
+        const masked = Buffer.from(payload.map((byte, i) => byte ^ mask[i % 4]));
+        socket.write(Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, masked]));
+      }
+      // Server frames are unmasked; the echo is short enough for a 7-bit length.
+      if (buf.length >= 2 && buf.length >= 2 + (buf[1] & 0x7f)) {
+        const text = buf.subarray(2, 2 + (buf[1] & 0x7f)).toString('utf8');
+        done(() => resolve(text));
+      }
+    });
+
+    socket.on('error', (err) => done(() => reject(err)));
+  });
+}
+
 /** Turns off Force HTTPS in the open host dialog, so the spec can talk plain HTTP to the host. */
 export async function turnOffForceHttps(page: Page): Promise<void> {
   const toggle = page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' });

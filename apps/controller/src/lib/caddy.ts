@@ -113,9 +113,9 @@ import { getWafPresetDirectives } from "./models/waf-presets";
 import { getCrsPluginRules } from "./models/crs-plugins";
 import { loadWithCrsPluginRecovery } from "./crs-plugins/recovery";
 import {
+  buildWafHandler,
   type CrsPluginRules,
   WEBSOCKET_ATTEMPT_MATCHERS,
-  buildWafHandlerEntry,
   resolveEffectiveWaf,
 } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
@@ -1604,17 +1604,12 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
-      handlers.unshift(
-        buildWafHandlerEntry(
-          effectiveWaf,
-          Boolean(row.allowWebsocket),
-          context.wafPresets,
-          context.crsPlugins,
-        ),
-      );
+      // WebSocket upgrades included: routing them around the WAF (#195) let any request that only
+      // claimed to be one skip inspection, and coraza-caddy >= 2.6 passes the 101 hijack through.
+      handlers.unshift(buildWafHandler(effectiveWaf, context.wafPresets, context.crsPlugins));
     }
 
-    // Refused ahead of the WAF: coraza mangles an upgrade it wraps (see buildWafHandlerEntry).
+    // Ahead of the WAF, so a refused upgrade never costs a Coraza transaction.
     if (!row.allowWebsocket) {
       handlers.unshift({
         handler: "subroute",

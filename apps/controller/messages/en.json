@@ -1930,7 +1930,7 @@
     "hstsHelp": "Tell browsers to only ever use HTTPS for this host. Requires Force HTTPS",
     "hstsSubdomains": "HSTS Subdomains",
     "websocketSupport": "WebSocket Support",
-    "websocketSupportHelp": "Allow WebSocket upgrades. They bypass the WAF, which cannot inspect them",
+    "websocketSupportHelp": "Allow WebSocket upgrades. The WAF checks the handshake but not the messages after it",
     "preserveHostHeader": "Preserve Host Header",
     "preserveHostHeaderHelp": "Send the original Host header to the upstream instead of the upstream's own address",
     "hstsSubdomainsHelp": "Include subdomains in the Strict-Transport-Security header",

@@ -100,6 +100,16 @@ describe('host toggles', () => {
     expect(on).not.toContain('(?i)websocket');
   });
 
+  it('runs the WAF on WebSocket upgrades too, so claiming to be one skips nothing', async () => {
+    const config = await host('waf-ws.example.com', {
+      allowWebsocket: true,
+      waf: { enabled: true, mode: 'On', load_owasp_crs: true, waf_mode: 'override' },
+    });
+    expect(config).toContain('"handler":"waf"');
+    // The old #195 carve-out: a `not` on the upgrade headers in front of the WAF.
+    expect(config).not.toContain('"Upgrade":["websocket"]');
+  });
+
   it('sets the Host header only while preserveHostHeader is on', async () => {
     expect(await host('keep-host.example.com', { preserveHostHeader: true })).toContain(
       '{http.request.host}"]',

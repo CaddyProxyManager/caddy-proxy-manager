@@ -132,10 +132,10 @@ api_expect "a host with hostile directives is refused" 400 POST /api/v1/proxy-ho
 t_contains "the refusal names the engine directive" "SecRuleEngine Off" "$API_BODY"
 t_contains "the refusal names the Include" "Include /etc/passwd" "$API_BODY"
 
-# ── WebSocket carve-out ─────────────────────────────────────────────────────
+# ── WebSockets through the WAF ──────────────────────────────────────────────
 #
-# Coraza wraps the response writer, which breaks a connection hijack. A host
-# with both the WAF and WebSockets enabled must route upgrades around it.
+# Upgrades go through the WAF: coraza-caddy passes the 101 hijack through, and
+# routing them around it let any request claiming to be one skip inspection.
 
 wafws=$(domain_for "waf-websocket")
 create_host_or_fail "a host with both the WAF and WebSockets can be created" "$(jq -nc --arg d "$wafws" \
@@ -154,6 +154,8 @@ ws_reply=$(python3 /suite/helpers/ws_client.py "$wafws" /ws "$CA_BUNDLE" through
 t_contains "a WebSocket upgrade survives an enabled WAF" "echo:through-the-waf" "$ws_reply"
 t_eq "ordinary requests on the same host are still filtered" "403" \
   "$(http_code "https://$wafws/waf-tripwire")"
+t_eq "a request claiming to be an upgrade is filtered too" "403" \
+  "$(http_code "https://$wafws/waf-tripwire" -H 'Connection: Upgrade' -H 'Upgrade: websocket')"
 
 # ── Recorded events ─────────────────────────────────────────────────────────
 #
