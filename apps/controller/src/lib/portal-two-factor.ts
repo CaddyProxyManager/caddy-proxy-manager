@@ -16,6 +16,9 @@ export const PORTAL_CHALLENGE_ATTEMPTS = 5;
 /** Attempts per live nonce; spent ones stay until they would have expired anyway. */
 const ATTEMPTS = new Map<string, { count: number; expiresAt: number }>();
 const MAX_TRACKED = 100_000;
+/** Expired entries go at most this often, so a long-lived process doesn't keep every nonce. */
+const PRUNE_INTERVAL_MS = 60_000;
+let lastPrune = 0;
 
 /** A restart invalidates every challenge, since ATTEMPTS starts empty again. */
 const bootSalt = randomBytes(32);
@@ -28,6 +31,7 @@ function signature(userId: number, rid: string, expiresAt: number, nonce: string
 }
 
 function prune(now: number) {
+  lastPrune = now;
   for (const [nonce, entry] of ATTEMPTS) if (entry.expiresAt <= now) ATTEMPTS.delete(nonce);
 }
 
@@ -58,7 +62,7 @@ export function redeemPortalChallenge(
   const given = Buffer.from(sig);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
 
-  if (ATTEMPTS.size >= MAX_TRACKED) prune(now);
+  if (ATTEMPTS.size >= MAX_TRACKED || now - lastPrune >= PRUNE_INTERVAL_MS) prune(now);
   const entry = ATTEMPTS.get(nonce) ?? { count: 0, expiresAt };
   if (entry.count >= PORTAL_CHALLENGE_ATTEMPTS) return null;
   entry.count += 1;

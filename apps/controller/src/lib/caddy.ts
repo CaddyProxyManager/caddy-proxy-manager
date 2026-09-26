@@ -121,7 +121,7 @@ import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-ca
 import { buildRedirectRoute } from "./caddy-redirects";
 import { evictedNames, withRenewalOverrides } from "./certificate-renewals";
 import { reachabilityRoute } from "./domain-reachability";
-import { type AccessListRuntime, buildAccessListHandlers } from "./access-list-rules";
+import { type AccessListRuntime, buildAccessListHandlers, type IpRule } from "./access-list-rules";
 import {
   type CaddyModuleAvailability,
   getCaddyModuleAvailability,
@@ -3470,6 +3470,18 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     mTlsOptionalAuthDomains,
   });
 
+  // Grouped once; the query already orders each list's rules.
+  const ipRulesByList = new Map<number, IpRule[]>();
+  for (const rule of accessListIpRuleRecords) {
+    const rules = ipRulesByList.get(rule.accessListId) ?? [];
+    rules.push({
+      action: rule.action === "allow" ? "allow" : "deny",
+      cidr: rule.cidr,
+      note: null,
+    });
+    ipRulesByList.set(rule.accessListId, rules);
+  }
+
   const caddyBuildContext: CaddyBuildContext = {
     rows: proxyHostRows,
     accessLists: new Map(
@@ -3477,13 +3489,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
         list.id,
         {
           accounts: accessMap.get(list.id) ?? [],
-          ipRules: accessListIpRuleRecords
-            .filter((rule) => rule.accessListId === list.id)
-            .map((rule) => ({
-              action: rule.action === "allow" ? ("allow" as const) : ("deny" as const),
-              cidr: rule.cidr,
-              note: null,
-            })),
+          ipRules: ipRulesByList.get(list.id) ?? [],
           ipDefault: list.ipDefault === "allow" ? ("allow" as const) : ("deny" as const),
           satisfy: list.satisfy === "any" ? ("any" as const) : ("all" as const),
           passAuth: list.passAuth,

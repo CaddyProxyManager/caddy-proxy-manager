@@ -26,6 +26,7 @@ type Preview = {
   newerThanThis: boolean;
 };
 
+/** `MIN_PASSPHRASE_LENGTH` in lib/backup/format.ts, which pulls node:crypto into the bundle. */
 const MIN_PASSPHRASE = 12;
 
 /** The tables worth naming in the preview; the rest are counted together. */
@@ -145,10 +146,14 @@ function RestoreCard() {
     const form = new FormData();
     form.set("file", chosen);
     form.set("preview", "1");
-    const response = await fetch("/api/backup/restore", { method: "POST", body: form });
-    const body = await response.json();
-    if (!response.ok) setError(body.error ?? t("restoreFailed"));
-    else setPreview(body as Preview);
+    try {
+      const response = await fetch("/api/backup/restore", { method: "POST", body: form });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) setError(body.error ?? t("restoreFailed"));
+      else setPreview(body as Preview);
+    } catch {
+      setError(t("restoreFailed"));
+    }
   };
 
   const restore = async () => {
@@ -232,7 +237,7 @@ function RestoreCard() {
               variant="destructive"
               icon={<Upload />}
               label={t("restore")}
-              isDisabled={!passphrase || preview.newerThanThis || busy}
+              isDisabled={passphrase.length < MIN_PASSPHRASE || preview.newerThanThis || busy}
               onClick={() => setConfirmOpen(true)}
             />
           </VStack>
