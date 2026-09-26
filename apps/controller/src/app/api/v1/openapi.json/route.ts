@@ -3260,7 +3260,17 @@ const spec = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "name", "entries", "createdAt", "updatedAt"],
+        required: [
+          "id",
+          "name",
+          "entries",
+          "ipRules",
+          "ipDefault",
+          "satisfy",
+          "passAuth",
+          "createdAt",
+          "updatedAt",
+        ],
       },
       AccessListIpRule: {
         type: "object",

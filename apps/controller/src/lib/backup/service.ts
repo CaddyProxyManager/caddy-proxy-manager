@@ -8,6 +8,7 @@
  * would silently throw away.
  */
 import { mkdir, writeFile } from "node:fs/promises";
+import { isNewer } from "../updates";
 import { join } from "node:path";
 import { getTableColumns } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
@@ -80,15 +81,6 @@ export async function createBackup(
   return await sealBackup(payload, passphrase, { appVersion: pkg.version });
 }
 
-function compareVersions(a: string, b: string): number {
-  const parts = (v: string) => v.split(/[.-]/).map((n) => Number.parseInt(n, 10) || 0);
-  const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
-  }
-  return 0;
-}
-
 /** What restoring would do, read from the header alone. */
 export function describeBackup(file: Buffer) {
   const { header } = readBackupHeader(file);
@@ -96,7 +88,8 @@ export function describeBackup(file: Buffer) {
     createdAt: header.createdAt,
     appVersion: header.appVersion,
     counts: header.counts,
-    newerThanThis: compareVersions(header.appVersion, pkg.version) > 0,
+    // Semver precedence, so a 3.0.0 backup counts as newer than a 3.0.0-beta.1 build.
+    newerThanThis: isNewer(pkg.version, header.appVersion),
   };
 }
 
