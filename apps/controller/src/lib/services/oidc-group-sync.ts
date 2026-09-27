@@ -3,12 +3,13 @@
  * is parked by provider + subject and consumed at session creation.
  */
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { type AppRole, normalizeGroupName } from "../oidc-groups";
 import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
+import { isLastActiveAdmin, withAdminLock } from "../models/user";
 
 export type PendingOidcSync = {
   providerId: string;
@@ -63,24 +64,26 @@ export function clearPendingOidcSyncs(): void {
   pending.clear();
 }
 
-async function countOtherActiveAdmins(userId: number): Promise<number> {
-  const rows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
-  return rows.filter((row) => row.id !== userId).length;
+async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> {
+  const role = entry.role;
+  if (role === null) return;
+
+  // Under the admin lock: two reconciliations demoting each other would both see the other admin.
+  await withAdminLock(() => applyRoleLocked(userId, role, entry));
 }
 
-async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> {
-  if (entry.role === null) return;
-
+async function applyRoleLocked(
+  userId: number,
+  role: NonNullable<PendingOidcSync["role"]>,
+  entry: PendingOidcSync,
+): Promise<void> {
   const current = await db.query.users.findFirst({
     where: (table, { eq: equals }) => equals(table.id, userId),
   });
-  if (!current || current.role === entry.role) return;
+  if (!current || current.role === role) return;
 
   // Never let a claim change lock the instance out of its last administrator.
-  if (current.role === "admin" && (await countOtherActiveAdmins(userId)) === 0) {
+  if (current.role === "admin" && (await isLastActiveAdmin(userId))) {
     console.warn(
       `[oidc-group-sync] Skipping demotion of user ${userId} to "${entry.role}": they are the last active admin.`,
     );
@@ -94,7 +97,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
     return;
   }
 
-  await db.update(users).set({ role: entry.role, updatedAt: nowIso() }).where(eq(users.id, userId));
+  await db.update(users).set({ role, updatedAt: nowIso() }).where(eq(users.id, userId));
 
   await logAuditEvent({
     userId,

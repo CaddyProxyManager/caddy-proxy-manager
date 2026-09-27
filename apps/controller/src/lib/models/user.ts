@@ -5,6 +5,7 @@ import { and, count, desc, eq, max, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 import { isDemoAdmin } from "../demo-mode";
 import { domainError } from "../domain-error";
+import { withRowLock } from "../db-claim";
 
 /** See isDemoAdmin: the shared demo account keeps its password, its role and its access. */
 function assertNotDemoAdmin(userId: number): void {
@@ -264,25 +265,56 @@ export async function listUsers(): Promise<User[]> {
   return rows.map(parseDbUser);
 }
 
+const ADMIN_INVARIANT_LOCK = "admin_invariant_lock";
+
+/**
+ * Whether `userId` is an active admin with no other active admin beside them. Only meaningful
+ * under the admin lock: two unlocked callers removing each other would both see the other.
+ */
+export async function isLastActiveAdmin(userId: number): Promise<boolean> {
+  const admins = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
+  return admins.some((row) => row.id === userId) && admins.length === 1;
+}
+
+/**
+ * Serialises every change that can remove an active admin - role, status, delete, OIDC sync -
+ * so the "at least one" check and the write can't interleave with another such change.
+ */
+export function withAdminLock<T>(work: () => Promise<T>): Promise<T> {
+  return withRowLock(ADMIN_INVARIANT_LOCK, work);
+}
+
+async function assertKeepsAnAdmin(userId: number): Promise<void> {
+  if (await isLastActiveAdmin(userId)) throw domainError("lastActiveAdmin", {}, { status: 409 });
+}
+
 export async function updateUserRole(userId: number, role: User["role"]): Promise<User | null> {
   if (role !== "admin") assertNotDemoAdmin(userId);
-  const now = nowIso();
-  const [updated] = await db
-    .update(users)
-    .set({ role, updatedAt: now })
-    .where(eq(users.id, userId))
-    .returning();
-  return updated ? parseDbUser(updated) : null;
+  return withAdminLock(async () => {
+    if (role !== "admin") await assertKeepsAnAdmin(userId);
+    const [updated] = await db
+      .update(users)
+      .set({ role, updatedAt: nowIso() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated ? parseDbUser(updated) : null;
+  });
 }
 
 export async function updateUserStatus(userId: number, status: string): Promise<User | null> {
   if (status !== "active") assertNotDemoAdmin(userId);
-  const now = nowIso();
-  const [updated] = await db
-    .update(users)
-    .set({ status, updatedAt: now })
-    .where(eq(users.id, userId))
-    .returning();
+  const updated = await withAdminLock(async () => {
+    if (status !== "active") await assertKeepsAnAdmin(userId);
+    const [row] = await db
+      .update(users)
+      .set({ status, updatedAt: nowIso() })
+      .where(eq(users.id, userId))
+      .returning();
+    return row;
+  });
 
   if (status !== "active") {
     await deleteUserForwardAuthSessions(userId);
@@ -293,7 +325,10 @@ export async function updateUserStatus(userId: number, status: string): Promise<
 
 export async function deleteUser(userId: number): Promise<void> {
   assertNotDemoAdmin(userId);
-  await db.delete(users).where(eq(users.id, userId));
+  await withAdminLock(async () => {
+    await assertKeepsAnAdmin(userId);
+    await db.delete(users).where(eq(users.id, userId));
+  });
 }
 
 /**

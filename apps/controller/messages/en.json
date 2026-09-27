@@ -786,6 +786,8 @@
     "deleteProxyHostFailed": "Failed to delete proxy host. Please check the logs for details.",
     "deleteUserFailed": "Failed to delete user",
     "demoAdminProtected": "The demo administrator cannot be disabled, deleted, demoted or have its password or two-factor sign-in changed.",
+    "lastActiveAdmin": "That would leave no active administrator. Make someone else an administrator first.",
+    "changeInProgress": "Another change is being saved. Try again in a moment.",
     "discardStagedFailed": "Failed to discard changes",
     "emailAndPasswordRequired": "Email and password are required",
     "emailInvalid": "Enter a valid email address, such as name@example.com",
