@@ -9,7 +9,7 @@ import {
   AGENT_COMMAND_TIMEOUT_MS,
   AGENT_STREAM_KEEPALIVE_MS,
   type AgentCommand,
-  type AgentCommandResult,
+  type DecodedCommandResult,
   type AgentDesiredState,
   type AgentServerEvent,
   type AgentStatus,
@@ -341,7 +341,7 @@ function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyRe
 }
 
 /** Unknown ids are stale and dropped. */
-export function settleResults(agentId: string, results: AgentCommandResult[]): void {
+export function settleResults(agentId: string, results: DecodedCommandResult[]): void {
   for (const result of results) {
     const waiter = waiters.get(result.id);
     if (!waiter) continue;
@@ -350,7 +350,8 @@ export function settleResults(agentId: string, results: AgentCommandResult[]): v
 
     clearTimeout(waiter.timer);
     waiters.delete(result.id);
-    if (result.ok) waiter.resolve(result.response);
+    if ("malformed" in result) waiter.reject(new AgentCommandError("Malformed agent reply", 502));
+    else if (result.ok) waiter.resolve(result.response);
     else waiter.reject(new AgentCommandError(result.error, 502));
   }
 

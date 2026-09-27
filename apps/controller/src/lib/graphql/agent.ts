@@ -5,6 +5,9 @@
  */
 
 import {
+  AgentDecodeError,
+  decodeAgentStatus,
+  decodeCommandResults,
   MAX_ANALYTICS_REQUEST_BYTES,
   MAX_CADDY_CONFIG_BYTES,
   type AgentAnalyticsResult,
@@ -62,6 +65,16 @@ export async function requireAgent(
   };
 }
 
+/** A signed but malformed value is the agent's fault: refused with a code it can log, not a 500. */
+function decodeOrRefuse<T>(decode: () => T): T {
+  try {
+    return decode();
+  } catch (error) {
+    if (!(error instanceof AgentDecodeError)) throw error;
+    throw new GraphQLError(error.message, { extensions: { code: "AGENT_BAD_REQUEST" } });
+  }
+}
+
 export const agentResolvers = {
   Subscription: {
     agentEvents: {
@@ -106,7 +119,10 @@ export const agentResolvers = {
         });
       }
 
-      recordStatus(agent.agentId, args.status);
+      recordStatus(
+        agent.agentId,
+        decodeOrRefuse(() => decodeAgentStatus(args.status)),
+      );
       await recordAgentContact(agent.id, { ok: true });
       return true;
     },
@@ -118,7 +134,10 @@ export const agentResolvers = {
     ): Promise<boolean> => {
       const agent = await requireAgent(context, MAX_CADDY_CONFIG_BYTES);
 
-      settleResults(agent.agentId, args.results);
+      settleResults(
+        agent.agentId,
+        decodeOrRefuse(() => decodeCommandResults(args.results)),
+      );
       return true;
     },
 

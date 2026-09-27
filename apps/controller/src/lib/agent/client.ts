@@ -4,17 +4,21 @@
  * rest.
  */
 
-import type {
-  AgentStatus,
-  CaddyAdminProxyRequest,
-  CaddyAdminProxyResponse,
-  CaddyBuildStatus,
-  L4PortsStatus,
-  LogReadRequest,
-  LogReadResponse,
-  CaddyCertificate,
-  CertificateFileRequest,
-  CertificateFiles,
+import {
+  AgentDecodeError,
+  type AgentStatus,
+  type CaddyAdminProxyRequest,
+  type CaddyAdminProxyResponse,
+  type CaddyBuildStatus,
+  type CaddyCertificate,
+  type CertificateFileRequest,
+  type CertificateFiles,
+  decodeCertificateFiles,
+  decodeCertificateList,
+  decodeLogReadResponse,
+  type L4PortsStatus,
+  type LogReadRequest,
+  type LogReadResponse,
 } from "@cpm/shared";
 import { type DomainErrorCode, domainErrorMessage } from "../domain-error";
 import { pushDesiredState } from "./desired-state";
@@ -211,7 +215,7 @@ export async function listAgentCertificates(): Promise<
         return {
           agentId: agent.agentId,
           name: agent.name,
-          certificates: JSON.parse(response.text) as CaddyCertificate[],
+          certificates: decodeCertificateList(response.text),
         };
       } catch {
         return { agentId: agent.agentId, name: agent.name, certificates: null };
@@ -226,7 +230,7 @@ export async function readAgentCertificate(
 ): Promise<CertificateFiles | null> {
   if (!agentsWith("certificates").some((agent) => agent.agentId === agentId)) return null;
   const response = await dispatchCertificateRead(agentId, request);
-  return response.status === 200 ? (JSON.parse(response.text) as CertificateFiles) : null;
+  return response.status === 200 ? decodeCertificateFiles(response.text) : null;
 }
 
 export function logReadableAgents(): { agentId: string; name: string }[] {
@@ -242,9 +246,10 @@ export async function readAgentLog(
   if (!logReadableAgents().some((agent) => agent.agentId === agentId)) return null;
   try {
     const response = await dispatchLogRead(agentId, request);
-    return JSON.parse(response.text) as LogReadResponse;
+    return decodeLogReadResponse(response.text);
   } catch (error) {
     if (error instanceof AgentNotConnectedError) return null;
+    if (error instanceof AgentDecodeError) throw new AgentRequestError(error.message, 502);
     if (error instanceof AgentCommandError)
       throw new AgentRequestError(error.message, error.status);
     throw error;

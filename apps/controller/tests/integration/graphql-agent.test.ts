@@ -191,6 +191,20 @@ describe('the agent mutations', () => {
     await iterator.return?.();
   });
 
+  it('refuses a malformed status and keeps the last good one', async () => {
+    const iterator = await connect();
+    const result = await graphql({
+      schema,
+      source: AGENT_OPERATIONS.status,
+      contextValue: agentContext(),
+      variableValues: { status: { ...status, l4Ports: { applied: 'all', status: {} } } },
+    });
+
+    expect(result.errors?.[0]?.extensions?.code).toBe('AGENT_BAD_REQUEST');
+    expect(connectedAgents().find((a) => a.agentId === 'a1')?.status).toBeNull();
+    await iterator.return?.();
+  });
+
   it('refuses a status from an agent with no open subscription', async () => {
     // Accepting it would let the dashboard report a host as reachable when nothing can reach it.
     const result = await graphql({
