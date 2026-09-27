@@ -6,7 +6,13 @@
  */
 import { Database } from "bun:sqlite";
 import { config } from "../config";
-import { decryptSecretWith, encryptSecret, isEncryptedSecret } from "../secret";
+import {
+  decryptSecretWith,
+  ENCRYPTED_SECRET_PREFIX,
+  encryptSecret,
+  isEncryptedSecret,
+} from "../secret";
+import { mapTextColumn } from "../secret-walk";
 
 /** How many samples `probeLegacySecrets` collects before it stops reading. */
 const SAMPLE_LIMIT = 25;
@@ -80,26 +86,10 @@ export class LegacySecretError extends Error {
  * byte-for-byte, so a migration that needed no key can still be repeated against the original file.
  */
 export function createRekeyer(legacyKey: string | null): Rekeyer {
-  return (value: string): string => {
-    if (!value.includes("enc:v1:")) return value;
-
-    if (isEncryptedSecret(value)) return rekeyToken(value, legacyKey);
-
-    // Something inside is a token. Only JSON columns do this, so parse: a substring rewrite would
-    // depend on where a token ends, and trailing base64 has no reliable delimiter.
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      // A `enc:v1:` inside something that is not JSON and not a token is not ours to touch.
-      return value;
-    }
-
-    const mapped = mapStrings(parsed, (text) =>
+  return (value: string): string =>
+    mapTextColumn(value, ENCRYPTED_SECRET_PREFIX, (text) =>
       isEncryptedSecret(text) ? rekeyToken(text, legacyKey) : text,
     );
-    return JSON.stringify(mapped);
-  };
 }
 
 /** One token: left alone if this deployment can already read it, otherwise re-encrypted. */
@@ -116,18 +106,6 @@ function rekeyToken(token: string, legacyKey: string | null): string {
   }
 
   return encryptSecret(plaintext);
-}
-
-/** Apply `map` to every string in a parsed JSON value, preserving the structure around them. */
-function mapStrings(input: unknown, map: (text: string) => string): unknown {
-  if (typeof input === "string") return map(input);
-  if (Array.isArray(input)) return input.map((entry) => mapStrings(entry, map));
-  if (input !== null && typeof input === "object") {
-    return Object.fromEntries(
-      Object.entries(input).map(([key, entry]) => [key, mapStrings(entry, map)]),
-    );
-  }
-  return input;
 }
 
 /** Reads every table, not the known ones, to notice a secret even in a table this app dropped. */
@@ -174,16 +152,8 @@ function collectSamples(sqlitePath: string): string[] {
 
 /** The tokens in one column value, whether it is a token itself or JSON holding some. */
 function collectTokens(value: string, into: string[]): void {
-  if (isEncryptedSecret(value)) {
-    into.push(value);
-    return;
-  }
-  try {
-    mapStrings(JSON.parse(value), (text) => {
-      if (isEncryptedSecret(text)) into.push(text);
-      return text;
-    });
-  } catch {
-    // Not JSON, so the marker was part of some other text. Nothing to sample.
-  }
+  mapTextColumn(value, ENCRYPTED_SECRET_PREFIX, (text) => {
+    if (isEncryptedSecret(text)) into.push(text);
+    return text;
+  });
 }

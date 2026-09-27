@@ -1,6 +1,17 @@
-import { describe, it, expect } from 'bun:test';
+import { afterEach, describe, it, expect } from 'bun:test';
 import { fresh } from '@/tests/helpers/fresh';
-import { encryptSecret, decryptSecret, isEncryptedSecret } from '@/src/lib/secret';
+import { vi } from '@/tests/helpers/vi';
+import {
+  encryptUnderOtherSecret,
+  OTHER_SESSION_SECRET,
+} from '@/tests/helpers/encrypt-under-other-secret';
+import {
+  encryptSecret,
+  decryptSecret,
+  decryptSecretWith,
+  isEncryptedSecret,
+  reencryptSecret,
+} from '@/src/lib/secret';
 
 describe('secret', () => {
   it('encrypts a value (output is non-empty string)', () => {
@@ -97,6 +108,69 @@ describe('secret', () => {
       );
       expect(() => legacyEnabled.decryptSecret(value)).toThrow(/HKDF\).*legacy/);
       expect(() => legacyEnabled.decryptSecret(value)).toThrow(/SESSION_SECRET changed/);
+      expect(() => legacyEnabled.decryptSecret(value)).toThrow(/set SESSION_SECRET_PREVIOUS/);
+    });
+  });
+
+  describe('previous secrets (SESSION_SECRET rotation)', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it('decrypts with any SESSION_SECRET_PREVIOUS entry but encrypts only with the current key', () => {
+      const stored = encryptUnderOtherSecret('dns-api-token');
+      vi.stubEnv(
+        'SESSION_SECRET_PREVIOUS',
+        `unrelated-secret-abcdefghijklmnopqrstuvwxyz,${OTHER_SESSION_SECRET}`,
+      );
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(decryptSecret(stored)).toBe('dns-api-token');
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Keep SESSION_SECRET_PREVIOUS set/));
+
+      const fresh = encryptSecret('new-token');
+      expect(decryptSecretWith(fresh, OTHER_SESSION_SECRET)).toBeNull();
+    });
+
+    it('decrypts values stored under a refused placeholder secret without configuration', () => {
+      const stored = encryptUnderOtherSecret(
+        'client-secret',
+        'your-secure-session-secret-here-min-32-chars',
+      );
+      vi.stubEnv('SESSION_SECRET_PREVIOUS', undefined);
+      expect(decryptSecret(stored)).toBe('client-secret');
+    });
+
+    it('still fails for a key that is neither current nor previous', () => {
+      const stored = encryptUnderOtherSecret('token');
+      vi.stubEnv('SESSION_SECRET_PREVIOUS', 'some-other-secret-abcdefghijklmnopqrstuvwxyz');
+      expect(() => decryptSecret(stored)).toThrow(/SESSION_SECRET_PREVIOUS/);
+    });
+
+    it('reencryptSecret re-encrypts only values that need a previous key', () => {
+      const stored = encryptUnderOtherSecret('private-key');
+      vi.stubEnv('SESSION_SECRET_PREVIOUS', OTHER_SESSION_SECRET);
+      const current = encryptSecret('already-current');
+
+      expect(reencryptSecret('')).toBeNull();
+      expect(reencryptSecret('plaintext-value')).toBeNull();
+      expect(reencryptSecret(current)).toBeNull();
+
+      const rotated = reencryptSecret(stored);
+      expect(rotated).not.toBeNull();
+      expect(rotated).not.toBe(stored);
+      expect(reencryptSecret(rotated as string)).toBeNull();
+
+      // The re-encrypted value no longer needs the previous secret.
+      vi.stubEnv('SESSION_SECRET_PREVIOUS', undefined);
+      expect(decryptSecret(rotated as string)).toBe('private-key');
+      expect(() => decryptSecret(stored)).toThrow(/Failed to decrypt/);
+    });
+
+    it('reencryptSecret throws, naming the value, when no key decrypts it', () => {
+      const stored = encryptUnderOtherSecret('token');
+      vi.stubEnv('SESSION_SECRET_PREVIOUS', undefined);
+      expect(() => reencryptSecret(stored, 'agent "edge" secret')).toThrow(/agent "edge" secret/);
     });
   });
 });

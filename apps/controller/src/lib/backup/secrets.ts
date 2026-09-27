@@ -5,34 +5,19 @@
  */
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { config } from "../config";
-import { decryptSecret, encryptSecret, isEncryptedSecret, sealSecretColumn } from "../secret";
+import {
+  decryptSecret,
+  ENCRYPTED_SECRET_PREFIX,
+  encryptSecret,
+  isEncryptedSecret,
+  sealSecretColumn,
+} from "../secret";
+import {
+  BETTER_AUTH_ENCRYPTED_COLUMNS as BETTER_AUTH_ENCRYPTED,
+  mapTextColumn,
+} from "../secret-walk";
 
 const MARKER = "cpmbak-secret:";
-/** Better Auth encrypts these with the auth secret, not with `enc:v1:`. */
-const BETTER_AUTH_ENCRYPTED: Record<string, readonly string[]> = {
-  two_factors: ["secret", "backupCodes"],
-};
-
-function mapStrings(input: unknown, map: (text: string) => string): unknown {
-  if (typeof input === "string") return map(input);
-  if (Array.isArray(input)) return input.map((entry) => mapStrings(entry, map));
-  if (input !== null && typeof input === "object") {
-    return Object.fromEntries(Object.entries(input).map(([k, v]) => [k, mapStrings(v, map)]));
-  }
-  return input;
-}
-
-/** Also to every string inside JSON text. */
-function mapTextColumn(value: string, needle: string, map: (text: string) => string): string {
-  if (!value.includes(needle)) return value;
-  const whole = map(value);
-  if (whole !== value) return whole;
-  try {
-    return JSON.stringify(mapStrings(JSON.parse(value), map));
-  } catch {
-    return value;
-  }
-}
 
 const toMarker = (plaintext: string) => `${MARKER}${Buffer.from(plaintext).toString("base64")}`;
 const fromMarker = (text: string) => Buffer.from(text.slice(MARKER.length), "base64").toString();
@@ -48,7 +33,7 @@ export async function exportRow(
     } else if (BETTER_AUTH_ENCRYPTED[table]?.includes(column)) {
       out[column] = toMarker(await symmetricDecrypt({ key: config.sessionSecret, data: value }));
     } else {
-      out[column] = mapTextColumn(value, "enc:v1:", (text) =>
+      out[column] = mapTextColumn(value, ENCRYPTED_SECRET_PREFIX, (text) =>
         isEncryptedSecret(text) ? toMarker(decryptSecret(text, `${table}.${column}`)) : text,
       );
     }

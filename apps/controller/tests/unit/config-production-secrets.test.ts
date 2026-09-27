@@ -32,6 +32,9 @@ describe('production secret validation', () => {
       SESSION_SECRET: 'your-secure-session-secret-here-min-32-chars',
     });
     expect(() => config.sessionSecret).toThrow(/placeholder/);
+    // Switching away from it keeps what was stored under it.
+    expect(() => config.sessionSecret).toThrow(/re-encrypted .* automatically/);
+    expect(() => config.sessionSecret).toThrow(/SESSION_SECRET_PREVIOUS/);
   });
 
   for (const password of [
@@ -106,5 +109,34 @@ describe('production secret validation', () => {
     });
     expect(config.sessionSecret).toBe('test-session-secret-32chars!xxxY');
     expect(config.adminPassword).toBe('TestPassword2026!');
+  });
+});
+
+describe('SESSION_SECRET_PREVIOUS', () => {
+  it('is empty when unset', async () => {
+    const config = await loadConfig({ SESSION_SECRET_PREVIOUS: '' });
+    expect(config.previousSessionSecrets).toEqual([]);
+  });
+
+  it('accepts a comma-separated list and keeps the whole value as one entry', async () => {
+    const config = await loadConfig({
+      SESSION_SECRET_PREVIOUS: ' old-secret-one , old-secret-two ',
+    });
+    expect(config.previousSessionSecrets).toEqual([
+      'old-secret-one , old-secret-two',
+      'old-secret-one',
+      'old-secret-two',
+    ]);
+  });
+
+  it('is not subject to the production checks', async () => {
+    const config = await loadConfig({
+      NODE_ENV: 'production',
+      NEXT_RUNTIME: 'nodejs',
+      SESSION_SECRET: STRONG_SECRET,
+      SESSION_SECRET_PREVIOUS: 'your-secure-session-secret-here-min-32-chars',
+    });
+    expect(config.sessionSecret).toBe(STRONG_SECRET);
+    expect(config.previousSessionSecrets).toEqual(['your-secure-session-secret-here-min-32-chars']);
   });
 });

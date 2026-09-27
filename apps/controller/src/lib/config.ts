@@ -84,7 +84,9 @@ function resolveSessionSecret(): string {
     if (DISALLOWED_SESSION_SECRETS.has(secret)) {
       throw new Error(
         "SESSION_SECRET is using a known insecure placeholder value. " +
-          "Generate a secure secret with: openssl rand -base64 32",
+          "Generate a secure secret with: openssl rand -base64 32. " +
+          "Secrets stored under the placeholder are re-encrypted with the new one automatically on the next start; " +
+          "for any other rotation, put the old value in SESSION_SECRET_PREVIOUS.",
       );
     }
     if (secret.length < MIN_SESSION_SECRET_LENGTH) {
@@ -160,9 +162,24 @@ function getSessionSecret() {
   return _sessionSecret;
 }
 
+/**
+ * Comma-separated; the whole value is kept as one entry too, in case a secret contains a comma.
+ * Never checked like SESSION_SECRET: it only ever decrypts.
+ */
+function resolvePreviousSessionSecrets(): string[] {
+  const raw = process.env.SESSION_SECRET_PREVIOUS?.trim();
+  if (!raw) return [];
+  const entries = [raw, ...raw.split(",").map((entry) => entry.trim())];
+  return [...new Set(entries.filter(Boolean))];
+}
+
 export const config = {
   get sessionSecret() {
     return getSessionSecret();
+  },
+  /** Keys a rotation left behind, tried for decryption only. Read per access so tests can vary it. */
+  get previousSessionSecrets(): string[] {
+    return resolvePreviousSessionSecrets();
   },
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",

@@ -411,7 +411,8 @@ it win even then.
 
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
-| `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts, and rotating it makes every stored secret unreadable | None | **Yes** |
+| `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts. To rotate it, see `SESSION_SECRET_PREVIOUS` | None | **Yes** |
+| `SESSION_SECRET_PREVIOUS` | The secret(s) `SESSION_SECRET` replaced, comma-separated. Only ever decrypts: each start re-encrypts what still needs it under `SESSION_SECRET`, two-factor secrets included, so one restart with it set completes a rotation and it can then be removed. OAuth sign-in tokens no key opens are dropped; the next sign-in stores new ones. Sessions end with the rotation either way | Unset | No |
 | `POSTGRES_PASSWORD` | Password for the database. Provisions the bundled `postgres` service and is what the app authenticates with. Any characters; it is never put through a URL | None | **Yes** |
 | `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates, and what the app connects as | `cpm` / `cpm` | No |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Where the app looks for PostgreSQL. Set these to use a server other than the bundled one | `postgres` / `5432` | No |
@@ -785,8 +786,9 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 **Limitations:**
 - In-memory rate limiting (not suitable for multi-instance deployments)
 - `SESSION_SECRET` encrypts every secret the database holds - DNS credentials, private keys, agent
-  secrets, two-factor secrets. Rotating it makes all of them unreadable; a backup restores them
-  under a new one
+  secrets, two-factor secrets. Rotate it by moving the old value to `SESSION_SECRET_PREVIOUS`, which
+  the next start re-encrypts everything away from; changing it without that makes them unreadable.
+  A backup restores them under a new one
 
 ---
 

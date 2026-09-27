@@ -84,6 +84,29 @@ export async function register() {
       console.error("Failed to encrypt plaintext DNS provider credentials:", error);
     }
 
+    // Before anything decrypts to build the Caddy config, so a rotation costs one restart.
+    const { reencryptStoredSecrets } = await import("./lib/secret-rotation");
+    try {
+      const { reencrypted, failed, clearedOAuthTokens } = await reencryptStoredSecrets();
+      if (reencrypted > 0) {
+        console.log(`Re-encrypted ${reencrypted} stored secret(s) with the current SESSION_SECRET`);
+      }
+      if (clearedOAuthTokens > 0) {
+        console.log(
+          `Cleared ${clearedOAuthTokens} stored OAuth token(s) no key decrypts; the next sign-in stores new ones`,
+        );
+      }
+      if (failed > 0) {
+        console.warn(
+          `${failed} stored secret(s) listed above could not be decrypted with SESSION_SECRET or ` +
+            "SESSION_SECRET_PREVIOUS; re-enter them or set SESSION_SECRET_PREVIOUS to the secret they were stored with",
+        );
+      }
+    } catch (error) {
+      // Values left behind still decrypt through the fallback keys.
+      console.error("Failed to re-encrypt stored secrets:", error);
+    }
+
     // Before the startup apply, so the config lands on the demo agent's in-memory Caddy.
     if (demoMode) {
       try {

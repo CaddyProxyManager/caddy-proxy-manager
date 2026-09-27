@@ -18,6 +18,8 @@ services:
 
       # Required, and unique per instance. Generate with: openssl rand -base64 32
       SESSION_SECRET: ${SESSION_SECRET:?ERROR - SESSION_SECRET is required}
+      # The value before a rotation; decrypt-only, and re-encrypted away at startup.
+      SESSION_SECRET_PREVIOUS: ${SESSION_SECRET_PREVIOUS:-}
 
       # Only used with no agent. Caddy's name on the internal caddy-admin network; see caddy below.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
