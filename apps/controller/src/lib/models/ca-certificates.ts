@@ -88,7 +88,7 @@ export async function getCaCertificatePrivateKey(id: number): Promise<string | n
     return decryptSecret(cert.privateKeyPem, `CA certificate ${id} private key`);
   } catch (error) {
     // The raw error names key derivations; the admin needs to know what to do instead.
-    console.error(`Failed to decrypt the private key of CA certificate ${id}:`, error);
+    console.error("Failed to decrypt the private key of CA certificate %d:", id, error);
     throw domainError("caCertificatePrivateKeyUnavailable", {}, { status: 409 });
   }
 }

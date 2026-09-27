@@ -169,7 +169,7 @@ export async function reencryptStoredSecrets(): Promise<SecretRotationResult> {
         result.clearedOAuthTokens += cleared;
       } catch (error) {
         result.failed += reencrypted;
-        console.warn(`[secret] Failed to store re-encrypted ${where}:`, error);
+        console.warn("[secret] Failed to store re-encrypted %s:", where, error);
       }
     }
   }
