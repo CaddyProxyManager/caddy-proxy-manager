@@ -25,6 +25,8 @@ type Connection = {
   /** For messages, never for routing. */
   name: string;
   agentRowId: number;
+  /** Fingerprint of the secret the stream authenticated with; unset for the demo agent. */
+  credential?: string;
   connectedAt: number;
   /** False once the stream is gone. */
   send: (event: AgentServerEvent) => boolean;
@@ -71,6 +73,7 @@ export type AttachedAgent = {
 export function attach(params: {
   agentId: string;
   agentRowId: number;
+  credential?: string;
   name: string;
   controllerId: string;
   controllerName: string;
@@ -156,6 +159,7 @@ export function attach(params: {
     agentId: params.agentId,
     name: params.name,
     agentRowId: params.agentRowId,
+    credential: params.credential,
     connectedAt: Date.now(),
     send,
     close,
@@ -185,6 +189,22 @@ export function detach(agentId: string): void {
       waiters.delete(id);
     }
   }
+}
+
+/**
+ * Closes every stream `stillValid` rejects, before anything else can be sent down it - a restore
+ * can replace the agents table under open streams. Returns the agentIds it closed.
+ */
+export function reconcileConnections(
+  stillValid: (connection: { agentId: string; agentRowId: number; credential?: string }) => boolean,
+): string[] {
+  const closed: string[] = [];
+  for (const connection of [...connections.values()]) {
+    if (stillValid(connection)) continue;
+    detach(connection.agentId);
+    closed.push(connection.agentId);
+  }
+  return closed;
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────

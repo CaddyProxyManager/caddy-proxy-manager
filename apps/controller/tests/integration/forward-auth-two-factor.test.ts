@@ -42,7 +42,11 @@ import { POST as verifyCode } from '../../src/app/api/forward-auth/login/verify/
 import { createRedirectIntent } from '../../src/lib/models/forward-auth';
 import { hashPassword } from '../../src/lib/password';
 import { accountKey, resetAccountFailures } from '../../src/lib/rate-limit';
-import { TWO_FACTOR_MAX_FAILURES, resetTwoFactor } from '../../src/lib/two-factor';
+import {
+  TWO_FACTOR_MAX_FAILURES,
+  resetTwoFactor,
+  verifySecondFactor,
+} from '../../src/lib/two-factor';
 
 const PASSWORD = 'correct horse battery staple';
 const TARGET = 'https://app.example.com/dashboard';
@@ -200,6 +204,17 @@ describe('portal sign-in with 2FA', () => {
       (await codeStep({ challenge: again.body.challenge, rid: rid2, code, method: 'backup' }))
         .status,
     ).toBe(401);
+  });
+
+  it('spends a backup code once even when two requests race for it', async () => {
+    const user = await setup({ twoFactor: true });
+    const code = BACKUP_CODES[1];
+    const results = await Promise.all([
+      verifySecondFactor(user.id, 'backup', code),
+      verifySecondFactor(user.id, 'backup', code),
+    ]);
+    expect(results.filter((result) => result === 'ok')).toHaveLength(1);
+    expect(results).toContain('invalid');
   });
 
   it('locks the account after too many wrong codes, across challenges', async () => {

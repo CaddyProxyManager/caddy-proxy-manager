@@ -17,7 +17,7 @@ import { attach, isConnected, recordStatus, settleResults } from "../agent/regis
 import { buildDesiredState } from "../agent/desired-state";
 import { verifyAgentRequest } from "../agent/verify";
 import { isDemoMode } from "../demo-mode";
-import { getControllerId, recordAgentContact } from "../models/agents";
+import { agentCredentialFingerprint, getControllerId, recordAgentContact } from "../models/agents";
 import { getSetting } from "../settings";
 import type { GraphQLContext } from "./context";
 import { GraphQLError } from "graphql";
@@ -25,7 +25,7 @@ import { GraphQLError } from "graphql";
 /** Per operation: a command result can carry a megabytes-long config readback. */
 const MAX_STATUS_BYTES = 64 * 1024;
 
-export type VerifiedAgent = { id: number; agentId: string; name: string };
+export type VerifiedAgent = { id: number; agentId: string; name: string; credential: string };
 
 /**
  * Verifies the raw bytes the agent sent (Yoga consumed the original), not a re-serialisation that
@@ -54,7 +54,12 @@ export async function requireAgent(
   if (!verified.ok) {
     throw new GraphQLError(verified.error, { extensions: { code: "AGENT_UNAUTHORIZED" } });
   }
-  return { id: verified.agent.id, agentId: verified.agent.agentId, name: verified.agent.name };
+  return {
+    id: verified.agent.id,
+    agentId: verified.agent.agentId,
+    name: verified.agent.name,
+    credential: agentCredentialFingerprint(verified.agent.secret),
+  };
 }
 
 export const agentResolvers = {
@@ -69,6 +74,7 @@ export const agentResolvers = {
         const { events } = attach({
           agentId: agent.agentId,
           agentRowId: agent.id,
+          credential: agent.credential,
           name: agent.name,
           controllerId: await getControllerId(),
           controllerName,

@@ -38,7 +38,7 @@ vi.mock('../../src/lib/agent/verify', () => ({
     if (typeof body !== 'string' || body.length === 0) {
       return { ok: false, status: 401, error: 'Empty body reached the signature check' };
     }
-    return { ok: true, agent: { id: 1, agentId: 'a1', name: 'edge' } };
+    return { ok: true, agent: { id: 1, agentId: 'a1', name: 'edge', secret: 's3cret' } };
   },
 }));
 

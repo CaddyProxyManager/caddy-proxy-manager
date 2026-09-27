@@ -104,6 +104,10 @@ export async function restoreBackup(
     throw domainError("backupFromNewerVersion", {}, { status: 400 });
   }
   const payload = await openBackup(file, passphrase);
+  // Again, now the header is authenticated: the check above only saves asking for a passphrase.
+  if (isNewer(pkg.version, payload.header.appVersion)) {
+    throw domainError("backupFromNewerVersion", {}, { status: 400 });
+  }
 
   const all = inFkOrder(describeTables());
   const known = new Map(all.map((table) => [table.name, table]));

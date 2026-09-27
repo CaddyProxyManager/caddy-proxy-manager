@@ -167,6 +167,74 @@ describe('restore', () => {
     expect(readdirSync(join(dataDir, 'backups')).some((f) => f.endsWith('.cpmbak'))).toBe(true);
   });
 
+  it('closes live agent streams the restored agents table no longer vouches for', async () => {
+    const { attach, isConnected, resetRegistry } = await import('../../src/lib/agent/registry');
+    const { agentCredentialFingerprint, reconcileAgentConnections } = await import(
+      '../../src/lib/models/agents'
+    );
+    const file = await createBackup(PASSPHRASE);
+    // After the backup: agent 3 re-paired with a new secret, and a second agent paired.
+    await ctx.db
+      .update(schema.agents)
+      .set({ secret: encryptSecret('re-paired-secret') })
+      .where(eq(schema.agents.id, 3));
+    await ctx.db.insert(schema.agents).values({
+      id: 4,
+      name: 'new',
+      agentId: 'b'.repeat(32),
+      secret: encryptSecret('new-agent-secret'),
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    resetRegistry();
+    const open = (agentId: string, agentRowId: number, secret: string) =>
+      attach({
+        agentId,
+        agentRowId,
+        credential: agentCredentialFingerprint(secret),
+        name: agentId.slice(0, 4),
+        controllerId: 'controller',
+        controllerName: 'CPM',
+        initialState: {} as Parameters<typeof attach>[0]['initialState'],
+      });
+    const repaired = open('a'.repeat(32), 3, 're-paired-secret');
+    open('b'.repeat(32), 4, 'new-agent-secret');
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const closed = await reconcileAgentConnections();
+
+    expect(closed.sort()).toEqual(['a'.repeat(32), 'b'.repeat(32)]);
+    expect(isConnected('a'.repeat(32))).toBe(false);
+    expect(isConnected('b'.repeat(32))).toBe(false);
+    // Drain what attach queued; the stream then ends instead of waiting for restored state.
+    const seen: string[] = [];
+    for await (const event of repaired.events) seen.push(event.type);
+    expect(seen).not.toContain('command');
+    resetRegistry();
+  });
+
+  it('keeps a stream whose agent and secret the restore left as they were', async () => {
+    const { attach, isConnected, resetRegistry } = await import('../../src/lib/agent/registry');
+    const { agentCredentialFingerprint, reconcileAgentConnections } = await import(
+      '../../src/lib/models/agents'
+    );
+    const file = await createBackup(PASSPHRASE);
+    resetRegistry();
+    attach({
+      agentId: 'a'.repeat(32),
+      agentRowId: 3,
+      credential: agentCredentialFingerprint('agent-secret'),
+      name: 'edge',
+      controllerId: 'controller',
+      controllerName: 'CPM',
+      initialState: {} as Parameters<typeof attach>[0]['initialState'],
+    });
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    expect(await reconcileAgentConnections()).toEqual([]);
+    expect(isConnected('a'.repeat(32))).toBe(true);
+    resetRegistry();
+  });
+
   it('drops agent pairings when asked, for a restore onto a new machine', async () => {
     const file = await createBackup(PASSPHRASE);
     await restoreBackup(file, PASSPHRASE, { keepAgents: false });

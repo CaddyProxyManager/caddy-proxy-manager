@@ -7,7 +7,7 @@
 // Pinned in package.json to the exact version better-auth depends on, so both check codes alike.
 import { createOTP } from "@better-auth/utils/otp";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import db from "./db";
 import { twoFactors, users } from "./db/schema";
 import { config } from "./config";
@@ -45,14 +45,16 @@ export async function verifySecondFactor(
   } else {
     const codes = JSON.parse(await symmetricDecrypt({ key, data: row.backupCodes }));
     if (Array.isArray(codes) && codes.includes(trimmed)) {
-      ok = true;
       const remaining = codes.filter((candidate: unknown) => candidate !== trimmed);
-      await db
+      // Compare-and-swap on the list we read: a concurrent use of the same code matches no row.
+      const spent = await db
         .update(twoFactors)
         .set({
           backupCodes: await symmetricEncrypt({ key, data: JSON.stringify(remaining) }),
         })
-        .where(eq(twoFactors.id, row.id));
+        .where(and(eq(twoFactors.id, row.id), eq(twoFactors.backupCodes, row.backupCodes)))
+        .returning({ id: twoFactors.id });
+      ok = spent.length > 0;
     }
   }
 

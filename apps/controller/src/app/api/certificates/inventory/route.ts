@@ -8,8 +8,11 @@ import { renewalsPending, settleRenewals } from "@/src/lib/certificate-renewals"
 export async function GET() {
   await requireAdmin();
   const agents = await listAgentCertificates();
-  const certificates = agents.flatMap((agent) => agent.certificates ?? []);
-  if (settleRenewals(certificates)) {
+  let settled = false;
+  for (const agent of agents) {
+    if (agent.certificates && settleRenewals(agent.agentId, agent.certificates)) settled = true;
+  }
+  if (settled) {
     await applyCaddyConfig().catch((error) =>
       console.error("[certificates] Reverting a finished renewal failed:", error),
     );

@@ -12,6 +12,7 @@ import { invalidateProviderCache } from "@/src/lib/auth-server";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { describeBackup, restoreBackup } from "@/src/lib/backup/service";
 import { backupErrorMessage } from "@/src/lib/backup/errors";
+import { reconcileAgentConnections } from "@/src/lib/models/agents";
 import { invalidateSettingsCache } from "@/src/lib/settings/resolve";
 
 /** Large enough for years of audit log; small enough that a stray upload can't fill memory. */
@@ -56,6 +57,8 @@ export async function POST(request: NextRequest) {
     const result = await restoreBackup(file, String(form.get("passphrase") ?? ""), {
       keepAgents: form.get("keepAgents") === "1",
     });
+    // First, so no stream the restored agents table doesn't vouch for gets the restored config.
+    await reconcileAgentConnections();
 
     // Written after the restore, so the entry survives it; the actor may not, if the backup's
     // users differ, which is why the id is also in the summary's data.

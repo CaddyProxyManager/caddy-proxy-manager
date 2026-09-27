@@ -29,7 +29,10 @@ vi.mock('../../src/lib/db', () => {
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 // The signature check is tested in agent/verify; here only its answer varies.
-const verified = { ok: true as const, agent: { id: 1, agentId: 'a1', name: 'edge' } };
+const verified = {
+  ok: true as const,
+  agent: { id: 1, agentId: 'a1', name: 'edge', secret: 's3cret' },
+};
 let verifyResult: unknown = verified;
 vi.mock('../../src/lib/agent/verify', () => ({
   verifyAgentRequest: async () => verifyResult,

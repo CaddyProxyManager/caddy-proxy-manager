@@ -4,11 +4,12 @@ import { getTranslations } from "next-intl/server";
 import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { listAgentCertificates } from "@/src/lib/agent/client";
+import { connectedAgents } from "@/src/lib/agent/registry";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { requestRenewal, withEviction } from "@/src/lib/certificate-renewals";
 import { isCheckableDomain } from "@/src/lib/domain-reachability";
 
-/** The newest certificate for a name in any agent's storage. */
+/** The newest certificate for a name in one agent's storage. */
 function currentCertificate(stored: CaddyCertificate[], name: string) {
   return stored
     .filter((cert) => cert.names.some((n) => n.toLowerCase() === name))
@@ -38,11 +39,17 @@ export async function POST(request: NextRequest) {
   }
   // Dates from the caller only mean something for a single name.
   const hint = names.length === 1 ? datesFrom(body) : null;
-  const stored = (await listAgentCertificates().catch(() => [])).flatMap(
-    (agent) => agent.certificates ?? [],
+  // Every agent loads the name; one without the certificates capability just can't settle early.
+  const inventories = new Map(
+    (await listAgentCertificates().catch(() => [])).map((a) => [a.agentId, a.certificates ?? []]),
   );
+  const agents = connectedAgents().map((agent) => agent.agentId);
   for (const name of names) {
-    requestRenewal(name, currentCertificate(stored, name) ?? hint);
+    const targets = (agents.length > 0 ? agents : [""]).map((agent) => ({
+      agent,
+      current: currentCertificate(inventories.get(agent) ?? [], name) ?? hint,
+    }));
+    requestRenewal(name, targets);
     await logAuditEvent({
       userId: Number(session.user.id),
       action: "certificate_renew_requested",

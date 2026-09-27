@@ -2778,7 +2778,7 @@ export async function buildTlsAutomation(
   return {
     tlsApp: {
       automation: {
-        policies: sortAutomationPoliciesBySubjectPriority(withRenewalOverrides(policies)),
+        policies: sortAutomationPoliciesBySubjectPriority(policies),
       },
     },
     managedCertificateIds,
@@ -3371,7 +3371,7 @@ export async function buildCaddyDocument(
       effectiveGlobalGeoBlock = { ...globalGeoBlock, trusted_proxies: serverRanges };
     }
   }
-  const { tlsApp, managedCertificateIds } = await buildTlsAutomation({
+  const { tlsApp: sharedTlsApp, managedCertificateIds } = await buildTlsAutomation({
     usage: certificateUsage,
     autoManagedDomains,
     options: {
@@ -3382,6 +3382,14 @@ export async function buildCaddyDocument(
       moduleAvailability,
     },
   });
+  // Renew-now overrides are per agent: only names this agent's Caddy still has to renew.
+  const tlsApp = sharedTlsApp && {
+    automation: {
+      policies: sortAutomationPoliciesBySubjectPriority(
+        withRenewalOverrides(sharedTlsApp.automation.policies, options.adaptVia ?? ""),
+      ),
+    },
+  };
   const {
     policies: tlsConnectionPolicies,
     readyCertificates,

@@ -3,7 +3,7 @@
  * encrypted at rest, never leaves the server, and a row exists only through a pairing exchange.
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { agents } from "../db/schema";
@@ -118,6 +118,35 @@ export async function findAgentByAgentId(agentId: string): Promise<AgentCredenti
     console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
     return null;
   }
+}
+
+/** What the registry keeps instead of a secret, to tell later whether it still matches. */
+export function agentCredentialFingerprint(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
+/**
+ * Closes the streams the agents table no longer vouches for: gone, disabled, a different row, or
+ * a different secret. Run after anything that rewrites the table, before config is pushed.
+ */
+export async function reconcileAgentConnections(): Promise<string[]> {
+  const { reconcileConnections } = await import("../agent/registry");
+  const rows = new Map<string, { id: number; fingerprint: string | null }>();
+  for (const row of await db.select().from(agents)) {
+    if (!row.enabled) continue;
+    let fingerprint: string | null = null;
+    try {
+      fingerprint = agentCredentialFingerprint(decryptSecret(row.secret));
+    } catch {
+      // Unreadable under this SESSION_SECRET: nothing can authenticate as it.
+    }
+    rows.set(row.agentId, { id: row.id, fingerprint });
+  }
+  return reconcileConnections((connection) => {
+    const row = rows.get(connection.agentId);
+    if (!row || row.id !== connection.agentRowId) return false;
+    return connection.credential === undefined || connection.credential === row.fingerprint;
+  });
 }
 
 /** Operator-facing only: routing is by agentId, which this never touches. */

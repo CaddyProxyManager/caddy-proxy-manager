@@ -12,8 +12,17 @@ export const RENEWAL_TIMEOUT_MS = 15 * 60 * 1000;
 type Pending = { requestedAt: number; ratio: number };
 type Lifetime = { notBefore: string; notAfter: string };
 
-const pending = new Map<string, Pending>();
+/**
+ * Keyed by name, then by the agent whose Caddy renews it ("" with no agent). Each agent settles
+ * only its own entry from its own report, so one agent can't end another's renewal.
+ */
+const pending = new Map<string, Map<string, Pending>>();
 const evicting = new Set<string>();
+
+/** Test seam: forget every request. */
+export function resetRenewals() {
+  pending.clear();
+}
 
 /** Runs `load` with these names left out of Caddy's management, so they drop out of its cache. */
 export async function withEviction(names: string[], load: () => Promise<void>) {
@@ -30,8 +39,11 @@ export function evictedNames(): string[] {
 }
 
 function prune(now: number) {
-  for (const [name, { requestedAt }] of pending) {
-    if (now - requestedAt > RENEWAL_TIMEOUT_MS) pending.delete(name);
+  for (const [name, agents] of pending) {
+    for (const [agent, { requestedAt }] of agents) {
+      if (now - requestedAt > RENEWAL_TIMEOUT_MS) agents.delete(agent);
+    }
+    if (agents.size === 0) pending.delete(name);
   }
 }
 
@@ -44,35 +56,49 @@ export function renewNowRatio(current: Lifetime | null | undefined, now = Date.n
   const notAfter = Date.parse(current?.notAfter ?? "");
   const lifetime = notAfter - notBefore;
   if (!(lifetime > 0) || notAfter <= now || notBefore >= now) return RENEW_NOW_WINDOW_RATIO;
-  return 1 - Math.max((now - notBefore) * 0.9, 1000) / lifetime;
+  // No floor: one above the cert's age would open the window after now, missing a fresh cert.
+  return 1 - ((now - notBefore) * 0.9) / lifetime;
 }
 
-export function requestRenewal(name: string, current?: Lifetime | null, now = Date.now()) {
-  pending.set(name.toLowerCase(), { requestedAt: now, ratio: renewNowRatio(current, now) });
+/** `targets`: each agent that serves the name, with the certificate it holds if known. */
+export function requestRenewal(
+  name: string,
+  targets: { agent: string; current?: Lifetime | null }[],
+  now = Date.now(),
+) {
+  const agents = new Map<string, Pending>();
+  for (const { agent, current } of targets) {
+    agents.set(agent, { requestedAt: now, ratio: renewNowRatio(current, now) });
+  }
+  if (agents.size > 0) pending.set(name.toLowerCase(), agents);
 }
 
-export function renewalsPending(now = Date.now()): Map<string, Pending> {
+/** Names with any agent still renewing. */
+export function renewalsPending(now = Date.now()): Map<string, ReadonlyMap<string, Pending>> {
   prune(now);
   return new Map(pending);
 }
 
-/** True when any request was answered, so the caller reloads with the ordinary policy. */
+/** From one agent's own storage report. True when it finished any, so the caller reloads. */
 export function settleRenewals(
+  agent: string,
   certificates: { names: string[]; notBefore: string }[],
   now = Date.now(),
 ): boolean {
   prune(now);
   let settled = false;
-  for (const [name, { requestedAt }] of pending) {
+  for (const [name, agents] of pending) {
+    const entry = agents.get(agent);
+    if (!entry) continue;
     const renewed = certificates.some(
       (cert) =>
         cert.names.some((n) => n.toLowerCase() === name) &&
-        Date.parse(cert.notBefore) >= requestedAt - 60_000,
+        Date.parse(cert.notBefore) >= entry.requestedAt - 60_000,
     );
-    if (renewed) {
-      pending.delete(name);
-      settled = true;
-    }
+    if (!renewed) continue;
+    agents.delete(agent);
+    if (agents.size === 0) pending.delete(name);
+    settled = true;
   }
   return settled;
 }
@@ -80,8 +106,16 @@ export function settleRenewals(
 type Policy = Record<string, unknown> & { subjects?: string[] };
 
 /** Each pending name gets a copy of its policy: widening the original would renew every cert. */
-export function withRenewalOverrides(policies: Policy[], now = Date.now()): Policy[] {
-  const names = renewalsPending(now);
+export function withRenewalOverrides(
+  policies: Policy[],
+  agent: string,
+  now = Date.now(),
+): Policy[] {
+  const names = new Map<string, Pending>();
+  for (const [name, agents] of renewalsPending(now)) {
+    const entry = agents.get(agent);
+    if (entry) names.set(name, entry);
+  }
   if (evicting.size > 0) {
     policies = policies
       .map((policy) =>

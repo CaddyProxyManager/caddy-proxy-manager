@@ -13,7 +13,8 @@ export const MIN_PASSPHRASE_LENGTH = 12;
 
 export type BackupHeader = {
   format: "cpm-backup";
-  version: 1;
+  /** 2 authenticates the header; 1 left it open to tampering and is refused. */
+  version: 2;
   appVersion: string;
   createdAt: string;
   /** Rows per table, shown before restoring. */
@@ -23,6 +24,30 @@ export type BackupHeader = {
 };
 
 export type BackupPayload = { tables: Record<string, Record<string, unknown>[]> };
+
+/**
+ * Everything in the header but the tag, which GCM only produces afterwards. Rebuilt from the parsed
+ * header in a fixed order, so reordering keys in the file can't change what is authenticated.
+ */
+function headerAad(
+  header: Omit<BackupHeader, "cipher"> & { cipher: { name: string; iv: string } },
+) {
+  const counts = Object.keys(header.counts)
+    .sort()
+    .map((name) => [name, header.counts[name]]);
+  return Buffer.from(
+    JSON.stringify([
+      header.format,
+      header.version,
+      header.appVersion,
+      header.createdAt,
+      counts,
+      [header.kdf.name, header.kdf.N, header.kdf.r, header.kdf.p, header.kdf.salt],
+      [header.cipher.name, header.cipher.iv],
+    ]),
+    "utf8",
+  );
+}
 
 function deriveKey(
   passphrase: string,
@@ -51,23 +76,29 @@ export async function sealBackup(
   const salt = randomBytes(16);
   const iv = randomBytes(12);
   const key = await deriveKey(passphrase, salt);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const body = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
-
-  const header: BackupHeader = {
-    format: "cpm-backup",
-    version: 1,
+  const unsealed = {
+    format: "cpm-backup" as const,
+    version: 2 as const,
     appVersion: meta.appVersion,
     createdAt: (meta.now ?? new Date()).toISOString(),
     counts: Object.fromEntries(
       Object.entries(payload.tables).map(([name, rows]) => [name, rows.length]),
     ),
-    kdf: { name: "scrypt", N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, salt: salt.toString("base64") },
-    cipher: {
-      name: "aes-256-gcm",
-      iv: iv.toString("base64"),
-      tag: cipher.getAuthTag().toString("base64"),
+    kdf: {
+      name: "scrypt" as const,
+      N: SCRYPT.N,
+      r: SCRYPT.r,
+      p: SCRYPT.p,
+      salt: salt.toString("base64"),
     },
+    cipher: { name: "aes-256-gcm" as const, iv: iv.toString("base64") },
+  };
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(headerAad(unsealed));
+  const body = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
+  const header: BackupHeader = {
+    ...unsealed,
+    cipher: { ...unsealed.cipher, tag: cipher.getAuthTag().toString("base64") },
   };
   return Buffer.concat([
     Buffer.from(`${MAGIC}\n${JSON.stringify(header)}\n`, "utf8"),
@@ -75,7 +106,7 @@ export async function sealBackup(
   ]);
 }
 
-/** Without the passphrase. Throws on anything that isn't a backup. */
+/** Without the passphrase, so display-only: nothing in it is trusted until `openBackup`. */
 export function readBackupHeader(file: Buffer): { header: BackupHeader; body: string } {
   const text = file.toString("utf8");
   const first = text.indexOf("\n");
@@ -89,13 +120,17 @@ export function readBackupHeader(file: Buffer): { header: BackupHeader; body: st
   } catch {
     throw domainError("backupNotRecognised", {}, { status: 400 });
   }
-  if (header.format !== "cpm-backup" || header.version !== 1) {
+  if (header.format !== "cpm-backup" || header.version !== 2) {
     throw domainError("backupNotRecognised", {}, { status: 400 });
   }
   return { header, body: text.slice(second + 1) };
 }
 
-export async function openBackup(file: Buffer, passphrase: string): Promise<BackupPayload> {
+/** The payload and the header it vouches for. */
+export async function openBackup(
+  file: Buffer,
+  passphrase: string,
+): Promise<BackupPayload & { header: BackupHeader }> {
   const { header, body } = readBackupHeader(file);
   const { N, r, p } = header.kdf;
   // A header can name any cost; accept none above what this writes, so a crafted file can't pin
@@ -106,9 +141,10 @@ export async function openBackup(file: Buffer, passphrase: string): Promise<Back
   const key = await deriveKey(passphrase, Buffer.from(header.kdf.salt, "base64"), { N, r, p });
   try {
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(header.cipher.iv, "base64"));
+    decipher.setAAD(headerAad(header));
     decipher.setAuthTag(Buffer.from(header.cipher.tag, "base64"));
     const plain = Buffer.concat([decipher.update(Buffer.from(body, "base64")), decipher.final()]);
-    return JSON.parse(plain.toString("utf8"));
+    return { ...JSON.parse(plain.toString("utf8")), header };
   } catch {
     // GCM can't tell a wrong passphrase from a tampered file, and neither should the message.
     throw domainError("backupPassphraseWrong", {}, { status: 400 });

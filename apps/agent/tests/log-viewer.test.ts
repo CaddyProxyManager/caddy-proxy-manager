@@ -14,7 +14,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const lines = (from: number, to: number) =>
-  Array.from({ length: to - from + 1 }, (_, i) => `line ${from + i}`).join("\n") + "\n";
+  `${Array.from({ length: to - from + 1 }, (_, i) => `line ${from + i}`).join("\n")}\n`;
 
 describe("readLogFile", () => {
   it("says so when the log does not exist", async () => {
