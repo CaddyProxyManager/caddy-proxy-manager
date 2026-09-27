@@ -86,3 +86,7 @@ jobs:
           SESSION_SECRET: ci-build-session-secret-at-least-32-chars
           ADMIN_PASSWORD: ci-build-admin-password
         run: bun run build
+
+      # Swagger UI is the largest chunk at ~360 KiB; a new one past this fails instead of warning.
+      - name: Bundle size budget
+        run: bun scripts/check-bundle-budget.ts apps/controller/dist/client --max-kib=400

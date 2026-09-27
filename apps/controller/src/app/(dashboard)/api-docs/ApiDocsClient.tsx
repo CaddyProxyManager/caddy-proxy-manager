@@ -1,15 +1,16 @@
 "use client";
 
-import SwaggerUI from "swagger-ui-react";
-import "swagger-ui-react/swagger-ui.css";
-import "./swagger-ui-overrides.css";
+import { lazy, Suspense } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useTranslations } from "next-intl";
+
+const SwaggerPanel = lazy(() => import("./SwaggerPanel"));
 
 /**
  * Swagger UI, bundled so no mutable CDN gets admin-level script access. The page adds what it
@@ -57,7 +58,9 @@ export default function ApiDocsClient() {
       </Card>
 
       <div className="w-full min-h-[600px] -mx-4 md:-mx-8 px-4 md:px-8">
-        <SwaggerUI url="/api/v1/openapi.json" deepLinking defaultModelsExpandDepth={1} />
+        <Suspense fallback={<Spinner size="md" label={t("loading")} />}>
+          <SwaggerPanel />
+        </Suspense>
       </div>
     </VStack>
   );

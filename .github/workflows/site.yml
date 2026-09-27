@@ -40,6 +40,10 @@ jobs:
       - name: Build the site
         run: bun run --filter @cpm/site build
 
+      # ApexCharts, loaded only by the chart demos, is the largest chunk at ~265 KiB.
+      - name: Bundle size budget
+        run: bun scripts/check-bundle-budget.ts apps/site/dist/_astro --max-kib=300
+
       # From apps/site so bunx resolves the pinned CLI, not the latest - see e2e.yml.
       - name: Resolve the Playwright version
         id: playwright

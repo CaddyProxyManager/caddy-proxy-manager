@@ -257,6 +257,7 @@
   },
   "apiDocs": {
     "graphqlEndpoint": "GraphQL endpoint",
+    "loading": "Loading the API reference…",
     "openApiSpec": "OpenAPI spec",
     "restApi": "REST API",
     "restApiNote": "Bearer-token authenticated. Group grants are applied per request, so a scoped token sees a scoped list.",
