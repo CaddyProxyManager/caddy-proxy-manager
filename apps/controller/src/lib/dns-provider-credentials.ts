@@ -13,7 +13,10 @@ import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 
 export type { DnsProviderCredentials };
 
-/** Encrypt password-type credential fields; others and already-encrypted values pass through. */
+/**
+ * Encrypt password-type credential fields; others, non-strings (the REST API validates shape, not
+ * types) and already-encrypted values pass through.
+ */
 export function encryptProviderCredentials(
   providerName: string,
   credentials: Record<string, string>,
@@ -23,11 +26,46 @@ export function encryptProviderCredentials(
 
   const result = { ...credentials };
   for (const field of def.fields) {
-    if (field.type === "password" && result[field.key] && !isEncryptedSecret(result[field.key])) {
-      result[field.key] = encryptSecret(result[field.key]);
+    const value: unknown = result[field.key];
+    if (
+      field.type === "password" &&
+      typeof value === "string" &&
+      value &&
+      !isEncryptedSecret(value)
+    ) {
+      result[field.key] = encryptSecret(value);
     }
   }
   return result;
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A whole `dns_provider` value with its password fields encrypted, in the current
+ * `{ providers, default }` shape or the legacy `{ provider, credentials }` one. Anything else is
+ * returned as it came.
+ */
+export function encryptDnsProviderSettingCredentials<T>(value: T): T {
+  if (!isJsonObject(value)) return value;
+  if (isJsonObject(value.providers)) {
+    const providers = Object.fromEntries(
+      Object.entries(value.providers).map(([provider, credentials]) => [
+        provider,
+        isJsonObject(credentials)
+          ? encryptProviderCredentials(provider, credentials as Record<string, string>)
+          : credentials,
+      ]),
+    );
+    return { ...value, providers };
+  }
+  if (typeof value.provider === "string" && isJsonObject(value.credentials)) {
+    const credentials = value.credentials as Record<string, string>;
+    return { ...value, credentials: encryptProviderCredentials(value.provider, credentials) };
+  }
+  return value;
 }
 
 /** Decrypt password-type credential fields for use in Caddy config. */

@@ -74,6 +74,16 @@ export async function register() {
       if (process.env.NODE_ENV === "production") throw error;
     }
 
+    const { encryptPlaintextDnsCredentials } = await import("./lib/settings/plaintext-credentials");
+    try {
+      const encrypted = await encryptPlaintextDnsCredentials();
+      if (encrypted > 0) {
+        console.log(`Encrypted DNS provider credentials stored in plaintext (${encrypted} row(s))`);
+      }
+    } catch (error) {
+      console.error("Failed to encrypt plaintext DNS provider credentials:", error);
+    }
+
     // Before the startup apply, so the config lands on the demo agent's in-memory Caddy.
     if (demoMode) {
       try {

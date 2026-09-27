@@ -52,6 +52,7 @@ vi.mock('@/src/lib/dns-providers', () => ({
 }));
 vi.mock('@/src/lib/dns-provider-credentials', () => ({
   encryptProviderCredentials: vi.fn(),
+  encryptDnsProviderSettingCredentials: vi.fn(),
 }));
 
 import { suppressWafRuleForHostAction } from '@/src/app/(dashboard)/settings/actions';

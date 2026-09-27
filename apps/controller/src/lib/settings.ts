@@ -13,6 +13,7 @@ import {
   normalizeTailscaleSettings,
   type TailscaleSettings,
 } from "./caddy-tailscale";
+import { encryptDnsProviderSettingCredentials } from "./dns-provider-credentials";
 import { encryptSecret } from "./secret";
 import {
   DEFAULT_HTTP_CACHE_SETTINGS,
@@ -417,8 +418,9 @@ export async function getDnsProviderSettings(): Promise<DnsProviderSettings | nu
   return raw as unknown as DnsProviderSettings;
 }
 
+/** Encrypts here, not in the callers: the REST API saved credentials in plaintext when it was theirs. */
 export async function saveDnsProviderSettings(settings: DnsProviderSettings): Promise<void> {
-  await setSetting("dns_provider", settings);
+  await setSetting("dns_provider", encryptDnsProviderSettingCredentials(settings));
 }
 
 export async function getUpstreamDnsResolutionSettings(): Promise<UpstreamDnsResolutionSettings | null> {
