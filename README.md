@@ -31,7 +31,7 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
 ```bash
-VERSION=v3.3.0   # the release you downloaded
+VERSION=v3.4.0   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
@@ -1374,7 +1374,7 @@ docker build \
   --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
   --build-arg PUID=10000 --build-arg PGID=10000 \
   -t caddy-proxy-manager-caddy:custom \
-  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.3.0
+  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.4.0
 ```
 
 Build it on the agent's host, or elsewhere and push it to a registry. The first time,
