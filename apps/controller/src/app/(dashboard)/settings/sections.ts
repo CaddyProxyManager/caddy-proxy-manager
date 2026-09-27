@@ -122,6 +122,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "Global Caddyfile",
             desc: "Raw Caddy configuration added to every agent's config",
           },
+          {
+            id: "http-cache",
+            name: "HTTP Cache",
+            desc: "Where the Caddy cache keeps entries, and which CDN it purges",
+          },
         ],
       },
       {

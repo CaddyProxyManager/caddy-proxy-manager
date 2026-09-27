@@ -8,7 +8,8 @@ import {
   isValidBodyLimit,
   seclangErrorDetails,
 } from "./caddy-waf";
-import { domainErrorMessage } from "./domain-error";
+import { DomainError, domainErrorMessage } from "./domain-error";
+import { CACHE_STORAGES, CDN_PROVIDERS, normalizeHttpCacheSettings } from "./http-cache";
 import { seclangErrors } from "./seclang";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
 import { normalizeTailscaleSettings } from "./caddy-tailscale";
@@ -577,6 +578,45 @@ function validateDefaultResponse(value: Record<string, unknown>): void {
   normalizeDefaultResponseSettings(value);
 }
 
+/** The GET shape round-trips: `hasPassword` and `hasApiKey` are accepted and ignored. */
+function validateHttpCache(value: Record<string, unknown>): void {
+  const label = "HTTP cache settings";
+  onlyKeys(value, ["storage", "otterSize", "redis", "etcd", "cdn"], label);
+  if (value.redis !== undefined) {
+    onlyKeys(
+      record(value.redis, "redis"),
+      ["addresses", "username", "password", "db", "hasPassword"],
+      label,
+    );
+  }
+  if (value.etcd !== undefined) onlyKeys(record(value.etcd, "etcd"), ["endpoints"], label);
+  if (value.cdn !== undefined) {
+    onlyKeys(
+      record(value.cdn, "cdn"),
+      ["provider", "apiKey", "email", "zoneId", "serviceId", "strategy", "hasApiKey"],
+      label,
+    );
+  }
+  for (const [key, allowed] of [
+    ["storage", CACHE_STORAGES],
+    ["cdn.provider", CDN_PROVIDERS],
+  ] as const) {
+    const raw =
+      key === "storage"
+        ? value.storage
+        : (value.cdn as Record<string, unknown> | undefined)?.provider;
+    if (raw !== undefined && !(allowed as readonly unknown[]).includes(raw)) {
+      invalid(`${key} must be one of: ${allowed.join(", ")}`);
+    }
+  }
+  try {
+    normalizeHttpCacheSettings(value, { secretsPending: true });
+  } catch (error) {
+    if (error instanceof DomainError) invalid(error.message);
+    throw error;
+  }
+}
+
 function validateTailscale(value: Record<string, unknown>): void {
   onlyKeys(
     value,
@@ -680,6 +720,9 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
     case "two-factor":
       onlyKeys(value, ["requireForAdmins"], "two-factor settings");
       booleanValue(required(value, "requireForAdmins", "two-factor settings"), "requireForAdmins");
+      break;
+    case "http-cache":
+      validateHttpCache(value);
       break;
     case "global-caddy-config":
       // Length, characters and whether Caddy takes it are checked on save, against a real Caddy.

@@ -14,6 +14,13 @@ import {
   type TailscaleSettings,
 } from "./caddy-tailscale";
 import { encryptSecret } from "./secret";
+import {
+  DEFAULT_HTTP_CACHE_SETTINGS,
+  encryptHttpCacheSecrets,
+  type HttpCacheSettings,
+  keepStoredSecrets,
+  normalizeHttpCacheSettings,
+} from "./http-cache";
 import { currentStagingScope } from "./settings/staging-context";
 
 export type { DefaultResponseSettings } from "./caddy-default-response";
@@ -346,6 +353,34 @@ export async function saveGlobalCaddyConfigSettings(settings: unknown): Promise<
   const { assertGlobalCaddyConfigLoads } = await import("./caddy-global-config");
   await assertGlobalCaddyConfigLoads(caddyfile);
   await setSetting("global_caddy_config", { caddyfile });
+}
+
+/** Secrets stay encrypted here; config generation decrypts them (see `getTailscaleSettings`). */
+export async function getHttpCacheSettings(): Promise<HttpCacheSettings> {
+  const stored = await getSetting<unknown>("http_cache");
+  if (stored === null) return structuredClone(DEFAULT_HTTP_CACHE_SETTINGS);
+  try {
+    return normalizeHttpCacheSettings(stored);
+  } catch (error) {
+    // Throwing would fail every config apply, taking every other host down with it.
+    console.warn("Ignoring invalid HTTP cache settings", error);
+    return structuredClone(DEFAULT_HTTP_CACHE_SETTINGS);
+  }
+}
+
+/** A blank secret keeps the stored one, as the form never sends it back. */
+export async function saveHttpCacheSettings(settings: unknown): Promise<void> {
+  const submitted = normalizeHttpCacheSettings(settings, { secretsPending: true });
+  const stored = await getSetting<unknown>("http_cache");
+  let previous: HttpCacheSettings | null = null;
+  try {
+    previous = stored === null ? null : normalizeHttpCacheSettings(stored);
+  } catch {
+    // An unreadable row has nothing worth keeping.
+  }
+  // Again with the secrets in place: a CDN switched on must not be saved without its key.
+  const merged = normalizeHttpCacheSettings(keepStoredSecrets(submitted, previous));
+  await setSetting("http_cache", encryptHttpCacheSecrets(merged));
 }
 
 export type TwoFactorPolicySettings = { requireForAdmins: boolean };

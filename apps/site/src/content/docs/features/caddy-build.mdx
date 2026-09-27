@@ -26,8 +26,10 @@ provider. Turning one off does two things:
   follow caddy-tailscale, and each DNS provider follows its own module - so disabling Cloudflare
   leaves Route 53 alone.
 
-**HTTP Cache** is the one module the shipped image leaves out: it is off until you turn it on and
-rebuild, and it unlocks the **Caddy cache** mode of a host's [Cache assets](/features/reverse-proxy/#cache-assets).
+The **HTTP caching** modules are the ones the shipped image leaves out: each is off until you turn
+it on and rebuild. **HTTP Cache** unlocks the **Caddy cache** mode of a host's
+[Cache assets](/features/reverse-proxy/#cache-assets); the storage modules beside it give that
+cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-storage)).
 
 <Demo title="Settings → Caddy Build" note="Nothing saves here, so the build stays current and Rebuild is never offered.">
   <CaddyBuildDemo client:visible />
@@ -41,8 +43,8 @@ and geo blocking, enabled L4 hosts, hosts served on the tailnet, and every DNS p
 credentials on file. Turn the
 feature off first.
 
-HTTP Cache is the exception: nothing is lost without it, so turning it off is allowed and hosts in
-Caddy cache mode fall back to browser caching.
+The HTTP caching modules are the exception: nothing is lost without them, so turning one off is
+allowed. Hosts in Caddy cache mode fall back to browser caching, and a storage falls back to memory.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
 only Caddy's adapter knows what a directive resolves to - for the binary running *now* rather than
@@ -58,6 +60,34 @@ commit. It is compiled from source at build time.
 
 The [agent](../agent/) runs the build and recreates the Caddy container when it finishes, reporting
 progress as it goes. The running Caddy keeps serving until the new binary is ready.
+
+## HTTP cache storage
+
+**Settings → Caddy Build → HTTP Cache** picks where the Caddy cache keeps entries. Memory is
+built in; each other storage is its own module, and can be chosen once that module is selected above:
+
+| Storage | Kept | Shared between Caddys |
+| --- | --- | --- |
+| Memory | In memory, lost on restart | No |
+| Otter | In memory, bounded by entry count | No |
+| Badger | On the Caddy data volume | No |
+| SimpleFS | Files on the Caddy data volume | No |
+| Redis | A Redis or Valkey server, with optional ACL user, password and database | Yes |
+| etcd | An etcd cluster that does not require authentication | Yes |
+
+Redis and etcd servers are dialed by Caddy, so they have to be reachable from the Caddy container.
+A storage Caddy cannot reach, or one whose module is not compiled in yet, leaves the cache in memory
+rather than taking hosts down; Caddy's log says why.
+
+NATS, Olric and NutsDB have Souin storages too but are not offered: with the current cache handler
+the first two are silently replaced by memory, and NutsDB stalls on reads.
+
+**CDN purging** tags cached responses for a CDN in front of Caddy and purges it when Souin
+invalidates an entry. Cloudflare takes the account's Global API Key, its email and the zone ID;
+Fastly takes an API token, the service ID and a soft or hard purge. Both keys are stored encrypted.
+
+A `cache` block in the global Caddyfile still works while this is left at memory with no CDN.
+Once either is set, CPM writes the `cache` app itself and the global one is refused by name.
 
 ## Global Caddyfile
 

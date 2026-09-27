@@ -6,6 +6,7 @@
 import { applyCaddyConfig } from "./caddy";
 import { logUnexpectedApiError } from "./api-auth";
 import { redactTailscaleSettingsForApi } from "./caddy-tailscale";
+import { type HttpCacheSettings, redactHttpCacheSettings } from "./http-cache";
 import {
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
@@ -46,6 +47,8 @@ import {
   saveTwoFactorPolicySettings,
   saveHttpProtocolsSettings,
   getGlobalCaddyConfigSettings,
+  getHttpCacheSettings,
+  saveHttpCacheSettings,
   saveGlobalCaddyConfigSettings,
   getTailscaleSettings,
   saveTailscaleSettings,
@@ -174,6 +177,13 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     save: saveGlobalCaddyConfigSettings as (data: never) => Promise<void>,
     storageKey: "global_caddy_config",
     applyCaddy: true,
+  },
+  "http-cache": {
+    get: getHttpCacheSettings,
+    save: saveHttpCacheSettings as (data: never) => Promise<void>,
+    storageKey: "http_cache",
+    applyCaddy: true,
+    redact: (value: HttpCacheSettings) => redactHttpCacheSettings(value),
   },
   "two-factor": {
     get: getTwoFactorPolicySettings,

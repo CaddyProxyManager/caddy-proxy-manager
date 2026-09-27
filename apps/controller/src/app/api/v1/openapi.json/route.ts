@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { APP_VERSION } from "@/src/lib/app-version";
+import { SETTINGS_GROUPS } from "@/src/lib/settings-api";
 
 const spec = {
   openapi: "3.1.0",
@@ -950,23 +951,7 @@ const spec = {
             required: true,
             schema: {
               type: "string",
-              enum: [
-                "general",
-                "acme",
-                "cloudflare",
-                "dns-provider",
-                "authentik",
-                "forward-auth",
-                "metrics",
-                "logging",
-                "dns",
-                "upstream-dns",
-                "geoblock",
-                "waf",
-                "error-pages",
-                "default-response",
-                "tailscale",
-              ],
+              enum: [...SETTINGS_GROUPS],
             },
             description: "Settings group name",
           },
@@ -990,6 +975,7 @@ const spec = {
                     { $ref: "#/components/schemas/WafSettings" },
                     { $ref: "#/components/schemas/DefaultResponseSettings" },
                     { $ref: "#/components/schemas/TailscaleSettingsStatus" },
+                    { $ref: "#/components/schemas/HttpCacheSettingsStatus" },
                   ],
                 },
               },
@@ -1009,23 +995,7 @@ const spec = {
             required: true,
             schema: {
               type: "string",
-              enum: [
-                "general",
-                "acme",
-                "cloudflare",
-                "dns-provider",
-                "authentik",
-                "forward-auth",
-                "metrics",
-                "logging",
-                "dns",
-                "upstream-dns",
-                "geoblock",
-                "waf",
-                "error-pages",
-                "default-response",
-                "tailscale",
-              ],
+              enum: [...SETTINGS_GROUPS],
             },
             description: "Settings group name",
           },
@@ -1048,6 +1018,7 @@ const spec = {
                   { $ref: "#/components/schemas/WafSettings" },
                   { $ref: "#/components/schemas/DefaultResponseSettings" },
                   { $ref: "#/components/schemas/TailscaleSettings" },
+                  { $ref: "#/components/schemas/HttpCacheSettings" },
                 ],
               },
             },
@@ -2664,6 +2635,47 @@ const spec = {
         },
         required: ["enabled"],
       },
+      HttpCacheSettings: {
+        type: "object",
+        description:
+          "Where the Caddy cache keeps entries, and which CDN it purges. A blank redis.password or cdn.apiKey keeps the stored one",
+        properties: {
+          storage: {
+            type: "string",
+            enum: ["memory", "otter", "badger", "simplefs", "redis", "etcd"],
+          },
+          otterSize: { type: ["integer", "null"], minimum: 1000, maximum: 10000000 },
+          redis: {
+            type: "object",
+            properties: {
+              addresses: { type: "array", items: { type: "string", example: "redis:6379" } },
+              username: { type: "string" },
+              password: { type: "string", writeOnly: true },
+              db: { type: "integer", minimum: 0, maximum: 255 },
+            },
+          },
+          etcd: {
+            type: "object",
+            properties: { endpoints: { type: "array", items: { type: "string" } } },
+          },
+          cdn: {
+            type: "object",
+            properties: {
+              provider: { type: "string", enum: ["none", "cloudflare", "fastly"] },
+              apiKey: { type: "string", writeOnly: true },
+              email: { type: "string" },
+              zoneId: { type: "string" },
+              serviceId: { type: "string" },
+              strategy: { type: "string", enum: ["soft", "hard"] },
+            },
+          },
+        },
+      },
+      HttpCacheSettingsStatus: {
+        description:
+          "HttpCacheSettings with redis.hasPassword and cdn.hasApiKey in place of the secrets",
+        allOf: [{ $ref: "#/components/schemas/HttpCacheSettings" }],
+      },
       TailscaleSettingsStatus: {
         type: "object",
         description: "Tailscale settings as returned by GET, with the auth key withheld",
@@ -2822,7 +2834,7 @@ const spec = {
                 name: { type: "string" },
                 modulePath: { type: "string" },
                 description: { type: "string" },
-                category: { type: "string", enum: ["proxy", "security", "dns"] },
+                category: { type: "string", enum: ["proxy", "cache", "security", "dns"] },
                 features: { type: "array", items: { type: "string" } },
               },
             },

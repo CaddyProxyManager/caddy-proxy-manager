@@ -55,14 +55,15 @@ const nextRowId = () => `custom-${++rowIdCounter}`;
 
 const CATEGORY_LABEL_KEYS: Record<
   CaddyModuleCategory,
-  "categoryProxy" | "categorySecurity" | "categoryDns"
+  "categoryProxy" | "categoryCache" | "categorySecurity" | "categoryDns"
 > = {
   proxy: "categoryProxy",
+  cache: "categoryCache",
   security: "categorySecurity",
   dns: "categoryDns",
 };
 
-const CATEGORY_ORDER: CaddyModuleCategory[] = ["proxy", "security", "dns"];
+const CATEGORY_ORDER: CaddyModuleCategory[] = ["proxy", "cache", "security", "dns"];
 
 function groupModules(): [CaddyModuleCategory, CaddyModuleDefinition[]][] {
   return CATEGORY_ORDER.map((category) => [
@@ -77,8 +78,8 @@ const FLEET = 0;
 function resolveModuleMap(overrides: Record<string, boolean>): Record<string, boolean> {
   const resolved: Record<string, boolean> = {};
   for (const module of CADDY_MODULES) {
-    // Missing means enabled, so a module added to the catalog since the last save is on.
-    resolved[module.id] = overrides[module.id] !== false;
+    // Missing means its default: on, so a module added since the last save is on, unless opt-in.
+    resolved[module.id] = overrides[module.id] ?? module.defaultEnabled !== false;
   }
   return resolved;
 }
@@ -280,7 +281,7 @@ export function CaddyBuildFields({
               <ModuleToggle
                 key={module.id}
                 module={module}
-                value={modules[module.id] ?? true}
+                value={modules[module.id] ?? module.defaultEnabled !== false}
                 onChange={(next) => setModules((prev) => ({ ...prev, [module.id]: next }))}
               />
             ))}

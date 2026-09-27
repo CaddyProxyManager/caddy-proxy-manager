@@ -18,7 +18,7 @@ export type CaddyFeatureId =
   | "dns01"
   | "cache";
 
-export type CaddyModuleCategory = "dns" | "proxy" | "security";
+export type CaddyModuleCategory = "dns" | "proxy" | "cache" | "security";
 
 export type CaddyModuleDefinition = {
   /** Persisted in settings. Never reuse or rename. */
@@ -32,6 +32,8 @@ export type CaddyModuleDefinition = {
   dnsProvider?: string;
   /** The brand as written, which the translated module name is built around. */
   dnsProviderDisplayName?: string;
+  /** The HTTP cache storage this module provides (`http-cache.ts`). */
+  cacheStorage?: string;
   /**
    * False for an opt-in module the shipped image leaves out: it is compiled in only once an admin
    * selects it and rebuilds. Defaulting it on would ask every fresh install to rebuild.
@@ -87,11 +89,57 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     description:
       "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild.",
     docsUrl: "https://github.com/caddyserver/cache-handler",
-    category: "proxy",
+    category: "cache",
     features: ["cache"],
     defaultEnabled: false,
   },
+  ...cacheStorageModule(
+    "otter",
+    "Otter Cache Storage",
+    "An in-memory store for the HTTP cache, bounded by entry count and faster than the built-in one. Entries are lost on restart.",
+  ),
+  ...cacheStorageModule(
+    "badger",
+    "Badger Cache Storage",
+    "Keeps the HTTP cache on disk in a Badger database on the Caddy data volume, so it survives a restart.",
+  ),
+  ...cacheStorageModule(
+    "simplefs",
+    "SimpleFS Cache Storage",
+    "Keeps the HTTP cache as plain files on the Caddy data volume, so it survives a restart.",
+  ),
+  ...cacheStorageModule(
+    "redis",
+    "Redis Cache Storage",
+    "Keeps the HTTP cache in Redis or Valkey, shared by every Caddy that points at the same server.",
+  ),
+  ...cacheStorageModule(
+    "etcd",
+    "etcd Cache Storage",
+    "Keeps the HTTP cache in an etcd cluster, shared by every Caddy that points at it. No authentication.",
+  ),
 ];
+
+/** Needs HTTP Cache as well; alone it compiles but nothing loads it. */
+function cacheStorageModule(
+  storage: string,
+  name: string,
+  description: string,
+): CaddyModuleDefinition[] {
+  return [
+    {
+      id: `souin-storage-${storage}`,
+      name,
+      modulePath: `github.com/darkweak/storages/${storage}/caddy`,
+      description,
+      docsUrl: `https://github.com/darkweak/storages/tree/main/${storage}`,
+      category: "cache",
+      features: [],
+      cacheStorage: storage,
+      defaultEnabled: false,
+    },
+  ];
+}
 
 export function dnsModuleId(providerName: string): string {
   return `caddy-dns-${providerName}`;

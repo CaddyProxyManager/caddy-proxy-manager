@@ -43,6 +43,7 @@ import {
   saveTrustedProxiesSettings,
   saveHttpProtocolsSettings,
   saveGlobalCaddyConfigSettings,
+  saveHttpCacheSettings,
   saveTwoFactorPolicySettings,
   saveDefaultResponseSettings,
   type DefaultResponseSettings,
@@ -1195,6 +1196,57 @@ async function updateHttpProtocolsSettingsActionUnlocked(
   }
 }
 
+async function updateHttpCacheSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  const field = (name: string) => String(formData.get(name) ?? "");
+  try {
+    await requireAdmin();
+    // A blank secret keeps the stored one; saveHttpCacheSettings fills it in.
+    await saveHttpCacheSettings({
+      storage: field("storage"),
+      otterSize: field("otterSize"),
+      redis: {
+        addresses: field("redisAddresses"),
+        username: field("redisUsername"),
+        password: field("redisPassword"),
+        db: field("redisDb"),
+      },
+      etcd: { endpoints: field("etcdEndpoints") },
+      cdn: {
+        provider: field("cdnProvider"),
+        apiKey: field("cdnApiKey"),
+        email: field("cdnEmail"),
+        zoneId: field("cdnZoneId"),
+        serviceId: field("cdnServiceId"),
+        strategy: field("cdnStrategy"),
+      },
+    });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.httpCacheSaved") };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      return {
+        success: true,
+        message: t("results.applyFailed", {
+          error: await errorText(error, t("results.unknownError")),
+        }),
+      };
+    }
+  } catch (error) {
+    console.error("Failed to save the HTTP cache settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.httpCacheFailed")),
+    };
+  }
+}
+
 async function updateGlobalCaddyConfigActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -2043,6 +2095,9 @@ export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
 );
 export const updateGlobalCaddyConfigAction = stagedSettingsAction(
   updateGlobalCaddyConfigActionUnlocked,
+);
+export const updateHttpCacheSettingsAction = stagedSettingsAction(
+  updateHttpCacheSettingsActionUnlocked,
 );
 export const updateTwoFactorPolicySettingsAction = stagedSettingsAction(
   updateTwoFactorPolicySettingsActionUnlocked,

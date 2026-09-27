@@ -207,6 +207,16 @@ export function isFeatureUsable(
   return availability.desired.has(feature) && availability.applied.has(feature);
 }
 
+/** Whether an HTTP cache storage is selected and compiled in; HTTP Cache itself is checked apart. */
+export function isCacheStorageUsable(
+  availability: CaddyModuleAvailability,
+  storage: string,
+): boolean {
+  const module = CADDY_MODULES.find((m) => m.cacheStorage === storage);
+  if (!module) return false;
+  return availability.desiredIds.has(module.id) && availability.appliedPaths.has(module.modulePath);
+}
+
 /**
  * Whether a DNS provider can serve an ACME DNS-01 challenge. Per-provider, unlike the coarser
  * feature check: Cloudflare compiled in says nothing about Route 53.

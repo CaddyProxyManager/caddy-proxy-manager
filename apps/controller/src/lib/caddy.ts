@@ -43,6 +43,7 @@ import {
   getErrorPagesSettings,
   getDefaultResponseSettings,
   getTrustedProxiesSettings,
+  getHttpCacheSettings,
   getHttpProtocolsSettings,
   getGlobalCaddyConfigSettings,
   type HttpProtocolsSettings,
@@ -127,9 +128,11 @@ import { type AccessListRuntime, buildAccessListHandlers, type IpRule } from "./
 import {
   type CaddyModuleAvailability,
   getCaddyModuleAvailability,
+  isCacheStorageUsable,
   isDnsProviderUsable,
   isFeatureUsable,
 } from "./caddy-build";
+import { buildHttpCacheApp } from "./http-cache";
 import { buildHostCacheHandler, type HostCacheMeta, withHostCache } from "./host-cache";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
@@ -3349,6 +3352,7 @@ export async function buildCaddyDocument(
     metricsSettings,
     loggingSettings,
     httpProtocols,
+    httpCacheSettings,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3368,6 +3372,7 @@ export async function buildCaddyDocument(
     getMetricsSettings(),
     getLoggingSettings(),
     getHttpProtocolsSettings(),
+    getHttpCacheSettings(),
   ]);
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
@@ -3612,6 +3617,13 @@ export async function buildCaddyDocument(
 
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
+  const cacheAppConfig = isFeatureUsable(moduleAvailability, "cache")
+    ? buildHttpCacheApp(httpCacheSettings, (storage) =>
+        isCacheStorageUsable(moduleAvailability, storage),
+      )
+    : null;
+  const cacheApp = cacheAppConfig ? { cache: cacheAppConfig } : {};
+
   const document = {
     admin: {
       // A bare port binds every address family; "0.0.0.0:2019" bound only IPv4, so an agent
@@ -3636,6 +3648,7 @@ export async function buildCaddyDocument(
         : {}),
       ...l4App,
       ...tailscaleApp,
+      ...cacheApp,
     },
   };
   const globalCaddyfile =

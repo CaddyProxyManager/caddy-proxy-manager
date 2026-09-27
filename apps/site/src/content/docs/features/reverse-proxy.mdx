@@ -101,7 +101,9 @@ API responses are never cached. The max age runs from a minute to a year, a day 
   `Cache-Control` of its own, so an application that already manages caching keeps its policy.
 - **Caddy cache** also keeps a shared copy in Caddy, so repeat requests skip the upstream. It needs
   the opt-in HTTP Cache module (see [Caddy build](/features/caddy-build/)); until that is compiled
-  in, the host falls back to browser caching.
+  in, the host falls back to browser caching. The cache lives in memory unless another
+  [storage](/features/caddy-build/#http-cache-storage) is chosen, such as Redis to share it between
+  Caddys.
 
 Either way, a response that sets a cookie is marked `private`, and nothing marked `private` or
 `no-store` is stored. The cache sits after any forward auth or access check, just before the

@@ -1,4 +1,5 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { redactHttpCacheSettings } from "@/src/lib/http-cache";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
 import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
@@ -18,6 +19,7 @@ import {
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
   getGlobalCaddyConfigSettings,
+  getHttpCacheSettings,
   getTwoFactorPolicySettings,
   getDefaultResponseSettings,
   getAvatarSettings,
@@ -104,6 +106,7 @@ export default async function SettingsSectionPage({
       trustedProxies,
       httpProtocols,
       globalCaddyConfig,
+      httpCache,
       twoFactorPolicy,
       defaultResponse,
       oauthProviders,
@@ -143,6 +146,7 @@ export default async function SettingsSectionPage({
         getTrustedProxiesSettings(),
         getHttpProtocolsSettings(),
         getGlobalCaddyConfigSettings(),
+        getHttpCacheSettings(),
         getTwoFactorPolicySettings(),
         getDefaultResponseSettings(),
         listOAuthProviders(),
@@ -229,6 +233,7 @@ export default async function SettingsSectionPage({
       trustedProxies={trustedProxies}
       httpProtocols={httpProtocols}
       globalCaddyConfig={globalCaddyConfig}
+      httpCache={redactHttpCacheSettings(httpCache)}
       twoFactorPolicy={twoFactorPolicy}
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}

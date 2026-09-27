@@ -90,6 +90,7 @@ import {
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
   updateGlobalCaddyConfigAction,
+  updateHttpCacheSettingsAction,
   updateTwoFactorPolicySettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
@@ -116,6 +117,8 @@ import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
+import { HttpCacheSection } from "./HttpCacheSection";
+import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -137,6 +140,7 @@ type Props = {
   trustedProxies: TrustedProxiesSettings | null;
   httpProtocols: HttpProtocolsSettings;
   globalCaddyConfig: GlobalCaddyConfigSettings;
+  httpCache: HttpCacheSettingsView;
   twoFactorPolicy: TwoFactorPolicySettings;
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
@@ -196,6 +200,7 @@ export default function SettingsClient({
   trustedProxies,
   httpProtocols,
   globalCaddyConfig,
+  httpCache,
   twoFactorPolicy,
   defaultResponse,
   globalGeoBlock,
@@ -280,6 +285,7 @@ export default function SettingsClient({
     updateGlobalCaddyConfigAction,
     null,
   );
+  const [httpCacheState, httpCacheFormAction] = useActionState(updateHttpCacheSettingsAction, null);
   const [httpProtocolsState, httpProtocolsFormAction] = useActionState(
     updateHttpProtocolsSettingsAction,
     null,
@@ -344,6 +350,13 @@ export default function SettingsClient({
         globalCaddyConfig={globalCaddyConfig}
         state={globalCaddyConfigState}
         formAction={globalCaddyConfigFormAction}
+      />
+    ),
+    "http-cache": (
+      <HttpCacheSection
+        httpCache={httpCache}
+        state={httpCacheState}
+        formAction={httpCacheFormAction}
       />
     ),
     "caddy-build": (

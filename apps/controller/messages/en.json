@@ -567,6 +567,7 @@
     "removing": "Removing:",
     "version": "Version",
     "categoryProxy": "Proxying",
+    "categoryCache": "HTTP caching",
     "categorySecurity": "Security",
     "categoryDns": "ACME DNS-01 providers",
     "modulesSelected": "{count, plural, one {# module selected. This is exactly what the rebuild runs.} other {# modules selected. This is exactly what the rebuild runs.}}",
@@ -593,6 +594,26 @@
       "cacheHandler": {
         "name": "HTTP Cache",
         "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild."
+      },
+      "souinStorageOtter": {
+        "name": "Otter Cache Storage",
+        "description": "An in-memory store for the HTTP cache, bounded by entry count and faster than the built-in one. Entries are lost on restart."
+      },
+      "souinStorageBadger": {
+        "name": "Badger Cache Storage",
+        "description": "Keeps the HTTP cache on disk in a Badger database on the Caddy data volume, so it survives a restart."
+      },
+      "souinStorageSimplefs": {
+        "name": "SimpleFS Cache Storage",
+        "description": "Keeps the HTTP cache as plain files on the Caddy data volume, so it survives a restart."
+      },
+      "souinStorageRedis": {
+        "name": "Redis Cache Storage",
+        "description": "Keeps the HTTP cache in Redis or Valkey, shared by every Caddy that points at the same server."
+      },
+      "souinStorageEtcd": {
+        "name": "etcd Cache Storage",
+        "description": "Keeps the HTTP cache in an etcd cluster, shared by every Caddy that points at it. No authentication."
       },
       "corazaWaf": {
         "name": "Coraza WAF",
@@ -1043,6 +1064,11 @@
     "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
     "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Network → Tailscale first.",
     "customCaddyfileInvalid": "Custom Caddyfile: {error}",
+    "httpCacheInvalidEndpoint": "{field}: \"{value}\" must be host:port",
+    "httpCacheTooManyEndpoints": "{field}: at most {max} addresses",
+    "httpCacheInvalidField": "{field} is not valid",
+    "httpCacheStorageNeedsEndpoint": "{storage} storage needs at least one server address",
+    "httpCacheCdnIncomplete": "The CDN needs these filled in: {fields}",
     "agentNotReported": "Connected, but has not reported yet."
   },
   "groups": {
@@ -2708,6 +2734,10 @@
         "name": "Global Caddyfile",
         "desc": "Raw Caddy configuration added to every agent's config"
       },
+      "httpCache": {
+        "name": "HTTP Cache",
+        "desc": "Where the Caddy cache keeps entries, and which CDN it purges"
+      },
       "dashboard": {
         "name": "Dashboard Host",
         "desc": "Serve this dashboard through Caddy, on a domain of its own"
@@ -3129,6 +3159,7 @@
       "updates": "Updates",
       "caddyBuild": "Caddy Build",
       "globalCaddyConfig": "Global Caddyfile",
+      "httpCache": "HTTP Cache",
       "dashboard": "Dashboard Host",
       "dnsProviders": "DNS Providers",
       "dnsResolvers": "DNS Resolvers",
@@ -3216,6 +3247,8 @@
       "httpProtocolsSaved": "HTTP versions saved and applied",
       "globalCaddyConfigSaved": "Global Caddyfile saved and applied",
       "globalCaddyConfigFailed": "Failed to save the global Caddyfile",
+      "httpCacheSaved": "HTTP cache settings saved and applied",
+      "httpCacheFailed": "Failed to save the HTTP cache settings",
       "httpProtocolsFailed": "Failed to save HTTP versions",
       "twoFactorPolicySaved": "Two-factor policy saved",
       "twoFactorPolicyFailed": "Failed to save the two-factor policy",
@@ -3272,6 +3305,73 @@
     "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
     "pageDiscard": "Discard",
+    "httpCache": {
+      "moduleOffTitle": "The Caddy cache is not available",
+      "storage": "Storage",
+      "storageHelp": "Where hosts in Caddy cache mode keep cached assets. Each option but memory is its own module under Caddy Build.",
+      "storageModuleOff": "Select its module under Caddy Build and rebuild. Until then the cache stays in memory.",
+      "storageFallbackTitle": "Caching in memory for now",
+      "storages": {
+        "memory": {
+          "name": "Memory (built in)",
+          "description": "Souin's own store. Per Caddy, lost on restart, and not tuned for production."
+        },
+        "otter": {
+          "name": "Otter",
+          "description": "In memory and bounded by entry count. Per Caddy, lost on restart."
+        },
+        "badger": {
+          "name": "Badger",
+          "description": "On disk in the Caddy data volume. Per Caddy, survives a restart."
+        },
+        "simplefs": {
+          "name": "SimpleFS",
+          "description": "Plain files in the Caddy data volume. Per Caddy, survives a restart."
+        },
+        "redis": {
+          "name": "Redis",
+          "description": "A Redis or Valkey server, shared by every Caddy pointed at it."
+        },
+        "etcd": {
+          "name": "etcd",
+          "description": "An etcd cluster without authentication, shared by every Caddy pointed at it."
+        }
+      },
+      "otterSize": "Maximum entries",
+      "otterSizeHelp": "Leave blank for Souin's default of 10,000.",
+      "redisAddresses": "Redis servers",
+      "redisAddressesHelp": "host:port, one per line. Caddy connects to these, so they must be reachable from the Caddy container.",
+      "redisUsername": "Username",
+      "redisUsernameHelp": "For a Redis ACL user. Leave blank to sign in with the password alone.",
+      "redisPassword": "Password",
+      "redisPasswordHelp": "Stored encrypted. A wrong one leaves the cache in memory; Caddy's log says why.",
+      "redisDb": "Database number",
+      "etcdEndpoints": "etcd endpoints",
+      "etcdEndpointsHelp": "host:port, one per line, reachable from the Caddy container. Souin cannot pass etcd credentials, so the cluster must not require them.",
+      "secretStored": "Stored. Leave blank to keep it.",
+      "cdnProvider": "CDN purging",
+      "cdnProviderHelp": "Tags cached responses for the CDN in front of Caddy and purges it when Souin invalidates an entry.",
+      "cdnProviders": {
+        "none": "None",
+        "cloudflare": "Cloudflare",
+        "fastly": "Fastly"
+      },
+      "cdnApiKey": "API key",
+      "cdnApiKeyHelp": {
+        "cloudflare": "The Global API Key: Souin authenticates with the key and account email, not an API token.",
+        "fastly": "A Fastly API token allowed to purge this service."
+      },
+      "cdnEmail": "Account email",
+      "cdnEmailHelp": "The email of the Cloudflare account the key belongs to.",
+      "cdnZoneId": "Zone ID",
+      "cdnServiceId": "Service ID",
+      "cdnStrategy": "Purge strategy",
+      "cdnStrategyHelp": "A soft purge marks content stale so Fastly can still serve it while it refetches.",
+      "cdnStrategies": {
+        "soft": "Soft purge",
+        "hard": "Hard purge"
+      }
+    },
     "captcha": {
       "provider": "Provider",
       "providerHelp": "Shown on the sign-in screen's username step. The password step is refused until it is solved, for the form and the API alike. Single sign-on is not affected.",

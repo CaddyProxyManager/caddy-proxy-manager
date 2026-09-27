@@ -35,6 +35,7 @@ import { CADDY_MODULES } from '../../src/lib/caddy-modules';
 import {
   saveCaddyBuildSettings,
   saveGeoBlockSettings,
+  saveHttpCacheSettings,
   saveWafSettings,
   type GeoBlockSettings,
 } from '../../src/lib/settings';
@@ -259,6 +260,66 @@ describe('cache gating', () => {
     const document = await buildCaddyDocument();
     expect(handlerNames(document)).not.toContain('cache');
     expect(JSON.stringify(document)).toContain('max-age=3600');
+  });
+});
+
+describe('cache storage gating', () => {
+  const REDIS = {
+    storage: 'redis',
+    redis: { addresses: ['redis:6379'], password: 'hunter2' },
+  };
+  const cacheApp = async () =>
+    ((await buildCaddyDocument()) as { apps: Record<string, unknown> }).apps.cache as
+      | Record<string, unknown>
+      | undefined;
+
+  it('points the cache at Redis once both modules are built, with the password decrypted', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    await saveHttpCacheSettings(REDIS);
+
+    const stored = await ctx.db.select().from(schema.settings);
+    const row = JSON.stringify(stored.find((r) => r.key === 'http_cache'));
+    expect(row).not.toContain('hunter2');
+    expect(row).toContain('enc:v1:');
+
+    const app = await cacheApp();
+    expect(app?.redis).toMatchObject({
+      found: true,
+      configuration: { InitAddress: ['redis:6379'], Password: 'hunter2' },
+    });
+  });
+
+  it('keeps the stored key when the form sends it blank, and refuses a CDN without one', async () => {
+    const cdn = { provider: 'fastly', serviceId: 'svc' };
+    await expect(saveHttpCacheSettings({ cdn })).rejects.toThrow(/apiKey/);
+    await saveHttpCacheSettings({ cdn: { ...cdn, apiKey: 'fastly-key' } });
+    await saveHttpCacheSettings({ cdn: { ...cdn, strategy: 'hard' } });
+
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    expect((await cacheApp())?.cdn).toEqual({
+      provider: 'fastly',
+      api_key: 'fastly-key',
+      service_id: 'svc',
+      strategy: 'hard',
+    });
+  });
+
+  it('leaves the storage out until its own module is compiled in', async () => {
+    setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('storages/redis')));
+    await selectAllModulesExcept();
+    await saveHttpCacheSettings(REDIS);
+
+    expect(await cacheApp()).toBeUndefined();
+  });
+
+  it('emits no cache app without HTTP Cache itself', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept('cache-handler');
+    await saveHttpCacheSettings(REDIS);
+
+    expect(await cacheApp()).toBeUndefined();
   });
 });
 
