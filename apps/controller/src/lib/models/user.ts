@@ -159,13 +159,27 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
     .where(eq(users.id, userId));
 
   // Also update the Better Auth credential account so the new password takes effect there too
-  await db
+  const updated = await db
     .update(accounts)
     .set({
       password: passwordHash,
       updatedAt: now,
     })
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .returning({ id: accounts.id });
+
+  // A first password (an invitation, or an SSO user adding one) has no account to update, and
+  // Better Auth signs in from the account alone.
+  if (updated.length === 0) {
+    await db.insert(accounts).values({
+      userId,
+      accountId: userId.toString(),
+      providerId: "credential",
+      password: passwordHash,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
 }
 
 /**
