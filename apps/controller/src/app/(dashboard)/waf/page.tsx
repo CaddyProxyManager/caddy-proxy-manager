@@ -22,6 +22,7 @@ import {
   toCrsPluginOption,
 } from "@/src/lib/models/crs-plugins";
 import { requireAdmin } from "@/src/lib/auth";
+import { listDroppedWafDirectives } from "@/src/lib/caddy-waf";
 import { strictId } from "@/src/lib/strict-id";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -166,6 +167,7 @@ export default async function WafPage({ searchParams }: PageProps) {
           };
         })}
         pluginUpdates={Object.fromEntries(pluginUpdates)}
+        droppedDirectives={listDroppedWafDirectives(globalWaf ?? null, hosts)}
         plugins={plugins.map((plugin) => {
           const usage = pluginUsage.get(plugin.id);
           return {

@@ -27,6 +27,7 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Field } from "@astryxdesign/core/Field";
@@ -48,7 +49,14 @@ import { SearchField } from "@/components/ui/SearchField";
 import { UrlPowerSearch, type UrlSearchField } from "@/components/ui/UrlPowerSearch";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
-import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/src/lib/caddy-waf";
+import {
+  bytesToMib,
+  CORAZA_MAX_BODY_LIMIT,
+  CORAZA_MIN_BODY_LIMIT,
+  type DroppedWafDirectiveReport,
+  MAX_BODY_LIMIT_MIB,
+  MIN_BODY_LIMIT_MIB,
+} from "@/src/lib/caddy-waf";
 import { fromZonedWallTime, toZonedWallTime } from "@/src/lib/date-format";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
@@ -87,6 +95,7 @@ type Props = {
   presets: WafPresetRow[];
   plugins: WafPluginRow[];
   pluginUpdates: Record<number, string>;
+  droppedDirectives: DroppedWafDirectiveReport[];
 };
 
 type RangeOption = Props["initialRange"];
@@ -955,6 +964,48 @@ function bodyLimitMib(bytes: number | undefined): number | null {
   return mib ? Number(mib) : null;
 }
 
+/** Stored lines the config leaves out: a left-out deny rule silently stops blocking. */
+function DroppedDirectivesBanner({ dropped }: { dropped: DroppedWafDirectiveReport[] }) {
+  const t = useTranslations("waf");
+  const tErrors = useTranslations("errors");
+  if (dropped.length === 0) return null;
+  // As strings, or the catalog formats 1073741824 with separators.
+  const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
+  const source = ({ origin, host }: DroppedWafDirectiveReport) => {
+    if (origin === "global" || !host) return t("droppedDirectiveGlobal");
+    const params = { name: host.name, domains: host.domains.join(", ") };
+    return origin === "host"
+      ? t("droppedDirectiveHost", params)
+      : t("droppedDirectiveHostFromGlobal", params);
+  };
+  return (
+    <Banner
+      status="warning"
+      title={t("droppedDirectivesTitle", { count: dropped.length })}
+      description={t("droppedDirectivesDescription")}
+    >
+      <List hasDividers>
+        {dropped.map((entry) => (
+          <ListItem
+            key={JSON.stringify([entry.origin, entry.host?.name, entry.line, entry.reason])}
+            label={source(entry)}
+            description={
+              <VStack gap={1}>
+                <Text type="code" size="sm">
+                  {entry.line}
+                </Text>
+                <Text type="body" size="sm" color="secondary">
+                  {tErrors(entry.reason, { ...bounds, ...entry.params })}
+                </Text>
+              </VStack>
+            }
+          />
+        ))}
+      </List>
+    </Banner>
+  );
+}
+
 export default function WafEventsClient({
   events,
   stats,
@@ -971,6 +1022,7 @@ export default function WafEventsClient({
   presets,
   plugins,
   pluginUpdates,
+  droppedDirectives,
 }: Props) {
   const t = useTranslations("waf");
   // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
@@ -1302,6 +1354,8 @@ export default function WafEventsClient({
           />
         </HStack>
       </HStack>
+
+      <DroppedDirectivesBanner dropped={droppedDirectives} />
 
       <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
         <Tab value="events" label={t("events")} />
