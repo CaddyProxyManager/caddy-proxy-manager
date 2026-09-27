@@ -806,7 +806,7 @@
     "applyStagedFailed": "Failed to apply changes",
     "caCertificateNotFound": "CA certificate not found",
     "caCertificatePrivateKeyMissing": "This CA has no stored private key - cannot issue client certificates",
-    "caCertificatePrivateKeyUnavailable": "This CA's private key cannot be decrypted with the current SESSION_SECRET. Restore the secret it was stored under, or create a new CA.",
+    "caCertificatePrivateKeyUnavailable": "This CA's private key cannot be decrypted with the current SESSION_SECRET. Set SESSION_SECRET_PREVIOUS to the secret it was stored under and restart, or create a new CA.",
     "cannotChangeOwnRole": "Cannot change your own role",
     "userNotFound": "User not found",
     "cannotResetOwnTwoFactor": "Turn off your own two-factor sign-in from your Profile page instead",
