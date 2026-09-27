@@ -42,18 +42,28 @@ afterEach(() => {
 });
 
 type FakeDocker = {
+  /** What the image Caddy runs says, after the recreate. */
   list: CaddyModuleList;
+  /** What the incoming image says, before it. */
+  incoming: CaddyModuleList;
   image: string | null;
-  load: { ok: boolean; output: string };
+  pull: { ok: boolean; output: string };
   health: string;
   calls: string[];
 };
 
+const result = (step: { ok: boolean; output: string }) => ({
+  ...step,
+  exitCode: step.ok ? 0 : 1,
+  timedOut: false,
+});
+
 function fakeDocker(overrides: Partial<FakeDocker> = {}): FakeDocker & DockerHost {
   const fake: FakeDocker = {
     list: { state: "found", modules: [L4] },
+    incoming: { state: "found", modules: [L4] },
     image: "registry.example/caddy:custom",
-    load: { ok: true, output: "" },
+    pull: { ok: true, output: "" },
     health: "healthy",
     calls: [],
     ...overrides,
@@ -65,9 +75,18 @@ function fakeDocker(overrides: Partial<FakeDocker> = {}): FakeDocker & DockerHos
       return fake.list;
     },
     caddyImageRef: async () => fake.image,
-    loadCaddyImage: async () => {
-      fake.calls.push("load");
-      return { ...fake.load, exitCode: fake.load.ok ? 0 : 1, timedOut: false };
+    pullCaddyImage: async () => {
+      fake.calls.push("pull");
+      return result(fake.pull);
+    },
+    composeCaddyImage: async () => fake.image,
+    readImageModuleList: async () => {
+      fake.calls.push("inspect");
+      return fake.incoming;
+    },
+    upCaddyImage: async () => {
+      fake.calls.push("up");
+      return result({ ok: true, output: "" });
     },
     waitForCaddyHealth: async () => fake.health,
     stopCaddy: async () => ({ ok: true, exitCode: 0, output: "", timedOut: false }),
@@ -111,11 +130,63 @@ describe("syncModulesFromImage", () => {
 
 describe("loadCaddyImage", () => {
   it("loads, reads the list before the health wait, and reports applied", async () => {
+    store.setAppliedCaddyModules([L4]);
     const docker = fakeDocker();
     await new Operations(loadConfig(), store, docker).loadCaddyImage();
-    expect(docker.calls).toEqual(["load", "read"]);
+    expect(docker.calls).toEqual(["pull", "inspect", "up", "read"]);
     expect(store.appliedCaddyModules()).toEqual([L4]);
     expect(store.caddyBuildStatus().state).toBe("applied");
+  });
+
+  it("recreates at once when the new image keeps every module Caddy has", async () => {
+    store.setAppliedCaddyModules([L4]);
+    const docker = fakeDocker({
+      incoming: { state: "found", modules: [L4, TAILSCALE] },
+      list: { state: "found", modules: [L4, TAILSCALE] },
+    });
+    let narrowed = 0;
+    await new Operations(loadConfig(), store, docker).loadCaddyImage(async () => {
+      narrowed++;
+      return true;
+    });
+    expect(narrowed).toBe(0);
+    expect(store.appliedCaddyModules()).toEqual([L4, TAILSCALE]);
+  });
+
+  it("drops what the new image lacks and waits for a config without it before recreating", async () => {
+    // Caddy resumes from its autosave, and exits on one naming a module the binary lacks.
+    store.setAppliedCaddyModules([L4, TAILSCALE]);
+    const docker = fakeDocker({ incoming: { state: "found", modules: [L4] } });
+    const seen: { applied: string[] | null } = { applied: null };
+    await new Operations(loadConfig(), store, docker).loadCaddyImage(async () => {
+      seen.applied = store.appliedCaddyModules();
+      expect(docker.calls).not.toContain("up");
+      return true;
+    });
+    expect(seen.applied).toEqual([L4]);
+    expect(docker.calls).toEqual(["pull", "inspect", "up", "read"]);
+    expect(store.caddyBuildStatus().state).toBe("applied");
+  });
+
+  it("narrows to nothing for an image without a list", async () => {
+    store.setAppliedCaddyModules([L4]);
+    const docker = fakeDocker({ incoming: { state: "missing" }, list: { state: "missing" } });
+    const seen: { applied: string[] | null } = { applied: null };
+    await new Operations(loadConfig(), store, docker).loadCaddyImage(async () => {
+      seen.applied = store.appliedCaddyModules();
+      return false;
+    });
+    expect(seen.applied).toEqual([]);
+    expect(store.appliedCaddyModules()).toEqual([]);
+  });
+
+  it("leaves Caddy alone when the new image cannot be inspected", async () => {
+    store.setAppliedCaddyModules([L4]);
+    const docker = fakeDocker({ incoming: { state: "unreadable", reason: "no such image" } });
+    await new Operations(loadConfig(), store, docker).loadCaddyImage();
+    expect(docker.calls).toEqual(["pull", "inspect"]);
+    expect(store.appliedCaddyModules()).toEqual([L4]);
+    expect(store.caddyBuildStatus()).toMatchObject({ state: "failed", error: "no such image" });
   });
 
   it("still records the new list when Caddy comes up unhealthy on it", async () => {
@@ -125,11 +196,11 @@ describe("loadCaddyImage", () => {
     expect(store.caddyBuildStatus().state).toBe("failed");
   });
 
-  it("changes nothing when the load itself fails", async () => {
+  it("changes nothing when the pull itself fails", async () => {
     store.setAppliedCaddyModules([TAILSCALE]);
-    const docker = fakeDocker({ load: { ok: false, output: "No such image" } });
+    const docker = fakeDocker({ pull: { ok: false, output: "No such image" } });
     await new Operations(loadConfig(), store, docker).loadCaddyImage();
-    expect(docker.calls).toEqual(["load"]);
+    expect(docker.calls).toEqual(["pull"]);
     expect(store.appliedCaddyModules()).toEqual([TAILSCALE]);
     expect(store.caddyBuildStatus()).toMatchObject({ state: "failed", error: "No such image" });
   });

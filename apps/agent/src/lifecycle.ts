@@ -68,6 +68,8 @@ export type LifecycleDeps = {
 
 /** Pairs a co-starting stack in seconds; cheap for remote agents that never get a token. */
 const BOOTSTRAP_POLL_MS = 3_000;
+/** How long an image load waits for the controller's narrowed config before recreating anyway. */
+const NARROWED_CONFIG_TIMEOUT_MS = 60_000;
 
 export type PairOutcome = { ok: true } | { ok: false; error: string };
 
@@ -83,6 +85,8 @@ export class AgentLifecycle {
   /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
   private caddyRestore: Promise<void> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  /** Resolved by the next config load forwarded to Caddy; see `nextConfigLoad`. */
+  private configLoadWaiters: (() => void)[] = [];
   private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly deps: LifecycleDeps) {}
@@ -532,6 +536,9 @@ export class AgentLifecycle {
 
     try {
       const response = await forwardToCaddy(this.deps.config.caddyApiUrl, request);
+      if (loadsConfig(request) && response.status < 300) {
+        for (const resolve of this.configLoadWaiters.splice(0)) resolve();
+      }
       return { id: command.id, ok: true, response };
     } catch (error) {
       const code = error instanceof CaddyAdminUnreachable ? "BUSY" : "INTERNAL";
@@ -542,6 +549,21 @@ export class AgentLifecycle {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /** True once the controller loads a config through here, false after `timeoutMs`. */
+  private nextConfigLoad(timeoutMs: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        this.configLoadWaiters = this.configLoadWaiters.filter((waiter) => waiter !== done);
+        resolve(false);
+      }, timeoutMs);
+      this.configLoadWaiters.push(done);
+    });
   }
 
   private runCaddyImageLoad(id: string): AgentCommandResult {
@@ -555,7 +577,11 @@ export class AgentLifecycle {
     }
     let loading: Promise<void>;
     try {
-      loading = this.deps.operations.loadCaddyImage();
+      loading = this.deps.operations.loadCaddyImage(async () => {
+        const loaded = this.nextConfigLoad(NARROWED_CONFIG_TIMEOUT_MS);
+        await this.reportStatus();
+        return loaded;
+      });
     } catch (busy) {
       if (!(busy instanceof OperationBusyError)) throw busy;
       return { id, ok: false, code: "BUSY", error: `${busy.running} is already running.` };

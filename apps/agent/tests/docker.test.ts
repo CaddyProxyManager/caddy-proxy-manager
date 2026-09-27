@@ -90,12 +90,28 @@ describe("external build mode", () => {
     expect(lastCompose()).not.toContain("--no-build");
   });
 
-  it("pulls before loading, and recreates without building", async () => {
-    await new DockerHost(config).loadCaddyImage();
-    const composes = spawned.filter((a) => a[0] === "docker" && a[1] === "compose");
-    expect(composes.at(-2)).toContain("--ignore-pull-failures");
-    expect(composes.at(-1)).toContain("--no-build");
-    expect(composes.at(-1)).not.toContain("--force-recreate");
+  it("pulls a registry tag without failing on a local one, and recreates without building", async () => {
+    const host = new DockerHost(config);
+    await host.pullCaddyImage();
+    expect(lastCompose()).toContain("--ignore-pull-failures");
+    await host.upCaddyImage();
+    expect(lastCompose()).toContain("--no-build");
+    expect(lastCompose()).not.toContain("--force-recreate");
+  });
+
+  it("asks compose which image it would create Caddy from", async () => {
+    results.push({ exitCode: 0, stdout: "proj" });
+    results.push({ exitCode: 0, stdout: "caddy-proxy-manager-caddy:custom\n" });
+    expect(await new DockerHost(config).composeCaddyImage()).toBe(
+      "caddy-proxy-manager-caddy:custom",
+    );
+    expect(lastCompose().slice(-3)).toEqual(["config", "--images", "caddy"]);
+  });
+
+  it("reads an image's list from a container it never starts, and removes it", async () => {
+    await new DockerHost(config).readImageModuleList("caddy-proxy-manager-caddy:custom");
+    const verbs = spawned.filter((a) => a[0] === "docker").map((a) => a[1]);
+    expect(verbs).toEqual(["create", "cp", "rm"]);
   });
 
   it("tells a missing module list from a daemon that cannot be read", async () => {

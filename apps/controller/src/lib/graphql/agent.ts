@@ -16,7 +16,14 @@ import {
   type AgentStatus,
 } from "@cpm/shared";
 import { AnalyticsIngestError, ingestAnalytics } from "../agent/analytics-ingest";
-import { attach, isConnected, recordStatus, settleResults } from "../agent/registry";
+import { modulesChanged, reapplyAfterModuleChange } from "../agent/module-change";
+import {
+  attach,
+  connectedAgents,
+  isConnected,
+  recordStatus,
+  settleResults,
+} from "../agent/registry";
 import { buildDesiredState } from "../agent/desired-state";
 import { verifyAgentRequest } from "../agent/verify";
 import { isDemoMode } from "../demo-mode";
@@ -119,10 +126,11 @@ export const agentResolvers = {
         });
       }
 
-      recordStatus(
-        agent.agentId,
-        decodeOrRefuse(() => decodeAgentStatus(args.status)),
-      );
+      const status = decodeOrRefuse(() => decodeAgentStatus(args.status));
+      const previous =
+        connectedAgents().find((candidate) => candidate.agentId === agent.agentId)?.status ?? null;
+      recordStatus(agent.agentId, status);
+      if (modulesChanged(previous, status)) reapplyAfterModuleChange(agent.agentId);
       await recordAgentContact(agent.id, { ok: true });
       return true;
     },

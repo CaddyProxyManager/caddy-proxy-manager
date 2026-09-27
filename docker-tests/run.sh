@@ -5,6 +5,7 @@
 #   ./run.sh mtls l4             run only the test files matching those patterns
 #   ./run.sh --keep              leave the rig running afterwards
 #   ./run.sh --rebuild           force a rebuild of the web and caddy images
+#   ./run.sh --no-agent          skip the agent phase (an agent in external build mode, run last)
 #   ./run.sh --shell             drop into a shell in the client container
 #   ./run.sh --logs [service]    tail logs
 #   ./run.sh --down              tear the rig down, volumes and all
@@ -25,6 +26,7 @@ KEEP=0
 REBUILD=0
 ACTION=run
 FILTERS=()
+AGENT=1
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -35,6 +37,7 @@ while [ "$#" -gt 0 ]; do
     --logs)    ACTION=logs; shift; FILTERS=("$@"); break ;;
     --no-geoblock) export CPM_TEST_GEOBLOCK=0 ;;
     --no-waf)      export CPM_TEST_WAF=0 ;;
+    --no-agent)    AGENT=0 ;;
     -h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)        echo "unknown option: $1" >&2; exit 2 ;;
     *)         FILTERS+=("$1") ;;
@@ -43,11 +46,28 @@ while [ "$#" -gt 0 ]; do
 done
 
 compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "$@"; }
+# The agent phase's services, which `down` must name too or they outlive the rig.
+AGENT_PROFILES=(--profile agent --profile agent-build)
+agent_compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "${AGENT_PROFILES[@]}" "$@"; }
+
+# Which half a filter selects: a pattern matching nothing in a half skips that half.
+matches() {  # matches DIR - true when a file in DIR matches a filter, or there are none
+  [ "${#FILTERS[@]}" -eq 0 ] && return 0
+  local file pattern
+  for file in "$1"/*.sh; do
+    for pattern in "${FILTERS[@]}"; do
+      case "$(basename "$file")" in *"$pattern"*) return 0 ;; esac
+    done
+  done
+  return 1
+}
+MAIN=0; matches suite/tests && MAIN=1
+[ "$AGENT" = "1" ] && ! matches suite/agent-tests && AGENT=0
 
 case "$ACTION" in
   down)
     echo "==> tearing the rig down"
-    compose down -v --remove-orphans
+    agent_compose down -v --remove-orphans
     exit $?
     ;;
   logs)
@@ -64,7 +84,7 @@ teardown() {
   fi
   echo
   echo "==> tearing the rig down"
-  compose down -v --remove-orphans >/dev/null 2>&1
+  agent_compose down -v --remove-orphans >/dev/null 2>&1
 }
 
 # ── Build ───────────────────────────────────────────────────────────────────
@@ -74,6 +94,10 @@ build_args=()
 [ "$REBUILD" = "1" ] && build_args+=(--no-cache)
 if ! compose build "${build_args[@]}"; then
   echo "build failed" >&2
+  exit 1
+fi
+if [ "$AGENT" = "1" ] && ! agent_compose build "${build_args[@]}" agent caddy-external; then
+  echo "build failed (agent phase)" >&2
   exit 1
 fi
 
@@ -104,9 +128,26 @@ fi
 
 # ── Run ─────────────────────────────────────────────────────────────────────
 
-echo "==> running the suite"
-compose exec -T runner bash /suite/run-tests.sh "${FILTERS[@]+"${FILTERS[@]}"}"
-status=$?
+status=0
+if [ "$MAIN" = "1" ]; then
+  echo "==> running the suite"
+  compose exec -T runner bash /suite/run-tests.sh "${FILTERS[@]+"${FILTERS[@]}"}"
+  status=$?
+fi
+
+if [ "$AGENT" = "1" ]; then
+  echo
+  echo "==> agent phase: an agent in external build mode"
+  if ! agent_compose up -d docker-socket-proxy agent; then
+    echo "the agent did not start" >&2
+    status=1
+  else
+    compose exec -T runner bash /suite/run-tests.sh --agent "${FILTERS[@]+"${FILTERS[@]}"}"
+    agent_status=$?
+    [ "$agent_status" -gt "$status" ] && status=$agent_status
+    [ "$agent_status" -ne 0 ] && agent_compose logs --tail 60 agent
+  fi
+fi
 
 if [ "$status" -ne 0 ]; then
   echo

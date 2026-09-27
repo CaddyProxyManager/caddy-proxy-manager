@@ -7,6 +7,7 @@ import {
   MANAGED_SERVICES,
   type ManagedServiceName,
   type ManagedServicesRequest,
+  SHIPPED_CADDY_MODULES,
 } from "@cpm/shared";
 import {
   BUILD_OVERRIDE_FILE,
@@ -188,9 +189,11 @@ export class Operations {
 
   /**
    * External mode's rebuild: load whatever the operator built under Caddy's image reference.
-   * Throws when busy before it returns; the promise settles when the load does.
+   * Throws when busy before it returns; the promise settles when the load does. `narrowed` runs
+   * when the new image drops modules Caddy has now, and resolves once the controller has loaded a
+   * config without them: `caddy run --resume` exits on an autosave naming a missing module.
    */
-  loadCaddyImage(): Promise<void> {
+  loadCaddyImage(narrowed: () => Promise<boolean> = async () => false): Promise<void> {
     this.begin("caddy-build");
     const triggeredAt = new Date().toISOString();
     this.store.setCaddyBuildStatus({
@@ -198,24 +201,48 @@ export class Operations {
       message: "Loading the Caddy image you built.",
       triggeredAt,
     });
-    return this.runCaddyImageLoad(triggeredAt).finally(() => {
+    return this.runCaddyImageLoad(triggeredAt, narrowed).finally(() => {
       this.running = null;
     });
   }
 
-  private async runCaddyImageLoad(triggeredAt: string): Promise<void> {
+  private async runCaddyImageLoad(
+    triggeredAt: string,
+    narrowed: () => Promise<boolean>,
+  ): Promise<void> {
     const failed = (message: string, error: string) =>
       this.store.setCaddyBuildStatus({ state: "failed", message, triggeredAt, error });
+    const untouched = (step: string, detail: string) =>
+      failed(`${step}; the running container was left untouched. ${detail}`, detail);
     try {
-      const load = await this.docker.loadCaddyImage();
-      if (!load.ok) {
-        const detail = tail(load.output, 5);
-        failed(
-          `Loading the Caddy image failed; the running container was left untouched. ${detail}`,
-          detail,
-        );
-        return;
+      const pull = await this.docker.pullCaddyImage();
+      if (!pull.ok) return untouched("Pulling the Caddy image failed", tail(pull.output, 5));
+
+      const image = await this.docker.composeCaddyImage();
+      const incoming = image
+        ? await this.docker.readImageModuleList(image)
+        : ({ state: "unreadable", reason: "compose names no image for caddy." } as const);
+      if (incoming.state === "unreadable") {
+        return untouched("The new image's module list could not be read", incoming.reason);
       }
+      const next = incoming.state === "found" ? incoming.modules : [];
+      const current = this.store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
+      const kept = current.filter((module) => next.includes(module));
+      if (kept.length < current.length) {
+        this.store.setAppliedCaddyModules(kept);
+        this.store.setCaddyBuildStatus({
+          state: "building",
+          message: "Waiting for the controller to stop using modules the new image lacks.",
+          triggeredAt,
+        });
+        // Timed out, the recreate is still tried: the old config may not use what was dropped.
+        if (!(await narrowed())) {
+          console.warn("[agent] no narrowed config arrived before recreating Caddy");
+        }
+      }
+
+      const up = await this.docker.upCaddyImage();
+      if (!up.ok) return untouched("Recreating Caddy on the new image failed", tail(up.output, 5));
 
       // Before the health wait: a binary missing a module the running config names never turns
       // healthy, and the controller has to stop emitting that module either way.
@@ -238,13 +265,13 @@ export class Operations {
         return;
       }
 
-      const image = this.store.caddyImage() ?? "the image";
+      const loaded = this.store.caddyImage() ?? "the image";
       this.store.setCaddyBuildStatus({
         state: "applied",
         message:
           list.state === "found"
-            ? `Loaded ${image} with ${list.modules.length} module(s).`
-            : `Loaded ${image}, which has no ${CADDY_MODULE_LIST_PATH}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.`,
+            ? `Loaded ${loaded} with ${list.modules.length} module(s).`
+            : `Loaded ${loaded}, which has no ${CADDY_MODULE_LIST_PATH}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.`,
         triggeredAt,
         appliedAt: new Date().toISOString(),
       });

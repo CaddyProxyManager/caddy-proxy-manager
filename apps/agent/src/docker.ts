@@ -303,20 +303,28 @@ export class DockerHost {
     });
   }
 
-  /**
-   * Pulls first, for an image pushed to a registry under the same tag; a local-only tag fails the
-   * pull, which is ignored. `up` recreates only when the tag now names another image.
-   */
-  async loadCaddyImage(): Promise<CommandResult> {
-    const pull = await this.compose(
-      ["--profile", "caddy", "pull", "--ignore-pull-failures", "caddy"],
-      { timeoutSeconds: this.config.serviceTimeoutSeconds },
-    );
-    if (!pull.ok) return pull;
+  /** For an image pushed under the same tag; a local-only tag fails the pull, which is ignored. */
+  async pullCaddyImage(): Promise<CommandResult> {
+    return this.compose(["--profile", "caddy", "pull", "--ignore-pull-failures", "caddy"], {
+      timeoutSeconds: this.config.serviceTimeoutSeconds,
+    });
+  }
+
+  /** Recreates only when the tag now names another image. */
+  async upCaddyImage(): Promise<CommandResult> {
     return this.compose(
       ["--profile", "caddy", "up", "-d", "--no-deps", "--pull", "never", "--no-build", "caddy"],
       { timeoutSeconds: this.config.serviceTimeoutSeconds },
     );
+  }
+
+  /** The image compose would create Caddy from now, CADDY_IMAGE interpolated; null if unknown. */
+  async composeCaddyImage(): Promise<string | null> {
+    const result = await this.compose(["--profile", "caddy", "config", "--images", "caddy"], {
+      timeoutSeconds: 30,
+    });
+    const image = result.ok ? (result.output.trim().split("\n")[0]?.trim() ?? "") : "";
+    return image.length > 0 ? image : null;
   }
 
   /** The reference Caddy's container was created from, or null when there is no container. */
@@ -334,18 +342,45 @@ export class DockerHost {
    * container: the archive endpoint is a plain GET, and a stopped container still answers it.
    */
   async readCaddyModuleList(): Promise<CaddyModuleList> {
-    const local = join(tmpdir(), `cpm-caddy-modules-${randomUUID()}.txt`);
+    return this.copyModuleList(this.config.caddyContainerName);
+  }
+
+  /** The same, from an image not running yet: a created, never started container has the file. */
+  async readImageModuleList(image: string): Promise<CaddyModuleList> {
+    const name = `cpm-caddy-modules-${randomUUID()}`;
     try {
-      const copy = await run(
-        ["docker", "cp", `${this.config.caddyContainerName}:${CADDY_MODULE_LIST_PATH}`, local],
+      const create = await run(
+        ["docker", "create", "--name", name, "--label", "cpm.caddy-modules=1", image],
         { timeoutSeconds: 30 },
       );
+      if (!create.ok) return { state: "unreadable", reason: tail(create.output, 3) };
+      return await this.copyModuleList(name);
+    } finally {
+      await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
+    }
+  }
+
+  private async copyModuleList(container: string): Promise<CaddyModuleList> {
+    const local = join(tmpdir(), `cpm-caddy-modules-${randomUUID()}.txt`);
+    try {
+      const copy = await run(["docker", "cp", `${container}:${CADDY_MODULE_LIST_PATH}`, local], {
+        timeoutSeconds: 30,
+      });
       if (!copy.ok) {
         return /could not find the file|no such container:path/i.test(copy.output)
           ? { state: "missing" }
           : { state: "unreadable", reason: tail(copy.output, 3) };
       }
-      const modules = parseCaddyModuleList(readFileSync(local, "utf-8"));
+      let contents: string;
+      try {
+        contents = readFileSync(local, "utf-8");
+      } catch (error) {
+        return {
+          state: "unreadable",
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+      const modules = parseCaddyModuleList(contents);
       return modules === null
         ? { state: "unreadable", reason: `${CADDY_MODULE_LIST_PATH} is not a module list.` }
         : { state: "found", modules };

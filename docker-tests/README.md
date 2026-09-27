@@ -42,6 +42,8 @@ else.
 | `origin-udp` | `172.28.0.24` | L4 UDP echo                                                  |
 | `pebble`     | `172.28.0.30` | ACME certificate authority                                   |
 | `runner`     | `172.28.0.40` | **simulated client** - the only container that runs tests    |
+| `agent`      | `172.28.0.12` | agent phase only: an agent in external build mode            |
+| `docker-socket-proxy` | own network | agent phase only: the agent's Docker API, BuildKit denied |
 
 ### The destinations
 
@@ -89,6 +91,8 @@ Two CAs are in play, and they are unrelated:
 ./run.sh --logs caddy       # tail a service
 ./run.sh --down             # tear down, volumes included
 ./run.sh --rebuild          # rebuild images from scratch
+./run.sh --no-agent         # skip the agent phase
+./run.sh external           # only the agent phase (a filter matching agent-tests/ only)
 ```
 
 Two feature areas can be switched off when they are not the point of the run:
@@ -122,6 +126,25 @@ Test files are ordinary bash. Editing one on the host takes effect immediately -
 | `55-waf`                   | Coraza rules, DetectionOnly, global/host merge, directive allowlist, WebSocket carve-out |
 | `60-forward-auth`          | portal bounce, full login round-trip, identity headers, header spoofing, revocation    |
 | `65-settings-and-admin`    | every settings group, metrics listener, groups, sessions, audit log, OpenAPI           |
+| `agent-tests/70-external-build` | agent phase: self-pairing, external build mode, Load built image onto an image with fewer modules |
+
+### The agent phase
+
+The main suite runs with no agent, so it is followed by a second phase that starts one:
+`agent` and a `docker-socket-proxy` with `GRPC` and `SESSION` at `0`, so BuildKit is out of
+reach. The agent pairs itself with the bootstrap token `web` leaves on its volume, as the bundled
+agent does, and runs in external build mode (`CADDY_BUILD_MODE=external`). `run.sh` builds
+`cpm-test/caddy:external` beforehand from the same Dockerfile with a single DNS module, standing
+in for the image an operator builds, and the test loads it through `POST /api/caddy-build/image`.
+
+The swap drops every module the rig's own image carries, so it covers the case a careless load
+would break: Caddy resumes from an autosaved config, and exits on one naming a module the binary
+lacks. The agent narrows the applied set first, the controller pushes a config without the
+dropped modules, and only then is Caddy recreated. The test checks the applied set is the new
+image's own list and that a host created before the swap still serves after it.
+
+It runs last because pairing moves every admin call onto the agent. The files live in
+`suite/agent-tests/`, which the main pass never reads.
 
 ### What the rig has caught
 
@@ -178,13 +201,14 @@ a change to either is deliberate:
   auth, which shares the same route-building code, is covered end to end.
 - **Analytics** (ClickHouse) is not started. `55-waf` checks that the WAF event
   endpoint answers, not that a specific event was ingested.
-- The **agent** is not run. `web` is pointed straight at Caddy's admin API with
-  `CADDY_API_URL`, which is the no-agent path the controller keeps for exactly
-  this shape of deployment. What the agent adds - republishing host ports when
-  L4 hosts change, rebuilding the binary when the module selection changes,
+- The **agent** runs only in the agent phase, and only in external build mode.
+  The main suite points `web` straight at Caddy's admin API with `CADDY_API_URL`,
+  the no-agent path the controller keeps for this shape of deployment. So
+  republishing host ports when L4 hosts change, rebuilding the binary itself,
   parsing this host's logs into ClickHouse, and fanning one configuration out to
-  several hosts - is therefore not exercised here. The client is on the same
-  network as Caddy, so it reaches stream listeners directly.
+  several hosts are not exercised here; the e2e suite runs the bundled agent for
+  most of that. The client is on the same network as Caddy, so it reaches stream
+  listeners directly.
 - **First-run setup and migration** are not reachable: `web` is given
   `ADMIN_USERNAME`/`ADMIN_PASSWORD`, so the setup flow is marked complete at
   startup, which is what every pre-3.0 deployment does. Those flows are covered

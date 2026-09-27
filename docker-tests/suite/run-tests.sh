@@ -3,6 +3,7 @@
 #
 #   /suite/run-tests.sh              run everything
 #   /suite/run-tests.sh mtls l4      run only files whose name matches a pattern
+#   /suite/run-tests.sh --agent      the agent phase (agent-tests/), once run.sh has started one
 #
 # One bash process per file, so a crash takes down only that file.
 set -uo pipefail
@@ -28,7 +29,15 @@ started=$(date +%s)
 
 # ── Select test files ───────────────────────────────────────────────────────
 
-mapfile -t ALL_TESTS < <(find "$SUITE_DIR/tests" -maxdepth 1 -name '*.sh' | sort)
+TESTS_DIR="$SUITE_DIR/tests"
+AGENT_PHASE=0
+if [ "${1:-}" = "--agent" ]; then
+  TESTS_DIR="$SUITE_DIR/agent-tests"
+  AGENT_PHASE=1
+  shift
+fi
+
+mapfile -t ALL_TESTS < <(find "$TESTS_DIR" -maxdepth 1 -name '*.sh' | sort)
 
 TESTS=()
 if [ "$#" -eq 0 ]; then
@@ -96,9 +105,9 @@ fi
 # ── API surface coverage ────────────────────────────────────────────────────
 #
 # Informational, never a gate - see helpers/api_coverage.py.
-if [ "$#" -eq 0 ] && [ -s "$STATE_DIR/openapi.json" ]; then
+if [ "$#" -eq 0 ] && [ "$AGENT_PHASE" = "0" ] && [ -s "$STATE_DIR/openapi.json" ]; then
   python3 "$SUITE_DIR/helpers/api_coverage.py" "$STATE_DIR/openapi.json" "$CALLS_FILE" || true
-elif [ "$#" -gt 0 ]; then
+elif [ "$#" -gt 0 ] || [ "$AGENT_PHASE" = "1" ]; then
   printf '%sAPI surface coverage skipped - a filtered run does not measure the whole surface%s\n\n' \
     "$C_DIM" "$C_OFF"
 fi

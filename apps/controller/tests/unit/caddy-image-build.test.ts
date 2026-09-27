@@ -1,6 +1,11 @@
 /** External build mode: what the panel tells an operator to run, and who a load is sent to. */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { AgentDecodeError, type AgentStatus, decodeAgentStatus } from '@cpm/shared';
+import {
+  AgentDecodeError,
+  type AgentStatus,
+  decodeAgentStatus,
+  SHIPPED_CADDY_MODULES,
+} from '@cpm/shared';
 import {
   caddyImageBuildCommand,
   caddyImageSourceRef,
@@ -8,6 +13,7 @@ import {
   SUGGESTED_CADDY_IMAGE,
 } from '@/src/lib/caddy-image-build';
 import { caddyBuildAgents, requestCaddyImageLoad } from '@/src/lib/agent/client';
+import { modulesChanged } from '@/src/lib/agent/module-change';
 import { attach, recordStatus, resetRegistry, settleResults } from '@/src/lib/agent/registry';
 
 const status = (patch: Partial<AgentStatus['caddyBuild']> = {}, capabilities = ['caddy-image']) =>
@@ -123,5 +129,21 @@ describe('who loads an image', () => {
       break;
     }
     expect(await pending).toEqual([{ agent: 'edge-1', ok: true, value: null }]);
+  });
+});
+
+describe('a changed module set', () => {
+  it('is what re-applies config, not a first report or the same set reordered', () => {
+    const l4 = 'github.com/mholt/caddy-l4';
+    const waf = 'github.com/corazawaf/coraza-caddy/v2';
+    expect(modulesChanged(null, status({ applied: [l4] }))).toBe(false);
+    expect(modulesChanged(status({ applied: [l4, waf] }), status({ applied: [waf, l4] }))).toBe(
+      false,
+    );
+    expect(modulesChanged(status({ applied: [l4, waf] }), status({ applied: [l4] }))).toBe(true);
+    // Never rebuilt is the shipped set, so reporting that set explicitly changes nothing.
+    expect(
+      modulesChanged(status({ applied: null }), status({ applied: [...SHIPPED_CADDY_MODULES] })),
+    ).toBe(false);
   });
 });

@@ -11,6 +11,11 @@ networks:
       config:
         - subnet: 172.28.0.0/24
           gateway: 172.28.0.1
+  # The agent phase's Docker API, which nothing else can reach.
+  cpm-test-docker:
+    name: cpm-test-docker
+    driver: bridge
+    internal: true
 
 volumes:
   postgres-data: # postgres: the controller's database
@@ -20,6 +25,7 @@ volumes:
   caddy-logs:    # shared: unread here (no agent), but the log paths in Caddy's config must exist
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
+  agent-data:    # agent phase: the agent's state
 
 services:
   # ── Test PKI ────────────────────────────────────────────────────────────
@@ -107,7 +113,8 @@ services:
     build:
       context: ..
       dockerfile: docker/caddy/Dockerfile
-    image: cpm-test/caddy:latest
+    # The agent phase's agent sets this to the image it loads; everything else runs the rig's own.
+    image: ${CADDY_IMAGE:-cpm-test/caddy:latest}
     container_name: cpm-test-caddy
     environment:
       DASHBOARD_DOMAIN: cpm.test
@@ -257,6 +264,81 @@ services:
 
   # ── Simulated client ────────────────────────────────────────────────────
   # Drives the tests, resolving through dnsmasq as a browser would.
+  # ── Agent phase (run.sh, after the main suite) ─────────────────────────
+  # An agent in external build mode, behind a socket proxy with BuildKit denied: it must load an
+  # image built elsewhere, never build one. Last, because pairing moves every admin call onto it.
+
+  # Built, never run: the image an operator would build for it. One DNS module and nothing else,
+  # so the rig's own image and this one differ in the module list the agent must read.
+  caddy-external:
+    profiles: ["agent-build"]
+    build:
+      context: ..
+      dockerfile: docker/caddy/Dockerfile
+      args:
+        CADDY_MODULES: github.com/caddy-dns/cloudflare
+    image: cpm-test/caddy:external
+
+  docker-socket-proxy:
+    profiles: ["agent"]
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    container_name: cpm-test-docker-proxy
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      IMAGES: 1
+      # The point of the phase: no BuildKit, so a build could not run even if the agent tried.
+      GRPC: 0
+      SESSION: 0
+      BUILD: 0
+      EVENTS: 0
+      EXEC: 0
+      SWARM: 0
+      AUTH: 0
+      SECRETS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../docker/socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    networks:
+      - cpm-test-docker
+
+  agent:
+    profiles: ["agent"]
+    build:
+      context: ..
+      dockerfile: docker/agent/Dockerfile
+    image: cpm-test/agent:latest
+    container_name: cpm-test-agent
+    environment:
+      DATA_DIR: /data
+      # Pairs itself with the bootstrap token web leaves there, as the bundled agent does.
+      CONTROLLER_DATA_DIR: /controller-data
+      CONTROLLER_URL: http://web:3000
+      COMPOSE_DIR: /compose
+      CADDY_API_URL: http://caddy:2019
+      CADDY_CONTAINER_NAME: cpm-test-caddy
+      CADDY_BUILD_MODE: external
+      CADDY_IMAGE: cpm-test/caddy:external
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    group_add:
+      # web's, for the bootstrap token.
+      - "10001"
+    volumes:
+      - agent-data:/data
+      - cpm-data:/controller-data:ro
+      # This directory, so the agent's compose manages the rig's own caddy service.
+      - .:/compose:ro
+      - caddy-logs:/logs
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.12
+      cpm-test-docker: {}
+
   runner:
     build:
       context: ./images/runner
