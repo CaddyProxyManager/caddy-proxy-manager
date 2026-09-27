@@ -1,7 +1,8 @@
 import db, { nowIso, runInTransaction, toIso } from "../db";
 import type { AppRole } from "../oidc-groups";
 import { users, accounts, sessions } from "../db/schema";
-import { and, count, desc, eq, isNotNull, max, ne } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, max, ne } from "drizzle-orm";
+import { uuidv7 } from "../uuidv7";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 import { isDemoAdmin } from "../demo-mode";
 import { domainError } from "../domain-error";
@@ -638,4 +639,28 @@ export async function usersWithPassword(): Promise<Set<number>> {
     .from(accounts)
     .where(eq(accounts.providerId, "credential"));
   return new Set(rows.map((row) => row.userId));
+}
+
+/** Rows written by raw SQL (a pre-UUID database, e2e seeds) have none until this fills them. */
+export async function ensureUserUuids(): Promise<number> {
+  const missing = await db.select({ id: users.id }).from(users).where(isNull(users.uuid));
+  for (const { id } of missing) {
+    await db
+      .update(users)
+      .set({ uuid: uuidv7() })
+      .where(and(eq(users.id, id), isNull(users.uuid)));
+  }
+  return missing.length;
+}
+
+/** The user's UUID, assigned now if it has none; re-read so a concurrent assignment wins. */
+export async function getOrAssignUserUuid(id: number, current: string | null): Promise<string> {
+  if (current) return current;
+  await db
+    .update(users)
+    .set({ uuid: uuidv7() })
+    .where(and(eq(users.id, id), isNull(users.uuid)));
+  const [row] = await db.select({ uuid: users.uuid }).from(users).where(eq(users.id, id)).limit(1);
+  if (!row?.uuid) throw new Error(`User ${id} has no UUID`);
+  return row.uuid;
 }

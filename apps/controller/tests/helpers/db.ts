@@ -38,12 +38,15 @@ function adminUrl(): string {
  * Every migration, in the order drizzle's journal records, so a test schema is built exactly the
  * way a deployment is.
  */
-function migrationSql(): string {
+function migrationSql(part: 'all' | 'before' | 'from' = 'all', tagSuffix = ''): string {
   const journal = JSON.parse(
     readFileSync(resolve(MIGRATIONS_DIR, 'meta/_journal.json'), 'utf8'),
   ) as { entries: Array<{ idx: number; tag: string }> };
-  return [...journal.entries]
-    .sort((left, right) => left.idx - right.idx)
+  const entries = [...journal.entries].sort((left, right) => left.idx - right.idx);
+  const split =
+    part === 'all' ? entries.length : entries.findIndex((entry) => entry.tag.endsWith(tagSuffix));
+  if (split < 0) throw new Error(`No migration tagged *${tagSuffix}`);
+  return (part === 'from' ? entries.slice(split) : entries.slice(0, split))
     .map((entry) => readFileSync(resolve(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8'))
     .join('\n');
 }
@@ -52,8 +55,8 @@ function migrationSql(): string {
  * The DDL, rewritten to build inside one schema. drizzle-kit emits its foreign keys as
  * `REFERENCES "public"."users"`, which would point every schema's tables back at public.
  */
-function ddlFor(schemaName: string): string {
-  const raw = migrationSql().split('--> statement-breakpoint').join('\n');
+function ddlFor(schemaName: string, migrations = migrationSql()): string {
+  const raw = migrations.split('--> statement-breakpoint').join('\n');
   const scoped = raw.replaceAll('"public".', `"${schemaName}".`);
   // Guard against drizzle changing how it qualifies names: an unrewritten reference would silently
   // wire this schema's foreign keys to another test's tables.
@@ -103,6 +106,50 @@ export async function createTestDb(): Promise<TestDb> {
 
   live.push({ sql, schemaName });
   return drizzle(sql, { schema }) as unknown as TestDb;
+}
+
+/**
+ * Migrated up to the first migration tagged `*tagSuffix` (the same suffix in both dialects), so a
+ * test can seed the state that migration meets with raw `exec` (the schema already names columns
+ * it adds), then run it and the rest with `migrateRest`.
+ */
+export async function createTestDbBefore(tagSuffix: string): Promise<{
+  db: TestDb;
+  exec: (statement: string) => Promise<void>;
+  migrateRest: () => Promise<void>;
+}> {
+  const before = migrationSql('before', tagSuffix);
+  const rest = migrationSql('from', tagSuffix);
+  if (testDialect === 'sqlite') {
+    const sqlite = new Database(':memory:');
+    sqlite.run('PRAGMA foreign_keys = ON');
+    sqlite.run(before.split('--> statement-breakpoint').join('\n'));
+    live.push({ sqlite });
+    return {
+      db: drizzleSqlite(sqlite, { schema: sqliteSchema }) as unknown as TestDb,
+      exec: async (statement) => {
+        sqlite.run(statement);
+      },
+      migrateRest: async () => {
+        sqlite.run(rest.split('--> statement-breakpoint').join('\n'));
+      },
+    };
+  }
+
+  const schemaName = `t_${randomUUID().replaceAll('-', '')}`;
+  await admin().unsafe(`CREATE SCHEMA "${schemaName}"`);
+  const sql = new SQL({ url: adminUrl(), max: 1 });
+  await sql.unsafe(`SET search_path TO "${schemaName}"; ${ddlFor(schemaName, before)}`);
+  live.push({ sql, schemaName });
+  return {
+    db: drizzle(sql, { schema }) as unknown as TestDb,
+    exec: async (statement) => {
+      await sql.unsafe(statement);
+    },
+    migrateRest: async () => {
+      await sql.unsafe(ddlFor(schemaName, rest));
+    },
+  };
 }
 
 /**

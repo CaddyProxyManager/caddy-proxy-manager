@@ -2,6 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import db from "@/src/lib/db";
 import { validateForwardAuthSession, checkHostAccess } from "@/src/lib/models/forward-auth";
 import { getGroupsForUser } from "@/src/lib/models/groups";
+import { getOrAssignUserUuid } from "@/src/lib/models/user";
+import { forwardAuthSequentialUserIds } from "@/src/lib/settings/registry";
+import { getSetting } from "@/src/lib/settings/resolve";
 import {
   FORWARD_AUTH_PORTAL_TARGET_HEADER,
   getForwardAuthPortalTarget,
@@ -44,7 +47,7 @@ export async function GET(request: NextRequest) {
   const [user, hasAccess, userGroups] = await Promise.all([
     db.query.users.findFirst({
       where: (table, { eq }) => eq(table.id, session.userId),
-      columns: { id: true, email: true, username: true, status: true },
+      columns: { id: true, uuid: true, email: true, username: true, status: true },
     }),
     checkHostAccess(session.userId, audience.proxyHostId),
     getGroupsForUser(session.userId),
@@ -57,6 +60,10 @@ export async function GET(request: NextRequest) {
     return deny(request, 403);
   }
 
+  const userId = (await getSetting(forwardAuthSequentialUserIds))
+    ? String(user.id)
+    : await getOrAssignUserUuid(user.id, user.uuid);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
@@ -64,7 +71,7 @@ export async function GET(request: NextRequest) {
       "X-CPM-User": encodeIdentityHeaderValue(user.username ?? user.email),
       "X-CPM-Email": encodeIdentityHeaderValue(user.email),
       "X-CPM-Groups": encodeGroupsHeaderValue(userGroups.map((g) => g.name)),
-      "X-CPM-User-Id": String(user.id),
+      "X-CPM-User-Id": userId,
     },
   });
 }

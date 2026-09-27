@@ -389,6 +389,7 @@ it win even then.
 | Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
 | Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
+| Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/silentspud/caddy-proxy-manager` |
 | Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |

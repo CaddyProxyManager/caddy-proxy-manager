@@ -467,6 +467,18 @@ export const forwardAuthAllowedPorts = stringSetting({
   maxLength: 512,
 });
 
+/** Upgraded installs have this stored as true by migration: their upstreams keyed on the number. */
+export const forwardAuthSequentialUserIds = booleanSetting({
+  name: "forward_auth_sequential_user_ids",
+  env: "FORWARD_AUTH_SEQUENTIAL_USER_IDS",
+  group: "authentication",
+  label: "Numeric forward-auth user IDs",
+  description:
+    "Send X-CPM-User-Id as the sequential account number instead of a UUID. Sequential ids reveal " +
+    "how many accounts exist. Changing this changes the id every upstream sees for every user.",
+  default: false,
+});
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 /**
@@ -621,6 +633,7 @@ export const SETTING_DEFINITIONS = [
   loginWindowMs,
   loginBlockMs,
   forwardAuthAllowedPorts,
+  forwardAuthSequentialUserIds,
   analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,

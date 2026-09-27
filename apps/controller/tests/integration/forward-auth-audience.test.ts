@@ -66,6 +66,9 @@ import {
   getTrustedForwardAuthOrigin,
 } from '../../src/lib/forward-auth-trust';
 import { buildCaddyDocument } from '../../src/lib/caddy';
+import { ensureUserUuids } from '../../src/lib/models/user';
+import { forwardAuthSequentialUserIds } from '../../src/lib/settings/registry';
+import { clearStoredSetting, saveSettings } from '../../src/lib/settings/resolve';
 
 const now = () => new Date().toISOString();
 
@@ -501,7 +504,6 @@ describe('verify endpoint portal target', () => {
     await ctx.db.update(schema.users).set({ name: 'admin' }).where(eq(schema.users.id, user.id));
     let headers = await verifiedHeaders();
     expect(headers.get('X-CPM-User')).toBe('alice@localhost');
-    expect(headers.get('X-CPM-User-Id')).toBe(String(user.id));
 
     await ctx.db
       .update(schema.users)
@@ -510,6 +512,80 @@ describe('verify endpoint portal target', () => {
     headers = await verifiedHeaders();
     expect(headers.get('X-CPM-User')).toBe('alice');
     expect(headers.get('X-CPM-Email')).toBe('alice@localhost');
+  });
+
+  it('sends the UUID as the user id unless numeric ids are switched on', async () => {
+    const { user, host } = await setupAuthorizedWildcard();
+    const userId = async () => {
+      const { rawCode, audience } = await createCode(user.id, 'https://private.example.com/');
+      const redeemed = await redeemExchangeCode(rawCode, audience);
+      const response = await forwardAuthVerify(
+        verifyRequest({
+          ...proxyHeaders('https://private.example.com', undefined, host.id),
+          'x-forwarded-uri': '/',
+          cookie: `_cpm_fa=${redeemed!.rawSessionToken}`,
+        }),
+      );
+      expect(response.status).toBe(200);
+      return response.headers.get('X-CPM-User-Id');
+    };
+    const [stored] = await ctx.db
+      .select({ uuid: schema.users.uuid })
+      .from(schema.users)
+      .where(eq(schema.users.id, user.id));
+    expect(stored?.uuid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(await userId()).toBe(stored!.uuid);
+
+    try {
+      await saveSettings({ [forwardAuthSequentialUserIds.key]: true });
+      expect(await userId()).toBe(String(user.id));
+    } finally {
+      await clearStoredSetting(forwardAuthSequentialUserIds.key);
+    }
+  });
+
+  it('fills every missing UUID at startup and leaves assigned ones alone', async () => {
+    const first = await insertUser();
+    const [kept] = await ctx.db
+      .select({ uuid: schema.users.uuid })
+      .from(schema.users)
+      .where(eq(schema.users.id, first.id));
+    const timestamp = now();
+    const [second] = await ctx.db
+      .insert(schema.users)
+      .values({ email: 'bob@localhost', role: 'user', createdAt: timestamp, updatedAt: timestamp })
+      .returning();
+    await ctx.db.update(schema.users).set({ uuid: null }).where(eq(schema.users.id, second!.id));
+
+    expect(await ensureUserUuids()).toBe(1);
+    const rows = await ctx.db
+      .select({ id: schema.users.id, uuid: schema.users.uuid })
+      .from(schema.users);
+    expect(rows.find((row) => row.id === first.id)?.uuid).toBe(kept!.uuid);
+    expect(rows.find((row) => row.id === second!.id)?.uuid).toBeTruthy();
+    expect(await ensureUserUuids()).toBe(0);
+  });
+
+  it('assigns a UUID to a user inserted without one', async () => {
+    const { user, host } = await setupAuthorizedWildcard();
+    await ctx.db.update(schema.users).set({ uuid: null }).where(eq(schema.users.id, user.id));
+    const { rawCode, audience } = await createCode(user.id, 'https://private.example.com/');
+    const redeemed = await redeemExchangeCode(rawCode, audience);
+    const response = await forwardAuthVerify(
+      verifyRequest({
+        ...proxyHeaders('https://private.example.com', undefined, host.id),
+        'x-forwarded-uri': '/',
+        cookie: `_cpm_fa=${redeemed!.rawSessionToken}`,
+      }),
+    );
+    const [stored] = await ctx.db
+      .select({ uuid: schema.users.uuid })
+      .from(schema.users)
+      .where(eq(schema.users.id, user.id));
+    expect(stored?.uuid).toBeTruthy();
+    expect(response.headers.get('X-CPM-User-Id')).toBe(stored!.uuid);
   });
 });
 

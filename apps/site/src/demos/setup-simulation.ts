@@ -558,6 +558,13 @@ export const SETTING_FIELDS: Array<{
     value: "",
   },
   {
+    key: "config:forward_auth_sequential_user_ids",
+    env: "FORWARD_AUTH_SEQUENTIAL_USER_IDS",
+    group: "authentication",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:analytics_enabled",
     env: "ANALYTICS_ENABLED",
     group: "analytics",

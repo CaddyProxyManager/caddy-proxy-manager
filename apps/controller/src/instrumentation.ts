@@ -31,6 +31,14 @@ export async function register() {
       // Let the app start; errors surface when users reach the features.
     }
 
+    const { ensureUserUuids } = await import("./lib/models/user");
+    try {
+      const filled = await ensureUserUuids();
+      if (filled > 0) console.log(`Assigned forward-auth UUIDs to ${filled} user(s)`);
+    } catch (error) {
+      console.error("Failed to assign user UUIDs:", error);
+    }
+
     // Only reports: a stored username is never changed on startup.
     const { warnAboutSignInUsernamesToReview } = await import("./lib/models/user");
     try {

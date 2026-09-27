@@ -2461,6 +2461,10 @@
         "description": "Non-default ports that CPM forward-auth sites are served on, comma-separated. Caddy matches a host whatever the port, so a sign-in on a port that is neither listed here nor the default for http or https is refused.",
         "label": "Forward-auth ports"
       },
+      "forward_auth_sequential_user_ids": {
+        "description": "Send X-CPM-User-Id as the sequential account number instead of a UUID. Sequential ids reveal how many accounts exist. Changing this changes the id every upstream sees for every user.",
+        "label": "Numeric forward-auth user IDs"
+      },
       "forward_auth_internal_url": {
         "description": "The address Caddy uses to reach this app for forward_auth. Derived from the container network when empty; set it only if that derivation is wrong.",
         "label": "Internal forward-auth address"

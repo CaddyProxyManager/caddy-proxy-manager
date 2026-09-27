@@ -64,6 +64,13 @@
       "when": 1790431763430,
       "tag": "0008_access_list_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790544583218,
+      "tag": "0009_user_uuid",
+      "breakpoints": true
     }
   ]
 }

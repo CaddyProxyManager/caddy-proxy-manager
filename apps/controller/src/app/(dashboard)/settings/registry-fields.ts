@@ -16,6 +16,7 @@ import {
   caddyMonitorEnabled,
   disableLocalUsers,
   forwardAuthAllowedPorts,
+  forwardAuthSequentialUserIds,
   loginBlockMs,
   loginMaxAttempts,
   loginWindowMs,
@@ -34,7 +35,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
-  "forward-auth": [forwardAuthAllowedPorts] as AnySetting[],
+  "forward-auth": [forwardAuthAllowedPorts, forwardAuthSequentialUserIds] as AnySetting[],
   "sign-in": [
     allowSelfRegistration,
     allowOauthRegistration,

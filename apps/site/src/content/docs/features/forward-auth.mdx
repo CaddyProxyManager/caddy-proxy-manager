@@ -42,6 +42,18 @@ and the wrong one for a page you merely think nobody will find.
 Once a visitor is authenticated, their identity can be forwarded to the application as headers, so
 an app that understands "trusted proxy told me who this is" does not need its own login at all.
 
+| Header | Carries |
+| --- | --- |
+| `X-CPM-User` | The sign-in username, or the email address for an account without one |
+| `X-CPM-Email` | The email address |
+| `X-CPM-Groups` | The user's groups, comma-separated |
+| `X-CPM-User-Id` | An opaque UUID that never changes for the account |
+
+Key an application's accounts on `X-CPM-User-Id` when it can: a username or email can be edited,
+the id cannot. Installs upgraded from before the UUID keep sending the sequential account number
+here, which their upstreams were already keyed on; **Settings → Forward Auth → Numeric forward-auth
+user IDs** switches between the two, and changes the id every upstream sees for every user.
+
 ## Bring your own auth server
 
 A host can instead be pointed at a forward-auth server you already run - [Authelia](https://www.authelia.com/),
