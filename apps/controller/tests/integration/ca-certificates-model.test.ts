@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import {
+  caCertificates,
   issuedClientCertificates,
   mtlsCertificateRoles,
   mtlsRoles,
@@ -46,9 +47,8 @@ beforeEach(async () => {
   userId = user.id;
 });
 
-const { createCaCertificate, deleteCaCertificate, listCaCertificates } = await import(
-  '../../src/lib/models/ca-certificates'
-);
+const { createCaCertificate, deleteCaCertificate, getCaCertificatePrivateKey, listCaCertificates } =
+  await import('../../src/lib/models/ca-certificates');
 
 function nowIso() {
   return new Date().toISOString();
@@ -227,5 +227,36 @@ describe('deleteCaCertificate cascade', () => {
       .from(issuedClientCertificates)
       .where(eq(issuedClientCertificates.caCertificateId, caB.id));
     expect(survivors.map((c) => c.id)).toEqual([keep.id]);
+  });
+});
+
+describe('getCaCertificatePrivateKey', () => {
+  it('returns the key sealed at creation', async () => {
+    const ca = await createCaCertificate(
+      { name: 'Keyed CA', certificatePem: 'PEM', privateKeyPem: 'KEY' },
+      userId,
+    );
+    expect(await getCaCertificatePrivateKey(ca.id)).toBe('KEY');
+  });
+
+  it('answers a key it cannot decrypt with a code an admin can act on', async () => {
+    const ca = await createCaCertificate({ name: 'Orphaned CA', certificatePem: 'PEM' }, userId);
+    // Sealed under a key this instance does not have.
+    const foreign = `enc:v1:${Buffer.alloc(12).toString('base64')}:${Buffer.alloc(16).toString('base64')}:${Buffer.from('x').toString('base64')}`;
+    await db
+      .update(caCertificates)
+      .set({ privateKeyPem: foreign })
+      .where(eq(caCertificates.id, ca.id));
+
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const error = await getCaCertificatePrivateKey(ca.id).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(DomainError);
+      expect(error).toMatchObject({ code: 'caCertificatePrivateKeyUnavailable', status: 409 });
+    } finally {
+      logged.mockRestore();
+      warned.mockRestore();
+    }
   });
 });
