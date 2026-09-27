@@ -18,6 +18,7 @@ import {
   canonicalHeaderName,
   buildAuthResponseCopyRoutes,
   buildIdentityHeaderStripHandler,
+  upstreamHeaderPlaceholder,
   stripCaddyPlaceholders,
   escapeHostPlaceholders,
   isReservedL4ListenAddress,
@@ -137,7 +138,12 @@ import {
 import { buildHttpCacheApp } from "./http-cache";
 import { buildHostCacheHandler, type HostCacheMeta, withHostCache } from "./host-cache";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
-import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
+import {
+  FORWARD_AUTH_PORTAL_TARGET_HEADER,
+  FORWARD_AUTH_PROXY_HOST_ID_HEADER,
+  FORWARD_AUTH_PROXY_PROOF_HEADER,
+  getForwardAuthProxyProof,
+} from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
 import {
   CaddyApplyError,
@@ -2054,6 +2060,30 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           : handlers;
         const cpmHandleResponseRoutes = buildAuthResponseCopyRoutes(CPM_COPY_HEADERS);
 
+        // Verify hands back the target already encoded for a query value, so "&", "#", "+" and "%"
+        // in it survive; without one, Caddy escapes the whole URI itself.
+        const portalTargetPlaceholder = upstreamHeaderPlaceholder(
+          FORWARD_AUTH_PORTAL_TARGET_HEADER,
+        );
+        const portalRedirect = (location: string): Record<string, unknown> => ({
+          handler: "static_response",
+          status_code: 302,
+          headers: { Location: [location] },
+        });
+        const cpmPortalRedirectRoutes: Record<string, unknown>[] = [
+          {
+            match: [{ not: [{ vars: { [portalTargetPlaceholder]: [""] } }] }],
+            handle: [portalRedirect(`${portalBaseUrl}/portal?rd=${portalTargetPlaceholder}`)],
+          },
+          {
+            handle: [
+              portalRedirect(
+                `${portalBaseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri_escaped}`,
+              ),
+            ],
+          },
+        ];
+
         const cpmForwardAuthHandler: Record<string, unknown> = {
           handler: "reverse_proxy",
           upstreams: [{ dial: cpmDialAddress }],
@@ -2069,6 +2099,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
                 "X-Forwarded-Host": ["{http.request.hostport}"],
                 "X-Forwarded-Proto": ["{http.request.scheme}"],
                 [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
+                [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: [String(row.id)],
               },
             },
           },
@@ -2079,21 +2110,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             },
             {
               match: { status_code: [401, 403] },
-              routes: [
-                {
-                  handle: [
-                    {
-                      handler: "static_response",
-                      status_code: 302,
-                      headers: {
-                        Location: [
-                          `${portalBaseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`,
-                        ],
-                      },
-                    },
-                  ],
-                },
-              ],
+              routes: cpmPortalRedirectRoutes,
             },
           ],
           trusted_proxies: [
@@ -2122,6 +2139,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
                     "X-Forwarded-Host": ["{http.request.hostport}"],
                     "X-Forwarded-Proto": ["{http.request.scheme}"],
                     [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
+                    [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: [String(row.id)],
                   },
                 },
               },

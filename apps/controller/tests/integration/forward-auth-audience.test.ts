@@ -42,6 +42,7 @@ vi.mock('../../src/lib/caddy', () => ({
 }));
 
 import * as schema from '../../src/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import {
   createExchangeCode,
   createForwardAuthSession,
@@ -51,7 +52,10 @@ import {
   validateForwardAuthSession,
 } from '../../src/lib/models/forward-auth';
 import { GET as forwardAuthCallback } from '../../src/app/api/forward-auth/callback/route';
+import { GET as forwardAuthVerify } from '../../src/app/api/forward-auth/verify/route';
 import {
+  FORWARD_AUTH_PORTAL_TARGET_HEADER,
+  FORWARD_AUTH_PROXY_HOST_ID_HEADER,
   FORWARD_AUTH_PROXY_PROOF_HEADER,
   getForwardAuthProxyProof,
   getTrustedForwardAuthOrigin,
@@ -113,13 +117,51 @@ async function setupAuthorizedWildcard() {
   return { user, host };
 }
 
-function proxyHeaders(origin: string, proof = getForwardAuthProxyProof()): HeadersInit {
+function proxyHeaders(
+  origin: string,
+  proof = getForwardAuthProxyProof(),
+  proxyHostId?: number,
+): Record<string, string> {
   const target = new URL(origin);
   return {
     'x-forwarded-proto': target.protocol.slice(0, -1),
     'x-forwarded-host': target.host,
     [FORWARD_AUTH_PROXY_PROOF_HEADER]: proof,
+    ...(proxyHostId !== undefined
+      ? { [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: String(proxyHostId) }
+      : {}),
   };
+}
+
+function rawProxyHeaders(proto: string, rawHost: string): Record<string, string> {
+  return {
+    'x-forwarded-proto': proto,
+    'x-forwarded-host': rawHost,
+    [FORWARD_AUTH_PROXY_PROOF_HEADER]: getForwardAuthProxyProof(),
+  };
+}
+
+async function insertExactHost(domain: string) {
+  const timestamp = now();
+  const [host] = await ctx.db
+    .insert(schema.proxyHosts)
+    .values({
+      name: `Exact ${domain}`,
+      domains: JSON.stringify([domain]),
+      upstreams: JSON.stringify(['backend2:8080']),
+      sslForced: true,
+      hstsEnabled: true,
+      hstsSubdomains: false,
+      allowWebsocket: true,
+      preserveHostHeader: true,
+      skipHttpsHostnameValidation: false,
+      enabled: true,
+      meta: JSON.stringify({ cpm_forward_auth: { enabled: true } }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .returning();
+  return host;
 }
 
 async function createCode(userId: number, target: string) {
@@ -236,14 +278,14 @@ describe('trusted Caddy callback boundary', () => {
   });
 
   it('rejects a disclosed code at a different Caddy-served wildcard origin without consuming it', async () => {
-    const { user } = await setupAuthorizedWildcard();
+    const { user, host } = await setupAuthorizedWildcard();
     const target = 'https://private.example.com/dashboard';
     const { rawCode } = await createCode(user.id, target);
 
     const attackerRequest = new NextRequest(
       `http://localhost/api/forward-auth/callback?code=${rawCode}`,
       {
-        headers: proxyHeaders('https://evil.example.com'),
+        headers: proxyHeaders('https://evil.example.com', undefined, host.id),
       },
     );
     expect((await forwardAuthCallback(attackerRequest)).status).toBe(401);
@@ -251,7 +293,7 @@ describe('trusted Caddy callback boundary', () => {
     const legitimateRequest = new NextRequest(
       `http://localhost/api/forward-auth/callback?code=${rawCode}`,
       {
-        headers: proxyHeaders('https://private.example.com'),
+        headers: proxyHeaders('https://private.example.com', undefined, host.id),
       },
     );
     const response = await forwardAuthCallback(legitimateRequest);
@@ -306,6 +348,162 @@ describe('trusted Caddy callback boundary', () => {
 
     // Caddy's `host` omits the port; `hostport` keeps a :8443 origin intact.
     const serialized = JSON.stringify(document);
-    expect(serialized).toContain('://{http.request.hostport}{http.request.uri}');
+    expect(serialized).toContain('://{http.request.hostport}{http.request.uri_escaped}');
+    // The raw request URI is never placed in the portal query string.
+    expect(serialized).not.toContain('{http.request.hostport}{http.request.uri}"');
+  });
+});
+
+describe('forwarded host must match the route Caddy chose', () => {
+  it.each([
+    ['percent-encoded label', '%61pp.example.com'],
+    ['percent-encoded dot', 'x%2eapp.example.com'],
+    ['percent-encoded UTF-8', '%EF%BD%81pp.example.com'],
+    ['IPv4 shorthand', '127.1'],
+    ['multiple values', 'app.example.com, evil.example.com'],
+  ])('rejects a %s', (_caseName, rawHost) => {
+    expect(getTrustedForwardAuthOrigin(new Headers(rawProxyHeaders('https', rawHost)))).toBeNull();
+  });
+
+  it('accepts a plain hostname regardless of case', () => {
+    expect(
+      getTrustedForwardAuthOrigin(new Headers(rawProxyHeaders('https', 'App.Example.com'))),
+    ).toBe('https://app.example.com');
+  });
+
+  it('refuses a callback whose origin resolves to a different proxy host than the pinned route', async () => {
+    const { user, host: wildcard } = await setupAuthorizedWildcard();
+    const exact = await insertExactHost('app.example.com');
+    await ctx.db.insert(schema.forwardAuthAccess).values({
+      proxyHostId: exact.id,
+      userId: user.id,
+      groupId: null,
+      createdAt: now(),
+    });
+    const { rawCode } = await createCode(user.id, 'https://app.example.com/');
+    const callback = (headers: Record<string, string>) =>
+      forwardAuthCallback(
+        new NextRequest(`http://localhost/api/forward-auth/callback?code=${rawCode}`, { headers }),
+      );
+
+    // Routed through the wildcard host's Caddy route, but claiming the exact host.
+    expect(
+      (await callback(proxyHeaders('https://app.example.com', undefined, wildcard.id))).status,
+    ).toBe(401);
+    expect((await callback(proxyHeaders('https://app.example.com'))).status).toBe(401);
+
+    const [exchange] = await ctx.db.select().from(schema.forwardAuthExchanges);
+    expect(exchange.used).toBe(false);
+
+    expect(
+      (await callback(proxyHeaders('https://app.example.com', undefined, exact.id))).status,
+    ).toBe(302);
+  });
+
+  it('pins each generated subrequest to its own proxy host id', async () => {
+    const { host } = await setupAuthorizedWildcard();
+    const serialized = JSON.stringify(await buildCaddyDocument());
+    expect(serialized).toContain(`"${FORWARD_AUTH_PROXY_HOST_ID_HEADER}":["${host.id}"]`);
+  });
+});
+
+describe('verify endpoint portal target', () => {
+  function verifyRequest(headers: Record<string, string>) {
+    return new NextRequest('http://localhost/api/forward-auth/verify', { headers });
+  }
+
+  it('returns the protected URL encoded so its query string survives the portal round trip', async () => {
+    const { host } = await setupAuthorizedWildcard();
+    const uri = '/search?q=a%26b&page=2&tag=c++&rd=https://evil.test/&rid=abc#frag';
+    const response = await forwardAuthVerify(
+      verifyRequest({
+        ...proxyHeaders('https://private.example.com', undefined, host.id),
+        'x-forwarded-uri': uri,
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    const target = response.headers.get(FORWARD_AUTH_PORTAL_TARGET_HEADER);
+    expect(target).toBeTruthy();
+    expect(target).not.toMatch(/[&#+ ]/);
+    expect(target).toContain('https://private.example.com/search?q=');
+
+    // Parsed exactly as the portal's query string is.
+    const params = new URLSearchParams(`rd=${target}`);
+    expect(params.getAll('rd')).toEqual([`https://private.example.com${uri}`]);
+    expect(params.has('rid')).toBe(false);
+  });
+
+  it('sends the target on 403 as well', async () => {
+    const { user, host } = await setupAuthorizedWildcard();
+    await ctx.db.delete(schema.forwardAuthAccess);
+    const { rawCode, audience } = await createCode(user.id, 'https://private.example.com/');
+    const redeemed = await redeemExchangeCode(rawCode, audience);
+    const forbidden = await forwardAuthVerify(
+      verifyRequest({
+        ...proxyHeaders('https://private.example.com', undefined, host.id),
+        'x-forwarded-uri': '/admin',
+        cookie: `_cpm_fa=${redeemed!.rawSessionToken}`,
+      }),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.headers.get(FORWARD_AUTH_PORTAL_TARGET_HEADER)).toBe(
+      'https://private.example.com/admin',
+    );
+  });
+
+  it('sends no target without the proxy proof or for a non origin-form URI', async () => {
+    const { host } = await setupAuthorizedWildcard();
+    const direct = await forwardAuthVerify(
+      verifyRequest({
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'private.example.com',
+        'x-forwarded-uri': '/',
+      }),
+    );
+    expect(direct.status).toBe(401);
+    expect(direct.headers.get(FORWARD_AUTH_PORTAL_TARGET_HEADER)).toBeNull();
+
+    for (const uri of ['*', 'https://evil.test/', '']) {
+      const response = await forwardAuthVerify(
+        verifyRequest({
+          ...proxyHeaders('https://private.example.com', undefined, host.id),
+          'x-forwarded-uri': uri,
+        }),
+      );
+      expect(response.status).toBe(401);
+      expect(response.headers.get(FORWARD_AUTH_PORTAL_TARGET_HEADER)).toBeNull();
+    }
+  });
+
+  it('names the user by sign-in username or email, never by the display name others can share', async () => {
+    const { user, host } = await setupAuthorizedWildcard();
+    const verifiedHeaders = async () => {
+      const { rawCode, audience } = await createCode(user.id, 'https://private.example.com/');
+      const redeemed = await redeemExchangeCode(rawCode, audience);
+      const response = await forwardAuthVerify(
+        verifyRequest({
+          ...proxyHeaders('https://private.example.com', undefined, host.id),
+          'x-forwarded-uri': '/',
+          cookie: `_cpm_fa=${redeemed!.rawSessionToken}`,
+        }),
+      );
+      expect(response.status).toBe(200);
+      return response.headers;
+    };
+
+    // Display name "admin", as anyone can pick; no username: the email address.
+    await ctx.db.update(schema.users).set({ name: 'admin' }).where(eq(schema.users.id, user.id));
+    let headers = await verifiedHeaders();
+    expect(headers.get('X-CPM-User')).toBe('alice@localhost');
+    expect(headers.get('X-CPM-User-Id')).toBe(String(user.id));
+
+    await ctx.db
+      .update(schema.users)
+      .set({ username: 'alice' })
+      .where(eq(schema.users.id, user.id));
+    headers = await verifiedHeaders();
+    expect(headers.get('X-CPM-User')).toBe('alice');
+    expect(headers.get('X-CPM-Email')).toBe('alice@localhost');
   });
 });

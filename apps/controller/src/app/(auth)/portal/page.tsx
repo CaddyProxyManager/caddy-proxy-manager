@@ -22,7 +22,11 @@ const INTENT_WINDOW_MS = 10 * 60_000;
 
 interface PortalPageProps {
   /** `error` is set by Better Auth when a single sign-on attempt comes back refused. */
-  searchParams: Promise<{ rd?: string; rid?: string; error?: string }>;
+  searchParams: Promise<{
+    rd?: string | string[];
+    rid?: string | string[];
+    error?: string | string[];
+  }>;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,16 +40,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PortalPage({ searchParams }: PortalPageProps) {
   const params = await searchParams;
-  const redirectUri = params.rd ?? "";
+  // CPM never repeats one, so a repeated parameter is refused rather than resolved by picking.
+  const repeatedParam = Array.isArray(params.rd) || Array.isArray(params.rid);
+  const redirectUri = typeof params.rd === "string" ? params.rd : "";
   // After OAuth callback, the portal is loaded with ?rid= (the opaque ID we created earlier)
-  const existingRid = params.rid ?? "";
+  const existingRid = typeof params.rid === "string" ? params.rid : "";
 
   // Two entry modes:
   // 1. Fresh from Caddy redirect: ?rd=<full-url> → validate, store server-side, create rid
   // 2. Returning from OAuth: ?rid=<opaque-id> → reuse the existing rid (redirect already stored)
+  // A Caddy redirect always carries ?rd=, so a ?rid= beside it came from the protected URL's own
+  // query string and must not replace the target the browser was sent from.
   let targetDomain = "";
-  let rid = existingRid;
-  if (!rid && redirectUri) {
+  let rid = redirectUri || repeatedParam ? "" : existingRid;
+  if (!rid && redirectUri && !repeatedParam) {
     try {
       const parsed = new URL(redirectUri);
       if (
@@ -67,12 +75,17 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     }
   }
 
-  const [session, enabledProviders, t] = await Promise.all([
+  const [session, enabledProviders, t, tAuth] = await Promise.all([
     auth(),
     getProviderDisplayList(),
     getTranslations("auth.login"),
+    getTranslations("auth"),
   ]);
-  const oauthError = oauthCallbackErrorMessage(params.error, t);
+  const oauthError = oauthCallbackErrorMessage(
+    typeof params.error === "string" ? params.error : undefined,
+    t,
+  );
+  const errorMessage = repeatedParam ? tAuth("portalInvalidLink") : null;
   const localLoginEnabled = !(await localUsersDisabled());
   // Per host: an operator can switch it off for one whose users cannot solve it.
   const configured = localLoginEnabled && rid ? await getActiveCaptcha() : null;
@@ -82,8 +95,9 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     <PortalLoginForm
       rid={rid}
       initialError={oauthError}
-      hasRedirect={!!redirectUri || !!existingRid}
+      hasRedirect={!!redirectUri || !!existingRid || repeatedParam}
       targetDomain={targetDomain}
+      errorMessage={errorMessage}
       enabledProviders={enabledProviders}
       localLoginEnabled={localLoginEnabled}
       captcha={captcha}

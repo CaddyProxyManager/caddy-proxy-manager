@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { redeemExchangeCode, resolveForwardAuthAudience } from "@/src/lib/models/forward-auth";
-import { getTrustedForwardAuthOrigin } from "@/src/lib/forward-auth-trust";
+import { redeemExchangeCode } from "@/src/lib/models/forward-auth";
+import { resolveTrustedForwardAuthAudience } from "@/src/lib/forward-auth-trust";
 
 const COOKIE_NAME = "_cpm_fa";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Missing code parameter", { status: 400 });
   }
 
-  // The origin may be reached directly, so forwarded headers need the Caddy route's proof.
-  const requestOrigin = getTrustedForwardAuthOrigin(request.headers);
-  const audience = requestOrigin ? await resolveForwardAuthAudience(requestOrigin) : null;
+  // The origin may be reached directly, so forwarded headers need the Caddy route's proof, and
+  // only count for the proxy host that route belongs to.
+  const audience = await resolveTrustedForwardAuthAudience(request.headers);
   if (!audience) {
     return new NextResponse("Invalid or expired authorization code. Please try logging in again.", {
       status: 401,

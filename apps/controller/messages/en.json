@@ -461,6 +461,7 @@
       "submit": "Update Password",
       "subtitle": "Your password is stored with an older algorithm. Choose a new one to continue."
     },
+    "portalInvalidLink": "This sign-in link is invalid. Open the site you were trying to reach again.",
     "signInToAccess": "Sign in to access <host_>{host}</host_>",
     "signInToContinue": "Sign in to continue",
     "signInUnavailableTitle": "No sign-in method available",

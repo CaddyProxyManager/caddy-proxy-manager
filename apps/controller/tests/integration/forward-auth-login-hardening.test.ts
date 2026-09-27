@@ -48,9 +48,11 @@ import {
   resolveForwardAuthAudience,
 } from '../../src/lib/models/forward-auth';
 import {
+  FORWARD_AUTH_PROXY_HOST_ID_HEADER,
   FORWARD_AUTH_PROXY_PROOF_HEADER,
   getForwardAuthProxyProof,
 } from '../../src/lib/forward-auth-trust';
+import { eq } from 'drizzle-orm';
 import { hashPassword } from '../../src/lib/password';
 import {
   accountKey,
@@ -197,7 +199,12 @@ describe('forward-auth login', () => {
 
 describe('forward-auth verify identity headers', () => {
   it('encodes names the Headers constructor would reject, and commas inside group names', async () => {
-    const { user } = await setup('Zoë 李');
+    const { user, host } = await setup();
+    // Not something sign-up accepts, but an OAuth-created or legacy row can hold anything.
+    await ctx.db
+      .update(schema.users)
+      .set({ username: 'Zoë 李' })
+      .where(eq(schema.users.id, user.id));
     const timestamp = now();
     const [group] = await ctx.db
       .insert(schema.groups)
@@ -216,6 +223,7 @@ describe('forward-auth verify identity headers', () => {
           'x-forwarded-proto': 'https',
           'x-forwarded-host': 'app.example.com',
           [FORWARD_AUTH_PROXY_PROOF_HEADER]: getForwardAuthProxyProof(),
+          [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: String(host.id),
           cookie: `_cpm_fa=${rawToken}`,
         },
       }),
