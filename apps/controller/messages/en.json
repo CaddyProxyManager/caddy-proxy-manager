@@ -368,6 +368,7 @@
       "userCreated": "Created user {id} ({email}) with role {role}",
       "userDeleted": "Deleted user {id}",
       "userProfileUpdated": "Updated user {id} profile",
+      "userSignInUsernameChanged": "Changed user {id} sign-in username to {username}",
       "userRoleChanged": "Changed user {id} role to {role}",
       "userStatusChanged": "Changed user {id} status to {status}"
     }
