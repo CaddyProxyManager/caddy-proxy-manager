@@ -18,8 +18,9 @@ describe('API documentation asset security', () => {
   });
 
   it('uses an exact, bundled Swagger UI dependency instead of runtime CDN injection', () => {
+    // Lazy-loaded into its own chunk from ApiDocsClient, but still the bundled package.
     const component = readFileSync(
-      resolve(root, 'src/app/(dashboard)/api-docs/ApiDocsClient.tsx'),
+      resolve(root, 'src/app/(dashboard)/api-docs/SwaggerPanel.tsx'),
       'utf8',
     );
     const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
