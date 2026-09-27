@@ -215,6 +215,50 @@ export async function markSetupCompleted(): Promise<void> {
   await setFlag(SETUP_COMPLETED_KEY);
 }
 
+export const SETUP_ACCOUNT_CLAIM = "setup_account_claim";
+const SETUP_PROMOTION_CLAIM = "setup_admin_promotion";
+/** Only a crash leaves a claim behind; after this long it can be taken over. */
+const SETUP_CLAIM_TTL_MS = 10 * 60_000;
+
+/**
+ * A cross-process one-time claim on a setup step: one INSERT, or one compare-and-swap over a stale
+ * claim, wins. The holder re-checks the step under it and always releases it, so the next claimer
+ * checks after the holder's writes committed. Null when someone else holds it.
+ */
+export async function claimSetupStep(key: string, now = Date.now()): Promise<string | null> {
+  const value = JSON.stringify({ token: randomBytes(16).toString("hex"), at: now });
+  const updatedAt = new Date(now).toISOString();
+  const inserted = await db
+    .insert(settings)
+    .values({ key, value, updatedAt })
+    .onConflictDoNothing()
+    .returning({ key: settings.key });
+  if (inserted.length > 0) return value;
+
+  const [held] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, key));
+  if (!held) return null;
+  let at = 0;
+  try {
+    at = Number(JSON.parse(held.value).at) || 0;
+  } catch {
+    // Unreadable: treat as stale.
+  }
+  if (now - at <= SETUP_CLAIM_TTL_MS) return null;
+  const taken = await db
+    .update(settings)
+    .set({ value, updatedAt })
+    .where(and(eq(settings.key, key), eq(settings.value, held.value)))
+    .returning({ key: settings.key });
+  return taken.length > 0 ? value : null;
+}
+
+export async function releaseSetupStep(key: string, claim: string): Promise<void> {
+  await db.delete(settings).where(and(eq(settings.key, key), eq(settings.value, claim)));
+}
+
 /** A local account or an enabled OAuth provider, checked regardless of mode. */
 export async function hasAnySignIn(): Promise<boolean> {
   if ((await getUserCount()) > 0) return true;
@@ -229,7 +273,17 @@ export async function hasAnySignIn(): Promise<boolean> {
 export async function promoteFirstSetupAdmin(userId: number): Promise<boolean> {
   if (!Number.isFinite(userId)) return false;
   if (await isSetupCompleted()) return false;
+  // Two federated sign-ins at once would otherwise both see "no admin yet".
+  const claim = await claimSetupStep(SETUP_PROMOTION_CLAIM);
+  if (!claim) return false;
+  try {
+    return await promoteUnderClaim(userId);
+  } finally {
+    await releaseSetupStep(SETUP_PROMOTION_CLAIM, claim);
+  }
+}
 
+async function promoteUnderClaim(userId: number): Promise<boolean> {
   const admins = await db
     .select({ id: users.id })
     .from(users)

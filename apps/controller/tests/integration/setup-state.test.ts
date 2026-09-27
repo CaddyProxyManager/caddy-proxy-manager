@@ -33,6 +33,7 @@ vi.mock('@/src/lib/db', () => ({
 
 const {
   backfillSetupCompletion,
+  claimSetupStep,
   declineMigration,
   getSetupState,
   hasAnySignIn,
@@ -40,6 +41,7 @@ const {
   markSetupCompleted,
   promoteFirstSetupAdmin,
   recordMigrationSource,
+  releaseSetupStep,
 } = await import('@/src/lib/setup');
 
 const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'OAUTH_ENABLED', 'LEGACY_SQLITE_PATH'];
@@ -325,6 +327,17 @@ describe('promoteFirstSetupAdmin', () => {
     expect(await roleOf(userId)).toBe('admin');
   });
 
+  it('promotes exactly one of two federated users signing in at once', async () => {
+    const first = await addFederatedUser('sso@example.com');
+    const second = await addFederatedUser('colleague@example.com');
+    const results = await Promise.all([
+      promoteFirstSetupAdmin(first),
+      promoteFirstSetupAdmin(second),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect([await roleOf(first), await roleOf(second)].sort()).toEqual(['admin', 'user']);
+  });
+
   it('refuses a second caller once the first was promoted', async () => {
     const first = await addFederatedUser('sso@example.com');
     await promoteFirstSetupAdmin(first);
@@ -363,5 +376,32 @@ describe('promoteFirstSetupAdmin', () => {
 
     expect(await promoteFirstSetupAdmin(userId)).toBe(true);
     expect(await roleOf(userId)).toBe('admin');
+  });
+});
+
+describe('setup step claims', () => {
+  it('lets exactly one of several concurrent claimers in', async () => {
+    const claims = await Promise.all([1, 2, 3].map(() => claimSetupStep('setup_account_claim')));
+    expect(claims.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('frees the step once released, and only by its holder', async () => {
+    const claim = await claimSetupStep('setup_account_claim');
+    expect(claim).not.toBeNull();
+    await releaseSetupStep('setup_account_claim', 'someone else');
+    expect(await claimSetupStep('setup_account_claim')).toBeNull();
+    await releaseSetupStep('setup_account_claim', claim as string);
+    expect(await claimSetupStep('setup_account_claim')).not.toBeNull();
+  });
+
+  it('takes over a claim a crash left behind, once, after the timeout', async () => {
+    const stale = Date.now() - 11 * 60_000;
+    expect(await claimSetupStep('setup_account_claim', stale)).not.toBeNull();
+    expect(await claimSetupStep('setup_account_claim', stale + 60_000)).toBeNull();
+    const takers = await Promise.all([
+      claimSetupStep('setup_account_claim'),
+      claimSetupStep('setup_account_claim'),
+    ]);
+    expect(takers.filter(Boolean)).toHaveLength(1);
   });
 });
