@@ -58,7 +58,8 @@
     "typescript": "^7.0.2"
   },
   "overrides": {
-    "@astrojs/starlight": "0.42.4"
+    "@astrojs/starlight": "0.42.4",
+    "@esbuild-kit/esm-loader": "file:./patches/esbuild-kit-esm-loader-stub"
   },
   "trustedDependencies": [
     "@astryxdesign/core",

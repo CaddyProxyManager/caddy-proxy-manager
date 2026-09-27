@@ -1,0 +1,7 @@
+{
+  "name": "@esbuild-kit/esm-loader",
+  "version": "0.0.0-unused",
+  "description": "Empty stand-in: drizzle-kit 0.31 declares this dependency but never loads it, and its esbuild 0.18 carries GHSA-67mh-4wv8-2f99. See the root package.json overrides.",
+  "private": true,
+  "main": "index.js"
+}
