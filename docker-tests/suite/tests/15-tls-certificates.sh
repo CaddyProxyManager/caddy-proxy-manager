@@ -33,7 +33,7 @@ t_ok "the chain verifies against the ACME root alone" tls_handshake_ok "$acme_do
 fetch "https://$acme_domain/"
 t_eq "traffic flows over the ACME certificate" "200" "$FETCH_CODE"
 
-# -- Renew now -----------------------------------------------------------------
+# ── Renew now ───────────────────────────────────────────────────────────────
 #
 # Caddy has no renew endpoint; CPM widens the name's renewal window and reloads.
 # A fresh certificate is the only proof that worked.

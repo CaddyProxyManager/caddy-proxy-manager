@@ -150,7 +150,7 @@ t_ne "the L4 port status carries a diff" "null" "$(jqr '.diff')"
 api GET /api/geoip-status
 t_eq "a bearer caller is redirected away from the non-v1 endpoints" "307" "$API_STATUS"
 
-# -- Global Caddyfile ----------------------------------------------------------
+# ── Global Caddyfile ────────────────────────────────────────────────────────
 #
 # Merged by addition only: a site on its own port is served, a replacement of CPM's config refused.
 
