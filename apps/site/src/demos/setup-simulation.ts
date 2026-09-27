@@ -394,7 +394,7 @@ type FieldKind = "string" | "number" | "boolean" | "tristate";
 export const SETTING_FIELDS: Array<{
   key: string;
   env: string;
-  group: "application" | "authentication" | "analytics" | "geoip";
+  group: "application" | "authentication" | "email" | "analytics" | "geoip";
   kind: FieldKind;
   value: string | number | boolean | null;
   secret?: boolean;
@@ -563,6 +563,71 @@ export const SETTING_FIELDS: Array<{
     group: "authentication",
     kind: "boolean",
     value: false,
+  },
+  {
+    key: "config:smtp_enabled",
+    env: "SMTP_ENABLED",
+    group: "email",
+    kind: "tristate",
+    value: false,
+    gate: true,
+  },
+  {
+    key: "config:smtp_host",
+    env: "SMTP_HOST",
+    group: "email",
+    kind: "string",
+    value: "",
+  },
+  {
+    key: "config:smtp_port",
+    env: "SMTP_PORT",
+    group: "email",
+    kind: "number",
+    value: 587,
+  },
+  {
+    key: "config:smtp_security",
+    env: "SMTP_SECURITY",
+    group: "email",
+    kind: "string",
+    value: "starttls",
+  },
+  {
+    key: "config:smtp_username",
+    env: "SMTP_USERNAME",
+    group: "email",
+    kind: "string",
+    value: "",
+  },
+  {
+    key: "config:smtp_password",
+    env: "SMTP_PASSWORD",
+    group: "email",
+    kind: "string",
+    value: "",
+    secret: true,
+  },
+  {
+    key: "config:smtp_from",
+    env: "SMTP_FROM",
+    group: "email",
+    kind: "string",
+    value: "",
+  },
+  {
+    key: "config:email_alert_recipients",
+    env: "EMAIL_ALERT_RECIPIENTS",
+    group: "email",
+    kind: "string",
+    value: "",
+  },
+  {
+    key: "config:certificate_expiry_alert_days",
+    env: "CERTIFICATE_EXPIRY_ALERT_DAYS",
+    group: "email",
+    kind: "number",
+    value: 14,
   },
   {
     key: "config:analytics_enabled",

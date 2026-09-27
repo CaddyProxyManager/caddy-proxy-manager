@@ -115,6 +115,7 @@ export default defineConfig({
           items: [
             { label: "Analytics", slug: "features/analytics" },
             { label: "Settings", slug: "features/settings" },
+            { label: "Email", slug: "features/email" },
             { label: "Users, roles & groups", slug: "features/users-and-groups" },
             { label: "The agent", slug: "features/agent" },
             { label: "Caddy Build", slug: "features/caddy-build" },

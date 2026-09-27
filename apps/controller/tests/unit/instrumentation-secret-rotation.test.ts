@@ -61,7 +61,10 @@ vi.mock('../../src/lib/agent/fleet-config', () => ({ pushFleetConfig: async () =
 vi.mock('../../src/lib/agent/managed-services', () => ({ applyManagedServices: async () => {} }));
 vi.mock('../../src/lib/geoip/updater', () => ({ startGeoipUpdater: () => {} }));
 vi.mock('../../src/lib/crs-plugins/sync', () => ({ startCrsRegistryUpdater: () => {} }));
-vi.mock('../../src/lib/models/crs-plugins', () => ({ installedCrsPluginRepositories: [] }));
+vi.mock('../../src/lib/models/crs-plugins', () => ({
+  installedCrsPluginRepositories: [],
+  assertCrsPluginIdsExist: async () => {},
+}));
 
 import { register } from '../../src/instrumentation';
 

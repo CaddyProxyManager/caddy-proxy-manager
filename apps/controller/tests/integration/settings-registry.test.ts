@@ -221,7 +221,7 @@ describe('group gates', () => {
       perGroup.set(definition.group, (perGroup.get(definition.group) ?? 0) + 1);
     }
     expect([...perGroup.values()].every((count) => count === 1)).toBe(true);
-    expect([...perGroup.keys()].sort()).toEqual(['analytics', 'geoip']);
+    expect([...perGroup.keys()].sort()).toEqual(['analytics', 'email', 'geoip']);
   });
 
   it('leaves a gate tri-state so an upgrade infers rather than defaults to off', () => {

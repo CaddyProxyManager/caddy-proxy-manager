@@ -226,6 +226,14 @@ export async function register() {
       console.error("Failed to start the CRS plugin registry updater:", error);
     }
 
+    // A pass sends nothing until email is set up and the threshold is above zero.
+    const { startCertificateExpiryAlerts } = await import("./lib/email/certificate-alerts");
+    try {
+      startCertificateExpiryAlerts();
+    } catch (error) {
+      console.error("Failed to start the certificate expiry alerts:", error);
+    }
+
     process.on("SIGTERM", () => {
       closeClickHouse();
     });

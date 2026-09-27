@@ -136,6 +136,18 @@ services:
       GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
       GEOIP_UPDATE_INTERVAL_HOURS: ${GEOIP_UPDATE_INTERVAL_HOURS:-24}
 
+      # Settings -> Email. Unset SMTP_ENABLED turns email on once a server is named. Prefer
+      # Settings for the password, where it is encrypted at rest.
+      SMTP_ENABLED: ${SMTP_ENABLED:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      EMAIL_ALERT_RECIPIENTS: ${EMAIL_ALERT_RECIPIENTS:-}
+      CERTIFICATE_EXPIRY_ALERT_DAYS: ${CERTIFICATE_EXPIRY_ALERT_DAYS:-14}
+
       # First-start defaults of Settings fields.
       FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
       FORWARD_AUTH_ALLOWED_PORTS: ${FORWARD_AUTH_ALLOWED_PORTS:-}

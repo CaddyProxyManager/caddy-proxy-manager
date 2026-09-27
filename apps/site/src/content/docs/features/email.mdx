@@ -1,0 +1,69 @@
+---
+title: Email
+description: Password resets, invitations and certificate alerts, sent through your own SMTP server.
+---
+
+CPM sends three kinds of mail, all through an SMTP server you name under **Settings → Email**:
+
+- **Password reset links**, from **Forgot your password?** on the sign-in page.
+- **Invitations**, so an administrator can create an account and let its owner choose the password.
+- **Certificate alerts**, a digest for the administrators when a certificate is about to expire.
+
+Until a server and a sender address are saved, none of these is offered: the sign-in page has no
+reset link, and **Users** has no invitation option.
+
+## Setting it up
+
+**Settings → Email → SMTP Server** takes the server, its port and encryption, an optional username
+and password, and the address mail is sent from. The application name is shown as the sender.
+
+- **STARTTLS** (port 587) is the default, and refuses a server that does not offer it rather than
+  sending the password in the clear. **Implicit TLS** (port 465) encrypts from the first byte.
+  **None** is for a relay on a network you trust, such as a local Postfix.
+- **The password is encrypted at rest** and never sent back to the browser. Leave the field empty
+  to keep the stored one.
+- **Send test email** sends a message with the saved settings - to you, or to an address you give -
+  and shows the server's refusal word for word when there is one.
+
+Each field has an environment variable (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`), honoured until a value is saved in Settings. With
+`SMTP_ENABLED` left unset, naming a server is enough to turn email on.
+
+## Password resets
+
+**Forgot your password?** appears on the password step of the sign-in page. It asks for the
+username or email address and always answers the same way, whether or not an account matched, so
+it can't be used to find out who has one.
+
+- **Local accounts only.** An account that signs in through single sign-on has no password here,
+  and a reset email would hand it one that goes around its identity provider.
+- **The link works once, for an hour**, and only the newest one works. Asking again from the same
+  address is limited to three times an hour.
+- **It is never logged.** The token travels in the link's `#fragment`, which browsers don't send,
+  so it stays out of Caddy's access log - and out of analytics, when the
+  [dashboard is served through Caddy](../dashboard-host/).
+- **Saving the new password signs out everywhere else**, forward-auth portal sessions included.
+  Two-factor sign-in still applies afterwards: a mailbox is not a second factor.
+
+## Invitations
+
+Creating a user under **Users** offers **Email an invitation** beside **Set one now**. The account
+is created at once, with no password; its owner gets a link, valid for seven days, to choose one.
+If the mail server refuses the message, the account is kept and the invitation can be sent again.
+
+The same place in a user's details sends a fresh link later: **Send invitation** for an account
+still without a password, **Email a reset link** for one with.
+
+## Certificate alerts
+
+Twice a day the controller looks at every certificate - imported ones, and the ones each agent's
+Caddy manages - and emails a digest of those that have fewer days left than the threshold under
+**Settings → Email → Certificate Alerts** (14 by default; 0 turns alerts off).
+
+- **Caddy renews on its own.** A managed certificate is reported only once it is also in the last
+  quarter of its life, well past the point Caddy starts renewing, so an alert means renewal is
+  failing. Caddy's short-lived internal certificates don't trigger one every day.
+- **Once per stage.** Each certificate is reported as it nears expiry, and once more if it expires.
+  A renewed certificate starts over.
+- **Recipients** are the addresses you list, or every active administrator with a deliverable
+  address when the list is empty.

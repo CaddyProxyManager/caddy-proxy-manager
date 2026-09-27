@@ -903,6 +903,84 @@ async function updateRegistrySettingsActionUnlocked(
   }
 }
 
+/** Registry writes, translated like the registry block's; shared by both Email forms. */
+async function saveEmailRegistryValues(
+  values: Record<string, unknown>,
+  t: Awaited<ReturnType<typeof getTranslations<"settings">>>,
+): Promise<ActionResult> {
+  const [{ SettingValidationError }, { saveSettings }] = await Promise.all([
+    import("@/src/lib/settings/registry"),
+    import("@/src/lib/settings/resolve"),
+  ]);
+  try {
+    await saveSettings(values);
+  } catch (error) {
+    if (error instanceof SettingValidationError) {
+      const [tRoot, { settingValidationMessage }] = await Promise.all([
+        getTranslations(),
+        import("@/src/lib/settings/messages"),
+      ]);
+      return { success: false, message: settingValidationMessage(tRoot, error) };
+    }
+    throw error;
+  }
+  // "layout" scope: the sign-in page and the Users screen offer mail only once it is set up.
+  revalidatePath("/", "layout");
+  return { success: true, message: t("email.saved") };
+}
+
+/** An empty password keeps the stored one: the form never receives it to send back. */
+async function updateEmailSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const registry = await import("@/src/lib/settings/registry");
+    const values: Record<string, unknown> = {
+      // Never back to null: the tri-state is for deployments that never saw this page.
+      [registry.smtpEnabled.key]: formData.get("smtpEnabled") === "on",
+      [registry.smtpHost.key]: String(formData.get("smtpHost") ?? ""),
+      [registry.smtpPort.key]: String(formData.get("smtpPort") ?? ""),
+      [registry.smtpSecurity.key]: String(formData.get("smtpSecurity") ?? ""),
+      [registry.smtpUsername.key]: String(formData.get("smtpUsername") ?? ""),
+      [registry.smtpFrom.key]: String(formData.get("smtpFrom") ?? ""),
+    };
+    const password = String(formData.get("smtpPassword") ?? "");
+    if (password.length > 0) values[registry.smtpPassword.key] = password;
+    // Without a username the password is never sent, so there is nothing left to keep it for.
+    if (String(formData.get("smtpUsername") ?? "").trim() === "") {
+      values[registry.smtpPassword.key] = "";
+    }
+    return await saveEmailRegistryValues(values, t);
+  } catch (error) {
+    console.error("Failed to save the email settings:", error);
+    return { success: false, message: await errorText(error, t("email.saveFailed")) };
+  }
+}
+
+async function updateCertificateAlertSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const registry = await import("@/src/lib/settings/registry");
+    return await saveEmailRegistryValues(
+      {
+        [registry.emailAlertRecipients.key]: String(formData.get("alertRecipients") ?? ""),
+        [registry.certificateExpiryAlertDays.key]: String(formData.get("alertDays") ?? ""),
+      },
+      t,
+    );
+  } catch (error) {
+    console.error("Failed to save the certificate alert settings:", error);
+    return { success: false, message: await errorText(error, t("email.saveFailed")) };
+  }
+}
+
 /** Checks inline after saving: "never checked" straight after a save reads as a failed save. */
 async function updateUpdateSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -2164,6 +2242,36 @@ export const updateAnalyticsSettingsAction = serializedSettingsAction(
 export const updateGeoipSettingsAction = serializedSettingsAction(
   updateGeoipSettingsActionUnlocked,
 );
+// Not staged: mail is sent by this app, and Caddy has nothing to reload for it.
+export const updateEmailSettingsAction = serializedSettingsAction(
+  updateEmailSettingsActionUnlocked,
+);
+export const updateCertificateAlertSettingsAction = serializedSettingsAction(
+  updateCertificateAlertSettingsActionUnlocked,
+);
+
+/** Sends with the saved settings, to `recipient` or the signed-in administrator. */
+export async function sendTestEmailAction(recipient: string): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    const session = await requireAdmin();
+    const to = recipient.trim() || session.user.email;
+    if (!isEmailAddress(to)) return { success: false, message: t("email.testInvalidRecipient") };
+
+    const [{ readSmtpConfig }, { testEmail }, { sendEmail }] = await Promise.all([
+      import("@/src/lib/email/config"),
+      import("@/src/lib/email/messages"),
+      import("@/src/lib/email/transport"),
+    ]);
+    const { config: smtp } = await readSmtpConfig();
+    const { getLocale } = await import("next-intl/server");
+    await sendEmail(await testEmail(to, smtp.host, await getLocale()));
+    return { success: true, message: t("email.testSent", { email: to }) };
+  } catch (error) {
+    console.error("Failed to send a test email:", error);
+    return { success: false, message: await errorText(error, t("email.testFailed")) };
+  }
+}
 
 /** Not staged: it writes only the databases, and there is nothing for an operator to review. */
 export async function updateGeoipDatabasesAction(): Promise<ActionResult> {

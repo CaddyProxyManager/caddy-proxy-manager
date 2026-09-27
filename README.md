@@ -260,7 +260,7 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 - **mTLS** - Mutual TLS per proxy host using built-in CA certificates. Issue, track, and revoke client certificates. Fail-closed revocation (all certs revoked = all connections rejected)
 - **mTLS RBAC** - Role-based access control for mTLS client certificates. Define roles, assign certs to roles, and create path-based access rules per proxy host (e.g. `/admin/*` requires the "ops" role)
 - **User Roles** - Four roles (Viewer, User, Operator, Admin) controlling dashboard access, API permissions, and feature visibility
-- **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; reset two-factor sign-in; search and filter. The last active admin cannot be demoted, disabled or deleted
+- **User Management** - Admin page for managing users: edit roles, status, profiles; invite by email or email a reset link; disable or delete accounts; reset two-factor sign-in; search and filter. The last active admin cannot be demoted, disabled or deleted
 - **View as** - Preview the dashboard as an operator, user or viewer, or as an operator in chosen groups, from Users or a group. It only narrows your own session, ends after an hour, and is audited under your name
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
@@ -275,6 +275,7 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
+- **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, and a certificate expiry digest for the administrators, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
 - **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. Optionally required for administrators; resettable by an admin or from the container console
 - **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`. Restores onto a new machine with a different `SESSION_SECRET`, and saves what it replaces first
 - **Global Caddyfile** - Raw Caddyfile, global options and site blocks on their own ports, added to every agent's config. Adapted by each agent's Caddy and checked with `caddy validate` on save; anything that would replace CPM's own config (admin API, storage, certificate automation, ports 80/443) is refused by name
@@ -402,6 +403,15 @@ it win even then.
 | MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
 | MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
 | Hours between checks for newer MaxMind databases, 1-168 | `GEOIP_UPDATE_INTERVAL_HOURS` | `24` |
+| Send email. If left unset, email is on whenever an SMTP server is named | `SMTP_ENABLED` | Unset |
+| SMTP server host name or address | `SMTP_HOST` | None |
+| SMTP port | `SMTP_PORT` | `587` |
+| SMTP encryption: `starttls`, `tls` (implicit) or `none` | `SMTP_SECURITY` | `starttls` |
+| SMTP username. Empty for a relay that needs no sign-in | `SMTP_USERNAME` | None |
+| SMTP password. Encrypted at rest | `SMTP_PASSWORD` | None |
+| Sender address; the application name is the sender's name | `SMTP_FROM` | None |
+| Comma-separated recipients of certificate alerts. Empty sends them to every active administrator | `EMAIL_ALERT_RECIPIENTS` | None |
+| Email once a certificate has fewer days than this left, 0-90. `0` turns alerts off | `CERTIFICATE_EXPIRY_ALERT_DAYS` | `14` |
 
 > Compose reads `CLICKHOUSE_PASSWORD` too, to provision the `clickhouse` container. **With an agent
 > running the stack you do not need to keep it in `.env`**: the agent starts ClickHouse itself and
