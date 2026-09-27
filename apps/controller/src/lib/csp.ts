@@ -22,6 +22,11 @@ function directives(extra: CspAdditions): string {
     `connect-src 'self'${add(extra.connect)}`,
     ...(extra.frame && extra.frame.length > 0 ? [`frame-src${add(extra.frame)}`] : []),
     "frame-ancestors 'none'",
+    // default-src covers neither; an injected <base> would re-point every relative URL.
+    "base-uri 'none'",
+    "object-src 'none'",
+    // Browsers apply it to a form's redirects too, which is why logout redirects relatively.
+    "form-action 'self'",
   ].join("; ");
 }
 
