@@ -183,6 +183,20 @@ describe('import', () => {
     expect(users.find((user) => user.id === 1)?.role).toBe('admin');
   });
 
+  it('gives imported users UUIDs but keeps sending their numeric forward-auth id', async () => {
+    await importLegacyDatabase(buildLegacyDatabase());
+
+    const users = await ctx.db.select().from(schemaModule.users);
+    expect(users.every((user) => typeof user.uuid === 'string' && user.uuid.length === 36)).toBe(
+      true,
+    );
+    const [pinned] = await ctx.db
+      .select()
+      .from(schemaModule.settings)
+      .where(eq(schemaModule.settings.key, 'config:forward_auth_sequential_user_ids'));
+    expect(pinned?.value).toBe('true');
+  });
+
   it('converts SQLite 0/1 into real booleans', async () => {
     await importLegacyDatabase(buildLegacyDatabase());
 
@@ -345,7 +359,9 @@ describe('choosing what to migrate', () => {
   it('leaves the settings behind when they were not chosen', async () => {
     await importLegacyDatabase(buildLegacyDatabase(), ['users']);
 
-    expect(await ctx.db.select().from(schemaModule.settings)).toHaveLength(0);
+    // The one row left is not copied: importing users pins their numeric forward-auth id.
+    const rows = await ctx.db.select().from(schemaModule.settings);
+    expect(rows.map((row) => row.key)).toEqual(['config:forward_auth_sequential_user_ids']);
     expect(await ctx.db.select().from(schemaModule.users)).toHaveLength(2);
   });
 

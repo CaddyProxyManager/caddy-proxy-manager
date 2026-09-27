@@ -11,6 +11,8 @@ import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
 import { sealSecretColumn } from "../secret";
+import { forwardAuthSequentialUserIds } from "../settings/registry";
+import { invalidateSettingsCache } from "../settings/resolve";
 import {
   ALL_MIGRATION_GROUP_IDS,
   MIGRATION_GROUPS,
@@ -288,6 +290,20 @@ export async function importLegacyDatabase(
 
       results.push({ table: table.name, copied, skipped: rows.length - copied });
       totalRows += copied;
+    }
+
+    // Pre-3.0 sent the account number as X-CPM-User-Id, and upstreams keyed on it. Migration 0016
+    // pins that for upgrades in place, but ran here while `users` was still empty.
+    if (results.some((result) => result.table === "users" && result.copied > 0)) {
+      await db
+        .insert(schema.settings)
+        .values({
+          key: forwardAuthSequentialUserIds.key,
+          value: JSON.stringify(true),
+          updatedAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing();
+      invalidateSettingsCache();
     }
 
     return {
