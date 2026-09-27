@@ -129,17 +129,16 @@ export function mapOAuthProvider(
  * Parks the IdP `sid` from the ID token, swallowing any failure: a missing `sid` costs only logout
  * precision, which is not worth refusing a sign-in over.
  */
-function rememberIdpSession(account: {
-  userId?: unknown;
-  providerId?: unknown;
-  idToken?: unknown;
-}) {
+function rememberIdpSession(
+  account: { userId?: unknown; providerId?: unknown; idToken?: unknown },
+  request: object | null | undefined,
+) {
   try {
     if (typeof account.providerId !== "string" || account.providerId === "credential") return;
     if (typeof account.idToken !== "string") return;
     const userId = typeof account.userId === "string" ? Number(account.userId) : account.userId;
     if (typeof userId !== "number") return;
-    recordSessionBindingFromIdToken(userId, account.providerId, account.idToken);
+    recordSessionBindingFromIdToken(request, userId, account.providerId, account.idToken);
   } catch (error) {
     console.warn("[auth-server] Could not read the IdP session id from an ID token:", error);
   }
@@ -320,9 +319,9 @@ async function createAuth(baseURL: string): Promise<any> {
             if (data.idToken) data.idToken = encryptSecret(data.idToken);
             return { data };
           },
-          after: async (account) => {
+          after: async (account, context) => {
             // The session row does not exist yet, so `sid` is parked for the session hook below.
-            rememberIdpSession(account);
+            rememberIdpSession(account, context);
 
             // The only password Better Auth writes itself; every other path is models/user.
             if (account.providerId === "credential" && account.password) {
@@ -360,9 +359,9 @@ async function createAuth(baseURL: string): Promise<any> {
               data.idToken = encryptSecret(data.idToken);
             return { data };
           },
-          after: async (account) => {
+          after: async (account, context) => {
             // A repeat sign-in brings a fresh `sid` for a fresh session row.
-            rememberIdpSession(account);
+            rememberIdpSession(account, context);
 
             // Repeat sign-ins update rather than create the row.
             try {
@@ -404,7 +403,7 @@ async function createAuth(baseURL: string): Promise<any> {
             try {
               const sessionId =
                 typeof session.id === "string" ? Number(session.id) : (session.id as number);
-              await bindSessionToIdpSession(userId, sessionId);
+              await bindSessionToIdpSession(context, userId, sessionId);
             } catch (error) {
               console.warn("[auth-server] Binding the session to its IdP session failed:", error);
             }

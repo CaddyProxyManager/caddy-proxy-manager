@@ -17,52 +17,49 @@ export type PendingSessionBinding = {
   sid: string;
 };
 
-/** A sign-in consumes its entry within milliseconds; this is only a leak guard. */
-const PENDING_TTL_MS = 5 * 60 * 1000;
+/**
+ * Keyed by the sign-in request's own endpoint context, which Better Auth hands both the account
+ * and the session hook: overlapping sign-ins for one user each keep their own `sid`, whatever order
+ * their hooks finish in. Weak, so an unconsumed entry goes with its request.
+ */
+const pending = new WeakMap<object, PendingSessionBinding>();
 
-const pending = new Map<number, { entry: PendingSessionBinding; expiresAt: number }>();
-
-function prunePending(now: number): void {
-  for (const [key, value] of pending) {
-    if (value.expiresAt <= now) pending.delete(key);
-  }
+export function recordPendingSessionBinding(request: object, entry: PendingSessionBinding): void {
+  pending.set(request, entry);
 }
 
-export function recordPendingSessionBinding(entry: PendingSessionBinding): void {
-  const now = Date.now();
-  prunePending(now);
-  pending.set(entry.userId, { entry, expiresAt: now + PENDING_TTL_MS });
-}
-
-export function consumePendingSessionBinding(userId: number): PendingSessionBinding | null {
-  const found = pending.get(userId);
-  pending.delete(userId);
-  if (!found || found.expiresAt <= Date.now()) return null;
-  return found.entry;
-}
-
-/** Exposed for tests - the registry is process-wide state. */
-export function clearPendingSessionBindings(): void {
-  pending.clear();
+export function consumePendingSessionBinding(
+  request: object,
+  userId: number,
+): PendingSessionBinding | null {
+  const entry = pending.get(request);
+  pending.delete(request);
+  return entry && entry.userId === userId ? entry : null;
 }
 
 /** No `sid`, no binding: that provider's logout tokens are honoured by subject, per the spec. */
 export function recordSessionBindingFromIdToken(
+  request: object | null | undefined,
   userId: number,
   providerId: string,
   idToken: string | null | undefined,
 ): void {
-  if (!Number.isFinite(userId) || !idToken) return;
+  // Without the request there is nothing safe to correlate by, so the session goes unbound.
+  if (!request || !Number.isFinite(userId) || !idToken) return;
   const raw = isEncryptedSecret(idToken) ? decryptSecret(idToken, "OIDC id_token") : idToken;
   const claims = decodeJwtPayload(raw);
   const sid = claims?.sid;
   if (typeof sid !== "string" || !sid) return;
-  recordPendingSessionBinding({ userId, providerId, sid });
+  recordPendingSessionBinding(request, { userId, providerId, sid });
 }
 
-export async function bindSessionToIdpSession(userId: number, sessionId: number): Promise<void> {
-  if (pending.size === 0 || !Number.isFinite(userId) || !Number.isFinite(sessionId)) return;
-  const entry = consumePendingSessionBinding(userId);
+export async function bindSessionToIdpSession(
+  request: object | null | undefined,
+  userId: number,
+  sessionId: number,
+): Promise<void> {
+  if (!request || !Number.isFinite(userId) || !Number.isFinite(sessionId)) return;
+  const entry = consumePendingSessionBinding(request, userId);
   if (!entry) return;
 
   await db
