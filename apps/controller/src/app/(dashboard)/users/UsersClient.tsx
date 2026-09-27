@@ -51,7 +51,7 @@ import {
   updateUserInfoAction,
   deleteUserAction,
   resetUserTwoFactorAction,
-  sendPasswordLinkAction,
+  sendEmailedLinkAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
 
@@ -292,7 +292,7 @@ export default function UsersClient({
               key={selected.id}
               user={selected}
               groups={groups}
-              canSendPasswordLink={localUsersEnabled && emailEnabled}
+              canSendEmailedLink={localUsersEnabled && emailEnabled}
               onDone={refresh}
             />
           ) : (
@@ -328,12 +328,12 @@ export default function UsersClient({
 function UserDetail({
   user,
   groups,
-  canSendPasswordLink,
+  canSendEmailedLink,
   onDone,
 }: {
   user: UserEntry;
   groups: GroupSummary[];
-  canSendPasswordLink: boolean;
+  canSendEmailedLink: boolean;
   /** null after a successful change, the message after a failed one. */
   onDone: (message: string | null) => void;
 }) {
@@ -450,7 +450,7 @@ function UserDetail({
                   )}
                 </Text>
                 {/* SSO accounts never had a password to reset, and should not be handed one. */}
-                {canSendPasswordLink && !isExternal(user) && !user.isDemoAdmin && !isDisabled && (
+                {canSendEmailedLink && !isExternal(user) && !user.isDemoAdmin && !isDisabled && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -460,7 +460,7 @@ function UserDetail({
                     onClick={async () => {
                       setSendingLink(true);
                       try {
-                        const result = await sendPasswordLinkAction(user.id);
+                        const result = await sendEmailedLinkAction(user.id);
                         if (result.status === "error") {
                           onDone(result.message ?? null);
                         } else if (result.message) {

@@ -18,7 +18,7 @@ import { resetTwoFactor } from "@/src/lib/two-factor";
 import { logAuditEvent } from "@/src/lib/audit";
 import { hashPassword } from "@/src/lib/password";
 import { getLocale, getTranslations } from "next-intl/server";
-import { sendPasswordLink } from "@/src/lib/services/password-links";
+import { sendEmailedLink } from "@/src/lib/services/emailed-links";
 import {
   actionError,
   actionSuccess,
@@ -77,7 +77,7 @@ async function createUserActionUntranslated(formData: FormData): Promise<unknown
   revalidatePath("/users");
   if (!invite) return null;
   try {
-    await sendPasswordLink(user.id, session.user.name || session.user.email, await getLocale());
+    await sendEmailedLink(user.id, session.user.name || session.user.email, await getLocale());
     return null;
   } catch (error) {
     console.error("createUserAction: the invitation was not sent:", error);
@@ -270,10 +270,10 @@ export async function resetUserTwoFactorAction(userId: number): Promise<ActionSt
 }
 
 /** An invitation to an account with no password yet, a reset link to one with. */
-export async function sendPasswordLinkAction(userId: number): Promise<ActionState> {
+export async function sendEmailedLinkAction(userId: number): Promise<ActionState> {
   try {
     const session = await requireAdmin();
-    const purpose = await sendPasswordLink(
+    const purpose = await sendEmailedLink(
       userId,
       session.user.name || session.user.email,
       await getLocale(),
@@ -294,7 +294,7 @@ export async function sendPasswordLinkAction(userId: number): Promise<ActionStat
     );
   } catch (error) {
     const t = await getTranslations();
-    console.error("sendPasswordLinkAction failed:", error);
+    console.error("sendEmailedLinkAction failed:", error);
     return actionError(t, error, t("errors.emailSendFailedUnknown"));
   }
 }

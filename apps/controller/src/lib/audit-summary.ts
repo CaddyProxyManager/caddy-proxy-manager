@@ -431,7 +431,7 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^User set a password$/,
   },
 
-  // services/password-links.ts
+  // services/emailed-links.ts
   {
     entityType: "user",
     action: "password_set",

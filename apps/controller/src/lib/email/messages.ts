@@ -102,7 +102,7 @@ export async function testEmail(
   };
 }
 
-export async function passwordResetEmail(
+export async function resetLinkEmail(
   input: { to: string; link: string; minutes: number },
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {

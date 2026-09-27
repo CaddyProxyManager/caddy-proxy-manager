@@ -17,12 +17,12 @@ import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 
-type PasswordLink = { purpose: "reset" | "invite"; username: string };
+type EmailedLink = { purpose: "reset" | "invite"; username: string };
 type Stage =
   | { kind: "checking" }
   | { kind: "invalid" }
-  | { kind: "form"; token: string; link: PasswordLink }
-  | { kind: "done"; purpose: PasswordLink["purpose"] };
+  | { kind: "form"; token: string; link: EmailedLink }
+  | { kind: "done"; purpose: EmailedLink["purpose"] };
 
 /** The token arrives in the fragment, which no server sees; it is dropped from the address bar. */
 export default function ResetPasswordForm({ canRequestAnother }: { canRequestAnother: boolean }) {
@@ -53,7 +53,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
           setStage({ kind: "invalid" });
           return;
         }
-        setStage({ kind: "form", token, link: (await response.json()) as PasswordLink });
+        setStage({ kind: "form", token, link: (await response.json()) as EmailedLink });
       })
       .catch(() => {
         if (!cancelled) setStage({ kind: "invalid" });

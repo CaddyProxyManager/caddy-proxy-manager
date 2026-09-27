@@ -33,14 +33,14 @@ import {
   setEmailDeliveryForTests,
 } from '../../src/lib/email/transport';
 import { createUser, usersWithPassword } from '../../src/lib/models/user';
-import { issuePasswordLink } from '../../src/lib/models/password-links';
+import { issueEmailedLink } from '../../src/lib/models/emailed-links';
 import { hashPassword, verifyPassword } from '../../src/lib/password';
 import {
-  completePasswordLink,
-  describePasswordLink,
+  completeEmailedLink,
+  describeEmailedLink,
   requestPasswordReset,
-  sendPasswordLink,
-} from '../../src/lib/services/password-links';
+  sendEmailedLink,
+} from '../../src/lib/services/emailed-links';
 import { invalidateSettingsCache } from '../../src/lib/settings/resolve';
 
 const SMTP_ENV = {
@@ -124,12 +124,12 @@ describe('requestPasswordReset', () => {
     expect(sent[0].from).toEqual({ name: 'Caddy Proxy Manager', address: 'proxy@example.com' });
     const token = tokenFrom(sent[0]);
     expect(sent[0].html).toContain(`#${token}`);
-    expect(await describePasswordLink(token)).toEqual({
+    expect(await describeEmailedLink(token)).toEqual({
       purpose: 'reset',
       username: 'alice@example.com',
     });
 
-    expect(await completePasswordLink(token, 'New-password-2')).toEqual({
+    expect(await completeEmailedLink(token, 'New-password-2')).toEqual({
       userId: user.id,
       purpose: 'reset',
     });
@@ -140,8 +140,8 @@ describe('requestPasswordReset', () => {
     // The old password's sessions go with it.
     expect(await ctx.db.select().from(sessions).where(eq(sessions.userId, user.id))).toEqual([]);
 
-    await expectInvalidLink(completePasswordLink(token, 'Another-password-3'));
-    expect(await describePasswordLink(token)).toBeNull();
+    await expectInvalidLink(completeEmailedLink(token, 'Another-password-3'));
+    expect(await describeEmailedLink(token)).toBeNull();
   });
 
   it('matches the username too, not just the address', async () => {
@@ -188,28 +188,28 @@ describe('requestPasswordReset', () => {
     await requestPasswordReset('alice@example.com', 'en');
 
     const [older, newer] = sent.map(tokenFrom);
-    await expectInvalidLink(completePasswordLink(older, 'New-password-2'));
-    await completePasswordLink(newer, 'New-password-2');
+    await expectInvalidLink(completeEmailedLink(older, 'New-password-2'));
+    await completeEmailedLink(newer, 'New-password-2');
   });
 });
 
 describe('password links', () => {
   it('refuses an expired link', async () => {
     const user = await localUser();
-    const { token } = await issuePasswordLink(user.id, 'reset', Date.now() - 2 * 60 * 60 * 1000);
-    expect(await describePasswordLink(token)).toBeNull();
-    await expectInvalidLink(completePasswordLink(token, 'New-password-2'));
+    const { token } = await issueEmailedLink(user.id, 'reset', Date.now() - 2 * 60 * 60 * 1000);
+    expect(await describeEmailedLink(token)).toBeNull();
+    await expectInvalidLink(completeEmailedLink(token, 'New-password-2'));
   });
 
   it('refuses a link for an account disabled since it was sent', async () => {
     const user = await localUser();
-    const { token } = await issuePasswordLink(user.id, 'reset');
+    const { token } = await issueEmailedLink(user.id, 'reset');
     await ctx.db.update(users).set({ status: 'disabled' }).where(eq(users.id, user.id));
-    await expectInvalidLink(completePasswordLink(token, 'New-password-2'));
+    await expectInvalidLink(completeEmailedLink(token, 'New-password-2'));
   });
 });
 
-describe('sendPasswordLink', () => {
+describe('sendEmailedLink', () => {
   it('invites an account without a password, which then signs in with the one chosen', async () => {
     configureEmail();
     const user = await createUser({
@@ -218,13 +218,13 @@ describe('sendPasswordLink', () => {
       subject: 'bob@example.com',
     });
 
-    expect(await sendPasswordLink(user.id, 'Avery', 'en')).toBe('invite');
+    expect(await sendEmailedLink(user.id, 'Avery', 'en')).toBe('invite');
     expect(sent[0].subject).toContain('invited');
     expect(sent[0].text).toContain('Avery created an account for bob@example.com');
 
     const token = tokenFrom(sent[0]);
-    expect((await describePasswordLink(token))?.purpose).toBe('invite');
-    await completePasswordLink(token, 'Chosen-password-1');
+    expect((await describeEmailedLink(token))?.purpose).toBe('invite');
+    await completeEmailedLink(token, 'Chosen-password-1');
     // Better Auth signs in from the credential account, which an invitation starts without.
     expect((await usersWithPassword()).has(user.id)).toBe(true);
   });
@@ -232,14 +232,14 @@ describe('sendPasswordLink', () => {
   it('sends a reset link to an account that has a password', async () => {
     configureEmail();
     const user = await localUser();
-    expect(await sendPasswordLink(user.id, 'Avery', 'en')).toBe('reset');
+    expect(await sendEmailedLink(user.id, 'Avery', 'en')).toBe('reset');
     expect(sent[0].subject).toBe('Reset your Caddy Proxy Manager password');
   });
 
   it('refuses a single sign-on account', async () => {
     configureEmail();
     const user = await createUser({ email: 'sso@example.com', provider: 'oidc', subject: 'x' });
-    const error = await sendPasswordLink(user.id, 'Avery', 'en').catch((caught: unknown) => caught);
+    const error = await sendEmailedLink(user.id, 'Avery', 'en').catch((caught: unknown) => caught);
     expect((error as DomainError).code).toBe('passwordLinkSsoAccount');
   });
 
@@ -250,7 +250,7 @@ describe('sendPasswordLink', () => {
       throw new Error('550 relay denied');
     });
 
-    const error = await sendPasswordLink(user.id, 'Avery', 'en').catch((caught: unknown) => caught);
+    const error = await sendEmailedLink(user.id, 'Avery', 'en').catch((caught: unknown) => caught);
     expect((error as DomainError).code).toBe('emailSendFailed');
     expect((error as DomainError).params).toEqual({ detail: '550 relay denied' });
     expect(await ctx.db.select().from(verifications)).toEqual([]);

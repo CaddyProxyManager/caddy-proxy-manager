@@ -7,7 +7,7 @@ import { getClientIp } from "@/src/lib/client-ip";
 import { DomainError } from "@/src/lib/domain-error";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import { takeFromWindow } from "@/src/lib/rate-limit";
-import { completePasswordLink } from "@/src/lib/services/password-links";
+import { completeEmailedLink } from "@/src/lib/services/emailed-links";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { purpose } = await completePasswordLink(token, password);
+    const { purpose } = await completeEmailedLink(token, password);
     return Response.json({ ok: true, purpose });
   } catch (error) {
     if (error instanceof DomainError && error.code === "passwordLinkInvalid") {

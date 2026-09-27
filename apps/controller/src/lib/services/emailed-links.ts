@@ -15,24 +15,24 @@ import { hashPassword } from "../password";
 import { getPublicBaseUrl } from "../public-url";
 import { accountKey, resetAccountFailures } from "../rate-limit";
 import { emailReady } from "../email/config";
-import { inviteEmail, passwordResetEmail } from "../email/messages";
+import { inviteEmail, resetLinkEmail } from "../email/messages";
 import { sendEmail } from "../email/transport";
 import { createAuditEvent } from "../models/audit";
 import {
-  PASSWORD_LINK_TTL_MS,
-  type PasswordLinkPurpose,
-  findPasswordLink,
-  issuePasswordLink,
-  redeemPasswordLink,
-  revokePasswordLinks,
-} from "../models/password-links";
+  EMAILED_LINK_TTL_MS,
+  type EmailedLinkPurpose,
+  findEmailedLink,
+  issueEmailedLink,
+  redeemEmailedLink,
+  revokeEmailedLinks,
+} from "../models/emailed-links";
 import { revokeSessionsAfterPasswordChange } from "../models/sessions";
 import { getUserById, updateUserPassword, usersWithPassword } from "../models/user";
 
-export const PASSWORD_LINK_PATH = "/login/reset-password";
+export const EMAILED_LINK_PATH = "/login/reset-password";
 
 async function linkFor(token: string): Promise<string> {
-  return `${await getPublicBaseUrl()}${PASSWORD_LINK_PATH}#${token}`;
+  return `${await getPublicBaseUrl()}${EMAILED_LINK_PATH}#${token}`;
 }
 
 type Account = {
@@ -81,13 +81,13 @@ export async function requestPasswordReset(identifier: string, locale: Locale): 
   if (account?.status !== "active" || isDemoAdmin(account.id)) return;
   if (!(await isLocalAccount(account))) return;
 
-  const { token } = await issuePasswordLink(account.id, "reset");
+  const { token } = await issueEmailedLink(account.id, "reset");
   await sendEmail(
-    await passwordResetEmail(
+    await resetLinkEmail(
       {
         to: account.email,
         link: await linkFor(token),
-        minutes: PASSWORD_LINK_TTL_MS.reset / 60_000,
+        minutes: EMAILED_LINK_TTL_MS.reset / 60_000,
       },
       locale,
     ),
@@ -105,11 +105,11 @@ export async function requestPasswordReset(identifier: string, locale: Locale): 
  * Sent by an administrator: an invitation to an account with no password yet, a reset link to one
  * with. Throws, unlike the self-service request - the administrator should see a refusal.
  */
-export async function sendPasswordLink(
+export async function sendEmailedLink(
   userId: number,
   inviter: string,
   locale: Locale,
-): Promise<PasswordLinkPurpose> {
+): Promise<EmailedLinkPurpose> {
   if (await localUsersDisabled()) throw domainError("localUserCreationDisabled");
   if (!(await emailReady())) throw domainError("emailNotConfigured");
 
@@ -119,8 +119,8 @@ export async function sendPasswordLink(
   if (!(await isLocalAccount(account))) throw domainError("passwordLinkSsoAccount");
 
   const hasPassword = account.passwordHash !== null || (await usersWithPassword()).has(account.id);
-  const purpose: PasswordLinkPurpose = hasPassword ? "reset" : "invite";
-  const { token } = await issuePasswordLink(account.id, purpose);
+  const purpose: EmailedLinkPurpose = hasPassword ? "reset" : "invite";
+  const { token } = await issueEmailedLink(account.id, purpose);
   const link = await linkFor(token);
   const message =
     purpose === "invite"
@@ -128,30 +128,30 @@ export async function sendPasswordLink(
           {
             to: account.email,
             link,
-            days: PASSWORD_LINK_TTL_MS.invite / 86_400_000,
+            days: EMAILED_LINK_TTL_MS.invite / 86_400_000,
             inviter,
           },
           locale,
         )
-      : await passwordResetEmail(
-          { to: account.email, link, minutes: PASSWORD_LINK_TTL_MS.reset / 60_000 },
+      : await resetLinkEmail(
+          { to: account.email, link, minutes: EMAILED_LINK_TTL_MS.reset / 60_000 },
           locale,
         );
   try {
     await sendEmail(message);
   } catch (error) {
     // A link nobody received should not stay redeemable.
-    await revokePasswordLinks(account.id);
+    await revokeEmailedLinks(account.id);
     throw error;
   }
   return purpose;
 }
 
 /** What the form shows before a password is typed; null for a dead link. */
-export async function describePasswordLink(
+export async function describeEmailedLink(
   token: string,
-): Promise<{ purpose: PasswordLinkPurpose; username: string } | null> {
-  const link = await findPasswordLink(token);
+): Promise<{ purpose: EmailedLinkPurpose; username: string } | null> {
+  const link = await findEmailedLink(token);
   if (!link) return null;
   const account = await findAccount(eq(users.id, link.userId));
   if (account?.status !== "active") return null;
@@ -159,13 +159,13 @@ export async function describePasswordLink(
 }
 
 /** The caller has already checked `password` against the policy, so a refusal keeps the link. */
-export async function completePasswordLink(
+export async function completeEmailedLink(
   token: string,
   password: string,
-): Promise<{ userId: number; purpose: PasswordLinkPurpose }> {
+): Promise<{ userId: number; purpose: EmailedLinkPurpose }> {
   if (await localUsersDisabled()) throw domainError("passwordLinkInvalid");
 
-  const link = await redeemPasswordLink(token);
+  const link = await redeemEmailedLink(token);
   if (!link) throw domainError("passwordLinkInvalid");
   const user = await getUserById(link.userId);
   if (user?.status !== "active") throw domainError("passwordLinkInvalid");
@@ -173,7 +173,7 @@ export async function completePasswordLink(
   await updateUserPassword(user.id, await hashPassword(password));
   // Whoever had the old password, or a session on it, is out; so is any other link in the inbox.
   await revokeSessionsAfterPasswordChange(user.id, null);
-  await revokePasswordLinks(user.id);
+  await revokeEmailedLinks(user.id);
 
   const account = await findAccount(eq(users.id, user.id));
   for (const name of [user.email, account?.username]) {
