@@ -17,4 +17,14 @@ export default defineConfig({
 
   // maplibre-gl's tile worker is `{ type: "module" }` (WorldMapInner.tsx); Vite defaults to iife.
   worker: { format: "es" },
+
+  build: {
+    rolldownOptions: {
+      // An import that is always undefined is a dead branch the bundler found; fail, not warn.
+      onwarn(warning, warn) {
+        if (warning.code === "IMPORT_IS_UNDEFINED") throw new Error(warning.message);
+        warn(warning);
+      },
+    },
+  },
 });

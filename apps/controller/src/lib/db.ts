@@ -127,7 +127,7 @@ async function runEnvProviderSync() {
     };
   };
   try {
-    config = require("./config").config;
+    ({ config } = await import("./config"));
   } catch {
     return;
   }
@@ -137,7 +137,7 @@ async function runEnvProviderSync() {
   const { oauthProviders } = schema;
   let encryptSecret: (v: string) => string;
   try {
-    encryptSecret = require("./secret").encryptSecret;
+    ({ encryptSecret } = await import("./secret"));
   } catch (e) {
     console.error(
       "CRITICAL: Failed to load encryption module, refusing to store plaintext secrets:",
