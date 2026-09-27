@@ -138,6 +138,7 @@ services:
 
       # First-start defaults of Settings fields.
       FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
+      FORWARD_AUTH_ALLOWED_PORTS: ${FORWARD_AUTH_ALLOWED_PORTS:-}
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       # Variables that override a stored value, for getting back into a locked-out instance.
       SETTINGS_ENV_OVERRIDE: ${SETTINGS_ENV_OVERRIDE:-}

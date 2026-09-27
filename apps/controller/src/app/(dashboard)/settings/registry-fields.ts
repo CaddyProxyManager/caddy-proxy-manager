@@ -15,6 +15,7 @@ import {
   baseUrl,
   caddyMonitorEnabled,
   disableLocalUsers,
+  forwardAuthAllowedPorts,
   loginBlockMs,
   loginMaxAttempts,
   loginWindowMs,
@@ -33,6 +34,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
+  "forward-auth": [forwardAuthAllowedPorts] as AnySetting[],
   "sign-in": [
     allowSelfRegistration,
     allowOauthRegistration,

@@ -462,6 +462,7 @@
       "subtitle": "Your password is stored with an older algorithm. Choose a new one to continue."
     },
     "portalInvalidLink": "This sign-in link is invalid. Open the site you were trying to reach again.",
+    "portalPortNotAllowed": "This site is served on port {port}, which is not allowed for forward authentication. Ask the administrator to add it to the forward-auth ports in Settings.",
     "signInToAccess": "Sign in to access <host_>{host}</host_>",
     "signInToContinue": "Sign in to continue",
     "signInUnavailableTitle": "No sign-in method available",
@@ -2441,6 +2442,10 @@
       "clickhouse_user": {
         "description": "The account traffic and WAF events are written as.",
         "label": "ClickHouse user"
+      },
+      "forward_auth_allowed_ports": {
+        "description": "Non-default ports that CPM forward-auth sites are served on, comma-separated. Caddy matches a host whatever the port, so a sign-in on a port that is neither listed here nor the default for http or https is refused.",
+        "label": "Forward-auth ports"
       },
       "forward_auth_internal_url": {
         "description": "The address Caddy uses to reach this app for forward_auth. Derived from the container network when empty; set it only if that derivation is wrong.",

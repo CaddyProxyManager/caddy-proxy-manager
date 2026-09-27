@@ -452,6 +452,21 @@ export const loginBlockMs = numberSetting({
   max: 24 * 60 * 60 * 1000,
 });
 
+export const forwardAuthAllowedPorts = stringSetting({
+  name: "forward_auth_allowed_ports",
+  env: "FORWARD_AUTH_ALLOWED_PORTS",
+  group: "authentication",
+  label: "Forward-auth ports",
+  description:
+    "Non-default ports that CPM forward-auth sites are served on, comma-separated. Caddy matches " +
+    "a host whatever the port, so a sign-in on a port that is neither listed here nor the " +
+    "default for http or https is refused.",
+  default: "",
+  pattern: /^\d{1,5}(?:\s*,\s*\d{1,5})*$/,
+  patternHint: "must be a comma-separated list of port numbers",
+  maxLength: 512,
+});
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 /**
@@ -605,6 +620,7 @@ export const SETTING_DEFINITIONS = [
   loginMaxAttempts,
   loginWindowMs,
   loginBlockMs,
+  forwardAuthAllowedPorts,
   analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,

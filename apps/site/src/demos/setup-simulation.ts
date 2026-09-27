@@ -551,6 +551,13 @@ export const SETTING_FIELDS: Array<{
     value: 900_000,
   },
   {
+    key: "config:forward_auth_allowed_ports",
+    env: "FORWARD_AUTH_ALLOWED_PORTS",
+    group: "authentication",
+    kind: "string",
+    value: "",
+  },
+  {
     key: "config:analytics_enabled",
     env: "ANALYTICS_ENABLED",
     group: "analytics",

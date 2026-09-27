@@ -261,6 +261,10 @@ export default function SettingsClient({
     updateRegistrySettingsAction,
     null,
   );
+  const [forwardAuthRegistryState, forwardAuthRegistryFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
     null,
@@ -484,11 +488,19 @@ export default function SettingsClient({
       />
     ),
     "forward-auth": (
-      <ForwardAuthSection
-        forwardAuth={forwardAuth}
-        forwardAuthState={forwardAuthState}
-        forwardAuthFormAction={forwardAuthFormAction}
-      />
+      <>
+        <ForwardAuthSection
+          forwardAuth={forwardAuth}
+          forwardAuthState={forwardAuthState}
+          forwardAuthFormAction={forwardAuthFormAction}
+        />
+        <RegistrySettingsBlock
+          block="forward-auth"
+          fields={registry["forward-auth"] ?? []}
+          state={forwardAuthRegistryState}
+          formAction={forwardAuthRegistryFormAction}
+        />
+      </>
     ),
     geoip: <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />,
     geoblock: (

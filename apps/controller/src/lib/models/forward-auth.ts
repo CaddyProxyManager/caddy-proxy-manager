@@ -30,7 +30,7 @@ export type ForwardAuthAudience = {
   proxyHostId: number;
 };
 
-function parseForwardAuthUrl(rawUrl: string): URL | null {
+function parseForwardAuthUrlAnyPort(rawUrl: string): URL | null {
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
@@ -39,6 +39,66 @@ function parseForwardAuthUrl(rawUrl: string): URL | null {
   } catch {
     return null;
   }
+}
+
+/** Ports as the setting lists them; anything that is not one is dropped rather than refused. */
+export function parseForwardAuthPortList(raw: string): Set<string> {
+  return new Set(
+    raw
+      .split(",")
+      .map((port) => port.trim())
+      .filter((port) => /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535)
+      .map((port) => String(Number(port))),
+  );
+}
+
+/** Read per call so a save needs no restart; imported lazily, as in rate-limit.ts. */
+async function allowedForwardAuthPorts(): Promise<Set<string>> {
+  const [{ forwardAuthAllowedPorts }, { getSetting }] = await Promise.all([
+    import("../settings/registry"),
+    import("../settings/resolve"),
+  ]);
+  return parseForwardAuthPortList(await getSetting(forwardAuthAllowedPorts));
+}
+
+/** Caddy matches hosts whatever the port, so a non-default one must be declared as served. */
+async function isForwardAuthPortAllowed(parsed: URL): Promise<boolean> {
+  return !parsed.port || (await allowedForwardAuthPorts()).has(parsed.port);
+}
+
+async function parseForwardAuthUrl(rawUrl: string): Promise<URL | null> {
+  const parsed = parseForwardAuthUrlAnyPort(rawUrl);
+  return parsed && (await isForwardAuthPortAllowed(parsed)) ? parsed : null;
+}
+
+// Once per port per window, and capped, so probing many ports cannot flood the log; the window
+// restarts hourly, so a port crowded out by probing is still reported later.
+let reportedDisallowedPorts = new Set<string>();
+let reportWindowStartedAt = 0;
+const MAX_REPORTED_DISALLOWED_PORTS = 32;
+const DISALLOWED_PORT_REPORT_WINDOW_MS = 60 * 60 * 1000;
+
+function reportDisallowedPort(hostname: string, port: string): void {
+  const now = Date.now();
+  if (
+    now < reportWindowStartedAt ||
+    now - reportWindowStartedAt >= DISALLOWED_PORT_REPORT_WINDOW_MS
+  ) {
+    reportedDisallowedPorts = new Set();
+    reportWindowStartedAt = now;
+  }
+  if (
+    reportedDisallowedPorts.has(port) ||
+    reportedDisallowedPorts.size >= MAX_REPORTED_DISALLOWED_PORTS
+  ) {
+    return;
+  }
+  reportedDisallowedPorts.add(port);
+  console.warn(
+    `[forward-auth] Rejected ${hostname}:${port} because port ${port} is not an allowed ` +
+      `forward-auth port. If protected sites are served on it, add it under Settings > Forward ` +
+      `Auth (FORWARD_AUTH_ALLOWED_PORTS).`,
+  );
 }
 
 function audienceMatchesUrl(audience: ForwardAuthAudience, parsed: URL): boolean {
@@ -158,7 +218,7 @@ export async function consumeRedirectIntent(rid: string): Promise<{
 
   await db.delete(forwardAuthRedirectIntents).where(eq(forwardAuthRedirectIntents.id, intent.id));
 
-  const parsed = parseForwardAuthUrl(intent.redirectUri);
+  const parsed = await parseForwardAuthUrl(intent.redirectUri);
   if (!parsed || !intent.audienceOrigin || !intent.proxyHostId) return null;
 
   const audience: ForwardAuthAudience = {
@@ -197,7 +257,7 @@ export async function createForwardAuthSession(
   audience: ForwardAuthAudience,
   ttlSeconds?: number,
 ): Promise<{ rawToken: string; session: ForwardAuthSession }> {
-  const parsedAudience = parseForwardAuthUrl(audience.origin);
+  const parsedAudience = await parseForwardAuthUrl(audience.origin);
   if (!parsedAudience || !audienceMatchesUrl(audience, parsedAudience)) {
     throw domainError("invalidForwardAuthAudience");
   }
@@ -282,7 +342,7 @@ export async function createExchangeCode(
   redirectUri: string,
   audience: ForwardAuthAudience,
 ): Promise<{ rawCode: string }> {
-  const parsedRedirect = parseForwardAuthUrl(redirectUri);
+  const parsedRedirect = await parseForwardAuthUrl(redirectUri);
   if (!parsedRedirect || !audienceMatchesUrl(audience, parsedRedirect)) {
     throw domainError("invalidForwardAuthAudience");
   }
@@ -343,7 +403,7 @@ export async function redeemExchangeCode(
   if (claimed.length === 0) return null;
   const exchange = claimed[0];
 
-  const parsedRedirect = parseForwardAuthUrl(exchange.redirectUri);
+  const parsedRedirect = await parseForwardAuthUrl(exchange.redirectUri);
   if (!parsedRedirect || !audienceMatchesUrl(audience, parsedRedirect)) {
     await db.delete(forwardAuthExchanges).where(eq(forwardAuthExchanges.id, exchange.id));
     return null;
@@ -525,11 +585,17 @@ async function findForwardAuthProxyHost(host: string) {
 export async function resolveForwardAuthAudience(
   targetUrl: string,
 ): Promise<ForwardAuthAudience | null> {
-  const parsed = parseForwardAuthUrl(targetUrl);
+  const parsed = parseForwardAuthUrlAnyPort(targetUrl);
   if (!parsed) return null;
 
   const proxyHost = await findForwardAuthProxyHost(parsed.hostname);
   if (!proxyHost) return null;
+
+  // After the host lookup, so only a port on a protected host is worth a warning.
+  if (!(await isForwardAuthPortAllowed(parsed))) {
+    reportDisallowedPort(parsed.hostname, parsed.port);
+    return null;
+  }
 
   return {
     origin: parsed.origin,
@@ -540,4 +606,13 @@ export async function resolveForwardAuthAudience(
 
 export async function isForwardAuthDomain(host: string): Promise<boolean> {
   return !!(await findForwardAuthProxyHost(host));
+}
+
+/** The port of a forward-auth URL refused only for being undeclared, so the portal can say why. */
+export async function getDisallowedForwardAuthPort(targetUrl: string): Promise<string | null> {
+  const parsed = parseForwardAuthUrlAnyPort(targetUrl);
+  if (!parsed || (await isForwardAuthPortAllowed(parsed))) return null;
+  if (!(await findForwardAuthProxyHost(parsed.hostname))) return null;
+  reportDisallowedPort(parsed.hostname, parsed.port);
+  return parsed.port;
 }

@@ -4,6 +4,7 @@ import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import {
   isForwardAuthDomain,
   createRedirectIntent,
+  getDisallowedForwardAuthPort,
   redirectIntentWantsCaptcha,
 } from "@/src/lib/models/forward-auth";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
@@ -52,6 +53,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   // A Caddy redirect always carries ?rd=, so a ?rid= beside it came from the protected URL's own
   // query string and must not replace the target the browser was sent from.
   let targetDomain = "";
+  let disallowedPort: string | null = null;
   let rid = redirectUri || repeatedParam ? "" : existingRid;
   if (!rid && redirectUri && !repeatedParam) {
     try {
@@ -64,7 +66,12 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         // Every GET writes a row, so each client gets a budget; past it the portal shows its
         // generic message rather than another intent.
         const ip = (await getClientIp(await headers())) ?? "unknown";
-        if (takeFromWindow(`portal-intent:${ip}`, INTENTS_PER_CLIENT, INTENT_WINDOW_MS)) {
+        // A form that could only fail is replaced by the reason.
+        disallowedPort = await getDisallowedForwardAuthPort(redirectUri);
+        if (
+          !disallowedPort &&
+          takeFromWindow(`portal-intent:${ip}`, INTENTS_PER_CLIENT, INTENT_WINDOW_MS)
+        ) {
           // Store the redirect URI server-side. The client only gets an opaque ID,
           // so a tampered ?rd= parameter cannot influence the final redirect target.
           rid = await createRedirectIntent(redirectUri);
@@ -85,7 +92,11 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     typeof params.error === "string" ? params.error : undefined,
     t,
   );
-  const errorMessage = repeatedParam ? tAuth("portalInvalidLink") : null;
+  const errorMessage = repeatedParam
+    ? tAuth("portalInvalidLink")
+    : disallowedPort
+      ? tAuth("portalPortNotAllowed", { port: disallowedPort })
+      : null;
   const localLoginEnabled = !(await localUsersDisabled());
   // Per host: an operator can switch it off for one whose users cannot solve it.
   const configured = localLoginEnabled && rid ? await getActiveCaptcha() : null;
