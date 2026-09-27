@@ -115,6 +115,7 @@ import {
 } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
+import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { HttpCacheSection } from "./HttpCacheSection";
@@ -167,6 +168,8 @@ type Props = {
   updates: UpdateStatus;
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
   registry: Record<string, readonly RegistryField[]>;
+  /** Picked out on the server: the registry module is not browser-safe. */
+  sequentialUserIdsField?: RegistryField;
   analytics: AnalyticsView;
   geoip: GeoipView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
@@ -220,6 +223,7 @@ export default function SettingsClient({
   hasFavicon,
   updates,
   registry,
+  sequentialUserIdsField,
   analytics,
   geoip,
   canManageServices,
@@ -489,6 +493,7 @@ export default function SettingsClient({
     ),
     "forward-auth": (
       <>
+        <SequentialUserIdsBanner field={sequentialUserIdsField} />
         <ForwardAuthSection
           forwardAuth={forwardAuth}
           forwardAuthState={forwardAuthState}
