@@ -6,6 +6,7 @@
  */
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { extractErrorMessage } from "@/src/lib/actions";
 import { createOAuthProvider } from "@/src/lib/models/oauth-providers";
 import { createUser, findUserByEmail } from "@/src/lib/models/user";
 import { hashPassword } from "@/src/lib/password";
@@ -40,7 +41,7 @@ async function withAccountStep(create: () => Promise<string | null>): Promise<st
     await assertAccountStepOpen();
     return await create();
   } catch (error) {
-    return error instanceof Error ? error.message : t("noLongerOpen");
+    return extractErrorMessage(await getTranslations(), error, t("noLongerOpen"));
   } finally {
     await releaseSetupStep(SETUP_ACCOUNT_CLAIM, claim);
   }
