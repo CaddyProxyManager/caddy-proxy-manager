@@ -60,12 +60,13 @@ export function hydrateHostCache(meta: HostCacheMeta | undefined): HostCacheConf
 
 /**
  * A Set-Cookie response is marked private before any cache sees it, so one visitor's cookie is
- * never stored and replayed to the next - Souin caches such responses otherwise.
+ * never stored and replayed to the next - Souin caches such responses otherwise. Added, not set,
+ * so an upstream's own `no-store` survives it.
  */
 const COOKIE_GUARD = {
   handler: "headers",
   response: {
-    set: { "Cache-Control": ["private"] },
+    add: { "Cache-Control": ["private"] },
     require: { headers: { "Set-Cookie": [] } },
   },
 };
@@ -86,24 +87,35 @@ export function buildHostCacheHandler(
     handler: "headers",
     response: {
       set: { "Cache-Control": [`max-age=${maxAge}`] },
-      // A null list matches only when the header is absent: the upstream's own policy wins.
-      require: { headers: { "Cache-Control": null } },
+      // 2xx only, so a 404 or 500 mid-deploy is not kept for a day. A null list matches only
+      // when the header is absent: the upstream's own policy wins.
+      require: { status_code: [2], headers: { "Cache-Control": null } },
     },
   };
-  // Outermost first: the innermost header op runs first on the way out, so the guard sees the
-  // browser default and overrides it, and the cache sees both.
-  const handle =
-    cache.mode === "caddy" && caddyCacheUsable
-      ? [
-          // The per-host TTL lives here; the handler's own `ttl` field is ignored.
-          { handler: "cache", Configuration: { DefaultCache: { ttl: `${maxAge}s` } } },
-          COOKIE_GUARD,
-          browser,
-        ]
-      : [COOKIE_GUARD, browser];
+  // Outermost first: the innermost header op runs first on the way out, so the guard marks a
+  // cookie response before the browser default would fill it in, and the cache sees both.
+  const headers = [browser, COOKIE_GUARD];
+  if (cache.mode !== "caddy" || !caddyCacheUsable) {
+    return {
+      handler: "subroute",
+      routes: [{ match: [{ path: CACHE_ASSET_PATHS }], handle: headers }],
+    };
+  }
+  // Souin keys on the URL and skips only Authorization, so an asset an upstream gates by cookie
+  // would reach the next visitor. Exclusive matchers: a terminal route here would end the request.
   return {
     handler: "subroute",
-    routes: [{ match: [{ path: CACHE_ASSET_PATHS }], handle }],
+    routes: [
+      {
+        match: [{ path: CACHE_ASSET_PATHS, header: { Cookie: null } }],
+        handle: [
+          // The per-host TTL lives here; the handler's own `ttl` field is ignored.
+          { handler: "cache", Configuration: { DefaultCache: { ttl: `${maxAge}s` } } },
+          ...headers,
+        ],
+      },
+      { match: [{ path: CACHE_ASSET_PATHS, header: { Cookie: [] } }], handle: headers },
+    ],
   };
 }
 

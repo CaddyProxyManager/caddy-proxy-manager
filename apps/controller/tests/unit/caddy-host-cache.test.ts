@@ -100,24 +100,43 @@ describe('buildHostCacheHandler', () => {
       routes: Route[];
     };
     const [route] = handler.routes;
+    expect(handler.routes).toHaveLength(1);
     expect(route.match).toEqual([{ path: CACHE_ASSET_PATHS }]);
     expect(route.handle?.map((h) => h.handler)).toEqual(['headers', 'headers']);
-    expect(route.handle?.[1]).toEqual({
+    expect(route.handle?.[0]).toEqual({
       handler: 'headers',
       response: {
         set: { 'Cache-Control': ['max-age=3600'] },
-        require: { headers: { 'Cache-Control': null } },
+        require: { status_code: [2], headers: { 'Cache-Control': null } },
       },
     });
   });
 
-  it('marks responses that set a cookie private, in either mode', () => {
+  it('adds private to a response setting a cookie, innermost so it runs first', () => {
     for (const mode of ['browser', 'caddy'] as const) {
-      const json = JSON.stringify(buildHostCacheHandler({ mode, max_age: 60 }, true));
-      expect(json).toContain(
-        '"set":{"Cache-Control":["private"]},"require":{"headers":{"Set-Cookie":[]}}',
-      );
+      const handler = buildHostCacheHandler({ mode, max_age: 60 }, true) as { routes: Route[] };
+      for (const route of handler.routes) {
+        // Added, not set: an upstream's own no-store must survive it.
+        expect(route.handle?.at(-1)).toEqual({
+          handler: 'headers',
+          response: {
+            add: { 'Cache-Control': ['private'] },
+            require: { headers: { 'Set-Cookie': [] } },
+          },
+        });
+      }
     }
+  });
+
+  it('keeps a request carrying a cookie out of the shared cache', () => {
+    const handler = buildHostCacheHandler({ mode: 'caddy', max_age: 600 }, true) as {
+      routes: (Route & { match: Record<string, unknown>[] })[];
+    };
+    const [anonymous, withCookie] = handler.routes;
+    expect(anonymous.match).toEqual([{ path: CACHE_ASSET_PATHS, header: { Cookie: null } }]);
+    expect(withCookie.match).toEqual([{ path: CACHE_ASSET_PATHS, header: { Cookie: [] } }]);
+    expect(JSON.stringify(withCookie)).not.toContain('"handler":"cache"');
+    expect(withCookie.handle?.map((h) => h.handler)).toEqual(['headers', 'headers']);
   });
 
   it('puts the shared cache first in Caddy mode, with the TTL where Souin reads it', () => {

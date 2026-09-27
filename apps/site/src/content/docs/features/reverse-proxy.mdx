@@ -97,17 +97,20 @@ reaches the upstream.
 **Cache assets** covers stylesheets, scripts, images and fonts, matched by file extension. Pages and
 API responses are never cached. The max age runs from a minute to a year, a day by default.
 
-- **Browser** sets `Cache-Control: max-age=<n>` on assets whose upstream sent no
-  `Cache-Control` of its own, so an application that already manages caching keeps its policy.
+- **Browser** sets `Cache-Control: max-age=<n>` on successful asset responses whose upstream sent
+  no `Cache-Control` of its own, so an application that already manages caching keeps its policy,
+  and a 404 or 500 during a deploy is not kept for a day.
 - **Caddy cache** also keeps a shared copy in Caddy, so repeat requests skip the upstream. It needs
   the opt-in HTTP Cache module (see [Caddy build](/features/caddy-build/)); until that is compiled
   in, the host falls back to browser caching. The cache lives in memory unless another
   [storage](/features/caddy-build/#http-cache-storage) is chosen, such as Redis to share it between
-  Caddys.
+  Caddys. A request carrying a cookie or an `Authorization` header always goes to the upstream, so
+  an asset an application serves per user never reaches the next visitor.
 
-Either way, a response that sets a cookie is marked `private`, and nothing marked `private` or
-`no-store` is stored. The cache sits after any forward auth or access check, just before the
-upstream, so an asset is never served to a caller who could not fetch it.
+Either way, a response that sets a cookie gets `private` added to its `Cache-Control`, alongside
+anything stricter the upstream sent, and nothing marked `private` or `no-store` is stored. The
+cache sits after any forward auth or access check, just before the upstream, so an asset is never
+served to a caller who could not fetch it.
 
 ## DNS controls
 

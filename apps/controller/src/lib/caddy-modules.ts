@@ -7,6 +7,7 @@
 import { MODULE_PATH_PATTERN, MODULE_VERSION_PATTERN } from "@cpm/shared";
 import { DNS_PROVIDERS } from "./dns-providers";
 import { type DomainError, domainError } from "./domain-error";
+import { CACHE_STORAGE_MODULE_IDS, type ModuleCacheStorage } from "./http-cache-options";
 
 /** What the UI and generation gate on; one toggled module can power several. */
 export type CaddyFeatureId =
@@ -33,7 +34,7 @@ export type CaddyModuleDefinition = {
   /** The brand as written, which the translated module name is built around. */
   dnsProviderDisplayName?: string;
   /** The HTTP cache storage this module provides (`http-cache.ts`). */
-  cacheStorage?: string;
+  cacheStorage?: ModuleCacheStorage;
   /**
    * False for an opt-in module the shipped image leaves out: it is compiled in only once an admin
    * selects it and rebuilds. Defaulting it on would ask every fresh install to rebuild.
@@ -93,27 +94,27 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     features: ["cache"],
     defaultEnabled: false,
   },
-  ...cacheStorageModule(
+  cacheStorageModule(
     "otter",
     "Otter Cache Storage",
     "An in-memory store for the HTTP cache, bounded by entry count and faster than the built-in one. Entries are lost on restart.",
   ),
-  ...cacheStorageModule(
+  cacheStorageModule(
     "badger",
     "Badger Cache Storage",
     "Keeps the HTTP cache on disk in a Badger database on the Caddy data volume, so it survives a restart.",
   ),
-  ...cacheStorageModule(
+  cacheStorageModule(
     "simplefs",
     "SimpleFS Cache Storage",
     "Keeps the HTTP cache as plain files on the Caddy data volume, so it survives a restart.",
   ),
-  ...cacheStorageModule(
+  cacheStorageModule(
     "redis",
     "Redis Cache Storage",
     "Keeps the HTTP cache in Redis or Valkey, shared by every Caddy that points at the same server.",
   ),
-  ...cacheStorageModule(
+  cacheStorageModule(
     "etcd",
     "etcd Cache Storage",
     "Keeps the HTTP cache in an etcd cluster, shared by every Caddy that points at it. No authentication.",
@@ -122,23 +123,21 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
 
 /** Needs HTTP Cache as well; alone it compiles but nothing loads it. */
 function cacheStorageModule(
-  storage: string,
+  storage: ModuleCacheStorage,
   name: string,
   description: string,
-): CaddyModuleDefinition[] {
-  return [
-    {
-      id: `souin-storage-${storage}`,
-      name,
-      modulePath: `github.com/darkweak/storages/${storage}/caddy`,
-      description,
-      docsUrl: `https://github.com/darkweak/storages/tree/main/${storage}`,
-      category: "cache",
-      features: [],
-      cacheStorage: storage,
-      defaultEnabled: false,
-    },
-  ];
+): CaddyModuleDefinition {
+  return {
+    id: CACHE_STORAGE_MODULE_IDS[storage],
+    name,
+    modulePath: `github.com/darkweak/storages/${storage}/caddy`,
+    description,
+    docsUrl: `https://github.com/darkweak/storages/tree/main/${storage}`,
+    category: "cache",
+    features: [],
+    cacheStorage: storage,
+    defaultEnabled: false,
+  };
 }
 
 export function dnsModuleId(providerName: string): string {

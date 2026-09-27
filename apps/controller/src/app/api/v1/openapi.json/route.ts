@@ -2,6 +2,21 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { APP_VERSION } from "@/src/lib/app-version";
 import { SETTINGS_GROUPS } from "@/src/lib/settings-api";
+import {
+  DEFAULT_CACHE_MAX_AGE,
+  HOST_CACHE_MODES,
+  MAX_CACHE_MAX_AGE,
+  MIN_CACHE_MAX_AGE,
+} from "@/src/lib/host-cache";
+import {
+  CACHE_STORAGES,
+  CDN_PROVIDERS,
+  CDN_STRATEGIES,
+  MAX_CACHE_ENDPOINTS,
+  MAX_OTTER_SIZE,
+  MAX_REDIS_DB,
+  MIN_OTTER_SIZE,
+} from "@/src/lib/http-cache-options";
 
 const spec = {
   openapi: "3.1.0",
@@ -2642,31 +2657,45 @@ const spec = {
         properties: {
           storage: {
             type: "string",
-            enum: ["memory", "otter", "badger", "simplefs", "redis", "etcd"],
+            enum: [...CACHE_STORAGES],
           },
-          otterSize: { type: ["integer", "null"], minimum: 1000, maximum: 10000000 },
+          otterSize: {
+            type: ["integer", "null"],
+            minimum: MIN_OTTER_SIZE,
+            maximum: MAX_OTTER_SIZE,
+          },
           redis: {
             type: "object",
             properties: {
-              addresses: { type: "array", items: { type: "string", example: "redis:6379" } },
+              addresses: {
+                type: "array",
+                maxItems: MAX_CACHE_ENDPOINTS,
+                items: { type: "string", example: "redis:6379" },
+              },
               username: { type: "string" },
               password: { type: "string", writeOnly: true },
-              db: { type: "integer", minimum: 0, maximum: 255 },
+              db: { type: "integer", minimum: 0, maximum: MAX_REDIS_DB },
             },
           },
           etcd: {
             type: "object",
-            properties: { endpoints: { type: "array", items: { type: "string" } } },
+            properties: {
+              endpoints: {
+                type: "array",
+                maxItems: MAX_CACHE_ENDPOINTS,
+                items: { type: "string" },
+              },
+            },
           },
           cdn: {
             type: "object",
             properties: {
-              provider: { type: "string", enum: ["none", "cloudflare", "fastly"] },
+              provider: { type: "string", enum: [...CDN_PROVIDERS] },
               apiKey: { type: "string", writeOnly: true },
               email: { type: "string" },
               zoneId: { type: "string" },
               serviceId: { type: "string" },
-              strategy: { type: "string", enum: ["soft", "hard"] },
+              strategy: { type: "string", enum: [...CDN_STRATEGIES] },
             },
           },
         },
@@ -2717,8 +2746,13 @@ const spec = {
         description:
           "Cache assets: static asset paths only. Caddy mode needs the opt-in cache-handler module and falls back to browser mode without it",
         properties: {
-          mode: { type: "string", enum: ["browser", "caddy"] },
-          maxAge: { type: "integer", minimum: 60, maximum: 31536000, example: 86400 },
+          mode: { type: "string", enum: [...HOST_CACHE_MODES] },
+          maxAge: {
+            type: "integer",
+            minimum: MIN_CACHE_MAX_AGE,
+            maximum: MAX_CACHE_MAX_AGE,
+            example: DEFAULT_CACHE_MAX_AGE,
+          },
         },
         required: ["mode", "maxAge"],
       },

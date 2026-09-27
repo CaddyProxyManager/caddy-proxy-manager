@@ -210,14 +210,16 @@ class OriginHandler(BaseHTTPRequestHandler):
             self._send_text("x" * 100000)
             return
 
-        # ?cc= and ?cookie= set those response headers, for the cache tests.
+        # ?cc=, ?cookie= and ?status= shape the response, for the cache tests.
         params = parse_qs(query)
         extra = {}
         if "cc" in params:
             extra["Cache-Control"] = params["cc"][0]
         if "cookie" in params:
             extra["Set-Cookie"] = "session=%s; Path=/" % params["cookie"][0]
-        self._send_json(self._reflect(), extra_headers=extra)
+        status = params.get("status", ["200"])[0]
+        status = int(status) if status.isdigit() else 200
+        self._send_json(self._reflect(), status=status, extra_headers=extra)
 
     def do_GET(self):  # noqa: N802 - name fixed by BaseHTTPRequestHandler
         self._dispatch()

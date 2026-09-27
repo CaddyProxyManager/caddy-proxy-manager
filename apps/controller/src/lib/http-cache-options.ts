@@ -9,14 +9,15 @@ export type CdnProvider = (typeof CDN_PROVIDERS)[number];
 export const CDN_STRATEGIES = ["soft", "hard"] as const;
 export type CdnStrategy = (typeof CDN_STRATEGIES)[number];
 
-/** Module id per storage; `memory` is Souin's built-in and needs none. */
-export const CACHE_STORAGE_MODULE_IDS: Record<Exclude<CacheStorage, "memory">, string> = {
-  otter: "souin-storage-otter",
-  badger: "souin-storage-badger",
-  simplefs: "souin-storage-simplefs",
-  redis: "souin-storage-redis",
-  etcd: "souin-storage-etcd",
-};
+export type ModuleCacheStorage = Exclude<CacheStorage, "memory">;
+
+/** Module id per storage, persisted in the Caddy Build settings; `memory` needs none. */
+export const CACHE_STORAGE_MODULE_IDS = Object.fromEntries(
+  CACHE_STORAGES.filter((storage) => storage !== "memory").map((storage) => [
+    storage,
+    `souin-storage-${storage}`,
+  ]),
+) as Record<ModuleCacheStorage, string>;
 
 /** On the Caddy data volume, so a file-backed cache survives a restart. Fixed: no path input. */
 export const CACHE_STORAGE_PATHS = {
@@ -25,6 +26,7 @@ export const CACHE_STORAGE_PATHS = {
 } as const;
 
 export const MAX_CACHE_ENDPOINTS = 16;
+export const MAX_CACHE_TOKEN_LENGTH = 128;
 export const MIN_OTTER_SIZE = 1_000;
 export const MAX_OTTER_SIZE = 10_000_000;
 export const MAX_REDIS_DB = 255;

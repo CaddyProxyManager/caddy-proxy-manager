@@ -3333,6 +3333,7 @@ export async function buildCaddyDocument(
     proxyHostRows,
     certificateMap,
   );
+  const moduleAvailabilityRead = getCaddyModuleAvailability(agentRowId);
   const [
     accessRulesByHost,
     generalSettings,
@@ -3365,14 +3366,17 @@ export async function buildCaddyDocument(
     getWafPresetDirectives(),
     getCrsPluginRules(),
     getTrustedProxiesSettings(),
-    getCaddyModuleAvailability(agentRowId),
+    moduleAvailabilityRead,
     getDefaultResponseSettings(),
     getTailscaleSettings(),
     getErrorPagesSettings(),
     getMetricsSettings(),
     getLoggingSettings(),
     getHttpProtocolsSettings(),
-    getHttpCacheSettings(),
+    // Read only for a binary that can load it, still alongside the rest.
+    moduleAvailabilityRead.then((availability) =>
+      isFeatureUsable(availability, "cache") ? getHttpCacheSettings() : null,
+    ),
   ]);
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
@@ -3617,11 +3621,9 @@ export async function buildCaddyDocument(
 
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
-  const cacheAppConfig = isFeatureUsable(moduleAvailability, "cache")
-    ? buildHttpCacheApp(httpCacheSettings, (storage) =>
-        isCacheStorageUsable(moduleAvailability, storage),
-      )
-    : null;
+  const cacheAppConfig = buildHttpCacheApp(httpCacheSettings, (storage) =>
+    isCacheStorageUsable(moduleAvailability, storage),
+  );
   const cacheApp = cacheAppConfig ? { cache: cacheAppConfig } : {};
 
   const document = {

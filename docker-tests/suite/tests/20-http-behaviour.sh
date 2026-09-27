@@ -134,6 +134,11 @@ fetch "https://$cached/app.css?cc=no-store"
 t_eq "the upstream's own Cache-Control wins" "no-store" "$(header_value cache-control)"
 fetch "https://$cached/app.css?cookie=abc"
 t_eq "an asset setting a cookie is marked private" "private" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cookie=abc&cc=no-store"
+t_contains "a cookie never weakens the upstream's no-store" "no-store" \
+  "$(printf '%s' "$FETCH_HEADERS" | grep -i '^cache-control:')"
+fetch "https://$cached/app.css?status=404"
+t_eq "an error response is not given the max age" "" "$(header_value cache-control)"
 fetch "https://$cached/page"
 t_eq "a page is left alone" "" "$(header_value cache-control)"
 

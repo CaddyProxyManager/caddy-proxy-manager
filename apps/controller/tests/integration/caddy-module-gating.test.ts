@@ -292,7 +292,9 @@ describe('cache storage gating', () => {
 
   it('keeps the stored key when the form sends it blank, and refuses a CDN without one', async () => {
     const cdn = { provider: 'fastly', serviceId: 'svc' };
-    await expect(saveHttpCacheSettings({ cdn })).rejects.toThrow(/apiKey/);
+    await expect(saveHttpCacheSettings({ cdn })).rejects.toThrow(
+      /Fastly purging needs an API token/,
+    );
     await saveHttpCacheSettings({ cdn: { ...cdn, apiKey: 'fastly-key' } });
     await saveHttpCacheSettings({ cdn: { ...cdn, strategy: 'hard' } });
 

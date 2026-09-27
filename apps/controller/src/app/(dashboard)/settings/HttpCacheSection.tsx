@@ -130,7 +130,7 @@ export function HttpCacheSection({
                 type="password"
                 isOptional
                 description={
-                  httpCache.redis.hasPassword ? t("secretStored") : t("redisPasswordHelp")
+                  httpCache.redis.hasPassword ? t("redisPasswordStored") : t("redisPasswordHelp")
                 }
                 htmlName="redisPassword"
                 value={redisPassword}

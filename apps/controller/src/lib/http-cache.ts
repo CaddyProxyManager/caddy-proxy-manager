@@ -8,7 +8,7 @@
  */
 
 import { decryptSecret, encryptSecret } from "./secret";
-import { domainError } from "./domain-error";
+import { type DomainErrorCode, domainError } from "./domain-error";
 
 import {
   CACHE_STORAGE_PATHS,
@@ -21,9 +21,11 @@ import {
   type HttpCacheSettings,
   type HttpCacheSettingsView,
   MAX_CACHE_ENDPOINTS,
+  MAX_CACHE_TOKEN_LENGTH,
   MAX_OTTER_SIZE,
   MAX_REDIS_DB,
   MIN_OTTER_SIZE,
+  type ModuleCacheStorage,
 } from "./http-cache-options";
 
 export * from "./http-cache-options";
@@ -35,7 +37,7 @@ const ETCD_ENDPOINT =
   /^(?:https?:\/\/)?(?:\[[0-9a-fA-F:.]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?):\d{1,5}$/;
 // Room for the encrypted form of a long secret, which is what the stored row holds.
 const MAX_SECRET_LENGTH = 4096;
-const TOKEN = /^[A-Za-z0-9_-]{1,128}$/;
+const TOKEN = new RegExp(`^[A-Za-z0-9_-]{1,${MAX_CACHE_TOKEN_LENGTH}}$`);
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}$/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point.
 const CONTROL = /[\u0000-\u001f\u007f]/;
@@ -60,37 +62,40 @@ function port(address: string): number {
   return Number(address.slice(address.lastIndexOf(":") + 1));
 }
 
-function endpoints(value: unknown, pattern: RegExp, field: string): string[] {
+// One code per field: a field name interpolated into a sentence is not something a reader can use.
+function endpoints(
+  value: unknown,
+  pattern: RegExp,
+  codes: { tooMany: DomainErrorCode; invalid: DomainErrorCode },
+): string[] {
   const entries = [...new Set(list(value))];
   if (entries.length > MAX_CACHE_ENDPOINTS) {
-    throw domainError("httpCacheTooManyEndpoints", { field, max: MAX_CACHE_ENDPOINTS });
+    throw domainError(codes.tooMany, { max: MAX_CACHE_ENDPOINTS });
   }
   for (const entry of entries) {
     const p = port(entry);
     if (!pattern.test(entry) || p < 1 || p > 65_535) {
-      throw domainError("httpCacheInvalidEndpoint", { field, value: entry });
+      throw domainError(codes.invalid, { value: entry });
     }
   }
   return entries;
 }
 
-function secret(value: unknown, field: string, max: number): string {
+function secret(value: unknown, code: DomainErrorCode): string {
   const raw = typeof value === "string" ? value : "";
-  if (raw.length > max || CONTROL.test(raw)) throw domainError("httpCacheInvalidField", { field });
+  if (raw.length > MAX_SECRET_LENGTH || CONTROL.test(raw)) throw domainError(code);
   return raw;
 }
 
-function matching(value: unknown, pattern: RegExp, field: string): string {
+function matching(value: unknown, pattern: RegExp, code: DomainErrorCode): string {
   const raw = text(value);
-  if (raw && !pattern.test(raw)) throw domainError("httpCacheInvalidField", { field });
+  if (raw && !pattern.test(raw)) throw domainError(code, { max: MAX_CACHE_TOKEN_LENGTH });
   return raw;
 }
 
-function integer(value: unknown, min: number, max: number, field: string): number {
+function integer(value: unknown, min: number, max: number, code: DomainErrorCode): number {
   const n = typeof value === "number" ? value : Number(text(value));
-  if (!Number.isInteger(n) || n < min || n > max) {
-    throw domainError("httpCacheInvalidField", { field });
-  }
+  if (!Number.isInteger(n) || n < min || n > max) throw domainError(code, { min, max });
   return n;
 }
 
@@ -114,15 +119,23 @@ export function normalizeHttpCacheSettings(
 
   const otterSize = blank(raw.otterSize)
     ? null
-    : integer(raw.otterSize, MIN_OTTER_SIZE, MAX_OTTER_SIZE, "otterSize");
+    : integer(raw.otterSize, MIN_OTTER_SIZE, MAX_OTTER_SIZE, "httpCacheOtterSizeInvalid");
 
   const redis = {
-    addresses: endpoints(redisRaw.addresses, HOST_PORT, "redis.addresses"),
-    username: matching(redisRaw.username, TOKEN, "redis.username"),
-    password: secret(redisRaw.password, "redis.password", MAX_SECRET_LENGTH),
-    db: blank(redisRaw.db) ? 0 : integer(redisRaw.db, 0, MAX_REDIS_DB, "redis.db"),
+    addresses: endpoints(redisRaw.addresses, HOST_PORT, {
+      tooMany: "httpCacheTooManyRedisAddresses",
+      invalid: "httpCacheRedisAddressInvalid",
+    }),
+    username: matching(redisRaw.username, TOKEN, "httpCacheRedisUsernameInvalid"),
+    password: secret(redisRaw.password, "httpCacheRedisPasswordInvalid"),
+    db: blank(redisRaw.db) ? 0 : integer(redisRaw.db, 0, MAX_REDIS_DB, "httpCacheRedisDbInvalid"),
   };
-  const etcd = { endpoints: endpoints(etcdRaw.endpoints, ETCD_ENDPOINT, "etcd.endpoints") };
+  const etcd = {
+    endpoints: endpoints(etcdRaw.endpoints, ETCD_ENDPOINT, {
+      tooMany: "httpCacheTooManyEtcdEndpoints",
+      invalid: "httpCacheEtcdEndpointInvalid",
+    }),
+  };
   if (storage === "redis" && redis.addresses.length === 0) {
     throw domainError("httpCacheStorageNeedsEndpoint", { storage: "Redis" });
   }
@@ -135,37 +148,50 @@ export function normalizeHttpCacheSettings(
     : "none";
   const cdn = {
     provider,
-    apiKey: secret(cdnRaw.apiKey, "cdn.apiKey", MAX_SECRET_LENGTH),
-    email: matching(cdnRaw.email, EMAIL, "cdn.email"),
-    zoneId: matching(cdnRaw.zoneId, TOKEN, "cdn.zoneId"),
-    serviceId: matching(cdnRaw.serviceId, TOKEN, "cdn.serviceId"),
+    apiKey: secret(cdnRaw.apiKey, "httpCacheCdnApiKeyInvalid"),
+    email: matching(cdnRaw.email, EMAIL, "httpCacheCdnEmailInvalid"),
+    zoneId: matching(cdnRaw.zoneId, TOKEN, "httpCacheCdnZoneIdInvalid"),
+    serviceId: matching(cdnRaw.serviceId, TOKEN, "httpCacheCdnServiceIdInvalid"),
     strategy: CDN_STRATEGIES.includes(cdnRaw.strategy as CdnStrategy)
       ? (cdnRaw.strategy as CdnStrategy)
       : "soft",
   };
-  const needs =
+  const hasApiKey = secretsPending || cdn.apiKey !== "";
+  const needs: [boolean, DomainErrorCode][] =
     provider === "cloudflare"
-      ? { apiKey: cdn.apiKey, email: cdn.email, zoneId: cdn.zoneId }
+      ? [
+          [hasApiKey, "httpCacheCloudflareApiKeyRequired"],
+          [cdn.email !== "", "httpCacheCloudflareEmailRequired"],
+          [cdn.zoneId !== "", "httpCacheCloudflareZoneIdRequired"],
+        ]
       : provider === "fastly"
-        ? { apiKey: cdn.apiKey, serviceId: cdn.serviceId }
-        : {};
-  const missing = Object.entries(needs)
-    .filter(([k, v]) => !v && !(secretsPending && k === "apiKey"))
-    .map(([k]) => k);
-  if (missing.length > 0) throw domainError("httpCacheCdnIncomplete", { fields: missing });
+        ? [
+            [hasApiKey, "httpCacheFastlyApiKeyRequired"],
+            [cdn.serviceId !== "", "httpCacheFastlyServiceIdRequired"],
+          ]
+        : [];
+  const missing = needs.find(([present]) => !present);
+  if (missing) throw domainError(missing[1]);
 
   return { storage, otterSize, redis, etcd, cdn };
 }
 
+const sameServers = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
+
 /**
  * Fills a blank secret from the stored one, as a re-saved form leaves it blank. Only for the same
  * storage or provider, and dropped with it: a key for a CDN switched off is not kept on file.
+ * The Redis password also needs the same servers, or pointing them elsewhere would hand it over.
  */
 export function keepStoredSecrets(
   submitted: HttpCacheSettings,
   stored: HttpCacheSettings | null,
 ): HttpCacheSettings {
-  const redisKept = submitted.storage === "redis" && stored?.storage === "redis";
+  const redisKept =
+    submitted.storage === "redis" &&
+    stored?.storage === "redis" &&
+    sameServers(submitted.redis.addresses, stored.redis.addresses);
   const cdnKept =
     submitted.cdn.provider !== "none" && stored?.cdn.provider === submitted.cdn.provider;
   return {
@@ -212,7 +238,7 @@ export function redactHttpCacheSettings(settings: HttpCacheSettings): HttpCacheS
  */
 export function buildHttpCacheApp(
   settings: HttpCacheSettings | null,
-  storageUsable: (storage: Exclude<CacheStorage, "memory">) => boolean,
+  storageUsable: (storage: ModuleCacheStorage) => boolean,
 ): Record<string, unknown> | null {
   if (!settings) return null;
   const app: Record<string, unknown> = {};

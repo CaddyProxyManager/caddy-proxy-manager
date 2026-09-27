@@ -67,11 +67,19 @@ describe('normalizeHttpCacheSettings', () => {
     expect(() => settings({ otterSize: 5 })).toThrow();
   });
 
-  it('names what a CDN is missing', () => {
+  it('names what a CDN is missing in words, not field ids', () => {
     expect(() => settings({ cdn: { provider: 'cloudflare', apiKey: 'k' } })).toThrow(
-      /email, zoneId/,
+      'Cloudflare purging needs the account email.',
     );
-    expect(() => settings({ cdn: { provider: 'fastly', serviceId: 's' } })).toThrow(/apiKey/);
+    expect(() =>
+      settings({ cdn: { provider: 'cloudflare', apiKey: 'k', email: 'a@b.c' } }),
+    ).toThrow('Cloudflare purging needs the zone ID.');
+    expect(() => settings({ cdn: { provider: 'fastly', serviceId: 's' } })).toThrow(
+      'Fastly purging needs an API token.',
+    );
+    expect(() => settings({ storage: 'redis', redis: { addresses: ['r:1'], db: 256 } })).toThrow(
+      'The Redis database number must be a whole number from 0 to 255.',
+    );
     expect(() =>
       settings({ cdn: { provider: 'cloudflare', apiKey: 'k', email: 'a@b.c', zoneId: 'z/..' } }),
     ).toThrow();
@@ -112,6 +120,19 @@ describe('secrets', () => {
     expect(kept.redis.password).toBe('');
     expect(kept.cdn.apiKey).toBe('');
     expect(keepStoredSecrets(settings({}), stored).cdn.apiKey).toBe('');
+  });
+
+  it('keeps the Redis password only for the same servers, so it cannot be sent elsewhere', () => {
+    const stored = settings({
+      storage: 'redis',
+      redis: { addresses: ['r1:6379', 'r2:6379'], password: 'old' },
+    });
+    const resubmit = (addresses: string[]) =>
+      keepStoredSecrets(settings({ storage: 'redis', redis: { addresses } }), stored).redis
+        .password;
+    expect(resubmit(['r2:6379', 'r1:6379'])).toBe('old');
+    expect(resubmit(['elsewhere:6379'])).toBe('');
+    expect(resubmit(['r1:6379'])).toBe('');
   });
 
   it('encrypts both at rest and never shows them', () => {

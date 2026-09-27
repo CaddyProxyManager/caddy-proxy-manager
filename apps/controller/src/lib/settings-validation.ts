@@ -93,6 +93,12 @@ function integerValue(value: unknown, label: string, min: number, max: number): 
   return value;
 }
 
+function optionalOneOf(value: unknown, allowed: readonly string[], label: string): void {
+  if (value !== undefined && !allowed.includes(value as string)) {
+    invalid(`${label} must be one of: ${allowed.join(", ")}`);
+  }
+}
+
 function stringList(
   value: unknown,
   label: string,
@@ -591,24 +597,15 @@ function validateHttpCache(value: Record<string, unknown>): void {
   }
   if (value.etcd !== undefined) onlyKeys(record(value.etcd, "etcd"), ["endpoints"], label);
   if (value.cdn !== undefined) {
+    const cdn = record(value.cdn, "cdn");
     onlyKeys(
-      record(value.cdn, "cdn"),
+      cdn,
       ["provider", "apiKey", "email", "zoneId", "serviceId", "strategy", "hasApiKey"],
       label,
     );
+    optionalOneOf(cdn.provider, CDN_PROVIDERS, "cdn.provider");
   }
-  for (const [key, allowed] of [
-    ["storage", CACHE_STORAGES],
-    ["cdn.provider", CDN_PROVIDERS],
-  ] as const) {
-    const raw =
-      key === "storage"
-        ? value.storage
-        : (value.cdn as Record<string, unknown> | undefined)?.provider;
-    if (raw !== undefined && !(allowed as readonly unknown[]).includes(raw)) {
-      invalid(`${key} must be one of: ${allowed.join(", ")}`);
-    }
-  }
+  optionalOneOf(value.storage, CACHE_STORAGES, "storage");
   try {
     normalizeHttpCacheSettings(value, { secretsPending: true });
   } catch (error) {
