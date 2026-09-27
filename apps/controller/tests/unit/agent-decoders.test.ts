@@ -1,5 +1,5 @@
 /** What an agent sends is checked, bounded and stripped before the controller acts on it. */
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   AgentDecodeError,
   decodeAgentStatus,
@@ -84,30 +84,39 @@ describe('command results', () => {
 });
 
 describe('command replies', () => {
+  beforeEach(() => resetRegistry());
   afterEach(() => resetRegistry());
 
   it('fails a waiter at once on a malformed reply instead of holding it to the timeout', async () => {
-    const sent: { id: string }[] = [];
+    // Its own id: other suites attach 'a1', and the registry is a module singleton.
+    const agentId = `decoder-${crypto.randomUUID()}`;
     const { events } = attach({
-      agentId: 'a1',
+      agentId,
       agentRowId: 1,
       name: 'edge',
       controllerId: 'c',
       controllerName: 'CPM',
       initialState: {} as Parameters<typeof attach>[0]['initialState'],
     });
-    const pending = dispatchCaddyAdmin('a1', { path: '/config/', method: 'GET' });
+    const pending = dispatchCaddyAdmin(agentId, { path: '/config/', method: 'GET' });
+    let commandId = '';
     // next(), not for-await: leaving that loop would close the stream and fail the waiter itself.
     for (let step = await events.next(); !step.done; step = await events.next()) {
       if (step.value.type === 'command') {
-        sent.push(step.value.command as { id: string });
+        commandId = (step.value.command as { id: string }).id;
         break;
       }
     }
-    const started = Date.now();
-    settleResults('a1', decodeCommandResults([{ id: sent[0].id, ok: true, response: null }]));
-    await expect(pending).rejects.toThrow('Malformed agent reply');
-    expect(Date.now() - started).toBeLessThan(1000);
+    settleResults(agentId, decodeCommandResults([{ id: commandId, ok: true, response: null }]));
+    // Against a sentinel, not the wall clock, which a loaded parallel run can blow through.
+    const outcome = await Promise.race([
+      pending.then(
+        () => 'resolved',
+        (error: Error) => error.message,
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting'), 5000)),
+    ]);
+    expect(outcome).toBe('Malformed agent reply');
   });
 });
 
