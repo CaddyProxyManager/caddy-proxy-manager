@@ -10,9 +10,11 @@
  *   Compose reads on the host, and the agent's pre-database config.
  */
 
+import { EMAIL_ADDRESS } from "../email-address";
+import { SMTP_SECURITY_MODES } from "../email/security";
 import { hasForbiddenControlCharacter } from "../settings-validation";
 
-export type SettingGroup = "application" | "authentication" | "analytics" | "geoip";
+export type SettingGroup = "application" | "authentication" | "email" | "analytics" | "geoip";
 
 /** A value as stored, before it is parsed. Settings are held as JSON in the `settings` table. */
 export type SettingValue = string | number | boolean | null;
@@ -452,6 +454,119 @@ export const loginBlockMs = numberSetting({
   max: 24 * 60 * 60 * 1000,
 });
 
+// ── Email ────────────────────────────────────────────────────────────────────
+
+/** Unset keeps meaning "on once a server is named", so SMTP_HOST alone is enough. */
+export const smtpEnabled = optionalBooleanSetting({
+  name: "smtp_enabled",
+  env: "SMTP_ENABLED",
+  group: "email",
+  gate: true,
+  label: "Send email",
+  description:
+    "Password reset links, invitations and certificate alerts go out through the SMTP server " +
+    "below. If left unset, email is on whenever a server is named.",
+});
+
+export const smtpHost = stringSetting({
+  name: "smtp_host",
+  env: "SMTP_HOST",
+  group: "email",
+  label: "SMTP server",
+  description: "The host name or address of the mail server to relay through.",
+  default: "",
+  pattern: /^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$|^\[[0-9a-fA-F:.]+\]$/,
+  patternHint: "must be a host name or an IP address",
+  maxLength: 253,
+});
+
+export const smtpPort = numberSetting({
+  name: "smtp_port",
+  env: "SMTP_PORT",
+  group: "email",
+  label: "SMTP port",
+  description: "Usually 587 for STARTTLS, 465 for implicit TLS and 25 for an unencrypted relay.",
+  default: 587,
+  min: 1,
+  max: 65_535,
+});
+
+export const smtpSecurity = stringSetting({
+  name: "smtp_security",
+  env: "SMTP_SECURITY",
+  group: "email",
+  label: "SMTP encryption",
+  description:
+    "starttls upgrades the connection and refuses a server that cannot; tls encrypts from the " +
+    "first byte; none sends in the clear, for a relay on a trusted network only.",
+  default: "starttls",
+  pattern: new RegExp(`^(${SMTP_SECURITY_MODES.join("|")})$`),
+  patternHint: "must be starttls, tls or none",
+  maxLength: 16,
+});
+
+export const smtpUsername = stringSetting({
+  name: "smtp_username",
+  env: "SMTP_USERNAME",
+  group: "email",
+  label: "SMTP username",
+  description: "Leave empty for a relay that accepts mail without signing in.",
+  default: "",
+  maxLength: 256,
+});
+
+export const smtpPassword = secretSetting({
+  name: "smtp_password",
+  env: "SMTP_PASSWORD",
+  group: "email",
+  label: "SMTP password",
+  description: "Sent only after the connection is encrypted, unless encryption is set to none.",
+  default: "",
+  maxLength: 1024,
+});
+
+export const smtpFrom = stringSetting({
+  name: "smtp_from",
+  env: "SMTP_FROM",
+  group: "email",
+  label: "Sender address",
+  description:
+    "The From address on every message, shown under the application name. Many servers refuse " +
+    "one the account is not allowed to send as.",
+  default: "",
+  pattern: EMAIL_ADDRESS,
+  patternHint: "must be an email address",
+  maxLength: 320,
+});
+
+export const emailAlertRecipients = stringSetting({
+  name: "email_alert_recipients",
+  env: "EMAIL_ALERT_RECIPIENTS",
+  group: "email",
+  label: "Alert recipients",
+  description:
+    "Comma-separated addresses that certificate alerts go to. If left empty they go to every " +
+    "active administrator.",
+  default: "",
+  // Linear: each address is one run of non-separators, split on a comma the address cannot hold.
+  pattern: /^[^\s,@]+@[^\s,@]+(\s*,\s*[^\s,@]+@[^\s,@]+)*$/,
+  patternHint: "must be email addresses separated by commas",
+  maxLength: 2048,
+});
+
+export const certificateExpiryAlertDays = numberSetting({
+  name: "certificate_expiry_alert_days",
+  env: "CERTIFICATE_EXPIRY_ALERT_DAYS",
+  group: "email",
+  label: "Certificate alert threshold (days)",
+  description:
+    "Email the alert recipients once a certificate has fewer days than this left. Caddy renews " +
+    "on its own well before then, so an alert means renewal is failing. 0 turns alerts off.",
+  default: 14,
+  min: 0,
+  max: 90,
+});
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 /**
@@ -605,6 +720,15 @@ export const SETTING_DEFINITIONS = [
   loginMaxAttempts,
   loginWindowMs,
   loginBlockMs,
+  smtpEnabled,
+  smtpHost,
+  smtpPort,
+  smtpSecurity,
+  smtpUsername,
+  smtpPassword,
+  smtpFrom,
+  emailAlertRecipients,
+  certificateExpiryAlertDays,
   analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,
@@ -628,6 +752,7 @@ export const SETTINGS_BY_ENV: ReadonlyMap<string, SettingDefinition> = new Map(
 export const SETTING_GROUPS: readonly SettingGroup[] = [
   "application",
   "authentication",
+  "email",
   "analytics",
   "geoip",
 ];

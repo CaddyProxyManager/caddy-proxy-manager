@@ -21,7 +21,8 @@ export function SignInIdentity({
   username: string;
   /** Optional line under the name - e.g. which provider the account signs in through. */
   description?: string;
-  onChange: () => void;
+  /** Omitted where the name is fixed, such as an emailed password link. */
+  onChange?: () => void;
   isDisabled?: boolean;
 }) {
   const t = useTranslations("auth.login");
@@ -44,13 +45,15 @@ export function SignInIdentity({
             )}
           </VStack>
         </HStack>
-        <Button
-          variant="ghost"
-          size="sm"
-          label={t("changeUsername")}
-          isDisabled={isDisabled}
-          onClick={onChange}
-        />
+        {onChange && (
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("changeUsername")}
+            isDisabled={isDisabled}
+            onClick={onChange}
+          />
+        )}
       </HStack>
     </Card>
   );

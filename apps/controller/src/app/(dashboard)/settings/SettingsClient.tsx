@@ -75,6 +75,8 @@ import {
   updateMetricsSettingsAction,
   updateAnalyticsSettingsAction,
   updateGeoipSettingsAction,
+  updateEmailSettingsAction,
+  updateCertificateAlertSettingsAction,
   updateAvatarSettingsAction,
   updateFaviconAction,
   updateRegistrySettingsAction,
@@ -118,6 +120,8 @@ import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlo
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { HttpCacheSection } from "./HttpCacheSection";
+import { CertificateAlertsSection, EmailServerSection } from "./EmailSection";
+import type { EmailSettingsView } from "@/src/lib/email/view";
 import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
 
@@ -169,6 +173,7 @@ type Props = {
   registry: Record<string, readonly RegistryField[]>;
   analytics: AnalyticsView;
   geoip: GeoipView;
+  email: EmailSettingsView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
   canManageServices: boolean;
   baseUrl: string;
@@ -222,6 +227,7 @@ export default function SettingsClient({
   registry,
   analytics,
   geoip,
+  email,
   canManageServices,
   baseUrl,
   agents,
@@ -251,6 +257,11 @@ export default function SettingsClient({
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
   const [analyticsState, analyticsFormAction] = useActionState(updateAnalyticsSettingsAction, null);
   const [geoipState, geoipFormAction] = useActionState(updateGeoipSettingsAction, null);
+  const [emailState, emailFormAction] = useActionState(updateEmailSettingsAction, null);
+  const [certificateAlertsState, certificateAlertsFormAction] = useActionState(
+    updateCertificateAlertSettingsAction,
+    null,
+  );
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
   const [updatesState, updatesFormAction] = useActionState(updateUpdateSettingsAction, null);
@@ -491,6 +502,14 @@ export default function SettingsClient({
       />
     ),
     geoip: <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />,
+    email: <EmailServerSection email={email} state={emailState} formAction={emailFormAction} />,
+    "certificate-alerts": (
+      <CertificateAlertsSection
+        email={email}
+        state={certificateAlertsState}
+        formAction={certificateAlertsFormAction}
+      />
+    ),
     geoblock: (
       <GeoBlockSection
         globalGeoBlock={globalGeoBlock}

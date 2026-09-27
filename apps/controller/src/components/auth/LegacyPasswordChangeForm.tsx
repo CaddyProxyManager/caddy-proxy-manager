@@ -3,7 +3,6 @@
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, X } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -11,20 +10,13 @@ import { Center } from "@astryxdesign/core/Center";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { VStack } from "@astryxdesign/core/Stack";
+import { PasswordPolicyChecklist } from "@/src/components/auth/PasswordPolicyChecklist";
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_NEW_PASSWORD,
 } from "@/components/ui/native-input-attrs";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
-import {
-  MIN_PASSWORD_LENGTH,
-  type PasswordPolicyViolation,
-  passwordPolicyViolations,
-} from "@/src/lib/password-policy";
-
-/** Every rule, in the order the policy reports them, so the checklist and the error agree. */
-const RULES: PasswordPolicyViolation[] = ["length", "case", "number", "special"];
 
 export default function LegacyPasswordChangeForm() {
   const t = useTranslations();
@@ -35,8 +27,6 @@ export default function LegacyPasswordChangeForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const failing = new Set(passwordPolicyViolations(newPassword));
-  const metCount = RULES.length - failing.size;
   // Only once something has been typed into the confirmation: an empty field is not a mismatch yet.
   const isMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
 
@@ -143,44 +133,7 @@ export default function LegacyPasswordChangeForm() {
             width="100%"
           />
 
-          {/* The rule as a live checklist rather than a sentence to hold in mind while typing. */}
-          <VStack gap={1}>
-            <HStack justify="between" vAlign="center" paddingInline={1}>
-              <Text type="label" size="3xs" color="secondary">
-                {t("auth.passwordChange.policyTitle")}
-              </Text>
-              <Text type="body" size="xsm" color="secondary">
-                {t("auth.passwordChange.policyProgress", { met: metCount, total: RULES.length })}
-              </Text>
-            </HStack>
-            <Card padding={4}>
-              <VStack gap={2} as="ul" aria-label={t("auth.passwordChange.policyTitle")}>
-                {RULES.map((rule) => {
-                  const isMet = !failing.has(rule);
-                  return (
-                    <HStack key={rule} as="li" gap={2} vAlign="center">
-                      {isMet ? (
-                        <Check
-                          size={16}
-                          aria-hidden="true"
-                          style={{ color: "var(--color-success)", flex: "none" }}
-                        />
-                      ) : (
-                        <X
-                          size={16}
-                          aria-hidden="true"
-                          style={{ color: "var(--color-text-secondary)", flex: "none" }}
-                        />
-                      )}
-                      <Text type="body" size="sm" color={isMet ? "primary" : "secondary"}>
-                        {t(`passwordPolicy.rule.${rule}`, { min: MIN_PASSWORD_LENGTH })}
-                      </Text>
-                    </HStack>
-                  );
-                })}
-              </VStack>
-            </Card>
-          </VStack>
+          <PasswordPolicyChecklist password={newPassword} />
         </VStack>
       </form>
     </Center>

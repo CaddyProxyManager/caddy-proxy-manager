@@ -94,6 +94,8 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/agent/") ||
     pathname.startsWith("/api/forward-auth/") ||
     pathname === "/api/sign-in/captcha" ||
+    // For someone who cannot sign in; each route is rate-limited and answers nothing about accounts.
+    pathname.startsWith("/api/password-reset/") ||
     // Signed by `cpm-server --reset-2fa` and answered only to loopback; see the route.
     pathname === CONSOLE_RESET_TWO_FACTOR_PATH
   ) {

@@ -10,6 +10,7 @@ import LoginClient from "@/src/components/auth/LoginClient";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { oauthCallbackErrorMessage } from "@/src/lib/oauth-callback-error";
+import { emailReady } from "@/src/lib/email/config";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.login");
@@ -44,6 +45,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       appName={await getAppName()}
       initialError={oauthError}
       captcha={captcha}
+      passwordResetEnabled={localLoginEnabled && (await emailReady())}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
     />
   );

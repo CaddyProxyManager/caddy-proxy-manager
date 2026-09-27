@@ -9,6 +9,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
+import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
@@ -38,6 +39,8 @@ interface LoginClientProps {
   captcha?: CaptchaWidgetConfig | null;
   /** Cap needs it for the scripts it injects. */
   cspNonce?: string;
+  /** Email is set up, so a forgotten password can be reset from here. */
+  passwordResetEnabled?: boolean;
 }
 
 export default function LoginClient({
@@ -47,6 +50,7 @@ export default function LoginClient({
   initialError = null,
   captcha = null,
   cspNonce,
+  passwordResetEnabled = false,
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
   const tErrors = useTranslations("auth.errors");
@@ -282,6 +286,11 @@ export default function LoginClient({
                       width="100%"
                     />
                   </div>
+                  {onPasswordStep && passwordResetEnabled && (
+                    <Link href="/login/forgot-password" size="sm">
+                      {t("forgotPassword")}
+                    </Link>
+                  )}
                   {/* Back after a failed attempt, which spent the last solve. */}
                   {onPasswordStep && captchaStep.widget}
                   <Button

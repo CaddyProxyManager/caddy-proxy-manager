@@ -17,8 +17,14 @@ import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { resetTwoFactor } from "@/src/lib/two-factor";
 import { logAuditEvent } from "@/src/lib/audit";
 import { hashPassword } from "@/src/lib/password";
-import { getTranslations } from "next-intl/server";
-import { actionError, actionSuccess, type ActionState } from "@/src/lib/actions";
+import { getLocale, getTranslations } from "next-intl/server";
+import { sendEmailedLink } from "@/src/lib/services/emailed-links";
+import {
+  actionError,
+  actionSuccess,
+  extractErrorMessage,
+  type ActionState,
+} from "@/src/lib/actions";
 import {
   assertAcceptablePassword,
   assertEmailAddress,
@@ -27,7 +33,8 @@ import {
   assertUserStatus,
 } from "@/src/lib/user-admin";
 
-async function createUserActionUntranslated(formData: FormData) {
+/** Returns why an invitation was not sent: the account exists regardless, and can be re-sent. */
+async function createUserActionUntranslated(formData: FormData): Promise<unknown> {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
@@ -39,14 +46,16 @@ async function createUserActionUntranslated(formData: FormData) {
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;
   const role = assertUserRole(String(formData.get("role") ?? "user"));
   const password = String(formData.get("password") ?? "");
+  // Without a password, the account can only be reached through the link the invitation carries.
+  const invite = formData.get("invite") === "on";
 
-  if (!email || !password) {
+  if (!email || (!password && !invite)) {
     throw domainError("emailAndPasswordRequired");
   }
   assertEmailAddress(email);
-  assertAcceptablePassword(password);
+  if (!invite) assertAcceptablePassword(password);
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = invite ? null : await hashPassword(password);
 
   const user = await createUser({
     email,
@@ -66,6 +75,14 @@ async function createUserActionUntranslated(formData: FormData) {
   });
 
   revalidatePath("/users");
+  if (!invite) return null;
+  try {
+    await sendEmailedLink(user.id, session.user.name || session.user.email, await getLocale());
+    return null;
+  } catch (error) {
+    console.error("createUserAction: the invitation was not sent:", error);
+    return error;
+  }
 }
 
 async function updateUserRoleActionUntranslated(userId: number, requestedRole: User["role"]) {
@@ -151,10 +168,17 @@ async function deleteUserActionUntranslated(userId: number) {
 
 /* Failures return a translated ActionState, or the browser gets an unhandled rejection. */
 
+/** A success carrying a message: created, but the invitation still has to be re-sent. */
 export async function createUserAction(formData: FormData): Promise<ActionState> {
   try {
-    await createUserActionUntranslated(formData);
-    return actionSuccess();
+    const inviteError = await createUserActionUntranslated(formData);
+    if (!inviteError) return actionSuccess();
+    const t = await getTranslations();
+    return actionSuccess(
+      t("users.inviteNotSent", {
+        error: extractErrorMessage(t, inviteError, t("errors.emailSendFailedUnknown")),
+      }),
+    );
   } catch (error) {
     const t = await getTranslations();
     console.error("createUserAction failed:", error);
@@ -242,5 +266,35 @@ export async function resetUserTwoFactorAction(userId: number): Promise<ActionSt
     const t = await getTranslations();
     console.error("resetUserTwoFactorAction failed:", error);
     return actionError(t, error, t("errors.resetTwoFactorFailed"));
+  }
+}
+
+/** An invitation to an account with no password yet, a reset link to one with. */
+export async function sendEmailedLinkAction(userId: number): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    const purpose = await sendEmailedLink(
+      userId,
+      session.user.name || session.user.email,
+      await getLocale(),
+    );
+    const target = await getUserById(userId);
+    await logAuditEvent({
+      userId: Number(session.user.id),
+      action: "password_link_sent",
+      entityType: "user",
+      entityId: userId,
+      summary: `Emailed a password link to user ${target?.email ?? userId}`,
+    });
+    const t = await getTranslations("users");
+    return actionSuccess(
+      purpose === "invite"
+        ? t("inviteSent", { email: target?.email ?? "" })
+        : t("resetLinkSent", { email: target?.email ?? "" }),
+    );
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("sendEmailedLinkAction failed:", error);
+    return actionError(t, error, t("errors.emailSendFailedUnknown"));
   }
 }

@@ -432,7 +432,7 @@ async function createAuth(baseURL: string): Promise<any> {
         usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),
       }) as unknown as BetterAuthPlugin,
       genericOAuth({ config: oauthConfigs }),
-      // TOTP and backup codes only: there is no mail or SMS.
+      // TOTP and backup codes only: a code by mail would come from the inbox a reset link opens.
       twoFactor({
         issuer: appName,
         twoFactorTable: "twoFactors",
