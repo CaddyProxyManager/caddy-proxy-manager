@@ -92,14 +92,13 @@ describe('PUT /api/v1/caddy/modules', () => {
 
     expect(response.status).toBe(409);
     expect(data.error).toMatch(/Layer 4 Proxy module/);
-    // Nothing is written - the refusal has to be total, not cosmetic.
+    // The refusal must be total, not cosmetic.
     expect(mockSave).not.toHaveBeenCalled();
     expect(mockApply).not.toHaveBeenCalled();
   });
 
   it('regenerates the Caddy config after an accepted change', async () => {
-    // Otherwise the stored config keeps naming a module the next rebuild will
-    // remove, and the recreated container resumes into a config it cannot load.
+    // Else the recreated container resumes a config naming a module the rebuild removed.
     await PUT(createMockRequest({ modules: { 'coraza-waf': false } }));
 
     expect(mockApply).toHaveBeenCalledTimes(1);

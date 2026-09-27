@@ -1,17 +1,8 @@
 /**
- * OIDC Back-Channel Logout endpoint (OpenID Connect Back-Channel Logout 1.0).
- *
- * Register this URL with the identity provider as its `backchannel_logout_uri`:
- *
- *   https://<cpm>/api/auth/oidc/backchannel-logout
- *
- * One URL serves every configured provider - the token names its issuer, and that is what selects
- * the provider whose client id and signing keys it is then checked against.
- *
- * There is deliberately no CSRF or same-origin check here. The caller is the IdP's own server, not
- * a browser: there is no cookie to abuse and no origin to compare, and the signed token is the
- * whole of the authentication. Everything the request claims about itself is checked against the
- * provider row rather than taken at face value.
+ * OIDC Back-Channel Logout 1.0: register https://<cpm>/api/auth/oidc/backchannel-logout as the
+ * IdP's `backchannel_logout_uri`. One URL serves every provider - the token's issuer selects it.
+ * No CSRF or same-origin check: the caller is the IdP's server, and the signed token is the
+ * whole of the authentication.
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -30,9 +21,8 @@ function ok(): NextResponse {
 }
 
 /**
- * §2.8: a failure is a 400 carrying a JSON `error`/`error_description`. The description names the
- * check that failed - this endpoint is configured by hand against a provider nobody can debug from
- * here, and "invalid_request" alone would make every misconfiguration look identical.
+ * §2.8: a 400 with JSON `error`/`error_description`. The description names the failed check,
+ * or every misconfiguration of a provider nobody can debug from here would look identical.
  */
 function bad(description: string): NextResponse {
   return NextResponse.json(
@@ -42,12 +32,8 @@ function bad(description: string): NextResponse {
 }
 
 /**
- * Whether a provider row is the one that signed this token.
- *
- * Exact equality, the same comparison `jwtVerify` makes - an issuer identifier is compared as a
- * string (OIDC Core §2), and a trailing slash is part of it. Matching leniently here and strictly
- * a few lines later would mean two different answers to "is this the right issuer" in one request,
- * and the operator would see a JOSE error code where the real fault is a mistyped issuer.
+ * Exact equality, as `jwtVerify` compares (a trailing slash is part of an issuer). A lenient
+ * match here would surface a mistyped issuer as a JOSE error code a few lines later.
  */
 function issuedBy(provider: { issuer: string | null }, claimedIssuer: string): boolean {
   return provider.issuer === claimedIssuer;

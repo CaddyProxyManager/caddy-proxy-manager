@@ -35,16 +35,14 @@ export default async function SetupSettingsPage() {
       gateDefaults(),
       getGeneralSettings(),
       getDashboardSettings(),
-      // Only a migrated deployment has hosts at this point - and it is the one likely to have been
-      // proxying this dashboard already, under a host the dashboard host would now shadow.
+      // Only a migrated deployment has hosts yet, possibly one the dashboard host would shadow.
       listDomainClaims(),
       listOAuthProviders(),
       headers(),
     ]);
   const proposedBaseUrl = proposeBaseUrl(resolved.get(baseUrl.key), requestHeaders);
 
-  // Secrets are never sent to the browser. An operator re-entering one is a small cost next to a
-  // page that ships the ClickHouse password in its HTML.
+  // Secrets never reach the browser; re-entering one beats shipping it in the HTML.
   const fields: SettingField[] = SETTING_DEFINITIONS.map((definition) => {
     const current = resolved.get(definition.key);
     if (definition.key === baseUrl.key && proposedBaseUrl) {
@@ -59,8 +57,7 @@ export default async function SetupSettingsPage() {
         generatable: false,
         gate: false,
         value: proposedBaseUrl,
-        // Not "environment": this is not the .env's value, and counting it as migrated would invite
-        // the operator to delete a variable whose value was never copied.
+        // Not "environment", or the operator is invited to delete a variable never copied.
         source: "default",
       };
     }
@@ -81,9 +78,8 @@ export default async function SetupSettingsPage() {
       secret: definition.secret === true,
       generatable: definition.generatable === true,
       gate: definition.gate === true,
-      // A gate is stored tri-state but rendered as a switch, so an unset one has to arrive as the
-      // answer the app is currently acting on rather than as `null` - which a switch would show as
-      // off, offering to disable something that is already running.
+      // Stored tri-state but shown as a switch, so unset arrives as the effective answer - `null`
+      // would show off for something already running.
       value: definition.gate
         ? (gates[definition.key] ?? false)
         : definition.secret
@@ -112,14 +108,8 @@ export default async function SetupSettingsPage() {
 }
 
 /**
- * The dashboard-host card: whether CPM proxies its own dashboard once setup finishes, and on which
- * name.
- *
- * Opens with what setup used to do without asking - DASHBOARD_DOMAIN, else the BASE_URL hostname -
- * so leaving the card alone changes nothing. The address this page was reached at is the last
- * resort, for the deployment whose BASE_URL is still the loopback default: it is the same guess the
- * Public URL field makes, and it is only a guess the operator can see and change. No usable name
- * means the switch opens off, rather than claiming a domain nobody gave.
+ * Opens with DASHBOARD_DOMAIN, else the BASE_URL hostname, else this page's address when BASE_URL
+ * is the loopback default. No usable name opens the switch off rather than claim a domain.
  */
 function dashboardCard(
   stored: { enabled: boolean; domain: string } | null,
@@ -138,30 +128,18 @@ function dashboardCard(
 }
 
 /**
- * The identity-provider card: what is already configured, or the OAUTH_* values to take over.
- *
- * A provider is a row in `oauth_providers`, not a registry setting, so this is the one part of the
- * page not generated from the registry. It is here because the account step only asks about OAuth
- * on the branch where it is the *only* way in - an operator who created a local administrator was
- * never offered it, and had to find Settings afterwards.
- *
- * The prefill is the same bargain the rest of the page makes: values are read out of the
- * environment, and saving is what moves them into the database so the variables can be deleted.
- * The client secret is prefilled too, unlike every other secret here, because a provider cannot be
- * created without one - and it is precisely the value the operator is about to be able to delete
- * from the file it currently lives in.
+ * Not from the registry: a provider is an `oauth_providers` row. The client secret alone is
+ * prefilled, since a provider cannot be created without one and saving lets the operator drop it
+ * from the environment.
  */
 function oauthCard(existing: string[]) {
   const { oauth } = config;
 
-  // What decides is a client ID, or the switch being on. Not the provider name: config.ts gives
-  // that one a fallback of "OAuth2" whether or not anything is configured, and carrying that into
-  // the form made a card nobody had touched look half filled - which the save then refused,
-  // stopping setup on a deployment that had never mentioned OAuth at all.
+  // Not the provider name: config.ts defaults it to "OAuth2", which made an untouched card look
+  // half filled and the save refuse it.
   const fromEnvironment = oauth.enabled || !!oauth.clientId;
 
-  // Blank means blank. The three below keep their defaults either way: they are the values the
-  // advanced fields would show anyway, and none of them is part of what counts as "filled in".
+  // The three defaults below do not count as "filled in".
   const blank = {
     providerName: "",
     issuer: "",
@@ -211,19 +189,12 @@ function oauthCard(existing: string[]) {
   };
 }
 
-// Both IPv6 spellings: the URL standard serialises `hostname` with the brackets, and Bun follows
-// it, but a runtime that strips them would otherwise read loopback as a public address.
+// Both IPv6 spellings, in case a runtime strips the brackets the URL standard keeps.
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 /**
- * The address this page was reached at, offered as the Public URL when the configured one is only
- * a loopback default - Compose sets BASE_URL to http://localhost:3000 for anyone who did not, so an
- * operator setting up over the network would otherwise save a URL nobody else can reach. Null when
- * a value was stored, when the configured URL names a real host, or when this page was itself
- * reached over loopback.
- *
- * The scheme comes from X-Forwarded-Proto, which a client can set. It only fills in a field the
- * operator reviews and can edit before saving.
+ * This page's address, when BASE_URL is Compose's loopback default nobody else can reach. The
+ * client-settable X-Forwarded-Proto only prefills a field the operator reviews.
  */
 function proposeBaseUrl(
   current: { value: unknown; source: string } | undefined,
@@ -244,17 +215,7 @@ function proposeBaseUrl(
   }
 }
 
-/**
- * A first guess at the primary domain, taken from the URL this instance is reached at.
- *
- * The field is required and setup cannot finish without it, so it opens with the answer that is
- * right for almost everyone rather than a blank to think about. `localhost` is not excluded: on a
- * deployment reached at localhost that is genuinely the name, and proposing nothing there would
- * hand exactly the deployments used for trying this out an empty required field.
- *
- * BASE_URL has a default, so there is always something to read - the fallback covers a stored
- * value that somehow is not a URL, not the ordinary case.
- */
+/** `localhost` is kept: it is the real name on a trial deployment, and the field is required. */
 function domainFromBaseUrl(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") return "";
   try {

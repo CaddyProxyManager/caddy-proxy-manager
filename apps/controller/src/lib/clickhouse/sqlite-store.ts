@@ -1,14 +1,6 @@
 /**
- * Analytics for a demo with no ClickHouse: the same two tables in a SQLite file, and the same
- * queries, translated.
- *
- * ./client.ts builds its queries as ClickHouse SQL and runs them through one helper, so this takes
- * them there rather than keeping a second copy of every query to drift. The dialect they use is
- * small - count(), uniq, countIf, intDiv and friends - and each has a direct SQLite spelling; a
- * function outside that list is left as written, and fails loudly in SQLite rather than silently
- * returning something else.
- *
- * Demo only. It holds a few hundred thousand rows comfortably, which is a demo and not a deployment.
+ * Demo-only analytics without ClickHouse: ./client.ts's ClickHouse SQL, translated, rather than a
+ * second copy of every query to drift. An unlisted function is left as written and fails loudly.
  */
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
@@ -51,10 +43,7 @@ CREATE INDEX IF NOT EXISTS waf_events_ts ON waf_events (ts);
 
 export const ANALYTICS_TABLES = ["traffic_events", "waf_events"] as const;
 
-/**
- * Beside the app's own SQLite file, so a demo's data lives and resets in one directory. On a
- * PostgreSQL demo there is no such directory, and memory is the honest answer.
- */
+/** Beside the app's SQLite file, so a demo resets in one directory; memory on PostgreSQL. */
 export function sqliteStorePath(env: Record<string, string | undefined> = process.env): string {
   const pinned = env.DEMO_ANALYTICS_DB?.trim();
   if (pinned) return pinned;
@@ -87,13 +76,13 @@ export function clearSqliteStore(): void {
   for (const table of ANALYTICS_TABLES) store().run(`DELETE FROM ${table}`);
 }
 
-/** Delete what is older than the retention, as ClickHouse's TTL would. */
+/** As ClickHouse's TTL would. */
 export function pruneSqliteStore(retentionDays: number): void {
   const cutoff = Math.floor(Date.now() / 1000) - retentionDays * 86400;
   for (const table of ANALYTICS_TABLES) store().run(`DELETE FROM ${table} WHERE ts < ?`, [cutoff]);
 }
 
-/** The newest event's timestamp, so a restarted demo can fill the gap it was down for. */
+/** So a restarted demo can fill the gap it was down for. */
 export function latestEventTs(): number | null {
   const row = store()
     .query<{ ts: number | null }, []>("SELECT max(ts) AS ts FROM traffic_events")
@@ -128,7 +117,7 @@ export function querySqliteStore<T>(query: string, params: Record<string, unknow
 
 // ── Translation ─────────────────────────────────────────────────────────────
 
-/** The arguments of the call whose opening parenthesis is at `open`, split at top-level commas. */
+/** Split at top-level commas. */
 function callArguments(sql: string, open: number): { args: string[]; end: number } {
   const args: string[] = [];
   let depth = 0;
@@ -154,7 +143,7 @@ function callArguments(sql: string, open: number): { args: string[]; end: number
   throw new Error(`Unbalanced parentheses in analytics query: ${sql}`);
 }
 
-/** Each ClickHouse function this layer uses, as SQLite. Longer names first, so a prefix never wins. */
+/** Longer names first, so a prefix never wins. */
 const FUNCTIONS: Array<[string, (args: string[]) => string]> = [
   [
     "uniqExactIf",
@@ -178,8 +167,7 @@ function translateCalls(sql: string): string {
   let out = "";
   let i = 0;
   while (i < sql.length) {
-    // A string literal is copied whole: 'count()' in a WHERE is data, not a call. An escaped quote
-    // ('') ends one copy and starts the next, which join back into the same literal.
+    // Copied whole: 'count()' in a literal is data. An escaped quote ('') rejoins the literal.
     if (sql[i] === "'") {
       const close = sql.indexOf("'", i + 1);
       const end = close === -1 ? sql.length : close + 1;
@@ -215,7 +203,7 @@ export function translateClickHouseSql(
       typeof value === "boolean" ? (value ? 1 : 0) : ((value as string | number | null) ?? null);
     return `$${name}`;
   });
-  // SQLite's LIKE is already case-insensitive for ASCII, which is what ILIKE was asked for here.
+  // SQLite's LIKE is already case-insensitive for ASCII.
   const sql = translateCalls(withPlaceholders).replace(/\bILIKE\b/g, "LIKE");
   return { sql, bindings };
 }

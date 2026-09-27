@@ -1,13 +1,6 @@
 /**
- * Derives src/lib/db/schema.sqlite.ts from src/lib/db/schema.pg.ts.
- *
- * PostgreSQL stays the hand-edited source of truth. The mirror is mechanical because the schema
- * uses only four shapes - serial primary key, integer, text and boolean - each with one obvious
- * sqlite-core counterpart. Run after editing the PostgreSQL schema:
- *
- *   bun scripts/generate-sqlite-schema.ts
- *
- * tests/unit/db-schema-parity.test.ts fails if this was not re-run.
+ * Derives schema.sqlite.ts from schema.pg.ts - mechanical, as the schema uses only four shapes.
+ * Run `bun scripts/generate-sqlite-schema.ts` after a schema edit; the parity test checks it.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -51,7 +44,7 @@ export function toSqliteSchema(source: string): string {
   return HEADER + out;
 }
 
-/** Through biome, so the file on disk is exactly what `bun run format` would leave. */
+/** So the file is exactly what `bun run format` would leave. */
 export function formatWithBiome(source: string): string {
   const result = Bun.spawnSync(["bunx", "biome", "format", "--stdin-file-path=schema.sqlite.ts"], {
     stdin: Buffer.from(source, "utf8"),
@@ -65,7 +58,6 @@ export function formatWithBiome(source: string): string {
   return result.stdout.toString().replace(/\r\n/g, "\n");
 }
 
-/** The exact bytes src/lib/db/schema.sqlite.ts should contain. */
 export function generate(source: string = readFileSync(SOURCE, "utf8")): string {
   return formatWithBiome(toSqliteSchema(source));
 }

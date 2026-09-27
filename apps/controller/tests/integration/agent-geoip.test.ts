@@ -1,12 +1,6 @@
 /**
- * The one route that runs agent-to-controller.
- *
- * The MaxMind databases are tens of megabytes, so agents pull them rather than having them pushed.
- * The pairing secret is symmetric, so the agent signs with it and the controller verifies against
- * the row it stored - no second credential, and nothing to leak.
- *
- * Every refusal is a 404 rather than a 401, so nothing can learn that this route exists, or which
- * agent ids are real, without already holding a secret. The tests below are mostly about that.
+ * Every refusal is a 404, not a 401, so nothing learns the route exists, or which agent ids are
+ * real, without already holding a secret. Mostly what these tests are about.
  */
 import { createHmac, randomBytes } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,8 +22,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -57,7 +50,6 @@ type RouteHandler = (
 ) => Promise<Response>;
 let GET: RouteHandler;
 
-/** A signed request, as the agent's own fetch builds one. */
 function signedRequest(
   overrides: {
     agentId?: string;
@@ -76,8 +68,7 @@ function signedRequest(
   if (overrides.signed !== false) {
     headers[AGENT_ID_HEADER] = overrides.agentId ?? AGENT_ID;
     headers[AGENT_TIMESTAMP_HEADER] = String(timestamp);
-    // A nonce per request, as the agent sends: two requests signed in the same millisecond would
-    // otherwise be byte-identical, and the second would rightly be refused as a replay.
+    // Two requests signed in the same millisecond would otherwise be refused as a replay.
     const nonce = randomBytes(16).toString('hex');
     headers[AGENT_NONCE_HEADER] = nonce;
     headers[AGENT_SIGNATURE_HEADER] = createHmac('sha256', overrides.secret ?? SECRET)
@@ -142,7 +133,6 @@ describe('serving a GeoIP database to an agent', () => {
   });
 
   it('is 404, not 401, to an unsigned caller', async () => {
-    // Nothing should be able to learn this route exists without already holding a secret.
     const response = await call(signedRequest({ signed: false }));
     expect(response.status).toBe(404);
   });
@@ -192,8 +182,7 @@ describe('serving a GeoIP database to an agent', () => {
   });
 });
 
-// The suite's beforeEach puts a GeoLite2-Country.mmdb on disk, so the "databases are present"
-// branch is the starting state for these.
+// The suite's beforeEach puts a GeoLite2-Country.mmdb on disk.
 const geoip = await import('../../src/lib/agent/geoip');
 const registry = await import('../../src/lib/settings/registry');
 const { saveSettings, clearStoredSetting } = await import('../../src/lib/settings/resolve');
@@ -206,8 +195,7 @@ describe('the GeoIP toggle', () => {
   });
 
   it('infers "on" from the databases being present when nothing is stored', async () => {
-    // The upgrade path. Before the toggle existed this was the whole rule, and a deployment that
-    // has never opened the Settings page must not read as one where someone turned GeoIP off.
+    // The upgrade path: never opening Settings must not read as turning GeoIP off.
     await expect(geoip.geoipEnabled()).resolves.toBe(true);
     await expect(geoip.geoipFleetConfig()).resolves.toMatchObject({
       editions: ['GeoLite2-Country'],
@@ -223,8 +211,7 @@ describe('the GeoIP toggle', () => {
     });
 
     await expect(geoip.geoipEnabled()).resolves.toBe(true);
-    // Still nothing to offer an agent, though: naming an edition it cannot fetch would turn its
-    // daily sync into a daily 404.
+    // An edition it cannot fetch would turn the agent's daily sync into a daily 404.
     await expect(geoip.geoipFleetConfig()).resolves.toBeNull();
   });
 
@@ -232,8 +219,7 @@ describe('the GeoIP toggle', () => {
     await saveSettings({ [registry.geoipEnabled.key]: false });
 
     await expect(geoip.geoipEnabled()).resolves.toBe(false);
-    // The file is still on disk and deliberately ignored: an agent told about it would keep
-    // recording countries for a feature the operator has turned off.
+    // Deliberately ignored: an agent told about it would keep recording countries.
     expect(geoip.installedGeoipEditions()).toEqual(['GeoLite2-Country']);
     await expect(geoip.geoipFleetConfig()).resolves.toBeNull();
   });

@@ -1,8 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 
-// The web container creates the tables with this TTL on startup. The test stack
-// leaves CLICKHOUSE_RETENTION_DAYS unset, so both default to 30.
+// The test stack leaves it unset, so this and the web container's tables both default to 30.
 const RETENTION_DAYS = Number(process.env.CLICKHOUSE_RETENTION_DAYS ?? 30);
 const DAY_SECONDS = 86_400;
 
@@ -41,9 +40,7 @@ async function countRows(
   return Number(rows[0]?.c ?? 0);
 }
 
-// TTL deletion is lazy (background merges). Force it synchronously so the test
-// is deterministic: MATERIALIZE TTL recomputes TTL info and drops expired rows,
-// and mutations_sync=2 makes the command block until that mutation finishes.
+// TTL deletion is lazy; MATERIALIZE TTL with mutations_sync=2 forces it and blocks until done.
 async function forceTtl(
   ch: ClickHouseClient,
   table: 'traffic_events' | 'waf_events',
@@ -113,9 +110,7 @@ test.describe('ClickHouse retention TTL', () => {
         ],
       });
 
-      // Don't assert both rows here: ClickHouse schedules a TTL merge as soon as it ingests a part
-      // with already-expired rows, so a count() right after insert races it. Force the purge, then
-      // assert only the fresh row survives.
+      // No count() after insert: ClickHouse merges expired rows at once, so it would race.
       await forceTtl(ch, 'traffic_events');
 
       expect(await countRows(ch, 'traffic_events', marker, retentionBoundary)).toBe(0);
@@ -167,8 +162,7 @@ test.describe('ClickHouse retention TTL', () => {
         ],
       });
 
-      // See the traffic_events test: count() right after insert races the TTL
-      // merge ClickHouse schedules for expired rows, so we don't assert it here.
+      // No count() after insert, as in the traffic_events test.
       await forceTtl(ch, 'waf_events');
 
       expect(await countRows(ch, 'waf_events', marker, retentionBoundary)).toBe(0);

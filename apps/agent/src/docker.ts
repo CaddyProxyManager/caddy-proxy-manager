@@ -1,10 +1,6 @@
 /**
- * Everything the agent does with Docker.
- *
- * This is the whole reason the agent exists as a separate container: the controller has no Docker
- * socket, and anything needing the Caddy *container* recreated - rather than its config reloaded
- * over the admin API - has to happen here. Two such things: published ports, which are fixed at
- * create time, and compiled-in plugins.
+ * Everything the agent does with Docker. The controller has no socket, so whatever needs Caddy's
+ * container recreated rather than reloaded - published ports, compiled-in plugins - happens here.
  */
 
 import { randomUUID } from "node:crypto";
@@ -20,18 +16,12 @@ import {
 } from "@cpm/shared";
 import type { AgentConfig } from "./config";
 
-/** Files the agent generates for compose. Written by the agent now, not the controller. */
 export const L4_OVERRIDE_FILE = "docker-compose.l4-ports.yml";
 export const BUILD_OVERRIDE_FILE = "docker-compose.caddy-build.yml";
 
 export type CommandResult = { ok: boolean; exitCode: number; output: string; timedOut: boolean };
 
-/**
- * Run a command, capturing both streams as one transcript.
- *
- * Interleaved rather than separated because that transcript exists to be shown to an operator, and
- * a build failure's cause is routinely on stdout with the exit context on stderr.
- */
+/** One transcript for an operator: a build's cause is often on stdout, its context on stderr. */
 async function run(
   argv: string[],
   options: { timeoutSeconds?: number; env?: Record<string, string> } = {},
@@ -46,8 +36,7 @@ async function run(
       stdout: "pipe",
       stderr: "pipe",
       signal: controller.signal,
-      // Spread, because Bun replaces the environment wholesale rather than extending it - and
-      // `docker` needs DOCKER_HOST from ours to find the socket proxy at all.
+      // Spread: Bun replaces the environment wholesale, and `docker` needs our DOCKER_HOST.
       env: options.env ? { ...process.env, ...options.env } : undefined,
     });
     const [stdout, stderr, exitCode] = await Promise.all([
@@ -74,32 +63,13 @@ export function tail(output: string, lines: number): string {
   return output.split("\n").slice(-lines).join("\n").trim();
 }
 
-/**
- * A drive-letter path, as recorded by a compose CLI running on Windows.
- *
- * Anchored and case-insensitive on the letter; a UNC path (`\\server\share`) deliberately does
- * not match, because there is no drive for Docker Desktop to have mounted.
- */
+/** A drive-letter path from a Windows compose CLI. No UNC: Docker Desktop mounts no drive then. */
 const WINDOWS_DRIVE_PATH = /^([A-Za-z]):[\\/](.*)$/;
 
 /**
- * Where Docker Desktop exposes a Windows path to the daemon, or "" if it cannot be worked out.
- *
- * The agent runs a Linux `docker compose` against the host's daemon, and hands it
- * `--project-directory` so relative bind mounts resolve somewhere the *daemon* can find. On a
- * Linux host the label is already such a path. On Docker Desktop for Windows it is a drive path,
- * which is not a path at all as far as the daemon is concerned: passing it raw produces
- * "mount denied: too many colons", and passing nothing leaves `./docker/...` resolving against the
- * agent's own `/compose`, where the daemon silently creates an empty directory instead.
- *
- * Docker Desktop mounts each shared drive inside its VM at `/run/desktop/mnt/host/<letter>`, so
- * `C:\\deploy\\cpm` is `/run/desktop/mnt/host/c/deploy/cpm`. Verified against Docker Desktop
- * 29.7: a bind resolved through this prefix mounts the real file, where the untranslated form
- * mounts an empty directory.
- *
- * Only the current layout is produced. Docker Desktop used `/host_mnt/<letter>` years ago, and
- * guessing between the two would be wrong half the time on deployments that still have it;
- * COMPOSE_HOST_DIR is the answer there, and the caller says so when this returns "".
+ * Where Docker Desktop exposes a Windows drive path to the daemon, or "" if it cannot tell. Raw, it
+ * is "mount denied: too many colons"; omitted, relative binds mount empty directories. Only the
+ * current layout: the old `/host_mnt/<letter>` is left to COMPOSE_HOST_DIR rather than guessed.
  */
 export function hostPathForDaemon(label: string): string {
   const match = WINDOWS_DRIVE_PATH.exec(label.trim());
@@ -129,23 +99,16 @@ export class DockerHost {
   constructor(private readonly config: AgentConfig) {}
 
   /**
-   * Read one compose label off the running Caddy container. Empty when it cannot be read.
-   *
-   * Bounded, unlike most inspects: this runs before every compose invocation, and an unresponsive
-   * daemon would otherwise hold the operation lock with no timeout to end it. Both callers treat
-   * an empty answer as "fall back", so giving up early costs nothing.
+   * One compose label off Caddy's container, "" when unreadable. Bounded: it runs before every
+   * compose call, and a hung daemon would hold the operation lock; "" just means "fall back".
    */
   private async caddyLabel(label: string): Promise<string> {
     return this.containerLabel(this.config.caddyContainerName, label);
   }
 
   /**
-   * One compose label off this agent's own container.
-   *
-   * The agent is a service in the same project, so it carries the same project name and working
-   * directory as everything else - and unlike Caddy it is, by definition, running whenever this
-   * code executes. `/etc/hostname` is the container id inside the container, which is what the
-   * daemon accepts in place of a name.
+   * One compose label off the agent's own container: same project as Caddy, and always running.
+   * `/etc/hostname` is the container id, which the daemon accepts as a name.
    */
   private async selfLabel(label: string): Promise<string> {
     let id: string;
@@ -168,19 +131,12 @@ export class DockerHost {
     return value === "<no value>" ? "" : value;
   }
 
-  /**
-   * The compose project to operate on, read off the running Caddy container's labels.
-   *
-   * Detected rather than assumed: the project name comes from the directory the operator ran
-   * `docker compose up` in, so hard-coding it would make the agent silently manage a project that
-   * does not exist on any deployment whose directory is not called `caddy-proxy-manager`.
-   */
+  /** Detected, not assumed: the project name comes from the directory compose was run in. */
   async composeProject(): Promise<string> {
     if (this.config.composeProject) return this.config.composeProject;
     if (this.detectedProject) return this.detectedProject;
 
-    // This agent's own container first: Caddy may not exist yet - the agent is what starts it -
-    // and asking a container that is not there returns nothing at all.
+    // Own container first: Caddy may not exist yet, since the agent is what starts it.
     const detected =
       (await this.selfLabel("com.docker.compose.project")) ||
       (await this.caddyLabel("com.docker.compose.project"));
@@ -189,44 +145,23 @@ export class DockerHost {
   }
 
   /**
-   * The project directory as the *host* knows it, for `--project-directory`.
-   *
-   * The daemon resolves a relative bind mount against the project directory, and `/compose` is a
-   * path inside this container. Left unset, `./docker/clickhouse/low-disk-write.yml` resolves to a
-   * host path that does not exist, and Docker silently creates an empty directory there - so the
-   * service comes up without the config it was mounted, which is a wrong container rather than a
-   * failed command.
-   *
-   * Caddy uses named volumes only, so this went unnoticed while recreating it was all the agent
-   * did. Detected from the same container's labels as the project name, for the same reason:
-   * asking the operator to set `COMPOSE_HOST_DIR` correctly is not a thing to depend on.
+   * The project directory as the host knows it. Without it a relative bind resolves to a host path
+   * that does not exist, and Docker silently mounts an empty directory instead of the config.
    */
   private async composeHostDir(): Promise<string> {
     if (this.config.composeHostDir) return this.config.composeHostDir;
     if (this.detectedHostDir) return this.detectedHostDir;
 
-    // Own container first, for the reason in composeProject: the first thing the agent brings up
-    // may be a managed service rather than Caddy, and reading Caddy's labels before Caddy exists
-    // answers "" - which meant no --project-directory and every relative bind resolving against a
-    // path only this container has. ClickHouse came up with an empty directory where its config
-    // should have been, which is a wrong container rather than a failed command.
-    //
-    // Only a real answer is cached. Caching "" meant one early miss poisoned every later
-    // invocation for the life of the process, long after Caddy was up and could have answered.
+    // Own container first, as in composeProject. Only a real answer is cached: a cached "" let one
+    // early miss poison every later invocation.
     const detected =
       (await this.selfLabel("com.docker.compose.project.working_dir")) ||
       (await this.caddyLabel("com.docker.compose.project.working_dir"));
 
-    // A POSIX path is already what the daemon wants. A Windows one is not, and passing it raw
-    // turns every invocation into "mount denied: too many colons" - see hostPathForDaemon, which
-    // translates it into the path Docker Desktop exposes the drive at instead.
     const usable = detected.startsWith("/") ? detected : hostPathForDaemon(detected);
 
     if (detected && !usable) {
-      // Loud, because the alternative is a container that comes up wrong. Without a project
-      // directory the daemon resolves `./docker/...` against a path only this container has, and
-      // silently creates an empty directory there - the service starts, without the configuration
-      // it was supposed to be given.
+      // Loud: otherwise the service starts silently without the config it mounts.
       console.warn(
         `[docker] Cannot translate the compose project directory "${detected}" into a path the ` +
           "Docker daemon can resolve. Services mounting files by relative path will come up " +
@@ -239,15 +174,9 @@ export class DockerHost {
   }
 
   /**
-   * The -f/-p/--env-file arguments every invocation shares.
-   *
-   * Both overrides are always included: a rebuild must not drop the published L4 ports, and a port
-   * change must not rebuild Caddy without the module selection. Omitting either is how one
-   * operation silently undoes the other.
-   *
-   * `readsBuildContext` drops `--project-directory`: the daemon resolves bind mounts, but the CLI in
-   * this container reads `context: .`, and the host path does not exist here - so a build against it
-   * fails with "unable to prepare context". Compose then anchors to the first -f file, in COMPOSE_DIR.
+   * Both overrides always: omitting either lets a rebuild drop the L4 ports, or vice versa.
+   * `readsBuildContext` drops `--project-directory`: this CLI reads `context: .`, and the host path
+   * does not exist here ("unable to prepare context").
    */
   private async composeArgs(readsBuildContext = false): Promise<string[]> {
     const { composeDir, composeSkipOverride, composeExtraFile, dataDir } = this.config;
@@ -258,12 +187,9 @@ export class DockerHost {
     ]);
     const args = ["-p", project];
 
-    // The daemon resolves relative bind-mount paths against the project directory, and the agent's
-    // /compose mount is not where the host thinks the project is. See composeHostDir.
     if (hostDir) args.push("--project-directory", hostDir);
-    // Never the project's .env: it holds SESSION_SECRET and POSTGRES_PASSWORD, which this container
-    // must not read. An explicit empty file stops compose finding one on its own. What the services
-    // the agent runs interpolate reaches it through its own environment (docker-compose.yml).
+    // Never the project's .env, which holds SESSION_SECRET and POSTGRES_PASSWORD; services get
+    // their values through the agent's own environment instead.
     args.push("--env-file", "/dev/null");
 
     args.push("-f", join(composeDir, "docker-compose.yml"));
@@ -316,21 +242,13 @@ export class DockerHost {
     );
   }
 
-  /** Recreate only the Caddy container, leaving everything else running. */
   async recreateCaddy(): Promise<CommandResult> {
     return this.compose(["up", "-d", "--no-deps", "--pull", "never", "--force-recreate", "caddy"]);
   }
 
   /**
-   * Bring Caddy up, enabling its profile for this invocation.
-   *
-   * Caddy sits behind a compose profile so that `docker compose up` does not start it: an agent
-   * with no controller has no configuration to serve, and a Caddy answering on 80 and 443 with a
-   * default page is worse than one that is not listening at all. This is the only thing that
-   * starts it, which is what makes "paired" and "serving traffic" the same state.
-   *
-   * `--profile` explicitly rather than relying on compose to infer it from the service name, for
-   * the same reason startService does: that inference is a "no such service" error on older v2.
+   * The only thing that starts Caddy, so "paired" and "serving traffic" are one state. `--profile`
+   * explicitly: inferring it from the service name fails on older compose v2.
    */
   async startCaddy(): Promise<CommandResult> {
     return this.compose(["--profile", "caddy", "up", "-d", "--no-deps", "caddy"], {
@@ -343,12 +261,7 @@ export class DockerHost {
     return this.compose(["--profile", "caddy", "restart", "caddy"], { timeoutSeconds: 120 });
   }
 
-  /**
-   * Stop Caddy, leaving its container, certificates and config volumes in place.
-   *
-   * `stop`, never `down`: an agent that was unpaired must not be how someone discovers their ACME
-   * account and issued certificates are gone.
-   */
+  /** `stop`, never `down`: unpairing must not be how someone loses their ACME account and certs. */
   async stopCaddy(timeoutSeconds = 120): Promise<CommandResult> {
     return this.compose(["--profile", "caddy", "stop", "caddy"], { timeoutSeconds });
   }
@@ -373,11 +286,7 @@ export class DockerHost {
     });
   }
 
-  /**
-   * Poll the Caddy healthcheck until it passes or the budget runs out, returning the last status
-   * seen. Both the port apply and the rebuild ask the same question - did it come back up - so
-   * neither reports success on a container that started and immediately died.
-   */
+  /** So no caller reports success on a container that started and immediately died. */
   async waitForCaddyHealth(timeoutSeconds = this.config.healthTimeoutSeconds): Promise<string> {
     const deadline = Date.now() + timeoutSeconds * 1000;
     let health = "unknown";
@@ -397,23 +306,9 @@ export class DockerHost {
   }
 
   /**
-   * Bring one optional service up, enabling its profile for this invocation.
-   *
-   * `--profile` rather than relying on compose auto-enabling the profile of a service named on the
-   * command line: that behaviour arrived partway through v2 and is silently a "no such service"
-   * error on anything older. `--no-deps` because these have no dependency the stack is not already
-   * running, and pulling in the rest would recreate containers nobody asked to touch.
-   *
-   * No `--pull` flag, unlike recreateCaddy: a deployment that never ran the profile has no image
-   * for it, so the implicit pull-if-missing is exactly what is wanted - and also why this takes a
-   * timeout measured in minutes.
-   *
-   * `env` carries the credentials the compose file interpolates. Passed through the child's
-   * environment rather than a generated `--env-file`, for two reasons: compose reads the process
-   * environment at a higher precedence than any env file, so this overrides a stale value in the
-   * project's own `.env` without the agent needing to write to a read-only mount - and a value
-   * passed this way needs no quoting, where an env file would need escaping that compose's parser
-   * defines differently for single and double quotes. It also keeps the password off disk.
+   * `--no-deps` so nothing else is recreated. No `--pull`: a profile never run has no image yet.
+   * `env` goes through the child environment, not an `--env-file`: it outranks `.env`, needs no
+   * quoting and stays off disk.
    */
   async startService(
     service: ManagedServiceName,
@@ -426,15 +321,8 @@ export class DockerHost {
   }
 
   /**
-   * Stop one optional service, leaving its container and volume in place.
-   *
-   * `stop` rather than `down` or `rm`: turning analytics off must not be how someone discovers
-   * their event history is gone. The data volume outlives the toggle.
-   *
-   * Still takes `env`, so every invocation resolves the project to the same configuration. Compose
-   * interpolates the whole file before deciding what to act on, and a deployment whose compose file
-   * still guards a credential with `${VAR:?}` - an override, or one shipped before this - would
-   * otherwise fail here on a variable belonging to a service this command is not touching.
+   * `stop`, not `down`: turning analytics off must not delete its history. Still takes `env`:
+   * compose interpolates the whole file, and an older `${VAR:?}` guard would fail here otherwise.
    */
   async stopService(
     service: ManagedServiceName,
@@ -531,13 +419,9 @@ export class DockerHost {
   }
 
   /**
-   * `caddy validate` on a config, run by the binary this host's Caddy runs, without loading it.
-   *
-   * A throwaway container from the Caddy container's own image, so a rebuilt Caddy validates with
-   * its own modules. The socket proxy grants no exec, and a mount would hand the image this agent's
-   * data volume, so the config is copied into the created container before it starts. It keeps
-   * the image's user because Coraza opens the audit log, caddy-owned in the image, while building a
-   * WAF. No network: whatever the config says, it can reach nothing.
+   * `caddy validate` in a throwaway, network-less container of Caddy's own image, so its modules
+   * count. No exec grant and no mount, so the config is copied in; the image's user stays because
+   * Coraza opens the caddy-owned audit log while building a WAF.
    */
   async validateCaddyConfig(config: string, timeoutSeconds = 45): Promise<CaddyValidation> {
     const deadline = Date.now() + timeoutSeconds * 1000;
@@ -747,11 +631,8 @@ export function overrideIsUsable(dataDir: string, file: string): boolean {
 }
 
 /**
- * The child environment for a managed-service invocation.
- *
- * Only MANAGED_SERVICE_ENV_KEYS pass: every entry lands in the environment of a `docker` that
- * holds the socket, where DOCKER_HOST, PATH or LD_PRELOAD would hand over the host. Unset entries
- * are dropped so compose falls back to the agent's own environment; it never reads `.env`.
+ * Only MANAGED_SERVICE_ENV_KEYS pass: this reaches a `docker` holding the socket, where DOCKER_HOST
+ * or LD_PRELOAD would hand over the host. Unset entries fall back to the agent's own environment.
  */
 export function composeEnv(env: ManagedServicesRequest["env"] | undefined): Record<string, string> {
   const allowed = MANAGED_SERVICE_ENV_KEYS as readonly string[];

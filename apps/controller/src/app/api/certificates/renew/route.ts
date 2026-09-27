@@ -22,10 +22,7 @@ function datesFrom(body: { notBefore?: unknown; notAfter?: unknown }) {
     : null;
 }
 
-/**
- * "Renew now" for a host's names - together, so the eviction reload happens once. The Certificates
- * page then watches the inventory for the new certificates.
- */
+/** A host's names together, so the eviction reload happens once. */
 export async function POST(request: NextRequest) {
   const forbidden = checkSameOrigin(request);
   if (forbidden) return forbidden;

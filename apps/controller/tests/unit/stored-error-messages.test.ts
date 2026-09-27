@@ -1,8 +1,6 @@
 /**
- * The update check and the GeoIP updater run with no reader, so they store a failure's English and
- * its code, and the settings page says it later in the reader's language. These check that the
- * stored shapes render, that a result stored before codes existed still shows its English, and that
- * the English a code renders to is what the job stored - the REST contract and the log see that.
+ * Jobs with no reader store English plus a code. A result from before codes must still show its
+ * English, and a code must render to the English stored, which REST and the log see.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';

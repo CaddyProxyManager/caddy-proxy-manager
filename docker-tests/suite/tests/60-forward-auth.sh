@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# CPM's built-in forward auth: an unauthenticated request is bounced to the
-# portal, a full login round-trip issues a session cookie, identity headers are
-# injected for the upstream, per-host access is enforced, and client-supplied
-# identity headers are stripped.
+# CPM's built-in forward auth: portal bounce, login round-trip, identity headers, per-host access,
+# and stripping of client-supplied identity headers.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "forward authentication"
@@ -35,8 +33,7 @@ t_eq "an excluded path is served without authentication" "200" "$(http_code "htt
 body=$(http_body "https://$domain/open/health")
 t_contains "the excluded path reaches the upstream" "origin-a" "$body"
 
-# Identity headers are injected by CPM alone. A client that supplies its own
-# must not have them reach the upstream - on any route, authenticated or not.
+# Identity headers come from CPM alone; a client's own must never reach the upstream.
 spoof=$(http_body "https://$domain/open/spoof" \
   -H 'X-CPM-User: mallory' -H 'X-CPM-Email: mallory@evil.example' -H 'X-CPM-Groups: admins')
 t_not_contains "a spoofed identity header is stripped (user)" "mallory" "$spoof"
@@ -44,7 +41,7 @@ t_not_contains "a spoofed identity header is stripped (groups)" "admins" "$spoof
 
 # ── Access control ──────────────────────────────────────────────────────────
 #
-# Forward auth denies by default: a user needs an explicit grant on the host.
+# Denied by default: a user needs an explicit grant on the host.
 
 api GET "/api/v1/proxy-hosts/$host_id/forward-auth-access"
 t_eq "host access starts empty" "200" "$API_STATUS"
@@ -54,8 +51,7 @@ portal_login() {  # portal_login USERNAME PASSWORD -> prints the callback URL
   local portal rid_candidates rid response
 
   portal=$(curl -sS --max-time 15 "$CPM_API/portal?rd=$(printf '%s' "https://$domain/private/page" | jq -sRr @uri)" 2>/dev/null)
-  # The portal mints a single-use redirect intent and hands the client only its
-  # opaque id; it is rendered into the page, so pick it out of the markup.
+  # The portal renders only the opaque id of a single-use redirect intent into the page.
   rid_candidates=$(printf '%s' "$portal" | grep -oE '[0-9a-f]{32}' | sort -u)
   for rid in $rid_candidates; do
     response=$(curl -sS --max-time 15 -H 'Content-Type: application/json' -H "Origin: $CPM_API" \
@@ -65,8 +61,7 @@ portal_login() {  # portal_login USERNAME PASSWORD -> prints the callback URL
     LAST_LOGIN_RESPONSE="$response"
     local target; target=$(printf '%s' "$response" | jq -r '.redirectTo // empty' 2>/dev/null)
     if [ -n "$target" ]; then printf '%s' "$target"; return 0; fi
-    # A 403 means the credentials were fine but the grant is missing - that is
-    # a real answer, not a wrong rid, so stop trying other candidates.
+    # A 403 means good credentials but no grant - a real answer, so stop trying candidates.
     case "$response" in *"do not have access"*) return 1 ;; esac
   done
   return 1
@@ -95,8 +90,7 @@ fi
 pass "the portal issues an exchange code"
 t_contains "the exchange code is redeemed on the protected domain" "https://$domain/.cpm-auth/callback" "$callback"
 
-# Caddy routes /.cpm-auth/callback back to CPM; redeeming sets the session
-# cookie on the protected domain and bounces to the originally requested URL.
+# Redeeming sets the session cookie on the protected domain and bounces to the original URL.
 fetch "$callback" -c "$JAR"
 t_eq "redeeming the code redirects back to the original URL" "302" "$FETCH_CODE"
 t_eq "the redirect returns to where the client started" "https://$domain/private/page" "$(header_value location)"
@@ -106,17 +100,14 @@ fetch "https://$domain/private/page" -b "$JAR"
 t_eq "the authenticated request is served" "200" "$FETCH_CODE"
 t_eq "it reaches the upstream" "origin-a" "$(fetch_json '.origin')"
 
-# Regression: these four were red on the rig's first run, against a real defect. The generated
-# handle_response block read values back through `{http.reverse_proxy.header.X-CPM-User}`, which
-# does not resolve - Go canonicalises the key to `X-Cpm-User`. The empty-value guard then matched,
-# the copy route was skipped, and every upstream received an anonymous request. Fixed by
-# canonicalising the placeholder in caddy.ts; also pinned in caddy-forward-auth-copy-headers.test.ts.
+# Regression: `{http.reverse_proxy.header.X-CPM-User}` never resolved (Go canonicalises it to
+# X-Cpm-User), so every upstream got an anonymous request. Also pinned in
+# caddy-forward-auth-copy-headers.test.ts.
 t_eq "the upstream is told who the user is" "$CPM_ADMIN_USER" "$(fetch_json '.headers["x-cpm-user"]')"
 t_eq "the upstream is told the user's email" "$CPM_ADMIN_USER@localhost" "$(fetch_json '.headers["x-cpm-email"]')"
 t_eq "the upstream is told the user's id" "1" "$(fetch_json '.headers["x-cpm-user-id"]')"
 
-# Even with a valid session, a forged header must be replaced rather than
-# passed through alongside the real one.
+# Even with a valid session, a forged header must be replaced, not passed alongside.
 fetch "https://$domain/private/page" -b "$JAR" -H 'X-CPM-User: mallory'
 t_eq "a forged identity header is overwritten for an authenticated user" \
   "$CPM_ADMIN_USER" "$(fetch_json '.headers["x-cpm-user"]')"
@@ -126,9 +117,7 @@ t_eq "a forged identity header is overwritten for an authenticated user" \
 api GET /api/v1/forward-auth-sessions
 t_eq "forward-auth sessions can be listed" "200" "$API_STATUS"
 
-# Pick the session this run created rather than trusting the listing order:
-# sessions from an earlier run in the same container are still in the table,
-# and revoking one of those would prove nothing about the cookie in hand.
+# Sessions from earlier runs in this container are still listed; revoking one proves nothing.
 session_id=$(jqr '[.[]? | select(.id as $i | ($known | index($i)) | not) | .id] | .[0]' \
   --argjson known "$(printf '%s' "$sessions_before" | jq -c '[.[]?.id]')")
 

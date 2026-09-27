@@ -1,19 +1,6 @@
 /**
- * Regression (#261): OAuth account linking/unlinking was not reflected in the
- * CPM user state. Better Auth writes federated identities to the `accounts`
- * table only, while the Profile UI (and admin user list) read the informational
- * `users.provider` / `users.subject` columns:
- *
- *   - auto-link / profile "Link <provider>" created a working accounts row but
- *     left users.provider/subject empty, so the Profile page showed the account
- *     as NOT linked even though OAuth sign-in worked;
- *   - unlinking deleted the accounts rows but left users.provider/subject
- *     populated, so the Profile page kept claiming the account was linked.
- *
- * These tests lock in the fix: the accounts table stays the single source of
- * truth, users.provider/subject are re-derived from it whenever Better Auth
- * creates an account (account.create.after hook) and after unlinking, and the
- * Profile page reads its connection state straight from accounts.
+ * #261: `accounts` is the source of truth; `users.provider`/`subject` are re-derived from it by
+ * the account hooks and after unlinking, and the Profile page reads `accounts` directly.
  */
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -25,8 +12,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, unlinkUserId: 0 }
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Outside the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -42,8 +28,7 @@ vi.mock('../../src/lib/db', () => ({
 
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
-// Stub better-auth so `betterAuth(options)` hands back the raw options object;
-// the databaseHooks on (await getAuth()).options are then the real functions CPM wired.
+// Hands back the raw options, so their databaseHooks are the real functions CPM wired.
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
 }));
@@ -63,8 +48,7 @@ import { accounts, oauthProviders, users } from '../../src/lib/db/schema';
 import { auth } from '@/src/lib/auth';
 import { eq } from 'drizzle-orm';
 
-// setup.bun.ts pins the session to a fixed admin; the unlink route needs it to
-// name the user created inside that test instead.
+// setup.bun.ts pins a fixed admin; the unlink route needs the test's own user.
 vi.mocked(auth).mockImplementation(
   async () =>
     ({
@@ -95,11 +79,7 @@ async function seedProvider(id: string, issuer: string) {
     });
 }
 
-/**
- * Mimic what Better Auth's internal adapter does on OAuth sign-up/link: a row
- * in `accounts`, nothing else. The account.create.after hook under test is the
- * seam CPM uses to keep users.provider/subject in step.
- */
+/** Better Auth writes only the `accounts` row; the hook under test does the rest. */
 async function createAccountLikeBetterAuth(userId: number, providerId: string, accountId: string) {
   await db().insert(accounts).values({
     userId,
@@ -141,8 +121,7 @@ describe('#261 - account.create.after keeps users.provider/subject in sync', () 
   });
 
   it('syncs provider/subject for brand-new federated sign-ups too', async () => {
-    // Better Auth creates the user first (provider/subject default to ""), then
-    // the accounts row - the after-hook must still fix the columns.
+    // Better Auth creates the user (with "" columns) before the accounts row.
     const user = await createUser({
       email: 'federated@example.com',
       name: 'Federated',
@@ -172,7 +151,6 @@ describe('#261 - account.create.after keeps users.provider/subject in sync', () 
       updatedAt: NOW,
     });
 
-    // Simulate a repeat sign-in: Better Auth updates the existing account row.
     const options = ((await getAuth()) as any).options;
     await options.databaseHooks.account.update.after({
       userId: String(user.id),
@@ -268,7 +246,6 @@ describe('#261 - syncUserOAuthIdentity', () => {
       updatedAt: NOW,
     });
 
-    // Simulate unlink: delete the OAuth account rows, then re-derive.
     await db().delete(accounts).where(eq(accounts.userId, user.id));
     await syncUserOAuthIdentity(user.id);
 
@@ -343,13 +320,12 @@ describe('#261 - profile connection state is derived from the accounts table', (
     });
     await createAccountLikeBetterAuth(user.id, 'prov-a', 'sub-a-derived');
 
-    // Even if users.provider were stale, the profile must see the link.
+    // A stale users.provider must not hide the link.
     await db().update(users).set({ provider: '', subject: '' }).where(eq(users.id, user.id));
 
     const linked = await listUserOAuthProviders(user.id);
     expect(linked).toEqual([{ providerId: 'prov-a', accountId: 'sub-a-derived' }]);
 
-    // And after unlinking, the list empties.
     await db().delete(accounts).where(eq(accounts.userId, user.id));
     expect(await listUserOAuthProviders(user.id)).toEqual([]);
   });

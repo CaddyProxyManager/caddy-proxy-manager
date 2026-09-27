@@ -1,7 +1,6 @@
 /**
- * The review sheet's history names each past apply from its stored keys, in the reader's language.
- * `summary` stays in the table as it was written - the migration copies it - so these pin that the
- * keys come back alongside it, and that a row whose keys cannot be read still has something to show.
+ * History names each apply from its stored keys, in the reader's language; `summary` stays as
+ * written, and a row with unreadable keys still shows something.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -9,13 +8,11 @@ import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-// bun evaluates a vi.mock factory synchronously while linking, so the helpers it needs
-// are imported above it rather than awaited inside it.
+// bun runs a vi.mock factory synchronously, so its helpers are imported above it.
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -149,7 +146,6 @@ describe('revision version control', () => {
     );
     expect(lines.some((line) => line.kind === 'added' && line.text.includes('b.test'))).toBe(true);
 
-    // Backwards is the same span with its sides swapped.
     const reversed = await compareRevisions(second, first);
     const back = reversed.keys?.[0]?.diff.lines ?? [];
     expect(back.some((line) => line.kind === 'added' && line.text.includes('a.test'))).toBe(true);

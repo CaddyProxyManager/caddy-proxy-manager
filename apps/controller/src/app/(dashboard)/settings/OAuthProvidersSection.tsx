@@ -108,8 +108,7 @@ export default function OAuthProvidersSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<OAuthProviderView | null>(null);
-  // Which provider the sign-in screen offers first. Held here so the badge moves with the
-  // click rather than waiting for a reload.
+  // Held locally so the badge moves on click rather than on reload.
   const [primaryId, setPrimaryId] = useState<string | null>(initialPrimaryProviderId);
 
   const callbackUrl = useCallback(
@@ -117,13 +116,11 @@ export default function OAuthProvidersSection({
     [baseUrl],
   );
 
-  // One URL for every provider - the logout token names its own issuer, which is what picks the
-  // provider it gets verified against.
+  // One URL for every provider: the logout token's issuer picks the provider to verify against.
   const backchannelLogoutUrl = useMemo(() => oidcBackchannelLogoutUrl(baseUrl), [baseUrl]);
 
   function closeDialog() {
-    // Clear any newly-entered replacement secret from client memory as soon
-    // as the dialog closes.
+    // Drops a typed replacement secret from client memory.
     setDialogOpen(false);
     setEditingProvider(null);
     setRotateClientSecret(false);
@@ -244,8 +241,7 @@ export default function OAuthProvidersSection({
   }
 
   async function handleSetPrimary(provider: OAuthProviderView) {
-    // Clicking the current primary clears it, which is how the operator gets back to the
-    // alphabetical list without a separate control for "none".
+    // Clicking the current primary clears it - the only way back to alphabetical order.
     const next = primaryId === provider.id ? null : provider.id;
     setPrimaryId(next);
     try {
@@ -338,8 +334,7 @@ export default function OAuthProvidersSection({
                     variant="secondary"
                     size="sm"
                     label={isPrimary ? t("clearPrimary") : t("makePrimary")}
-                    // Filled and pink once it is the primary, so the row says which provider that
-                    // is from the button that sets it - the same pink the badge beside it uses.
+                    // The badge's pink, so the button that sets the primary also shows it.
                     icon={
                       <Star
                         fill={isPrimary ? "currentColor" : "none"}
@@ -370,8 +365,6 @@ export default function OAuthProvidersSection({
                   />
                 </HStack>
               </HStack>
-              {/* CodeBlock owns the copy affordance, replacing the hand-built
-                  button and its two-second "Copied!" flag. */}
               <CodeBlock code={callbackUrl(provider.id)} width="100%" />
             </VStack>
           </Card>
@@ -388,8 +381,6 @@ export default function OAuthProvidersSection({
         />
       </HStack>
 
-      {/* The inline Confirm/Cancel pair became a real dialog, so a destructive
-          action is announced as one. */}
       <AlertDialog
         isOpen={deleteConfirm !== null}
         onOpenChange={(open) => !open && setDeleteConfirm(null)}
@@ -401,7 +392,6 @@ export default function OAuthProvidersSection({
         onAction={() => deleteConfirm && handleDelete(deleteConfirm.id)}
       />
 
-      {/* Add / Edit Dialog */}
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -477,8 +467,7 @@ export default function OAuthProvidersSection({
                 onChange={(v) => updateField("clientSecret", v)}
               />
               {editingProvider?.hasClientSecret && rotateClientSecret && (
-                // Rotating is otherwise a one-way door: isClientSecretRequired turns on with it,
-                // so a misclick forces either inventing a new secret or losing the whole dialog.
+                // Otherwise a misclick on Rotate makes a new secret required, or costs the dialog.
                 <HStack justify="end">
                   <Button
                     type="button"
@@ -558,10 +547,8 @@ export default function OAuthProvidersSection({
                 </Text>
               </VStack>
 
-              {/* The helper text below used inline <code> spans. Astryx ties a
-                  field's description to it via aria-describedby but types it as
-                  a plain string, so the monospace styling is traded for keeping
-                  that association. */}
+              {/* No <code> in the help: Astryx types a description as a string, and only
+                  that keeps its aria-describedby link. */}
               <TextInput
                 label={t("groupsClaim")}
                 size="sm"
@@ -657,8 +644,7 @@ export default function OAuthProvidersSection({
             </VStack>
           )}
 
-          {/* Optional, and only meaningful once the provider is saved - but it belongs beside the
-              callback URL, which is the other value being copied into the IdP's own form. */}
+          {/* Shown before saving too: it goes into the IdP's form beside the callback URL. */}
           <VStack gap={1}>
             <Text type="label" size="xsm" color="secondary">
               {t("backChannelLogoutUrl")}

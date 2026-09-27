@@ -59,7 +59,6 @@ test.describe('Groups page', () => {
     await dialog.getByLabel('Description').fill('Created by E2E test');
     await dialog.getByRole('button', { name: 'Create' }).click();
 
-    // It appears in the rail and is selected, so its detail heads the page.
     await expect(rail(page).getByText('E2E Test Group')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'E2E Test Group', level: 2 })).toBeVisible();
     await expect(page.getByText('Created by E2E test')).toBeVisible();
@@ -67,7 +66,7 @@ test.describe('Groups page', () => {
   });
 
   test('add members to group, several in one go', async ({ page }) => {
-    // Two accounts of this run's own, so there is always a pair to pick whatever else exists.
+    // This run's own accounts, so there is always a pair to pick whatever else exists.
     const tag = `picker-${Date.now()}`;
     const origin = new URL(page.url()).origin;
     for (const n of [1, 2]) {
@@ -107,8 +106,8 @@ test.describe('Groups page', () => {
 
   test('the access tab says what the group manages', async ({ page }) => {
     await rail(page).getByText('E2E Test Group', { exact: true }).click();
-    // Astryx tabs are buttons (the navigation pattern), named with their count badge - which also
-    // keeps this apart from the header's "Access - <group>" icon button.
+    // Astryx tabs are buttons named with their count badge, which also keeps this apart from the
+    // header's "Access - <group>" icon button.
     await page.getByRole('button', { name: /^Access\s*\d+$/ }).click();
     await expect(page.getByRole('heading', { name: 'Managed resources' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Edit access' })).toBeVisible();
@@ -129,8 +128,7 @@ test.describe('Groups page', () => {
   test('delete group via confirm dialog', async ({ page }) => {
     await rail(page).getByText('E2E Test Group', { exact: true }).click();
 
-    // Deletion is confirmed through an in-app AlertDialog. The header button is labelled per
-    // group; the dialog's action is the bare verb.
+    // The header button is labelled per group; the dialog's action is the bare verb.
     await page.getByRole('button', { name: 'Delete group E2E Test Group' }).click();
     const confirm = page.getByRole('alertdialog');
     await expect(confirm).toBeVisible();

@@ -1,15 +1,8 @@
 "use client";
 
 /**
- * The command palette, on every dashboard page.
- *
- * It used to belong to the Settings rail and could only jump between settings sections. It now
- * lives with the dashboard layout, so ⌘K / Ctrl+K opens it anywhere, and it holds everything the
- * reader can navigate to: every page their role can open, then - for an admin - every settings
- * section, still findable by its description, its group and the environment variables it owns.
- *
- * The provider owns the open state so a button anywhere below it (either rail) can open the same
- * palette the shortcut does.
+ * Every page the role can open, and for an admin every settings section, searchable by its
+ * description, group and env vars. The provider owns open state so either rail can open it.
  */
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,14 +27,14 @@ import {
 } from "@/src/app/(dashboard)/settings/sections";
 
 type PaletteItem = {
-  /** The page it opens. Unique already, so it doubles as the id selection reports back. */
+  /** The page it opens; unique, so it doubles as the id. */
   id: string;
   label: string;
   auxiliaryData: {
-    /** The palette's own heading for this item; CommandPalette groups on it. */
+    /** CommandPalette groups on it. */
     group: string;
     desc: string;
-    /** Extra words a search can match on without them being shown. */
+    /** Searchable but not shown. */
     keywords: string[];
     icon: LucideIcon;
   };
@@ -49,12 +42,10 @@ type PaletteItem = {
 
 const PaletteContext = createContext<{ open: () => void }>({ open: () => {} });
 
-/** Opens the global palette - for a search button that is not the keyboard shortcut. */
 export function useCommandPalette() {
   return useContext(PaletteContext);
 }
 
-/** Opens the command palette: the rail's visible way in, beside the keyboard shortcut. */
 export function PaletteSearchButton() {
   const t = useTranslations("commandPalette");
   const { open } = useCommandPalette();
@@ -75,7 +66,7 @@ export function GlobalCommandPaletteProvider({
   role,
   children,
 }: {
-  /** The signed-in user's role: it decides which pages, and whether settings, are listed. */
+  /** Decides which pages, and whether settings, are listed. */
   role: string | undefined;
   children: ReactNode;
 }) {
@@ -89,7 +80,7 @@ export function GlobalCommandPaletteProvider({
     function handler(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        // One toggle per press: a held shortcut repeats, and would flicker the palette open and shut.
+        // A held shortcut repeats, and would flicker the palette open and shut.
         if (event.repeat) return;
         setIsOpen((open) => !open);
       }
@@ -98,10 +89,8 @@ export function GlobalCommandPaletteProvider({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Enter takes the top result when nothing is highlighted. Astryx highlights a row only once the
-  // arrow keys or the pointer reach one, so "type, Enter" - the way a palette is used - otherwise
-  // did nothing unless the mouse happened to rest over the list. Clicking the row goes through the
-  // palette's own selection, so it closes and navigates exactly as a click would.
+  // Enter takes the top result when nothing is highlighted: Astryx highlights only on arrow or
+  // pointer, so "type, Enter" did nothing. Clicking the row reuses the palette's own selection.
   useEffect(() => {
     if (!isOpen) return;
     function handler(event: KeyboardEvent) {
@@ -122,8 +111,7 @@ export function GlobalCommandPaletteProvider({
     return () => document.removeEventListener("keydown", handler, true);
   }, [isOpen]);
 
-  // Built per render of the language rather than at module scope: the names it matches are the
-  // reader's language. Environment variable names are the same in all of them.
+  // Per language rather than module scope: it matches translated names.
   const searchSource = useMemo(() => {
     const pages: PaletteItem[] = visibleDestinations(role).map((destination) => ({
       id: destination.href,
@@ -136,7 +124,7 @@ export function GlobalCommandPaletteProvider({
       },
     }));
 
-    // Settings are admin-only pages; listing them for anyone else would only lead to a refusal.
+    // Admin-only pages; anyone else would only be refused.
     const settings: PaletteItem[] =
       role === "admin"
         ? SETTINGS_ITEMS.map((item) => {
@@ -149,8 +137,7 @@ export function GlobalCommandPaletteProvider({
                 desc: settingsSectionDescription(tSettings, item),
                 keywords: [
                   group ? settingsGroupLabel(tSettings, group) : "",
-                  // Every block's variables, and every block's name: a page is now found by
-                  // anything it carries, not only by what it is called.
+                  // So a page is found by anything it carries, not only its name.
                   ...item.blocks.flatMap((block) => [
                     settingsBlockName(tSettings, block.id),
                     ...(block.env ?? []),
@@ -172,8 +159,7 @@ export function GlobalCommandPaletteProvider({
   return (
     <PaletteContext value={{ open: () => setIsOpen(true) }}>
       {children}
-      {/* Mounted only while open: closed, its search box would still sit in every page's DOM
-          beside the page's own, and anything looking for "the search field" would find two. */}
+      {/* Only while open, or every page would have two search fields in its DOM. */}
       {isOpen && (
         <CommandPalette
           isOpen={isOpen}

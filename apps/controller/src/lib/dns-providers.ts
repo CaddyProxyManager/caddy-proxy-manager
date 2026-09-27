@@ -5,43 +5,27 @@ export type DnsProviderFieldType = "string" | "password" | "duration";
 export type DnsProviderField = {
   /** Key sent to Caddy config (e.g. "api_token") */
   key: string;
-  /** Human-readable label */
   label: string;
   /** "password" fields are encrypted at rest; "duration" fields are validated as Caddy durations */
   type: DnsProviderFieldType;
-  /** Placeholder text for the input */
   placeholder?: string;
-  /** Help text shown below the input */
   description?: string;
-  /** Whether the field is required */
   required: boolean;
 };
 
 export type DnsProviderDefinition = {
   /** Caddy DNS module name (e.g. "cloudflare", "route53") */
   name: string;
-  /** Human-readable display name */
   displayName: string;
-  /** Short description */
   description?: string;
-  /** Link to caddy-dns module docs */
   docsUrl?: string;
-  /** Credential fields this provider requires */
   fields: DnsProviderField[];
-  /** caddy-dns Go module path (for Dockerfile reference) */
   modulePath: string;
-  /**
-   * Sensible DNS-challenge tuning defaults for this provider, applied when
-   * the corresponding option field is left empty. Values are Caddy durations
-   * (e.g. "600s", "10m").
-   */
+  /** Applied when the matching option field is left empty. */
   challengeDefaults?: DnsProviderChallengeDefaults;
 };
 
-/**
- * DNS-challenge tuning defaults for slow-propagation providers. Keys map to
- * the Caddy `challenges.dns` JSON fields of the same name.
- */
+/** Keys are the Caddy `challenges.dns` fields of the same name; values are Caddy durations. */
 export type DnsProviderChallengeDefaults = {
   propagation_delay?: string;
   propagation_timeout?: string;
@@ -52,11 +36,7 @@ export type DnsProviderCredentials = {
   credentials: Record<string, string>;
 };
 
-/**
- * Safe representation returned by the REST settings endpoint. Credential
- * names are useful for showing which optional fields are configured, but the
- * values themselves must remain write-only.
- */
+/** Names only: credential values stay write-only over REST. */
 export type DnsProviderApiStatus = {
   providers: Record<string, { configuredFields: string[] }>;
   default: string | null;
@@ -73,12 +53,7 @@ export type LegacyCloudflareApiStatus = {
 /** Keys that tune the DNS challenge itself rather than the provider module. */
 export const CHALLENGE_OPTION_KEYS = ["propagation_delay", "propagation_timeout"] as const;
 
-/**
- * Optional DNS-challenge tuning fields appended to every provider so that
- * slow-propagation DNS services can be worked around without editing the
- * Caddy config by hand. `defaults` pre-selects sensible values and is
- * reflected in the placeholder/help text shown in the settings UI.
- */
+/** Appended to every provider, so slow-propagation DNS can be worked around without raw config. */
 export function challengeOptionFields(defaults?: DnsProviderChallengeDefaults): DnsProviderField[] {
   return [
     {
@@ -338,9 +313,8 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
       { key: "api_key", label: "API Key", type: "password", required: true },
       { key: "api_password", label: "API Password", type: "password", required: true },
     ],
-    // netcup's DNS propagation is notoriously slow (see
-    // https://github.com/caddy-dns/netcup#attention-slow-netcup-propagation-time),
-    // so default to generous challenge timings. Users can override both.
+    // Notoriously slow propagation:
+    // https://github.com/caddy-dns/netcup#attention-slow-netcup-propagation-time
     challengeDefaults: { propagation_delay: "600s", propagation_timeout: "900s" },
   },
   {
@@ -417,11 +391,6 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
   },
 ];
 
-/**
- * Full provider registry. The challenge option fields (propagation delay and
- * timeout) are appended to every provider so slow-DNS workarounds are always
- * available, with per-provider defaults where they are known to help.
- */
 export const DNS_PROVIDERS: DnsProviderDefinition[] = BASE_DNS_PROVIDERS.map((provider) => ({
   ...provider,
   fields: [...provider.fields, ...challengeOptionFields(provider.challengeDefaults)],
@@ -429,18 +398,11 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = BASE_DNS_PROVIDERS.map((pr
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Caddy durations follow Go duration syntax (ns/us/µs/ms/s/m/h compounds,
-// plus "d" for days, handled by caddy.ParseDuration). Validation stays
-// permissive about unit ordering; Caddy reports anything exotic at load time.
+// Go durations plus caddy.ParseDuration's "d". Lax on unit order; Caddy reports the exotic.
 const DURATION_SEGMENT = String.raw`(?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h|d)`;
 const DURATION_PATTERN = new RegExp(`^-1$|^[+-]?(?:${DURATION_SEGMENT})+$`);
 
-/**
- * Validate a Caddy duration string as accepted by the DNS challenge settings
- * ("600s", "2m", "1h30m", ...). The special value "-1" (disable propagation
- * checks) is also accepted. Unit-less numbers are rejected because Caddy
- * would silently interpret them as nanoseconds.
- */
+/** "-1" disables propagation checks. Unit-less numbers are refused: Caddy reads them as ns. */
 export function isValidDnsDuration(value: string): boolean {
   return DURATION_PATTERN.test(value);
 }
@@ -449,12 +411,7 @@ export function getProviderDefinition(name: string): DnsProviderDefinition | und
   return DNS_PROVIDERS.find((p) => p.name === name);
 }
 
-/**
- * Reduce DNS-provider settings to non-secret metadata before crossing an API
- * response boundary. This intentionally redacts every value, including fields
- * whose registry type is not `password`, so newly-added credential fields are
- * safe by default.
- */
+/** Redacts every value, not just `password` fields, so a new credential field starts safe. */
 export function redactDnsProviderSettingsForApi(settings: {
   providers: Record<string, Record<string, string>>;
   default: string | null;
@@ -475,7 +432,6 @@ export function redactDnsProviderSettingsForApi(settings: {
   };
 }
 
-/** Redact the credential from the legacy single-provider settings group. */
 export function redactLegacyCloudflareSettingsForApi(settings: {
   apiToken: string;
   zoneId?: string;
@@ -488,5 +444,4 @@ export function redactLegacyCloudflareSettingsForApi(settings: {
   };
 }
 
-// Encrypting, decrypting and building the challenge config live in dns-provider-credentials.ts:
-// they need `secret`, and this file is reached from client components.
+// Crypto and challenge config live in dns-provider-credentials.ts: this file reaches the client.

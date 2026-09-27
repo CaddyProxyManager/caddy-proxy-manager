@@ -12,13 +12,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useTranslations } from "next-intl";
 
 /**
- * API documentation is bundled with the application. Keeping executable assets
- * same-origin avoids granting a mutable CDN administrator-level script access.
- *
- * The explorer itself stays Swagger UI - it already resolves $ref, renders schemas and issues
- * requests, and a hand-written replacement would be a large surface to keep correct for no gain.
- * What it does not do is say where it is pointed or that a second API exists beside it, so the
- * page supplies that above it.
+ * Swagger UI, bundled so no mutable CDN gets admin-level script access. The page adds what it
+ * lacks: where it points, and that a second API exists.
  */
 export default function ApiDocsClient() {
   const t = useTranslations("apiDocs");

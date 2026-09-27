@@ -1,15 +1,7 @@
 /**
- * What the agent is doing, and the one place that decides it.
- *
- * Three states, and the transitions between them are the whole feature: an agent installed on a
- * host has nowhere to fetch a configuration from, so it comes up `idle` - Caddy stopped, ports 80
- * and 443 shut - and stays there until an operator runs `cpm-agent --pair`. Only once it has a
- * controller does it start Caddy, which makes "paired" and "serving traffic" the same state rather
- * than two an operator has to reconcile.
- *
- * Caddy is deliberately not started by compose (it sits behind a profile), so this class is the
- * only thing that starts it. Anything that bypasses this file gets a Caddy answering the internet
- * with a default page on a host nobody has finished installing.
+ * The agent's lifecycle, and the only thing that starts Caddy (compose keeps it behind a profile).
+ * An unpaired agent stays `idle` with Caddy stopped, so "paired" and "serving traffic" are one
+ * state and a half-installed host never answers on 80 and 443.
  */
 
 import {
@@ -70,22 +62,13 @@ export type LifecycleDeps = {
   store: AgentStore;
   docker: DockerHost;
   operations: Operations;
-  /**
-   * End the process, for a restart the controller asked for. The entrypoint supplies its shutdown
-   * so the socket and store are released first; a test supplies a spy.
-   */
+  /** For a controller-requested restart; the entrypoint releases socket and store first. */
   exit?: (reason: string) => void;
 };
 
-/**
- * How often an idle agent looks for a bootstrap token the controller has not written yet.
- *
- * Frequent enough that a stack coming up together pairs itself in seconds, slow enough that an
- * agent which will never have one - every remote agent - spends nothing worth measuring on it.
- */
+/** Pairs a co-starting stack in seconds; cheap for remote agents that never get a token. */
 const BOOTSTRAP_POLL_MS = 3_000;
 
-/** Same shape both entry points want back: the CLI prints it, the local route serialises it. */
 export type PairOutcome = { ok: true } | { ok: false; error: string };
 
 export class AgentLifecycle {
@@ -94,15 +77,12 @@ export class AgentLifecycle {
   private client: ControllerClient | null = null;
   private secret: string | null = null;
   private controllerId: string | null = null;
-  /** Aborts the live stream. Replaced on every (re)connect, nulled when idle. */
   private connection: AbortController | null = null;
   private stopped = false;
-  /** What the controller last said it wanted. Null until the first frame arrives. */
   private desired: AgentDesiredState | null = null;
   /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
   private caddyRestore: Promise<void> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
-  /** Polls for a bootstrap token that has not been written yet. Null unless idle and waiting. */
   private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly deps: LifecycleDeps) {}
@@ -110,23 +90,19 @@ export class AgentLifecycle {
   // ─── Entry points ──────────────────────────────────────────────────────────
 
   /**
-   * Resume a stored pairing, or take one from the command line, or idle.
-   *
-   * Stored pairing wins over configuration: a `--code` left in place after a successful pair would
-   * otherwise re-pair on every restart, burning a code that is already spent and landing the agent
-   * back in idle for no reason.
+   * Resume a stored pairing, else pair from config, else idle. Stored wins: a leftover `--code`
+   * would otherwise re-pair on every restart with a spent code and land back in idle.
    */
   async start(): Promise<void> {
     const storedUrl = this.deps.store.pairedControllerUrl();
     const [storedController] = this.deps.store.listControllers();
-    // Read once and cleared at once: it describes the last shutdown, and only this start acts on it.
+    // Cleared at once: it describes the last shutdown, and only this start acts on it.
     const restoreCaddy = this.deps.store.caddyStoppedForShutdown();
     this.deps.store.setCaddyStoppedForShutdown(false);
 
     if (storedUrl && storedController) {
-      // Checked on resume too: a pairing stored before plain http to a public address was refused
-      // must not keep carrying credentials over it. The pairing is kept, so opting in and
-      // restarting resumes it.
+      // Also on resume, so a pairing stored before public plain http was refused stops using it.
+      // The pairing is kept: opting in and restarting resumes it.
       try {
         const warning = checkControllerTransport(storedUrl, this.deps.config.allowInsecureHttp);
         if (warning) console.warn(`[agent] ${warning}`);
@@ -137,9 +113,8 @@ export class AgentLifecycle {
       }
       this.adopt(storedUrl, storedController.controllerId, storedController.secret);
       console.log(`[agent] resuming pairing with ${storedUrl}`);
-      // Before the controller answers, so a host that rebooted while its controller is unreachable
-      // still serves. The controller's desired state still decides: if it has turned Caddy off,
-      // the first reconcile stops it again.
+      // Before the controller answers, so a reboot with the controller down still serves; the
+      // first reconcile stops it again if the controller has Caddy off.
       if (restoreCaddy) this.caddyRestore = this.startCaddy().catch(() => {});
       void this.run();
       return;
@@ -166,30 +141,16 @@ export class AgentLifecycle {
   }
 
   /**
-   * Keep looking for a bootstrap token whenever the agent lands in idle with a controller to pair
-   * with.
-   *
-   * The bundled stack starts the agent and the controller together, and the controller writes the
-   * bootstrap token as it boots. Reading it once meant losing that race left the agent idle
-   * *forever* - Caddy never started, and the only clue was "No pairing code" on a stack the
-   * operator never had to pair by hand. The same applies to an agent whose stored pairing the
-   * controller no longer recognises: a rebuilt controller writes a fresh token, and an agent that
-   * stopped watching would sit idle beside it. A remote agent has no such file and this finds
-   * nothing, which costs one `existsSync` every few seconds and is the state it is already in. An
-   * explicit `--code` opts out: that operator is pairing by hand.
+   * Watch for a bootstrap token whenever idle: the controller writes it as it boots (or after a
+   * rebuild), and a single read that lost that race left the agent idle forever. An explicit
+   * `--code` opts out.
    */
   private rearmBootstrapWatch(): void {
     const { controllerUrl, pairingCode } = this.deps.config;
     if (controllerUrl && !pairingCode) this.watchForBootstrapToken(controllerUrl);
   }
 
-  /**
-   * Wait for a bootstrap token to appear, then pair with it.
-   *
-   * Stops on the first success, and on `stop()`. Every failure is left to the next tick rather
-   * than logged: the common one is the controller not being up yet, which is not worth a line
-   * every few seconds on a stack that is still starting.
-   */
+  /** Failures are left to the next tick unlogged: usually the controller is just not up yet. */
   private watchForBootstrapToken(controllerUrl: string): void {
     if (this.bootstrapWatch) return;
     this.bootstrapWatch = setInterval(() => {
@@ -202,8 +163,7 @@ export class AgentLifecycle {
       this.clearBootstrapWatch();
       void this.pairWith(controllerUrl, token).then((outcome) => {
         if (outcome.ok) return;
-        // Redeeming a token can fail for a reason a retry fixes - the controller still starting -
-        // so go back to watching rather than giving up the way the old single read did.
+        // A retry can fix it (controller still starting), so keep watching.
         console.warn(`[agent] ${outcome.error}`);
         if (!this.stopped && this.lifecycle === "idle") this.watchForBootstrapToken(controllerUrl);
       });
@@ -216,14 +176,8 @@ export class AgentLifecycle {
   }
 
   /**
-   * A token the controller left on its data volume, for the agent in its own stack.
-   *
-   * Only ever read here, and only when there is no stored pairing: reaching this file means
-   * mounting the controller's volume, which is the same host and the same trust boundary. The
-   * bundled agent mounts it read-only and reads the token through the controller's group. An agent
-   * on another host has no such file and pairs with a code an operator carries instead.
-   *
-   * Not treated as a failure when absent - that is the normal state for every remote agent.
+   * The controller's bootstrap token from its data volume. Mounting that volume means the same
+   * host and trust boundary; absent is normal for every remote agent.
    */
   private readBootstrapToken(): string | null {
     const { controllerDataDir, dataDir } = this.deps.config;
@@ -233,17 +187,11 @@ export class AgentLifecycle {
       const token = readFileSync(path, "utf-8").trim();
       return AGENT_BOOTSTRAP_TOKEN_PATTERN.test(token) ? token : null;
     } catch {
-      // Unreadable is the same as absent: pair with a typed code instead.
       return null;
     }
   }
 
-  /**
-   * Hand a running agent its controller and code - what `cpm-agent --pair` reaches.
-   *
-   * Validation happens here rather than in the CLI so that a bad address is refused the same way
-   * whether it arrived from a flag, an environment variable, or the local route.
-   */
+  /** Validated here, not in the CLI, so flag, env and local route refuse a bad address alike. */
   async pair(host: string, port: number | null, code: string): Promise<PairOutcome> {
     let url: string;
     let normalizedCode: string;
@@ -259,12 +207,7 @@ export class AgentLifecycle {
     return this.pairWith(url, normalizedCode);
   }
 
-  /**
-   * Who `pair` would pair with, asked before it runs so `cpm-agent --pair` can confirm by name.
-   *
-   * Validates the address and code exactly as `pair` does, and touches no state: the stream, the
-   * stored pairing and the lifecycle are all left as they are, so answering "no" changes nothing.
-   */
+  /** Who `pair` would pair with, so the CLI can confirm by name. Touches no state. */
   async previewPair(
     host: string,
     port: number | null,
@@ -314,11 +257,8 @@ export class AgentLifecycle {
   }
 
   /**
-   * Stop Caddy as this agent shuts down, and remember that it did.
-   *
-   * The agent is what owns Caddy on this host, so Caddy does not outlive it. Bounded, because the
-   * container is given a short grace period before it is killed, and a Docker daemon that is itself
-   * shutting down may never answer. Never throws: the shutdown goes on either way.
+   * Stop Caddy with the agent that owns it, and remember that it did. Bounded: the container's
+   * grace period is short and a shutting-down daemon may never answer. Never throws.
    */
   async stopCaddyForShutdown(timeoutSeconds: number): Promise<void> {
     try {
@@ -346,16 +286,14 @@ export class AgentLifecycle {
     this.connection = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
-    // Cleared here as well as on the next tick: an interval still armed keeps the process alive
-    // after a SIGTERM, which turns a clean shutdown into a ten-second wait for the kill.
+    // An armed interval keeps the process alive after SIGTERM until the kill.
     this.clearBootstrapWatch();
   }
 
   // ─── Pairing ───────────────────────────────────────────────────────────────
 
   private async pairWith(url: string, code: string): Promise<PairOutcome> {
-    // Drop any live stream first: pairing to a second controller while still attached to the first
-    // would leave two sources of desired state racing over one Caddy.
+    // Otherwise two controllers' desired state would race over one Caddy.
     this.connection?.abort();
     this.connection = null;
     this.lifecycle = "pairing";
@@ -397,12 +335,7 @@ export class AgentLifecycle {
     this.message = null;
   }
 
-  /**
-   * Drop to idle and take Caddy down with it.
-   *
-   * Stopping Caddy is the point: an agent whose controller revoked it must not keep serving a
-   * configuration nobody can change any more.
-   */
+  /** Stops Caddy too: a revoked agent must not serve a config nobody can change any more. */
   private async goIdle(message: string): Promise<void> {
     this.lifecycle = "idle";
     this.message = message;
@@ -420,12 +353,8 @@ export class AgentLifecycle {
   // ─── The stream ────────────────────────────────────────────────────────────
 
   /**
-   * Stay attached to the controller, reconnecting for as long as the agent runs.
-   *
-   * Only a 401 breaks the loop: the controller has forgotten this agent, so the stored secret is
-   * dead and retrying with it is a request that can never start succeeding. Everything else - a
-   * controller being restarted, a network that came and went - is a reconnect with backoff, and
-   * Caddy keeps serving the configuration it already has throughout.
+   * Only a 401 breaks the loop: the controller forgot this agent, so the secret is dead. Anything
+   * else reconnects with backoff while Caddy keeps serving what it has.
    */
   private async run(): Promise<void> {
     let backoff = AGENT_RECONNECT_MIN_MS;
@@ -444,7 +373,6 @@ export class AgentLifecycle {
           backoff = AGENT_RECONNECT_MIN_MS;
           await this.handle(event);
         }
-        // A clean end is still an end: the controller closed the stream, so reconnect.
       } catch (error) {
         if (connection.signal.aborted) return;
         if (error instanceof ControllerRejected && error.status === 401) {
@@ -483,16 +411,9 @@ export class AgentLifecycle {
   }
 
   /**
-   * Restart Caddy, then this process.
-   *
-   * The controller sends this as it restarts itself after a migration, so the whole stack comes
-   * back reading the database it now has rather than what each part read at boot. Caddy only when
-   * it is running: before setup finishes it is not, and starting it here would answer 80 and 443
-   * before the controller has said it may.
-   *
-   * The process exits rather than running `compose restart agent`: stopping this container ends
-   * the compose command before it can start the container again, and an explicit stop is one
-   * `restart: unless-stopped` does not undo. An exit it does.
+   * Restart Caddy (only if running, so setup never opens 80/443 early), then exit. Not `compose
+   * restart agent`: stopping this container kills that command, and `unless-stopped` does not undo
+   * an explicit stop - it does undo an exit.
    */
   private async restart(reason: string): Promise<void> {
     console.log(`[agent] restart requested: ${reason}`);
@@ -506,16 +427,9 @@ export class AgentLifecycle {
 
   // ─── Reconciliation ────────────────────────────────────────────────────────
 
-  /**
-   * Bring this host to what the controller asked for.
-   *
-   * Every branch is a diff against what is already applied, never an unconditional apply: the
-   * controller repeats the full desired state on every reconnect, and acting on all of it would
-   * rebuild Caddy's image every time a network blip dropped the stream.
-   */
+  /** Diffs only: each reconnect resends full state, and a blind apply rebuilds Caddy's image. */
   private async reconcile(state: AgentDesiredState): Promise<void> {
-    // A restore still starting Caddy must finish first: a "Caddy off" that ran alongside it would
-    // find nothing running yet, do nothing, and leave Caddy coming up against the controller's word.
+    // Else a "Caddy off" finds nothing running yet and the restore brings it up anyway.
     if (this.caddyRestore) {
       await this.caddyRestore;
       this.caddyRestore = null;
@@ -534,8 +448,7 @@ export class AgentLifecycle {
         operations.applyL4Ports(state.l4Ports);
       }
 
-      // Null means "never rebuilt", so the running binary is the shipped image. Skipping the diff
-      // there instead made the first rebuild on a fresh install impossible.
+      // Null means never rebuilt (the shipped image), not "skip", or no first rebuild ever runs.
       const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
       if (!sameList(state.caddyModules, appliedModules)) {
         operations.applyCaddyBuild(state.caddyModules);
@@ -547,8 +460,7 @@ export class AgentLifecycle {
       }
     } catch (busy) {
       if (busy instanceof OperationBusyError) {
-        // The next desired-state frame reconciles whatever this one could not; a queue here would
-        // only let a slow rebuild pile up work that is already superseded.
+        // No queue: the next frame supersedes this one anyway.
         console.log(`[agent] deferring: ${busy.running} is already running`);
       } else {
         throw busy;
@@ -568,21 +480,13 @@ export class AgentLifecycle {
 
   // ─── Commands ──────────────────────────────────────────────────────────────
 
-  /**
-   * Run one command and hand the answer back.
-   *
-   * Commands are the one thing in the protocol the controller blocks on: inverting the dial
-   * direction is what forced them onto the stream rather than leaving them requests the controller
-   * could simply make.
-   */
   private async execute(command: AgentCommand): Promise<void> {
     const result = await this.runCommand(command);
     const client = this.client;
     const secret = this.secret;
     if (!client || !secret) return;
     await client.postResults(secret, [result]).catch((error: unknown) => {
-      // Nothing to retry against: the controller times the command out on its own, and a result
-      // arriving after that would resolve a waiter that has already been failed.
+      // No retry: the controller times the command out, and a late result finds no waiter.
       console.warn(`[agent] could not return the result of command ${command.id}:`, error);
     });
   }
@@ -656,7 +560,7 @@ export class AgentLifecycle {
       : { id, ok: true, response: { status: 404, text: "", headers: {} } };
   }
 
-  /** A page of a log for the controller's log viewer. The answer is JSON in a 200's text. */
+  /** The answer is JSON in a 200's text. */
   private async runLogRead(id: string, request: LogReadRequest): Promise<AgentCommandResult> {
     const answer = (page: LogReadResponse): AgentCommandResult => ({
       id,
@@ -685,10 +589,7 @@ export class AgentLifecycle {
     return answer(parseContainerLogs(logs.output, cursor, limit));
   }
 
-  /**
-   * `caddy validate` for the controller. Not pinned like a load: nothing binds, and the container
-   * it runs in has no network to bind on.
-   */
+  /** Not pinned like a load: nothing binds, and the container has no network anyway. */
   private async runValidate(
     id: string,
     request: CaddyValidateRequest,
@@ -726,12 +627,7 @@ export class AgentLifecycle {
 
   // ─── Status ────────────────────────────────────────────────────────────────
 
-  /**
-   * Push status on a slow timer as well as on change.
-   *
-   * The controller shows "last seen" from these, and an agent that changed nothing for an hour
-   * would otherwise be indistinguishable from one whose host caught fire.
-   */
+  /** On a timer as well as on change: "last seen" must tell a quiet agent from a dead one. */
   private startHeartbeat(): void {
     if (this.heartbeat) return;
     this.heartbeat = setInterval(() => void this.reportStatus(), AGENT_STATUS_HEARTBEAT_MS);
@@ -765,7 +661,6 @@ function sameServices(
   applied: Record<string, boolean> | null,
 ): boolean {
   if (applied === null) return false;
-  // Only what this agent manages: a controller of another version may name a service it does not,
-  // and diffing that would re-apply on every frame.
+  // Only services this agent manages, or one it lacks would re-apply on every frame.
   return MANAGED_SERVICES.every((name) => (wanted[name] ?? false) === (applied[name] ?? false));
 }

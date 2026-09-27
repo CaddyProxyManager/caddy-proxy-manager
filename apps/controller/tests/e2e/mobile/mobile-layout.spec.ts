@@ -2,8 +2,7 @@ import { test, expect } from '@playwright/test';
 import { openCreateHostDialog } from '../../helpers/proxy-api';
 import { waitForHydration } from '../../helpers/hydration';
 
-// Force a mobile viewport even under the desktop Chromium project so these
-// checks validate responsive behavior instead of self-skipping.
+// Forced even under the desktop project, so these run instead of self-skipping.
 test.use({ viewport: { width: 393, height: 852 } });
 
 test.describe('Mobile layout', () => {
@@ -15,8 +14,7 @@ test.describe('Mobile layout', () => {
       await expect(tabBar.getByRole('link', { name, exact: true })).toBeVisible();
     }
     await expect(tabBar.getByRole('button', { name: 'More', exact: true })).toBeVisible();
-    // Two persistent ways to navigate cost a screen's worth of chrome for one job, so AppShell's
-    // own hamburger is switched off on a phone.
+    // The tab bar replaces AppShell's hamburger on a phone.
     await expect(page.getByRole('button', { name: /open navigation/i })).toHaveCount(0);
   });
 
@@ -79,20 +77,17 @@ test.describe('Mobile layout', () => {
 
   test('proxy hosts page shows card list, not a table', async ({ page }) => {
     await page.goto('/proxy-hosts');
-    // On mobile with mobileCard, there should be no <table> element
-    // (DataTable renders cards instead)
+    // DataTable renders cards instead.
     await expect(page.locator('table')).not.toBeVisible();
   });
 
   test('page header action button appears below title on mobile', async ({ page }) => {
     await page.goto('/proxy-hosts');
-    // level 1 pins this to the page title; the empty state renders its own
-    // "No proxy hosts found" heading.
+    // The empty state has its own "No proxy hosts found" heading.
     const title = page.getByRole('heading', { name: /proxy hosts/i, level: 1 });
     const button = page.getByRole('button', { name: /create host/i });
     await expect(title).toBeVisible();
     await expect(button).toBeVisible();
-    // Button should be below the title - its Y coordinate should be greater
     const titleBox = await title.boundingBox();
     const buttonBox = await button.boundingBox();
     expect(titleBox).not.toBeNull();
@@ -104,26 +99,22 @@ test.describe('Mobile layout', () => {
     await page.goto('/proxy-hosts');
     await openCreateHostDialog(page);
     const dialog = page.getByRole('dialog');
-    // Dialog should not overflow - check it fits in viewport
     const dialogBox = await dialog.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 393;
     expect(dialogBox).not.toBeNull();
     expect(dialogBox!.width).toBeLessThanOrEqual(viewportWidth + 1); // +1 for rounding
-    // Key form fields should be visible
     await expect(page.getByLabel(/^domains/i)).toBeVisible();
   });
 
   test('card edit and delete actions reachable without scrolling', async ({ page }) => {
     await page.goto('/proxy-hosts');
-    // Create a host so there is at least one card to inspect
     await openCreateHostDialog(page);
     await page.getByLabel('Name').fill('Mobile Test Host');
     await page.getByLabel(/^domains/i).fill('mobile-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-    // The card's action menu is an astryx MoreMenu, whose icon-only trigger is
-    // labelled "Actions for <host name>".
+    // MoreMenu's icon-only trigger is labelled "Actions for <host name>".
     const moreButton = page.getByRole('button', { name: /^Actions for / }).first();
     await expect(moreButton).toBeVisible();
     await moreButton.click();
@@ -133,9 +124,7 @@ test.describe('Mobile layout', () => {
 
   test('analytics page loads without horizontal body overflow', async ({ page }) => {
     await page.goto('/analytics');
-    // Wait for content to load
     await page.waitForLoadState('networkidle');
-    // The document body should not be wider than the viewport
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
     const viewportWidth = page.viewportSize()?.width ?? 393;
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 5); // 5px tolerance

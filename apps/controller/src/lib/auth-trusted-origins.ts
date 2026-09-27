@@ -1,24 +1,8 @@
 /**
- * The origins Better Auth trusts beyond the `baseURL` it was built with, which it adds by itself.
- *
- * That alone locks out a fresh deployment reached any other way. Compose defaults BASE_URL to
- * http://localhost:3000, so an operator opening http://<server-ip>:3000 is refused at the setup
- * sign-in - before the step that asks for the public URL is reachable at all.
- *
- * Three additions:
- *
- * - The Public URL setting and BASE_URL, both. The Public URL is what the instance is built with,
- *   but trusting BASE_URL as well keeps an operator who just stored a different Public URL signed
- *   in from the address they were already using.
- * - The dashboard host's own origin. That domain is this application, served by the Caddy it
- *   manages, and it is rarely the Public URL - setup seeds it from BASE_URL's hostname, which
- *   differs by port alone. Without it, the dashboard answers on the domain an operator was sent to
- *   and then refuses the sign-in that domain exists for.
- * - Until setup is finished, the address the browser is already using, and only when the request
- *   is same-origin: the Origin it sends names the host the request was sent to. That is the whole
- *   of what the origin check defends. A cross-site page cannot forge Origin, and a DNS-rebound one
- *   carries no cookies for this host. It ends with setup because from then on the Public URL is a
- *   real answer, and anything else being trusted would be a quiet way to leave it wrong.
+ * Origins Better Auth trusts beyond its `baseURL`, without which a deployment reached at
+ * http://<server-ip>:3000 is refused at setup sign-in. Adds the Public URL and BASE_URL, the
+ * dashboard host's origin, and until setup finishes the browser's own address when same-origin -
+ * a cross-site page cannot forge Origin, and a DNS-rebound one carries no cookies for this host.
  */
 import { publicOrigins } from "./public-url";
 
@@ -80,11 +64,8 @@ async function isSetupFinished(): Promise<boolean> {
 }
 
 /**
- * Better Auth's `trustedOrigins`. Called on every auth request, and only the setup flag is
- * remembered - once setup is seen finished it stops costing a query. The Public URL and the
- * dashboard host are two `getSetting` calls, so two indexed single-row reads, on every auth
- * request; `settings` caches nothing. Worth revisiting if it ever shows up in a profile, but auth
- * already reads the session row from the same database.
+ * Better Auth's `trustedOrigins`, called on every auth request. Only the setup flag is cached;
+ * the other two are indexed single-row reads, cheap beside the session read auth already does.
  */
 export async function extraTrustedOrigins(request?: Request): Promise<string[]> {
   const origins = new Set(await publicOrigins());

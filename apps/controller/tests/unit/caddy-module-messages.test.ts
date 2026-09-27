@@ -1,9 +1,6 @@
 /**
- * The module picker, the module gate and the settings action name Caddy modules and refuse module
- * selections from the catalog, keyed by module id and conflict kind at runtime - which TypeScript
- * cannot check. These do it instead: a module or conflict added without a message fails here, and
- * the English entries must say exactly what the registry says, because the registry's copy is still
- * what `/api/v1/caddy/modules` returns.
+ * Keys composed at runtime, which TypeScript cannot check. The English must match the registry's
+ * copy, which `/api/v1/caddy/modules` still returns.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';

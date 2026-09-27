@@ -28,7 +28,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const targetId = Number(id);
 
-    // Non-admins can only view themselves
     if (auth.role !== "admin" && auth.userId !== targetId) {
       throw new ApiAuthError("Forbidden", 403);
     }
@@ -50,7 +49,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const targetId = Number(id);
     const body = await request.json();
 
-    // Refused rather than skipped: silently ignoring an unknown value reads as success to a client.
+    // Refused, not skipped: ignoring an unknown value reads as success to a client.
     const hasRole = body.role !== undefined && body.role !== null;
     const hasStatus = body.status !== undefined && body.status !== null;
     if (hasRole && !isUserRole(body.role)) {
@@ -67,7 +66,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: domainErrorMessage("emailInvalid") }, { status: 400 });
     }
 
-    // Handle role change
     if (hasRole) {
       if (auth.userId === targetId) {
         return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
@@ -75,7 +73,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await updateUserRole(targetId, body.role);
     }
 
-    // Handle status change
     if (hasStatus) {
       if (auth.userId === targetId) {
         return NextResponse.json({ error: "Cannot change your own status" }, { status: 400 });
@@ -83,7 +80,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await updateUserStatus(targetId, body.status);
     }
 
-    // Handle profile update
     const profileFields: Record<string, unknown> = {};
     if (body.email !== undefined) profileFields.email = body.email;
     if (body.name !== undefined) profileFields.name = body.name;

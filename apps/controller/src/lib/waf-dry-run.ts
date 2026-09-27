@@ -1,15 +1,7 @@
 /**
- * Asking a real Caddy whether a WAF configuration loads, before it is saved.
- *
- * Coraza compiles a WAF while Caddy provisions its config, so a directive it refuses fails the
- * whole document and every host stops updating. The linter (`seclang.ts`) catches what can be
- * known from the text; this catches the rest - a rule id the CRS already uses, two rules from
- * different sources colliding once merged - by having an agent run `caddy validate` on the WAFs a
- * save would produce, with the binary its Caddy runs.
- *
- * Best effort by design. With no agent able to run it (none attached, one older than the
- * `caddy-validate` capability, Caddy not started yet) the save goes ahead on the linter's word,
- * and the apply-time recovery in `crs-plugins/recovery.ts` stays the net.
+ * Has an agent `caddy validate` the WAFs a save would produce: a directive Coraza refuses fails the
+ * whole document, and `seclang.ts` cannot see id clashes with the CRS or across merged sources.
+ * Best effort: with no capable agent the save proceeds and `crs-plugins/recovery.ts` is the net.
  */
 
 import { CADDY_VALIDATE_REFUSED_STATUS } from "@cpm/shared";
@@ -18,7 +10,7 @@ import { domainError } from "./domain-error";
 import type { WafHostConfig } from "./models/proxy-hosts";
 import type { WafSettings } from "./settings";
 
-/** What a candidate WAF belongs to, which is what the refusal names. */
+/** What the refusal names. */
 export type WafDryRunTarget =
   | { kind: "global" }
   | { kind: "dashboard" }
@@ -46,20 +38,17 @@ const agentValidator: CaddyValidator = async (config) => {
 
 let validator: CaddyValidator = agentValidator;
 
-/** Test seam, shaped like `setCaddyAdminTransport`: returns the previous one to restore. */
+/** Test seam; returns the previous validator to restore. */
 export function setCaddyValidator(next: CaddyValidator): CaddyValidator {
   const previous = validator;
   validator = next;
   return previous;
 }
 
-/** Ports the candidate servers claim. Nothing binds during validate; distinct only so none clash. */
+/** Nothing binds during validate; ports are distinct only so servers do not clash. */
 const CANDIDATE_PORT_BASE = 20_000;
 
-/**
- * A config holding nothing but one server per WAF handler, so what Caddy provisions is the WAFs
- * and the server name in a refusal says which one failed.
- */
+/** One server per WAF handler, so the server name in a refusal says which one failed. */
 export function buildValidationDocument(handlers: readonly Record<string, unknown>[]): string {
   const servers = Object.fromEntries(
     handlers.map((handler, index) => [
@@ -74,17 +63,14 @@ export function buildValidationDocument(handlers: readonly Record<string, unknow
   return JSON.stringify({ admin: { disabled: true }, apps: { http: { servers } } });
 }
 
-/** Coraza's wording for a WAF it could not build, as caddy-apply-error.ts matches it. */
+/** As caddy-apply-error.ts matches it. */
 const WAF_FAILURE = /provision http\.handlers\.waf: |invalid WAF config/i;
 /** Long enough for any Coraza message; a rule it quotes whole is cut. */
 const MAX_DETAIL = 400;
 
 /**
- * Which candidate Caddy refused and Coraza's reason, or null when the refusal is not a WAF's -
- * a Caddy built without coraza, say, which says nothing about the directives.
- *
- * The reason is shown as Coraza wrote it, untranslated: it quotes only the directives being saved
- * and the public CRS, since the document held nothing else.
+ * Null when the refusal is not a WAF's (e.g. Caddy built without coraza). The detail is shown
+ * untranslated; it can only quote the directives being saved and the public CRS.
  */
 export function parseValidationRefusal(
   transcript: string,
@@ -191,9 +177,7 @@ async function loadPlugins(): Promise<Map<number, CrsPluginRules>> {
   return getCrsPluginRules();
 }
 
-// ---------------------------------------------------------------------------
 // Candidates: the WAFs a save would change, resolved as caddy.ts resolves them.
-// ---------------------------------------------------------------------------
 
 type HostWaf = { target: WafDryRunTarget; waf: WafHostConfig | null | undefined };
 
@@ -206,7 +190,6 @@ function wafInMeta(meta: string | null | undefined): WafHostConfig | null {
   }
 }
 
-/** The dashboard host, when served, and every enabled proxy host, with their own WAF blocks. */
 async function hostWafs(): Promise<HostWaf[]> {
   const [{ default: db }, { proxyHosts }, { eq }, { getDashboardSettings }] = await Promise.all([
     import("./db"),
@@ -246,7 +229,6 @@ export async function wafCandidatesForGlobal(next: WafSettings): Promise<WafDryR
   ];
 }
 
-/** A host save changes that host's WAF alone. */
 export async function wafCandidatesForHost(
   target: WafDryRunTarget,
   waf: WafHostConfig | null | undefined,
@@ -254,7 +236,7 @@ export async function wafCandidatesForHost(
   return [{ target, waf: resolveEffectiveWaf(await currentGlobal(), waf) }];
 }
 
-/** Every WAF the config builds today whose settings `selects`, for a preset or plugin edit. */
+/** For a preset or plugin edit: every current WAF that `selects` matches. */
 export async function wafCandidatesSelecting(
   selects: (waf: WafSettings) => boolean,
 ): Promise<WafDryRunCandidate[]> {

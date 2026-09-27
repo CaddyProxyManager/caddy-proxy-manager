@@ -4,18 +4,11 @@ import { settings } from "../db/schema";
 import { type DestinationId, isDestinationId, MORE_DRAWER_SLOTS } from "../nav/destinations";
 
 /**
- * Which pages a user keeps in the mobile More drawer.
- *
- * One settings row per user. It is written straight to the table rather than through setSetting,
- * because setSetting stages its writes for Review & apply - and a personal navigation choice is
- * not instance configuration, has nothing to apply, and must not appear in anyone's staged diff.
- *
- * The row's presence is also the answer to "has this user customized the drawer?": the drawer
- * only offers to be customized until it has been, so there is no second flag to keep in step.
+ * Written to the table directly, not via setSetting, which stages writes for Review & apply: a
+ * personal choice must not appear in anyone's staged diff. The row's presence means "customized".
  */
 const keyFor = (userId: number) => `nav:more_drawer:${userId}`;
 
-/** The saved choice, or null when the user has never customized the drawer. */
 export async function getMoreDrawerPins(userId: number): Promise<DestinationId[] | null> {
   const [row] = await db
     .select({ value: settings.value })
@@ -28,8 +21,7 @@ export async function getMoreDrawerPins(userId: number): Promise<DestinationId[]
   try {
     parsed = JSON.parse(row.value);
   } catch {
-    // A row nobody can read is treated as a drawer nobody chose, which shows the defaults and
-    // offers to customize again. Throwing here would take the whole dashboard layout down.
+    // Unreadable reads as never chosen; throwing would take the whole dashboard layout down.
     return null;
   }
   if (!Array.isArray(parsed)) return null;

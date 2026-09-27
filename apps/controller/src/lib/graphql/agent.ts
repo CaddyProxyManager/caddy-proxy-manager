@@ -1,19 +1,7 @@
 /**
- * The agent's half of the schema.
- *
- * An agent is not a user. It authenticates by signing its request with the secret agreed at
- * pairing - `x-cpm-agent`, `x-cpm-timestamp`, `x-cpm-signature` over the body - and it holds one
- * subscription open for as long as it runs. Everything the controller pushes travels down that
- * subscription; everything the agent reports comes back as a mutation.
- *
- * **Why it lives in the same schema as the operator API.** Two schemas would mean two endpoints,
- * two servers and two sets of transport decisions, for a difference that is entirely about which
- * credential arrives. The gate is per field instead: `agentEvents` and the `agent*` mutations
- * require a signed agent and reject a Bearer token, and every other field requires a user and
- * rejects a signature. Nothing is reachable by both.
- *
- * **Pairing is deliberately still REST.** It runs before there is a secret to sign with, so it
- * cannot use this path - the exchange is what produces the credential everything here depends on.
+ * The agent's half of the schema, gated per field rather than split into a second endpoint: the
+ * `agent*` fields require a signed agent and reject a Bearer token, every other field the reverse.
+ * Pairing stays REST, since it runs before there is a secret to sign with.
  */
 
 import {
@@ -34,24 +22,14 @@ import { getSetting } from "../settings";
 import type { GraphQLContext } from "./context";
 import { GraphQLError } from "graphql";
 
-/**
- * How large a signed agent request may be, per operation.
- *
- * These were two routes with two different caps, and collapsing them into one endpoint lost that:
- * a status is one small object, but a command result carries a Caddy admin response, which for a
- * config readback is measured in megabytes. One shared 64KiB ceiling would have rejected valid
- * results before they were even verified.
- */
+/** Per operation: a command result can carry a megabytes-long config readback. */
 const MAX_STATUS_BYTES = 64 * 1024;
 
 export type VerifiedAgent = { id: number; agentId: string; name: string };
 
 /**
- * The agent behind this request, or a refusal.
- *
- * The body is read from a clone. Yoga has already consumed the original to parse the document, and
- * the signature covers the bytes the agent sent - verifying anything else would be verifying a
- * re-serialisation that may differ in key order or spacing from what was signed.
+ * Verifies the raw bytes the agent sent (Yoga consumed the original), not a re-serialisation that
+ * may differ in key order or spacing from what was signed.
  */
 export async function requireAgent(
   context: GraphQLContext,
@@ -83,7 +61,6 @@ export const agentResolvers = {
   Subscription: {
     agentEvents: {
       subscribe: async (_: unknown, __: unknown, context: GraphQLContext) => {
-        // The document is all that is sent to open one; the payloads travel the other way.
         const agent = await requireAgent(context, MAX_STATUS_BYTES);
 
         const controllerName =
@@ -95,11 +72,9 @@ export const agentResolvers = {
           name: agent.name,
           controllerId: await getControllerId(),
           controllerName,
-          // Built for this agent: the ports its own hosts need, and its own module selection.
           initialState: await buildDesiredState(agent.id),
         });
 
-        // Wrapped so each value arrives under the field name the document asked for.
         return (async function* () {
           for await (const event of events) {
             yield { agentEvents: event };
@@ -118,9 +93,7 @@ export const agentResolvers = {
     ): Promise<boolean> => {
       const agent = await requireAgent(context, MAX_STATUS_BYTES);
 
-      // Refused rather than accepted: a status from an agent with no open subscription describes a
-      // host the controller cannot reach, and recording it would make the dashboard claim
-      // otherwise.
+      // Without a subscription the host is unreachable; recording this would claim otherwise.
       if (!isConnected(agent.agentId)) {
         throw new GraphQLError("That agent is not connected.", {
           extensions: { code: "AGENT_NOT_CONNECTED" },
@@ -137,7 +110,6 @@ export const agentResolvers = {
       args: { results: AgentCommandResult[] },
       context: GraphQLContext,
     ): Promise<boolean> => {
-      // The ceiling a Caddy config readback needs, which is what these results carry.
       const agent = await requireAgent(context, MAX_CADDY_CONFIG_BYTES);
 
       settleResults(agent.agentId, args.results);
@@ -151,8 +123,7 @@ export const agentResolvers = {
     ): Promise<AgentAnalyticsResult> => {
       const agent = await requireAgent(context, MAX_ANALYTICS_REQUEST_BYTES);
 
-      // No connection check, unlike a status: rows parsed while the stream was down still describe
-      // real traffic, and refusing them would only have the agent send them again.
+      // No connection check: rows parsed while the stream was down still describe real traffic.
       try {
         return await ingestAnalytics(agent.agentId, args.kind, args.rows);
       } catch (error) {

@@ -224,12 +224,8 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
 }
 
 /**
- * Which provider the sign-in screen offers first.
- *
- * A settings key rather than a column on the provider: there can only ever be one, and a single
- * value makes "two primaries" unrepresentable instead of something the writes have to police.
- * The id may name a provider that has since been deleted or disabled, so every read resolves it
- * against the live list rather than trusting it.
+ * A settings key, not a column: a single value makes "two primaries" unrepresentable. The id may
+ * name a deleted or disabled provider, so reads resolve it against the live list.
  */
 const PRIMARY_PROVIDER_KEY = "auth:primary_provider";
 

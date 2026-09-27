@@ -175,7 +175,6 @@ describe('portal sign-in with a CAPTCHA configured', () => {
 
 describe('the per-host switch', () => {
   it('defaults on, and survives an update that does not mention it', async () => {
-    // The owner the host is created by has to exist.
     const { user } = await setup();
     const created = await createProxyHost(
       {

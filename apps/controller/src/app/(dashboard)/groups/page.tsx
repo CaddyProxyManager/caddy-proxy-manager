@@ -53,9 +53,7 @@ export default async function GroupsPage() {
         .filter((g) => g.resource.kind === "l4ProxyHost")
         .map((g) => g.resource.id),
       agentIds: groupGrants.filter((g) => g.resource.kind === "agent").map((g) => g.resource.id),
-      // The dialog edits one capability for the whole group. "manage" is both the default and what
-      // a group with no grants yet should start on; a mixed set reads as manage, which is what it
-      // will be saved back as.
+      // One capability for the whole group; a mixed or empty set reads as "manage", as it saves.
       capability:
         groupGrants.length === 0 || groupGrants.some((g) => g.capability === "manage")
           ? "manage"

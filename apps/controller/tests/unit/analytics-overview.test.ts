@@ -1,10 +1,4 @@
-/**
- * The overview's traffic payload when analytics is switched off.
- *
- * The failure this guards was loud: every overview load ran five ClickHouse queries against a host
- * name that does not resolve without the container, answered 500, and the page showed "could not
- * load traffic" where it should have said analytics is off.
- */
+/** With analytics off, the overview must not query a ClickHouse that is not there and 500. */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 

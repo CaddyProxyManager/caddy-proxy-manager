@@ -1,11 +1,7 @@
 /**
- * ADMIN_USERNAME / ADMIN_PASSWORD after the setup flow arrived.
- *
- * Absent credentials used to fail startup in production. They now mean "not configured yet", and
- * the app answers with first-run setup instead - so the property under test is that a production
- * instance with neither variable set starts cleanly and seeds nothing. Credentials that *are*
- * present must still be strong: a weak one silently produces a reachable admin account, which is
- * worse than no account at all.
+ * ADMIN_USERNAME / ADMIN_PASSWORD with the setup flow: a production instance with neither set
+ * starts cleanly and seeds nothing. Present credentials must still be strong - a weak one is a
+ * reachable admin account, worse than none.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

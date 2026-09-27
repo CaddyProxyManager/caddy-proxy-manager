@@ -1,15 +1,12 @@
 # syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
-# The agent compiles to a single Bun binary, but its runtime still needs the Docker CLI and the
-# compose plugin: recreating the Caddy container is the whole job, and there is no Go client here
-# that would let it talk to the daemon directly.
+# A single Bun binary, but the runtime still needs the Docker CLI and compose plugin to recreate Caddy.
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS builder
 WORKDIR /app
 
-# Every workspace manifest, not just the agent's: `bun install` resolves the whole workspace graph
-# up front and fails on a member it cannot read. bunfig.toml pins the isolated linker.
+# Every workspace manifest: `bun install` fails on a member it cannot read.
 COPY package.json bun.lock bunfig.toml ./
-# patchedDependencies in package.json: a frozen install refuses to run without the files it names.
+# A frozen install refuses to run without the patchedDependencies files.
 COPY patches ./patches
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
@@ -22,9 +19,7 @@ COPY packages/shared ./packages/shared
 COPY apps/agent/tsconfig.json ./apps/agent/
 COPY apps/agent/src ./apps/agent/src
 
-# This stage runs on the host arch, so the binary is cross-compiled for the target. Bun names
-# targets by libc and arch, and the glibc variants match the docker:cli runtime's musl - they do
-# not, which is why the runtime stage below is Debian rather than Alpine.
+# Runs on the host arch, so the binary is cross-compiled for the target.
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
       amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
@@ -34,15 +29,11 @@ RUN case "$TARGETARCH" in \
     cd apps/agent && bun run build:binary
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# Debian rather than docker:cli, whose Alpine base is musl: the compiled binary carries its own
-# glibc-linked Bun runtime and will not start there.
+# Debian, not docker:cli: the binary's glibc-linked Bun runtime will not start on Alpine's musl.
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
 
-# docker-ce-cli and the compose plugin from Docker's own repository. `docker compose` is invoked
-# for every operation this container exists to perform, so its absence is a startup failure rather
-# than something to discover on the first port change. buildx because without it compose falls back
-# to the legacy builder, which cannot build docker/caddy/Dockerfile. Pinned to a major, not an exact build: that
-# repository drops old builds, which would break every rebuild. Bump the majors by hand.
+# buildx because the legacy builder cannot build docker/caddy/Dockerfile. Pinned to majors, not
+# exact builds, since the repository drops old ones. Bump the majors by hand.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
@@ -58,19 +49,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
-# The documented `docker exec ... cpm-agent --pair` needs it on PATH; nothing else puts it there.
+# For the documented `docker exec ... cpm-agent --pair`.
 ENV PATH="/app:${PATH}"
 
-# Its own user, not root - though that is no boundary: through docker-socket-proxy the agent can
-# create a privileged container, so it is host-root-equivalent and this image stays minimal. Nothing
-# here needs root: the agent owns /data -
-# its database, socket, compose overrides and the GeoIP databases Caddy reads - and reaches Caddy's
-# logs and the controller's bootstrap token through groups docker-compose.yml adds. /data/geoip is
-# created here so a new volume starts with it: Caddy mounts that subdirectory, and a volume subpath
-# that does not exist fails the mount.
-#
-# Removing any existing user or group with the same IDs first, as the caddy and web images do, so
-# a PUID/PGID override that collides with one of Debian's never fails the build.
+# Non-root, though the socket proxy makes it host-root-equivalent anyway. /data/geoip exists up
+# front because Caddy mounts it as a subpath, which fails if missing. Colliding IDs are removed
+# first so a PUID/PGID override never fails the build.
 ARG PUID=10002
 ARG PGID=10002
 RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
@@ -80,9 +64,7 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     mkdir -p /data/geoip && \
     chown -R agent:agent /data
 
-# Image identity, so a pulled image describes itself without the compose file beside it. Static
-# facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
-# .github/workflows/docker-build-trusted.yml, whose --label flags override anything set here.
+# Static facts only: version, revision and timestamp come from docker-build-trusted.yml's labels.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
       org.opencontainers.image.description="Host-side agent that rebuilds the Caddy image and recreates its container on behalf of Caddy Proxy Manager." \
       org.opencontainers.image.vendor="SilentSpud" \

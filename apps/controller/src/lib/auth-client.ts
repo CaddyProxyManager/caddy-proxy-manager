@@ -6,10 +6,9 @@ import { twoFactorClient, usernameClient } from "better-auth/client/plugins";
 // `email: string` while BetterAuthClientPlugin accepts an optional email field.
 const usernamePlugin = usernameClient() as unknown as BetterAuthClientPlugin;
 
-// No genericOAuthClient: since better-auth 1.7 the server plugin registers each provider as a
-// first-class social provider, so call sites use `signIn.social({ provider })`.
-// No redirect option: the sign-in form shows the code step itself when a sign-in answers with
-// `twoFactorRedirect`.
+// No genericOAuthClient: since better-auth 1.7 each provider is a social one, so call sites use
+// `signIn.social({ provider })`. No redirect option: the sign-in form shows the code step itself
+// on `twoFactorRedirect`.
 export const authClient = createAuthClient({
   plugins: [usernamePlugin, twoFactorClient()],
 });

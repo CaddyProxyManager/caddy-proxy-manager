@@ -40,7 +40,7 @@ type Props = {
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
-  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
   canCreate?: boolean;
@@ -66,7 +66,6 @@ function ProtocolBadge({ protocol }: { protocol: string }) {
   return <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />;
 }
 
-/** "10.0.0.1:443 +2" - the primary upstream plus a count of the rest. */
 function summarizeUpstreams(upstreams: string[]) {
   return upstreams.length > 1 ? `${upstreams[0]} +${upstreams.length - 1}` : upstreams[0];
 }
@@ -88,7 +87,7 @@ function HostActions({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
+  /** Duplicating makes a new host, so it follows Create, not Edit. */
   canCreate: boolean;
 }) {
   const t = useTranslations("l4ProxyHosts");
@@ -136,8 +135,6 @@ export default function L4ProxyHostsClient({
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [bannerRefresh, setBannerRefresh] = useState(0);
-  // The whole layer4 app comes from caddy-l4; with it off, nothing on this page
-  // reaches the running proxy.
   const l4DisabledReason = useDisabledReason("l4");
 
   const router = useRouter();
@@ -300,9 +297,7 @@ export default function L4ProxyHostsClient({
 
   return (
     <VStack gap={6}>
-      {/* Existing hosts stay listed and editable while the module is off - they
-          are simply not emitted into the config. Hiding them would make hosts
-          that still exist look deleted. */}
+      {/* Hosts stay listed while the module is off: hiding them would make them look deleted. */}
       {l4DisabledReason && (
         <Banner
           status="warning"

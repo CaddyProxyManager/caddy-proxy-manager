@@ -16,12 +16,9 @@ export async function generateViewport(): Promise<Viewport> {
   return { themeColor: themeColor(parseThemeMode(cookieStore.get(THEME_COOKIE)?.value)) };
 }
 
-// Each page sets its own `title`; the template appends APP_NAME. A page opts out with
-// `title: { absolute: "..." }` - the forward auth portal does, since it runs on someone else's
-// domain and should not name the product guarding the app.
-//
-// A generateMetadata, so the description follows the reader's locale. It stays in <head> only
-// because next.config.mjs sets `htmlLimitedBots` - see there for what vinext does without it.
+// A function so the description follows the locale. The forward auth portal opts out of the title
+// template, as it runs on someone else's domain. It stays in <head> only because next.config.mjs
+// sets `htmlLimitedBots`.
 export async function generateMetadata(): Promise<Metadata> {
   const [t, appName] = await Promise.all([getTranslations("common"), getAppName()]);
   return {
@@ -30,9 +27,8 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${appName}`,
     },
     description: t("metaDescription"),
-    // Pointed at the route unconditionally rather than looked up here: this is the root layout, so
-    // a database read would run on every page of every request. The route answers 404 when no icon
-    // has been uploaded, which the browser treats exactly as it treated the missing /favicon.ico.
+    // Unconditional: a database read here would run on every request. The route 404s with no
+    // upload, which the browser treats like a missing /favicon.ico.
     icons: { icon: "/api/branding/favicon" },
   };
 }
@@ -40,9 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
   const themeMode = parseThemeMode(cookieStore.get(THEME_COOKIE)?.value);
-  // getLocale() resolves through src/i18n/request.ts, so the cookie and Accept-Language
-  // negotiation happen in exactly one place. The preference itself is read separately: the
-  // switcher has to tell "chose English" from "we guessed English".
+  // Resolved in src/i18n/request.ts alone. The preference is read separately, since the switcher
+  // must tell "chose English" from "we guessed English".
   const locale = await getLocale();
   const messages = await getMessages();
   // Resolved from the time zone cookie in the same request config, and handed to the client

@@ -1,14 +1,11 @@
 /** mTLS helpers for Caddy TLS connection policies and HTTP-layer RBAC routes. */
 
-/**
- * Normalise a fingerprint to Caddy's format - lowercase hex, no colons. Node gives "AB:CD:EF:…";
- * Caddy's placeholder gives "abcdef…".
- */
+/** Caddy's form: Node gives "AB:CD:EF:..." and Caddy's placeholder "abcdef...". */
 export function normalizeFingerprint(fp: string): string {
   return fp.replace(/:/g, "").toLowerCase();
 }
 
-/** Minimal MtlsAccessRule, redeclared here to avoid importing models (which pulls in db.ts). */
+/** Redeclared: importing models pulls in db.ts. */
 export type MtlsAccessRuleLike = {
   pathPattern: string;
   allowedRoleIds: number[];
@@ -16,7 +13,7 @@ export type MtlsAccessRuleLike = {
   denyAll: boolean;
 };
 
-/** PEM → base64 DER, the form `trusted_ca_certs` and `trusted_leaf_certs` expect. */
+/** Base64 DER, the form `trusted_ca_certs` and `trusted_leaf_certs` expect. */
 export function pemToBase64Der(pem: string): string {
   return pem
     .replace(/-----BEGIN CERTIFICATE-----/, "")
@@ -25,14 +22,9 @@ export function pemToBase64Der(pem: string): string {
 }
 
 /**
- * Builds a Caddy `client_authentication` block for the given domains, unioning their CA cert IDs -
- * so callers must pre-group domains sharing a CA config (`groupMtlsDomainsByCaSet`). Per CA:
- * unmanaged → trust anything it signed; managed with active certs → CA plus active leaves in
- * `trusted_leaf_certs`; all revoked → excluded. Null when no CA certs are left to trust.
- *
- * `verify_if_given` (path-scoped hosts) carries no leaf pins: Caddy's leaf verifier fails a
- * handshake with no certificate, which would lock cert-less clients out of the open paths. Go still
- * verifies chain and expiry of any presented cert, and the HTTP gate pins the fingerprints.
+ * Unions the domains' CA ids, so callers pre-group them (`groupMtlsDomainsByCaSet`). No leaf pins
+ * under `verify_if_given`: Caddy's leaf verifier fails a certless handshake, locking clients out
+ * of open paths; the HTTP gate pins fingerprints instead.
  */
 export function buildClientAuthentication(
   domains: string[],
@@ -52,7 +44,7 @@ export function buildClientAuthentication(
   }
   if (caCertIds.size === 0) return null;
 
-  // Check if any domain in this group uses the new cert-based model (has leaf override)
+  // Any domain on the cert-based model (a leaf override).
   const leafOverridePems = new Set<string>();
   let hasLeafOverride = false;
   if (mTlsDomainLeafOverride) {
@@ -69,8 +61,7 @@ export function buildClientAuthentication(
   const trustedLeafCerts: string[] = [];
 
   if (hasLeafOverride) {
-    // New cert-based model: CAs derived from the selected certs. Add them for chain
-    // validation, pin to only the explicitly selected leaf certs.
+    // Cert-based: the CAs validate the chain, the selected leaves are pinned.
     for (const id of caCertIds) {
       const ca = caCertMap.get(id);
       if (ca) trustedCaCerts.push(pemToBase64Der(ca.certificatePem));
@@ -79,7 +70,6 @@ export function buildClientAuthentication(
       trustedLeafCerts.push(pemToBase64Der(pem));
     }
   } else {
-    // Legacy CA-based model
     for (const id of caCertIds) {
       const ca = caCertMap.get(id);
       if (!ca) continue;
@@ -125,10 +115,8 @@ export function isCertificateUnexpired(validTo: string, now = Date.now()): boole
 }
 
 /**
- * What a legacy whole-CA host admits on its gated paths: null for any cert the TLS layer verified,
- * otherwise the active fingerprints. Mirrors buildClientAuthentication's `trusted_leaf_certs`, which
- * pins the whole set once any CA in it has CPM-issued certs - and which path-scoped hosts cannot
- * carry at the TLS layer.
+ * Null admits any TLS-verified cert. Mirrors buildClientAuthentication's `trusted_leaf_certs`,
+ * which path-scoped hosts cannot carry at the TLS layer.
  */
 export function resolveLegacyCaFingerprints(
   caIds: number[],
@@ -143,10 +131,7 @@ export function resolveLegacyCaFingerprints(
   return allowed;
 }
 
-/**
- * Groups mTLS domains by sorted CA ID fingerprint, so each group gets its own TLS policy with an
- * isolated trust set - a cert from CA_B cannot authenticate against a host that configured CA_A.
- */
+/** One TLS policy per CA set, so a cert from CA_B cannot authenticate to a host that chose CA_A. */
 export function groupMtlsDomainsByCaSet(
   domains: string[],
   mTlsDomainMap: Map<string, number[]>,
@@ -164,10 +149,6 @@ export function groupMtlsDomainsByCaSet(
 
 // ── mTLS RBAC HTTP-layer route enforcement ───────────────────────────
 
-/**
- * One access rule's allowed fingerprints: the union of active certs holding an allowed role and
- * directly-allowed cert IDs.
- */
 export function resolveAllowedFingerprints(
   rule: MtlsAccessRuleLike,
   roleFingerprintMap: Map<number, Set<string>>,
@@ -190,18 +171,13 @@ export function resolveAllowedFingerprints(
   return allowed;
 }
 
-/** A CEL expression testing the client fingerprint against the allowed set. */
 export function buildFingerprintCelExpression(fingerprints: Set<string>): string {
   const fps = Array.from(fingerprints).sort();
   const quoted = fps.map((fp) => `'${fp}'`).join(", ");
   return `{http.request.tls.client.fingerprint} in [${quoted}]`;
 }
 
-/**
- * Subroutes enforcing a host's path-based mTLS RBAC at the HTTP layer; null when there are no
- * rules. Per rule: a path+fingerprint allow route, then a path-only 403. A catch-all afterwards
- * admits any valid cert.
- */
+/** Per rule an allow route then a path-only 403; the catch-all admits any valid cert. */
 export function buildMtlsRbacSubroutes(
   accessRules: MtlsAccessRuleLike[],
   roleFingerprintMap: Map<number, Set<string>>,
@@ -218,7 +194,6 @@ export function buildMtlsRbacSubroutes(
   // Rules are already sorted by priority desc, path asc
   for (const rule of accessRules) {
     if (rule.denyAll) {
-      // Explicit deny: any request matching this path gets 403
       subroutes.push({
         match: [{ path: [rule.pathPattern] }],
         handle: [
@@ -236,7 +211,7 @@ export function buildMtlsRbacSubroutes(
     const allowedFps = resolveAllowedFingerprints(rule, roleFingerprintMap, certFingerprintMap);
 
     if (allowedFps.size === 0) {
-      // Rule exists but no certs match → deny all for this path
+      // No certs match: deny the path.
       subroutes.push({
         match: [{ path: [rule.pathPattern] }],
         handle: [
@@ -251,7 +226,6 @@ export function buildMtlsRbacSubroutes(
       continue;
     }
 
-    // Allow route: path + fingerprint CEL match
     const celExpr = buildFingerprintCelExpression(allowedFps);
     subroutes.push({
       match: [{ path: [rule.pathPattern], expression: celExpr }],
@@ -259,7 +233,6 @@ export function buildMtlsRbacSubroutes(
       terminal: true,
     });
 
-    // Deny route: path matches but fingerprint didn't → 403
     subroutes.push({
       match: [{ path: [rule.pathPattern] }],
       handle: [
@@ -296,7 +269,6 @@ export function buildMtlsRbacSubroutes(
       terminal: true,
     });
   } else {
-    // Catch-all: paths without explicit rules → any valid cert gets through
     subroutes.push({
       handle: [...baseHandlers, reverseProxyHandler],
       terminal: true,

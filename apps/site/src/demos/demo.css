@@ -1,44 +1,18 @@
 /*
- * Everything a live demo needs to look like the product, without restyling the docs around it.
- *
- * Imported by DemoSurface rather than listed in `customCss`, so the ~200 kB of compiled component
- * CSS below lands only on the pages that actually have a demo.
- *
- * Astryx ships three cascade layers and this states their order. Where they sit relative to
- * Starlight's own layers is not stated and does not need to be: the frame carries Starlight's
- * `not-content`, which its content styles exclude by selector, and every rule here is scoped to
- * `.cpm-demo` or to `[data-astryx-theme]`, which nothing outside a demo carries.
+ * Imported by DemoSurface, not `customCss`, so ~200 kB lands only on pages with a demo. Every
+ * rule is scoped to `.cpm-demo` or `[data-astryx-theme]`; the frame carries `not-content`.
  */
 @layer reset, astryx-base, astryx-theme, cpm-demo-phone;
 
-/*
- * Astryx's compiled component CSS: atomic classes only, all inside @layer astryx-base, so it
- * cannot reach any markup that does not carry those classes. The theme is @scope'd to
- * `[data-astryx-theme]`, which DemoSurface puts on its wrapper and nothing else - see the note
- * there about why the demos do not use Astryx's own <Theme>.
- */
+/* Atomic classes only; the theme is @scope'd to DemoSurface's wrapper (not Astryx's <Theme>). */
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/theme-neutral/theme.css";
-/*
- * The variants the controller adds to that theme - the `tonal` button, the phone's OLED palette and
- * touch-sized controls. The same @scope, so like the theme it reaches nothing outside a demo.
- */
+/* The controller's theme variants, under the same @scope. */
 @import "@cpm/controller/src/app/astryx-variants.css";
 
 /*
- * The half of the controller's mobile.css a demo needs.
- *
- * The components mark what belongs to which width with `cpm-desktop-only`, `cpm-mobile-only` and
- * `cpm-mobile-flex`, and leave the rest to that stylesheet. Without these rules a demo shows both
- * copies at once - the audit log's activity strip twice, the phone's summary card under the
- * desktop's tiles.
- *
- * mobile.css itself is not imported. Half of it is chrome positioned against the screen - the tab
- * bar, the More drawer, the floating action button, a list header that sticks to the top - and on
- * this site the screen belongs to the docs, not to a demo. So a demo follows the phone layout for
- * everything inside the page and none of what is pinned to the viewport: the floating button stays
- * hidden and the list header stays a plain block. Same 767px edge, so it switches where the app
- * does, and where DataTable's card view already does.
+ * The half of mobile.css a demo needs, or both width variants show at once. The rest pins chrome
+ * to a viewport that belongs to the docs. Same 767px edge as the app and DataTable's card view.
  */
 @layer cpm-demo-phone {
   .cpm-demo :is(.cpm-fab, .cpm-mobile-only, .cpm-mobile-flex) {
@@ -49,10 +23,9 @@
     display: contents;
   }
 
-  /* The sign-in screen centres itself in a full viewport's height, set inline. In a documentation
-     page that is a screen of empty frame, so the demo keeps the centring and drops the height. */
+  /* The sign-in screen's inline viewport height is a screen of empty frame in the docs. */
   .cpm-demo .cpm-demo-auth > * {
-    /* biome-ignore lint/complexity/noImportantStyles: Center sets the height inline, which only an important declaration outranks. */
+    /* biome-ignore lint/complexity/noImportantStyles: only this outranks an inline height. */
     min-height: 0 !important;
   }
 
@@ -69,7 +42,7 @@
       display: flex;
     }
 
-    /* Search first and full width, as the app's list header lays it out. */
+    /* As the app's list header lays it out. */
     .cpm-demo .cpm-list-toolbar {
       flex-direction: column;
       align-items: stretch;
@@ -124,12 +97,8 @@
 }
 
 /*
- * Astryx's reset, scoped.
- *
- * The real `@astryxdesign/core/reset.css` is global and would take Starlight's prose with it -
- * bullets, heading sizes, link colours, the lot. The rules its components actually depend on are
- * these, so they are repeated here under `.cpm-demo`. Zero-specificity `:where()` is kept, so
- * layer order alone decides: astryx-base and astryx-theme still win inside a demo.
+ * Astryx's reset, scoped: the real one is global and would strip Starlight's prose. `:where()`
+ * keeps specificity zero, so layer order alone decides.
  */
 @layer reset {
   .cpm-demo :where(*, *::before, *::after) {

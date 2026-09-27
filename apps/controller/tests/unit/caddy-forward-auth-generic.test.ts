@@ -1,11 +1,6 @@
 /**
- * The generic forward-auth provider: an auth server this app does not run (Authelia and anything
- * else answering a forward-auth subrequest).
- *
- * What is worth asserting here is the shape of the routes rather than the handler's fields: the
- * split between a browser and an API caller, the bypass header that must win over both, and the
- * inbound strip of the identity headers - without which a caller forges Remote-User straight to
- * the upstream on any route the auth server never sees.
+ * Asserts route shape, not handler fields: the browser/API split, the bypass header winning over
+ * both, and the identity-header strip without which a caller forges Remote-User to the upstream.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -17,8 +12,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -53,10 +47,7 @@ const AUTHELIA_HEADERS = [
 type Handler = Record<string, unknown>;
 type Route = { match?: Record<string, unknown>[]; handle?: unknown[] };
 
-/**
- * The host's proxying routes, in the order Caddy will try them. The scheme redirect that every
- * TLS host also gets is left out: it answers before any of this and proxies nothing.
- */
+/** In Caddy's order, minus the scheme redirect, which proxies nothing. */
 async function routesFor(domain: string): Promise<Route[]> {
   const doc = (await buildCaddyDocument()) as Record<string, unknown>;
   const servers = ((doc.apps as Record<string, { servers?: Record<string, { routes?: Route[] }> }>)
@@ -91,7 +82,6 @@ function isIdentityStrip(handler: unknown): boolean {
   return AUTHELIA_HEADERS.every((name) => lowered.includes(name.toLowerCase()));
 }
 
-/** The auth subrequest a route runs, if any. */
 function authHandler(route: Route): Handler | undefined {
   return (route.handle ?? []).find(isAuthSubrequest) as Handler | undefined;
 }
@@ -241,7 +231,6 @@ describe('generic forward auth - stored block', () => {
       updateProxyHost(host.id, { cpmForwardAuth: { enabled: true } }, 1),
     ).rejects.toThrow(/one authenticator/);
 
-    // The host is untouched by the refusal.
     expect((await getProxyHost(host.id))?.forwardAuth?.enabled).toBe(true);
   });
 });
@@ -300,8 +289,7 @@ describe('generic forward auth - generated routes', () => {
     const routes = await routesFor('split.example.com');
     expect(routes).toHaveLength(2);
 
-    // Browser first, because Caddy takes the first route that matches and the API route
-    // deliberately matches everything.
+    // Browser first: Caddy takes the first match, and the API route matches everything.
     expect(matchesBrowser(routes[0])).toBe(true);
     expect(answers401(routes[0])).toBe(false);
     expect(matchesBrowser(routes[1])).toBe(false);
@@ -332,8 +320,7 @@ describe('generic forward auth - generated routes', () => {
     const routes = await routesFor('bypass.example.com');
     const bypass = routes[0];
 
-    // First of all of them: a caller holding the upstream's own credential must never be sent to
-    // the auth server, whichever other route would also have matched.
+    // First: a caller holding the upstream's own credential must never reach the auth server.
     expect((bypass.match ?? [])[0].header).toEqual({ 'X-Api-Key': ['*'] });
     expect(authHandler(bypass)).toBeUndefined();
     expect((bypass.handle ?? []).some(isUpstreamProxy)).toBe(true);
@@ -364,16 +351,14 @@ describe('generic forward auth - generated routes', () => {
     expect(gated).toHaveLength(1);
     expect((gated[0].match ?? [])[0].path).toEqual(['/admin/*']);
     expect(open.length).toBeGreaterThan(0);
-    // The open catch-all sees no auth server, so the strip is the only thing standing between a
-    // forged identity header and the upstream.
+    // The catch-all sees no auth server, so the strip alone stops a forged identity header.
     for (const route of open) {
       expect((route.handle ?? []).some(isIdentityStrip)).toBe(true);
     }
   });
 
   it('is not published at all for a block that cannot be read', async () => {
-    // Written straight to the row, as a sync from elsewhere or a hand edit could: the model would
-    // have refused it. Generation must not treat "enabled but unusable" as "no forward auth".
+    // Straight to the row, which the model would refuse: "enabled but unusable" is not "off".
     const host = await createProxyHost(
       { name: 'broken', domains: ['broken.example.com'], upstreams: [UPSTREAM] },
       1,
@@ -384,8 +369,7 @@ describe('generic forward auth - generated routes', () => {
       .where(eq(schema.proxyHosts.id, host.id));
 
     const routes = await routesFor('broken.example.com');
-    // It falls back to an ordinary host rather than failing the whole document - and that is
-    // exactly why the model refuses to store such a block in the first place.
+    // Falls back to an ordinary host rather than failing the document - hence the model's refusal.
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) expect(authHandler(route)).toBeUndefined();
   });

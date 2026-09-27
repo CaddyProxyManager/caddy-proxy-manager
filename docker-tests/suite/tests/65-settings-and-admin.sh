@@ -16,8 +16,7 @@ for group in general acme dns dns-provider upstream-dns geoblock waf error-pages
   fi
 done
 
-# The rig's ACME configuration must be exactly what bootstrap installed - every
-# certificate assertion in the suite depends on it.
+# Every certificate assertion in the suite depends on bootstrap's ACME config.
 api GET /api/v1/settings/acme
 t_contains "the ACME directory points at the in-network CA" "pebble" "$(jqr '.caUrl')"
 t_contains "the ACME CA root is stored" "BEGIN CERTIFICATE" "$(jqr '.caRootPem')"
@@ -45,8 +44,7 @@ t_eq "DNS resolver settings can be saved" "200" "$API_STATUS"
 api GET /api/v1/settings/dns
 t_eq "the configured resolver round-trips" "172.28.0.5" "$(jqr '.resolvers[0]')"
 
-# With a resolver configured, a host must still work end to end - the resolver
-# lands in the reverse-proxy transport and a bad one breaks every upstream.
+# The resolver lands in the proxy transport; a bad one breaks every upstream.
 dnsdomain=$(domain_for "custom-resolver")
 create_host_or_fail "a host can be created with a custom DNS resolver in effect" "$(jq -nc --arg d "$dnsdomain" '{
   name: "docker-test custom resolver", domains: [$d], upstreams: ["origin-a:8080"],
@@ -109,9 +107,6 @@ t_eq "active sessions can be listed" "200" "$API_STATUS"
 t_eq "the session listing is an array" "array" "$(jqr 'type')"
 
 # ── Audit trail ─────────────────────────────────────────────────────────────
-#
-# Everything the suite has done so far went through the models layer, which
-# writes an audit event for each mutation.
 
 api GET "/api/v1/audit-log?per_page=100"
 t_eq "the audit log can be read" "200" "$API_STATUS"
@@ -125,7 +120,6 @@ api POST /api/v1/caddy/apply
 t_eq "the Caddy config can be re-applied on demand" "200" "$API_STATUS"
 t_eq "the apply reports success" "true" "$(jqr '.ok')"
 
-# The applied document must be what Caddy is actually running.
 running=$(curl -sS --max-time 10 "http://caddy:2019/config/" 2>/dev/null)
 t_contains "Caddy is running a CPM-generated config" '"cpm"' "$running"
 
@@ -143,10 +137,8 @@ api GET /api/v1/oauth-providers
 t_eq "OAuth providers can be listed" "200" "$API_STATUS"
 
 # ── Endpoints outside /api/v1 ───────────────────────────────────────────────
-# The session middleware treats everything except /api/v1, /api/auth, /api/health and
-# /api/forward-auth as a page request, so these three answer to a browser
-# session and redirect a bearer-token caller to the login page. Both halves are pinned: the
-# middleware's allowlist is easy to change by accident.
+# The middleware treats these as pages: session works, bearer redirects to login. Both halves are
+# pinned, since its allowlist is easy to change by accident.
 
 api_session GET /api/geoip-status
 t_eq "the GeoIP status endpoint answers a session request" "200" "$API_STATUS"
@@ -160,8 +152,7 @@ t_eq "a bearer caller is redirected away from the non-v1 endpoints" "307" "$API_
 
 # ── Global Caddyfile ────────────────────────────────────────────────────────
 #
-# Adapted by the real Caddy and merged by addition only: a site block on a port
-# of its own is served, and anything that would replace CPM's config is refused.
+# Merged by addition only: a site on its own port is served, a replacement of CPM's config refused.
 
 put_global_caddyfile() {
   api PUT /api/v1/settings/global-caddy-config "$(jq -nc --arg c "$1" '{caddyfile: $c}')"

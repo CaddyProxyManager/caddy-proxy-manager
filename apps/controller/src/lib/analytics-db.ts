@@ -57,12 +57,8 @@ const EPOCH_SECONDS = /^\d{1,12}$/;
 const IPV4_HOST = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/;
 
 /**
- * The time window an analytics request asks for.
- *
- * An explicit `from`/`to` pair wins only when both are plain epoch seconds and `from` is before
- * `to`. Anything else - a missing half, `abc`, `1e9`, a reversed range - falls back to the
- * interval rather than reaching ClickHouse as NaN, which would either fail the query or, worse,
- * quietly match nothing and render as "no traffic".
+ * `from`/`to` win only as plain epoch seconds with `from` first. Anything else falls back to the
+ * interval rather than reaching ClickHouse as NaN, which can quietly match nothing.
  */
 export function resolveAnalyticsRange(
   params: URLSearchParams,
@@ -92,12 +88,8 @@ export interface AnalyticsSummary extends CHSummary {
 }
 
 /**
- * Whether any agent is writing an access log.
- *
- * Asked of the agents rather than checked on this filesystem: the log lives on the agent's host,
- * so a controller looking at its own disk would report logging as disabled on every deployment
- * whose Caddy is somewhere else. With no agent answering, nothing is being written either, which
- * is the same answer.
+ * Asked of the agents, not this filesystem: the log lives on the agent's host. With no agent
+ * answering, nothing is being written either.
  */
 async function isLoggingActive(): Promise<boolean> {
   const { getAllAgentStatuses } = await import("./agent/client");
@@ -190,14 +182,8 @@ export interface OverviewAnalytics {
 }
 
 /**
- * Everything the overview draws, in one round trip.
- *
- * The page changes all three of its bands together - tiles, chart and log all follow
- * the same range - so splitting this across the existing per-widget routes would put
- * three requests on every range change and let the bands disagree while they land.
- *
- * `limit` is the log's screenful; the rows are a sample of the window, not a page to
- * walk through, which is why there is no pagination here.
+ * One round trip: tiles, chart and log follow the same range, so per-widget routes would triple the
+ * requests and let the bands disagree. `limit` is a sample of the window, hence no pagination.
  */
 export async function getOverviewAnalytics(
   from: number,
@@ -245,24 +231,17 @@ export interface HostTraffic {
 
 export interface HostTrafficResult {
   /**
-   * Whether traffic numbers exist to show at all: analytics is switched on and ClickHouse
-   * answered. Distinct from `byHost` being empty, which with analytics on just means none of these
-   * hosts took traffic in the window - a zero worth showing, not an absence to hide.
+   * Analytics is on and ClickHouse answered. Distinct from an empty `byHost`, which is a zero worth
+   * showing, not an absence to hide.
    */
   available: boolean;
   byHost: Map<number, HostTraffic>;
 }
 
 /**
- * Traffic totals keyed by proxy host id, for a list that shows one number per row.
- *
- * ClickHouse records the Host header, which is a domain rather than a host id, so the totals are
- * folded back onto the row that serves that domain - a host with three domains reports the sum of
- * all three. Wildcards are not expanded: `*.lab.example.com` never appears as a Host header, so a
- * request to `a.lab.example.com` counts only if that exact name is also on the host.
- *
- * `available` is false when analytics is switched off or ClickHouse cannot be reached; the list
- * then renders without the column rather than failing, or showing zeroes that read as "no traffic".
+ * ClickHouse records the Host header, so totals fold back onto the host serving that domain.
+ * Wildcards are not expanded: a request counts only if its exact name is on the host. `available`
+ * false drops the column rather than showing zeroes that read as "no traffic".
  */
 export async function getTrafficByProxyHost(
   from: number,

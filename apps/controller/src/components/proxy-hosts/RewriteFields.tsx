@@ -9,8 +9,7 @@ type Props = { initialData?: RewriteConfig | null };
 
 export function RewriteFields({ initialData }: Props) {
   const t = useTranslations("proxyHosts");
-  // Astryx inputs are controlled; htmlName keeps the value in the submitted
-  // FormData exactly as the uncontrolled defaultValue did.
+  // Astryx inputs are controlled; htmlName keeps the value in the submitted FormData.
   const [pathPrefix, setPathPrefix] = useState(initialData?.path_prefix ?? "");
 
   return (

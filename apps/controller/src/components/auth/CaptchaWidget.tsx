@@ -1,18 +1,12 @@
 "use client";
 
-/**
- * The CAPTCHA on the sign-in screen's username step, for whichever provider is configured.
- *
- * Each provider ships a script that defines a global (or, for Cap, a custom element) and renders
- * into an element it is handed. The script is loaded on first mount only, so a deployment without
- * a CAPTCHA never contacts any of them.
- */
+/** Provider scripts load on first mount only, so a deployment without a CAPTCHA contacts none. */
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { type CaptchaWidgetConfig, captchaScriptUrl } from "@/src/lib/captcha/providers";
 
-/** The explicit-render API reCAPTCHA, hCaptcha and Turnstile share closely enough to treat as one. */
+/** reCAPTCHA, hCaptcha and Turnstile share this explicit-render API closely enough. */
 type RenderApi = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string | number;
   reset: (id?: string | number) => void;
@@ -36,9 +30,8 @@ type Props = {
   config: CaptchaWidgetConfig;
   /** The page's CSP nonce, for the scripts Cap injects into its own sandbox. */
   nonce?: string;
-  /** A solved token, or null once it expires or errors. */
+  /** Null once it expires or errors. */
   onToken: (token: string | null) => void;
-  /** The provider could not load or run at all. */
   onError: () => void;
 };
 
@@ -96,8 +89,7 @@ export const CaptchaWidget = forwardRef<CaptchaWidgetHandle, Props>(function Cap
 
   useImperativeHandle(ref, () => ({ reset: () => resetRef.current() }), []);
 
-  // Cap's labels, which it takes as attributes rather than from a language parameter. Every one it
-  // reads, screen-reader text included, or the rest stay English.
+  // Cap takes labels as attributes, not a language; every one, or the rest stay English.
   const capLabels = {
     "data-cap-i18n-initial-state": t("capInitial"),
     "data-cap-i18n-verifying-label": t("capVerifying"),
@@ -195,7 +187,6 @@ export const CaptchaWidget = forwardRef<CaptchaWidgetHandle, Props>(function Cap
     };
   }, [config.provider, config.siteKey, config.capApiEndpoint, nonce, locale]);
 
-  // A bare element: the provider owns everything inside it, labels included, and a layout
-  // component would only add a wrapper for it to render into anyway.
+  // A bare element: the provider owns everything inside it.
   return <div ref={container} />;
 });

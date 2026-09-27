@@ -1,14 +1,6 @@
 /**
- * Stands in for the controller's `src/lib/auth-client` inside the demos (see the alias in
- * astro.config.mjs).
- *
- * The real one is Better Auth's client, which posts to `/api/auth/*` on whatever origin loaded it -
- * here the documentation site, which has no such route and would answer with a 404 page. This one
- * never makes a request. Every attempt fails the way a wrong password or an unreachable provider
- * does, after a pause long enough to see the pending state, so what a reader gets to try is the
- * form's own handling of that: the name kept on screen, the error in the product's words.
- *
- * The exception is the setup demo, which has accounts of its own to check against.
+ * The docs site has no `/api/auth/*`, so this never makes a request: every attempt fails as a wrong
+ * password does, except in the setup demo, which has accounts of its own.
  */
 import { currentSimulation } from "../setup-simulation";
 
@@ -20,7 +12,7 @@ export const authClient = {
       const simulation = currentSimulation();
       if (simulation) return simulation.signInUsername(input.username, input.password);
       await pause();
-      // No message, so the form falls back to its own wording for a rejected password.
+      // No message, so the form uses its own wording.
       return { error: { status: 401 } };
     },
     async social(input: { provider: string; callbackURL?: string; errorCallbackURL?: string }) {

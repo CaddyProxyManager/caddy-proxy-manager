@@ -9,11 +9,7 @@ const lockGlobal = globalThis as typeof globalThis & {
 lockGlobal.__cpmSettingsUpdateLock ??= { waiters: [], locked: false };
 const state = lockGlobal.__cpmSettingsUpdateLock;
 
-/**
- * Caddy configuration is generated from all settings at once. Serialize the
- * save/apply/rollback transaction so a failed request cannot restore stale
- * state over a concurrent successful update.
- */
+/** Config is built from all settings: a failed save's rollback must not undo a concurrent one. */
 export async function withSettingsUpdateLock<T>(operation: () => Promise<T>): Promise<T> {
   if (state.locked) {
     await new Promise<void>((resolve) => state.waiters.push(resolve));

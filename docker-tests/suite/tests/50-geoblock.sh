@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# IP-based blocking, per host and globally. Country/continent/ASN rules need MaxMind databases,
-# which are a licensed download and absent from this offline rig; CIDR and bare-IP rules go through
-# the same handler and need none, so those are what is asserted. If the handler refuses to load at
-# all without a database, the file skips with that reason rather than failing.
+# IP blocking, per host and global. The offline rig has no MaxMind databases, so only CIDR and
+# bare-IP rules (same handler) are asserted; a handler that won't load without one skips the file.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "geo/IP blocking"
@@ -12,10 +10,8 @@ if [ "${TEST_GEOBLOCK:-1}" != "1" ]; then
   finish
 fi
 
-# The group's PUT rejects a missing key as hard as an unknown one, so every field goes in every
-# time. This is the whole document at its defaults; each assertion starts from it and overrides
-# only what it is about. A field added to the group fails here first, which is the intent - a
-# partial payload would otherwise be rejected wherever it happened to be sent.
+# The PUT rejects a missing key like an unknown one, so every call sends this whole document; a
+# field added to the group fails here first, on purpose.
 geoblock_defaults='{
   "enabled": false,
   "block_countries": [], "block_continents": [], "block_asns": [], "block_cidrs": [], "block_ips": [],
@@ -102,9 +98,7 @@ wait_for_https "$neutral" 120
 t_eq "hosts without a rule are not blocked" "200" "$(http_code "https://$neutral/")"
 
 # ── Global blocking ─────────────────────────────────────────────────────────
-#
-# Applies to every host that has not overridden it, which is the interesting
-# part: the neutral host above must start returning a rejection.
+# The neutral host above, which has no override, must start rejecting.
 
 api PUT /api/v1/settings/geoblock "$(geoblock_with \
   '.enabled = true | .block_ips = [$ip]' --arg ip "$CLIENT_IP")"

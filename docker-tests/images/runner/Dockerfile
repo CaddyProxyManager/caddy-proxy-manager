@@ -1,5 +1,4 @@
-# The simulated client. Deliberately has no application code from the project -
-# it only speaks HTTP/TLS/TCP/UDP, exactly as an outside user would.
+# The simulated client: deliberately no project code, only HTTP/TLS/TCP/UDP like an outside user.
 FROM alpine:3.24
 
 RUN apk add --no-cache \

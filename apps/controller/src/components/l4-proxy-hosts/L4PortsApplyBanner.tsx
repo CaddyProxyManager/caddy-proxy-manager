@@ -45,7 +45,6 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
     }
   }, []);
 
-  // Initial fetch on mount
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
@@ -56,8 +55,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
     fetchStatus();
   }, [refreshSignal, fetchStatus]);
 
-  // Keyed on the boolean, not on `data`: every poll result would otherwise restart the interval,
-  // and the old `polling` state it toggled re-ran this effect before the timer could ever fire.
+  // Keyed on the boolean, not on `data`: every poll result would otherwise restart the interval.
   const shouldPoll = data?.status.state === "pending" || data?.status.state === "applying";
   useEffect(() => {
     if (!shouldPoll) return;
@@ -83,7 +81,6 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
 
   const { diff, status } = data;
 
-  // Show nothing if no changes needed and status is idle/applied
   if (!diff.needsApply && (status.state === "idle" || status.state === "applied")) {
     return null;
   }

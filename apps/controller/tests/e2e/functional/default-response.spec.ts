@@ -1,7 +1,4 @@
-/**
- * Functional coverage for the configurable unmatched-host response (issue #241).
- * These tests update CPM through its API and then make real requests to Caddy.
- */
+/** The configurable unmatched-host response (#241), set over the API and requested from Caddy. */
 import {
   expect,
   request as playwrightRequest,
@@ -12,11 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { httpGet, waitForBody, type HttpResponse } from '../../helpers/http';
 
-/**
- * The signed-in state global-setup seeds, and what playwright.config.ts hands every test by
- * default. These hooks build their own APIRequestContext, so they resolve it themselves - through
- * import.meta.url, because the spec is an ES module and has no __dirname.
- */
+/** These hooks build their own APIRequestContext; an ES module has no __dirname. */
 const ADMIN_STORAGE_STATE = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../../.auth/admin.json',

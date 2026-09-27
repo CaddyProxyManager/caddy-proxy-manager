@@ -46,7 +46,6 @@ type DataTableProps<T> = {
   loading?: boolean;
   /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
-  /** Per-row status indicator. Replaces rowClassName, which conveyed meaning by colour alone. */
   rowStatus?: (row: T) => TableRowStatus | null;
   pagination?: {
     total: number;
@@ -61,8 +60,7 @@ type DataTableProps<T> = {
   expandOnRowClick?: boolean;
 };
 
-// Fixed-length placeholder lists. Keys are built once here rather than from the map index, so the
-// loading skeleton needs no index keys; nothing is ever inserted into or removed from either.
+// Fixed keys, so the skeletons need no index keys.
 const SKELETON_ROW_KEYS = ["row-1", "row-2", "row-3", "row-4", "row-5"];
 const SKELETON_CARD_KEYS = ["card-1", "card-2", "card-3"];
 
@@ -72,11 +70,7 @@ const ALIGN: Record<NonNullable<Column<unknown>["align"]>, "start" | "center" | 
   right: "end",
 };
 
-/**
- * Astryx pads the chevron's cell and the chevron's own wrapper, which together leave its 40px
- * column no room for the 24px button: the arrow renders clipped. The cell loses its padding and
- * the column grows to fit the wrapper's.
- */
+/** Astryx's cell and wrapper padding clip the chevron in a 40px column; widened, cell unpadded. */
 const EXPANSION_COLUMN = "__expansion";
 const EXPANSION_COLUMN_WIDTH = pixel(48);
 
@@ -119,10 +113,7 @@ function PaginationBar({ page, perPage, total }: { page: number; perPage: number
   );
 }
 
-/**
- * A column heading that toggles sort order through the URL - this app sorts server-side, so the
- * heading just pushes a new URL.
- */
+/** Sorting is server-side, so the heading just pushes a new URL. */
 function SortableHeader<T>({
   col,
   sort,
@@ -175,13 +166,11 @@ export function DataTable<T>({
   const t = useTranslations("ui");
   const emptyTitle = emptyMessage ?? t("noDataAvailable");
   const isEmpty = data.length === 0 && !loading;
-  // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only one of the two
-  // views is ever mounted.
+  // A query rather than CSS, so only one of the two views is ever mounted.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const density = useTableDensity();
 
-  // Astryx's Table requires rows to carry an index signature. The app's domain types are plain
-  // interfaces, so the cast is confined to this boundary rather than pushed onto every model.
+  // Astryx's Table wants an index signature; the cast stays here rather than on every model.
   const getStatus = useCallback(
     (row: TableRow) => (rowStatus ? rowStatus(row as T) : null),
     [rowStatus],
@@ -257,8 +246,7 @@ export function DataTable<T>({
   }));
 
   if (onRowClick) {
-    // The old table opened a row on click, which no keyboard user could reach. An explicit
-    // trailing control keeps the affordance and makes it focusable.
+    // A focusable control: a bare row click is unreachable from the keyboard.
     tableColumns.push({
       key: "__open",
       header: "",

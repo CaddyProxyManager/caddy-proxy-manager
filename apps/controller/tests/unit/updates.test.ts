@@ -1,19 +1,14 @@
 /**
- * Release comparison, registry-path parsing, and what the check reports.
- *
- * The comparison is the part worth pinning. A wrong answer either hides a release or invents one,
- * and the prerelease rules are the easy half to get backwards: 3.0.0-beta.2 precedes 3.0.0, so a
- * naive string or field comparison announces an "update" to the beta an operator just left.
+ * Release comparison, registry-path parsing, and what the check reports. Prerelease rules are
+ * easy to get backwards: 3.0.0-beta.2 precedes 3.0.0, or the beta just left reads as an update.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { version as DECLARED_VERSION } from '@/package.json';
 import { vi } from '@/tests/helpers/vi';
 
 /**
- * The cached check row and the two settings that drive it, as plain objects the tests set.
- *
- * Hoisted so the mock factories below can close over them: a Bun mock factory has to be
- * synchronous, and it runs before anything a test could assign.
+ * Test-set cache row and settings, hoisted: the mock factories close over them and a Bun
+ * mock factory runs before anything a test could assign.
  */
 const store = vi.hoisted(() => ({
   cache: null as unknown,
@@ -29,11 +24,9 @@ vi.mock('@/src/lib/settings', () => ({
   },
 }));
 
-// settings/resolve is the other database reader in the chain. settings/registry is left real, so
-// these tests are answering with the actual setting definitions rather than invented keys.
+// settings/registry stays real, so these tests answer with the actual setting definitions.
 vi.mock('@/src/lib/settings/resolve', () => ({
-  // Matched on the definition's `name` rather than its `key`, which carries a namespace prefix the
-  // registry owns and this file has no business restating.
+  // By `name`, not `key`: the key carries a namespace prefix the registry owns.
   getSetting: async (definition: { name: string }) =>
     definition.name === 'update_check_enabled' ? store.enabled : store.repository,
 }));
@@ -121,9 +114,8 @@ describe('deciding whether to tell the operator', () => {
   });
 
   it('is quiet for this build against the registry as it stands', () => {
-    // The end-to-end shape of the feature: real tags, the version this package declares, no notice.
     // Read from package.json rather than restated, so a release bump cannot leave this asserting
-    // about a version nothing ships any more.
+    // about a version nothing ships.
     expect(isNewer(DECLARED_VERSION, newestRelease(REAL_TAGS))).toBe(false);
   });
 });
@@ -134,7 +126,6 @@ describe('the repository setting', () => {
       host: 'ghcr.io',
       path: 'silentspud/caddy-proxy-manager',
     });
-    // The substitution the feature exists for.
     expect(parseRepository('ghcr.io/somerandomuser/caddy-proxy-manager')).toEqual({
       host: 'ghcr.io',
       path: 'somerandomuser/caddy-proxy-manager',
@@ -171,9 +162,8 @@ describe('following registry pagination', () => {
   });
 
   it('refuses a link to another host rather than fetching it', () => {
-    // new URL(value, base) ignores the base as soon as the value is absolute, so this would
-    // otherwise be a server-side fetch of whatever the registry named - carrying the bearer token
-    // the caller is holding.
+    // new URL(value, base) ignores the base for an absolute value, which would be a server-side
+    // fetch of whatever the registry named, carrying the caller's bearer token.
     expect(() =>
       nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
     ).toThrow(/will not follow/);
@@ -258,8 +248,8 @@ describe('what the status reports', () => {
   };
 
   it('serves the cached answer while checks are on', async () => {
-    // updateAvailable stays false here for a reason of its own: APP_VERSION is not baked into a
-    // test build, and an unknown current version never announces anything. See the case above.
+    // False regardless: APP_VERSION is not baked into a test build, and an unknown version never
+    // announces anything.
     store.cache = CACHED;
 
     const status = await getUpdateStatus();
@@ -271,9 +261,8 @@ describe('what the status reports', () => {
   });
 
   it('knows nothing while checks are off, rather than repeating a stale answer', async () => {
-    // The Settings page reads `latest` as authoritative. Left in, it would go on saying "9.9.9 is
-    // the newest release published" from a check that stopped running - and "Check now" is
-    // disabled along with the setting, so there is no way to refresh it.
+    // The Settings page reads `latest` as authoritative, and "Check now" is disabled with the
+    // setting, so a stale value could never be refreshed.
     store.cache = CACHED;
     store.enabled = false;
 

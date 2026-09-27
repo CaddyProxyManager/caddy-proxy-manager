@@ -1,10 +1,6 @@
 /**
- * Reading how old the MaxMind databases on disk are.
- *
- * The age comes from the file's mtime, on the same reasoning `geoipEtag` already relies on:
- * the updater replaces a database wholesale, so the write time is when this host last took
- * delivery of one. What matters here is that a missing directory or a file that vanishes
- * mid-read degrades to "unknown", never to a settings page that fails.
+ * How old the MaxMind databases on disk are, from mtime (the updater replaces them wholesale). A
+ * missing directory or a file vanishing mid-read must degrade to "unknown", not a failed page.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync } from 'node:fs';

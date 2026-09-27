@@ -1,8 +1,6 @@
 /**
- * An access list must FAIL CLOSED. A host attached to a list with no members used to get no
- * authentication handler at all, so Caddy served the backend to anyone - the list being empty was
- * read as "nothing to check" rather than "nobody is allowed". The host has to refuse every request
- * until the list has a member, on every route it owns, location rules included.
+ * An access list must FAIL CLOSED: an empty list means "nobody", not "nothing to check", on every
+ * route the host owns, location rules included.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -13,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -35,7 +32,6 @@ import * as schema from '../../src/lib/db/schema';
 type Handler = { handler?: string; status_code?: number | string };
 type Route = { match?: { host?: string[] }[]; handle?: Handler[] };
 
-/** Every route anywhere in the document whose matcher names the domain. */
 function routesForDomain(doc: unknown, domain: string): Route[] {
   const found: Route[] = [];
   const walk = (node: unknown) => {
@@ -54,7 +50,7 @@ function routesForDomain(doc: unknown, domain: string): Route[] {
   return found;
 }
 
-/** The handler chain lets nobody reach reverse_proxy without passing a gate first. */
+/** Nobody reaches reverse_proxy without passing a gate first. */
 function isGatedBeforeProxy(route: Route): boolean {
   const handlers = route.handle ?? [];
   const proxyAt = handlers.findIndex((h) => h.handler === 'reverse_proxy');
@@ -81,7 +77,7 @@ async function seedList(id: number, usernames: string[]) {
     await ctx.db.insert(schema.accessListEntries).values({
       accessListId: id,
       username,
-      // Any bcrypt-shaped string: the builder copies it through, nothing verifies it here.
+      // Only bcrypt-shaped: nothing verifies it here.
       passwordHash: '$2b$10$abcdefghijklmnopqrstuuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012',
       createdAt: NOW,
       updatedAt: NOW,
@@ -118,7 +114,7 @@ describe('access list fail-closed', () => {
 
     const routes = routesForDomain(await buildCaddyDocument(), domain);
 
-    // The host must still be routed - dropping it would hand the domain to whatever else matches.
+    // Dropping it would hand the domain to whatever else matches.
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) {
       expect(isGatedBeforeProxy(route)).toBe(true);

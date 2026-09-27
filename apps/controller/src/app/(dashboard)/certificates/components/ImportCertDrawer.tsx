@@ -34,8 +34,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
   const [keyPem, setKeyPem] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  // The inputs are controlled, so opening the dialog has to seed them; the
-  // old markup relied on defaultValue plus a remount to do the same job.
+  // The inputs are controlled, so opening the dialog has to seed them.
   useEffect(() => {
     if (!open) return;
     setName(cert?.name ?? "");

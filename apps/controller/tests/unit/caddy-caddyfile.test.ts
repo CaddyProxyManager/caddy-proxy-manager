@@ -14,7 +14,6 @@ import {
 
 let requests: CaddyAdminRequest[] = [];
 
-/** Install a transport that answers /adapt with a canned response. */
 function installAdapter(respond: (req: CaddyAdminRequest) => { status: number; text: string }) {
   requests = [];
   setCaddyAdminTransport(async (request) => {
@@ -45,8 +44,7 @@ beforeEach(() => {
 
 describe('adaptCaddyfileSnippet', () => {
   it('sends the snippet to /adapt as a Caddyfile, wrapped in a site block', async () => {
-    // Caddy's adapter needs a complete Caddyfile; :80 is used because it
-    // produces no host matcher of its own for this app to strip back out.
+    // :80 produces no host matcher for this app to strip back out.
     await adaptCaddyfileSnippet('respond "hi" 200');
 
     expect(requests).toHaveLength(1);
@@ -84,8 +82,7 @@ describe('adaptCaddyfileSnippet', () => {
   });
 
   it('reports app keys it cannot honour at host scope', async () => {
-    // A `tls` directive in a per-host snippet does nothing - TLS is configured
-    // at the server level. Saying so beats leaving the operator to wonder.
+    // A per-host `tls` does nothing: TLS is configured at the server level.
     installAdapter(() => adaptedOk([], { tls: { automation: {} } }));
 
     const { ignoredApps } = await adaptCaddyfileSnippet('tls internal');
@@ -93,8 +90,7 @@ describe('adaptCaddyfileSnippet', () => {
   });
 
   it("surfaces Caddy's own parse error verbatim", async () => {
-    // Caddy names the line and the directive; nothing this layer could
-    // synthesise would be as useful.
+    // Caddy names the line and directive; nothing synthesised here would be as useful.
     installAdapter(() => ({
       status: 400,
       text: JSON.stringify({ error: 'Caddyfile:2: unrecognized directive: respondd' }),
@@ -122,8 +118,7 @@ describe('adaptCaddyfileSnippet', () => {
 
 describe('buildCaddyfileSubrouteHandler', () => {
   it('wraps routes in a subroute so their matchers survive', () => {
-    // Flattening the handlers out would drop each route's own matcher, applying
-    // a path-scoped directive to every request the host serves.
+    // Flattening would drop each route's matcher, applying a path-scoped directive everywhere.
     const routes = [{ match: [{ path: ['/api/*'] }], handle: [{ handler: 'headers' }] }];
     expect(buildCaddyfileSubrouteHandler(routes)).toEqual({ handler: 'subroute', routes });
   });
@@ -153,9 +148,7 @@ describe('validateCaddyfileSnippet', () => {
   });
 
   it('does not blame the operator when Caddy is unreachable', async () => {
-    // A transport failure is an infrastructure problem. Reporting it as a
-    // syntax error would send someone hunting a typo that is not there, and
-    // would block saving a host for reasons unrelated to what they typed.
+    // Not a syntax error: that would send someone hunting a typo that is not there.
     setCaddyAdminTransport(async () => {
       throw new Error('connect ECONNREFUSED');
     });

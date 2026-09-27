@@ -84,8 +84,7 @@ describe('groups integration', () => {
     const now = nowIso();
 
     await db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now });
-    // drizzle's query builder is a thenable, not a Promise; bun:test's
-    // .rejects needs a real one before it will run the query.
+    // drizzle's builder is a thenable, and bun:test's .rejects needs a real Promise.
     await expect(
       Promise.resolve(
         db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now }),

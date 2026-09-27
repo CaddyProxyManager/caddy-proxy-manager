@@ -80,7 +80,6 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
       };
       if (host.proxyProtocolVersion) proxyHandler.proxy_protocol = host.proxyProtocolVersion;
 
-      // Load balancer config from meta
       if (host.meta) {
         const meta = JSON.parse(host.meta);
         if (meta.load_balancer?.enabled) {

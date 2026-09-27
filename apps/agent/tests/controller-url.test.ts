@@ -1,13 +1,6 @@
 /**
- * Turning what an operator types into an origin the agent dials, and whether it may.
- *
- * The port rules carry the weight in normalising. An address with no port is the normal case in
- * very different deployments - `web` in the bundled stack, where the controller's own 3000 is meant,
- * and `https://cpm.tailnet.ts.net`, where Tailscale is terminating TLS on 443.
- *
- * The scheme rules are about the secret. Pairing sends it over this link and desired state carries
- * database credentials, so a bare host means https unless it stays local, and plain http to a
- * public address is refused.
+ * No port means 3000 for `web` but 443 for a Tailscale-served https name. Pairing sends the secret
+ * over this link, so a bare host means https unless local, and http to a public address is refused.
  */
 import { describe, expect, it } from "bun:test";
 import {
@@ -48,7 +41,7 @@ describe("a bare host means https unless it stays local", () => {
 
 describe("an explicit http:// keeps meaning the controller's own port", () => {
   it("still means 3000 when only the http scheme was spelled out", () => {
-    // The compose default is `http://web:3000`; `http://web` has always meant the same thing.
+    // `http://web` has always meant the compose default.
     expect(normalizeControllerUrl("http://web")).toBe("http://web:3000");
     expect(normalizeControllerUrl("http://10.0.0.5")).toBe("http://10.0.0.5:3000");
   });
@@ -65,16 +58,14 @@ describe("an explicit http:// keeps meaning the controller's own port", () => {
 
 describe("an https address means whatever is terminating TLS, not the controller", () => {
   it("defaults to 443, because the controller never serves TLS itself", () => {
-    // `tailscale serve` publishes the controller at exactly this address with no port to type.
-    // Defaulting it to 3000 dialled a port nothing was listening on.
+    // What `tailscale serve` publishes; 3000 would dial a port nothing listens on.
     expect(normalizeControllerUrl("https://cpm.tailnet-1234.ts.net")).toBe(
       "https://cpm.tailnet-1234.ts.net:443",
     );
   });
 
   it("keeps an explicitly typed 443 rather than discarding it", () => {
-    // `new URL` normalises a scheme's default port away, so the explicit :443 vanished and the
-    // old rule fell through to 3000 - silently sending the agent somewhere it was not told to.
+    // `new URL` drops a default port, so an explicit :443 must not fall through to 3000.
     expect(normalizeControllerUrl("https://cpm.tailnet-1234.ts.net:443")).toBe(
       "https://cpm.tailnet-1234.ts.net:443",
     );
@@ -137,7 +128,7 @@ describe("refusals", () => {
   });
 
   it("rejects a pasted dashboard URL rather than trimming it", () => {
-    // Quietly dropping the path would send a pairing code somewhere the operator did not mean.
+    // Dropping the path would send a pairing code somewhere the operator did not mean.
     expect(() => normalizeControllerUrl("https://cpm.example.com/settings")).toThrow(
       ControllerAddressError,
     );

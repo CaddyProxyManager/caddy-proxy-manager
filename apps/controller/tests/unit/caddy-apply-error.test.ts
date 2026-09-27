@@ -33,9 +33,7 @@ describe('Caddy apply error redaction', () => {
     consoleSpy.mockRestore();
   });
 
-  // Coraza validates its body limits during config load, so the rejection takes
-  // down the whole document. Naming the cause is the difference between a
-  // fixable error and every host silently freezing on its old config.
+  // The rejection fails the whole document, so without the cause every host silently freezes.
   it('names known config rejections without echoing the response body', () => {
     const body = JSON.stringify({
       error:

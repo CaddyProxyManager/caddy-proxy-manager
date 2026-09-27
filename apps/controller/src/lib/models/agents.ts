@@ -1,9 +1,6 @@
 /**
- * Agents this controller has paired with, and the identity it pairs as.
- *
- * A row here is a standing grant: whoever holds the secret can recreate containers on that host.
- * So the secret is encrypted at rest, never leaves the server in any shape, and the only way to
- * create a row is to complete a pairing exchange with a code the agent itself issued.
+ * A row is a standing grant - its secret can recreate containers on that host - so the secret is
+ * encrypted at rest, never leaves the server, and a row exists only through a pairing exchange.
  */
 
 import { randomBytes } from "node:crypto";
@@ -13,7 +10,6 @@ import { agents } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secret";
 import { type CaddyBuildSettings, getSetting, setSetting } from "../settings";
 
-/** Setting holding this controller's stable id, as agents know it. */
 const CONTROLLER_ID_KEY = "controller_id";
 
 export type PairedAgent = {
@@ -21,7 +17,7 @@ export type PairedAgent = {
   name: string;
   agentId: string;
   enabled: boolean;
-  /** True when this agent has a Caddy build selection of its own rather than the fleet default. */
+  /** Its own Caddy build selection rather than the fleet default. */
   hasOwnBuildSettings: boolean;
   lastSeenAt: string | null;
   lastError: string | null;
@@ -29,12 +25,12 @@ export type PairedAgent = {
   updatedAt: string;
 };
 
-/** A paired agent with the secret needed to talk to it. Server-side only. */
+/** Server-side only. */
 export type AgentCredentials = PairedAgent & { secret: string };
 
 type Row = typeof agents.$inferSelect;
 
-/** Strip the secret. Everything that leaves this module for a page or an API goes through here. */
+/** Everything leaving this module goes through here, to strip the secret. */
 function toView(row: Row): PairedAgent {
   return {
     id: row.id,
@@ -49,12 +45,7 @@ function toView(row: Row): PairedAgent {
   };
 }
 
-/**
- * This controller's stable id, minted on first use.
- *
- * Agents key their stored secrets on it, so it has to outlive restarts: a new id would make every
- * previously paired agent refuse this controller, with no way back but re-pairing each one by hand.
- */
+/** Agents key their secrets on it, so a new id would force re-pairing every agent by hand. */
 export async function getControllerId(): Promise<string> {
   const existing = await getSetting<string>(CONTROLLER_ID_KEY);
   if (typeof existing === "string" && existing.length > 0) return existing;
@@ -70,11 +61,8 @@ export async function listAgents(): Promise<PairedAgent[]> {
 }
 
 /**
- * Store a newly paired agent, or return null when that agentId is already paired.
- *
- * Never an upsert: a pairing that could overwrite an existing row would let any code displace an
- * agent that is serving traffic, and re-enable one an operator disabled. Replacing a secret is
- * `replaceAgentSecret`, which the pair route reaches only with a credential minted for that agent.
+ * Null when already paired. Never an upsert, or any code could displace a live agent or
+ * re-enable a disabled one; `replaceAgentSecret` needs a credential minted for that agent.
  */
 export async function insertPairedAgent(input: {
   name: string;
@@ -97,12 +85,7 @@ export async function insertPairedAgent(input: {
   return row ? toView(row) : null;
 }
 
-/**
- * Give an existing agent a new secret - the recovery path for a host whose database was rebuilt.
- *
- * Leaves `enabled` and the operator's name for it alone: re-pairing restores a credential, it does
- * not undo decisions made about the agent.
- */
+/** Leaves `enabled` and the name alone: re-pairing restores a credential, not past decisions. */
 export async function replaceAgentSecret(input: {
   agentId: string;
   secret: string;
@@ -124,21 +107,20 @@ export async function findAgentById(id: number): Promise<PairedAgent | null> {
   return row ? toView(row) : null;
 }
 
-/** The stored row for an agent asserting this id, secret included, or null if it is unknown. */
+/** Secret included; null if unknown. */
 export async function findAgentByAgentId(agentId: string): Promise<AgentCredentials | null> {
   const [row] = await db.select().from(agents).where(eq(agents.agentId, agentId)).limit(1);
   if (!row?.enabled) return null;
   try {
     return { ...toView(row), secret: decryptSecret(row.secret) };
   } catch (error) {
-    // Encrypted under a SESSION_SECRET this process no longer has. Re-pairing is the only fix, and
-    // it is the same answer as "unknown agent" from the caller's point of view.
+    // Encrypted under an old SESSION_SECRET; only re-pairing fixes it, so treat it as unknown.
     console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
     return null;
   }
 }
 
-/** Rename an agent. Operator-facing only: routing is by agentId, which this never touches. */
+/** Operator-facing only: routing is by agentId, which this never touches. */
 export async function renameAgent(id: number, name: string): Promise<void> {
   await db
     .update(agents)
@@ -146,7 +128,7 @@ export async function renameAgent(id: number, name: string): Promise<void> {
     .where(eq(agents.id, id));
 }
 
-/** Delete a row, returning the agentId it held so the caller can drop that agent's stream. */
+/** Returns the agentId so the caller can drop that agent's stream. */
 export async function deleteAgent(id: number): Promise<string | null> {
   const [row] = await db
     .delete(agents)
@@ -155,12 +137,7 @@ export async function deleteAgent(id: number): Promise<string | null> {
   return row?.agentId ?? null;
 }
 
-/**
- * Record the outcome of talking to an agent.
- *
- * Best-effort on purpose: this runs on the path of every status read, and a controller that could
- * not write a timestamp should still serve the page it was rendering.
- */
+/** Best-effort: it runs on every status read, and a failed timestamp must not fail the page. */
 export async function recordAgentContact(
   id: number,
   result: { ok: boolean; error?: string },
@@ -181,13 +158,7 @@ export async function recordAgentContact(
 
 // ─── Per-agent Caddy build settings ──────────────────────────────────────────
 
-/**
- * This agent's own module selection, or null when it follows the fleet default.
- *
- * Unparseable JSON reads as null rather than throwing. The column is written by this module alone,
- * so bad content means someone edited the row by hand - and falling back to the fleet selection
- * keeps that agent building something, which is better than a page that will not render.
- */
+/** Null follows the fleet default - as does hand-edited, unparseable JSON, rather than throwing. */
 export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSettings | null> {
   const [row] = await db
     .select({ raw: agents.buildSettings })
@@ -197,8 +168,7 @@ export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSetti
   try {
     return JSON.parse(row.raw) as CaddyBuildSettings;
   } catch (error) {
-    // The id is passed as an argument rather than interpolated: console.warn reads its first
-    // argument as a format string, and this one reaches here from a request parameter.
+    // Not interpolated: console.warn's first argument is a format string, and the id is untrusted.
     console.warn("[cpm] agent has unparseable build settings; using the fleet default:", id, error);
     return null;
   }
@@ -213,13 +183,13 @@ export async function getAllAgentBuildSettings(): Promise<Map<number, CaddyBuild
     try {
       result.set(row.id, JSON.parse(row.raw) as CaddyBuildSettings);
     } catch {
-      // Same reasoning as above: fall through to the fleet default for this one agent.
+      // Falls through to the fleet default for this one agent.
     }
   }
   return result;
 }
 
-/** Give an agent its own selection, or pass null to put it back on the fleet default. */
+/** Null puts it back on the fleet default. */
 export async function setAgentBuildSettings(
   id: number,
   settings: CaddyBuildSettings | null,

@@ -77,7 +77,6 @@ export async function verifySecondFactor(
   return "invalid";
 }
 
-/** Turns 2FA off for a user, for the admin reset and the console recovery. */
 export async function resetTwoFactor(userId: number): Promise<boolean> {
   const deleted = await db.delete(twoFactors).where(eq(twoFactors.userId, userId)).returning();
   await db.update(users).set({ twoFactorEnabled: false }).where(eq(users.id, userId));

@@ -1,10 +1,7 @@
 /**
- * The agent's own store: a SQLite file beside its socket.
- *
- * Deliberately small and deliberately local. It holds the two things that must survive a restart
- * and cannot be recovered from anywhere else - which controllers this agent trusts, and what the
- * last operation did - and nothing that the controller is the authority on. Anything the controller
- * knows is asked for again rather than cached here, so a divergence is impossible by construction.
+ * The agent's own SQLite store: only what must survive a restart and cannot be recovered elsewhere
+ * (trusted controllers, last operation). Anything the controller knows is asked for again, never
+ * cached, so the two cannot diverge.
  */
 
 import { Database } from "bun:sqlite";
@@ -77,12 +74,7 @@ export class AgentStore {
 
   // ─── Identity ──────────────────────────────────────────────────────────────
 
-  /**
-   * This agent's stable id, minted on first start.
-   *
-   * Survives restarts so a paired controller keeps recognising the same agent across upgrades; a
-   * new id would read to the controller as a different machine at the same address.
-   */
+  /** Stable across restarts; a new id would read to the controller as a different machine. */
   agentId(): string {
     const existing = this.readState(AGENT_ID_KEY);
     if (existing) return existing;
@@ -109,11 +101,8 @@ export class AgentStore {
   }
 
   /**
-   * Record a controller's secret, replacing any it already had.
-   *
-   * Replacing rather than rejecting is what makes re-pairing a recovery path: a controller that
-   * lost its secret (a rebuilt volume, a restored backup) can pair again with a fresh code instead
-   * of needing the agent's database edited by hand.
+   * Replaces rather than rejects, so a controller that lost its secret (rebuilt volume, restored
+   * backup) can re-pair with a fresh code.
    */
   upsertController(entry: {
     controllerId: string;
@@ -134,13 +123,7 @@ export class AgentStore {
     return { ...entry, pairedAt };
   }
 
-  /**
-   * The controller origin this agent polls, once pairing has settled on one.
-   *
-   * In `state` rather than a column on `controllers`: the table predates this and adding a column
-   * would need a migration path for every agent database already on disk, for one row that is now
-   * always singular - an agent polls exactly one controller.
-   */
+  /** In `state`, not a `controllers` column, to avoid migrating every agent db for one value. */
   pairedControllerUrl(): string | null {
     return this.readState(CONTROLLER_URL_KEY);
   }
@@ -150,11 +133,8 @@ export class AgentStore {
   }
 
   /**
-   * Forget every controller and the address they were reached at, returning the agent to idle.
-   *
-   * Used when a poll is refused as unauthenticated: the controller no longer recognises this
-   * agent, so the stored secret is dead and holding it only makes the next `--pair` fail on a
-   * conflict the operator cannot see.
+   * For when the controller no longer recognises this agent: a dead secret held on would make the
+   * next `--pair` fail on a conflict the operator cannot see.
    */
   clearPairing(): void {
     this.db.query("DELETE FROM controllers").run();
@@ -188,11 +168,8 @@ export class AgentStore {
   }
 
   /**
-   * Which optional services this agent last brought up, or null before it has been asked.
-   *
-   * Null and "both false" are different answers: the first means the controller has never spoken
-   * about these, so whatever the operator started by hand with COMPOSE_PROFILES is still theirs to
-   * own. The second means the controller asked for them off, and they are.
+   * Null means the controller never spoke about these, so services started by hand with
+   * COMPOSE_PROFILES are still the operator's; "both false" means it asked for them off.
    */
   appliedManagedServices(): Record<ManagedServiceName, boolean> | null {
     return this.readJson<Record<ManagedServiceName, boolean>>(APPLIED_SERVICES_KEY);
@@ -203,11 +180,8 @@ export class AgentStore {
   }
 
   /**
-   * The ports currently published on the Caddy container.
-   *
-   * Recorded here rather than parsed back out of the generated compose override: the override is
-   * what the *next* recreate will use, so reading it would report a requested change as already
-   * applied. This key is written only once a recreate has succeeded.
+   * Not parsed from the compose override, which holds what the *next* recreate will use; written
+   * only once a recreate succeeds.
    */
   appliedL4Ports(): string[] {
     return this.readJson<string[]>(APPLIED_PORTS_KEY) ?? [];
@@ -218,11 +192,8 @@ export class AgentStore {
   }
 
   /**
-   * The xcaddy specs the running binary was built with. Same reasoning as appliedL4Ports, and more
-   * load-bearing: the controller refuses to emit config for a module outside this list, because
-   * Caddy rejects a document naming an unknown module in full.
-   *
-   * Null means "never rebuilt", which the controller reads as the shipped image's full catalog.
+   * The controller emits no module outside this list, since Caddy rejects a document naming an
+   * unknown one in full. Null means never rebuilt: the shipped image's full catalog.
    */
   appliedCaddyModules(): string[] | null {
     return this.readJson<string[]>(APPLIED_MODULES_KEY);
@@ -233,12 +204,8 @@ export class AgentStore {
   }
 
   /**
-   * Whether this agent stopped Caddy because it was itself shutting down.
-   *
-   * An explicit stop is one `restart: unless-stopped` does not undo, so without this a host that
-   * rebooted would bring the agent back but not Caddy - and the agent only starts Caddy once the
-   * controller says so, which a controller that is down never does. The flag lets the next start
-   * put Caddy back straight away, as the restart policy used to.
+   * An explicit stop survives `restart: unless-stopped`, and the agent only starts Caddy when the
+   * controller says so; this flag brings Caddy back after a reboot without waiting for it.
    */
   caddyStoppedForShutdown(): boolean {
     return this.readState(CADDY_STOPPED_FOR_SHUTDOWN_KEY) === "true";
@@ -255,12 +222,8 @@ export class AgentStore {
   // ─── Fleet configuration ───────────────────────────────────────────────────
 
   /**
-   * The credentials the controller last pushed, or null before it has pushed any.
-   *
-   * Persisted so the agent keeps writing analytics across a restart without waiting for the
-   * controller to notice it came back. Stored as it arrived: this file already holds the pairing
-   * secrets that grant container control on this host, so a database password beside them changes
-   * nothing about what an attacker with read access to the volume already has.
+   * Persisted so analytics resume after a restart. Unencrypted: this file already holds the pairing
+   * secrets that grant container control, so a database password beside them adds nothing.
    */
   fleetConfig(): FleetConfig | null {
     return this.readJson<FleetConfig>(FLEET_CONFIG_KEY);
@@ -303,8 +266,7 @@ export class AgentStore {
     try {
       return JSON.parse(raw) as T;
     } catch {
-      // A row this process wrote should always parse. If it does not, the file has been edited or
-      // truncated, and the honest answer is "no value" rather than a crash on every status read.
+      // Only an edited or truncated file gets here; no value beats crashing every status read.
       console.warn(`[agent] discarding unparseable state row "${key}"`);
       return null;
     }

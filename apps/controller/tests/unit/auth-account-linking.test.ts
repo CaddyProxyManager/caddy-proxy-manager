@@ -1,14 +1,6 @@
 /**
- * Regression (#247): OAuth/OIDC sign-in succeeded but linking the identity to
- * an existing CPM account always failed with `account_not_linked`.
- *
- * Two things were missing. Better Auth was never given an `account
- * .accountLinking` configuration, so its default gate refused every link (CPM
- * has no local email-verification flow, so `requireLocalEmailVerified` could
- * never be satisfied), and the per-provider `autoLink` switch was stored but
- * never reached the auth config. These tests lock the wiring in both
- * directions: auto-link providers are trusted, and providers without it stay
- * unable to claim an existing account.
+ * Regression (#247): linking always failed with `account_not_linked` - no `accountLinking` config,
+ * and `autoLink` never reached auth. Auto-link providers are trusted; others cannot claim accounts.
  */
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -16,18 +8,15 @@ import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-// bun evaluates a vi.mock factory synchronously while linking, so the helpers it needs
-// are imported above it rather than awaited inside it.
+// Bun mock factories run synchronously, so their helpers are imported up here.
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 const now = '2026-01-01T00:00:00.000Z';
-// Seeded at module scope rather than inside the factory below, which Bun evaluates
-// synchronously and so cannot await.
+// At module scope, since the factory below cannot await.
 await ctx.db.insert(schemaModule.oauthProviders).values([
   {
     id: 'autolink-idp',
@@ -87,8 +76,7 @@ vi.mock('../../src/lib/db', () => {
   };
 });
 
-// Stub better-auth so `betterAuth(options)` hands back the raw options object;
-// getAuth().options is then exactly the config createAuth() assembled.
+// `betterAuth(options)` returns the raw options, so getAuth().options is createAuth()'s config.
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
 }));
@@ -97,8 +85,7 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
-// The OAuth flow's state, as better-auth exposes it during a callback. Everything else in the
-// module stays real; only whether the flow is an explicit link is controlled here.
+// Only whether the flow is an explicit link is mocked; the rest of the module stays real.
 const { getOAuthStateMock } = vi.hoisted(() => ({ getOAuthStateMock: vi.fn() }));
 const actualApi = await import('better-auth/api');
 vi.mock('better-auth/api', () => ({ ...actualApi, getOAuthState: getOAuthStateMock }));
@@ -174,8 +161,7 @@ describe('mapOAuthProvider - email_verified claim mapping', () => {
   });
 
   it('lets a signed-in user link a provider without auto-link from their profile', async () => {
-    // Explicit linking: the session proves who owns the account, the provider login proves the
-    // identity. Auto-link governs only a sign-in claiming an account by email.
+    // The session proves the owner; auto-link governs only a sign-in claiming by email.
     getOAuthStateMock.mockResolvedValueOnce({ link: { userId: '1', email: 'admin@localhost' } });
     const mapped = await mapProfile(
       { ...baseProvider, autoLink: false },
@@ -212,8 +198,7 @@ describe('mapOAuthProvider - email_verified claim mapping', () => {
 });
 
 describe('better-auth account.accountLinking (wired into the real config)', () => {
-  // getAuth() builds the config asynchronously now that provider rows can come from PostgreSQL,
-  // so the options object is resolved once in beforeAll rather than at describe-body time.
+  // getAuth() is async, so resolve once in beforeAll.
   let options: any;
   beforeAll(async () => {
     options = ((await getAuth()) as any).options;
@@ -224,8 +209,7 @@ describe('better-auth account.accountLinking (wired into the real config)', () =
   });
 
   it('does not gate on a local emailVerified flag CPM can never set', () => {
-    // CPM has no email-verification flow, so the Better Auth default of `true`
-    // refuses every link regardless of provider trust - the #247 symptom.
+    // No email-verification flow, so the default `true` refuses every link (#247).
     expect(options.account.accountLinking.requireLocalEmailVerified).toBe(false);
   });
 
@@ -238,8 +222,7 @@ describe('better-auth account.accountLinking (wired into the real config)', () =
   });
 
   it('lets an explicit link use a provider email that differs from the account', () => {
-    // Only the explicit link paths read this. Setup's administrator is `name@localhost`, which
-    // no provider will ever return.
+    // Setup's admin is `name@localhost`, which no provider returns; only explicit links read it.
     expect(options.account.accountLinking.allowDifferentEmails).toBe(true);
   });
 });

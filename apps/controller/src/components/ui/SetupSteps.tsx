@@ -1,16 +1,8 @@
 "use client";
 
 /**
- * Where the operator is in first-run setup.
- *
- * The steps are the stages from `lib/setup.ts`, not a list of its own: the flow is derived from
- * what exists on the host rather than tracked as a counter, so a stepper with its own idea of the
- * sequence would disagree with the redirects the moment one of them fires.
- *
- * `migrate` is conditional because it only exists when a previous version's database is on the
- * host, and `verify` is a real stage even though it lives at `/login` - an account that has never
- * been signed in with is not yet proof the flow can continue. `/setup/done` is deliberately absent:
- * it is reached after setup completes, so it is not a step on the way there.
+ * The stages come from `lib/setup.ts` so the stepper cannot disagree with the redirects. `verify`
+ * is a real stage though it lives at `/login`; `/setup/done` comes after setup, so is no step.
  */
 import { Stepper, Step } from "@astryxdesign/core/Stepper";
 import { useTranslations } from "next-intl";
@@ -26,7 +18,7 @@ export function SetupSteps({
   hasMigrateStep,
 }: {
   stage: SetupStage;
-  /** True when a legacy database is on the host, which is the only thing that adds the step. */
+  /** A legacy database on the host is the only thing that adds the step. */
   hasMigrateStep: boolean;
 }) {
   const t = useTranslations("setup.steps");

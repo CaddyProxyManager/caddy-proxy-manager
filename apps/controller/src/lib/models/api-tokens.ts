@@ -44,7 +44,6 @@ export async function createApiToken(
     throw domainError("apiTokenNameTooLong", { max: MAX_TOKEN_NAME_LENGTH }, { status: 400 });
   }
 
-  // Enforce per-user token limit
   const existingCount = await db
     .select({ value: count() })
     .from(apiTokens)
@@ -53,7 +52,6 @@ export async function createApiToken(
     throw domainError("apiTokenLimitReached", { max: MAX_TOKENS_PER_USER }, { status: 400 });
   }
 
-  // Validate expires_at is a valid ISO 8601 date in the future
   let validatedExpiresAt: string | null = null;
   if (expiresAt) {
     const parsed = new Date(expiresAt);
@@ -108,9 +106,7 @@ export async function deleteApiToken(
   userId: number,
   canDeleteAny = false,
 ): Promise<void> {
-  // Keep inaccessible and nonexistent IDs indistinguishable. Authorization is
-  // part of the DELETE predicate, so a non-owner cannot use status codes to
-  // enumerate another user's token IDs.
+  // Authorization is in the DELETE predicate, so status codes cannot enumerate others' token ids.
   const deleted = await db
     .delete(apiTokens)
     .where(
@@ -140,7 +136,6 @@ export async function validateToken(
     return null;
   }
 
-  // Check expiry - reject tokens with invalid or past expiry dates
   if (row.expiresAt) {
     const expiresAt = new Date(row.expiresAt);
     if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
@@ -148,7 +143,6 @@ export async function validateToken(
     }
   }
 
-  // Load the creator user
   const user = await db.query.users.findFirst({
     where: (table, { eq }) => eq(table.id, row.createdBy),
   });
@@ -157,7 +151,6 @@ export async function validateToken(
     return null;
   }
 
-  // Debounced lastUsedAt update
   const now = new Date();
   const lastUsed = row.lastUsedAt ? new Date(row.lastUsedAt) : null;
   if (!lastUsed || now.getTime() - lastUsed.getTime() > LAST_USED_DEBOUNCE_MS) {

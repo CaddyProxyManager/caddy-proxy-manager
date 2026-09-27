@@ -1,18 +1,7 @@
 /**
- * Migrating a 3.0 installation, in a browser.
- *
- * Runs against `web-migrate` (port 3005): its own empty PostgreSQL database, no `ADMIN_USERNAME`,
- * and a real pre-3.0 SQLite file bind-mounted where the application scans for one. The database is
- * built from `drizzle/legacy-sqlite` - the migrations every 3.0 deployment actually ran - so what
- * the browser sees is a database the application discovered, not one a test injected.
- *
- * One page for the whole block, for the same reason as the setup spec: this is a sequence walked
- * through in a single session, and a fresh context per test would sign the operator out between
- * every step.
- *
- * The importer is covered by tests/integration/legacy-migration.test.ts. What is only provable
- * here is the operator's path through it: the offer comes before account creation, the migrated
- * account is the one they then sign in with, and their data is there at the end.
+ * Against `web-migrate` (port 3005): empty PostgreSQL plus a real pre-3.0 SQLite file built from
+ * `drizzle/legacy-sqlite`. One page for the block, since a fresh context would sign out between
+ * steps. The importer has integration tests; this proves the operator's path through it.
  */
 import { type Page, expect, test } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
@@ -64,10 +53,8 @@ test.describe('Migrating an existing installation', () => {
   });
 
   test('a path the scan did not offer is refused, not opened', async () => {
-    // This endpoint is unauthenticated by necessity and names a file to open on the host, so the
-    // guard has to be "one of the files this host offered" rather than "a file that parses as one
-    // of our databases". Without it, anything on the filesystem was reachable as an existence
-    // check and an error message - and a planted SQLite file was reachable as an account import.
+    // Unauthenticated and names a host file, so the guard must be "a file this host offered":
+    // otherwise any path is an existence check, and a planted SQLite file an account import.
     for (const path of ['/etc/passwd', '/etc/hostname', '../../etc/passwd', '/nonexistent.db']) {
       const response = await page.request.post('/api/setup/migrate', {
         data: { path, groups: ['users'] },
@@ -99,9 +86,7 @@ test.describe('Migrating an existing installation', () => {
   });
 
   test('the confirmation says what is coming across before anything is copied', async () => {
-    // The import is one-way and the selection above is easy to get wrong, so the counts get
-    // restated where they still mean something. Cancel leaves the page untouched for the test
-    // below, which is the one that actually migrates.
+    // Counts are restated before a one-way import. Cancel leaves the page for the test below.
     await page.getByRole('button', { name: 'Migrate this database' }).click();
     const sheet = page.getByRole('dialog');
 
@@ -118,9 +103,8 @@ test.describe('Migrating an existing installation', () => {
   });
 
   test('migrating restarts the app before handing them on', async () => {
-    // The restart is the point of this test, not a detail of it. The process read its
-    // configuration from an empty database at boot, and the import has just replaced that
-    // database underneath it - signing in before it restarts means signing in to the old answers.
+    // The restart is the point: the process read its config from the empty database at boot, and
+    // signing in before it restarts means signing in to the old answers.
     await page.getByRole('button', { name: 'Migrate this database' }).click();
 
     // The button opens a confirmation rather than importing: the copy is one-way, so the
@@ -179,18 +163,15 @@ test.describe('Migrating an existing installation', () => {
     // minute waiting out the cooldown the migration's restart left behind.
     test.setTimeout(300_000);
 
-    // Not the dashboard: an operator who has just replaced their database needs to be told where
-    // the old one is and what to remove from their .env before they go anywhere else. The dashboard
-    // host claimed a domain a moment ago and the restart still lands here, because the summary is
-    // behind the session this browser holds for this address.
+    // Not the dashboard: an operator who just replaced their database is first told where the old
+    // one is and what to drop from .env. Despite the dashboard host, this session keeps it here.
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
     await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
       timeout: 30_000,
     });
 
-    // The second real restart in this file, and the one the cooldown can land on: the route allows
-    // one a minute and the migration's was not long ago, which the screen waits out rather than
-    // reporting.
+    // The second restart, and the one the route's one-a-minute cooldown can land on; the screen
+    // waits it out rather than reporting it.
     await expect(page).toHaveURL(/\/setup\/done$/, { timeout: 240_000 });
     await expect(page.getByRole('heading', { name: 'Migration complete' })).toBeVisible();
     await expect(page.getByRole('link', { name: /download the old database/i })).toBeVisible();

@@ -14,10 +14,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-/**
- * Simulates syncEnvOAuthProviders: create when no env-sourced provider of this name exists, update
- * when one does, skip when a UI-sourced provider shares the name.
- */
+/** Simulates syncEnvOAuthProviders. */
 async function syncProvider(envConfig: {
   name: string;
   clientId: string;
@@ -31,7 +28,6 @@ async function syncProvider(envConfig: {
   });
 
   if (existing && existing.source === 'env') {
-    // Update existing env-sourced provider
     const { eq } = await import('drizzle-orm');
     await db
       .update(oauthProviders)
@@ -44,7 +40,6 @@ async function syncProvider(envConfig: {
       })
       .where(eq(oauthProviders.id, existing.id));
   } else if (!existing) {
-    // Create new env-sourced provider
     await db.insert(oauthProviders).values({
       id: randomUUID(),
       name: envConfig.name,
@@ -63,7 +58,7 @@ async function syncProvider(envConfig: {
       updatedAt: now,
     });
   }
-  // If a UI-sourced provider with the same name exists, skip
+  // A UI-sourced provider of the same name is left alone.
 }
 
 describe('syncEnvOAuthProviders', () => {
@@ -84,7 +79,6 @@ describe('syncEnvOAuthProviders', () => {
   });
 
   it('updates existing env-sourced provider when config changes', async () => {
-    // First sync
     await syncProvider({
       name: 'MyIdP',
       clientId: 'old-id',
@@ -93,7 +87,6 @@ describe('syncEnvOAuthProviders', () => {
       autoLink: false,
     });
 
-    // Second sync with changed config
     await syncProvider({
       name: 'MyIdP',
       clientId: 'new-id',
@@ -111,7 +104,6 @@ describe('syncEnvOAuthProviders', () => {
 
   it('does not overwrite a UI-sourced provider with the same name', async () => {
     const now = nowIso();
-    // Create a UI-sourced provider first
     await db.insert(oauthProviders).values({
       id: randomUUID(),
       name: 'SharedName',
@@ -126,7 +118,6 @@ describe('syncEnvOAuthProviders', () => {
       updatedAt: now,
     });
 
-    // Try to sync env with the same name
     await syncProvider({
       name: 'SharedName',
       clientId: 'env-id',
@@ -135,13 +126,11 @@ describe('syncEnvOAuthProviders', () => {
 
     const providers = await db.query.oauthProviders.findMany();
     expect(providers).toHaveLength(1);
-    // Should still be the UI provider, not overwritten
     expect(providers[0].source).toBe('ui');
     expect(decryptSecret(providers[0].clientId)).toBe('ui-id');
   });
 
   it('skips when OAuth is not configured (no providers created)', async () => {
-    // Simply don't call syncProvider - verify empty
     const providers = await db.query.oauthProviders.findMany();
     expect(providers).toHaveLength(0);
   });

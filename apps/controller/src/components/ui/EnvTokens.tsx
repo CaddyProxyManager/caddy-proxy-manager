@@ -4,18 +4,12 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { HStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 
-/**
- * Environment variables as purple badges beside the name of what they configure.
- *
- * Named rather than explained: an operator holding a `.env` line recognises `CLICKHOUSE_URL`
- * faster than any sentence about it, and the same string is what the settings search matches on.
- */
+/** Named, not explained: an operator recognises `CLICKHOUSE_URL` faster than a sentence. */
 export function EnvTokens({ names }: { names?: readonly string[] }) {
   const t = useTranslations("settings");
   if (!names || names.length === 0) return null;
   return (
-    // A bare div with an aria-label is not exposed; the role is what gives the badges a name
-    // instead of reading them out as loose words after the heading.
+    // A bare div's aria-label is not exposed; the role names the badges.
     <HStack
       gap={1}
       vAlign="center"

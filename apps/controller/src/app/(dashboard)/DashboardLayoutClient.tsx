@@ -68,13 +68,11 @@ type User = {
   role?: string;
 };
 
-/** The same edge DataTable uses for its card view, so the phone layout switches in one place. */
+/** DataTable's card-view edge, so the phone layout switches in one place. */
 const NARROW = "(max-width: 767px)";
 
 function ThemeToggle() {
-  // Astryx's useTheme reports the *resolved* mode, so "system" already reads as
-  // light or dark here and tracks the OS if it changes. Clicking pins the
-  // opposite mode, which is what leaves "system" behind.
+  // useTheme reports the resolved mode, so a click pins the opposite one and leaves "system".
   const t = useTranslations("common.theme");
   const { mode } = useTheme();
   const { setMode } = useThemeMode();
@@ -99,7 +97,6 @@ function SignOutButton() {
   );
 }
 
-/** The signed-in user, shown in the SideNav footer as a link to their profile. */
 function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
   const t = useTranslations("nav");
   const router = useRouter();
@@ -150,36 +147,31 @@ export default function DashboardLayoutClient({
   user: User;
   avatar: ResolvedAvatar;
   appName: string;
-  /** DEMO_MODE is on, so nothing saved here reaches a Caddy. */
   demoMode?: boolean;
   /** A real instance on SQLite, and this browser has not dismissed the warning lately. */
   sqliteNotice?: boolean;
-  /** A newer release exists in the registry. Surfaced beside the version it replaces. */
   updateAvailable: boolean;
-  /** Settings keys this operator has staged, so the settings rail can mark their sections. */
+  /** So the settings rail can mark their sections. */
   stagedKeys: readonly string[];
-  /** The pages this user keeps in the mobile More drawer, or null if they never customized it. */
+  /** Null if the user never customized the More drawer. */
   morePins: readonly DestinationId[] | null;
-  /** An administrator previewing the dashboard as another role; see lib/view-as.ts. */
+  /** See lib/view-as.ts. */
   viewAs?: { role: string; groupNames: string[] } | null;
   children: ReactNode;
 }) {
   const t = useTranslations("nav");
   const pathname = usePathname();
   const isNarrow = useMediaQuery(NARROW);
-  // Open on the path it was opened on. Any navigation - a tile, a tab, the browser's back button -
-  // leaves that path, so the move itself closes the drawer, with no effect to keep in step.
+  // Keyed to the path it opened on, so any navigation closes it with no effect to keep in step.
   const [moreOpenOn, setMoreOpenOn] = useState<string | null>(null);
   const isMoreOpen = moreOpenOn === pathname;
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Profile is reached from the rail's footer on a desktop; it only needs a row of its own on a
-  // phone, where there is no footer.
+  // The rail's footer reaches Profile on a desktop.
   const railItems = visibleDestinations(user.role).filter((d) => d.id !== "profile");
   const drawerItems = resolveDrawer(morePins, user.role);
 
-  // An element rather than the component, as the Settings rail passes it: SideNavItem draws a
-  // component at its small size, and the two rails read as different apps side by side.
+  // An element, as the Settings rail passes: SideNavItem draws a component smaller.
   const renderRailItem = ({ id, href, labelKey }: Destination) => {
     const RailIcon = DESTINATION_ICONS[id];
     return (
@@ -204,8 +196,7 @@ export default function DashboardLayoutClient({
   const inSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   const isFullBleed = inSettings || ["/access-lists", "/users", "/groups"].includes(pathname);
 
-  // On a phone the tab bar is the navigation, so AppShell's hamburger drawer is switched off
-  // rather than left as a second way to do the same thing.
+  // On a phone the tab bar is the navigation, so AppShell's hamburger is off.
   const mobileChrome = isNarrow ? (
     <>
       <MoreDrawer
@@ -226,9 +217,8 @@ export default function DashboardLayoutClient({
     </>
   ) : null;
   const content = <div className="cpm-mobile-content">{children}</div>;
-  // The demo banner is not dismissable: a visitor who forgets they are in a demo will wonder why
-  // their site is down. The SQLite one is, for a while - see src/lib/sqlite-notice.ts.
-  // First: it changes what every page shows, and the way back has to be on all of them.
+  // View-as first: the way back must be on every page. The demo banner is not dismissable; the
+  // SQLite one is, for a while (src/lib/sqlite-notice.ts).
   const banner = viewAs ? (
     <Banner
       status="warning"
@@ -251,7 +241,7 @@ export default function DashboardLayoutClient({
           label={t("viewAsReturn")}
           onClick={async () => {
             await stopViewAsAction();
-            // A full load, for the same reason starting one is: the whole shell changes.
+            // A full load: the whole shell changes.
             window.location.reload();
           }}
         />
@@ -278,8 +268,7 @@ export default function DashboardLayoutClient({
     />
   ) : undefined;
 
-  // Settings takes the rail over rather than nesting its own panel inside the page. One rail, and
-  // its first row is the way back - see ./settings/SettingsSideNav.tsx.
+  // Settings takes the rail over; its first row is the way back (./settings/SettingsSideNav.tsx).
   if (inSettings) {
     return (
       <GlobalCommandPaletteProvider role={user.role}>
@@ -314,9 +303,7 @@ export default function DashboardLayoutClient({
                 heading={appName}
                 headingHref="/"
                 subheading={formatAppVersion()}
-                // Beside the version rather than as a banner: this is the number the notice is
-                // about, and an operator who does not want to act on it should not have to dismiss
-                // anything. The link goes to where it can be acted on or switched off.
+                // Beside the version, not a banner, so there is nothing to dismiss.
                 subheadingHref={updateAvailable ? "/settings" : undefined}
                 headerEndContent={
                   updateAvailable ? <Badge variant="warning" label={t("updateBadge")} /> : undefined
@@ -334,15 +321,13 @@ export default function DashboardLayoutClient({
             }
             footer={<UserFooter user={user} avatar={avatar} />}
           >
-            {/* Hidden on a phone: there is no keyboard shortcut to advertise there, and the tab
-                bar is the navigation. */}
+            {/* No shortcut to advertise on a phone, where the tab bar navigates. */}
             <div className="cpm-desktop-only">
               <VStack padding={2}>
                 <PaletteSearchButton />
               </VStack>
             </div>
-            {/* Laid out like the Settings rail: ungrouped pages first under a hidden title, then one
-                titled section per group, each skipped when this role can open nothing in it. */}
+            {/* Laid out like the Settings rail; an empty group is skipped. */}
             <SideNavSection title={t("sectionLabel")} isHeaderHidden>
               {railItems.filter((d) => !d.railGroup).map(renderRailItem)}
             </SideNavSection>

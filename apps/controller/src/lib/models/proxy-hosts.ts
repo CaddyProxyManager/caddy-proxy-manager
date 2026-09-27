@@ -28,10 +28,7 @@ import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
 import { normalizeHostDescription } from "../host-description";
 
-/**
- * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
- * get one without a DNS provider. Block that up front.
- */
+/** A wildcard needs DNS-01: without a DNS provider, auto-managed TLS silently gets no cert. */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
   // An explicitly assigned certificate (imported, or managed with its own provider) is the
   // admin's responsibility - only guard the auto-managed path.
@@ -60,7 +57,6 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
 function validateUpstreamProtocol(upstream: string): void {
   const trimmed = upstream.trim();
   if (!trimmed) return;
-  // If upstream contains "://", enforce http or https scheme
   const schemeMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
@@ -157,9 +153,7 @@ export type ErrorPageRule = {
 };
 
 export type PathAllowRule = {
-  path: string; // Caddy path pattern, e.g. "/secret" - matches short-circuit the
-  // subroute (no block applies) and the request falls through to the
-  // upstream proxy.
+  path: string; // Caddy path pattern, e.g. "/secret"; a match skips every block
 };
 
 export type WafHostConfig = {
@@ -178,7 +172,6 @@ export type WafHostConfig = {
   request_body_limit_action?: "Reject" | "ProcessPartial";
 };
 
-// Load Balancer Types
 export type LoadBalancingPolicy =
   | "random"
   | "random_choose"
@@ -237,12 +230,8 @@ export type LoadBalancerConfig = {
   /** How many upstreams `random_choose` picks between. */
   policyChoose: number | null;
   /**
-   * Weights for `weighted_round_robin`, positional against the upstream list.
-   *
-   * Kept here rather than beside each upstream because `upstreams` is a flat list of dial strings
-   * and always has been; a parallel array needs no migration and is the shape Caddy wants anyway.
-   * A list that has drifted out of step with the upstreams is dropped at build time rather than
-   * padded - a silently reweighted backend is worse than an unweighted one.
+   * Weights for `weighted_round_robin`, positional against the flat `upstreams` list, as Caddy
+   * wants. A list out of step with the upstreams is dropped, not padded: reweighting is worse.
    */
   policyWeights: number[] | null;
   tryDuration: string | null;
@@ -330,7 +319,6 @@ type LoadBalancerMeta = {
   passive_health_check?: LoadBalancerPassiveHealthCheckMeta;
 };
 
-// DNS Resolver Types
 export type DnsResolverConfig = {
   enabled: boolean;
   resolvers: string[];
@@ -418,15 +406,12 @@ export type MtlsConfig = {
 };
 
 /**
- * Rejects per-host WAF body limits Coraza would refuse. Coraza builds its WAF
- * while Caddy loads the config, so one bad value here makes Caddy reject the
- * whole document and *every* host stops being reconfigured - worth failing the
- * write with a clear message instead.
+ * Coraza builds its WAF while Caddy loads the config, so one bad body limit rejects the whole
+ * document and stalls every host - fail the write with a clear message instead.
  */
 function validateWafMeta(waf: WafHostConfig): WafHostConfig {
-  // Codes rather than sentences: the host form reaches these too (a custom directive, or an
-  // in-memory limit above the request limit), while `/api/v1` keeps its 400 and the same English.
-  // The bounds go as strings, or the catalog would format 1073741824 with separators.
+  // Codes rather than sentences: the host form reaches these too, while `/api/v1` keeps its 400.
+  // Bounds go as strings, or the catalog would format 1073741824 with separators.
   const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
   const outOfRange = {
     request_body_limit: "hostWafRequestBodyLimitOutOfRange",
@@ -542,9 +527,8 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
     }
   }
 
-  // Reject enabling mTLS with no trust material: it would fail open, since no
-  // client_authentication block is emitted. A role emptied later by revocation still looks valid
-  // here, which is why config generation also fails closed for zero resolved trust.
+  // No trust material would fail open, since no client_authentication block is emitted. A role
+  // emptied later by revocation still passes here, so config generation also fails closed.
   if (
     !normalized.trusted_client_cert_ids &&
     !normalized.trusted_role_ids &&
@@ -559,15 +543,9 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
 // ─── Tailscale ───────────────────────────────────────────────────────────────
 
 /**
- * How one proxy host uses Tailscale. `serve` puts its routes on a `tailscale/<node>` listener,
- * `auth` gates them on the caller's tailnet identity, and `upstreamNode` dials the *upstreams*
- * through a node, for a backend that lives on the tailnet.
- *
- * `auth` implies `serve`: the plugin's authenticator finds its tsnet server by walking the
- * listeners the request arrived on, and with none it falls back to a local tailscaled socket that
- * does not exist in this image - every request would fail. normalizeTailscaleInput drops it rather
- * than letting that combination reach config generation, where the failure would be a 500 per
- * request with nothing in the UI to explain it.
+ * `serve` puts the routes on a `tailscale/<node>` listener, `auth` gates them on tailnet identity,
+ * `upstreamNode` dials upstreams through a node. `auth` implies `serve`: with no tsnet listener the
+ * authenticator falls back to a tailscaled socket this image lacks, so every request would fail.
  */
 export type TailscaleHostConfig = {
   serve: boolean;
@@ -622,10 +600,8 @@ function sanitizeTailscalePaths(paths: string[]): string[] {
 }
 
 /**
- * Merge a partial update over what is stored, as the Authentik and load-balancer normalizers do: a
- * form that only sends the fields it renders must not clear the rest. Everything that depends on
- * `serve` is dropped when it is off, so the stored blob never describes a combination generation
- * would have to second-guess.
+ * Merges over what is stored, like the other normalizers: a form sending only the fields it renders
+ * must not clear the rest. Everything depending on `serve` is dropped when it is off.
  */
 function normalizeTailscaleInput(
   input: TailscaleHostInput | null | undefined,
@@ -678,9 +654,8 @@ function normalizeTailscaleInput(
 }
 
 /**
- * Re-run the normalizer over a stored blob on read, so a hand-edited row cannot put a node name
- * into a listener address. It must not throw: a read that fails takes the whole proxy-hosts page
- * with it, so an unusable block is dropped the way an unparseable meta already is.
+ * Re-normalizes a stored blob so a hand-edited row cannot put a node name into a listener address.
+ * Must not throw - a failed read takes the whole page down - so a bad block is dropped instead.
  */
 function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta | undefined {
   if (!meta) return undefined;
@@ -689,9 +664,8 @@ function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta |
       {
         serve: meta.serve,
         node: meta.node ?? "",
-        // Explicitly Boolean, not the raw field: undefined would re-apply the "default to
-        // tailnet-only" rule that belongs to a *new* host, silently pulling a host the operator
-        // published in both places off the public listener on the next read.
+        // Boolean, not the raw field: undefined would re-apply the new-host tailnet-only default
+        // and pull a host published in both places off the public listener.
         tailnetOnly: Boolean(meta.tailnet_only),
         auth: meta.auth,
         protected_paths: meta.protected_paths ?? null,
@@ -708,17 +682,9 @@ function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta |
 }
 
 /**
- * Refuse to store a host that uses Tailscale while no auth key is configured.
- *
- * A node that cannot register is a listener that never comes up, and Caddy refuses a configuration
- * it cannot start - so this one host would fail the apply for *every* host on *every* agent, with
- * an error naming Tailscale rather than whatever was being edited. Blocking the write is the only
- * place that failure can be turned into a sentence about the thing the operator just did.
- *
- * Reads the serialized meta rather than the input so it sees the merged result: a partial update
- * that only sends `{ tailnetOnly: false }` still leaves `serve` on, and the REST API reaches the
- * same code. A stored Caddy placeholder counts as a key - whether the environment actually defines
- * it is only knowable inside the Caddy container.
+ * A node that cannot register never comes up, and Caddy refuses a config it cannot start - failing
+ * the apply for every host on every agent. Reads the serialized meta to see the merged result; a
+ * stored Caddy placeholder counts as a key, since only the Caddy container can resolve it.
  */
 async function assertTailscaleServable(meta: string | null): Promise<void> {
   if (!meta) return;
@@ -867,11 +833,7 @@ export type ProxyHostForwardAuthConfig = {
   /** Headers taken from the auth server's 2xx answer and set on the upstream request. */
   copyHeaders: string[];
   trustedProxies: string[];
-  /**
-   * Answer a caller that is not a browser with 401 rather than the auth server's redirect to its
-   * login portal. A WebSocket handshake and an API client both land here; neither can follow a
-   * redirect to a login page.
-   */
+  /** Answer non-browsers (WebSockets, API clients) with 401, not a redirect to the login page. */
   apiSplit: boolean;
   /**
    * A request carrying any of these headers skips forward auth entirely and reaches the upstream,
@@ -1115,12 +1077,7 @@ const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
   "query",
 ];
 
-/**
- * Control characters, refused in a health-check header value.
- *
- * A newline in either half would forge a second header on every probe, which is a request
- * Caddy makes on a timer against the operator's own backend.
- */
+/** Refused in health-check headers: a newline would forge a second header on every probe. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point.
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
@@ -1400,11 +1357,8 @@ function sanitizeCpmForwardAuthMeta(
 }
 
 /**
- * Cleans the generic forward-auth block read from storage.
- *
- * Header names are held to the RFC 7230 grammar and Caddy placeholders are stripped from the
- * endpoint and the paths: all three are interpolated into generated config, where a `{...}` would
- * be read as request context rather than as text.
+ * Header names are held to RFC 7230 and Caddy placeholders stripped from the endpoint and paths:
+ * all three are interpolated into config, where a `{...}` would read as request context.
  */
 function sanitizeForwardAuthMeta(meta: ForwardAuthMeta | undefined): ForwardAuthMeta | undefined {
   if (!meta) return undefined;
@@ -1708,8 +1662,6 @@ function parseLocationAccessListId(value: unknown): number | null | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-// Extract a validated { path, upstreams } pair from a raw location-rule item, or null if it is
-// malformed. Shared by the meta and input sanitizers below.
 function parseLocationRuleBase(item: unknown): { path: string; upstreams: string[] } | null {
   if (
     item &&
@@ -1780,8 +1732,6 @@ function hydrateLocationRules(metaRules: LocationRuleMeta[] | undefined): Locati
   }));
 }
 
-// Convert hydrated location rules back to the stored meta shape, when reconstructing existing
-// meta during an update.
 function dehydrateLocationRules(rules: LocationRule[]): LocationRuleMeta[] {
   return rules.map((rule) => {
     const meta: LocationRuleMeta = { path: rule.path, upstreams: rule.upstreams };
@@ -1946,12 +1896,8 @@ function normalizeAuthentikInput(
 }
 
 /**
- * Folds an edit into the stored forward-auth block.
- *
- * Enabling it validates: config generation treats a block it cannot read as absent, and an
- * absent block means the host is published with no authentication at all. A half-filled block
- * would therefore turn a host the operator just protected into an open one, so it is refused at
- * the write instead.
+ * Enabling validates: generation treats an unreadable block as absent, which publishes the host
+ * with no authentication - so a half-filled block would open a host the operator just protected.
  */
 function normalizeForwardAuthInput(
   input: ProxyHostForwardAuthInput | null | undefined,
@@ -2052,13 +1998,9 @@ function normalizeForwardAuthInput(
 }
 
 /**
- * Refuses a host that would have two authenticators at once.
- *
- * Generation picks one by a fixed precedence - Authentik, then this, then the built-in portal -
- * so the other would be listed as active on the host while doing nothing, which is the kind of
- * config that reads as protected and is not. A row that already carries the combination keeps
- * working and can still be edited: the conflict is only raised when this very request turns one
- * of them on.
+ * Generation picks one authenticator by precedence (Authentik, this, the portal), so a second would
+ * look active while doing nothing. Raised only when this request turns one on, so a row that
+ * already has both stays editable.
  */
 function assertSingleForwardAuthProvider(
   meta: ProxyHostMeta,
@@ -3032,10 +2974,8 @@ export type ProxyHostMetaView = Pick<
 >;
 
 /**
- * A stored `meta` blob, hydrated the way the host form reads it.
- *
- * Exported for the dashboard host, which is not a row but carries the same blob in its settings -
- * so its options render in the same fields and mean the same thing to the Caddy builder.
+ * A stored `meta` blob, hydrated as the host form reads it. Exported for the dashboard host, which
+ * carries the same blob in its settings.
  */
 export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
   const meta = parseMeta(value);
@@ -3153,11 +3093,8 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
 }
 
 /**
- * The list filter shared by the paginated read and its count.
- *
- * `visibleIds` narrows the list to what the viewer may see - null means no restriction, which is
- * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
- * viewer may see nothing, and turning that into an unfiltered query would list the whole fleet.
+ * `visibleIds` null means unrestricted (admin). An empty array means the viewer sees nothing and
+ * must not be dropped, or the query would list the whole fleet.
  */
 function proxyHostListFilter(search?: string, visibleIds?: number[] | null, enabled?: boolean) {
   const clauses = [];
@@ -3196,9 +3133,8 @@ export async function countProxyHosts(
 export type ProxyHostCounts = { total: number; enabled: number; disabled: number };
 
 /**
- * Enabled and disabled counts across everything this viewer can see, not just the current page.
- * The list header reports on the deployment, so paging through it must not change the numbers -
- * and the search box must, which is why the filter is the same one the list itself uses.
+ * Counts across everything the viewer can see, not the page: paging must not change the header's
+ * numbers but the search must, hence the list's own filter.
  */
 export async function countProxyHostsByState(
   search?: string,
@@ -3216,7 +3152,7 @@ export async function countProxyHostsByState(
   return { total, enabled, disabled: total - enabled };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
+// biome-ignore lint/suspicious/noExplicitAny: heterogeneous drizzle columns have no useful union
 const PROXY_HOST_SORT_COLUMNS: Record<string, any> = {
   name: proxyHosts.name,
   domains: proxyHosts.domains,
@@ -3248,9 +3184,8 @@ export async function listProxyHostsPaginated(
 }
 
 /**
- * Reject a Caddyfile snippet the running Caddy cannot adapt. In the model, not the server action,
- * so the REST API is held to the same rule: the builder would skip an unadaptable snippet with a
- * warning, quietly dropping whatever it was written for.
+ * In the model so the REST API meets it too: the builder would skip an unadaptable snippet with a
+ * warning, quietly dropping whatever it was for.
  */
 async function assertCaddyfileAdapts(
   snippet: string | null | undefined,
@@ -3270,10 +3205,9 @@ const RAW_CONFIG_FIELDS = [
 ] as const;
 
 /**
- * The raw-config fields are spliced into the Caddy document unchecked - a reverse_proxy to the admin
- * API or a file_server rooted at / is one JSON object away - so only an admin may change them.
- * Enforced here rather than per route so the dashboard, REST and GraphQL all meet it. Resubmitting
- * the stored value is not a change: an operator can still save a host an admin gave a snippet.
+ * Raw-config fields go in unchecked - a reverse_proxy to the admin API is one object away -
+ * so only an admin may change them, enforced here for every API. Resubmitting the stored value is
+ * not a change, so an operator can still save a host an admin gave a snippet.
  */
 async function assertRawConfigChangeAllowed(
   existing: Pick<ProxyHost, (typeof RAW_CONFIG_FIELDS)[number]> | null,

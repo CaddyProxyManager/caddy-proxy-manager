@@ -18,11 +18,7 @@ export type TwoFactorSubmission = {
   trustDevice: boolean;
 };
 
-/**
- * The code asked for after a correct password, on the dashboard and the forward-auth portal alike.
- * The portal passes `allowTrustDevice={false}`: its sign-in isn't Better Auth's, so there is no
- * trusted-device cookie for it to set.
- */
+/** The portal passes `allowTrustDevice={false}`: its sign-in has no Better Auth trust cookie. */
 export function TwoFactorStep({
   pending,
   allowTrustDevice = true,

@@ -31,12 +31,10 @@ import { useTableDensity } from "@/components/ui/TableDensity";
 import Link from "next/link";
 import { settingsHref } from "./settings/sections";
 
-// ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
-// server entry is an async Server Component this file cannot reach, and there is nothing
-// to draw until the effect below has fetched a window anyway.
+// Client only: v7's server entry is an async Server Component (see AnalyticsClient).
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-/** Icons the resource shortcuts can show, keyed by name so the server can name one. */
+/** Keyed by name so the server can name one. */
 const STAT_ICONS = {
   proxyHosts: ArrowLeftRight,
   certificates: ShieldCheck,
@@ -46,23 +44,18 @@ const STAT_ICONS = {
 export type StatCard = {
   label: string;
   icon: keyof typeof STAT_ICONS;
-  /** The headline number. Where `total` is set this is the enabled subset of it. */
+  /** Where `total` is set, the enabled subset of it. */
   count: number;
-  /**
-   * The whole set, when "how many are switched on" is a different question from "how
-   * many exist" - a disabled proxy host still occupies a domain and still shows in the
-   * list, so a bare count would overstate what is being served.
-   */
+  /** Set where disabled rows exist: a bare count would overstate what is being served. */
   total?: number;
   href: string;
 };
 
 export type RecentEvent = {
-  // The audit row's primary key, so the list keys on real identity rather than page position.
   id: number;
   action: string;
   entityType: string;
-  /** Null when the actor was the system, or an account that has since been deleted. */
+  /** Null for the system, or an account since deleted. */
   actor: string | null;
   summary: string;
   createdAt: string;
@@ -74,8 +67,7 @@ type TrafficSummary = {
 } | null;
 
 // ── The shapes /api/analytics/overview returns ───────────────────────────────
-// Declared here rather than imported from analytics-db: that module reaches ClickHouse
-// and the settings registry, and a client component must not pull either into the bundle.
+// Not imported from analytics-db, which would pull ClickHouse into the client bundle.
 
 type TimelineBucket = {
   ts: number;
@@ -127,21 +119,9 @@ type MetricKey =
   | "blocked";
 
 /**
- * A tile, and what selecting it does to the two bands below.
- *
- * `filter` is the slice of the access log the request pane shows, and `series` is what
- * the chart plots - both drawn from the same window, so a tile's number, its line and
- * its rows are always the same population.
- *
- * With no tile selected every series is plotted at once, which is the page's resting
- * state; selecting one narrows the chart and the log to it, and selecting it again
- * returns to the overlay. `color` is fixed per metric rather than per position so a
- * series keeps the same colour whether it is alone or one line among five.
- *
- * `serverEvents` is the exception: it has no traffic series of its own, so it narrows
- * the log to controller changes and leaves the chart on the overlay. Audit rows are not
- * bucketed over time anywhere in the schema, and inventing a series for them would be
- * the only fabricated thing on this page.
+ * `filter` and `series` come from the same window, so a tile's number, line and rows agree.
+ * `color` is per metric, not per position, so a series keeps its colour alone or overlaid.
+ * `serverEvents` has no series: audit rows are not bucketed, and inventing one would be fake.
  */
 type MetricDef = {
   key: MetricKey;
@@ -150,7 +130,6 @@ type MetricDef = {
     | keyof Pick<TimelineBucket, "total" | "blocked" | "clientErrors" | "serverErrors" | "bytes">
     | null;
   format: "count" | "bytes";
-  /** Set on every metric that has a series; there is one colour per line in the overlay. */
   color?: keyof ChartTheme["series"];
 };
 
@@ -181,7 +160,6 @@ const METRICS: MetricDef[] = [
   { key: "blocked", filter: "blocked", series: "blocked", format: "count", color: "cyan" },
 ];
 
-/** The metrics the chart can draw - everything except the one with no series. */
 type PlottedMetric = MetricDef & {
   series: NonNullable<MetricDef["series"]>;
   color: NonNullable<MetricDef["color"]>;
@@ -190,11 +168,7 @@ const PLOTTABLE: PlottedMetric[] = METRICS.filter(
   (m): m is PlottedMetric => m.series !== null && m.color !== undefined,
 );
 
-/**
- * Bytes as the log shows them, so a row and its tile agree on the unit. The number goes through
- * next-intl rather than `toFixed`, which writes the decimal separator English uses whatever the
- * page's locale is.
- */
+/** Through next-intl, not `toFixed`, which always writes English's decimal separator. */
 function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): string {
   const fixed = (value: number, digits: number) =>
     format.number(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -205,7 +179,6 @@ function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): st
   return `${format.number(bytes)} B`;
 }
 
-/** A bucket label short enough for an axis, at the resolution the range implies. */
 function formatBucket(
   format: ReturnType<typeof useFormatter>,
   ts: number,
@@ -227,12 +200,7 @@ const RANGE_SECONDS: Record<Interval, number> = {
   "30d": 30 * 86400,
 };
 
-/**
- * The tile filters, as a predicate.
- *
- * Only the preview path needs this - in the product the same slice is a WHERE clause in
- * `queryTrafficEvents`, and the two are kept deliberately in step.
- */
+/** Preview only; keep in step with the WHERE clause in `queryTrafficEvents`. */
 function matchesFilter(filter: MetricDef["filter"]): (event: TrafficEvent) => boolean {
   switch (filter) {
     case "server-errors":
@@ -248,7 +216,6 @@ function matchesFilter(filter: MetricDef["filter"]): (event: TrafficEvent) => bo
   }
 }
 
-/** Audit actions, coloured the way the status codes beside them are. */
 const AUDIT_VARIANT: Record<string, "success" | "error" | "info"> = {
   create: "success",
   add: "success",
@@ -297,15 +264,9 @@ export default function OverviewClient({
   stats: StatCard[];
   trafficSummary: TrafficSummary;
   recentEvents: RecentEvent[];
-  /** Audit rows in the last 24 hours, for the Server log tile. */
+  /** Audit rows in the last 24 hours. */
   serverEventCount?: number;
-  /**
-   * A window supplied by the caller instead of fetched.
-   *
-   * The docs site renders this component directly, with no API behind it. Without a way
-   * in, the demo would show the load-failure banner - and the alternative, a copy of this
-   * page kept in the docs, is exactly the thing that goes stale silently.
-   */
+  /** For the docs demo, which has no API; a copy of this page there would go stale silently. */
   previewPayload?: OverviewPayload;
   isAdmin?: boolean;
 }) {
@@ -316,8 +277,7 @@ export default function OverviewClient({
   const chartTheme = useChartTheme();
 
   const [interval, setIntervalValue] = useState<Interval>("24h");
-  // Null is the resting state: no tile is picked out, so the chart carries every series
-  // and the log carries everything the server did.
+  // Null: no tile picked, so the chart and log show everything.
   const [metricKey, setMetricKey] = useState<MetricKey | null>(null);
   const [payload, setPayload] = useState<OverviewPayload | null>(previewPayload ?? null);
   const [isLoading, setIsLoading] = useState(isAdmin && !previewPayload);
@@ -325,15 +285,11 @@ export default function OverviewClient({
 
   const metric = metricKey === null ? null : (METRICS.find((m) => m.key === metricKey) ?? null);
   const filter = metric?.filter ?? "all";
-  // The one tile whose rows come from Postgres rather than the traffic window.
   const isEventsOnly = metricKey === "serverEvents";
-  // Requests, and the unfiltered view it is the tile for, are the whole log: traffic and
-  // controller changes interleaved. Every other traffic tile is a slice of the requests,
-  // which a controller change is not part of.
+  // Other traffic tiles are slices of the requests, which controller changes are not part of.
   const blendsEvents = metricKey === null || metricKey === "requests";
 
-  // next-intl types t() against the catalog, so the key has to be a literal here
-  // rather than carried on the metric definition.
+  // Literal keys, so next-intl can type-check them against the catalog.
   const metricLabel = useCallback(
     (key: MetricKey): string => {
       switch (key) {
@@ -356,8 +312,6 @@ export default function OverviewClient({
 
   useEffect(() => {
     if (!isAdmin) return;
-    // A supplied window is the whole dataset; there is nothing to fetch and nothing the
-    // range or tile controls could load, so they act on what is already here.
     if (previewPayload) {
       setPayload(previewPayload);
       setIsLoading(false);
@@ -374,8 +328,7 @@ export default function OverviewClient({
         setIsLoading(false);
       })
       .catch((error: unknown) => {
-        // An abort is this effect superseding itself, not a failure: leaving the old
-        // window on screen while the new one lands is what keeps the page from flashing.
+        // Superseded, not failed: the old window stays up so the page does not flash.
         if (error instanceof DOMException && error.name === "AbortError") return;
         setHasFailed(true);
         setIsLoading(false);
@@ -386,12 +339,7 @@ export default function OverviewClient({
   const rangeSeconds = RANGE_SECONDS[interval];
   const timeline = payload?.timeline ?? [];
 
-  /**
-   * The series on the chart: the selected tile's alone, or all of them.
-   *
-   * A tile with no series of its own leaves the overlay up rather than blanking the
-   * chart - the log is what that tile is really for.
-   */
+  // A tile with no series leaves the overlay up rather than blanking the chart.
   const plotted = useMemo<PlottedMetric[]>(() => {
     const selected = PLOTTABLE.find((m) => m.key === metricKey);
     return selected ? [selected] : PLOTTABLE;
@@ -408,15 +356,13 @@ export default function OverviewClient({
   );
 
   const chartOptions: ApexOptions = useMemo(() => {
-    // Every count series reads off one axis, so a glance compares them honestly. Bytes
-    // cannot share that scale, so bandwidth takes the right-hand one instead.
+    // Counts share one axis so they compare honestly; bytes take the right-hand one.
     const countAxis = chartSeries[plotted.findIndex((m) => m.format === "count")]?.name;
     return {
       ...chartTheme.base,
       chart: {
         ...chartTheme.base.chart,
-        // Five filled areas on top of each other is mud; alone, the fill is what makes
-        // the shape readable at 220px.
+        // Five overlaid fills are mud; alone, the fill makes the shape readable at 220px.
         type: isOverlay ? "line" : "area",
         stacked: false,
         id: "overview",
@@ -433,9 +379,7 @@ export default function OverviewClient({
         axisBorder: { show: false },
         axisTicks: { show: false },
       },
-      // One entry per series, which is how ApexCharts pairs them. Pointing the count
-      // series at a single `seriesName` is what makes them share a scale rather than
-      // each getting its own.
+      // One entry per series; a shared `seriesName` is what makes the counts share a scale.
       yaxis: plotted.map((m, index) => ({
         opposite: m.format === "bytes",
         seriesName: m.format === "bytes" ? chartSeries[index]?.name : countAxis,
@@ -451,15 +395,14 @@ export default function OverviewClient({
         position: "bottom",
         horizontalAlign: "left",
         labels: { colors: chartTheme.labelColor },
-        // Two axes means two series groups, which ApexCharts otherwise stacks as separate
-        // legend blocks - five names down the side of a 260px chart. One flat row instead.
+        // Two axes would otherwise stack as separate legend blocks down a 260px chart.
         clusterGroupedSeries: false,
       },
       tooltip: {
         theme: chartTheme.mode,
         shared: true,
         intersect: false,
-        // Shared tooltip, mixed units: the formatter has to ask which series it is on.
+        // Shared tooltip, mixed units: ask which series this is.
         y: {
           formatter: (value: number, opts?: { seriesIndex: number }) =>
             plotted[opts?.seriesIndex ?? 0]?.format === "bytes"
@@ -470,13 +413,7 @@ export default function OverviewClient({
     };
   }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds, format]);
 
-  /**
-   * One row of the server log, whichever store it came from.
-   *
-   * The two are interleaved rather than shown side by side, so "what was the server
-   * doing when this broke" is one read: a config change and the 502s that followed it
-   * land next to each other instead of in two panes with different clocks.
-   */
+  // Interleaved, so a config change and the 502s that followed it land next to each other.
   type LogRow =
     | ({ kind: "traffic"; id: string } & TrafficEvent)
     | {
@@ -494,8 +431,7 @@ export default function OverviewClient({
       {
         key: "ts",
         header: t("logTime"),
-        // Wide enough for a 12-hour clock with seconds and a meridiem, which is the
-        // longest this renders in any locale; below that the "AM" wraps to its own line.
+        // Fits a 12-hour clock with seconds, the longest locale; narrower wraps the "AM".
         width: pixel(116),
         renderCell: (row) => (
           <Text type="code" size="sm" color="secondary">
@@ -504,11 +440,9 @@ export default function OverviewClient({
         ),
       },
       {
-        // One column for "what happened": an HTTP status, or the kind of change.
         key: "what",
         header: t("logStatus"),
-        // A share of the spare width rather than a fixed one: audit actions run as long as
-        // `forward_auth_access_denied`, which any width that suits an HTTP status cuts off.
+        // Proportional: a width that suits a status cuts off `forward_auth_access_denied`.
         width: proportional(1),
         renderCell: (row) =>
           row.kind === "traffic" ? (
@@ -534,8 +468,7 @@ export default function OverviewClient({
                 {row.method} {row.host}
                 {row.uri}
               </Text>
-              {/* The rest of what traffic_events stores, on one line: nine columns will
-                  not fit a table that also has to carry audit rows. */}
+              {/* One line: nine columns will not fit a table that also carries audit rows. */}
               <Text type="body" size="xsm" color="secondary" maxLines={1}>
                 {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
                 {row.countryCode ?? emptyValue} &middot; {row.clientIp}
@@ -558,9 +491,7 @@ export default function OverviewClient({
 
   const logRows = useMemo<LogRow[]>(() => {
     let traffic = isEventsOnly ? [] : (payload?.events ?? []);
-    // A supplied window arrives whole, so the tile's slice is taken here instead of by
-    // the query that would otherwise have applied it. Without this the docs demo would
-    // retitle the pane on a tile change and then show the same rows underneath.
+    // A supplied window arrives whole, so slice it here as the query otherwise would.
     if (previewPayload && !isEventsOnly) {
       traffic = traffic.filter(matchesFilter(filter));
       if (filter === "largest") {
@@ -586,8 +517,7 @@ export default function OverviewClient({
     }));
     if (isEventsOnly) return eventRows;
 
-    // Largest-first is a bandwidth question, not a timeline one, and that tile never
-    // blends; everything that reaches here is newest first.
+    // The largest-first tile never blends, so newest first is safe here.
     return [...trafficRows, ...eventRows].sort((a, b) => b.ts - a.ts);
   }, [payload, previewPayload, filter, isEventsOnly, blendsEvents, recentEvents]);
 
@@ -608,8 +538,7 @@ export default function OverviewClient({
     }
   };
 
-  // Non-admins get the welcome header and nothing else: every band below reads either
-  // ClickHouse or the audit log, both of which are admin-only.
+  // Everything below reads ClickHouse or the audit log, both admin-only.
   if (!isAdmin) {
     return (
       <VStack gap={8}>
@@ -642,7 +571,6 @@ export default function OverviewClient({
           title={t("loggingOffTitle")}
           description={t("loggingOffDescription")}
           endContent={
-            // Settings is admin-only, so nobody else is offered a door they cannot open.
             isAdmin ? (
               <Button
                 size="sm"
@@ -657,8 +585,7 @@ export default function OverviewClient({
       )}
       {hasFailed && <Banner status="error" title={t("loadFailedTitle")} />}
 
-      {/* Resource shortcuts. Kept from the previous overview: they are the only route to
-          these pages that does not go through the side navigation. */}
+      {/* The only route to these pages that skips the side navigation. */}
       <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
         {stats.map((stat) => (
           <ClickableCard
@@ -695,7 +622,6 @@ export default function OverviewClient({
         ))}
       </Grid>
 
-      {/* Tiles. Selecting one changes the chart and the request log below. */}
       <Grid columns={{ minWidth: 160, max: 6 }} gap={3}>
         {METRICS.map((m) => (
           <Tile
@@ -703,15 +629,12 @@ export default function OverviewClient({
             label={metricLabel(m.key)}
             value={tileValue(m.key)}
             isSelected={m.key === metricKey}
-            // Selecting the tile that is already on clears it, which puts the chart back
-            // on every series and the log back on everything.
             onSelect={() => setMetricKey((current) => (current === m.key ? null : m.key))}
           />
         ))}
       </Grid>
 
-      {/* The series the selected tile plots, then the rows behind it. Each takes a
-          row of its own: the chart wants width to be read, and the log wants it more. */}
+      {/* A row each: the chart wants width, and the log wants it more. */}
       <Card padding={5}>
         <VStack gap={3}>
           <HStack justify="between" vAlign="center" gap={2}>
@@ -723,8 +646,6 @@ export default function OverviewClient({
             </HStack>
             <HStack gap={3} vAlign="center">
               {isLoading && <Spinner label={t("loading")} size="sm" />}
-              {/* The overview answers "is anything off"; the analytics page is where a
-              question this chart raises gets followed up. */}
               <AstryxLink href="/analytics">{t("viewAnalytics")}</AstryxLink>
             </HStack>
           </HStack>
@@ -741,8 +662,6 @@ export default function OverviewClient({
         </VStack>
       </Card>
 
-      {/* One log for the whole server: requests and controller changes interleaved, with
-          the tile row picking which of them it holds. */}
       <Card padding={5}>
         <VStack gap={3}>
           <HStack justify="between" vAlign="center" gap={2}>
@@ -760,11 +679,8 @@ export default function OverviewClient({
               isCompact
             />
           ) : (
-            // Table brings its own scroll wrapper, and its fixed column plus two proportional ones
-            // (120px floor each) come to a 356px minimum, so it fits any card it can be read in.
-            // Wrapping it again in an overflow-x box only added a second scroller - and one axis set
-            // to `auto` turns the other from `visible` into `auto` too, which is where the
-            // stray vertical scrollbar came from.
+            // No overflow-x wrapper: Table scrolls itself, and overflow-x:auto forces
+            // overflow-y to auto too, which added a stray vertical scrollbar.
             <Table data={logRows} columns={logColumns} idKey="id" density={density} />
           )}
           <Text type="body" size="xsm" color="secondary">
@@ -777,7 +693,7 @@ export default function OverviewClient({
         </VStack>
       </Card>
 
-      {/* Kept so the 24h headline stays on the page even when a longer range is selected. */}
+      {/* The 24h headline stays even when a longer range is selected. */}
       {trafficSummary && trafficSummary.totalRequests > 0 && (
         <Text type="body" size="xsm" color="secondary">
           {t("traffic24hSummary", {

@@ -1,10 +1,7 @@
 /**
- * What an operator runs to fix the log permissions an agent reported.
- *
- * The agent only reports; it runs as its own user and could not change these even if it should.
- * Every fix is a command for the agent's host, run through `docker exec` as root in Caddy's
- * container - which works the same on a named volume and a bind mount, where a host-side `chmod`
- * would first need the operator to find out which of the two they have.
+ * What an operator runs to fix the log permissions an agent reported; the agent cannot. Each fix
+ * is a root `docker exec` in Caddy's container, which works on a named volume and a bind mount
+ * alike.
  */
 
 import type { LogAccessReport } from "@cpm/shared";

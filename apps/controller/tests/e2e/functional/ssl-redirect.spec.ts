@@ -1,7 +1,4 @@
-/**
- * Functional: HTTP→HTTPS redirect with ssl_forced enabled - plain HTTP gets a 308.
- * Domain: func-ssl.test
- */
+/** ssl_forced: plain HTTP gets a 308. Domain: func-ssl.test */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
@@ -21,7 +18,7 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').fill('echo-server:8080');
 
-      // Force HTTPS is on by default; the spec checks the switch rather than setting it.
+      // On by default; the spec checks the switch rather than setting it.
       await expect(
         page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' }),
       ).toBeChecked();
@@ -39,7 +36,6 @@ test.describe
 
     test('HTTP request receives 308 redirect to HTTPS', async () => {
       const res = await httpGet(DOMAIN, '/');
-      // Caddy redirects HTTP→HTTPS when ssl_forced=true
       expect(res.status).toBe(308);
     });
 

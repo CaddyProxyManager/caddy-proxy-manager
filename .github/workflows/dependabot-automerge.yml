@@ -5,9 +5,8 @@ on:
     branches:
       - main
 
-# Both scopes are for enabling auto-merge. There is deliberately no approval step: GITHUB_TOKEN
-# cannot approve a pull request under any permissions ("GitHub Actions is not permitted to approve
-# pull requests"), and main requires no reviews, so there is nothing to approve.
+# For enabling auto-merge. No approval step: GITHUB_TOKEN can never approve a PR, and main
+# requires no reviews.
 permissions:
   contents: write
   pull-requests: write
@@ -21,9 +20,7 @@ jobs:
         id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
-      # Hands the PR to GitHub's own auto-merge, which holds it until the checks main
-      # requires -- test and e2e -- report success, then merges. The job finishes in
-      # seconds rather than sitting on a runner watching a 14-minute suite.
+      # GitHub's auto-merge waits for the required checks, so no runner sits on the suite.
       - name: Enable auto-merge
         run: gh pr merge --auto --merge "$PR_URL"
         env:

@@ -1,10 +1,6 @@
 /**
- * The two schemas, and the SQLite migrations, must stay structurally identical.
- *
- * src/lib/db/schema.ts hands out the SQLite tables typed as their PostgreSQL twins, because a
- * dialect is a runtime value and types are not. That only holds while both declare the same
- * tables, columns, nullability, defaults, indexes and foreign keys - drift gives a SQLite
- * deployment row types for a database it does not have, with no error anywhere.
+ * schema.ts types the SQLite tables as their PostgreSQL twins, which only holds while the two
+ * (and the SQLite migrations) stay structurally identical; drift is otherwise silent.
  */
 import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
@@ -30,7 +26,7 @@ type Shape = {
   foreignKeys: Array<{ columns: string[]; target: string; onDelete: string | undefined }>;
 };
 
-/** Booleans and serials are integers in SQLite, and a bounded string is text(n); compared as those. */
+/** SQLite stores booleans and serials as integers and a bounded string as text(n). */
 const TYPE_ALIASES: Record<string, string> = { boolean: 'integer', PgSerial: 'integer' };
 
 function shape(config: any): Shape {
@@ -118,8 +114,7 @@ describe('schema parity', () => {
   });
 
   it('exports no null-prototype object, which Better Auth cannot walk under Vite', async () => {
-    // A module namespace is one. drizzle's is() throws on it inside Better Auth's schema check,
-    // and in dev that failed every sign-in with a 500.
+    // drizzle's is() throws on a module namespace in Better Auth's check: every dev sign-in 500s.
     const schema = await import('../../src/lib/db/schema');
     expect(Object.getPrototypeOf(schema.activeSchema)).not.toBeNull();
   });

@@ -35,7 +35,6 @@ test.describe
       const host = await res.json();
       proxyHostId = host.id;
 
-      // Grant testadmin (user ID 1) forward auth access
       const accessRes = await page.request.put(
         `${API}/proxy-hosts/${proxyHostId}/forward-auth-access`,
         {
@@ -45,7 +44,7 @@ test.describe
       );
       expect(accessRes.status()).toBe(200);
 
-      // Wait for Caddy to pick up the config - non-excluded paths should redirect (302)
+      // Caddy has the config once non-excluded paths redirect.
       await waitForStatus(DOMAIN, 302, 20_000);
     });
 
@@ -86,7 +85,6 @@ test.describe
         await freshPage.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/protected-page`);
         await expect(freshPage.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
 
-        // Intercept the login API response
         let capturedRedirect: string | null = null;
         await freshPage.route('**/api/forward-auth/login', async (route) => {
           const response = await route.fetch();
@@ -105,14 +103,12 @@ test.describe
         expect(capturedRedirect).toBeTruthy();
         expect(capturedRedirect).toContain('/.cpm-auth/callback');
 
-        // Complete the callback
         const callbackUrl = new URL(capturedRedirect!);
         const callbackRes = await httpGet(DOMAIN, callbackUrl.pathname + callbackUrl.search);
         expect(callbackRes.status).toBe(302);
         const setCookie = String(callbackRes.headers['set-cookie'] ?? '');
         expect(setCookie).toContain('_cpm_fa=');
 
-        // Verify authenticated access to non-excluded path
         const match = setCookie.match(/_cpm_fa=([^;]+)/);
         expect(match).toBeTruthy();
         const sessionCookie = match![1];

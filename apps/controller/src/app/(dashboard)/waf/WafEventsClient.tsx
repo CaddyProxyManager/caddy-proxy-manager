@@ -75,7 +75,6 @@ type Props = {
   events: WafEvent[];
   stats: WafEventStats;
   pagination: { total: number; page: number; perPage: number };
-  /** Every domain a proxy host serves, offered by the host filter. */
   hostOptions: string[];
   initialRange: "all" | "24h" | "7d" | "30d" | "custom";
   initialFrom: number | null;
@@ -92,9 +91,8 @@ type Props = {
 
 type RangeOption = Props["initialRange"];
 
-// The custom-range fields hold wall-clock values in the zone the event list is shown in, so a range
-// typed from the times on screen selects exactly those events. The zone is next-intl's rather than
-// the browser's own, so the fields also render the same on the server as in the browser.
+// Wall-clock values in the list's zone, so a range typed from the times on screen selects exactly
+// those events; next-intl's zone, not the browser's, so server and browser render alike.
 function pickerValue(unixTs: number | null, timeZone: string): string {
   return unixTs ? toZonedWallTime(unixTs, timeZone) : "";
 }
@@ -146,10 +144,7 @@ interface AuditData {
   messages?: AuditMessage[];
 }
 
-/**
- * Seven of these run over every message of every event in the table, and the field name is one of a
- * fixed handful - so the pattern is compiled once per field rather than once per call.
- */
+/** Run seven times per message of every event, so compiled once per field. */
 const bracketPatterns = new Map<string, RegExp>();
 
 function bracketPattern(field: string, flags: string): RegExp {
@@ -159,7 +154,7 @@ function bracketPattern(field: string, flags: string): RegExp {
     pattern = new RegExp(`\\[${field} "([^"]*)"\\]`, flags);
     bracketPatterns.set(key, pattern);
   }
-  // A /g regex carries lastIndex between uses; matchAll below starts from wherever it was left.
+  // A /g regex carries lastIndex between uses, and matchAll starts from it.
   pattern.lastIndex = 0;
   return pattern;
 }
@@ -201,7 +196,6 @@ function normalizeAuditMessage(message: AuditMessage): AuditMessage {
 }
 
 /* ── Severity config ──────────────────────────────────────────────────────── */
-/** Maps a Coraza severity onto the theme's badge variants. */
 const SEVERITY_VARIANTS: Record<string, "error" | "warning" | "info"> = {
   CRITICAL: "error",
   ERROR: "error",
@@ -281,7 +275,6 @@ function StatsBar({ stats }: { stats: WafEventStats }) {
 }
 
 /* ── Phone summary card ───────────────────────────────────────────────────── */
-/** The stat tiles folded into one card for a phone: the blocked count leads, the rest sit under it. */
 function WafStatusCard({ stats, isEnabled }: { stats: WafEventStats; isEnabled: boolean }) {
   const t = useTranslations("waf");
   const rest = [
@@ -351,7 +344,6 @@ function HeadersGrid({ headers }: { headers?: Record<string, string | string[]> 
   );
 }
 
-/** Pretty-prints a body when it parses as JSON, otherwise shows it verbatim. */
 function bodyCode(body: string) {
   try {
     return { code: JSON.stringify(JSON.parse(body), null, 2), language: "json" };
@@ -375,9 +367,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   const emptyValue = useEmptyValue();
   const [innerTab, setInnerTab] = useState("overview");
 
-  // Parsed once per event instead of on every render. The matched rules get their row ids here, so
-  // switching the inner tab re-keys nothing, and the pretty-printed copy - request and response
-  // bodies included - is not rebuilt on every tab switch either.
+  // Once per event, so a tab switch neither re-keys the rules nor re-prints the bodies.
   const { data, msgs, raw } = useMemo(() => {
     let parsed: AuditData | null = null;
     if (rawData) {
@@ -652,9 +642,7 @@ function EventDetailPanel({
   }
 
   return (
-    // Beside the list rather than over it. Triage means reading several events in a row, and a
-    // modal makes you dismiss one to see the next - so this is plain layout, with no backdrop and
-    // no focus trap to fight the table it sits next to.
+    // Beside the list, not a modal: triage reads several events in a row without dismissing each.
     <Card padding={4}>
       <VStack gap={4}>
         <HStack gap={2} vAlign="center" justify="between">
@@ -961,7 +949,7 @@ function GlobalSuppressedRules({
 }
 
 /* ── Main client component ───────────────────────────────────────────────── */
-/** Stored body limits are bytes; the form asks for whole MiB. Unset means "inherit the default". */
+/** Stored as bytes, asked in whole MiB. Unset inherits the default. */
 function bodyLimitMib(bytes: number | undefined): number | null {
   const mib = bytesToMib(bytes);
   return mib ? Number(mib) : null;
@@ -996,15 +984,13 @@ export default function WafEventsClient({
   const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
   const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));
   const [selected, setSelected] = useState<WafEvent | null>(null);
-  // Phone-only chrome: the range sheet, and search tucked behind its icon until it is wanted.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const detailRef = useRef<HTMLDivElement>(null);
   const searchWrapRef = useRef<HTMLDivElement>(null);
 
-  // The field is mounted all along (only hidden), so autofocus would never fire: focus it when the
-  // icon reveals it instead.
+  // Mounted but hidden all along, so autofocus never fires.
   useEffect(() => {
     if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
   }, [searchOpen]);
@@ -1027,8 +1013,7 @@ export default function WafEventsClient({
   const [wafLimitAction, setWafLimitAction] = useState<string>(
     globalWaf?.request_body_limit_action ?? "",
   );
-  // Coraza is a compiled-in plugin. With it off the settings below would be stored and then never
-  // reach Caddy, so the form says so up front rather than accepting a rule set that does nothing.
+  // Without the Coraza module these settings would be stored and never reach Caddy.
   const wafModuleDisabledReason = useDisabledReason("waf");
 
   const filterFields: UrlSearchField[] = [
@@ -1071,8 +1056,7 @@ export default function WafEventsClient({
   ];
 
   const limitActionId = useId();
-  // Each option says what it does, shown for the one selected: a single line covering all three
-  // left "Default" unexplained.
+  // Per-option help: one line covering all three left "Default" unexplained.
   const bodyLimitActions = [
     { value: "", label: t("bodyLimitActionDefault"), help: t("overLimitActionHelpDefault") },
     { value: "Reject", label: t("bodyLimitActionReject"), help: t("overLimitActionHelpReject") },
@@ -1280,8 +1264,7 @@ export default function WafEventsClient({
     />
   );
 
-  // On a phone the event replaces the list, which may have been scrolled well down: bring its top
-  // into view rather than opening it somewhere above the fold.
+  // On a phone the event replaces a list that may be scrolled well down.
   const selectedId = selected?.id;
   useEffect(() => {
     if (isNarrow && selectedId != null) detailRef.current?.scrollIntoView({ block: "start" });
@@ -1291,8 +1274,6 @@ export default function WafEventsClient({
     <VStack gap={4}>
       <HStack justify="between" vAlign="center" gap={2}>
         <Heading level={1}>{t("waf")}</Heading>
-        {/* A phone has no room for the tabs: the views move behind the overflow button, and search
-            waits behind its icon until it is wanted. */}
         <HStack gap={1} vAlign="center" className="cpm-mobile-flex">
           {tab === "events" && (
             <IconButton
@@ -1339,12 +1320,8 @@ export default function WafEventsClient({
             <WafStatusCard stats={stats} isEnabled={globalWafEnabled} />
           </div>
           <VStack gap={3}>
-            {/* The range on the left and search at the far right, one row. On a phone the chip
-                takes the range's place, and search wraps under it once opened. */}
             {/* Top-aligned: the search bar's bottom margin would pull a centred range down. */}
             <HStack justify="between" vAlign="start" gap={3} wrap="wrap">
-              {/* Was five buttons whose "selected" state read only as a filled
-                  variant; SegmentedControl exposes the choice as a radio group. */}
               <div className="cpm-desktop-only">
                 <SegmentedControl
                   label={t("timeRange")}
@@ -1365,9 +1342,8 @@ export default function WafEventsClient({
                   onClick={() => setRangeSheetOpen(true)}
                 />
               </div>
-              {/* Always there on a desktop; on a phone only once the search icon asks for it, or
-                  while a search is applied so the filter never hides. Grows to its cap, and the
-                  auto margin keeps it right-aligned when it wraps onto a line of its own. */}
+              {/* Shown on a phone while a search is applied, so the filter never hides. The auto
+                  margin keeps it right-aligned when it wraps. */}
               <div
                 ref={searchWrapRef}
                 className={searchOpen || hasFilters ? undefined : "cpm-desktop-only"}
@@ -1414,7 +1390,6 @@ export default function WafEventsClient({
             )}
           </VStack>
           {isNarrow && selected ? (
-            // A phone has no room for the list and the event side by side: the event replaces it.
             <VStack gap={3} ref={detailRef}>
               <div>
                 <Button
@@ -1444,8 +1419,7 @@ export default function WafEventsClient({
                 />
               </div>
 
-              {/* flexBasis rather than a fixed width: below roughly 900px the panel wraps under the
-                  table instead of squeezing it, which is the same behaviour the dialog had. */}
+              {/* flexBasis: below ~900px the panel wraps instead of squeezing the table. */}
               {selected && (
                 <div style={{ flexGrow: 1, flexBasis: 380, maxWidth: 460, minWidth: 0 }}>
                   {detailPanel}
@@ -1499,8 +1473,7 @@ export default function WafEventsClient({
                   description={wafModuleDisabledReason}
                 />
               )}
-              {/* Disabled controls emit no pointer events, so the reason is
-                  attached by wrapping. */}
+              {/* Disabled controls emit no pointer events, so the reason attaches by wrapping. */}
               <ModuleGated feature="waf">
                 <Switch
                   label={t("enableWafGloballyBlocking")}
@@ -1551,7 +1524,7 @@ export default function WafEventsClient({
                 isGroupLabel
                 description={bodyLimitActions.find((o) => o.value === wafLimitAction)?.help}
               >
-                {/* The HStack keeps Field's column from stretching the control across the page. */}
+                {/* Keeps Field's column from stretching the control across the page. */}
                 <HStack>
                   <SegmentedControl
                     label={t("overLimitAction")}
@@ -1585,9 +1558,7 @@ export default function WafEventsClient({
                 value={wafCustomDirectives}
                 onChange={setWafCustomDirectives}
                 issues={wafDirectiveIssues}
-                // isReadOnly, not isDisabled: a disabled field submits nothing, and
-                // updateWafSettingsAction reads a missing value as an empty string, which would
-                // erase the stored directives.
+                // Not isDisabled: a disabled field posts nothing, which erases the directives.
                 isReadOnly={Boolean(wafModuleDisabledReason)}
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description={t("customDirectivesHelp")}

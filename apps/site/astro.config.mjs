@@ -6,25 +6,15 @@ import starlight from "@astrojs/starlight";
 import catppuccin from "@catppuccin/starlight";
 import { defineConfig } from "astro/config";
 
-/**
- * Absolute path inside the controller workspace, for the aliases below.
- *
- * @param {string} path
- */
+/** @param {string} path */
 const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, import.meta.url));
 
-/**
- * The controller's version, for the sign-in screen's footer. The controller's own vite.config.ts
- * inlines it the same way, from the same package.json, so the demo shows what that build would.
- */
+/** Inlined the way the controller's vite.config.ts does, so the sign-in demo shows its version. */
 const { version: controllerVersion } = createRequire(import.meta.url)("../controller/package.json");
 
 /**
- * Points the setup screens' `./actions` imports at the setup demo's shim.
- *
- * A plugin rather than an alias because the specifier is relative: an alias would catch every
- * `./actions` in every demo, and a page client importing its actions is otherwise undemoable on
- * purpose (see AGENTS.md). This catches only the ones under `app/setup/`.
+ * Shims `./actions` under `app/setup/` only. A plugin, since an alias on a relative specifier
+ * would catch every `./actions`, and those stay undemoable on purpose (see AGENTS.md).
  */
 function setupActionsShim() {
   const setupPages = controller("src/app/setup/").replaceAll("\\", "/");
@@ -44,23 +34,14 @@ function setupActionsShim() {
 }
 
 /**
- * `satteri` in this app's dependencies is not imported by anything here, and is not cruft.
- *
- * It is Starlight's markdown engine, and it loads a per-platform native binding by `require`. The
- * static build inlines it into a prerender chunk, from which that require resolves upwards through
- * `dist/` - and bun keeps transitive dependencies in `node_modules/.bun/node_modules`, which is not
- * on that path, so the binding is unfindable and every page carrying a Starlight component fails to
- * render. Depending on it directly puts it in `apps/site/node_modules`, which is on the path.
- * Remove it and the build breaks with "Cannot find native binding".
+ * `satteri` is a direct dependency on purpose: Starlight's native binding is `require`d from a
+ * prerender chunk in `dist/`, which cannot see bun's `.bun/node_modules`. Remove it and the build
+ * fails with "Cannot find native binding".
  */
 
 /**
- * The project site, built as static files and served from GitHub Pages.
- *
- * `site` and `base` are what Pages needs and what a custom domain would change. A project site
- * lives under `https://<owner>.github.io/<repo>/`, so every absolute link and asset URL has to
- * carry that prefix - Astro does it for you, but only if `base` says so. Moving to a custom domain
- * later is two edits: point `site` at it, set `base` to "/", and add a CNAME file to `public/`.
+ * Served from GitHub Pages under `/<repo>/`, which `base` must say. For a custom domain: point
+ * `site` at it, set `base` to "/", and add a CNAME file to `public/`.
  */
 export default defineConfig({
   site: "https://silentspud.github.io",
@@ -82,23 +63,9 @@ export default defineConfig({
         baseUrl: "https://github.com/SilentSpud/caddy-proxy-manager/edit/main/apps/site/",
       },
       /*
-       * The palette. Catppuccin restates Starlight's accent and grey ramps, which is where almost
-       * all of the site's colour comes from, so the theme carries the brand on its own and the
-       * hand-written override file it replaced is gone.
-       *
-       * `lavender` is the accent nearest the indigo the old site used, and it is the same accent
-       * in both modes so the brand does not change with the reader's setting. `mocha` is the
-       * darkest of the three dark flavours; `latte` is the only light one.
-       *
-       * The plugin appends its stylesheets to `customCss` rather than replacing it, so demo.css
-       * below is loaded first. That is the right way round: demo.css only ever reads --sl-color-*,
-       * so it wants the theme's definitions to land after it.
-       *
-       * It also depends on `@astrojs/starlight` outright rather than as a peer, and ships its
-       * entry as TypeScript source. Left alone that pulls a second, older Starlight into the tree
-       * and `bun run typecheck` follows the import into its uncompiled internals, which reference
-       * virtual modules that only exist for this app's own copy. The `overrides` entry in the root
-       * package.json pins one version, which is why it is there.
+       * Its CSS is appended after demo.css, which only reads --sl-color-*. It depends on Starlight
+       * outright, not as a peer; the root package.json `overrides` pins one copy, or typecheck
+       * walks a second one's uncompiled internals.
        */
       plugins: [
         catppuccin({
@@ -107,9 +74,7 @@ export default defineConfig({
         }),
       ],
       customCss: ["./src/styles/demo.css"],
-      // Written out rather than generated from the directory: the order these appear in is the
-      // order someone new should meet them, which is not alphabetical and not the order the files
-      // happen to sit in.
+      // Hand-ordered: the order a newcomer should meet the pages, not the directory's.
       sidebar: [
         {
           label: "Start here",
@@ -158,19 +123,9 @@ export default defineConfig({
     plugins: [setupActionsShim()],
     resolve: {
       /**
-       * The demos render the controller's own components rather than copies, so the docs cannot
-       * drift from the product. Three of the controller's tsconfig paths have to be repeated here
-       * for its imports to resolve from this app; the fourth (`@/*`) is ambiguous by design there
-       * and unused by anything a demo pulls in.
-       *
-       * The two shims stand in for framework packages the components import but do not need: only
-       * `useTranslations` is used from next-intl, and `next/navigation` is reached by one
-       * component. Both resolve to a few lines each rather than dragging Next into a static site.
-       *
-       * The third replaces the controller's auth client, which would post sign-in attempts to
-       * `/api/auth/*` on this site, and the fourth its full page loads, which would leave it. The
-       * two after them are host actions the editors import, answered in the browser instead. All of
-       * them have to come before the `@/src/` alias, which would otherwise match first.
+       * Three controller tsconfig paths repeated (`@/*` is unused by demos), plus shims for
+       * next-intl, next/navigation, the auth client, full page loads and the host actions. The
+       * shims must precede the `@/src/` alias, which would otherwise match first.
        */
       alias: [
         {
@@ -207,11 +162,10 @@ export default defineConfig({
           ),
         },
       ],
-      // The controller is a workspace symlink, so its React would otherwise resolve to a second
-      // copy and every hook in a demo would throw.
+      // The controller is a symlink; a second React copy would make every demo hook throw.
       dedupe: ["react", "react-dom"],
     },
-    // Read by the controller's src/lib/app-version.ts, which the sign-in screen shows.
+    // Read by the controller's src/lib/app-version.ts.
     define: {
       "process.env.NEXT_PUBLIC_APP_VERSION": JSON.stringify(controllerVersion),
     },

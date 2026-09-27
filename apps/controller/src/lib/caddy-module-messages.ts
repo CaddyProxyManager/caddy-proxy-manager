@@ -1,15 +1,7 @@
 /**
- * Reads the `caddyModules.modules.*` and `caddyModules.conflicts.*` catalog for the screens that
- * name a Caddy module: the module picker, the module gate, and the settings action refusing a
- * selection.
- *
- * `caddy-modules.ts` and `caddy-build-conflicts.ts` keep their English as the source, because
- * `/api/v1/caddy/modules` returns it. The screens ask here instead, by module id and conflict kind -
- * both only known at runtime, so `tests/unit/caddy-module-messages.test.ts` asserts every module
- * and conflict has an entry, and that the English entries say exactly what the registry says.
- *
- * Takes the root translator, since a DNS module's description is the provider's own, which lives
- * under `settings.dnsProviders`.
+ * Module and conflict names for the screens. The source files keep English because
+ * `/api/v1/caddy/modules` returns it; keys are runtime-composed, so caddy-module-messages.test.ts
+ * checks coverage. Takes the root translator: DNS descriptions live under `settings.dnsProviders`.
  */
 
 import type { useTranslations } from "next-intl";
@@ -19,7 +11,7 @@ import { dnsMessageName } from "./dns-provider-messages";
 
 type Translator = ReturnType<typeof useTranslations>;
 
-/** The one place the narrowing is given up, for the reason in the header comment. */
+/** The one place the narrowing is given up: keys are composed at runtime. */
 type DynamicTranslator = {
   (key: string, values?: Record<string, string | number>): string;
   has: (key: string) => boolean;
@@ -29,7 +21,6 @@ function dynamic(t: Translator): DynamicTranslator {
   return t as unknown as DynamicTranslator;
 }
 
-/** A module id (`caddy-l4`) as a catalog key segment (`caddyL4`). */
 export function caddyModuleMessageName(id: string): string {
   return dnsMessageName(id);
 }

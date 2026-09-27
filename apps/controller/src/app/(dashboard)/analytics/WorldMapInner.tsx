@@ -239,9 +239,8 @@ function flag(code: string): string {
   );
 }
 
-// Unwrap polygon rings so consecutive vertices never jump more than 180° in longitude, which stops
-// MapLibre drawing giant artifacts for countries crossing ±180° (Russia, Fiji). Coordinates
-// outside [-180, 180] are intentional - MapLibre renders them via world-copy tiling.
+// Unwrap rings so consecutive vertices never jump over 180 degrees of longitude, or MapLibre draws
+// artifacts for countries crossing the antimeridian. Out-of-range values render via world copies.
 function cutAntimeridian(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
   function unwrapRing(ring: GeoJSON.Position[]): GeoJSON.Position[] {
     if (ring.length === 0) return ring;
@@ -311,9 +310,8 @@ export default function WorldMapInner({
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-  // `tokens` is memoized on theme + mode, so every layer spec below stays referentially stable
-  // until the mode actually flips - react-map-gl diffs these against the live style, and a new
-  // object each render would make it re-apply paint properties continuously.
+  // `tokens` is memoized on theme + mode, so these layer specs stay stable: react-map-gl diffs
+  // them against the live style, and a new object per render re-applies paint continuously.
   const { mode, tokens } = useTheme();
   const palette = useMemo(
     () => mapPalette(mode, (name: string) => tokens[name] ?? ""),
@@ -395,8 +393,7 @@ export default function WorldMapInner({
     });
   }, []);
 
-  // Clicking a country selects it - the same thing the table's country button does - and clicking
-  // the ocean clears the selection, which is what a click on "nothing" usually means on a map.
+  // Like the table's country button; clicking the ocean clears the selection.
   const onClick = useCallback(
     (event: MapLayerMouseEvent) => {
       if (!onSelectCountry) return;
@@ -431,7 +428,6 @@ export default function WorldMapInner({
 
     const lngs = positions.map((c) => c[0]);
     const lats = positions.map((c) => c[1]);
-    // Clamp longitude to [-180, 180] for the popup anchor
     const rawLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
     const longitude = ((((rawLng + 180) % 360) + 360) % 360) - 180;
     const latitude = Math.max(-85, Math.min(85, (Math.min(...lats) + Math.max(...lats)) / 2));
@@ -452,11 +448,8 @@ export default function WorldMapInner({
 
   return (
     <div className="relative h-full flex flex-col">
-      {/* MapLibre renders the popup into its own DOM with its own classes, so
-          its chrome can only be reached by overriding them. The values are
-          plain custom properties rather than resolved colours: unlike the WebGL
-          layers above, this is ordinary CSS, so it follows the theme on its own
-          and needs no re-render when the mode flips. */}
+      {/* MapLibre's popup lives in its own DOM, so only overriding its classes reaches it. Plain
+          CSS variables, not resolved colours, so it follows the theme without a re-render. */}
       <style>{`
         .wm-popup .maplibregl-popup-content {
           background: var(--color-background-popover) !important;
@@ -469,13 +462,8 @@ export default function WorldMapInner({
         .wm-popup .maplibregl-popup-tip { display: none !important; }
       `}</style>
 
-      {/* `relative` makes this the map's containing block. MapGL is then sized by
-          `inset: 0` rather than `height: 100%`: this wrapper is a flex item, and a
-          percentage height resolved against a flex-determined height collapses to
-          zero here. MapLibre's own container carries `overflow: hidden`, so a
-          collapsed height clips the canvas away completely - the map still runs
-          and answers queryRenderedFeatures, but paints nothing and hit-tests
-          nothing. */}
+      {/* MapGL is sized by `inset: 0`, not `height: 100%`: a percentage of this flex item's
+          height collapses to zero, and MapLibre's overflow:hidden then clips the canvas away. */}
       <div className="relative rounded-lg overflow-hidden border border-border flex-1 min-h-[280px] md:min-w-[400px] w-full">
         <MapGL
           mapStyle={mapStyle}
@@ -619,9 +607,7 @@ export default function WorldMapInner({
           <Text type="body" size="xsm" color="secondary">
             {t("low")}{" "}
           </Text>
-          {/* Mirrors the map's own fill-colour interpolation - same stops, same
-              order - so the key stays true to the map after a theme flip
-              inverts the ramp. */}
+          {/* The map's own stops, so the key stays true after a theme flip inverts the ramp. */}
           <div
             style={{
               flex: 1,

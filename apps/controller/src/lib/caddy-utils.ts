@@ -19,11 +19,7 @@ export function expandPrivateRanges(proxies: string[]): string[] {
 
 // ── Header names ─────────────────────────────────────────────────────────────
 
-/**
- * Rewrites a header name into Go's canonical MIME form ("X-CPM-User" → "X-Cpm-User"). Caddy
- * resolves `{http.reverse_proxy.header.<name>}` by literal lookup with no case-folding, so a
- * non-canonical spelling resolves to nothing.
- */
+/** Go's canonical form ("X-Cpm-User"): Caddy's header placeholders look names up literally. */
 export function canonicalHeaderName(name: string): string {
   return name
     .split("-")
@@ -134,16 +130,8 @@ export type HostPort = {
 };
 
 /**
- * Parse a listen or dial address: `HOST:PORT`, `:PORT` or `[v6]:PORT`.
- *
- * Built on parseHostPort so there is one place that knows how brackets work, with three things
- * added that the upstream path does not need: a bare `:PORT` is valid (a listener with no host
- * means every address), the port must be a number in range, and brackets must actually contain an
- * IPv6 address.
- *
- * Returns null for a bare IPv6 literal. `2001:db8::1` ends in `:1`, and reading its last group as
- * a port is how an address silently becomes a listener on port 1 - parseHostPort already refuses
- * it, and this is the reason why.
+ * `HOST:PORT`, `:PORT` or `[v6]:PORT`. Null for a bare IPv6 literal: `2001:db8::1` would
+ * otherwise become a listener on port 1.
  */
 export function splitHostPort(value: string): HostPort | null {
   const trimmed = value.trim();
@@ -165,16 +153,12 @@ export function splitHostPort(value: string): HostPort | null {
 }
 
 /**
- * Ports an L4 host may not listen on. The agent publishes an L4 listen port on the Caddy container,
- * so 2019 would put the admin API on the host; 80/443 belong to the HTTP server, 9090 is the
- * default metrics listener and 3000 is the controller's own published port.
+ * L4 ports are published on the host, so 2019 would expose the admin API; 9090 is the default
+ * metrics listener and 3000 the controller's own port.
  */
 export const RESERVED_L4_PORTS: ReadonlySet<number> = new Set([80, 443, 2019, 3000, 9090]);
 
-/**
- * Whether a stored L4 listen address is on a reserved port, or on the enabled metrics port. The
- * port publisher and the document builder both skip such a row, so neither acts on it alone.
- */
+/** Both the port publisher and the document builder skip such a row, so neither acts alone. */
 export function isReservedL4ListenAddress(
   listenAddress: string,
   metricsPort: number | null,
@@ -184,7 +168,7 @@ export function isReservedL4ListenAddress(
   return RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort;
 }
 
-/** Join a host and port, bracketing an IPv6 literal. The inverse of splitHostPort. */
+/** The inverse of splitHostPort. */
 export function formatHostPort(host: string, port: number): string {
   return host.length === 0 ? `:${port}` : formatDialAddress(host, String(port));
 }
@@ -264,13 +248,8 @@ export function toDurationMs(value: string | null | undefined): number | null {
 // ── Placeholder stripping ────────────────────────────────────────────────────
 
 /**
- * Strips Caddy placeholders (`{http.request.uri}`) out of an admin-supplied path or domain before
- * it lands in generated config, so a host's own rules can't reach into request state.
- *
- * The class excludes `{` as well as `}` on purpose: with `[^}]*`, an unterminated run of braces
- * makes the global replace rescan to end-of-string from every start position, which is quadratic
- * in the input length. Excluding `{` makes each failed position O(1). Caddy placeholders don't
- * nest, so nothing that should match stops matching.
+ * So a host's own rules cannot reach into request state. The class excludes `{` too: `[^}]*` is
+ * quadratic on unterminated braces, and placeholders do not nest.
  */
 export function stripCaddyPlaceholders(value: string): string {
   return value.replace(/\{[^{}]*\}/g, "");

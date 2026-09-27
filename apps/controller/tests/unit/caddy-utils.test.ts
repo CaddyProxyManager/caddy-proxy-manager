@@ -1,7 +1,3 @@
-/**
- * Unit tests for src/lib/caddy-utils.ts
- * Pure functions only - no DB, network, or filesystem.
- */
 import { describe, it, expect } from 'bun:test';
 import {
   expandPrivateRanges,
@@ -87,16 +83,13 @@ describe('mergeDeep', () => {
   it('blocks __proto__ pollution', () => {
     const target: Record<string, unknown> = {};
     mergeDeep(target, JSON.parse('{"__proto__":{"polluted":true}}'));
-    // The OWN property list must not contain __proto__
     expect(Object.hasOwn(target, '__proto__')).toBe(false);
-    // Object.prototype must not have been polluted
     expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
   });
 
   it('blocks constructor pollution', () => {
     const target: Record<string, unknown> = {};
     mergeDeep(target, { constructor: { name: 'hacked' } });
-    // No own property named 'constructor' should have been set
     expect(Object.hasOwn(target, 'constructor')).toBe(false);
   });
 
@@ -228,7 +221,6 @@ describe('parseHostPort', () => {
   });
 
   it('returns null for bare IPv6 without brackets', () => {
-    // Multiple colons without brackets → ambiguous
     expect(parseHostPort('::1')).toBeNull();
   });
 
@@ -394,7 +386,7 @@ describe('stripCaddyPlaceholders', () => {
   });
 
   it('stays linear on an unterminated run of braces', () => {
-    // The earlier /\{[^}]*\}/g rescanned to end-of-string from every start position here.
+    // The earlier /\{[^}]*\}/g rescanned to end-of-string from every start position.
     const start = performance.now();
     expect(stripCaddyPlaceholders('{'.repeat(100_000))).toBe('{'.repeat(100_000));
     expect(performance.now() - start).toBeLessThan(1000);
@@ -424,8 +416,7 @@ describe('splitHostPort', () => {
   });
 
   it('refuses a bare IPv6 literal rather than reading its last group as a port', () => {
-    // This is the whole reason this function exists. `2001:db8::1` ends in `:1`, and anything that
-    // splits on the last colon turns an address into a listener on port 1.
+    // Splitting on the last colon would turn `2001:db8::1` into a listener on port 1.
     expect(splitHostPort('2001:db8::1')).toBeNull();
     expect(splitHostPort('::1')).toBeNull();
     expect(splitHostPort('fe80::1234:5678')).toBeNull();

@@ -2,21 +2,15 @@ import { describe, expect, it } from 'bun:test';
 import { tokenizeCode, type CodeEditorLanguage } from '@/src/components/ui/code-syntax';
 
 /**
- * The tokenizers behind the code fields. Colour is cosmetic, but two things here are not:
- *
- * - The offsets are what CodeEditor slices each line with. A token reaching past the end of its
- *   line, or overlapping the one before it, paints the highlight onto the wrong glyphs.
- * - The rules are one alternation and the first match wins, so a pattern that can match nothing
- *   would spin forever. The invariant tests below are what keep both honest.
+ * Colour is cosmetic, but the offsets are what CodeEditor slices lines with, and a pattern that can
+ * match nothing would spin forever in the one alternation. The invariant tests guard both.
  */
 
-/** The type of the token starting at `needle` on that line, or undefined if none starts there. */
 function typeAt(code: string, language: CodeEditorLanguage, line: number, needle: string) {
   const start = (code.split('\n')[line] ?? '').indexOf(needle);
   return (tokenizeCode(code, language)[line] ?? []).find((t) => t.start === start)?.type;
 }
 
-/** Every token on every line, flattened, for the "is anything highlighted at all" assertions. */
 function allTokens(code: string, language: CodeEditorLanguage) {
   return tokenizeCode(code, language).flatMap((line) => line ?? []);
 }
@@ -60,9 +54,8 @@ describe('Caddyfile', () => {
   });
 
   it('starts an indented directive on the glyph, not on the indentation', () => {
-    // The line-anchored rules match their own indentation to avoid a lookbehind, so the scanner
-    // has to move the token past it. Getting this wrong paints the whitespace and shifts every
-    // following token on the line.
+    // Line-anchored rules swallow their indentation; a token left on it paints the whitespace and
+    // shifts every following token.
     const tokens = tokenizeCode(code, 'caddyfile')[2] ?? [];
     expect(tokens[0]).toMatchObject({ type: 'keyword', start: 2, end: 9 });
     expect((code.split('\n')[2] ?? '').slice(2, 9)).toBe('respond');
@@ -86,8 +79,7 @@ describe('SecLang', () => {
   });
 
   it('keeps the operator inside the string it belongs to', () => {
-    // The operator only reads as one when it is not already part of a quoted argument, which is
-    // where every real rule puts it - so the string wins and the whole argument is one token.
+    // Inside a quoted argument, where real rules put it, the string wins.
     expect(typeAt(code, 'seclang', 1, '"@beginsWith /admin"')).toBe('string');
     expect(typeAt(code, 'seclang', 2, "'@contains badbot'")).toBe('string');
   });
@@ -98,7 +90,7 @@ describe('SecLang', () => {
 });
 
 describe('Dockerfile', () => {
-  // Dockerfile's own substitution syntax, which happens to look like a JS placeholder.
+  // Dockerfile's own substitution syntax, not a JS placeholder.
   // biome-ignore lint/suspicious/noTemplateCurlyInString: see above
   const buildArg = '${MODULE}';
   const code = ['# build', 'FROM caddy:2 AS builder', `run xcaddy build --with ${buildArg}`].join(

@@ -25,8 +25,7 @@ export function buildRedirectRoute(rule: RedirectRule): Record<string, unknown> 
     };
   }
 
-  // With a target of "/" or "", an appended "//evil.example" (or "/\") would be a
-  // protocol-relative URL, so such requests are left unredirected.
+  // With a "/" or "" target, an appended "//evil.example" (or "/\") is protocol-relative.
   const base = rule.to.replace(/\/+$/, "");
   const unsafe: Record<string, unknown>[] = [{ path_regexp: { pattern: "^/[/\\\\]" } }];
   const handle: Record<string, unknown>[] = [];

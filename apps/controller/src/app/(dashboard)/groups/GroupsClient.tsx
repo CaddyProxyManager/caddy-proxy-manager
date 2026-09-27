@@ -1,13 +1,8 @@
 "use client";
 
 /**
- * Groups as a list-detail page: groups in a searchable rail, the selected group on the right.
- *
- * The group pages on Mobbin (Calendly, Miro, PlanetScale, Pinterest Business) share one shape: the
- * group's name and description lead, "Add members" is the primary action beside the edit and
- * delete ones, and the body is a searchable member list with a remove action per row, next to
- * what the group grants. Access here is that second part - IdP names and managed resources - so it
- * gets a tab of its own instead of hiding behind a dialog with nothing on the page to say so.
+ * Groups as a list-detail page. Access (IdP names and managed resources) gets its own tab rather
+ * than hiding behind a dialog with nothing on the page to say so.
  */
 import { useEffect, useMemo, useState } from "react";
 import { startViewAsAction } from "../view-as/actions";
@@ -478,7 +473,7 @@ function GroupDetail({
         }}
       />
 
-      {/* Replaces window.confirm, which was unstyled and not announced as a dialog. */}
+      {/* Not window.confirm: unstyled, and not announced as a dialog. */}
       <AlertDialog
         isOpen={confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(false)}
@@ -508,9 +503,8 @@ function GroupDetail({
           onClose={() => setAccessOpen(false)}
           onSave={async (next) => {
             setAccessOpen(false);
-            // Two writes, because they are two tables. The mapping is the harmless one, so it goes
-            // first: if the grants write fails the group is renamed in the IdP's terms but has
-            // gained nothing, which is the safe half to land alone.
+            // Two tables, two writes. The mapping goes first: if the grants write then fails, the
+            // group has gained nothing, the safe half to land alone.
             await setGroupMappingsAction(group.id, next.mappings);
             await setGroupGrantsAction(group.id, [
               ...next.proxyHostIds.map((id) => ({

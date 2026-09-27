@@ -16,25 +16,18 @@ export type Session = {
     hasPassword?: boolean;
     twoFactorEnabled?: boolean;
   };
-  /**
-   * Set while an administrator is viewing as another role. `user.role` is then that role, which is
-   * what every permission check reads; `realRole` is what the account actually is.
-   */
+  /** Viewing as another role, `user.role` is that role (checks read it); `realRole` is not. */
   viewAs?: ViewAs;
   realRole?: string;
 };
 
-/**
- * The current session, or null. `auth()` reads next/headers, `auth(req)` request headers. Role is
- * fetched fresh from the DB, so a demotion takes effect immediately.
- */
+/** Role is fetched fresh from the DB, so a demotion takes effect immediately. */
 export async function auth(req?: NextRequest): Promise<Session | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
 
-  // headers() in Next.js 15+ returns a Promise
   const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
 
-  // biome-ignore lint/suspicious/noExplicitAny: shape comes from better-auth's runtime-configured instance and is narrowed by the checks below
+  // biome-ignore lint/suspicious/noExplicitAny: better-auth's runtime shape, narrowed below
   let betterAuthSession: any;
   try {
     betterAuthSession = await (await getAuth()).api.getSession({
@@ -61,7 +54,6 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   };
   const userId = typeof baUser.id === "string" ? Number(baUser.id) : baUser.id;
 
-  // Always fetch role/status from the database so changes take effect immediately
   const currentUser = await getUserById(userId);
   if (currentUser?.status !== "active") {
     return null;
@@ -84,15 +76,11 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   };
 }
 
-/** Alias for auth() - get the current session on the server. */
 export async function getSession(): Promise<Session | null> {
   return auth();
 }
 
-/**
- * The DB id of the caller's better-auth session, or null without cookie auth. Marks the "current"
- * session and excludes it from "revoke other sessions".
- */
+/** Null without cookie auth. Marks "current" and is spared by "revoke other sessions". */
 export async function getCurrentSessionId(req?: NextRequest): Promise<number | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
   const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
@@ -105,7 +93,6 @@ export async function getCurrentSessionId(req?: NextRequest): Promise<number | n
   }
 }
 
-/** The caller's better-auth session id and when it began, or null without cookie auth. */
 export async function getCurrentSessionInfo(
   req?: NextRequest,
 ): Promise<{ id: number; createdAt: Date } | null> {
@@ -123,8 +110,8 @@ export async function getCurrentSessionInfo(
 }
 
 /**
- * How recent a sign-in must be to stand in for re-authentication, where there is no current
- * password to ask for. Short on purpose: a borrowed or stolen session is usually an old one.
+ * A sign-in this recent stands in for re-auth where there is no password to ask for. Short: a
+ * borrowed or stolen session is usually an old one.
  */
 export const FRESH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -132,7 +119,6 @@ export function isFreshSession(session: { createdAt: Date } | null, now = Date.n
   return !!session && now - session.createdAt.getTime() <= FRESH_SESSION_MAX_AGE_MS;
 }
 
-/** Require authentication. Redirects to /login if not authenticated. */
 export async function requireUser(): Promise<Session> {
   const session = await auth();
   if (!session?.user) {
@@ -143,7 +129,6 @@ export async function requireUser(): Promise<Session> {
   return session;
 }
 
-/** Require admin privileges. Throws if not authenticated or not admin. */
 export async function requireAdmin(): Promise<Session> {
   const session = await requireUser();
   if (session.user.role !== "admin") {
@@ -153,35 +138,28 @@ export async function requireAdmin(): Promise<Session> {
 }
 
 /**
- * Require a role that manages something: an admin, or an operator with grants.
- *
- * Separate from `requireAdmin` because the two answer different questions. This one gates a page
- * an operator is allowed to open - the host list, the agent list - and what they actually see on
- * it is decided per resource by `lib/permissions.ts`. Everything global stays on `requireAdmin`.
+ * Admin or operator: gates a page an operator may open, whose contents `lib/permissions.ts`
+ * filters per resource. Everything global stays on `requireAdmin`.
  */
 export async function requireManager(): Promise<Session> {
   const session = await requireUser();
   if (session.user.role !== "admin" && session.user.role !== "operator") {
-    // Role-neutral: this gate admits operators too, and borrowing requireAdmin's wording would
-    // tell an operator who was refused for a different reason to go and find an administrator.
+    // Role-neutral: requireAdmin's wording would send a refused operator to find an admin.
     throw domainError("accessDenied");
   }
   return session;
 }
 
 /**
- * Defense-in-depth CSRF check: 403 when Origin is present and mismatches Host, else null.
- * Browsers always send Origin cross-origin.
+ * Defense-in-depth CSRF: a mutating request must carry an Origin matching Host, which browsers
+ * always send cross-origin.
  */
 export function checkSameOrigin(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");
-  // Mutating requests must carry Origin; browsers always send it on cross-origin POST/PUT/DELETE
   const method = request.method.toUpperCase();
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   if (!origin) {
-    // Allow non-mutating requests without Origin (normal browser behavior)
     if (!isMutating) return null;
-    // For mutating requests, require Origin header
     return NextResponse.json({ error: "Forbidden: Origin header required" }, { status: 403 });
   }
 

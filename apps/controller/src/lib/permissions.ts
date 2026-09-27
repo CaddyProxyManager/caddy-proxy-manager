@@ -1,21 +1,6 @@
 /**
- * Who may see and change what.
- *
- * Three roles managed nothing and one managed everything, which is fine until an operator wants to
- * hand one team its own hosts. `operator` is the fourth: a role whose baseline is **nothing**, and
- * whose reach is exactly what its groups were granted.
- *
- * The shape of the rule matters more than the mechanism:
- *
- * - `admin` ignores grants entirely. Adding a grant can never take anything away from an admin,
- *   and no arrangement of groups can produce an instance nobody can administer.
- * - `user` and `viewer` are unchanged. They are forward-auth identities: they sign in, see their
- *   own profile, and manage nothing. A grant does not reach them, so shipping this changes no
- *   existing user's access.
- * - `operator` starts with nothing and gains only what a group it belongs to was granted.
- *
- * So grants are additive in the strict sense - every existing account keeps exactly the access it
- * had, and an operator is something someone has to deliberately create.
+ * Grants reach only `operator`, whose baseline is nothing. `admin` ignores them, so no arrangement
+ * of groups leaves an instance nobody can administer; `user` and `viewer` manage nothing.
  */
 
 import type { Session } from "./auth";
@@ -34,17 +19,13 @@ export type ResourceKind = "proxyHost" | "l4ProxyHost" | "agent";
 export type Access = {
   userId: number;
   role: string;
-  /** True for an admin: every check below short-circuits to allowed. */
   isAdmin: boolean;
-  /** True for an operator - the only non-admin role grants apply to. */
+  /** The only role grants apply to. */
   isOperator: boolean;
   grants: EffectiveGrants;
 };
 
-/**
- * A `DomainError`, so a server action says it in the reader's language. No status: `/api/v1` keeps
- * treating it as it did before it carried a code.
- */
+/** A `DomainError`, so an action says it in the reader's language. */
 export class ForbiddenError extends DomainError {
   constructor() {
     super("accessDenied", {}, domainErrorMessage("accessDenied"));
@@ -58,24 +39,11 @@ function bucket(access: Access, kind: ResourceKind): Map<number, GrantCapability
   return access.grants.agents;
 }
 
-/**
- * Resolve what this session may do.
- *
- * Grants are only loaded for an operator. For everyone else the answer does not depend on them,
- * and a query per request for a value nothing reads is a query per request for nothing.
- */
 export async function resolveAccess(session: Session): Promise<Access> {
   return await accessFor(Number(session.user.id), session.user.role, session.viewAs?.groupIds);
 }
 
-/**
- * The same answer, for a caller that has an id and a role but no session object.
- *
- * The GraphQL API authenticates a Bearer token, which produces exactly those two facts and no
- * email or display name. Building a half-empty `Session` to hand to `resolveAccess` would be
- * inventing fields nothing reads, so the identity-shaped part of the question lives here and
- * `resolveAccess` is the session-shaped wrapper over it.
- */
+/** For a caller with an id and a role but no session, e.g. a GraphQL Bearer token. */
 export async function accessFor(
   userId: number,
   role: string,
@@ -92,14 +60,13 @@ export async function accessFor(
   return { userId, role, isAdmin: role === "admin", isOperator, grants };
 }
 
-/** Whether this viewer may see the resource at all. A manage grant implies view. */
+/** A manage grant implies view. */
 export function canView(access: Access, kind: ResourceKind, id: number): boolean {
   if (access.isAdmin) return true;
   if (!access.isOperator) return false;
   return bucket(access, kind).has(id);
 }
 
-/** Whether this viewer may change the resource. */
 export function canManage(access: Access, kind: ResourceKind, id: number): boolean {
   if (access.isAdmin) return true;
   if (!access.isOperator) return false;
@@ -107,18 +74,13 @@ export function canManage(access: Access, kind: ResourceKind, id: number): boole
 }
 
 /**
- * Whether this viewer may create resources of a kind, or reach anything not tied to one - global
- * settings, certificates, users.
- *
- * Admins only, and deliberately so: a grant names a resource that already exists, so there is
- * nothing for it to say about one that does not. An operator who needs a new host asks an admin,
- * which is a smaller surface than inventing a "may create, in this shape" grant nobody asked for.
+ * Creating, or anything not tied to a resource. Admins only: a grant names a resource that
+ * already exists, so it has nothing to say about one that does not.
  */
 export function canCreate(access: Access): boolean {
   return access.isAdmin;
 }
 
-/** Narrow a list to what this viewer may see. */
 export function visibleIds(access: Access, kind: ResourceKind, ids: number[]): number[] {
   if (access.isAdmin) return ids;
   if (!access.isOperator) return [];
@@ -126,38 +88,29 @@ export function visibleIds(access: Access, kind: ResourceKind, ids: number[]): n
   return ids.filter((id) => granted.has(id));
 }
 
-/** The ids this viewer may see, or null meaning "no restriction" - an admin. */
+/** Null means no restriction (an admin). */
 export function visibleIdFilter(access: Access, kind: ResourceKind): Set<number> | null {
   if (access.isAdmin) return null;
   if (!access.isOperator) return new Set();
   return new Set(bucket(access, kind).keys());
 }
 
-/** Throw unless this viewer may change the resource. */
 export function assertCanManage(access: Access, kind: ResourceKind, id: number): void {
   if (canManage(access, kind, id)) return;
   throw new ForbiddenError();
 }
 
-/** Throw unless this viewer may see the resource. */
 export function assertCanView(access: Access, kind: ResourceKind, id: number): void {
   if (canView(access, kind, id)) return;
   throw new ForbiddenError();
 }
 
-/** The access for the current session, requiring a role that manages something. */
 export async function requireAccess(): Promise<Access> {
   const { requireManager } = await import("./auth");
   return resolveAccess(await requireManager());
 }
 
-/**
- * Whether this role has any management surface at all.
- *
- * What the dashboard navigation is gated on. An operator with no grants still gets the pages -
- * empty - rather than a redirect, because "you have no hosts yet" is a more useful answer than a
- * missing menu item they cannot explain.
- */
+/** Gates navigation. An operator with no grants still gets the pages, empty, not a redirect. */
 export function hasManagementSurface(role: string | undefined): boolean {
   return role === "admin" || role === "operator";
 }

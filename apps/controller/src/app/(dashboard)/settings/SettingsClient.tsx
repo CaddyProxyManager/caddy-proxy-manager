@@ -221,14 +221,10 @@ export default function SettingsClient({
   baseUrl,
   agents,
 }: Props) {
-  // Falls back rather than 404s: a stale bookmark to a renamed section should land somewhere
-  // useful, and every id here is also a real route. Route-derived rather than state - the rail
-  // navigates now, so there is nothing for the page to remember.
+  // Falls back rather than 404s, so a stale bookmark to a renamed section still lands somewhere.
   const active = findSettingsItem(initialSection) ? initialSection : "general";
-  // The page's own translator: the block headings in the list beside it come from the catalog.
   const t = useTranslations("settings");
 
-  // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
   const [acmeState, acmeFormAction] = useActionState(updateAcmeSettingsAction, null);
   const [dashboardState, dashboardFormAction] = useActionState(updateDashboardSettingsAction, null);
@@ -298,8 +294,7 @@ export default function SettingsClient({
   );
   const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
 
-  // Each block of this page, by the id the page registry lists it under. Built here rather than
-  // switched on, so a block cannot end up in the registry and nowhere on screen.
+  // A map rather than a switch, so a block cannot be in the registry and nowhere on screen.
   const blocks: Record<string, ReactNode> = {
     general: (
       <GeneralSection
@@ -515,11 +510,9 @@ export default function SettingsClient({
   };
 
   const page = findSettingsItem(active) ?? SETTINGS_ITEMS[0];
-  // Fields already in the change set: saved, not applied. They are marked on load the same way a
-  // field typed into just now is, since neither has reached Caddy.
+  // Saved but not applied, so marked the same as a field typed into just now.
   const stagedFields = staged.changes.flatMap((change) => change.fields);
-  // From three blocks up the page is longer than a screen, and the list beside it is how the
-  // operator gets to the one they came for. With two it would only name what is already visible.
+  // Below three blocks the page fits a screen and the list would only name what is visible.
   const showAnchors = page.blocks.length >= 3;
 
   return (
@@ -646,8 +639,7 @@ function DefaultResponseSection({
   const storedHeaders = Object.entries(defaultResponse?.headers ?? {})
     .map(([name, value]) => `${name}: ${value}`)
     .join("\n");
-  // Headers only carry over when the stored mode is the one being edited; switching modes starts
-  // from that mode's sensible default rather than the other mode's headers.
+  // Switching modes starts from that mode's default rather than the other mode's headers.
   const [headers, setHeaders] = useState(
     defaultResponse?.mode === "respond" || defaultResponse?.mode === "redirect"
       ? storedHeaders
@@ -806,8 +798,7 @@ function AcmeSection({
 
 function DnsProviderCredentialFields({ providerDef }: { providerDef: DnsProviderDefinition }) {
   const t = useTranslations("settings");
-  // Keyed on the provider so switching providers resets the credentials instead of carrying the
-  // previous provider's values across.
+  // Keyed on the provider so switching resets credentials instead of carrying them across.
   const [values, setValues] = useState<Record<string, string>>({});
   const description = dnsProviderDescription(t, providerDef);
 
@@ -859,9 +850,8 @@ function DnsProvidersSection({
 }) {
   const t = useTranslations("settings");
   const { enabledModuleIds } = useModuleGate();
-  // Each provider is a separate caddy-dns plugin, so availability is per provider, not one blanket
-  // "DNS-01 works" flag. A provider whose module is switched off would produce a config Caddy
-  // rejects outright, so it leaves the picker rather than failing at certificate-issuance time.
+  // Each provider is its own caddy-dns module; one switched off would make Caddy reject the config,
+  // so it is refused here rather than at issuance time.
   const isProviderAvailable = (name: string) =>
     enabledModuleIds === null || enabledModuleIds.includes(dnsModuleId(name));
 
@@ -878,12 +868,11 @@ function DnsProvidersSection({
     { value: "none", label: t("dnsProviderSelectPlaceholder") },
     ...dnsProviderDefinitions.map((p) => ({
       value: p.name,
-      // The display name is the provider's brand, so it stays as the registry spells it.
+      // A brand name, so it stays as the registry spells it.
       label: configuredProviders.includes(p.name)
         ? t("dnsProviderOptionUpdate", { name: p.displayName })
         : p.displayName,
-      // Kept in the list rather than filtered out, so an admin looking for a provider finds it and
-      // learns why it is unavailable.
+      // Listed rather than filtered, so an admin looking for it learns why it is unavailable.
       disabled: !isProviderAvailable(p.name),
       description: isProviderAvailable(p.name) ? undefined : t("dnsProviderModuleDisabledOption"),
     })),
@@ -1574,10 +1563,7 @@ function AuthentikSection({
   );
 }
 
-/**
- * Defaults for a host authenticating through an external forward-auth server. Only what every
- * host would otherwise repeat - the rest of the block is per host, in the host dialog.
- */
+/** Forward-auth defaults every host would otherwise repeat; the rest is per host. */
 function ForwardAuthSection({
   forwardAuth,
   forwardAuthState,
@@ -1660,10 +1646,7 @@ function OAuthSection({
 
 // ─── Section: Password Policy ────────────────────────────────────────────────
 
-/**
- * Not offered as an agent override: forcing a password reset is a local security decision, and
- * inheriting it would let one instance lock another's users out.
- */
+/** Not an agent override: inheriting it would let one instance lock another's users out. */
 function PasswordPolicySection({
   passwordPolicy,
   passwordPolicyState,
@@ -1760,17 +1743,9 @@ function AvatarsSection({
 // ─── Section: Branding ───────────────────────────────────────────────────────
 
 /**
- * An object URL for a file the operator just picked, or null if it is not one.
- *
- * `URL.createObjectURL` is specified to return `blob:<this origin>/<uuid>` - a name the browser
- * mints, carrying no byte of the file's name or contents - so the guard cannot fail at runtime.
- * It is here because the value still *derives* from a file the user chose, and that is enough for
- * a scanner tracing it into an attribute to call it attacker-controlled text (js/xss-through-dom
- * did). Narrowing to the one scheme this may ever be turns the invariant into something both a
- * reader and an analyser can see, instead of a claim in a comment.
- *
- * Null rather than a throw: a preview that cannot be shown is not a reason to break the form, and
- * the field still submits the file either way.
+ * Narrowed to `blob:` though createObjectURL cannot return anything else: the value derives from a
+ * user-picked file, which scanners flag as XSS (js/xss-through-dom). Null, not a throw, so a failed
+ * preview never breaks the form.
  */
 function objectUrlForPreview(file: File): string | null {
   const url = URL.createObjectURL(file);
@@ -1780,11 +1755,8 @@ function objectUrlForPreview(file: File): string | null {
 }
 
 /**
- * Upload or remove the favicon.
- *
- * A plain `<input type="file">` rather than a design-system control: Astryx has no file input, and
- * the point of this field is the native picker anyway. The preview is built from the chosen File
- * with an object URL - the stored icon is never sent to this page, only served by its own route.
+ * A plain `<input type="file">`: Astryx has none. The preview is an object URL of the picked File,
+ * since the stored icon is only served by its own route, never sent to this page.
  */
 function BrandingSection({
   hasFavicon,
@@ -1807,8 +1779,7 @@ function BrandingSection({
     [preview],
   );
 
-  // A cache-busting query so the tab icon and the preview below update on the same save. The
-  // route revalidates by ETag, which a browser is entitled to skip for an unchanged URL.
+  // The route revalidates by ETag, which a browser may skip for an unchanged URL.
   const currentSrc = `/api/branding/favicon?v=${faviconState?.success ? "new" : "current"}`;
 
   return (
@@ -1824,8 +1795,7 @@ function BrandingSection({
 
           <HStack gap={3} align="center">
             {(preview || hasFavicon) && (
-              // A plain <img>: next/image cannot serve an object URL built from a File the user
-              // has only just picked, and that preview is the point of this control.
+              // next/image cannot serve an object URL of a just-picked File.
               <img
                 src={preview ?? currentSrc}
                 alt={preview ? t("faviconSelectedAlt") : t("faviconCurrentAlt")}
@@ -1868,7 +1838,7 @@ function BrandingSection({
             )}
             <Button
               type="submit"
-              // Pink once a file is chosen, like every other save with something waiting to be saved.
+              // Pink once a file is chosen, like every other save with something pending.
               variant={preview ? "primary" : "secondary"}
               label={t("save")}
               isDisabled={!preview}
@@ -2000,11 +1970,8 @@ function UpdatesSection({
 // ─── Section: Analytics ──────────────────────────────────────────────────────
 
 /**
- * Explains where the current answer came from when nothing is stored yet.
- *
- * Worth a line of its own: an operator who has never opened this page sees a checkbox already
- * ticked, and without this it reads as a setting someone else changed rather than as the
- * deployment's existing configuration being described back to them.
+ * Where the current answer came from when nothing is stored, so a pre-ticked box reads as the
+ * deployment's configuration rather than a setting someone else changed.
  */
 function InferredNote({ source, children }: { source: string; children: ReactNode }) {
   const t = useTranslations("settings");
@@ -2140,11 +2107,8 @@ function AnalyticsSection({
 // ─── Section: GeoIP ──────────────────────────────────────────────────────────
 
 /**
- * When MaxMind was last asked for a newer database, and a way to ask now.
- *
- * The file's own date cannot answer "is the updater still working": a run that finds nothing new
- * leaves no trace on disk, so without this an operator cannot tell a quiet week at MaxMind from an
- * updater that keeps failing.
+ * The last MaxMind check, and a way to run one. A run finding nothing new leaves no trace on disk,
+ * so the file's date cannot tell a quiet week from a failing updater.
  */
 function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   const t = useTranslations("settings");
@@ -2295,11 +2259,7 @@ function GeoipSection({
 
 // ─── Section: Agent ──────────────────────────────────────────────────────────
 
-/**
- * Human date for a timestamp the agent or the pairing recorded, or `never` when there is none.
- * Formatted through next-intl so the zone and locale match every other timestamp on the page -
- * `toLocaleString()` would use whatever the runtime has, which differs between container and browser.
- */
+/** Through next-intl, not `toLocaleString()`, so zone and locale match the rest of the page. */
 function whenText(
   format: ReturnType<typeof useFormatter>,
   iso: string | null,
@@ -2312,7 +2272,6 @@ function whenText(
     : format.dateTime(parsed, TIMESTAMP_STYLES.dateTime);
 }
 
-/** One agent's line in the fleet list: what it is, and whether it is answering. */
 function AgentRow({
   name,
   status,
@@ -2552,12 +2511,8 @@ function AgentSection({
 // ─── Section: Caddy Build ────────────────────────────────────────────────────
 
 /**
- * One selection per agent, on top of a fleet default the rest follow.
- *
- * The module list describes a binary built on a particular host, so an agent that needs a plugin
- * the others do not - a DNS provider only it can reach - should not force that plugin into every
- * other image. What an agent without its own selection follows is the fleet default, which is what
- * this page edited before and what every agent starts on.
+ * Per-agent selections over a fleet default: the module list describes one host's binary, so a
+ * plugin only one agent needs should not land in every image.
  */
 function CaddyBuildSection({
   caddyBuild,

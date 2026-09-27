@@ -4,13 +4,8 @@ import { ApiValidationError } from "@/src/lib/api-errors";
 import { getAnalyticsCountryBreakdown, resolveAnalyticsRange } from "@/src/lib/analytics-db";
 
 /**
- * One country's breakdown: its hosts, response classes and user agents, for the strip that opens
- * under the map when a country is chosen.
- *
- * The code is validated here rather than trusted to the query's parameter binding alone: it names
- * a country, so anything that is not two capital letters is a mistake worth a 400, not a query
- * that silently matches nothing. "XX" is accepted - it is how the countries list names requests
- * GeoIP could not place.
+ * One country's breakdown. Anything but two capitals is a 400, not a query matching nothing; "XX"
+ * is how the countries list names requests GeoIP could not place.
  */
 export async function GET(req: NextRequest) {
   try {

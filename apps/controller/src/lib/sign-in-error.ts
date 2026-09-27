@@ -1,13 +1,7 @@
 /**
- * Puts a refused Better Auth sign-in into words for the sign-in screen.
- *
- * Better Auth answers with an English `message` and a stable `code`. The message is never shown -
- * it is English whatever the reader's language - and the code is looked up instead. A code this
- * does not know (a newer Better Auth, a plugin added later) gets a generic sentence rather than
- * raw text. The rate limiter answers 429 with a message and no code, so it is matched by status.
- *
- * The English under `auth.errors` is Better Auth's own wording, so an English reader sees what
- * they saw before; `tests/unit/sign-in-error.test.ts` holds the two together.
+ * Maps Better Auth's `code` (its `message` is always English) to the catalog; unknown codes get a
+ * generic sentence, and the codeless 429 matches by status. `auth.errors` keeps Better Auth's
+ * English wording, which `tests/unit/sign-in-error.test.ts` pins.
  */
 
 export type SignInErrorKey =
@@ -19,7 +13,7 @@ export type SignInErrorKey =
   | "usernameTooLong"
   | "usernameTooShort";
 
-/** The codes `signIn.username` can refuse with, from the username plugin's USERNAME_ERROR_CODES. */
+/** From the username plugin's USERNAME_ERROR_CODES. */
 export const SIGN_IN_ERROR_KEYS: Readonly<
   Record<string, Exclude<SignInErrorKey, "tooManyRequests" | "unknown">>
 > = {

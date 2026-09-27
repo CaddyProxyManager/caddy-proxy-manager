@@ -23,7 +23,7 @@ const isObject = (value: unknown): value is Json =>
 
 type PortRange = [number, number];
 
-/** The ports a Caddy listen address claims; null for one that can't be read, which never merges. */
+/** Null for an address that can't be read, which never merges. */
 function listenPorts(address: string): PortRange | null | "none" {
   const bare = address.replace(/^[a-z0-9+]+\//i, "");
   if (/^unix/i.test(address) || /^fd\//i.test(address)) return "none";
@@ -164,7 +164,6 @@ export async function withGlobalCaddyConfig(
   }
 }
 
-/** Anything a save must refuse before a byte of it reaches Caddy. */
 function assertShape(caddyfile: string) {
   if (caddyfile.length > GLOBAL_CADDYFILE_MAX_LENGTH) {
     throw domainError(

@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * The signed-in user's table density, for every table in the dashboard.
- *
- * Read once by the dashboard layout and held here rather than passed down, because tables sit at
- * every depth - DataTable, and the few pages that use Astryx's Table directly. Held as state so
- * Profile can change it and every table follows at once, before the server round trip that saves
- * it has come back; the layout's next render then hands down the same value.
+ * The signed-in user's table density, held in context because tables sit at every depth. State,
+ * so Profile can change it and every table follows before the save round trip returns.
  */
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { DEFAULT_TABLE_DENSITY, type TableDensity } from "@/src/lib/table-density";

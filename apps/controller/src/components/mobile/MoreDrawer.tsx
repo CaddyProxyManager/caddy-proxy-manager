@@ -9,15 +9,9 @@ import { type Destination, MORE_DRAWER_SLOTS } from "@/src/lib/nav/destinations"
 import { DESTINATION_ICONS } from "./nav-icons";
 
 /**
- * The More drawer: the pages this user keeps one tap away, over the page they are on.
- *
- * A sheet anchored above the tab bar rather than Astryx's modal BottomSheet. A modal dialog sits in
- * the browser's top layer and makes everything behind it inert, tab bar included - so a second tap
- * on More could never reach the button, and double-tap to the full More page would be impossible.
- * The bar staying live under the sheet is also what keeps More visibly the tab you are on.
- *
- * Unmounted when closed, not hidden: a closed sheet repeating every page name is a duplicate for
- * find-in-page, for a screen reader, and for every locator in the test suite.
+ * Not Astryx's modal BottomSheet: a modal makes the tab bar inert, so a second tap on More could
+ * never land. Unmounted when closed, or every page name is duplicated for find-in-page, screen
+ * readers and test locators.
  */
 export function MoreDrawer({
   isOpen,
@@ -32,7 +26,7 @@ export function MoreDrawer({
   items: Destination[];
   /** How many pages All pages leads to, for its caption. */
   totalPages: number;
-  /** True until the user has customized the drawer once; afterwards the row goes. */
+  /** Until the user has customized the drawer once. */
   offerCustomize: boolean;
   returnFocusRef: RefObject<HTMLElement | null>;
 }) {

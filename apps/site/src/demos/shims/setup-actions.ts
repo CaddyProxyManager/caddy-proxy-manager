@@ -1,9 +1,6 @@
 /**
- * Stands in for the setup screens' server actions - `app/setup/actions.ts` and
- * `app/setup/migrate/actions.ts` both resolve here (see the plugin in astro.config.mjs).
- *
- * The real ones write the database and `redirect()`; these hand the form to the running setup
- * simulation, which does the same to its own state and loads the next page.
+ * Stands in for `app/setup/actions.ts` and `app/setup/migrate/actions.ts` (see astro.config.mjs):
+ * instead of writing the database and redirecting, forms go to the running setup simulation.
  */
 import { currentSimulation } from "../setup-simulation";
 

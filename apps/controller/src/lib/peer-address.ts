@@ -1,9 +1,8 @@
 import type { IncomingMessage, Server } from "node:http";
 
 /**
- * The TCP peer of a request. vinext's Node adapter does not carry the socket into the Web Request,
- * so the compiled server stamps the address as this header before vinext reads the request,
- * overwriting anything a client sent under the same name.
+ * vinext's Node adapter drops the socket, so the compiled server stamps the peer here first,
+ * overwriting any client-sent copy.
  */
 export const PEER_ADDRESS_HEADER = "x-cpm-peer-address";
 

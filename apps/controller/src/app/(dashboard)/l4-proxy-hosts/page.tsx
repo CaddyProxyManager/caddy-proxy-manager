@@ -45,8 +45,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const sortBy = sortByParam || undefined;
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
-  // Filtering on the query rather than on the returned page, for the same reason as the HTTP list:
-  // a client-side tab would show nothing under "UDP" whenever every UDP host sat on a later page.
+  // In the query: a client-side tab shows nothing when every UDP host sits on a later page.
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 

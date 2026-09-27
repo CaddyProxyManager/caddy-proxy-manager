@@ -1,8 +1,4 @@
-/**
- * Issue #171: the analytics host dropdown hides traffic-only hosts by default, behind an "Include
- * unconfigured hosts" toggle. Seeds one configured and one traffic-only host, then checks the
- * toggle reveals the latter.
- */
+/** #171: traffic-only hosts stay hidden in the analytics host dropdown until the toggle is on. */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 
@@ -34,7 +30,6 @@ test.describe('Analytics host filter (#171)', () => {
     let proxyHostId: number | undefined;
 
     try {
-      // A configured proxy host (SQLite) - always present in the dropdown.
       const createRes = await page.request.post(API_PROXY_HOSTS, {
         headers: { Origin: ORIGIN },
         data: {
@@ -46,7 +41,7 @@ test.describe('Analytics host filter (#171)', () => {
       expect(createRes.ok(), `create proxy host failed: ${createRes.status()}`).toBeTruthy();
       proxyHostId = (await createRes.json()).id;
 
-      // A traffic-only host (ClickHouse) - present in the dropdown but not a proxy host.
+      // Traffic-only: in ClickHouse but not a proxy host.
       await ch.insert({
         table: 'traffic_events',
         format: 'JSONEachRow',
@@ -66,7 +61,7 @@ test.describe('Analytics host filter (#171)', () => {
         ],
       });
 
-      // Start with the toggle off regardless of any persisted preference.
+      // Ignore any persisted preference.
       await page.addInitScript(() => {
         try {
           localStorage.removeItem('analytics:includeUnconfiguredHosts');
@@ -75,8 +70,7 @@ test.describe('Analytics host filter (#171)', () => {
         }
       });
       await page.goto('/analytics');
-      // Scoped to the desktop tiles: phones get the same label in a summary card, which stays in the
-      // DOM (hidden) at this width.
+      // The phone summary card carries the same label, hidden but in the DOM.
       await expect(
         page.getByTestId('analytics-stats').getByText('Total Requests', { exact: true }),
       ).toBeVisible({
@@ -86,21 +80,17 @@ test.describe('Analytics host filter (#171)', () => {
       const configuredOption = page.getByRole('option', { name: configuredHost });
       const unconfiguredOption = page.getByRole('option', { name: unconfiguredHost });
 
-      // Open the hosts selector. In `hasSearch` mode the MultiSelector trigger is deliberately NOT
-      // a combobox - the popup's search input owns that role - so it is a plain listbox-opening
-      // button, the only one on the page.
+      // With `hasSearch` the trigger is not a combobox (the search input owns that role).
       const openHostList = async () => {
         await page.locator('button[aria-haspopup="listbox"]').click();
         await page.getByPlaceholder('Search hosts…').fill(tag);
       };
 
-      // By default only configured proxy hosts are listed.
       await openHostList();
       await expect(configuredOption).toBeVisible({ timeout: 10_000 });
       await expect(unconfiguredOption).not.toBeVisible();
 
-      // The toggle lives outside the popover, so activating it light-dismisses
-      // the listbox - reopen and re-search before checking the widened list.
+      // The toggle is outside the popover, so using it dismisses the listbox.
       await page.keyboard.press('Escape');
       await page.getByRole('checkbox', { name: /include unconfigured hosts/i }).click();
 

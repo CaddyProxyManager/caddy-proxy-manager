@@ -1,9 +1,6 @@
 /**
- * The real db module booted on a SQLite file, whichever backend the rest of the suite runs on.
- *
- * `bun run test:sqlite` covers the models; this covers what only a real file exercises - the
- * migrator, the pragmas that make SQLite behave like the schema assumes, and the refusal of a
- * pre-3.0 file that an unmodified old .env still points at.
+ * What only a real file exercises: the migrator, the pragmas the schema assumes, and refusing a
+ * pre-3.0 file an old .env still points at. `test:sqlite` covers the models.
  */
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';

@@ -1,21 +1,12 @@
 /**
- * The two scalars the schema needs beyond the built-ins.
- *
- * `JSON` carries the free-form configuration blobs - a proxy host's load-balancer settings, WAF
- * overrides, geoblock rules, location rules. Those are validated by the model layer against shapes
- * that change with the product, and mirroring each of them as GraphQL input types would be several
- * thousand lines that must be kept in step with validators that already exist. Worse, it would
- * make the schema *look* like the authority on a shape it is not.
- *
- * So the rule is: anything with a fixed, queryable shape is a real field, and configuration that
- * the models validate travels as JSON. That keeps the schema honest about which is which, and it
- * is what lets a GraphQL mutation and the REST route it replaces run the same validation on the
- * same input.
+ * Fixed, queryable shapes are real fields; configuration the models validate travels as `JSON`.
+ * Mirroring it as input types would make the schema look like an authority it is not, and JSON
+ * lets GraphQL and REST run the same validation on the same input.
  */
 
 import { GraphQLError, GraphQLScalarType, Kind, type ValueNode } from "graphql";
 
-/** Depth limit for a literal JSON value written inline in a query document. */
+/** For a JSON literal written inline in a query document. */
 const MAX_LITERAL_DEPTH = 32;
 
 function literalToJson(node: ValueNode, depth = 0): unknown {
@@ -38,8 +29,7 @@ function literalToJson(node: ValueNode, depth = 0): unknown {
     case Kind.NULL:
       return null;
     default:
-      // An enum or a variable reference. Neither is a JSON value, and guessing at one would accept
-      // a document that means something other than it appears to.
+      // An enum or variable: guessing would accept a document meaning other than it appears.
       throw new GraphQLError(`Cannot represent ${node.kind} as JSON`, { nodes: node });
   }
 }
@@ -51,17 +41,11 @@ export const JSONScalar = new GraphQLScalarType({
     "restating those shapes in the schema where the two could drift apart.",
   serialize: (value) => value,
   parseValue: (value) => value,
-  // Wrapped rather than passed directly: the depth counter is this function's business,
-  // and GraphQL calls a literal parser with (node, variables).
+  // Wrapped: GraphQL passes (node, variables), which would land in the depth counter.
   parseLiteral: (node) => literalToJson(node),
 });
 
-/**
- * An ISO 8601 timestamp, as a string.
- *
- * The database stores these as text already, so this documents the format rather than converting
- * anything - a Date round-tripped through JSON would arrive as a string regardless.
- */
+/** ISO 8601, as a string: this documents the format rather than converting anything. */
 export const DateTimeScalar = new GraphQLScalarType<string, string>({
   name: "DateTime",
   description: "An ISO 8601 timestamp, e.g. 2026-09-08T12:00:00.000Z.",

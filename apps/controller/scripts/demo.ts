@@ -1,14 +1,7 @@
 /**
- * A demo instance with no containers at all: DEMO_MODE on, a SQLite file for the database.
- *
- *   bun run demo                        # dev server on :3020, seeded on first start
- *   bun run demo --reset                # start over from a freshly seeded database
- *   bun run demo --reset-every 6        # and again every six hours, for a public demo
- *   bun run demo --prod                 # build once, then serve the production build
- *
- * Signs in as admin / admin (ADMIN_USERNAME / ADMIN_PASSWORD override it). Demo mode keeps that
- * account from being disabled, demoted or given a new password, so no visitor can lock out the next.
- * Everything else the environment sets is passed through, so CLICKHOUSE_PASSWORD still works.
+ * A container-free demo: DEMO_MODE on, SQLite. `bun run demo [--reset] [--reset-every <hours>]
+ * [--prod]`, on :3020. Signs in as admin/admin, which demo mode protects so no visitor can lock
+ * out the next; the rest of the environment passes through.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -29,7 +22,7 @@ const args = yargs(hideBin(process.argv))
   .parseSync();
 
 const controllerDir = resolve(import.meta.dir, "..");
-// Under the gitignored data/, and a directory down so the legacy-database scan of ./data skips it.
+// A directory below data/ so the legacy-database scan of ./data skips it.
 const dataDir = resolve(args["data-dir"] ?? join(controllerDir, "data", "demo"));
 const dbFile = join(dataDir, "cpm.db");
 mkdirSync(dataDir, { recursive: true });
@@ -57,7 +50,7 @@ const env: Record<string, string | undefined> = {
 };
 
 function deleteDatabase(): void {
-  // analytics.db is the demo's traffic (src/lib/clickhouse/sqlite-store.ts), which resets with it.
+  // analytics.db is the demo's traffic (clickhouse/sqlite-store.ts).
   for (const file of [dbFile, join(dataDir, "analytics.db")]) {
     for (const suffix of ["", "-wal", "-shm"]) rmSync(file + suffix, { force: true });
   }
@@ -75,7 +68,6 @@ async function run(command: string[]): Promise<void> {
 async function prepareDatabase(fresh: boolean): Promise<void> {
   const isNew = fresh || !existsSync(dbFile);
   if (fresh) deleteDatabase();
-  // Seeding migrates the new file and creates the admin, so the server starts on a finished one.
   if (isNew && args.seed) await run([process.execPath, "scripts/seed-demo.ts"]);
 }
 
@@ -83,8 +75,7 @@ const vinext = join(controllerDir, "node_modules", "vinext", "dist", "cli.js");
 let server: ReturnType<typeof Bun.spawn> | null = null;
 
 function startServer(): void {
-  // vinext itself rather than `bun run dev`, so stopping it for a reset stops the server and not
-  // only a wrapper around it.
+  // vinext directly, so stopping it for a reset stops the server, not a wrapper.
   server = Bun.spawn(
     [process.execPath, vinext, args.prod ? "start" : "dev", "--port", String(args.port)],
     { cwd: controllerDir, env, stdio: ["inherit", "inherit", "inherit"] },

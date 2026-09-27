@@ -4,13 +4,8 @@ import { fresh } from '@/tests/helpers/fresh';
 import type { SettingDefinition } from '@/src/lib/settings/registry';
 
 /**
- * The settings layer, minus its database.
- *
- * The client resolves its configuration through `getSetting` now rather than reading `process.env`
- * at module load, so these tests would otherwise need a schema each just to reach the environment
- * fallback. This reproduces resolve.ts's environment layer exactly - nothing stored, so every
- * setting falls through to its variable and then its default - which is what `stubEnv` below is
- * setting up. Whether a *stored* value wins is resolve.ts's own business, and tested there.
+ * resolve.ts's environment layer with nothing stored, so `stubEnv` reaches the client without a
+ * schema per test. Whether a stored value wins is tested in resolve.ts's own suite.
  */
 vi.mock('@/src/lib/settings/resolve', () => ({
   getSetting: async (definition: SettingDefinition) => {
@@ -130,7 +125,6 @@ describe('clickhouse client analytics enablement', () => {
     const wafDdl = commands.find((q) => q.includes('CREATE TABLE IF NOT EXISTS waf_events'));
     expect(trafficDdl).toContain('TTL ts + INTERVAL 30 DAY DELETE');
     expect(wafDdl).toContain('TTL ts + INTERVAL 30 DAY DELETE');
-    // TTL already matches → no MODIFY TTL migration issued.
     expect(commands.some((q) => q.includes('MODIFY TTL'))).toBe(false);
   });
 
@@ -167,10 +161,7 @@ describe('clickhouse client analytics enablement', () => {
     expect(modifies).toHaveLength(2);
   });
 
-  // Behaviour change: this used to throw at import and take the process down. Retention is a
-  // registry setting now, and the registry's rule is that an unusable value is ignored with a
-  // warning rather than being fatal - a typo in one environment variable must not be the reason
-  // the proxy stops serving. Falls back to the default, exactly as every other setting does.
+  // An unusable value is a warning, not fatal: a typo in one variable must not stop the proxy.
   it('falls back to the default when CLICKHOUSE_RETENTION_DAYS is not a positive integer', async () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', 'not-a-number');
@@ -180,9 +171,8 @@ describe('clickhouse client analytics enablement', () => {
     await expect(getRetentionDays()).resolves.toBe(30);
   });
 
-  // The drop step first enumerates matching tables from system.tables, then drops
-  // each. This mock answers the enumeration query with `liveTables` and every
-  // other query (the retention create_table_query read) with a matching 30-day TTL.
+  // Answers the system.tables enumeration with `liveTables`, and anything else (the retention
+  // read) with a matching 30-day TTL.
   function mockClient(liveTables: string[], commandImpl?: (q: string) => void) {
     const calls: {
       command: string[];
@@ -219,8 +209,7 @@ describe('clickhouse client analytics enablement', () => {
   it('drops every disabled system-log table that exists, including numbered upgrade leftovers', async () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
 
-    // What system.tables would return: live tables, numbered _N copies from past
-    // upgrades, and the newly-disabled histogram_metric_log.
+    // Includes _N copies from past upgrades.
     const liveTables = [
       'trace_log',
       'trace_log_3',
@@ -234,8 +223,6 @@ describe('clickhouse client analytics enablement', () => {
     const { initClickHouse } = await import(`@/src/lib/clickhouse/client${fresh()}`);
     await initClickHouse();
 
-    // The enumeration matches the disabled families plus an optional _<N> suffix,
-    // and now includes histogram_metric_log.
     const enumeration = calls.queries.find((q) => q.query.includes('match(name'));
     expect(enumeration?.params?.pattern).toBe(
       '^(metric_log|asynchronous_metric_log|trace_log|query_log|query_thread_log|query_views_log|' +
@@ -351,10 +338,7 @@ describe('per-country analytics', () => {
     vi.unstubAllEnvs();
   });
 
-  /**
-   * A client whose query() answers by what the SQL asks for, so the three grouped queries the
-   * breakdown fires in parallel each get their own rows regardless of which lands first.
-   */
+  /** Answers by SQL, since the breakdown's three parallel queries land in any order. */
   function clientAnswering(answers: { match: RegExp; rows: unknown[] }[]) {
     const calls: { query: string; query_params: Record<string, unknown> }[] = [];
     const query = vi.fn(async (args: { query: string; query_params: Record<string, unknown> }) => {
@@ -447,8 +431,7 @@ describe('per-country analytics', () => {
     const { queryCountryBreakdown } = await import(`@/src/lib/clickhouse/client${fresh()}`);
     const result = await queryCountryBreakdown(0, 1, [], 'XX');
 
-    // "XX" is what queryCountries calls requests GeoIP could not place; matching it literally
-    // would open an empty breakdown for the one row that is guaranteed to have traffic.
+    // "XX" is GeoIP's unplaced bucket; matching it literally would open an empty breakdown.
     for (const call of calls) {
       expect(call.query).toContain('country_code IS NULL');
       expect(call.query).not.toContain('{country:String}');

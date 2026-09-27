@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 const API_CA = 'http://localhost:3000/api/v1/ca-certificates';
 const API_CLIENT_CERTS = 'http://localhost:3000/api/v1/client-certificates';
 
-// Placeholder PEMs are fine here: the CA/cert are never attached to a host,
-// so they are not embedded into the Caddy config and don't need to be valid.
+// Never attached to a host, so never in the Caddy config.
 const FAKE_PEM = '-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----';
 const FAKE_KEY = '-----BEGIN PRIVATE KEY-----\nMIIBfake\n-----END PRIVATE KEY-----';
 
@@ -51,9 +50,7 @@ test.describe('mTLS - deleted CA must not remain selectable', () => {
       await page.reload();
       await openMtlsPicker(page);
       const dialog = page.getByRole('dialog');
-      // Both names appear more than once as text (field label plus selected
-      // value), so assert on the controls themselves: the CA is a checkbox and
-      // each issued cert is a CheckboxListItem named after its common name.
+      // By control: both names appear more than once as text.
       await expect(dialog.getByRole('checkbox', { name: caName })).toBeVisible({ timeout: 10000 });
       await expect(dialog.getByRole('checkbox', { name: certCommonName })).toBeVisible();
       await dialog
@@ -69,7 +66,7 @@ test.describe('mTLS - deleted CA must not remain selectable', () => {
       expect(delResp.ok()).toBeTruthy();
       caDeleted = true;
 
-      // The issued certificate must be gone from the API too (real cascade).
+      // Gone from the API too: a real cascade.
       const certAfter = await page.request.get(`${API_CLIENT_CERTS}/${cert.id}`);
       expect(certAfter.status()).toBe(404);
 
@@ -87,10 +84,7 @@ test.describe('mTLS - deleted CA must not remain selectable', () => {
   });
 });
 
-/**
- * Opens the Create Host dialog and enables the Mutual TLS (mTLS) section so the
- * "Trusted Certificates" picker is rendered.
- */
+/** The picker renders only once the mTLS section is enabled. */
 async function openMtlsPicker(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /create host/i }).click();
   const dialog = page.getByRole('dialog');

@@ -1,8 +1,6 @@
 /**
- * SECURITY-AUDIT H2: an operator with a manage grant could author arbitrary Caddy handlers through
- * the custom Caddyfile and raw JSON fields - a reverse_proxy to the admin API, or a file_server at /.
- * The model now refuses a change to those fields from anyone but an admin, while leaving an
- * operator free to save a host whose snippet an admin wrote.
+ * SECURITY-AUDIT H2: raw Caddyfile/JSON fields can author any handler, so only an admin may change
+ * them - though an operator can still save a host whose snippet an admin wrote.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -13,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

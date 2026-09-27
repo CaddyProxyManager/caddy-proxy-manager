@@ -127,23 +127,15 @@ type ActionResult = {
 
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
-/**
- * The message for a failed settings action. A `DomainError` is said in the reader's language; any
- * other error keeps its own text - Caddy's, the database's - and `fallback` covers a non-Error.
- */
+/** A `DomainError` is translated; any other error keeps its own text (Caddy's, the database's). */
 async function errorText(error: unknown, fallback: string): Promise<string> {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
   return extractErrorMessage(t, error, fallback, format);
 }
 
 /**
- * Applies as soon as it is submitted, under the settings lock.
- *
- * Reserved for the actions staging cannot represent: ones whose real work is not a settings write
- * at all (a favicon upload, an update check), ones that write another table (the WAF rule
- * suppressions, which edit proxy hosts), and ones that manage containers on save (Caddy build,
- * analytics, GeoIP). Splitting those in half - side effect now, settings blob later - would be
- * worse than not staging them, so they keep the old behaviour.
+ * Applies at once, under the settings lock. For actions staging cannot represent: side effects
+ * beyond a settings write (uploads, other tables, containers), which staging would split in half.
  */
 function serializedSettingsAction<TArgs extends unknown[], TResult>(
   action: (...args: TArgs) => Promise<TResult>,
@@ -152,14 +144,8 @@ function serializedSettingsAction<TArgs extends unknown[], TResult>(
 }
 
 /**
- * Collects the action's settings writes into the operator's change set instead of committing them.
- *
- * The action body is untouched and unaware: it validates and calls `save*Settings` exactly as
- * before, `setSetting` diverts into the capture map, and the `applyCaddyConfig()` it ends with is
- * suppressed because there is nothing to push until the change set is applied.
- *
- * The lock is still taken. Staging writes one row per key per operator, and two forms submitted at
- * once would otherwise race on the read-modify-write that composes them.
+ * Diverts the action's settings writes into the operator's change set; its `applyCaddyConfig()`
+ * is suppressed. Still locked: two staged forms would race on the read-modify-write.
  */
 function stagedSettingsAction<TArgs extends unknown[]>(
   action: (...args: TArgs) => Promise<ActionResult>,
@@ -171,24 +157,21 @@ function stagedSettingsAction<TArgs extends unknown[]>(
       const overlay = await stagedOverlay(userId);
 
       const { result, writes } = await withCapturedWrites(overlay, () => action(...args));
-      // A failed action may still have written before it threw; staging its half-finished state
-      // would leave the operator with a change set they never asked for.
+      // A failed action may have written before it threw; don't stage its half-finished state.
       if (!result.success) {
         return result;
       }
 
       await stageWrites(userId, writes);
-      // "layout" scope, not the default: the forms live at /settings/[section], and revalidating
-      // the bare path leaves every section route serving the values from before the edit.
+      // "layout" scope: the bare path would leave every /settings/[section] route stale.
       revalidatePath("/settings", "layout");
 
       if (writes.size === 0) {
         return result;
       }
 
-      // The action bodies still say "saved and applied", which is what they used to do. Nothing
-      // has been applied yet, so the wrapper that changed the meaning is the thing that corrects
-      // the wording - rather than nineteen edited messages that could drift back apart.
+      // The action bodies say "saved and applied"; nothing is applied yet, so the wrapper corrects
+      // the wording in one place rather than in every action's message.
       const t = await getTranslations("settings");
       return { ...result, staged: true, message: t("stagedSaved") };
     });
@@ -292,7 +275,7 @@ async function updateCloudflareSettingsActionUnlocked(
       accountId: accountId && accountId.length > 0 ? accountId : undefined,
     });
 
-    // Try to apply the config, but don't fail if Caddy is unreachable
+    // Don't fail the save if Caddy is unreachable.
     try {
       await applyCaddyConfig();
       revalidatePath("/settings");
@@ -305,7 +288,7 @@ async function updateCloudflareSettingsActionUnlocked(
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
       return {
-        success: true, // Settings were saved successfully
+        success: true,
         message: t("results.cloudflareApplyFailed", { error: errorMsg }),
       };
     }
@@ -338,7 +321,6 @@ async function updateDnsProviderSettingsActionUnlocked(
       const def = getProviderDefinition(providerName);
       delete settings.providers[providerName];
       if (settings.default === providerName) {
-        // Pick next configured provider, or null
         const remaining = Object.keys(settings.providers);
         settings.default = remaining.length > 0 ? remaining[0] : null;
       }
@@ -384,7 +366,6 @@ async function updateDnsProviderSettingsActionUnlocked(
       };
     }
 
-    // action === "save": add or update a provider's credentials
     if (!providerName || providerName === "none") {
       return { success: false, message: t("results.dnsProviderSelect") };
     }
@@ -396,7 +377,6 @@ async function updateDnsProviderSettingsActionUnlocked(
 
     const existingCreds = settings.providers[providerName];
 
-    // Collect credentials from form
     const credentials: Record<string, string> = {};
     for (const field of def.fields) {
       const rawValue = formData.get(`credential_${field.key}`);
@@ -408,7 +388,6 @@ async function updateDnsProviderSettingsActionUnlocked(
       }
     }
 
-    // Validate required fields
     for (const field of def.fields) {
       if (field.required && !credentials[field.key]) {
         return {
@@ -421,7 +400,6 @@ async function updateDnsProviderSettingsActionUnlocked(
       }
     }
 
-    // Validate duration-typed option fields (e.g. propagation delay/timeout)
     for (const field of def.fields) {
       if (
         field.type === "duration" &&
@@ -437,10 +415,8 @@ async function updateDnsProviderSettingsActionUnlocked(
       }
     }
 
-    // Encrypt password fields before storing
     settings.providers[providerName] = encryptProviderCredentials(providerName, credentials);
 
-    // If this is the first provider, make it the default
     if (!settings.default) {
       settings.default = providerName;
     }
@@ -509,10 +485,7 @@ async function updateAuthentikSettingsActionUnlocked(
   }
 }
 
-/**
- * Defaults a new host's forward-auth block is prefilled from. Nothing is applied from here: the
- * host carries its own block, and this only saves the operator typing one address per host.
- */
+/** Prefill for a new host's forward-auth block; nothing is applied, each host carries its own. */
 async function updateForwardAuthSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -547,12 +520,8 @@ async function updateForwardAuthSettingsActionUnlocked(
 }
 
 /**
- * Tailscale node defaults.
- *
- * An empty secret field means "keep the stored one", for both the auth key and the API access
- * token: the form never receives the current value to send back, so without this every unrelated
- * edit - a tag, the control URL - would wipe the credential and every node would fail to
- * re-register on the next restart.
+ * An empty secret field keeps the stored one: the form never receives it, so otherwise any
+ * unrelated edit would wipe the credential and nodes would fail to re-register.
  */
 async function updateTailscaleSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -572,8 +541,7 @@ async function updateTailscaleSettingsActionUnlocked(
     const validateAuthKey = parseCheckbox(formData.get("tailscaleValidateAuthKey"));
     const apiTailnet = String(formData.get("tailscaleApiTailnet") ?? "").trim() || "-";
 
-    // Checked before the save, not after: the point is to keep a key Caddy will choke on out of
-    // the database in the first place. Whatever was already stored keeps working meanwhile.
+    // Before the save, to keep a key Caddy will choke on out of the database.
     if (validateAuthKey && authKey) {
       const check = await checkTailscaleAuthKey({
         authKey: decryptSecret(authKey, "Tailscale auth key"),
@@ -620,11 +588,8 @@ async function updateTailscaleSettingsActionUnlocked(
 }
 
 /**
- * The CAPTCHA in front of the sign-in screen's password step.
- *
- * An empty secret keeps the stored one, as Tailscale's auth key does - but only for the provider it
- * was issued by: a key carried across a provider switch could never verify, and a gate that cannot
- * verify refuses every local sign-in.
+ * An empty secret keeps the stored one, but only for the same provider: a key carried across a
+ * switch could never verify, and that gate would refuse every local sign-in.
  */
 async function updateCaptchaSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -718,8 +683,7 @@ async function updateAvatarSettingsActionUnlocked(
   try {
     await requireAdmin();
 
-    // AVATAR_GRAVATAR pins the behaviour; refuse rather than silently storing an overridden
-    // preference.
+    // AVATAR_GRAVATAR pins the behaviour; refuse rather than store an overridden preference.
     if (config.avatars.gravatarFromEnv !== null) {
       return {
         success: false,
@@ -757,8 +721,7 @@ async function updateAnalyticsSettingsActionUnlocked(
     const enabled = formData.get("analyticsEnabled") === "on";
     const password = String(formData.get("clickhousePassword") ?? "");
 
-    // Refused here rather than saved and silently ignored: the ClickHouse container will not start
-    // without a password, so "on with no password" is a state that cannot become true.
+    // ClickHouse will not start without a password, so "on with no password" can never work.
     if (enabled && password.trim().length === 0 && formData.get("hasPassword") !== "yes") {
       return {
         success: false,
@@ -831,12 +794,7 @@ async function updateGeoipSettingsActionUnlocked(
   }
 }
 
-/**
- * Store an uploaded favicon, or remove the one already stored.
- *
- * One action for both so the section has a single form: `remove` is a submit button of its own
- * rather than a second form, which would have to live outside this one to be valid HTML.
- */
+/** Upload or remove in one action, so `remove` can be a submit button instead of a nested form. */
 async function updateFaviconActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -857,8 +815,7 @@ async function updateFaviconActionUnlocked(
     }
 
     await saveFavicon(file);
-    // The whole layout, not just /settings: the icon is declared in the root layout, so every
-    // route's metadata is what has just gone stale.
+    // The icon is declared in the root layout, so every route's metadata is stale.
     revalidatePath("/", "layout");
     return { success: true, message: t("results.faviconUpdated") };
   } catch (error) {
@@ -874,15 +831,8 @@ async function updateFaviconActionUnlocked(
 }
 
 /**
- * Save one block of registry settings.
- *
- * Generic over the block, because the fields are generated from the definitions rather than
- * written out: the form posts each value under its setting key, and the block says which keys it
- * is allowed to have posted. Anything else in the payload is ignored rather than refused - React
- * posts its own bookkeeping fields through every form.
- *
- * `saveSettings` does the validating, and does it for the whole batch before writing any of it,
- * so a form with one bad field leaves the rest as they were.
+ * Keys outside the block are ignored rather than refused: React posts its own bookkeeping fields.
+ * `saveSettings` validates the whole batch before writing, so one bad field changes nothing.
  */
 async function updateRegistrySettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -912,15 +862,12 @@ async function updateRegistrySettingsActionUnlocked(
     for (const key of keys) {
       const definition = SETTINGS_BY_KEY.get(key);
       if (!definition) continue;
-      // A setting whose variable overrides it is drawn disabled, so it posts nothing - and for a
-      // checkbox "nothing" would otherwise be stored as false. Skipped rather than stored: what
-      // is written would be ignored while the variable is set and would take effect the moment
-      // it was removed, which is not what anyone asked for.
+      // Env-overridden fields are disabled and post nothing, which a checkbox would store as
+      // false - to take effect the moment the variable is removed.
       if (isEnvOverridden(definition)) continue;
 
       const posted = formData.get(key);
-      // A checkbox posts nothing when it is clear, which is the whole of its answer. Every other
-      // kind absent means the field was not on this form, so it is left as it is.
+      // A clear checkbox posts nothing; any other absent kind was not on this form.
       if (typeof definition.default === "boolean") {
         values[key] = posted === "on" || posted === "true";
       } else if (typeof posted === "string") {
@@ -941,13 +888,11 @@ async function updateRegistrySettingsActionUnlocked(
       throw error;
     }
 
-    // The auth instance is built from these once and cached, so it has to be dropped or the
-    // policy that is live stays the one from before the save.
+    // The auth instance caches these; drop it or the old policy stays live.
     const { invalidateProviderCache } = await import("@/src/lib/auth-server");
     invalidateProviderCache();
 
-    // "layout" scope: the application name and the sign-in policy are read by the root layout and
-    // the dashboard shell, not only by the form that just changed them.
+    // "layout" scope: the root layout and dashboard shell read the app name and sign-in policy.
     revalidatePath("/", "layout");
     return { success: true, message: t("results.registrySaved") };
   } catch (error) {
@@ -956,13 +901,7 @@ async function updateRegistrySettingsActionUnlocked(
   }
 }
 
-/**
- * Save the update-check settings, then check straight away.
- *
- * The check runs inline here rather than being left to the background refresh: an operator who has
- * just corrected the repository wants to know whether it works, and being told "never checked"
- * after saving reads as the save having failed.
- */
+/** Checks inline after saving: "never checked" straight after a save reads as a failed save. */
 async function updateUpdateSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -979,10 +918,8 @@ async function updateUpdateSettingsActionUnlocked(
     const enabled = formData.get("updateCheckEnabled") === "on";
     const values: Record<string, unknown> = { [registry.updateCheckEnabled.key]: enabled };
 
-    // The field is disabled while the check is off, and a disabled Astryx input drops its `name`
-    // and so submits nothing - see the note in components/ui/FormBooleanControls. Absent therefore
-    // means "leave it alone": writing the empty string it looks like would wipe the repository the
-    // moment someone turned the check off, and leave it unusable when they turned it back on.
+    // A disabled Astryx input submits nothing (see components/ui/FormBooleanControls), so absent
+    // means "leave it alone" - not an empty string that wipes the repository.
     const repository = formData.get("updateImageRepository");
     if (typeof repository === "string" && repository.trim() !== "") {
       values[registry.updateImageRepository.key] = repository;
@@ -1054,7 +991,6 @@ async function updateMetricsSettingsActionUnlocked(
       port,
     });
 
-    // Apply config to enable/disable metrics
     try {
       await applyCaddyConfig();
       revalidatePath("/settings");
@@ -1087,7 +1023,6 @@ async function updateLoggingSettingsActionUnlocked(
     const enabled = formData.get("enabled") === "on";
     const format = formData.get("format") ? String(formData.get("format")).trim() : "json";
 
-    // Validate format
     if (format !== "json" && format !== "console") {
       return { success: false, message: t("results.loggingInvalidFormat") };
     }
@@ -1097,7 +1032,6 @@ async function updateLoggingSettingsActionUnlocked(
       format: format as "json" | "console",
     });
 
-    // Apply config to enable/disable logging
     try {
       await applyCaddyConfig();
       revalidatePath("/settings");
@@ -1129,12 +1063,8 @@ function parseResolverList(value: string | null): string[] {
 }
 
 /**
- * Save how the dashboard is served, and rebuild Caddy so the change takes effect at once.
- *
- * Switching this off is the one settings change that can remove the reader's own route to this
- * page. That is deliberate and reversible - the controller publishes its own port, so
- * `http://<host>:3000` still reaches here - and the form warns before submitting when the request
- * arrived through the domain being turned off.
+ * Switching this off can remove the reader's own route here - deliberately, since
+ * `http://<host>:3000` still works; the form warns first when the request came that way.
  */
 async function updateDashboardSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -1176,15 +1106,8 @@ async function updateDashboardSettingsActionUnlocked(
 }
 
 /**
- * Ask whether the dashboard's domain currently reaches this deployment.
- *
- * Takes no argument on purpose. It used to accept the domain typed into the form, which made an
- * administrator's keystrokes the host of a server-side request - CodeQL called that server-side
- * request forgery and was right to. It now checks the domain that is *saved*, which has been
- * through the settings validator, and is also the more truthful question: what the check reports is
- * the configuration Caddy is actually serving, not a string somebody is part-way through typing.
- *
- * Admin-gated like everything else on this page.
+ * No argument on purpose: it checks the *saved*, validated domain, since taking the typed one
+ * would make form input the host of a server-side request (SSRF).
  */
 export async function checkDashboardDnsAction(): Promise<DashboardDnsCheck> {
   await requireAdmin();
@@ -1350,7 +1273,6 @@ async function updateDnsSettingsActionUnlocked(
       timeout: timeout && timeout.length > 0 ? timeout : undefined,
     });
 
-    // Apply config to use new DNS resolvers
     try {
       await applyCaddyConfig();
       revalidatePath("/settings");
@@ -1747,10 +1669,8 @@ export async function createOAuthProviderAction(data: {
 }
 
 /**
- * Choose which provider the sign-in screen offers first, or null to go back to alphabetical.
- *
- * A separate action from updating the provider: the value does not live on the provider row, and
- * one that did would need every write to police "exactly one primary".
+ * Null means alphabetical. Not on the provider row, which would make every write police
+ * "exactly one primary".
  */
 export async function setPrimaryOAuthProviderAction(id: string | null): Promise<void> {
   const session = await requireAdmin();
@@ -1975,14 +1895,9 @@ async function updateWafSettingsActionUnlocked(
 // ─── Caddy Build ─────────────────────────────────────────────────────────────
 
 /**
- * Save the module selection. Does not rebuild - plugins are compiled in - but it changes what the
- * config builder will emit, so applyCaddyConfig runs here: a module switched off stops producing
- * handlers at once, rather than leaving config naming a plugin about to vanish.
- *
- * `agentRowId` picks what is being edited: absent or 0 is the fleet default, which every agent
- * without a selection of its own follows. With `followFleetDefault` set the agent's own selection
- * is cleared rather than overwritten, which is the only way back to tracking the fleet - saving a
- * copy of today's default would leave it frozen there.
+ * Applies config so a disabled module stops emitting handlers before its plugin vanishes.
+ * `agentRowId` 0 is the fleet default; `followFleetDefault` clears rather than copies it, or the
+ * agent would stay frozen at today's default.
  */
 async function updateCaddyBuildSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -2005,16 +1920,14 @@ async function updateCaddyBuildSettingsActionUnlocked(
 
     const modules: Record<string, boolean> = {};
     for (const module of CADDY_MODULES) {
-      // A checkbox that is off submits nothing, so every known module is read explicitly rather
-      // than inferred from which keys are present.
+      // An unchecked box submits nothing, so read every known module explicitly.
       modules[module.id] = formData.get(`module:${module.id}`) === "on";
     }
 
     const customModules = parseCustomModules(formData.get("customModulesJson"));
     const settings = sanitizeCaddyBuildSettings({ modules, customModules });
 
-    // Refuse a selection that would strip a module something is actively using: the rebuild would
-    // otherwise succeed and the feature would just stop, with settings still showing it enabled.
+    // Otherwise the rebuild succeeds and an in-use feature silently stops.
     const conflicts = await findModuleConflicts(settings, agentRowId);
     if (conflicts.length > 0) {
       return {
@@ -2032,8 +1945,7 @@ async function updateCaddyBuildSettingsActionUnlocked(
     await pushDesiredState();
 
     const diff = await getCaddyBuildDiff(agentRowId);
-    // Advisory, not a refusal - see describeCaddyfileSnippetWarning. With a warning the whole result
-    // is one message, so a translator decides how it follows the saved sentence.
+    // Advisory, not a refusal. One message, so a translator decides how it follows the saved one.
     const snippetWarning = await describeCaddyfileSnippetWarning(settings);
     const saved = snippetWarning
       ? t("results.caddyBuildSavedSnippetWarning", {
@@ -2170,8 +2082,7 @@ export const updateCaddyBuildSettingsAction = serializedSettingsAction(
 );
 export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
 export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
-// Not staged: these settings are the app's own - a name, a URL, who may sign in - and none of
-// them reaches a Caddy config, so there is nothing for "Review & apply" to apply.
+// Not staged: none of these reach a Caddy config, so "Review & apply" has nothing to apply.
 export const updateRegistrySettingsAction = serializedSettingsAction(
   updateRegistrySettingsActionUnlocked,
 );
@@ -2187,12 +2098,7 @@ export const updateGeoipSettingsAction = serializedSettingsAction(
   updateGeoipSettingsActionUnlocked,
 );
 
-/**
- * Ask MaxMind now whether a newer database exists, and download it if so.
- *
- * Applies immediately rather than staging: it writes only the databases and the cached results, and
- * staging "fetch what MaxMind has" would be nonsense - there is nothing for an operator to review.
- */
+/** Not staged: it writes only the databases, and there is nothing for an operator to review. */
 export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
   try {
     await requireAdmin();
@@ -2233,10 +2139,8 @@ export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
 // ─── Staged changes ──────────────────────────────────────────────────────────
 
 /**
- * Commit this operator's change set and reload Caddy once.
- *
- * Not wrapped in `serializedSettingsAction`: `applyStagedSettings` takes the lock itself, around
- * both the commit and the push, so that no staged write lands between them.
+ * Not wrapped in `serializedSettingsAction`: `applyStagedSettings` locks around both the commit
+ * and the push, so no staged write lands between them.
  */
 export async function applyStagedSettingsAction(): Promise<ActionResult> {
   const t = await getTranslations();
@@ -2246,8 +2150,7 @@ export async function applyStagedSettingsAction(): Promise<ActionResult> {
     revalidatePath("/settings", "layout");
 
     if (!outcome.ok) {
-      // The values are stored - only the push failed - so this is a partial success, and saying
-      // "failed" would invite an operator to re-enter changes that are already committed.
+      // Only the push failed; "failed" would invite re-entering changes already committed.
       return {
         success: true,
         message: t("settings.results.stagedAppliedReloadFailed", {
@@ -2313,12 +2216,8 @@ export async function restoreRevisionAction(revision: number): Promise<ActionRes
 // ─── Agents ──────────────────────────────────────────────────────────────────
 
 /**
- * Mint (or re-read) the code an operator carries to a new agent.
- *
- * The controller issues it now, where the agent used to and the operator had to read the new host's
- * container logs to find it. The code is all that comes back - the secret it is exchanged for is
- * minted at `/api/agent/v1/pair` and never leaves the server, because a server action's return
- * value is serialized to the browser.
+ * Only the code comes back: the secret is minted at `/api/agent/v1/pair`, since an action's
+ * return value is serialized to the browser.
  */
 export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
   await requireAdmin();
@@ -2334,12 +2233,8 @@ export async function revokePairingCodeAction(): Promise<void> {
 }
 
 /**
- * Forget a paired agent.
- *
- * Removes this controller's side and drops its stream, so the agent's reconnect is refused and it
- * goes back to idle on its own host - which stops its Caddy. Unpairing takes a host out of service,
- * so the UI says so. For the bundled agent it also turns auto-pairing off: otherwise the agent would
- * find a fresh bootstrap token and pair itself straight back.
+ * The agent goes idle, which stops its Caddy. For the bundled agent this also turns auto-pairing
+ * off, or it would find a fresh bootstrap token and pair straight back.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {
   await requireAdmin();
@@ -2360,11 +2255,8 @@ export type RepairAgentResult =
   | { kind: "failed" };
 
 /**
- * Let one paired agent pair again, replacing its secret: the recovery path for a host whose
- * database was rebuilt, or whose secret this controller can no longer decrypt.
- *
- * The bundled agent cannot be handed a code, so it gets a bootstrap token bound to its id. Any other
- * agent gets a six-letter code that re-pairs it and nothing else.
+ * Recovery for a lost or undecryptable secret. The bundled agent gets a bootstrap token bound to
+ * its id; any other gets a code that re-pairs it and nothing else.
  */
 export async function repairAgentAction(agentRowId: number): Promise<RepairAgentResult> {
   await requireAdmin();

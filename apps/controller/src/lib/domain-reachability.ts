@@ -10,7 +10,7 @@ import { derivePurposeKey } from "./derived-key";
 export const REACHABILITY_PATH = "/.well-known/cpm-reachability";
 const TIMEOUT_MS = 5000;
 
-/** What this deployment's Caddy answers on the probe path. Not a secret; just ours. */
+/** Not a secret; just ours. */
 export function reachabilityToken(): string {
   const mac = createHmac("sha256", derivePurposeKey("reachability-probe:v1"))
     .update("domain-probe")
@@ -37,7 +37,6 @@ export function reachabilityRoute(): Record<string, unknown> {
 export type DomainReachability = {
   domain: string;
   addresses: string[];
-  /** CAA records, which decide which certificate authorities may issue for the domain. */
   caa: string[];
   result: "reached" | "unresolved" | "noAnswer" | "otherServer" | "wildcard";
   /** What answered instead, for `otherServer`. */
@@ -57,7 +56,6 @@ async function caaRecords(resolver: Resolver, domain: string): Promise<string[]>
     try {
       const records = await resolver.resolveCaa(labels.slice(i).join("."));
       if (records.length > 0) {
-        // Each record is { critical, <tag>: value }.
         return records.map((record) => {
           const [tag, value] = Object.entries(record).find(([key]) => key !== "critical") ?? [];
           return `${tag ?? "?"} "${value ?? ""}"`;
@@ -73,7 +71,7 @@ async function caaRecords(resolver: Resolver, domain: string): Promise<string[]>
 export async function checkDomainReachability(domain: string): Promise<DomainReachability> {
   const name = domain.trim().toLowerCase();
   if (name.startsWith("*.")) {
-    // A wildcard can only be issued over DNS-01; there is no single name to request.
+    // A wildcard can only be issued over DNS-01.
     return { domain: name, addresses: [], caa: [], result: "wildcard" };
   }
   const resolver = new Resolver({ timeout: TIMEOUT_MS, tries: 2 });

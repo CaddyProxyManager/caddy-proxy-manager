@@ -1,10 +1,6 @@
 /**
- * Stands in for `app/(dashboard)/proxy-hosts/actions` inside the demos (see the alias in
- * astro.config.mjs).
- *
- * HostDialogs imports these, and the option fields the dashboard host demo renders live beside it,
- * so the module is reached without anything being submitted. Should a demo ever submit one, it
- * fails the way a save with no controller behind it would.
+ * Stands in for `app/(dashboard)/proxy-hosts/actions` in the demos (aliased in astro.config.mjs):
+ * HostDialogs imports it, and a demo that ever submits fails as a save with no controller would.
  */
 import type { ActionState } from "@cpm/controller/src/lib/actions";
 

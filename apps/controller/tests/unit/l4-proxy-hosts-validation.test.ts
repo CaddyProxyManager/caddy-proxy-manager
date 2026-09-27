@@ -3,14 +3,12 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
-// Mock db so the model module can be imported
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -32,9 +30,7 @@ vi.mock('../../src/lib/audit', () => ({
 import { createL4ProxyHost, type L4ProxyHostInput } from '../../src/lib/models/l4-proxy-hosts';
 import * as schema from '../../src/lib/db/schema';
 
-// ---------------------------------------------------------------------------
-// Setup: insert a test user so the FK constraint on ownerUserId is satisfied
-// ---------------------------------------------------------------------------
+// A test user satisfies the FK on ownerUserId.
 
 beforeEach(async () => {
   await ctx.db.delete(schema.l4ProxyHosts);
@@ -52,9 +48,7 @@ beforeEach(async () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Validation tests via createL4ProxyHost (which calls validateL4Input)
-// ---------------------------------------------------------------------------
+// Through createL4ProxyHost, which calls validateL4Input.
 
 describe('L4 proxy host create validation', () => {
   it('rejects empty name', async () => {
@@ -150,8 +144,7 @@ describe('L4 proxy host create validation', () => {
   });
 
   it('rejects an unbracketed IPv6 listen address', async () => {
-    // `2001:db8::1` ends in `:1`. Anything that splits on the last colon reads that as port 1 and
-    // silently opens a listener nobody asked for.
+    // Splitting on the last colon would read `:1` as a port and open a listener.
     const input: L4ProxyHostInput = {
       name: 'Test',
       protocol: 'tcp',
@@ -162,8 +155,7 @@ describe('L4 proxy host create validation', () => {
   });
 
   it('rejects an unbracketed IPv6 upstream', async () => {
-    // Same trap on the other side: it contains a colon, so the old check passed it through as
-    // "host:port" while naming no port at all.
+    // Contains a colon but names no port.
     const input: L4ProxyHostInput = {
       name: 'Test',
       protocol: 'tcp',

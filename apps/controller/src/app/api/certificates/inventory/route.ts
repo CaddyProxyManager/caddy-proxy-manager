@@ -4,10 +4,7 @@ import { listAgentCertificates } from "@/src/lib/agent/client";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { renewalsPending, settleRenewals } from "@/src/lib/certificate-renewals";
 
-/**
- * Every agent's Caddy storage, for the Certificates page. Also how a pending "Renew now" learns
- * it's done: once a newer certificate shows up, the name goes back to its ordinary policy.
- */
+/** Also completes a pending "Renew now": a newer certificate returns the name to its policy. */
 export async function GET() {
   await requireAdmin();
   const agents = await listAgentCertificates();

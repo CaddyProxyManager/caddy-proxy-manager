@@ -1,15 +1,6 @@
 /**
- * The registry settings that had no form of their own, as fields the Settings screens can edit.
- *
- * These were answered during setup or left to the environment, and for a while Settings could only
- * report them: an operator asking "why can nobody sign up" had to read `.env` to find out, and
- * then edit `.env` and restart to change it. They are ordinary registry settings, so `saveSettings`
- * already validates and stores them and a stored value already beats the variable - all that was
- * missing was the form.
- *
- * Built from the definitions rather than written out field by field, so the kind of control, its
- * bounds and its wording all come from the one place that decides them, and a setting added to a
- * block below gets a field without anyone writing one.
+ * Registry settings with no form of their own, as Settings fields. Built from the definitions, so
+ * control, bounds and wording come from one place and a setting added to a block gets a field.
  */
 
 import type { getTranslations } from "next-intl/server";
@@ -110,9 +101,8 @@ export async function registryFields(
         return {
           ...field(t, definition, resolved.value),
           source: resolved.source,
-          // Not just "came from the environment": this one cannot be changed here at all,
-          // because SETTINGS_ENV_OVERRIDE names its variable as one that overrides what is
-          // stored.
+          // Not just "from the environment": SETTINGS_ENV_OVERRIDE makes this variable win over
+          // what is stored, so it cannot be changed here at all.
           pinned: isEnvOverridden(definition),
         };
       }),

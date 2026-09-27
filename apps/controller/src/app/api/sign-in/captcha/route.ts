@@ -1,9 +1,6 @@
 /**
- * The username step's CAPTCHA check: verifies a widget token with its provider and, if it passes,
- * sets the pass the password step is refused without (see `lib/captcha/pass.ts`).
- *
- * A route rather than a server action because `LoginClient` is also rendered by the docs site,
- * which cannot bundle anything that reaches the database.
+ * Verifies a CAPTCHA token and sets the pass the password step requires (`lib/captcha/pass.ts`).
+ * A route, not an action: the docs site renders `LoginClient` and cannot bundle the database.
  */
 
 import { getClientIp } from "@/src/lib/client-ip";
@@ -61,8 +58,7 @@ export async function POST(request: Request) {
   }
   if (verdict === "failed") return Response.json({ code: "CAPTCHA_FAILED" }, { status: 403 });
 
-  // Secure on the same terms Better Auth's own session cookie is, so the two are sent, or not,
-  // together.
+  // Secure on Better Auth's session cookie's terms, so the two travel together.
   const secure = (await getPublicBaseUrl()).toLowerCase().startsWith("https:");
   const cookie = [
     `${CAPTCHA_PASS_COOKIE}=${issueCaptchaPass(username)}`,

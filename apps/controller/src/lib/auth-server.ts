@@ -33,26 +33,18 @@ import {
   isTwoFactorVerifyPath,
 } from "./auth-sign-in-paths";
 
-// biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
+// biome-ignore lint/suspicious/noExplicitAny: the type depends on a plugin list built at runtime
 let cachedAuth: any = null;
 let cachedProviders: GenericOAuthConfig[] | null = null;
 let cachedTrustedProviderIds: string[] = [];
 
-/**
- * OIDC spells the claim `email_verified`; some providers serialize it as a
- * string. Better Auth's generic-OAuth profile reader only looks at a camelCase
- * `emailVerified` field, so the claim has to be mapped explicitly.
- */
+/** Better Auth reads only camelCase `emailVerified`, and some IdPs send the claim as a string. */
 function profileEmailVerified(profile: Record<string, unknown>): boolean {
   const claim = profile.email_verified ?? profile.emailVerified;
   return claim === true || claim === "true";
 }
 
-/**
- * Whether this OAuth callback finishes an explicit link: a signed-in user pressed "Link" on their
- * profile. better-auth parses the flow's state before it asks the provider for the profile, and
- * only `/link-social` puts `link` into that state. Outside a request there is no state to read.
- */
+/** Whether this finishes a profile "Link": only `/link-social` puts `link` in the state. */
 async function isExplicitLinkCallback(): Promise<boolean> {
   try {
     return Boolean((await getOAuthState())?.link);
@@ -63,21 +55,12 @@ async function isExplicitLinkCallback(): Promise<boolean> {
 
 export function mapOAuthProvider(
   p: OAuthProvider,
-  /** From the stored policy. Defaults to the environment's answer, for callers outside a request. */
+  /** The environment's default is for callers outside a request. */
   allowOauthRegistration = config.auth.allowOauthRegistration,
 ): GenericOAuthConfig {
-  // Two different questions reach better-auth's one "is this provider trusted" gate:
-  //
-  // - A sign-in claiming the CPM account with the same email. Ownership is asserted by the
-  //   operator through the provider's auto-link switch, never by the IdP alone - reporting the
-  //   claim only for auto-link providers keeps a provider that merely returns
-  //   `email_verified: true` from attaching itself to someone's local account.
-  // - An explicit link from the profile page. The session already proves who owns the CPM
-  //   account and the provider login proves the identity, so no email trust is involved, and
-  //   gating it on auto-link made manual linking impossible exactly where it is the only option.
-  //
-  // Every mapProfileToUser below must report this - better-auth otherwise falls back to the raw
-  // profile's own emailVerified, which is exactly the ungated claim.
+  // Verified only for auto-link providers, so a bare `email_verified: true` cannot claim a local
+  // account - or for an explicit profile link, where the session already proves ownership. Every
+  // mapProfileToUser must report this, or better-auth falls back to the ungated raw claim.
   const mapEmailVerified = async (profile: Record<string, unknown>) => ({
     emailVerified:
       (await isExplicitLinkCallback()) || (p.autoLink === true && profileEmailVerified(profile)),
@@ -89,8 +72,7 @@ export function mapOAuthProvider(
     clientSecret: p.clientSecret,
     scopes: p.scopes ? p.scopes.split(/[\s,]+/).filter(Boolean) : undefined,
     pkce: true,
-    // Security: an OAuth sign-in must not implicitly create an account unless OAuth
-    // self-registration is on. Only first-time auto-provisioning is gated; linking still works.
+    // Gates first-time auto-provisioning only; linking still works.
     disableImplicitSignUp: !allowOauthRegistration,
     mapProfileToUser: (profile) => mapEmailVerified(profile),
   };
@@ -98,7 +80,6 @@ export function mapOAuthProvider(
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
       cfg.discoveryUrl = `${p.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
     }
@@ -106,8 +87,7 @@ export function mapOAuthProvider(
 
   const mapping = toGroupMappingConfig(p);
   if (needsGroupClaims(mapping)) {
-    // Resolve claims ourselves so the group claim is found whether the IdP puts it in the ID
-    // token or only on userinfo - better-auth stops at the ID token once it has sub and email.
+    // better-auth stops at the ID token once it has sub and email; groups may be on userinfo.
     cfg.getUserInfo = async (tokens) => {
       const claims = await fetchOidcClaims(
         { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
@@ -115,15 +95,13 @@ export function mapOAuthProvider(
         mapping.groupsClaim,
       );
       if (!claims) return null;
-      // The raw claims ride along so mapProfileToUser can read the group claim; better-auth's
-      // OAuth2UserInfo type declares only the standard fields.
+      // Raw claims ride along for the group claim; OAuth2UserInfo declares only standard fields.
       return toOAuthUserInfo(claims) as unknown as Awaited<
         ReturnType<NonNullable<GenericOAuthConfig["getUserInfo"]>>
       >;
     };
 
-    // Runs on every sign-in through this provider, new and existing users alike. It only parks
-    // the result: the user id isn't known here, so the mapping is applied at session creation.
+    // Only parks the result: the user id is unknown here, so it applies at session creation.
     cfg.mapProfileToUser = (profile: Record<string, unknown>) => {
       const subject = profile.sub ?? profile.id;
       if (subject !== undefined && subject !== null) {
@@ -138,9 +116,8 @@ export function mapOAuthProvider(
           syncGroups: mapping.syncGroups,
         });
       }
-      // Privileged fields are never taken from the profile (see enforceSafeUserDefaults); the
-      // role is applied by the sync instead. The auto-link gate still has to be reported, or
-      // enabling group mapping would quietly hand it back to the IdP's own claim.
+      // The sync applies the role; the auto-link gate must still be reported, or group mapping
+      // would hand it back to the IdP's own claim.
       return mapEmailVerified(profile);
     };
   }
@@ -149,11 +126,8 @@ export function mapOAuthProvider(
 }
 
 /**
- * Park the IdP session id from an account row's ID token, ignoring anything that goes wrong.
- *
- * Both account hooks call this, and neither may fail over it: a provider that issues no `sid`,
- * or a token this cannot decode, costs precision on a future logout and nothing else - refusing
- * the sign-in over it would be far worse.
+ * Parks the IdP `sid` from the ID token, swallowing any failure: a missing `sid` costs only logout
+ * precision, which is not worth refusing a sign-in over.
  */
 function rememberIdpSession(account: {
   userId?: unknown;
@@ -171,14 +145,12 @@ function rememberIdpSession(account: {
   }
 }
 
-/** Whether provider load succeeded at least once */
 let providersLoadedSuccessfully = false;
 
 async function loadProviders(): Promise<GenericOAuthConfig[]> {
-  // If we have a successful cache, use it
   if (cachedProviders !== null && providersLoadedSuccessfully) return cachedProviders;
 
-  // A cache left empty by a failed attempt is retried on every call until it succeeds
+  // A failed load is retried on every call until it succeeds.
   try {
     const rows = await db
       .select()
@@ -218,7 +190,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
     cachedTrustedProviderIds = providers.filter((p) => p.autoLink).map((p) => p.id);
     providersLoadedSuccessfully = true;
   } catch (e) {
-    // DB not ready yet - start with empty, will retry on next getAuth() call
+    // DB not ready yet; retried on the next getAuth().
     if (!cachedProviders) cachedProviders = [];
     console.warn("[auth-server] Failed to load OAuth providers (will retry):", e);
   }
@@ -237,40 +209,33 @@ export function enforceSafeUserDefaults<T extends object>(
   return { ...user, role: "user", status: "active" };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above - the return type depends on a plugin list only known at runtime
+// biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above
 async function createAuth(baseURL: string): Promise<any> {
-  // Resolved once per build of the instance. `getAuth` rebuilds when these change - see the
-  // note on invalidateProviderCache, which the settings action calls after saving them.
+  // Once per build; the settings action rebuilds via invalidateProviderCache after saving.
   const policy = await authPolicy();
   const oauthConfigs = await loadProviders();
   const appName = await getAppName();
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
-    // Every table, keyed by its export name: the adapter resolves each model by the `modelName`
-    // configured below, and those names already match.
+    // Keyed by export name, which matches each `modelName` below.
     database: drizzleAdapter(db, {
       provider: schema.schemaDialect === "sqlite" ? "sqlite" : "pg",
       schema: schema.activeSchema,
     }),
     secret: config.sessionSecret,
-    // The Public URL, not BASE_URL alone: OAuth redirect URIs are built from this, and they have to
-    // match what the Settings page tells the operator to register.
+    // The Public URL: redirect URIs must match what the Settings page tells operators to register.
     baseURL,
     basePath: "/api/auth",
-    // Only trust the Host header when the operator explicitly opts in. baseURL already pins the
-    // canonical origin; trustHost is needed only behind reverse proxies that rewrite Host
-    // without setting X-Forwarded-Host.
+    // Opt-in: only for proxies that rewrite Host without setting X-Forwarded-Host.
     trustHost: policy.trustHost,
-    // BASE_URL is trusted by Better Auth itself; this adds the stored Public URL, and the browser's
-    // own address while setup is unfinished. See auth-trusted-origins.ts.
+    // Adds the stored Public URL, and the browser's address during setup (auth-trusted-origins.ts).
     trustedOrigins: extraTrustedOrigins,
     advanced: {
       database: {
         generateId: "serial",
       },
-      // The /api/auth route sets this from lib/client-ip.ts, replacing any client-sent copy. Left on
-      // X-Forwarded-For, a spoofed or multi-hop value put every sign-in into one shared bucket.
+      // Set by /api/auth from lib/client-ip.ts; X-Forwarded-For put every sign-in in one bucket.
       ipAddress: {
         ipAddressHeaders: ["x-cpm-client-ip"],
       },
@@ -292,7 +257,7 @@ async function createAuth(baseURL: string): Promise<any> {
       modelName: "sessions",
       expiresIn: 7 * 24 * 60 * 60,
       cookieCache: { enabled: false },
-      // "View as" (lib/view-as.ts). Declared so getSession returns them; only the app writes them.
+      // "View as" (lib/view-as.ts): declared so getSession returns them; only the app writes them.
       additionalFields: {
         viewAsRole: { type: "string", required: false, input: false },
         viewAsGroupIds: { type: "string", required: false, input: false },
@@ -303,21 +268,16 @@ async function createAuth(baseURL: string): Promise<any> {
       modelName: "accounts",
       accountLinking: {
         enabled: true,
-        // A provider with "Auto-link accounts" enabled is trusted to prove that
-        // its identity owns the CPM account carrying the same email address.
+        // Providers with "Auto-link accounts" on.
         trustedProviders: trustedProviderIds,
-        // CPM has no local email-verification flow, so a user row's
-        // emailVerified is never set and the default gate would refuse every
-        // link. The per-provider trust decision above is the ownership signal.
+        // No local email verification exists, so the default gate would refuse every link.
         requireLocalEmailVerified: false,
-        // Read only by explicit linking, where the session proves the account's owner. Without
-        // it the administrator setup creates - `name@localhost` - could never link any provider.
+        // Explicit linking only; setup's `name@localhost` admin could otherwise never link.
         allowDifferentEmails: true,
       },
     },
     verification: { modelName: "verifications" },
     emailAndPassword: {
-      // OIDC-only mode turns credential sign-in off entirely - there are no local accounts.
       enabled: !policy.disableLocalUsers,
       disableSignUp: !policy.allowSelfRegistration,
       minPasswordLength: MIN_PASSWORD_LENGTH,
@@ -342,9 +302,7 @@ async function createAuth(baseURL: string): Promise<any> {
     databaseHooks: {
       user: {
         create: {
-          // By default, never let an external IdP set privileged fields (role/status) on a newly
-          // federated user - see enforceSafeUserDefaults above. Operators who trust their IdP to
-          // manage roles can opt out with AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true.
+          // AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true opts out of enforceSafeUserDefaults.
           before: async (user: Record<string, unknown>) => {
             if (policy.allowOauthRoleFromClaims) {
               return { data: user };
@@ -363,13 +321,10 @@ async function createAuth(baseURL: string): Promise<any> {
             return { data };
           },
           after: async (account) => {
-            // The ID token is in hand here and the session row does not exist yet, so its `sid`
-            // is parked for the session hook below - that is what a back-channel logout naming a
-            // single IdP session has to match against.
+            // The session row does not exist yet, so `sid` is parked for the session hook below.
             rememberIdpSession(account);
 
-            // Self-registration is the one password Better Auth writes itself - its change and
-            // reset endpoints are disabled, and every other path goes through models/user.
+            // The only password Better Auth writes itself; every other path is models/user.
             if (account.providerId === "credential" && account.password) {
               try {
                 const { markPasswordChanged } = await import("./models/user");
@@ -381,10 +336,7 @@ async function createAuth(baseURL: string): Promise<any> {
               }
             }
 
-            // Better Auth writes federated identities to the `accounts` table
-            // only. Re-derive the informational users.provider/subject columns
-            // from it so auto-linking, profile linking, and federated sign-up
-            // are all reflected in the CPM user state (#261).
+            // Better Auth writes only `accounts`; users.provider/subject derive from it (#261).
             try {
               const { syncUserOAuthIdentity } = await import("./models/user");
               const userId =
@@ -393,7 +345,6 @@ async function createAuth(baseURL: string): Promise<any> {
                 await syncUserOAuthIdentity(userId);
               }
             } catch (e) {
-              // Informational columns only - never break authentication over them.
               console.warn("[auth-server] Failed to sync users.provider/subject from accounts:", e);
             }
           },
@@ -410,12 +361,10 @@ async function createAuth(baseURL: string): Promise<any> {
             return { data };
           },
           after: async (account) => {
-            // A repeat sign-in gets a fresh ID token with a fresh `sid`, and a fresh session row
-            // to stamp with it.
+            // A repeat sign-in brings a fresh `sid` for a fresh session row.
             rememberIdpSession(account);
 
-            // Repeat OAuth sign-ins update the existing account row rather than
-            // creating one; keep the projection fresh in that path too.
+            // Repeat sign-ins update rather than create the row.
             try {
               const { syncUserOAuthIdentity } = await import("./models/user");
               const userId =
@@ -434,10 +383,9 @@ async function createAuth(baseURL: string): Promise<any> {
           after: async (session, context) => {
             const userId =
               typeof session.userId === "string" ? Number(session.userId) : session.userId;
-            // Created before the 2FA plugin decides it needs a code, then deleted if so; the auth
-            // route audits the final one.
+            // Created before 2FA decides it needs a code; the auth route audits the final one.
             if (isCredentialSignInPath(context?.path)) return;
-            // Turning 2FA on rotates the session through the verify endpoint; that isn't a sign-in.
+            // Enabling 2FA rotates the session through verify; that is not a sign-in.
             if (
               isTwoFactorVerifyPath(context?.path) &&
               !hasTwoFactorChallengeCookie(context?.request?.headers.get("cookie"))
@@ -445,16 +393,14 @@ async function createAuth(baseURL: string): Promise<any> {
               return;
             }
 
-            // Apply the IdP's group claim now that the user and account rows exist. Runs before
-            // the audit entry so a role change is in effect for anything reading the session.
+            // Before the audit entry, so the role is in effect for anything reading the session.
             try {
               await reconcileOidcUserAfterSignIn(userId);
             } catch (error) {
               console.warn("[auth-server] OIDC group sync failed:", error);
             }
 
-            // Stamp the session with the IdP session it belongs to, so a back-channel logout
-            // naming that `sid` can end this one and leave the user's others alone.
+            // So a back-channel logout naming `sid` ends this session and leaves the others.
             try {
               const sessionId =
                 typeof session.id === "string" ? Number(session.id) : (session.id as number);
@@ -481,14 +427,13 @@ async function createAuth(baseURL: string): Promise<any> {
     },
     disabledPaths: DISABLED_AUTH_PATHS,
     plugins: [
-      // Cast via unknown: better-auth's `username` plugin types `email: string` where
-      // BetterAuthPlugin expects `email?: any`, and the mismatch is environment-dependent.
+      // Cast via unknown: the plugin's `email: string` vs BetterAuthPlugin's `email?: any`.
       username({
         maxUsernameLength: 255,
         usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),
       }) as unknown as BetterAuthPlugin,
       genericOAuth({ config: oauthConfigs }),
-      // TOTP and backup codes only: there is no mail or SMS to send a one-time code with.
+      // TOTP and backup codes only: there is no mail or SMS.
       twoFactor({
         issuer: appName,
         twoFactorTable: "twoFactors",
@@ -498,15 +443,12 @@ async function createAuth(baseURL: string): Promise<any> {
   });
 }
 
-/** The Public URL the cached instance was built with. */
 let cachedBaseUrl: string | null = null;
 
 export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
-  // Read on every call - the settings module caches it, and clears that cache on save - because the
-  // Public URL changes at runtime: setup and Settings both write it, and neither restarts the app.
+  // Every call: setup and Settings change it at runtime without a restart (the read is cached).
   const baseURL = await getPublicBaseUrl();
 
-  // Rebuild if providers failed to load initially and are now available
   if (cachedAuth && !providersLoadedSuccessfully) {
     cachedProviders = null;
     cachedAuth = null;
@@ -515,8 +457,7 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
     cachedAuth = null;
   }
   if (!cachedAuth) {
-    // Cache the promise, not the resolved instance: concurrent first requests would otherwise each
-    // build their own Better Auth instance and the last one to finish would win.
+    // The promise, not the instance, or concurrent first requests each build their own.
     cachedBaseUrl = baseURL;
     cachedAuth = createAuth(baseURL);
   }

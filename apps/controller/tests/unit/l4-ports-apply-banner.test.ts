@@ -1,7 +1,4 @@
-/**
- * L4PortsApplyBanner's refresh-signal contract: it re-fetches port status whenever refreshSignal
- * changes. Inspects source rather than rendering, to avoid a jsdom environment.
- */
+/** Inspects source rather than rendering, to avoid a jsdom environment. */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -27,16 +24,13 @@ describe('L4PortsApplyBanner', () => {
   });
 
   it('re-fetches when refreshSignal changes via useEffect', () => {
-    // Must have a useEffect that depends on refreshSignal
     expect(banner).toMatch(/useEffect\s*\(\s*\(\s*\)\s*=>/);
     expect(banner).toContain('refreshSignal');
-    // The effect must call fetchStatus
     expect(banner).toContain('fetchStatus');
   });
 
   it('skips fetch when refreshSignal is falsy (avoids double-fetch on mount)', () => {
-    // The effect should guard against firing on initial 0/undefined value
-    // so the mount effect and the signal effect don't both fire on load.
+    // So the mount effect and the signal effect don't both fire on load.
     expect(banner).toMatch(/if\s*\(!\s*refreshSignal\s*\)/);
   });
 });
@@ -52,7 +46,6 @@ describe('L4ProxyHostsClient banner integration', () => {
   });
 
   it('increments bannerRefresh after toggle', () => {
-    // The toggle handler must signal the banner after the action completes
     expect(client).toMatch(/toggleL4ProxyHostAction[\s\S]{0,200}signalBannerRefresh/);
   });
 
@@ -69,7 +62,7 @@ describe('L4ProxyHostsClient banner integration', () => {
   });
 
   it('defines signalBannerRefresh as a function that increments the counter', () => {
-    // Must use functional update form to avoid stale closure
+    // The functional form avoids a stale closure.
     expect(client).toMatch(/signalBannerRefresh\s*=\s*\(\s*\)\s*=>\s*setBannerRefresh\s*\(/);
     expect(client).toContain('n + 1');
   });

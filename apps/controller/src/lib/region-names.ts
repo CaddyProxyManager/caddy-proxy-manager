@@ -1,8 +1,6 @@
 /**
- * Country and territory names in the reader's language. `Intl.DisplayNames` rather than a
- * hand-kept table: the runtime already carries CLDR's name for every region in every locale we
- * might add, and a table would only ever be English. The analytics map, its country breakdown and
- * the geoblock picker all name codes through here, so they agree on what a code is called.
+ * `Intl.DisplayNames` already has CLDR names in every locale; a table would be English only. The
+ * analytics map and the geoblock picker both name codes through here, so they agree.
  */
 
 const cache = new Map<string, Intl.DisplayNames>();

@@ -198,9 +198,8 @@ describe('mapGroupsToRole', () => {
   });
 
   it('ranks operator above user and viewer, and below admin', () => {
-    // An operator manages whatever their groups were granted; a user and a viewer manage nothing
-    // at all. So an account in both groups is an operator, and one that is also an admin is an
-    // admin - losing the admin group demotes it to operator rather than all the way to user.
+    // An operator manages its groups' grants; a user or viewer nothing. So operator beats user, and
+    // losing the admin group demotes to operator rather than all the way to user.
     expect(mapGroupsToRole(['CPM_User', 'CPM_Operator'], base)).toBe('operator');
     expect(mapGroupsToRole(['CPM_Viewer', 'CPM_Operator'], base)).toBe('operator');
     expect(mapGroupsToRole(['CPM_Operator', 'CPM_Admin'], base)).toBe('admin');

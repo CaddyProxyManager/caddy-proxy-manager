@@ -58,9 +58,8 @@ describe('browser secret boundaries', () => {
   });
 
   it('keeps the settings home from handing raw settings blobs to the client', () => {
-    // The home reads credential-bearing blobs (DNS provider tokens among them) to derive one line
-    // of status per tile. Only `sectionHealth`'s output may cross to the client component, and
-    // that carries names and counts - never the blobs it was computed from.
+    // The home reads credential-bearing blobs for tile status; only `sectionHealth`'s names and
+    // counts may cross to the client component.
     const homePage = readFileSync(
       join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
       'utf8',

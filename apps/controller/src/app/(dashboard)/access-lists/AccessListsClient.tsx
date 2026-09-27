@@ -206,8 +206,6 @@ function MembersTab({
     createdAt: e.createdAt,
   }));
 
-  // Replaces the hand-built <input type="checkbox"> column: the plugin owns the
-  // select-all/indeterminate state and labels each checkbox for screen readers.
   const selection = useTableSelection<MemberRow>({
     getIsItemSelected: (row) => selected.has(row.id),
     onSelectItem: ({ item, isSelected }) =>
@@ -357,8 +355,6 @@ function MembersTab({
                 />
               </HStack>
               {draft.password && (
-                // ProgressBar replaces a hand-sized coloured sliver that
-                // conveyed strength by width and colour alone.
                 <ProgressBar
                   label={t("passwordStrength", { strength: t(strength.labelKey) })}
                   value={(strength.score / 5) * 100}
@@ -439,8 +435,7 @@ function SettingsTab({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Switching to a different list that happens to share a name and description must still reset
-  // the form and clear the confirm field, so the effect keys on the id as well.
+  // Keyed on the id too: another list with the same name and description must still reset.
   // biome-ignore lint/correctness/useExhaustiveDependencies: list.id is deliberate
   useEffect(() => {
     setName(list.name);
@@ -705,8 +700,7 @@ function DetailPane({
         </VStack>
       </HStack>
 
-      {/* Above the tabs, so it shows whichever one is open: an empty list in use is a host that
-          answers nobody, which is worth knowing before anything else on this page. */}
+      {/* Above the tabs: an empty list in use is a host that answers nobody. */}
       {isEmpty && usage.length > 0 && (
         <Banner
           status="warning"
@@ -971,8 +965,7 @@ function ListsRail({
 
   return (
     <VStack gap={3} padding={3}>
-      {/* On a phone the title, search and sort stick over the lists like every other list page's
-          header; on a desktop the wrapper has no box and the rail's own gaps apply. */}
+      {/* Sticky on a phone like every list header; boxless on a desktop. */}
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
           <Heading level={1}>{t("title")}</Heading>
@@ -1009,7 +1002,6 @@ function ListsRail({
       </div>
 
       {lists.length === 0 ? (
-        // Nothing to search yet, so not a search miss: say so, and offer the way to make one.
         <EmptyState
           title={t("noListsTitle")}
           description={t("noListsDescription")}
@@ -1064,8 +1056,7 @@ function ListsRail({
         </List>
       )}
 
-      {/* The rail scrolls, so the totals go at its foot rather than above the list: they describe
-          the whole set, not the part currently in view. */}
+      {/* At the foot: the totals describe the whole set, not the part in view. */}
       <Text type="supporting" color="secondary">
         {t("railSummary", {
           lists: lists.length,
@@ -1093,12 +1084,10 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("recent");
   const [newOpen, setNewOpen] = useState(false);
-  // A phone has room for the rail or the detail, not both: it shows the rail until a list is
-  // picked. The desktop ignores this and always shows both.
+  // A phone has room for the rail or the detail, not both.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Sync from server props when they change (e.g. after revalidation)
   useEffect(() => {
     setLists(initialLists);
     setUsage(initialUsage);
@@ -1131,7 +1120,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     [router],
   );
 
-  // N creates a list. The mod+K shortcut belongs to the global command palette now.
+  // mod+K belongs to the global command palette.
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;

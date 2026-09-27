@@ -1,9 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * "Traffic by Country" world map. maplibre-gl v6 resolves its tile worker from `import.meta.url`,
- * which the bundler cannot follow - the worker never starts and the map is empty ocean. The fix
- * imports it as `?worker&url` and calls setWorkerUrl(). Covers plumbing and rendered geometry.
+ * maplibre-gl v6 resolves its worker from `import.meta.url`, which the bundler cannot follow, so
+ * the app imports it as `?worker&url` and calls setWorkerUrl(); otherwise the map is empty ocean.
  */
 
 const MAP_CANVAS = 'canvas.maplibregl-canvas';
@@ -23,17 +22,13 @@ test.describe('Analytics world map', () => {
     });
 
     await gotoAnalyticsMap(page);
-    // The worker is spawned lazily once the map starts loading its source. Its
-    // filename is content-hashed and its directory is the bundler's to choose,
-    // so match the stem rather than pinning a path the build is free to move.
+    // Content-hashed name in a directory the bundler chooses, so match the stem.
     await expect
       .poll(() => mapRequests.map((r) => r.url), { timeout: 15_000 })
       .toEqual(expect.arrayContaining([expect.stringContaining('maplibre-gl-worker-')]));
 
-    // The worker imports a sibling ./maplibre-gl-shared.mjs, and `?worker&url`
-    // bundles that into the same chunk. Seeing it arrive as a request of its own
-    // means the build went back to emitting the entry file alone - the shape
-    // whose relative import 404s, leaving the map an empty ocean.
+    // A separate request for the shared sibling means the worker entry was emitted alone, and its
+    // relative import 404s.
     expect(
       mapRequests.filter((r) => r.url.includes('maplibre-gl-shared')),
       'maplibre-gl-shared should be bundled into the worker chunk, not fetched separately',
@@ -60,9 +55,8 @@ test.describe('Analytics world map', () => {
   test('map renders country geometry that responds to hover', async ({ page }) => {
     await gotoAnalyticsMap(page);
 
-    // MapLibre's container carries `overflow: hidden`, so if it collapses to zero height the canvas
-    // is clipped away entirely while the map still reports rendered features. Assert real height
-    // first, so that regression reports itself instead of looking like "no geometry".
+    // The container is `overflow: hidden`: collapsed to zero height it clips the canvas while the
+    // map still reports features, so check height first rather than fail as "no geometry".
     const mapContainer = page.locator('.maplibregl-map');
     await expect
       .poll(async () => Math.round((await mapContainer.boundingBox())?.height ?? 0), {
@@ -76,13 +70,10 @@ test.describe('Analytics world map', () => {
     expect(box).not.toBeNull();
     if (!box) return;
 
-    // Give the worker time to parse the source and the fill layer to paint -
-    // the canvas is visible well before any geometry exists.
+    // The canvas is visible well before any geometry exists.
     await page.waitForTimeout(3_000);
 
-    // A hover only produces a popup when the fill layer actually rendered. Sweep a grid rather
-    // than hand-picked offsets: the projection depends on how maplibre fits the bounds to the
-    // canvas. A map with no geometry misses every point, which is what this catches.
+    // A grid, not hand-picked offsets: the projection depends on how maplibre fits the bounds.
     const targets: [number, number][] = [];
     for (const fy of [0.3, 0.4, 0.5, 0.62, 0.72]) {
       for (const fx of [0.2, 0.3, 0.5, 0.55, 0.72, 0.85]) {
@@ -95,19 +86,17 @@ test.describe('Analytics world map', () => {
     for (const [fx, fy] of targets) {
       const x = box.x + box.width * fx;
       const y = box.y + box.height * fy;
-      // Two moves: maplibre only re-evaluates the hover on a mousemove event,
-      // so a repeat of the current position would produce no event at all.
+      // Hover is re-evaluated only on mousemove, and moving to the current position fires none.
       await page.mouse.move(x - 2, y - 2);
       await page.mouse.move(x, y);
       try {
         await expect(popup).toBeVisible({ timeout: 1_000 });
-        // Bounded like the visibility check. The two moves land 2px apart, so the first can hover
-        // a coastline and the second the sea: the popup mounts, then correctly closes, and an
-        // unbounded read would wait out the whole test for a popup that is gone. That is a miss.
+        // Bounded: the second move can leave a coastline for sea and close the popup, and an
+        // unbounded read would wait out the whole test.
         popupText = await popup.innerText({ timeout: 1_000 });
         break;
       } catch {
-        // Miss (ocean, or a popup that closed as the pointer settled) - try the next point.
+        // Miss - try the next point.
       }
     }
 

@@ -1,10 +1,7 @@
 import db, { nowIso } from "./db";
 import { auditEvents } from "./db/schema";
 
-/**
- * Await this. It was synchronous while SQLite was the only backend; PostgreSQL writes are
- * asynchronous, and an un-awaited call would let the request finish before the row lands.
- */
+/** Await this, or the request can finish before the row lands. */
 export async function logAuditEvent(params: {
   userId?: number | null;
   action: string;
@@ -24,7 +21,7 @@ export async function logAuditEvent(params: {
       createdAt: nowIso(),
     });
   } catch (error) {
-    // Log error but don't throw to avoid breaking the main flow
+    // Never break the main flow over an audit row.
     console.error("Failed to log audit event:", error);
   }
 }

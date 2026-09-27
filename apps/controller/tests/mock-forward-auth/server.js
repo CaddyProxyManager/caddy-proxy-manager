@@ -1,17 +1,7 @@
 /**
- * A forward-auth server for the generic forward-auth functional tests, standing in for Authelia.
- *
- * Two endpoints, because the two behaviours a real auth server has are what the routes are built
- * around:
- *
- *  - /api/authz/forward-auth answers like Authelia: 200 with the Remote-* identity headers for a
- *    valid session cookie, a 302 to its portal for a browser without one, and 401 for anything
- *    else. A host with the API split off relies on this to tell the two apart at all.
- *  - /api/always-redirect answers every unauthenticated caller with the 302, whatever it looks
- *    like. That is the case the split exists for: turning that redirect into a 401 is CPM's job,
- *    not the auth server's.
- *
- * Reachable inside the test network as "mock-forward-auth:9091".
+ * Stands in for Authelia at "mock-forward-auth:9091". /api/authz/forward-auth answers like it:
+ * 200 with Remote-* headers, 302 for a browser, 401 otherwise. /api/always-redirect always 302s,
+ * the case where turning the redirect into a 401 is CPM's job.
  */
 const http = require('node:http');
 

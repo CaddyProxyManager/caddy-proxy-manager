@@ -1,18 +1,7 @@
 /**
- * SETTINGS_ENV_OVERRIDE: the variables that override a stored value rather than filling in for a
- * missing one.
- *
- * The escape hatch from a saved value that locks an operator out - OIDC-only mode saved on
- * before OAuth works, or a public URL that no longer matches the registered redirect URI.
- * Neither can be corrected from a Settings page nobody can reach, and without this the only way
- * back is to edit the database.
- *
- * Opt-in per variable rather than a property of those two settings, because Compose passes
- * BASE_URL and AUTH_DISABLE_LOCAL_USERS on every deployment, defaults included - "the variable
- * always wins" would mean neither could ever be changed from Settings.
- *
- * Pinned here rather than assumed: the order is invisible at the call site, since every reader
- * goes through `getSetting`.
+ * SETTINGS_ENV_OVERRIDE lets a variable beat a stored value: the way out of a saved setting that
+ * locks everyone out of Settings. Opt-in per variable, because Compose passes BASE_URL and
+ * AUTH_DISABLE_LOCAL_USERS on every deployment, so "env always wins" would freeze them.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

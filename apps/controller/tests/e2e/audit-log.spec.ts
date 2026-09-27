@@ -10,7 +10,6 @@ test.describe('Audit Log', () => {
 
   test('audit log page has a table or list', async ({ page }) => {
     await page.goto('/audit-log');
-    // Should have table or list structure
     const hasTable = (await page.locator('table, [role="grid"], [role="table"]').count()) > 0;
     const hasList = (await page.locator('ul, ol').count()) > 0;
     const hasRows = (await page.locator('tr').count()) > 0;
@@ -18,7 +17,6 @@ test.describe('Audit Log', () => {
   });
 
   test('creating a proxy host creates audit log entry', async ({ page }) => {
-    // Create a proxy host
     await page.goto('/proxy-hosts');
     await waitForHydration(page);
     await page.getByRole('button', { name: /create host/i }).click();
@@ -36,15 +34,12 @@ test.describe('Audit Log', () => {
       },
     );
 
-    // Check audit log
     await page.goto('/audit-log');
-    // Should show some entry related to proxy_host or create
     await expect(page.locator('body')).toBeVisible();
   });
 
   test('audit log page has search functionality', async ({ page }) => {
     await page.goto('/audit-log');
-    // Should have a search input
     const hasSearch =
       (await page.getByRole('searchbox').count()) > 0 ||
       (await page.getByPlaceholder(/search/i).count()) > 0 ||

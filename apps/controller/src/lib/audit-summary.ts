@@ -1,39 +1,25 @@
 /**
- * Puts a stored audit summary into the reader's language.
- *
- * Summaries are written once, in English, by whoever logs the event, and `/api/v1/audit-log`
- * returns them as stored - that response is a machine contract. So the row stays English and the
- * translation happens at render time: each summary shape the app writes is read back into its
- * parameters here and rendered from `auditLog.summaries.*`. A summary nothing here recognises - a
- * new call site, a row migrated from an older version - is shown as it was stored.
- *
- * The patterns mirror the template literals at the `logAuditEvent` and `createAuditEvent` call
- * sites, looked up by entity type and action, and the first that matches wins. The message keys
- * are composed at runtime, so `tests/unit/audit-summary-messages.test.ts` renders every one from
- * the English catalog and checks its pattern reads the same values back: a pattern without a
- * message, or a message that no longer reproduces the stored English, fails there.
+ * Rows stay English (`/api/v1/audit-log` is a machine contract), so each summary shape is parsed
+ * back here and rendered from `auditLog.summaries.*`; unrecognised ones show as stored. Keys are
+ * composed at runtime, so tests/unit/audit-summary-messages.test.ts round-trips every pattern.
  */
 
 import type { useTranslations } from "next-intl";
 
 type Translator = ReturnType<typeof useTranslations>;
 
-/** The one place the narrowing is given up, for the reason in the header comment. */
+/** The one place key narrowing is given up: the keys are composed at runtime. */
 type DynamicTranslate = (key: string, values?: Record<string, string>) => string;
 
 export type AuditSummaryPattern = {
   entityType: string;
   action: string;
-  /** The message's key under `auditLog.summaries`. */
   message: string;
   /** Anchored; each named group is one of the message's parameters. */
   pattern: RegExp;
 };
 
-/**
- * Created / Updated / Deleted `<noun> <name>` - the shape every model with a name logs. Builds a
- * pattern that reads the English back, not a sentence anyone is shown.
- */
+/** Created / Updated / Deleted `<noun> <name>`, the shape every named model logs. */
 function lifecycle(entityType: string, noun: string, messagePrefix: string): AuditSummaryPattern[] {
   return [
     ["create", "Created"],
@@ -276,8 +262,7 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern:
       /^Role for user (?<id>.+?) set to "(?<role>.+?)" from (?<provider>.+) groups \(was "(?<previous>.+)"\)$/s,
   },
-  // Both halves first: the added-only pattern would otherwise swallow "; removed from ..." as
-  // part of the group list.
+  // Both halves first, or the added-only pattern swallows "; removed from ..." as groups.
   {
     entityType: "user",
     action: "oidc_group_sync",
@@ -486,7 +471,7 @@ export function matchAuditSummary(event: {
   return null;
 }
 
-/** The summary in the reader's language, the stored one when it is not recognised, or null. */
+/** The stored summary when it is not recognised. */
 export function auditSummaryText(
   t: Translator,
   event: { action: string; entityType: string; summary: string | null },

@@ -1,8 +1,4 @@
-/**
- * The migration screen looks each group's label and description up by the group's id at runtime,
- * so TypeScript cannot check those keys against the catalog. This does it instead: a group added
- * to selection.ts without a message fails the build rather than rendering its raw key.
- */
+/** Group keys are composed at runtime, so tsc cannot check them against the catalog. */
 import { describe, expect, it } from 'bun:test';
 import messages from '../../messages/en.json';
 import { MIGRATION_GROUPS } from '@/src/lib/migration/selection';

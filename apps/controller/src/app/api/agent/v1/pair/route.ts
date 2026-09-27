@@ -1,17 +1,7 @@
 /**
- * POST /api/agent/v1/pair - exchange a one-time credential for a shared secret.
- *
- * The only unauthenticated route an agent calls, because there is nothing to authenticate with
- * yet: the code stands in for the secret, which is why it is six letters, lives five minutes, and
- * is burned on use.
- *
- * An agentId this controller already knows is never re-paired with a credential anyone could hold.
- * Replacing its secret takes a code or token an operator minted for that agent, because the old
- * secret dying is what stops that agent's Caddy - and a disabled agent is refused outright.
- *
- * Unlike the GeoIP route this answers 400/401 rather than 404. Hiding it would buy nothing - an
- * operator has to be told the difference between "wrong code" and "wrong address" - and guessing is
- * bounded per client address and per code.
+ * POST /api/agent/v1/pair - a one-time credential for a shared secret; unauthenticated, as no
+ * secret exists yet. A known agentId re-pairs only with a credential minted for it. 400/401, not
+ * 404: an operator must tell "wrong code" from "wrong address", and guessing is throttled.
  */
 
 import { randomBytes } from "node:crypto";
@@ -38,7 +28,7 @@ import { getClientIp } from "@/src/lib/client-ip";
 import { isDemoMode } from "@/src/lib/demo-mode";
 import { controllerDisplayName } from "@/src/lib/agent/controller-name";
 
-/** A pairing body is four short fields; anything larger is not one. */
+/** Four short fields; anything larger is not a pairing. */
 const MAX_BODY_BYTES = 4 * 1024;
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -66,20 +56,18 @@ export async function POST(request: Request) {
   // Before any credential is spent: pairing must never be how a disabled agent comes back.
   if (existing && !existing.enabled) return bad("This agent is disabled on the controller.", 403);
 
-  // Two ways in, and the shape says which. A bootstrap token is proof the caller can read this
-  // controller's data volume. It is not throttled: 64 hex characters are not guessable, and the
-  // bundled agent retries a stale one every few seconds.
+  // A bootstrap token proves access to the data volume. Unthrottled: 64 hex characters are not
+  // guessable, and the bundled agent retries a stale one every few seconds.
   const bootstrap = looksLikeBootstrapToken(code);
   if (bootstrap) {
     if (!redeemBootstrapToken(code, agentId, existing !== null)) {
-      // Startup is the only other writer, so an agent that arrives after the token expired would
-      // otherwise wait for a file nothing writes. A fresh one appears only while the bundled agent
-      // still wants pairing, and the agent's watcher picks it up on its next poll.
+      // Otherwise only startup writes one, and a late agent would wait forever. Written only while
+      // the bundled agent still wants pairing.
       await ensureBootstrapToken();
       return bad("That bootstrap token is not valid.", 401);
     }
   } else {
-    // Each code also has a budget of its own, for when no trusted address is known.
+    // Each code has its own budget too, for when no trusted address is known.
     const client = (await getClientIp(request.headers)) ?? "unknown";
     if (clientThrottled(client)) {
       return bad("Too many wrong pairing codes from this address. Try again in a minute.", 429);
@@ -95,7 +83,7 @@ export async function POST(request: Request) {
   if (existing) {
     await replaceAgentSecret({ agentId, secret });
   } else {
-    // Named for the operator's benefit only; routing is by agentId. Bounded because it is rendered.
+    // Display only; routing is by agentId. Bounded because it is rendered.
     const name =
       typeof parsed.agentName === "string" && parsed.agentName.trim().length > 0
         ? parsed.agentName.trim().slice(0, 128)

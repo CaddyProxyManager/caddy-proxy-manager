@@ -25,8 +25,7 @@ test.describe
 
     test('WebSocket upgrade through WAF returns 101 Switching Protocols (not mangled HTTP/0.9)', async () => {
       const res = await wsHandshake(DOMAIN, '/echo');
-      // The bug produced statusCode 0 (no parseable HTTP status line) or a closed
-      // connection with raw body. A correct handshake yields 101.
+      // The bug gave statusCode 0 or a closed connection with a raw body.
       expect(res.statusCode, `handshake response: ${JSON.stringify(res.raw)}`).toBe(101);
       expect(res.statusLine).toMatch(/HTTP\/1\.1 101/);
       expect(res.headers.upgrade?.toLowerCase()).toBe('websocket');
@@ -57,7 +56,7 @@ test.describe
     });
 
     test('WAF still blocks attacks on the same host', async () => {
-      // XSS <script> tag - CRS rule 941xxx.
+      // CRS rule 941xxx.
       const res = await httpGet(DOMAIN, '/page?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E');
       expect(res.status).toBe(403);
     });

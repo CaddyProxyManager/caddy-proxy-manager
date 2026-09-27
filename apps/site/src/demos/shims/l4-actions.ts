@@ -1,9 +1,6 @@
 /**
- * Stands in for `app/(dashboard)/l4-proxy-hosts/actions` inside the demos (see the alias in
- * astro.config.mjs).
- *
- * A save succeeds, which is what closes the editor, and what was posted is handed to whichever
- * demo is listening so it can show what the form sent - the part a reader cannot otherwise see.
+ * Shims `app/(dashboard)/l4-proxy-hosts/actions` (aliased in astro.config.mjs). A save succeeds,
+ * closing the editor, and the posted form goes to the demo to show what it sent.
  */
 import type { ActionState } from "@cpm/controller/src/lib/actions";
 import { t } from "../catalog";
@@ -12,7 +9,7 @@ export type SavedL4Host = { id: number | null; form: FormData };
 
 const listeners = new Set<(saved: SavedL4Host) => void>();
 
-/** Hear about every save until the returned function is called. */
+/** Until the returned function is called. */
 export function onL4HostSaved(listener: (saved: SavedL4Host) => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

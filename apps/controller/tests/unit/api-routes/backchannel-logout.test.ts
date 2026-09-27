@@ -1,10 +1,6 @@
 /**
- * The back-channel logout endpoint's contract with an identity provider.
- *
- * This is the one route in the app that answers an unauthenticated POST by deleting sessions, so
- * what it refuses matters as much as what it accepts - and the shape of the refusal matters too:
- * an IdP retries on a 5xx, gives up on a 400, and an operator wiring this up by hand has nothing
- * but `error_description` to debug against.
+ * The one route that deletes sessions on an unauthenticated POST. The refusal's shape matters: an
+ * IdP retries a 5xx, gives up on a 400, and `error_description` is all an operator can debug with.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { NextRequest } from 'next/server';
@@ -17,16 +13,8 @@ import { clearDiscoveryCache } from '@/src/lib/oidc-claims';
 import { clearJwksCache, clearLogoutJtis } from '@/src/lib/oidc-logout-token';
 
 /**
- * `vi.spyOn` on the module namespace rather than `vi.mock` on the module.
- *
- * Bun's module mocks are process-wide and permanent: `vi.mock` swaps the registry entry's live
- * bindings in place and nothing in `bun:test` puts them back, so the stub is inherited by every
- * file that runs afterwards in the same process. Stubbing the revocation service that way had
- * tests/integration/oidc-backchannel-logout.test.ts - which exercises the real revocation against
- * a database - silently asserting against this file's stub, reporting eight failures that said
- * nothing about the code under test. `--parallel` gives each file its own process and hides it;
- * an ad-hoc `bun test <file> <file>` does not. A spy is reversible, so `restoreAllMocks` below
- * leaves the registry exactly as it was found.
+ * A spy, not `vi.mock`: Bun's module mocks leak into every later file in the process, which broke
+ * oidc-backchannel-logout.test.ts in single-process runs. `restoreAllMocks` undoes a spy.
  */
 let listProviders: ReturnType<typeof vi.spyOn<typeof providerModel, 'listEnabledOAuthProviders'>>;
 let revoke: ReturnType<typeof vi.spyOn<typeof logoutService, 'revokeSessionsForLogoutToken'>>;
@@ -69,10 +57,7 @@ async function signLogoutToken(claims: Record<string, unknown> = {}): Promise<st
     .sign(privateKey);
 }
 
-/**
- * The spec posts a form, so that is what the route is exercised with. The handler is typed for a
- * NextRequest and reads only what a plain Request already provides - headers and a form body.
- */
+/** The spec posts a form; the handler reads nothing a plain Request lacks. */
 function postForm(
   token: string | null,
   contentType = 'application/x-www-form-urlencoded',
@@ -191,9 +176,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
   });
 
   it('refuses an issuer that differs from the configured one only by a trailing slash', async () => {
-    // Selection is the same string comparison the signature check makes. Matching leniently here
-    // would find the provider and then fail verification with a JOSE error code, which says
-    // nothing about the mistyped issuer that actually caused it.
+    // Lenient matching would surface a JOSE error instead of the mistyped issuer.
     const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', iss: `${ISSUER}/` })));
 
     expect(response.status).toBe(400);

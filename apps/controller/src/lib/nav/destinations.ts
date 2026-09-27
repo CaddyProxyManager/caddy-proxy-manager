@@ -1,9 +1,6 @@
 /**
- * Every place the dashboard navigation can take you, in one list, so the desktop rail, the mobile
- * tab bar, the More drawer and the More page cannot disagree about what exists or who may see it.
- *
- * No React here: the server reads it to validate a user's saved More drawer, so icons are attached
- * by the client components that draw them.
+ * Every nav destination, once, so the rail, tab bar, More drawer and More page cannot disagree.
+ * No React: the server validates saved drawers with it, so the client attaches icons.
  */
 
 export type DestinationId =
@@ -23,10 +20,8 @@ export type DestinationId =
   | "settings"
   | "profile";
 
-/** How the More page groups what the tab bar cannot hold. */
 export type MoreGroup = "access" | "security" | "reference" | "instance";
 
-/** The titled sections of the desktop rail, in order, laid out like the Settings rail's. */
 export type RailGroup = "hosts" | "access" | "security" | "observability" | "system";
 export const RAIL_GROUPS: readonly RailGroup[] = [
   "hosts",
@@ -36,10 +31,7 @@ export const RAIL_GROUPS: readonly RailGroup[] = [
   "system",
 ];
 
-/**
- * A key in the `nav` message namespace. Spelled out rather than `string` so next-intl's typed
- * keys still catch a typo here as a build error.
- */
+/** Spelled out, not `string`, so next-intl's typed keys catch a typo at build. */
 export type NavLabelKey =
   | "overview"
   | "proxyHosts"
@@ -61,17 +53,12 @@ export type Destination = {
   id: DestinationId;
   href: string;
   labelKey: NavLabelKey;
-  /** Answers for the whole instance, so only admins see it. */
   adminOnly: boolean;
-  /**
-   * An operator can open it too: it shows only what their groups were granted, and an operator
-   * with no grants sees it empty rather than not at all, because "you have no hosts yet" explains
-   * itself and a missing menu item does not.
-   */
+  /** Shown even with no grants: an empty page explains itself, a missing menu item does not. */
   operator: boolean;
-  /** Set for the pages that live behind More on a phone; unset for the ones the tab bar names. */
+  /** Behind More on a phone; unset for the tab bar's own. */
   moreGroup?: MoreGroup;
-  /** Its section in the desktop rail. Unset sits above the titled sections, as Overview does. */
+  /** Unset sits above the titled sections, as Overview does. */
   railGroup?: RailGroup;
 };
 
@@ -190,8 +177,7 @@ export const DESTINATIONS: readonly Destination[] = [
     operator: false,
     moreGroup: "instance",
   },
-  // Not in the desktop rail, which reaches Profile from its footer. On a phone there is no footer,
-  // so Profile has to be somewhere a thumb can find it.
+  // The desktop rail reaches Profile from its footer; a phone has none.
   {
     id: "profile",
     href: "/profile",
@@ -204,10 +190,7 @@ export const DESTINATIONS: readonly Destination[] = [
 
 export const MORE_GROUPS: readonly MoreGroup[] = ["access", "security", "reference", "instance"];
 
-/**
- * Eight, because the drawer is a three-by-three grid and the ninth slot always belongs to All
- * pages. A whole number of rows means that route can never be pushed out by a pin.
- */
+/** A three-by-three grid whose ninth slot is always All pages, so no pin can push it out. */
 export const MORE_DRAWER_SLOTS = 8;
 
 export function canSee(destination: Destination, role: string | undefined): boolean {
@@ -220,7 +203,6 @@ export function visibleDestinations(role: string | undefined): Destination[] {
   return DESTINATIONS.filter((d) => canSee(d, role));
 }
 
-/** The pages behind More that this role may open, in canonical order. */
 export function moreDestinations(role: string | undefined): Destination[] {
   return visibleDestinations(role).filter((d) => d.moreGroup !== undefined);
 }
@@ -229,12 +211,7 @@ export function isDestinationId(value: unknown): value is DestinationId {
   return typeof value === "string" && DESTINATIONS.some((d) => d.id === value);
 }
 
-/**
- * What the drawer holds for this role. Before a user has chosen, that is the first eight in
- * canonical order. After, it is their own choice with anything they can no longer open removed -
- * a demoted admin keeps a saved drawer that names Settings, and must not be shown a door that
- * would only refuse them.
- */
+/** A saved drawer is filtered by role: a demoted admin's may still name Settings. */
 export function resolveDrawer(
   saved: readonly DestinationId[] | null,
   role: string | undefined,

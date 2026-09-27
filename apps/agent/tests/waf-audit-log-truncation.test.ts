@@ -1,12 +1,6 @@
 /**
- * Regression: Coraza's SecAuditLog writes waf-audit.log with no rotation of its own, and it grew to
- * ~2GB in production. parseNewWafLogEntries truncates it in place once fully ingested and past a
- * size threshold; these pin that.
- *
- * Moved here with the parser. The offsets now go through the agent's own store, so this uses a real
- * one on a temp file rather than the shape-mocked data layer the controller's copy needed -
- * round-tripping through real SQLite is the point, since a test spanning two passes proves nothing
- * if each starts from a blank slate.
+ * Regression: Coraza never rotates waf-audit.log, which grew to ~2GB. A real store on a temp file,
+ * since a test spanning two passes proves nothing if each starts from a blank slate.
  */
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -27,10 +21,8 @@ vi.mock("node:fs", () => ({
     size: p.includes("waf-audit") ? fsState.auditSize : 0,
     ino: p.includes("waf-audit") ? fsState.auditInode : 1,
   })),
-  // Produces exactly `size - start` bytes so the parser always reads through
-  // to the simulated current end-of-file in one pass, regardless of start offset.
-  // Chunks are Buffers because that is what createReadStream yields when no
-  // encoding is set, and the offset accounting counts bytes, not characters.
+  // Exactly `size - start` bytes, to EOF in one pass. Buffers, as createReadStream yields with no
+  // encoding, because the offsets count bytes, not characters.
   createReadStream: vi.fn((p: string, opts: { start?: number }) => {
     const start = opts?.start ?? 0;
     const size = p.includes("waf-audit") ? fsState.auditSize : 0;
@@ -71,7 +63,7 @@ afterEach(() => {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
-    /* a leftover temp directory is not worth failing a test over */
+    /* not worth failing a test over */
   }
 });
 
@@ -105,11 +97,8 @@ describe("waf-audit.log truncation", () => {
     expect(stateValue("waf_audit_log_size")).toBe("0");
   });
 
-  // Regression (issue #233): Coraza creates waf-audit.log owned by the caddy
-  // user with mode 0644, so the web container - a different UID - gets EACCES
-  // here. The truncate used to run *before* the offsets were persisted, so the
-  // throw aborted the pass and froze them, making every later pass re-read and
-  // re-insert the same tail forever. Progress must survive a failed truncate.
+  // #233: the file is 0644 as caddy, so another UID gets EACCES on truncate. That must not abort
+  // the pass before the offsets persist, or every later pass re-inserts the same tail.
   it("keeps advancing the stored offset when truncation fails with EACCES", async () => {
     fsState.auditSize = TRUNCATE_THRESHOLD + 1;
     vi.mocked(fs.truncateSync).mockImplementation(() => {
@@ -133,8 +122,7 @@ describe("waf-audit.log truncation", () => {
     await parseNewWafLogEntries();
     expect(stateValue("waf_audit_log_offset")).toBe("5000");
 
-    // File is deleted and recreated, then grows past the previously stored
-    // size - so the shrink check alone would never notice the replacement.
+    // Recreated and grown past the stored size, so only the inode reveals the replacement.
     fsState.auditInode = 43;
     fsState.auditSize = 9_000;
     await parseNewWafLogEntries();

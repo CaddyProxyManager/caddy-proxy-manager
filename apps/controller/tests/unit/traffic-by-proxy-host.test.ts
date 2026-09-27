@@ -1,10 +1,6 @@
 /**
- * Folding ClickHouse's per-Host-header totals back onto proxy host rows.
- *
- * ClickHouse knows the authority a request was made to; the list knows host ids and their domain
- * lists. The fold between them is where the numbers on the Proxy Hosts page can go wrong without
- * any query being wrong: a port left on the authority, a domain in a different case, or a host with
- * several domains reporting only one of them.
+ * Folding per-Host-header totals onto host rows, where numbers go wrong with no query wrong:
+ * a port left on the authority, a domain in another case, a multi-domain host reporting one.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

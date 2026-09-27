@@ -19,10 +19,7 @@ function isViewAsRole(value: unknown): value is ViewAsRole {
   return (VIEW_AS_ROLES as readonly unknown[]).includes(value);
 }
 
-/**
- * The live view on a session row, or null. Checked against the account's real role as well, so a
- * view left on a session whose owner has since been demoted grants nothing.
- */
+/** Checked against the real role too, so a view left on a since-demoted admin grants nothing. */
 export function readViewAs(
   row: { viewAsRole?: unknown; viewAsGroupIds?: unknown; viewAsExpiresAt?: unknown } | undefined,
   realRole: string,

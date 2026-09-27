@@ -1,13 +1,8 @@
 "use client";
 
 /**
- * The proxy host form's options, for the managed dashboard host.
- *
- * The same field components the edit dialog renders, posting the same names, so the settings
- * action reads them with the same parser. Left out: name, domains and upstreams, which the managed
- * host decides for itself; the enabled switch, which is its own setting; CPM forward auth, whose
- * grants are stored against a host id this host does not have; and the mTLS access rules for the
- * same reason (the trust settings themselves are here).
+ * The edit dialog's fields and names, read by the same parser. CPM forward auth and mTLS access
+ * rules are left out: their grants are keyed by a host id this host lacks.
  */
 import { useState } from "react";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -46,7 +41,6 @@ import {
   WafPresetOptionsProvider,
 } from "./WafPresetOptions";
 
-/** Everything the option fields need besides the values themselves. */
 export type DashboardHostOptionsData = {
   view: DashboardHostFormView;
   certificates: CertificatePickerOption[];
@@ -70,7 +64,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
 
   return (
     <VStack gap={5}>
-      {/* Tells the action this form carries the options, so a form without them keeps them. */}
+      {/* So a form without the options keeps them. */}
       <input type="hidden" name="dashboardOptionsPresent" value="1" />
       <SettingsToggles
         showEnabled={false}

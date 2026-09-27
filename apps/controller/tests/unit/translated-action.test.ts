@@ -1,8 +1,4 @@
-/**
- * `withTranslatedErrors` sits in front of the actions that return data, so it is the only thing
- * standing between a `DomainError` and a reader who cannot read a code. The rethrow-untouched case
- * matters just as much: `redirect()` signals by throwing, and `skipMigration` redirects.
- */
+/** Rethrowing untouched matters as much: `redirect()` throws, and `skipMigration` redirects. */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -33,7 +29,7 @@ describe('withTranslatedErrors', () => {
   });
 
   it('hands on a plain Error untouched, so redirect() still signals', async () => {
-    // next/navigation throws to redirect. Converting that would turn a redirect into an error page.
+    // Converting it would turn a redirect into an error page.
     const redirectSignal = new Error('NEXT_REDIRECT');
     let caught: unknown;
     try {
@@ -47,8 +43,7 @@ describe('withTranslatedErrors', () => {
   });
 
   it('does not leave a DomainError instance for the client to unwrap', async () => {
-    // The class does not survive the server action boundary, which is the whole reason the message
-    // is resolved here rather than in the component.
+    // The class does not survive the action boundary, hence resolving the message here.
     let caught: unknown;
     try {
       await withTranslatedErrors(async () => {

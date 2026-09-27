@@ -23,13 +23,9 @@ export function useThemeMode(): ThemeModeContextValue {
 }
 
 function persist(mode: ThemeMode) {
-  // SameSite=Lax is enough: the cookie only picks a colour, and it must survive ordinary top-level
-  // navigation back into the app.
-  /* biome-ignore lint/suspicious/noDocumentCookie: the suggested Cookie Store API
-     is Chromium-only - no Safari, no Firefox - and its async set would let a
-     reload race the write. document.cookie is the portable, synchronous option,
-     and a single well-formed assignment has none of the overwrite hazards the
-     rule guards against. */
+  // Lax: it only picks a colour, and must survive top-level navigation back in.
+  /* biome-ignore lint/suspicious/noDocumentCookie: Cookie Store is Chromium-only and async,
+     so a reload could race the write. */
   document.cookie = `${THEME_COOKIE}=${mode}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 

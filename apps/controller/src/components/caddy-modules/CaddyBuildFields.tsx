@@ -1,9 +1,6 @@
 "use client";
 
-/**
- * The module picker. Save records the selection; Rebuild recompiles Caddy and restarts the proxy -
- * hence two separately-confirmed buttons.
- */
+/** Save only records; Rebuild restarts the proxy, hence two separately-confirmed buttons. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Hammer, Plus, Trash2 } from "lucide-react";
@@ -74,14 +71,13 @@ function groupModules(): [CaddyModuleCategory, CaddyModuleDefinition[]][] {
   ]);
 }
 
-/** The fleet default, as a target id. Zero is not a valid `agents.id`, so it cannot collide. */
+/** Zero is never an `agents.id`, so it cannot collide. */
 const FLEET = 0;
 
 function resolveModuleMap(overrides: Record<string, boolean>): Record<string, boolean> {
   const resolved: Record<string, boolean> = {};
   for (const module of CADDY_MODULES) {
-    // A module missing from the map counts as enabled, so one added to the catalog after the
-    // operator last saved appears on rather than silently off.
+    // Missing means enabled, so a module added to the catalog since the last save is on.
     resolved[module.id] = overrides[module.id] !== false;
   }
   return resolved;
@@ -93,15 +89,10 @@ export function CaddyBuildFields({
   agents = [],
   agentSelections = {},
 }: {
-  /** Stored overrides. A module missing from the map counts as enabled. */
   initialModules: Record<string, boolean>;
   initialCustomModules: CaddyCustomModule[];
-  /** Every paired agent, so one can be configured separately from the fleet. */
   agents?: { id: number; name: string; connected: boolean }[];
-  /**
-   * Each agent's own selection, keyed by row id. An agent absent from here - or mapped to null -
-   * follows the fleet default, which is the state every agent starts in.
-   */
+  /** Keyed by row id; absent or null follows the fleet default. */
   agentSelections?: Record<
     number,
     { modules: Record<string, boolean>; customModules: CaddyCustomModule[] } | null
@@ -111,21 +102,17 @@ export function CaddyBuildFields({
   // Custom module problems are domain error codes, which live at the catalog root.
   const tRoot = useTranslations();
   const [target, setTarget] = useState<number>(FLEET);
-  // Whether the selected agent tracks the fleet rather than carrying a selection of its own.
-  // Saving with this on clears the agent's row instead of writing a frozen copy of today's fleet.
+  // Saving with this on clears the agent's row rather than freezing a copy of today's fleet.
   const [follows, setFollows] = useState(false);
   const [modules, setModules] = useState<Record<string, boolean>>(() =>
     resolveModuleMap(initialModules),
   );
-  // Rows carry a client-only id because they have no server identity until saved, and reordering
-  // or deleting by array index makes React recycle inputs into the wrong row mid-edit.
+  // A client-only key: by index, React recycles inputs into the wrong row after a delete.
   const [customModules, setCustomModules] = useState<CustomModuleRow[]>(() =>
     initialCustomModules.map((entry) => ({ ...entry, uid: nextRowId() })),
   );
 
-  // Switching target reloads the editor from that target's stored selection. An agent with none
-  // starts from the fleet's, which is what it is actually running - so turning the switch off
-  // gives an accurate starting point rather than an empty form.
+  // An agent with no selection starts from the fleet's, which is what it actually runs.
   const selectTarget = (next: number) => {
     setTarget(next);
     const own = next === FLEET ? null : (agentSelections[next] ?? null);
@@ -140,7 +127,7 @@ export function CaddyBuildFields({
   };
   const [build, setBuild] = useState<BuildResponse | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
-  // Errors from the trigger request itself, which never reach the status file.
+  // The trigger request's own errors, which never reach the status file.
   const [rebuildError, setRebuildError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -150,7 +137,7 @@ export function CaddyBuildFields({
       );
       if (res.ok) setBuild(await res.json());
     } catch {
-      // A failed poll is not worth interrupting the page for; the next tick retries.
+      // The next tick retries.
     }
   }, [target]);
 
@@ -158,8 +145,7 @@ export function CaddyBuildFields({
     void fetchStatus();
   }, [fetchStatus]);
 
-  // Poll only while the agent is working. A build takes minutes, so a slower interval than the
-  // L4 banner's keeps the request count sane.
+  // Slower than the L4 banner's poll: a build takes minutes.
   const inFlight = build?.status.state === "pending" || build?.status.state === "building";
   useEffect(() => {
     if (!inFlight) return;
@@ -173,8 +159,7 @@ export function CaddyBuildFields({
     [modules, customModules],
   );
 
-  // Previewed from the same field list the server builds from, so what is shown is what the
-  // rebuild will actually pass to xcaddy.
+  // The same list the server builds from, so this is what xcaddy will get.
   const previewSpecs = useMemo(() => {
     const builtIn = CADDY_MODULES.filter((m) => modules[m.id]).map((m) => m.modulePath);
     const custom = customModules
@@ -206,8 +191,7 @@ export function CaddyBuildFields({
         { method: "POST" },
       );
       if (!res.ok) {
-        // Not left to the status poll: these failures abort before the agent writes any status,
-        // and the poll only runs while it says pending/building - the spinner would just stop.
+        // These abort before the agent writes a status, so the poll would never see them.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setRebuildError(body?.error ?? t("rebuildCouldNotStartHttp", { status: res.status }));
         return;
@@ -379,8 +363,7 @@ export function CaddyBuildFields({
         description={t("modulesSelected", { count: enabledCount })}
       />
 
-      {/* Every control above is React state, so the values reach the server
-          action through these hidden inputs rather than through the DOM. */}
+      {/* The controls above are React state; these carry it to the server action. */}
       {CADDY_MODULES.map((module) => (
         <input
           key={module.id}

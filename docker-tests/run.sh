@@ -83,10 +83,8 @@ echo "==> starting the rig"
 # dnsmasq's entire configuration is a bind mount, so compose sees no change to
 # the service when it is edited and leaves a stale container running.
 compose up -d --force-recreate dns >/dev/null 2>&1
-# certgen is left off this list on purpose: it is a one-shot container that
-# other services depend on with `service_completed_successfully`, so compose
-# starts it and waits for it to exit. Naming it here would make --wait treat
-# that exit as a failure to become healthy.
+# certgen is left off on purpose: a one-shot others wait on via `service_completed_successfully`,
+# whose exit --wait would treat as a failure to become healthy.
 if ! compose up -d --wait --wait-timeout 300 \
       dns pebble caddy web origin-a origin-b origin-tls origin-tcp origin-udp; then
   echo "the rig did not come up healthy" >&2

@@ -207,15 +207,13 @@ describe('REST settings runtime validation', () => {
       expect(() => withEmail(bad), bad).toThrow(/valid email address/);
     }
 
-    // An empty label is not a domain. The earlier pattern let both sides of the dot swallow one,
-    // which is what made a non-matching address backtrack quadratically.
+    // A pattern letting both sides of the dot swallow an empty label backtracks quadratically.
     expect(() => withEmail('admin@example..com')).toThrow(/valid email address/);
   });
 
   it('caps the address length before the pattern ever runs', () => {
-    // '!@!.!.!.…' is the worst case for a pattern whose two sides can both eat the dot. The
-    // length cap, not the pattern, is what keeps a hostile payload short enough to be harmless,
-    // so it has to stay in front of the match rather than beside it.
+    // '!@!.!.!...' is the worst case for such a pattern. The length cap, not the pattern, keeps a
+    // hostile payload harmless, so it has to run before the match.
     expect(() =>
       validateSettingsGroup('general', {
         defaultDomain: 'example.com',

@@ -1,9 +1,6 @@
 /**
- * `cpm-agent --pair` asks who it is about to pair with before it pairs.
- *
- * The preview has to name the controller for a right code, leave the agent exactly as it was -
- * nothing stored, nothing dialled but the preview itself, the code unspent - and still let an
- * operator proceed against a controller too old to answer, rather than blocking pairing on it.
+ * `--pair` previews the controller first: nothing stored, nothing dialled but the preview, the code
+ * unspent - and a controller too old to answer must not block pairing.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,10 +18,9 @@ const ORIGINAL_FETCH = globalThis.fetch;
 let dir: string;
 let store: AgentStore;
 let lifecycle: AgentLifecycle;
-/** Every request the agent made: path and parsed body. */
 let requests: { path: string; body: unknown }[];
 
-/** A controller that answers the preview route with `respond`, and anything else with 500. */
+/** Anything but the preview route answers 500. */
 function stubController(respond: () => Response) {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;

@@ -22,8 +22,7 @@ describe('assertWildcardIssuable', () => {
   it('rejects an auto-managed wildcard host when no DNS provider is configured', async () => {
     mockGetDnsProviderSettings.mockResolvedValue(null);
     const failure = assertWildcardIssuable(['*.example.com'], null);
-    // A DomainError with a 400: `/api/v1` answers it as it did the ApiValidationError it replaced,
-    // and a server action can say it in the reader's language.
+    // A 400 DomainError, so `/api/v1` answers as before and an action can translate it.
     await expect(failure).rejects.toBeInstanceOf(DomainError);
     await expect(failure).rejects.toMatchObject({
       code: 'wildcardDomainNeedsDnsProvider',

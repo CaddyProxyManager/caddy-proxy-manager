@@ -1,11 +1,6 @@
 /**
- * Analytics rows an agent relays, checked and written to ClickHouse.
- *
- * The agent parses its own Caddy logs, because only it can read them, but holds no ClickHouse
- * credential. What arrives comes from a less trusted party, so each row is checked field by field
- * and stamped with the agent that signed the request. A malformed row is dropped and counted rather
- * than failing the batch: a refused batch is resent every pass, so one bad row would stall that
- * agent's analytics for good.
+ * Agents are less trusted, so rows are checked field by field and stamped with the signer. A bad
+ * row is dropped and counted: a refused batch is resent every pass and would stall for good.
  */
 
 import {
@@ -17,13 +12,12 @@ import {
 } from "@cpm/shared";
 import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
 
-/** Longest ordinary string field. A URI or user agent past this is noise, not a request. */
+/** A URI or user agent past this is noise, not a request. */
 const MAX_FIELD_CHARS = 64 * 1024;
 
 /** Coraza's audit data carries request excerpts, so it gets more room. */
 const MAX_RAW_DATA_CHARS = 1024 * 1024;
 
-/** The largest Unix timestamp ClickHouse's DateTime holds. */
 const MAX_DATETIME_SECONDS = 4_294_967_295;
 
 export class AnalyticsIngestError extends Error {
@@ -135,10 +129,7 @@ function isKind(value: unknown): value is AgentAnalyticsKind {
   return (AGENT_ANALYTICS_KINDS as readonly unknown[]).includes(value);
 }
 
-/**
- * Write what `agentId` relayed. Throws when nothing can be written, so the agent keeps its place in
- * the log and resends; a ClickHouse failure propagates for the same reason.
- */
+/** Throws when nothing can be written, so the agent keeps its place and resends. */
 export async function ingestAnalytics(
   agentId: string,
   kind: unknown,

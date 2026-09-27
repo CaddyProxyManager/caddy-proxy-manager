@@ -1,14 +1,7 @@
 /**
- * How the environment names the database, and what it refuses.
- *
- * Two things are worth pinning here. SQLite: every pre-3.0 deployment has a SQLite value in its
- * .env, in one of several spellings, and each must name the same file it always did.
- *
- * And the field form, which exists because a URL has to encode its password and the Compose file
- * that builds one cannot. `openssl rand -base64 32` - what the .env.example tells operators to run
- * - emits `/` about half the time, and a `/` in a URL's password ends the authority early: the app
- * then tries to reach a host nobody configured. Fields have no delimiter to collide with, and the
- * tests below say so with the characters that actually broke it.
+ * Every pre-3.0 SQLite spelling must name the same file. The field form exists because Compose
+ * cannot URL-encode a password, and `openssl rand -base64` often emits a `/` that ends the URL's
+ * authority early.
  */
 import { describe, expect, it } from 'bun:test';
 import { resolve } from 'node:path';
@@ -55,8 +48,7 @@ describe('resolveDatabaseTarget', () => {
 
   describe('the POSTGRES_* fields', () => {
     it('takes a password with the characters that broke it as a URL', () => {
-      // The reported failure: base64 output containing a slash. As a URL this ends the authority
-      // early and the host becomes "cpm:pa"; as a field it is just the password.
+      // The reported failure: as a URL the host becomes "cpm:pa".
       const target = resolveDatabaseTarget(env({ POSTGRES_PASSWORD: 'pa/ss+wo=rd' }));
       expect(target).toMatchObject({ kind: 'fields', password: 'pa/ss+wo=rd' });
     });
@@ -110,8 +102,7 @@ describe('resolveDatabaseTarget', () => {
     });
 
     it('refuses a port that is not one rather than quietly defaulting past it', () => {
-      // Silently using 5432 for a typo'd port produces a connection error naming the right host
-      // and the wrong port, which is a long way to walk back to a one-character mistake.
+      // Falling back to 5432 would hide a one-character typo behind a connection error.
       for (const port of ['abc', '0', '70000', '5432.5', '']) {
         const values = env({ POSTGRES_PASSWORD: 'pw', POSTGRES_PORT: port });
         if (port === '') {
@@ -130,7 +121,7 @@ describe('resolveDatabaseTarget', () => {
   });
 
   describe('SQLite', () => {
-    // Every form a pre-3.0 .env carried is accepted again, so an old value is not a startup error.
+    // An old .env value must not be a startup error.
     const cwd = process.cwd();
     for (const [url, path] of [
       ['file:/app/data/caddy-proxy-manager.db', '/app/data/caddy-proxy-manager.db'],
@@ -197,8 +188,7 @@ describe('resolveDatabaseTarget', () => {
       expect(() => resolveDatabaseTarget(env({}))).toThrow(/No database is configured/);
       expect(() => resolveDatabaseTarget(env({}))).toThrow(/POSTGRES_PASSWORD/);
       expect(() => resolveDatabaseTarget(env({}))).toThrow(/DATABASE_URL/);
-      // A blank DATABASE_URL is what `${DATABASE_URL:-}` in the compose file produces when the
-      // operator has not set one; it must read as absent rather than as an empty URL.
+      // What `${DATABASE_URL:-}` in the compose file produces when unset.
       expect(() => resolveDatabaseTarget(env({ DATABASE_URL: '   ' }))).toThrow(
         /No database is configured/,
       );

@@ -1,7 +1,6 @@
 /**
- * SECURITY-AUDIT H3: an OAuth IdP must not set privileged user fields. better-auth's generic-OAuth
- * signup spreads raw claims into the new user and ignores `input:false`. The fix forces safe
- * defaults in a databaseHooks.user.create.before hook; these lock the transform and its wiring.
+ * SECURITY-AUDIT H3: better-auth's generic-OAuth signup spreads raw IdP claims into the new user,
+ * ignoring `input:false`, so a databaseHooks.user.create.before hook forces safe defaults.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -29,10 +27,8 @@ vi.mock('../../src/lib/db', () => {
   };
 });
 
-// Stub better-auth so importing auth-server doesn't pull in the full runtime
-// (which fails to resolve fully under the test runner). `betterAuth` returns the raw
-// options object, so getAuth().options is exactly the config createAuth() built
-// - including our real databaseHooks - which is what we want to assert on.
+// The real better-auth fails to resolve under the test runner; this `betterAuth` returns its
+// options, so getAuth().options is exactly what createAuth() built, real databaseHooks included.
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
 }));
@@ -134,8 +130,7 @@ describe('mapOAuthProvider - OAuth self-registration gating (M2)', () => {
   };
 
   it('disables implicit signup by default (AUTH_ALLOW_OAUTH_REGISTRATION unset)', () => {
-    // The test env does not set AUTH_ALLOW_OAUTH_REGISTRATION, so OAuth signup
-    // must be closed: an unknown IdP identity cannot self-provision an account.
+    // AUTH_ALLOW_OAUTH_REGISTRATION is unset in tests, so an unknown IdP identity cannot sign up.
     const cfg = mapOAuthProvider(sampleProvider);
     expect(cfg.disableImplicitSignUp).toBe(true);
   });

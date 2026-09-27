@@ -1,15 +1,6 @@
 /**
- * The agent protocol, as GraphQL.
- *
- * The transport changed; the conversation did not. An agent subscribes and receives `hello`, then
- * desired state, then commands and pings; it reports back with mutations. These tests drive the
- * schema directly rather than over HTTP, because what is worth pinning is the protocol and the
- * gate - the SSE framing belongs to the GraphQL server and is its to get right.
- *
- * The gate is the part that would be quiet if it broke. Agent fields and operator fields live in
- * one schema, separated only by which credential the resolver insists on, so "a user token cannot
- * drive an agent field" and "a signed agent cannot read proxy hosts" are asserted rather than
- * assumed.
+ * Drives the schema directly: the SSE framing is the server's to get right. The gate between agent
+ * and operator fields would break silently, so both directions are asserted, not assumed.
  */
 import { describe, it, expect, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -37,8 +28,7 @@ vi.mock('../../src/lib/db', () => {
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-// The signature check belongs to agent/verify and is tested there. What these tests vary is its
-// answer, so they can drive a verified agent and an unverified one.
+// The signature check is tested in agent/verify; here only its answer varies.
 const verified = { ok: true as const, agent: { id: 1, agentId: 'a1', name: 'edge' } };
 let verifyResult: unknown = verified;
 vi.mock('../../src/lib/agent/verify', () => ({
@@ -90,7 +80,6 @@ import { connectedAgents, detach, isConnected } from '../../src/lib/agent/regist
 
 function agentContext(): GraphQLContext {
   return {
-    // An agent presents no user credential at all; every operator field must refuse it.
     viewer: async () => {
       throw new Error('Unauthorized');
     },
@@ -140,7 +129,7 @@ describe('the agent subscription', () => {
     expect(first.type).toBe('hello');
     expect(second.type).toBe('desired-state');
 
-    // Ending the consumer is what detaches the agent, which is how a disconnect is noticed at all.
+    // Ending the consumer is the only way a disconnect is noticed.
     expect(isConnected('a1')).toBe(true);
     await iterator.return?.();
     expect(isConnected('a1')).toBe(false);
@@ -265,7 +254,6 @@ describe('the analytics relay', () => {
 
 describe('the two credentials do not cross over', () => {
   it('refuses agent fields to a user token', async () => {
-    // A signed agent is the only thing that may drive these, however privileged the user is.
     verifyResult = { ok: false, status: 401, error: 'Unknown agent' };
 
     const result = await graphql({
@@ -279,8 +267,7 @@ describe('the two credentials do not cross over', () => {
   });
 
   it('refuses operator fields to an agent', async () => {
-    // The agent context carries no user at all, so the ordinary API is closed to it - an agent
-    // secret is not a way to read the configuration of every host.
+    // An agent secret must not be a way to read every host's configuration.
     const result = await graphql({
       schema,
       source: '{ proxyHosts { id } }',

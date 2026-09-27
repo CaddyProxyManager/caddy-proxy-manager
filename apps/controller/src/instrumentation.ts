@@ -1,21 +1,16 @@
 /** Next.js instrumentation hook - runs once when the server starts. */
 export async function register() {
-  // Only run on the server side
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Refuse to run under anything but Bun. This catches the paths where the app gets to execute
-    // at all; the standalone build dies earlier, while linking, so `bun run build` plants an
-    // equivalent check atop dist/standalone/server.js (scripts/inject-runtime-guard.mjs).
+    // The standalone build dies earlier, while linking; scripts/inject-runtime-guard.mjs covers it.
     const { assertBunRuntime } = await import("./lib/runtime-guard");
     assertBunRuntime();
 
-    // Validate production configuration early to catch misconfigurations
     const { validateProductionConfig } = await import("./lib/config");
     try {
       validateProductionConfig();
     } catch (error) {
       console.error("Configuration validation failed:", error);
       if (process.env.NODE_ENV === "production") {
-        // Fail fast in production with bad config
         throw error;
       }
     }
@@ -33,11 +28,10 @@ export async function register() {
       console.log("Database initialization complete");
     } catch (error) {
       console.error("Failed to initialize database:", error);
-      // Don't throw - let the app start; errors surface when users reach the features
+      // Let the app start; errors surface when users reach the features.
     }
 
-    // After the seed, so an environment-configured deployment is recognised by the account it has
-    // just created rather than being sent through a setup flow it does not need.
+    // After the seed, so an env-configured deployment is recognised by the account it just made.
     const { backfillSetupCompletion } = await import("./lib/setup");
     try {
       await backfillSetupCompletion();
@@ -45,9 +39,7 @@ export async function register() {
       console.error("Failed to check first-run setup state:", error);
     }
 
-    // With local users disabled, an OAuth provider is the only way in. Warn loudly rather than
-    // throwing: an operator locked out of the UI can only recover by configuring a provider via
-    // OAUTH_* environment variables, which needs the app to keep starting.
+    // Warn, not throw: a locked-out operator recovers through OAUTH_*, which needs the app running.
     const { config: appConfig } = await import("./lib/config");
     if (appConfig.auth.disableLocalUsers) {
       try {
@@ -68,8 +60,7 @@ export async function register() {
       }
     }
 
-    // Imported keys and provider options could contain plaintext secrets in
-    // older releases. Repair them before any request handler reads the rows.
+    // Older releases stored plaintext secrets; repair before any handler reads the rows.
     const { migrateLegacyCertificateStorage } = await import("./lib/models/certificates");
     const { migrateLegacyCaCertificateStorage } = await import("./lib/models/ca-certificates");
     try {
@@ -83,7 +74,7 @@ export async function register() {
       if (process.env.NODE_ENV === "production") throw error;
     }
 
-    // Attached before the startup apply, so the config lands on the demo agent's in-memory Caddy.
+    // Before the startup apply, so the config lands on the demo agent's in-memory Caddy.
     if (demoMode) {
       try {
         await (await import("./lib/demo/start")).startSimulatedAgent();
@@ -92,7 +83,6 @@ export async function register() {
       }
     }
 
-    // Apply Caddy configuration from database on startup
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {
       console.log("Applying Caddy configuration from database...");
@@ -101,15 +91,13 @@ export async function register() {
       // So the monitor's first pass does not build and load the same document again.
       (await import("./lib/caddy-monitor")).noteStartupApply();
     } catch (error) {
-      // Don't throw - Caddy may not be ready yet, or the config may be applied later; this keeps
-      // proxy hosts working after a container restart
+      // Caddy may not be ready yet; the monitor applies it later.
       const { CaddyApplyError } = await import("./lib/caddy-apply-error");
       if (error instanceof CaddyApplyError && error.code === "CADDY_UNREACHABLE") {
         // The usual first start: the agent has not paired yet, so it has not started Caddy.
         console.log("Caddy is not reachable yet - its configuration is applied once it comes up");
       } else if (error instanceof CaddyApplyError) {
-        // The message and code, not the error: logCaddyApplyFailure already logged the details
-        // under an error ID, and Bun prints a stack by quoting the minified bundle line it names.
+        // Not the error: it is logged under an ID, and Bun's stack quotes the minified bundle.
         console.error(
           `Failed to apply Caddy configuration on startup: ${error.message} (${error.code})`,
         );
@@ -118,17 +106,14 @@ export async function register() {
       }
     }
 
-    // Start Caddy health monitoring to detect restarts and auto-reapply config
     const { startCaddyMonitoring } = await import("./lib/caddy-monitor");
     try {
       startCaddyMonitoring();
       console.log("Caddy health monitoring started");
     } catch (error) {
       console.error("Failed to start Caddy health monitoring:", error);
-      // Don't throw - monitoring is a nice-to-have feature
     }
 
-    // Initialize ClickHouse analytics database
     const { initClickHouse, closeClickHouse } = await import("./lib/clickhouse/client");
     try {
       await initClickHouse();
@@ -136,12 +121,9 @@ export async function register() {
       if (demoMode) await (await import("./lib/demo/traffic")).startLiveDemoTraffic();
     } catch (error) {
       console.error("Failed to initialize ClickHouse:", error);
-      // Don't throw - analytics is non-critical
     }
 
-    // Leave a token on the shared volume so the agent in this same stack can pair itself, if it is
-    // not paired already. Before the fleet push, so an agent that comes up while the controller is
-    // still starting finds one waiting rather than idling until the next restart.
+    // Before the fleet push, so an agent coming up now finds a token rather than idling.
     const { ensureBootstrapToken } = await import("./lib/agent/bootstrap");
     try {
       await ensureBootstrapToken();
@@ -149,9 +131,7 @@ export async function register() {
       console.error("Failed to write the agent bootstrap token:", error);
     }
 
-    // The log parsers moved to the agent: the Caddy log is a file on the agent's host, which a
-    // controller elsewhere cannot read at all. Hand each agent the credentials to write its own
-    // events instead.
+    // Agents parse the Caddy log on their own host, so each gets credentials to write its events.
     const { pushFleetConfig } = await import("./lib/agent/fleet-config");
     try {
       await pushFleetConfig();
@@ -159,9 +139,8 @@ export async function register() {
       console.error("Failed to send the fleet configuration to the agents:", error);
     }
 
-    // After the push, not before: an agent that is about to start ClickHouse should already know
-    // where to write. Reconciled on every start because the operator's own `docker compose up`
-    // brings the stack back without these profiles, so a host reboot leaves them stopped.
+    // After the push, so an agent starting ClickHouse knows where to write. Every start, because a
+    // plain `docker compose up` after a reboot leaves profiled services stopped.
     const { applyManagedServices } = await import("./lib/agent/managed-services");
     try {
       await applyManagedServices();
@@ -177,7 +156,6 @@ export async function register() {
       console.error("Failed to start the GeoIP updater:", error);
     }
 
-    // Reads the CRS plugin registries and checks their plugins on the configured interval.
     const { startCrsRegistryUpdater } = await import("./lib/crs-plugins/sync");
     const { installedCrsPluginRepositories } = await import("./lib/models/crs-plugins");
     try {

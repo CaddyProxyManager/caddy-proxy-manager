@@ -12,8 +12,7 @@ import type { PathBlockRule, PathBlockStatusCode } from "@/lib/models/proxy-host
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { useTranslations } from "next-intl";
 
-// Mirrors PATH_BLOCK_STATUS_CODES in src/lib/models/proxy-hosts.ts. Kept inline so this
-// client component does not pull the server-only model module into the bundle.
+// Mirrors PATH_BLOCK_STATUS_CODES in models/proxy-hosts.ts, which is server-only.
 const STATUS_CODES: readonly PathBlockStatusCode[] = [
   400, 401, 403, 404, 410, 418, 451, 500, 502, 503,
 ];

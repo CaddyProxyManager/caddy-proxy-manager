@@ -1,10 +1,6 @@
 /**
- * The settings service: resolution order, validation, and secrets at rest.
- *
- * The resolution order is the load-bearing part. Every setting here still has a live environment
- * variable behind it, and a deployment that has not run the migration must keep reading exactly
- * what it read before - so "stored wins, else environment, else default" is the property that lets
- * this land in pieces.
+ * The settings service: resolution order, validation, and secrets at rest. "Stored, else
+ * environment, else default" is what keeps an unmigrated deployment reading what it read before.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';

@@ -60,7 +60,6 @@ export function UpstreamInput({
     setEntries((prev) =>
       prev.map((entry) => {
         if (entry.rowId !== rowId) return entry;
-        // Strip protocol if the user pasted a full URL.
         if (newAddress.startsWith("https://")) {
           return { ...entry, protocol: "https://", address: newAddress.slice(8) };
         }
@@ -118,8 +117,7 @@ export function UpstreamInput({
               label={t("removeUpstreamLabel", { index: index + 1 })}
               icon={<MinusCircle />}
               isDisabled={isOnlyEntry}
-              // Explains the disabled state on hover, replacing a title on a
-              // wrapper span that screen readers never announced.
+              // Not a title on a wrapper span, which screen readers never announced.
               tooltip={isOnlyEntry ? t("atLeastOneUpstreamRequired") : t("removeUpstream")}
               onClick={() => handleRemove(entry.rowId)}
             />

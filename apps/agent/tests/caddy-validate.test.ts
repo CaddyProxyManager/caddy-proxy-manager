@@ -1,9 +1,6 @@
 /**
- * The `caddy validate` dry run: the argv it spawns, and what it makes of the answers.
- *
- * Pinned against the argv because each flag is a promise about the container: no network, no
- * capabilities beyond the one Caddy's binary needs, no attach through the socket proxy, and a
- * config that arrives by copy rather than by mounting this agent's data.
+ * Pinned against the argv because each flag is a promise: no network, one capability, no attach
+ * through the socket proxy, and the config copied in rather than mounted.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,7 +23,7 @@ let dir: string;
 let spawned: string[][];
 /** Answers by docker subcommand; anything unlisted succeeds with no output. */
 let replies: Record<string, Reply>;
-/** The config file's contents, read when `docker cp` is spawned. */
+/** Read when `docker cp` is spawned. */
 let copied: string | null;
 
 const realSpawn = Bun.spawn;

@@ -1,8 +1,4 @@
-/**
- * The admin bind the agent pins into every config it forwards. The controller writes one admin
- * block for every host, and left alone it binds Caddy's admin API on every interface - including
- * the network the upstreams share.
- */
+/** The controller's admin block binds every interface, including the upstreams' network. */
 import { describe, expect, it } from "bun:test";
 import { loadsConfig, pinAdminListen } from "../src/caddy-admin";
 

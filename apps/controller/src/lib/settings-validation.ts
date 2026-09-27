@@ -240,27 +240,19 @@ function validateDashboard(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "domain", "tls", "options"], "dashboard settings");
   booleanValue(required(value, "enabled", "dashboard settings"), "dashboard.enabled");
   booleanValue(required(value, "tls", "dashboard settings"), "dashboard.tls");
-  // Required even when disabled: the domain is what the route is rebuilt from the moment it is
-  // switched back on, and a blank one there would silently produce no route at all.
+  // Required even when disabled: re-enabling with a blank one would silently build no route.
   const domain = stringValue(required(value, "domain", "dashboard settings"), "dashboard.domain", {
     min: 1,
     max: 253,
   });
-  // A hostname, not merely a non-empty string. This value is interpolated into a Caddy host matcher
-  // and into the URL the reachability check requests, so "any text up to 253 characters" was the
-  // wrong bar in both places - the check being the one CodeQL objected to. Refusing it here is
-  // what stops anything else being stored to begin with.
+  // Interpolated into a Caddy host matcher and the reachability check's URL (which CodeQL flagged).
   if (!isHostname(domain)) {
     invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
   }
   if (value.options !== undefined) validateDashboardOptions(value.options);
 }
 
-/**
- * The shape of the dashboard host's proxy options. The `meta` blob is only checked for being a JSON
- * object here: the Caddy builder reads it through the same parser it uses for `proxy_hosts.meta`,
- * and the settings form builds it through the proxy host model, which does the field-level checks.
- */
+/** `meta` is only checked for being a JSON object: the proxy host model does the field checks. */
 function validateDashboardOptions(input: unknown): void {
   const options = record(input, "dashboard.options");
   onlyKeys(
@@ -505,8 +497,7 @@ function validateWaf(value: Record<string, unknown>): void {
       `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
     );
   }
-  // A dropped line is a rule the user believes is running. Refuse the write and name each one,
-  // rather than accepting the settings and quietly emitting a WAF without them.
+  // A dropped line is a rule the user believes is running, so refuse and name each one.
   const { dropped } = filterCustomDirectives(directives);
   if (dropped.length > 0) {
     invalid(
@@ -530,11 +521,7 @@ function validateWaf(value: Record<string, unknown>): void {
   validateBodyLimits(value, "waf");
 }
 
-/**
- * Shared by the global WAF settings and the per-host WAF config. Values above
- * Coraza's 1 GiB ceiling make Caddy reject the whole config document, so they
- * are refused at the input layer rather than silently dropped later.
- */
+/** Global and per-host WAF. Past Coraza's 1 GiB ceiling Caddy rejects the whole config. */
 export function validateBodyLimits(value: Record<string, unknown>, prefix: string): void {
   for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
     const raw = value[key];
@@ -609,9 +596,7 @@ function validateTailscale(value: Record<string, unknown>): void {
   );
   booleanValue(required(value, "enabled", "Tailscale settings"), "tailscale.enabled");
   try {
-    // The normalizer is the single source of truth for what a node name, a tag and a state
-    // directory may be - it also runs on every read, so duplicating the rules here would let the
-    // API accept something the next read would silently drop.
+    // The normalizer also runs on every read; duplicated rules could accept what a read then drops.
     normalizeTailscaleSettings(value);
   } catch (error) {
     invalid(error instanceof Error ? error.message : "Invalid Tailscale settings");

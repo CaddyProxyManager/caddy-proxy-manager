@@ -13,7 +13,6 @@ export interface HttpResponse {
   body: string;
 }
 
-/** Make an HTTP request to Caddy (localhost:80) with a custom Host header. */
 export function httpGet(
   domain: string,
   path = '/',
@@ -69,10 +68,7 @@ export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<
   );
 }
 
-/**
- * Poll until the route returns a specific expected status code. Useful for forward auth routes,
- * where a 302 to the portal is what you expect.
- */
+/** Poll until the route returns `expectedStatus` - a 302 to the portal, for forward auth. */
 export async function waitForStatus(
   domain: string,
   expectedStatus: number,
@@ -130,7 +126,6 @@ export interface WsHandshakeResult {
   statusLine: string;
   /** Parsed numeric status code, or 0 if the response had no parseable HTTP status line. */
   statusCode: number;
-  /** Lower-cased response headers. */
   headers: Record<string, string>;
   /** Raw response head (everything before the body), latin1-decoded. */
   raw: string;
@@ -192,7 +187,6 @@ export function wsHandshake(
 
     socket.on('data', (chunk: Buffer) => {
       buf = Buffer.concat([buf, chunk]);
-      // Once the full response head has arrived, the handshake outcome is known.
       if (buf.indexOf('\r\n\r\n') !== -1) {
         clearTimeout(timer);
         finish();

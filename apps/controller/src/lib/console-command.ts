@@ -6,7 +6,7 @@
 import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 
 export const CONSOLE_RESET_TWO_FACTOR_PATH = "/api/internal/reset-2fa";
-/** Clock skew allowed between the command and the server, which share one machine. */
+/** Short: the command and the server share one machine. */
 export const CONSOLE_COMMAND_MAX_AGE_MS = 60_000;
 
 function key(secret: string): Buffer {

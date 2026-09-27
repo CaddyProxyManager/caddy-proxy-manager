@@ -1,8 +1,6 @@
 /**
- * Reading the proxy host form.
- *
- * Out of proxy-hosts/actions.ts because a "use server" module may only export server actions, and
- * the dashboard host in Settings renders the same fields - so it has to read them the same way.
+ * Out of proxy-hosts/actions.ts: a "use server" module may only export actions, and the dashboard
+ * host in Settings reads the same fields.
  */
 import {
   type ForwardAuthProvider,
@@ -45,22 +43,18 @@ export async function validateAndSanitizeCertificateId(certificateId: number | n
   certificateId: number | null;
   /** English, for the server log. */
   warning?: string;
-  /** What the operator-facing message needs to say the same thing in their language. */
+  /** For the operator-facing message in their language. */
   missing?: { id: number; cloudflareConfigured: boolean };
 }> {
-  // null is valid (Caddy Auto)
   if (certificateId === null) {
     return { certificateId: null };
   }
 
-  // Check if certificate exists
   const certificate = await getCertificate(certificateId);
 
   if (!certificate) {
-    // Only the warning's wording depends on Cloudflare, so the read is deferred to this branch.
     const cloudflareConfigured = !!(await getCloudflareSettings())?.apiToken;
 
-    // Build helpful warning message
     let warning: string;
 
     if (!cloudflareConfigured) {
@@ -129,12 +123,7 @@ export function parseAuthentikConfig(formData: FormData): ProxyHostAuthentikInpu
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-/**
- * The host's generic forward-auth block.
- *
- * Every field is read only when the form rendered it, the way the Authentik and Tailscale parsers
- * do: a dialog that hides the advanced options must not clear what is stored behind them.
- */
+/** Fields read only when rendered, so hidden advanced options are not cleared on save. */
 export function parseForwardAuthConfig(formData: FormData): ProxyHostForwardAuthInput | undefined {
   if (!formData.has("forwardAuthPresent")) {
     return undefined;
@@ -157,8 +146,7 @@ export function parseForwardAuthConfig(formData: FormData): ProxyHostForwardAuth
 
   const result: ProxyHostForwardAuthInput = {};
   if (enabledValue !== undefined) result.enabled = enabledValue;
-  // An unknown string is passed through rather than dropped: the model decides what a provider
-  // may be, and silently ignoring it here would store a host under the wrong preset.
+  // Passed through: the model validates it, and dropping it would store the wrong preset.
   if (provider !== null) result.provider = provider as ForwardAuthProvider;
   if (authUpstream !== null) result.authUpstream = authUpstream;
   if (authEndpoint !== null) result.authEndpoint = authEndpoint;
@@ -187,8 +175,7 @@ export function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInp
     return undefined;
   }
 
-  // The boolean is carried by a hidden input that is always present (see FormBooleanControls), so
-  // presence no longer distinguishes on from off - only the value does.
+  // The hidden input is always present (FormBooleanControls), so only the value means on or off.
   const enabledIndicator = formData.has("cpmForwardAuthEnabledPresent");
   const enabledValue = enabledIndicator
     ? parseCheckbox(formData.get("cpmForwardAuthEnabled"))
@@ -214,13 +201,7 @@ export function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInp
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-/**
- * The host's Tailscale block.
- *
- * Every field is read only when the form actually rendered it, so a dialog that hides the identity
- * options behind the serve switch does not clear them on save; the model merges what arrives over
- * what is stored and drops whatever `serve` makes meaningless.
- */
+/** Fields read only when rendered, so options hidden behind the serve switch survive a save. */
 export function parseTailscaleConfig(formData: FormData): TailscaleHostInput | undefined {
   if (!formData.has("tailscalePresent")) {
     return undefined;
@@ -285,13 +266,7 @@ const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
   "query",
 ];
 
-/**
- * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
- *
- * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
- * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
- * to say why.
- */
+/** All or nothing: a weight silently dropped to 0 takes a backend out of rotation unseen. */
 export function parseWeightList(value: FormDataEntryValue | null): number[] | null {
   if (typeof value !== "string" || value.trim().length === 0) return null;
   const parts = value
@@ -332,7 +307,6 @@ export function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput |
   const tryInterval = parseOptionalText(formData.get("lbTryInterval"));
   const retries = parseOptionalNumber(formData.get("lbRetries"));
 
-  // Active health check
   const activeHealthEnabled = formData.has("lbActiveHealthEnabledPresent")
     ? formData.has("lbActiveHealthEnabled")
       ? parseCheckbox(formData.get("lbActiveHealthEnabled"))
@@ -359,7 +333,6 @@ export function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput |
     };
   }
 
-  // Passive health check
   const passiveHealthEnabled = formData.has("lbPassiveHealthEnabledPresent")
     ? formData.has("lbPassiveHealthEnabled")
       ? parseCheckbox(formData.get("lbPassiveHealthEnabled"))
@@ -368,7 +341,6 @@ export function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput |
 
   let passiveHealthCheck: LoadBalancerInput["passiveHealthCheck"];
   if (passiveHealthEnabled !== undefined || formData.has("lbPassiveHealthFailDuration")) {
-    // Parse unhealthy status codes from comma-separated input
     const unhealthyStatusRaw = parseOptionalText(formData.get("lbPassiveHealthUnhealthyStatus"));
     let unhealthyStatus: number[] | null = null;
     if (unhealthyStatusRaw) {
@@ -400,13 +372,8 @@ export function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput |
   if (policy !== undefined) {
     result.policy = policy;
   }
-  // Every one of these is gated on the field being *present*, never on its value.
-  //
-  // The model already draws the line this relies on: `undefined` leaves a meta key alone and
-  // `null` deletes it. Testing the value instead collapsed those two into one, so an emptied box
-  // was indistinguishable from a field the form never rendered - and no load-balancer field could
-  // be cleared once set. A policy's fields are only rendered while that policy is selected, so
-  // switching policy still leaves the old values untouched rather than wiping them.
+  // Gated on presence, never value: `undefined` leaves a key alone and `null` deletes it, so an
+  // emptied box clears while an unrendered policy's fields are left untouched.
   if (formData.has("lbPolicyHeaderField")) {
     result.policyHeaderField = policyHeaderField;
   }
@@ -456,7 +423,6 @@ export function parseGeoBlockConfig(formData: FormData): {
   const rawMode = formData.get("geoblockMode");
   const mode: GeoBlockMode = rawMode === "override" ? "override" : "merge";
 
-  // Helper to parse a comma-separated string field into a string array
   const parseStringList = (key: string): string[] => {
     const val = formData.get(key);
     if (!val || typeof val !== "string") return [];
@@ -466,7 +432,6 @@ export function parseGeoBlockConfig(formData: FormData): {
       .filter(Boolean);
   };
 
-  // Helper to parse a comma-separated string field into a number array
   const parseNumberList = (key: string): number[] => {
     return parseStringList(key)
       .map((s) => parseInt(s, 10))
@@ -499,7 +464,6 @@ export function parseGeoBlockConfig(formData: FormData): {
   return { geoblock: config, geoblockMode: mode };
 }
 
-// Parse response headers from geoblock_response_headers_keys[] / _values[]
 export function parseResponseHeaders(formData: FormData): Record<string, string> {
   const keys = formData.getAll("geoblockResponseHeadersKeys[]") as string[];
   const values = formData.getAll("geoblockResponseHeadersValues[]") as string[];
@@ -541,8 +505,7 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
     return { waf: { enabled: false, waf_mode: wafMode } };
   }
 
-  // Blank means "inherit" - the global body limits (or Coraza's own defaults)
-  // apply. createProxyHost/updateProxyHost re-validate the resulting config.
+  // Blank inherits the global limits; createProxyHost/updateProxyHost re-validate.
   const requestBodyLimit = parseBodyLimitMib(
     formData.get("wafRequestBodyLimitMb"),
     "hostWafRequestBodyLimitInvalid",
@@ -586,7 +549,6 @@ export function parseDnsResolverConfig(formData: FormData): DnsResolverInput | u
       : false
     : undefined;
 
-  // Parse resolvers from newline-separated input
   const resolversRaw = parseOptionalText(formData.get("dnsResolvers"));
   let resolvers: string[] | undefined;
   if (resolversRaw || formData.has("dnsResolvers")) {
@@ -598,7 +560,6 @@ export function parseDnsResolverConfig(formData: FormData): DnsResolverInput | u
       : [];
   }
 
-  // Parse fallbacks from newline-separated input
   const fallbacksRaw = parseOptionalText(formData.get("dnsFallbacks"));
   let fallbacks: string[] | null = null;
   if (fallbacksRaw) {
@@ -777,9 +738,8 @@ export function parseUpstreamDnsResolutionConfig(
 }
 
 /**
- * Every host option the edit form posts behind a presence marker, read the way
- * `updateProxyHostAction` reads it: a section that was not rendered is `undefined`, and so left
- * alone. Name, domains, upstreams, certificate, access list and agents are the caller's.
+ * An unrendered section is `undefined`, and so left alone. Name, domains, upstreams, certificate,
+ * access list and agents are the caller's.
  */
 export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHostInput> {
   const boolField = (key: string) =>

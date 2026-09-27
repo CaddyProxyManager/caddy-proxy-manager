@@ -1,13 +1,6 @@
 /**
- * The agent's only listener, and it faces the host rather than the network.
- *
- * `cpm-agent --pair` is a second process: the one already running holds the socket, the database
- * and the Docker connection, so pairing has to be handed to it rather than done alongside it. This
- * is that hand-off, plus the healthcheck the container runs against itself.
- *
- * Unauthenticated on purpose. It binds a Unix socket inside the data volume, so reaching it already
- * means being inside the container or mounting its volume - the same boundary the shared secret
- * used to sit behind, and one no in-band credential would tighten.
+ * The agent's only listener: `--pair` hands off to the running process, plus the healthcheck.
+ * Unauthenticated on purpose: a Unix socket in the data volume is already that boundary.
  */
 
 import {
@@ -18,7 +11,7 @@ import {
 import type { AgentLifecycle } from "./lifecycle";
 import { AGENT_VERSION } from "./status";
 
-/** A pairing body is three short fields; anything larger is not one. */
+/** Three short fields; anything larger is not a pairing. */
 const MAX_BODY_BYTES = 4 * 1024;
 
 export function createLocalHandler(lifecycle: AgentLifecycle) {
@@ -27,9 +20,7 @@ export function createLocalHandler(lifecycle: AgentLifecycle) {
 
     if (url.pathname === AGENT_LOCAL_ROUTES.health) {
       const state = await lifecycle.localState();
-      // 200 in every lifecycle state, idle included: the container is healthy when the agent is
-      // answering. Reporting unhealthy while waiting to be paired would make Docker restart it in
-      // a loop, and a restart is the one thing that cannot help.
+      // 200 even idle: unhealthy while unpaired would have Docker restart it in a loop.
       return Response.json({ ok: true, version: AGENT_VERSION, lifecycle: state.lifecycle });
     }
 
@@ -59,7 +50,6 @@ export function createLocalHandler(lifecycle: AgentLifecycle) {
   };
 }
 
-/** The body both pairing routes take, or the response that refuses it. */
 async function readPairBody(request: Request): Promise<AgentLocalPairRequest | Response> {
   const raw = await request.arrayBuffer();
   if (raw.byteLength > MAX_BODY_BYTES) {
@@ -92,7 +82,6 @@ async function handlePair(request: Request, lifecycle: AgentLifecycle): Promise<
     state: await lifecycle.localState(),
     ...(outcome.ok ? {} : { error: outcome.error }),
   };
-  // 200 even for a refused code: the request reached the agent and it answered. The CLI reads
-  // `ok`, and a non-2xx here would be indistinguishable from not reaching the agent at all.
+  // 200 even when refused: the CLI reads `ok`, and a non-2xx would look like no agent at all.
   return Response.json(body);
 }

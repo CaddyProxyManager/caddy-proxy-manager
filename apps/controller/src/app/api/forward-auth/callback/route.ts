@@ -3,7 +3,7 @@ import { redeemExchangeCode, resolveForwardAuthAudience } from "@/src/lib/models
 import { getTrustedForwardAuthOrigin } from "@/src/lib/forward-auth-trust";
 
 const COOKIE_NAME = "_cpm_fa";
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
 
 /** Forward auth callback - redeems an exchange code and sets the session cookie. */
 export async function GET(request: NextRequest) {
@@ -12,8 +12,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Missing code parameter", { status: 400 });
   }
 
-  // The public Next.js origin may be reachable directly, so forwarded headers
-  // are accepted only with the proof injected by the generated Caddy route.
+  // The origin may be reached directly, so forwarded headers need the Caddy route's proof.
   const requestOrigin = getTrustedForwardAuthOrigin(request.headers);
   const audience = requestOrigin ? await resolveForwardAuthAudience(requestOrigin) : null;
   if (!audience) {
@@ -29,7 +28,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Redirect back to original URL with the session cookie set
   const response = NextResponse.redirect(result.redirectUri, 302);
 
   response.cookies.set(COOKIE_NAME, result.rawSessionToken, {

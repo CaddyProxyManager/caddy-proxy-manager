@@ -24,7 +24,7 @@ type EventRow = {
 type Props = {
   events: EventRow[];
   pagination: { total: number; page: number; perPage: number };
-  /** What the filter menus offer. Resources and actions are stored identifiers, shown as they are. */
+  /** Resources and actions are stored identifiers, shown as they are. */
   filterOptions: {
     users: { value: string; label: string }[];
     resources: string[];

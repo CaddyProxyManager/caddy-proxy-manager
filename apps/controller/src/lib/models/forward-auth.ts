@@ -60,9 +60,7 @@ export const REDIRECT_INTENT_SWEEP_INTERVAL_MS = 60_000;
 let lastIntentSweepAt = 0;
 
 export async function createRedirectIntent(redirectUri: string): Promise<string> {
-  // Resolve and persist the concrete target now.  In particular, a wildcard
-  // match is reduced to the exact origin the browser will visit and the one
-  // proxy-host record that authorized it.
+  // Persist the concrete target now: a wildcard match reduces to the exact origin and host record.
   const audience = await resolveForwardAuthAudience(redirectUri);
   if (!audience) throw domainError("invalidForwardAuthRedirectTarget");
   if (
@@ -90,7 +88,7 @@ export async function createRedirectIntent(redirectUri: string): Promise<string>
     createdAt: now,
   });
 
-  // Opportunistic cleanup of expired intents, at most once per interval so a GET loop cannot drive it.
+  // At most once per interval, so a GET loop cannot drive the cleanup.
   if (Date.now() - lastIntentSweepAt >= REDIRECT_INTENT_SWEEP_INTERVAL_MS) {
     lastIntentSweepAt = Date.now();
     await db
@@ -115,11 +113,7 @@ export async function hasLiveRedirectIntent(rid: string): Promise<boolean> {
   return row !== undefined;
 }
 
-/**
- * Whether the host `rid` leads to asks for the sign-in CAPTCHA. True for an intent that is not
- * live, or a host that has gone: the sign-in is refused over the intent anyway, and failing open
- * would make a stale rid the way around the gate.
- */
+/** True for a dead intent or a gone host: failing open would make a stale rid bypass the gate. */
 export async function redirectIntentWantsCaptcha(rid: string): Promise<boolean> {
   const intent = await db.query.forwardAuthRedirectIntents.findFirst({
     columns: { proxyHostId: true },
@@ -162,7 +156,6 @@ export async function consumeRedirectIntent(rid: string): Promise<{
 
   const intent = claimed[0];
 
-  // Delete immediately after consumption
   await db.delete(forwardAuthRedirectIntents).where(eq(forwardAuthRedirectIntents.id, intent.id));
 
   const parsed = parseForwardAuthUrl(intent.redirectUri);
@@ -373,7 +366,6 @@ export async function redeemExchangeCode(
     )
     .returning({ id: forwardAuthSessions.id });
 
-  // Delete the redeemed exchange immediately
   await db.delete(forwardAuthExchanges).where(eq(forwardAuthExchanges.id, exchange.id));
 
   if (updatedSessions.length === 0) return null;
@@ -401,7 +393,6 @@ export async function checkHostAccess(userId: number, proxyHostId: number): Prom
   });
   if (!user) return false;
 
-  // Check direct user access
   const directAccess = await db.query.forwardAuthAccess.findFirst({
     where: (table, operators) =>
       operators.and(
@@ -411,7 +402,6 @@ export async function checkHostAccess(userId: number, proxyHostId: number): Prom
   });
   if (directAccess) return true;
 
-  // Check group-based access
   const userGroupIds = await db
     .select({ groupId: groupMembers.groupId })
     .from(groupMembers)
@@ -450,7 +440,6 @@ export async function setForwardAuthAccess(
   access: { userIds?: number[]; groupIds?: number[] },
   actorUserId: number,
 ): Promise<ForwardAuthAccessEntry[]> {
-  // Delete existing access for this host
   await db.delete(forwardAuthAccess).where(eq(forwardAuthAccess.proxyHostId, proxyHostId));
 
   const now = nowIso();
@@ -503,9 +492,7 @@ async function findForwardAuthProxyHost(host: string) {
     where: (table, operators) => operators.eq(table.enabled, true),
   });
 
-  // Exact-match hosts take precedence over wildcard-covered ones: if an explicit host exists for
-  // this domain, its own forward-auth setting decides and the wildcard host is never consulted -
-  // mirroring the routing precedence Caddy itself applies.
+  // An exact host decides alone, never falling back to a wildcard - as Caddy routes it.
   let exactMatchFound = false;
   let wildcardMatch: (typeof allHosts)[number] | null = null;
   const hostLower = host.toLowerCase();
@@ -534,11 +521,7 @@ async function findForwardAuthProxyHost(host: string) {
   return null;
 }
 
-/**
- * Resolve a URL to one exact forward-auth audience.  Wildcard proxy hosts are
- * supported, but the resulting audience always contains the concrete origin
- * visited by the browser, never the wildcard pattern itself.
- */
+/** The audience always holds the concrete origin visited, never a wildcard pattern. */
 export async function resolveForwardAuthAudience(
   targetUrl: string,
 ): Promise<ForwardAuthAudience | null> {

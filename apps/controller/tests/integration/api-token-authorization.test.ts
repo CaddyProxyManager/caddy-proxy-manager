@@ -18,18 +18,15 @@ afterEach(() => {
 
 describe('API token deletion authorization', () => {
   it("makes another user's token indistinguishable from a nonexistent ID", async () => {
-    // A database of its own rather than one of the per-test schemas: this boots the real db
-    // module, which reads DATABASE_URL and opens its own connection.
+    // Not a per-test schema: the real db module opens its own connection from DATABASE_URL.
     const database = await createTestDatabase();
 
     try {
       process.env.DATABASE_URL = database.url;
       resetDbModuleState();
 
-      // Bun cannot drop a module from its registry, so a unique specifier re-evaluates db
-      // against this temp file; pointing the plain specifier at it rewrites the live bindings
-      // every consumer already reads through.
-      // The template-literal specifier loses the module's type, so restore it explicitly.
+      // Bun cannot drop a cached module, so a unique specifier re-evaluates db against this file
+      // and rewrites every consumer's live bindings.
       const { dbModule: freshDb } = await reloadDbModule();
       const { default: db, nowIso } = freshDb;
       const [{ apiTokens, users }, { deleteApiToken }] = await Promise.all([

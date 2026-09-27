@@ -18,11 +18,8 @@ export type StatTile = {
 };
 
 /**
- * The row of numbers a list page opens with.
- *
- * Shared because every list page answers the same first question - is anything wrong here - and a
- * row that is laid out differently on each page makes that question take longer to answer. The
- * tiles report on the whole visible set, never on the page that happens to be loaded.
+ * The row of numbers a list page opens with. Shared so "is anything wrong here" reads the same on
+ * every page; tiles cover the whole visible set, never just the page that is loaded.
  */
 export function StatTiles({ tiles }: { tiles: StatTile[] }) {
   return (

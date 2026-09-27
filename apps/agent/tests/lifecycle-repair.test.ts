@@ -1,13 +1,7 @@
 /**
- * An agent the controller has forgotten must find its way back on its own.
- *
- * The bundled stack keeps the agent's pairing on its own volume, so a controller rebuilt with a
- * fresh database answers the resumed stream with 401. The agent rightly drops the dead secret and
- * stops Caddy - but the same controller has already written a new bootstrap token, and an agent
- * that stopped watching for one would sit idle beside it forever, Caddy down, on a stack nobody
- * ever had to pair by hand. So after the 401 it must go back to watching, exactly as it does when
- * it boots with no pairing at all. An explicit `--code` is the one case that opts out: that
- * operator is pairing by hand and a spent code must not be retried every few seconds.
+ * A controller rebuilt with a fresh database 401s the resumed stream but writes a new bootstrap
+ * token, so after dropping the dead secret the agent must go back to watching for one. An explicit
+ * `--code` opts out: a spent hand-typed code must not be retried every few seconds.
  */
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,15 +23,9 @@ const PAST_ONE_POLL_MS = 4_500;
 let dir: string;
 let store: AgentStore;
 let lifecycle: AgentLifecycle | null;
-/** Paths of every request the agent made, in order. */
 let requests: string[];
 
-/**
- * A controller that refuses the stale stream and accepts a fresh pairing.
- *
- * After the pairing the stream is answered with a body that never closes: the case under test ends
- * at "paired again", and a stream that closed would send the agent into its reconnect loop.
- */
+/** After pairing, the stream never closes: a closed one would send the agent into reconnects. */
 function stubController() {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;

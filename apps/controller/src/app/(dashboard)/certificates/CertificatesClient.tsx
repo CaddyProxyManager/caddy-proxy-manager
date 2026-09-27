@@ -59,9 +59,7 @@ export default function CertificatesClient({
   const { expired, expiringSoon, healthy: importedHealthy } = countExpiry(importedStatuses);
   const healthy = importedHealthy + healthyAcmeTotal;
 
-  // Days until the next imported certificate lapses. ACME certificates are renewed by Caddy on the
-  // agent and their notAfter never reaches this controller, so they cannot join this count - the
-  // tile is deliberately about the ones whose expiry is ours to watch.
+  // Imported only: an ACME certificate's notAfter lives on the agent, and Caddy renews it.
   const nextExpiry = importedCerts.reduce<number | null>((soonest, cert) => {
     if (!cert.validTo) return soonest;
     const days = Math.ceil((new Date(cert.validTo).getTime() - Date.now()) / 86_400_000);
@@ -185,7 +183,6 @@ export default function CertificatesClient({
       />
 
       <VStack gap={4}>
-        {/* Only the active tab's panel is mounted, as before. */}
         {activeTab === "acme" && (
           <AcmeTab
             acmeHosts={acmeHosts}

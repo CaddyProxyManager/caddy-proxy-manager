@@ -1,9 +1,6 @@
 /**
- * Everything the agent reads from its environment, resolved once at startup.
- *
- * The agent has no database to read configuration from until it has one, and nothing here is
- * changeable at runtime - it describes the host the agent is bolted to, not a preference - so this
- * stays environment-only rather than moving to the controller's settings registry.
+ * The agent's environment, read once. Not the settings registry: this describes the host, not a
+ * preference, and is needed before there is any database.
  */
 
 import { resolve } from "node:path";
@@ -18,31 +15,18 @@ import {
 export type { AgentMode };
 
 export type AgentConfig = {
-  /**
-   * Controller origin this agent polls, or null when it has never been given one.
-   *
-   * Null is the idle state the whole pairing flow exists to leave: the agent runs, answers
-   * `cpm-agent --pair`, and holds Caddy down until it has somewhere to fetch a config from.
-   */
+  /** Null is the idle state: the agent answers `--pair` and holds Caddy down. */
   controllerUrl: string | null;
-  /** One-time code to pair with at startup, when the operator supplied one up front. */
   pairingCode: string | null;
-  /**
-   * A label reported to the controller, and nothing more. Both modes dial out to the controller and
-   * bind only the local control socket; nothing listens on TCP.
-   */
+  /** A label only: both modes dial out, and nothing listens on TCP. */
   mode: AgentMode;
   /** Where state, the socket and the shared secret live. Must be writable. */
   dataDir: string;
   /**
-   * The controller's data volume, mounted read-only, or null for an agent that has none.
-   *
-   * Two things are read from it: the bootstrap token the controller leaves for the agent in its own
-   * stack, and - once, on upgrade - the database agents kept there before they had a volume of
-   * their own. Null falls back to `dataDir` for the token, which is where it was before.
+   * Read-only: the bootstrap token, and once on upgrade the agent database kept there before it had
+   * a volume. Null reads the token from `dataDir`.
    */
   controllerDataDir: string | null;
-  /** Where the compose project files are mounted, read-only. */
   composeDir: string;
   /** The local control socket. The agent's only listener, and it faces the host. */
   socketPath: string;
@@ -51,25 +35,16 @@ export type AgentConfig = {
   caddyApiUrl: string;
   /** Pinned as `admin.listen` in every config forwarded to Caddy, or null to forward as sent. */
   caddyAdminListen: string | null;
-  /** Override for the auto-detected compose project name. */
   composeProject: string | null;
   /** Passed to compose as --project-directory, for a host path the agent cannot see. */
   composeHostDir: string | null;
-  /** An extra `-f` file, used by the test rigs. */
+  /** Test rigs only. */
   composeExtraFile: string | null;
-  /** Skip docker-compose.override.yml, used by the test rigs. */
+  /** Test rigs only. */
   composeSkipOverride: boolean;
-  /** Seconds before a Caddy image rebuild is abandoned. */
   buildTimeoutSeconds: number;
-  /**
-   * Seconds before starting an optional service is abandoned.
-   *
-   * Generous because the first start of one pulls its image: a deployment that never ran the
-   * clickhouse profile has nothing cached, and abandoning a half-finished pull leaves the operator
-   * with a failure that a retry over the same slow link would only repeat.
-   */
+  /** Generous: the first start pulls the image, and a retry over a slow link only repeats. */
   serviceTimeoutSeconds: number;
-  /** Seconds to wait for Caddy to report healthy after a recreate. */
   healthTimeoutSeconds: number;
   /** Dial plain http to a public controller address anyway. See `checkControllerTransport`. */
   allowInsecureHttp: boolean;
@@ -96,19 +71,13 @@ function resolveMode(): AgentMode {
   throw new Error(`AGENT_MODE must be "standalone" or "managed"; got "${raw}".`);
 }
 
-/**
- * CLI values that win over the environment.
- *
- * Flags beat variables because a flag is typed for one invocation while a variable is baked into
- * the container: an operator repairing a bad `CONTROLLER_URL` must not have to edit compose first.
- */
+/** CLI flags beat the environment: fixing a bad `CONTROLLER_URL` must not need a compose edit. */
 export type ConfigOverrides = {
   controllerHost?: string | null;
   controllerPort?: number | null;
   pairingCode?: string | null;
 };
 
-/** Values that switch a flag on. Anything else, unset included, leaves it off. */
 function flag(name: string): boolean {
   return ["1", "true", "yes", "on"].includes((optional(name) ?? "").toLowerCase());
 }
@@ -137,8 +106,7 @@ function resolveControllerUrl(
       allowInsecureHttp,
     );
   }
-  // A port with nothing to attach it to is a half-configured agent, and silently idling on it
-  // would look identical to never having been configured at all.
+  // Idling silently would look like never having been configured at all.
   if (overrides.controllerPort != null) {
     throw new ControllerAddressError("--port needs --host (or CONTROLLER_URL) alongside it.");
   }

@@ -1,13 +1,7 @@
 /**
- * The controller's side of first-run setup, run in the browser for the setup demo.
- *
- * The screens are the real ones. What they talk to is this: the stage derivation from
- * lib/setup.ts, the redirects each setup page performs, the server actions (via
- * shims/setup-actions.ts), the four `/api/setup/*` routes and `/api/health` (via fake-api.ts),
- * and sign-in (via shims/auth-client.ts). Nothing is persisted, and nothing leaves the page.
- *
- * One simulation per page: the shims reach it through `currentSimulation()`, which is null unless
- * a demo has started one - so the sign-in demo elsewhere keeps failing every attempt as before.
+ * The controller's side of setup, in the browser, behind the real screens (via the shims and
+ * fake-api.ts). Nothing persists. `currentSimulation()` is null unless a demo started one, so the
+ * sign-in demo elsewhere keeps failing every attempt.
  */
 import { passwordPolicyMessage } from "@cpm/controller/src/lib/password-policy-message";
 import type { MigrationGroupId } from "@cpm/controller/src/lib/migration/selection";
@@ -18,7 +12,6 @@ import { json, serveApi } from "./fake-api";
 /** Where the reader "reached" the instance: a LAN name, so the dashboard host has one to claim. */
 const INITIAL_ORIGIN = "http://cpm.lan:3000";
 
-/** How long the simulated process stays down once a restart is asked for. */
 const RESTART_DOWNTIME_MS = 2500;
 
 /** Long enough to see a pending state, short enough not to be a wait. */
@@ -35,7 +28,7 @@ export type LegacyCandidate = {
   needsLegacyKey: boolean;
 };
 
-/** Two files, as a host with a backup beside the live database has - the backup under an old key. */
+/** A live database and a backup under an old key. */
 export const LEGACY_CANDIDATES: LegacyCandidate[] = [
   {
     path: "/app/data/caddy-proxy-manager.db",
@@ -77,21 +70,20 @@ export const LEGACY_CANDIDATES: LegacyCandidate[] = [
   },
 ];
 
-/** The accounts and provider an imported database brings. Their passwords are not known here. */
+/** Their passwords are not known here. */
 const LEGACY_ACCOUNTS = ["admin", "sam", "priya"];
 const LEGACY_PROVIDER = "Authentik";
 
-/** The host a migrated database already proxied the dashboard through. */
 const LEGACY_DASHBOARD_HOST = { id: 7, name: "CPM dashboard", domains: ["cpm.lan"], enabled: true };
 
 type Account = { username: string; password: string | null };
 
 export type SimulationState = {
   hasLegacyDatabase: boolean;
-  /** The address bar: the origin and path currently loaded. */
+  /** The address bar. */
   origin: string;
   path: string;
-  /** Bumped on every page load, so the page remounts the way a real navigation would. */
+  /** Bumped per load, so the page remounts as a real navigation would. */
   load: number;
   migrationDeclined: boolean;
   migratedFrom: string | null;
@@ -101,9 +93,8 @@ export type SimulationState = {
   /** A session belongs to the origin it was made on, as the app's cookie does. */
   sessionOrigin: string | null;
   completed: boolean;
-  /** Env names whose settings the settings step stored, for the cleanup command. */
+  /** For the cleanup command. */
   stored: string[];
-  /** When the restarted process answers again; null when nothing is restarting. */
   upAt: number | null;
 };
 
@@ -198,7 +189,6 @@ export class Simulation {
     for (const listener of this.listeners) listener();
   }
 
-  /** A full page load of `href`, resolved against the current address like a browser would. */
   navigate(href: string) {
     const url = new URL(href, `${this.state.origin}${this.state.path}`);
     const next = { ...this.state, origin: url.origin };
@@ -250,10 +240,9 @@ export class Simulation {
   async signInUsername(username: string, password: string) {
     await pause();
     const account = this.state.accounts.find((entry) => entry.username === username.toLowerCase());
-    // An imported account's password is whatever it was on the old install, which this cannot
-    // know - so any password opens one.
+    // An imported account's password is unknowable here, so any password opens one.
     if (!account || (account.password !== null && account.password !== password)) {
-      // What Better Auth's username plugin answers, so the form words it as the app would.
+      // Better Auth's username plugin's answer.
       return { error: { status: 401, code: "INVALID_USERNAME_OR_PASSWORD" } };
     }
     this.set({ sessionOrigin: this.state.origin });
@@ -356,7 +345,7 @@ export class Simulation {
     const providers =
       idpName && formData.get("idpClientId") ? [...this.state.providers, idpName] : undefined;
 
-    // Everything the form posted a value for is stored, which is what frees its variable.
+    // Storing a value is what frees its variable.
     const stored = SETTING_FIELDS.filter((field) => {
       const value = formData.get(field.key);
       return typeof value === "string" && value !== "";
@@ -399,10 +388,8 @@ export class Simulation {
 type FieldKind = "string" | "number" | "boolean" | "tristate";
 
 /**
- * The settings registry (lib/settings/registry.ts) as the settings step receives it.
- *
- * Repeated rather than imported: the registry validates with `node:net` and half of lib, none of
- * which can be bundled for a browser. Order, names and defaults follow SETTING_DEFINITIONS.
+ * lib/settings/registry.ts, repeated: it needs `node:net` and half of lib, which cannot be bundled
+ * for a browser. Order, names and defaults follow SETTING_DEFINITIONS.
  */
 export const SETTING_FIELDS: Array<{
   key: string;
@@ -650,7 +637,7 @@ export function currentSimulation(): Simulation | null {
   return current;
 }
 
-/** Make `simulation` the one the shims and the fake API reach, until the returned function is called. */
+/** Until the returned function is called. */
 export function startSimulation(simulation: Simulation): () => void {
   current = simulation;
   const stopServing = serveApi((url, init) => simulation.handle(url, init));

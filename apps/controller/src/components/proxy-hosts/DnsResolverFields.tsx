@@ -47,8 +47,7 @@ export function DnsResolverFields({
           />
         </HStack>
 
-        {/* Unmounted rather than collapsed behind max-h-0/opacity-0, so hidden
-            fields are not focusable and are not submitted. */}
+        {/* Unmounted, so hidden fields are neither focusable nor submitted. */}
         {enabled && (
           <VStack gap={5}>
             <TextArea

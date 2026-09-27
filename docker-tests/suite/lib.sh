@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Shared helpers for the caddy-proxy-manager docker test suite.
-#
-# Sourced by every file under tests/. Assertions never abort the file: they
-# record a result and return, so one broken feature does not hide the state of
-# the rest. Each test file exits non-zero if any of its own assertions failed.
+# Shared helpers, sourced by every file under tests/. Assertions record and return rather than
+# abort, so one broken feature does not hide the rest; a file exits non-zero if any failed.
 
 # shellcheck disable=SC2034  # several colour vars are used only by some files
 
@@ -11,8 +8,7 @@ set -o pipefail
 
 STATE_DIR="${STATE_DIR:-/tmp/cpm-test}"
 RESULT_FILE="${RESULT_FILE:-$STATE_DIR/results.tsv}"
-# Every REST call the suite makes, for the API-surface coverage report that
-# run-tests.sh prints at the end.
+# For run-tests.sh's API-surface coverage report.
 CALLS_FILE="${CALLS_FILE:-$STATE_DIR/api-calls.tsv}"
 SPEC_FILE="$STATE_DIR/openapi.json"
 TOKEN_FILE="$STATE_DIR/api-token"
@@ -108,15 +104,12 @@ t_fails() {  # t_fails NAME CMD... - passes when the command exits non-zero
 
 # ── CPM REST API ────────────────────────────────────────────────────────────
 #
-# api METHOD PATH [BODY] -> sets API_STATUS and API_BODY.
-# Uses the bearer token minted by bootstrap.sh unless API_TOKEN is overridden.
+# api METHOD PATH [BODY] -> API_STATUS, API_BODY, with bootstrap.sh's token unless API_TOKEN is set.
 
 API_STATUS=
 API_BODY=
 
-# Records a call for the coverage report. The raw path is kept as-is; matching
-# it back to a documented path template is the reporter's job, so nothing here
-# has to know which segments are ids.
+# The raw path; the reporter matches it to a template, so nothing here knows which segments are ids.
 _record_api_call() {
   printf '%s\t%s\n' "$1" "${2%%\?*}" >>"$CALLS_FILE" 2>/dev/null || true
 }
@@ -138,26 +131,20 @@ api() {
   rm -f "$out" "$out.err"
 }
 
-# jqr FILTER [extra jq args...] - jq over the last API response. Extra args go
-# before the filter, so `jqr '.x' --argjson y "$json"` works.
+# jqr FILTER [jq args...] - jq over the last response; extra args go before the filter.
 jqr() {
   local filter="$1"; shift
   printf '%s' "$API_BODY" | jq -r "$@" "$filter" 2>/dev/null
 }
 
-# with_token TOKEN CMD... - runs CMD with a different (or empty) bearer token.
-# `local` gives dynamic scope in bash, so `api` several frames down sees it, and
-# the override disappears when this returns.
+# with_token TOKEN CMD... - `local` scopes dynamically, so `api` frames down sees the override.
 with_token() {
   local API_TOKEN="$1"; shift
   "$@"
 }
 
 # cpm_sign_in BASE_URL COOKIE_JAR USERNAME PASSWORD -> prints the HTTP status
-#
-# The seeded admin has both an email (<username>@localhost) and a username, and which better-auth
-# accepts depends on how the account was created. Try email, then the username plugin, and report
-# whichever got furthest.
+# Which of email or username better-auth accepts depends on how the account was made; try both.
 cpm_sign_in() {
   local base="$1" jar="$2" user="$3" password="$4"
   local out="$STATE_DIR/signin-$$.json" status
@@ -189,10 +176,7 @@ cpm_mint_token() {
     "$1/api/v1/tokens" 2>/dev/null | jq -r '.raw_token // empty'
 }
 
-# Some endpoints outside /api/v1 (waf-events, geoip-status, l4-ports) sit behind
-# the session middleware, which redirects anything without a session cookie to
-# the login page - a bearer token is not enough. Those are called with the
-# admin's browser session instead, which is what the UI uses.
+# Endpoints outside /api/v1 (waf-events, geoip-status, l4-ports) need a session cookie, not a token.
 api_session() {  # api_session METHOD PATH [BODY] -> API_STATUS, API_BODY
   local method="$1" path="$2" body="${3:-}"
   _record_api_call "$method" "$path"
@@ -219,9 +203,7 @@ api_expect() {  # api_expect NAME EXPECTED_STATUS METHOD PATH [BODY]
 
 # ── Resource lifecycle ──────────────────────────────────────────────────────
 #
-# Everything created by a test file is registered here and torn down by the
-# EXIT trap, so a failure part-way through does not leak proxy hosts into the
-# next file's Caddy config.
+# Torn down by the EXIT trap, so a failure part-way does not leak hosts into the next file.
 
 CLEANUP_STACK=()
 
@@ -237,11 +219,8 @@ cleanup_tracked() {
 
 trap cleanup_tracked EXIT
 
-# create_resource COLLECTION JSON
-#
-# Sets NEW_ID on success and registers the resource for teardown; non-zero on failure, with the
-# reply in API_STATUS / API_BODY. Deliberately not written to echo the id - it must run in the
-# caller's shell so `track` mutates the caller's cleanup stack, which a $(...) subshell would lose.
+# create_resource COLLECTION JSON - sets NEW_ID and tracks it; non-zero on failure.
+# Does not echo the id: a $(...) subshell would lose the `track` on the caller's cleanup stack.
 NEW_ID=
 
 create_resource() {
@@ -251,10 +230,7 @@ create_resource() {
   case "$API_STATUS" in
     200|201) ;;
     *)
-      # CPM writes the row first and pushes the Caddy config second, so a
-      # rejected config still leaves a live resource behind - and every later
-      # config push would keep failing on it. Adopt any orphan so the EXIT trap
-      # removes it and the next test file starts from a clean config.
+      # A rejected config still leaves the row, failing every later push; adopt it for teardown.
       local name status_backup="$API_STATUS" body_backup="$API_BODY"
       name=$(printf '%s' "$body" | jq -r '.name // empty' 2>/dev/null)
       if [ -n "$name" ]; then
@@ -277,8 +253,7 @@ create_resource() {
 create_host() { create_resource proxy-hosts "$1"; }
 create_l4_host() { create_resource l4-proxy-hosts "$1"; }
 
-# create_host_or_fail NAME JSON - creates a host, recording a failed assertion
-# and returning non-zero if the API rejected it. On success NEW_ID holds the id.
+# create_host_or_fail NAME JSON - records a failed assertion if rejected; NEW_ID on success.
 create_host_or_fail() {
   local name="$1" body="$2"
   if create_host "$body"; then
@@ -291,8 +266,7 @@ create_host_or_fail() {
 # ── HTTP client against Caddy ───────────────────────────────────────────────
 #
 # fetch URL [curl args...] -> FETCH_CODE, FETCH_BODY, FETCH_HEADERS, FETCH_RC
-# Names resolve through dnsmasq, so URLs use the real test domain and Caddy
-# sees a genuine SNI + Host pair, exactly as a browser would send them.
+# Names resolve through dnsmasq, so Caddy sees a genuine SNI + Host pair.
 
 FETCH_CODE=; FETCH_BODY=; FETCH_HEADERS=; FETCH_RC=0
 
@@ -309,7 +283,7 @@ fetch() {
   return $FETCH_RC
 }
 
-# The last response's value for a header, lower-cased name, last occurrence wins.
+# Lower-cased name; the last occurrence wins.
 header_value() {
   printf '%s' "$FETCH_HEADERS" \
     | tr -d '\r' \
@@ -320,9 +294,7 @@ header_value() {
 
 fetch_json() { printf '%s' "$FETCH_BODY" | jq -r "$1" 2>/dev/null; }
 
-# Just the status code, and "000" when the request never produced one - which
-# is how a refused TLS handshake (mTLS with no client certificate, say) shows
-# up as distinct from an HTTP-level rejection.
+# "000" when there was no response - a refused TLS handshake, as distinct from an HTTP rejection.
 http_code() {
   local url="$1"; shift
   local code
@@ -359,9 +331,7 @@ tls_handshake_ok() {
 
 # ── Local PKI ───────────────────────────────────────────────────────────────
 #
-# Tests that need certificates CPM did not issue - imported server certs, mTLS
-# client certs - mint them here. Everything lands in $STATE_DIR, is idempotent
-# across test files, and never leaves the container.
+# Certificates CPM did not issue; idempotent across test files, all in $STATE_DIR.
 
 # make_ca NAME - creates $STATE_DIR/NAME-ca.{crt,key}.pem and, for server CAs,
 # adds the root to the bundle `fetch` verifies against.
@@ -413,7 +383,6 @@ cert_serial() { openssl x509 -in "$1" -noout -serial 2>/dev/null | sed 's/.*=//'
 cert_not_before() { openssl x509 -in "$1" -noout -startdate 2>/dev/null | sed 's/.*=//'; }
 cert_not_after() { openssl x509 -in "$1" -noout -enddate 2>/dev/null | sed 's/.*=//'; }
 
-# ISO-8601 form of a certificate validity bound, which is what the API stores.
 cert_date_iso() {  # cert_date_iso FILE -startdate|-enddate
   local raw; raw=$(openssl x509 -in "$1" -noout "$2" 2>/dev/null | sed 's/.*=//')
   date -u -d "$raw" +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null
@@ -435,8 +404,7 @@ wait_for() {
   done
 }
 
-# Caddy obtains certificates asynchronously after a config load, so anything
-# that talks HTTPS to a freshly-created host has to wait for issuance.
+# Issuance is asynchronous after a config load.
 wait_for_https() {
   local domain="$1" timeout="${2:-90}"
   wait_for "a certificate for $domain" "$timeout" tls_handshake_ok "$domain"
@@ -449,13 +417,11 @@ wait_for_http() {  # wait until an HTTP request to the domain returns a status
 
 # ── Misc ────────────────────────────────────────────────────────────────────
 
-# A domain unique to the calling test file, so parallel edits and leftover
-# state from an aborted run cannot collide.
+# Per test file, so leftovers from an aborted run cannot collide.
 domain_for() { printf '%s.%s' "$1" "$TEST_DOMAIN"; }
 
 json_escape() { printf '%s' "$1" | jq -Rs .; }
 
-# Read a PEM file into a JSON string literal.
 pem_json() { jq -Rs . <"$1"; }
 
 finish() {

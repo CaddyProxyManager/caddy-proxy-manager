@@ -1,12 +1,7 @@
 /**
- * The OWASP CRS plugin registry (github.com/coreruleset/plugin-registry), and fetching a plugin's
- * rule files from its repository.
- *
- * The registry allocates each plugin a rule id range and says who vetted it; the files come from
- * the plugin's own repository, resolved to its latest release tag (or the default branch's commit
- * when it has none) so what was installed is recorded exactly. Nothing is written to disk: the
- * files are stored in the database and inlined into the WAF directives, because Caddy runs on the
- * agents' hosts and the embedded CRS is the only rule tree it has.
+ * The OWASP CRS plugin registry, and fetching a plugin's rule files at its latest release tag (or
+ * default-branch commit) so the install is recorded exactly. Files go into the database and are
+ * inlined into WAF directives, since Caddy on the agents' hosts has only the embedded CRS tree.
  */
 
 import { findCrsPluginRejections } from "../caddy-waf";
@@ -100,10 +95,6 @@ export function parseCrsRegistry(json: unknown): CrsRegistryEntry[] {
   return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Adds the operator's GitHub token to API requests, lifting the unauthenticated limit of 60 an
- * hour to 5,000. Never sent anywhere but api.github.com: a custom registry lives elsewhere.
- */
 /** By parsed host: a prefix test would pass `https://api.github.com.example.test/`. */
 function isGitHubApi(url: string): boolean {
   try {
@@ -114,6 +105,7 @@ function isGitHubApi(url: string): boolean {
   }
 }
 
+/** Adds the GitHub token (60 requests an hour becomes 5,000); sent to api.github.com only. */
 export function withGitHubToken(fetcher: Fetcher, token: string | null): Fetcher {
   if (!token) return fetcher;
   return (input, init) =>
@@ -281,13 +273,10 @@ async function fetchDescriptor(
   }
 }
 
-/**
- * Fetches and checks a plugin's rule files at `version`. Throws, naming each refused line, rather
- * than returning a plugin that would be half emitted.
- */
 /** What a release is fetched and checked by; a registry entry, or an installed plugin. */
 export type CrsPluginSource = Pick<CrsRegistryEntry, "repository" | "ruleIdStart" | "ruleIdEnd">;
 
+/** Throws, naming each refused line, rather than returning a plugin that would be half emitted. */
 export async function fetchCrsPluginRelease(
   entry: CrsPluginSource,
   version: string,

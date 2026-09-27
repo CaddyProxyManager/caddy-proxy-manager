@@ -6,9 +6,8 @@
 export type ThemeMode = "light" | "dark" | "system";
 
 /**
- * Cookie rather than localStorage: the server must know the mode to render `<html data-theme>` on
- * the first paint, which is why the old next-themes setup needed a render-blocking inline script.
- * Not HttpOnly - the toggle writes it from the client, and a display preference needs no guarding.
+ * Cookie rather than localStorage: the server must know the mode to render `<html data-theme>`
+ * on first paint. Not HttpOnly - the toggle writes it, and a display preference needs no guard.
  */
 export const THEME_COOKIE = "cpm-theme";
 

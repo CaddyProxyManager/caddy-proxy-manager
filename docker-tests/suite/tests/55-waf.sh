@@ -2,8 +2,7 @@
 # The Coraza WAF: per-host rules, the global/host merge, DetectionOnly mode,
 # the directive allowlist, and the WebSocket carve-out.
 #
-# Rules here are hand-written rather than the OWASP core rule set, so the
-# assertions stay stable and do not depend on which CRS version is embedded.
+# Hand-written rules, not the CRS, so assertions do not depend on its version.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "web application firewall"
@@ -52,8 +51,7 @@ t_contains "allowed requests still reach the upstream" "origin-a" "$body"
 
 # ── DetectionOnly ───────────────────────────────────────────────────────────
 #
-# The rule still matches and is logged, but the request is not stopped. This is
-# the mode operators use to tune a rule set before enforcing it.
+# The rule matches and is logged, but the request is not stopped.
 
 detect=$(domain_for "waf-detect")
 create_host_or_fail "a DetectionOnly host can be created" "$(jq -nc --arg d "$detect" --arg rules "$BLOCK_RULE" '{
@@ -117,9 +115,8 @@ fi
 
 # ── Directive allowlist ─────────────────────────────────────────────────────
 #
-# Custom directives are operator input that ends up in Coraza's configuration.
-# Anything that could switch the engine off or pull in a file from the
-# container is refused at save, naming the lines, rather than quietly dropped.
+# Directives that could switch the engine off or read container files are
+# refused at save, naming the lines, rather than quietly dropped.
 
 smuggle=$(domain_for "waf-smuggle")
 api_expect "a host with hostile directives is refused" 400 POST /api/v1/proxy-hosts "$(jq -nc --arg d "$smuggle" \
@@ -134,8 +131,7 @@ t_contains "the refusal names the Include" "Include /etc/passwd" "$API_BODY"
 
 # ── WebSockets through the WAF ──────────────────────────────────────────────
 #
-# Upgrades go through the WAF: coraza-caddy passes the 101 hijack through, and
-# routing them around it let any request claiming to be one skip inspection.
+# Routed around the WAF, any request claiming to be an upgrade skipped inspection.
 
 wafws=$(domain_for "waf-websocket")
 create_host_or_fail "a host with both the WAF and WebSockets can be created" "$(jq -nc --arg d "$wafws" \
@@ -159,9 +155,7 @@ t_eq "a request claiming to be an upgrade is filtered too" "403" \
 
 # ── Recorded events ─────────────────────────────────────────────────────────
 #
-# Coraza's audit log is written to a volume shared with the web container,
-# which ingests it. Ingestion is periodic, so this asserts the endpoint works
-# rather than pinning a specific event.
+# Ingestion is periodic, so this asserts the endpoint works, not a specific event.
 
 api_session GET "/api/waf-events?range=24h&per_page=10"
 t_eq "the WAF event endpoint answers" "200" "$API_STATUS"

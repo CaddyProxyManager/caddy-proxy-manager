@@ -1,4 +1,3 @@
-/** Error pages: the buildErrorPageRoute builder and the sanitizeErrorPageRules sanitizer. */
 import { describe, it, expect } from 'bun:test';
 
 import { buildErrorPageRoute } from '@/src/lib/caddy';

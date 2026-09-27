@@ -1,21 +1,7 @@
 /**
- * Everything that still knows what a pre-3.0 SQLite database looks like.
- *
- * Nothing here runs during normal operation, including against today's SQLite backend, which
- * starts from its own migration history (drizzle/sqlite/). It is staged for the migration flow,
- * which opens an upgrading deployment's old file, reads it, and copies what it finds into the
- * current database. Kept because the quirks it encodes - which releases wrote which column names -
- * are not recoverable from the current schema.
- *
- * Schema repairs for SQLite deployments that upgraded through an older release:
- *
- * All of this is SQLite-only by construction: it drives `PRAGMA table_info`, reads `sqlite_master`,
- * and works around SQLite's inability to alter a column in place by rebuilding tables. It runs
- * before `migrate()` so the migration files meet the column names they expect.
- *
- * PostgreSQL deployments never call any of it. A PostgreSQL database can only have been created by
- * drizzle/postgres/0000_initial.sql, which already has the post-repair shape, so there is no
- * pre-rename history to fix up.
+ * Schema repairs for a pre-3.0 SQLite file, used only by the migration flow that copies it into
+ * the current database; which releases wrote which column names is not recoverable from today's
+ * schema. Runs before `migrate()`. PostgreSQL never had the pre-rename history.
  */
 import type { Database } from "bun:sqlite";
 
@@ -57,9 +43,8 @@ function addColumnIfMissing(
 }
 
 /**
- * Ensure `sessions.id` is INTEGER PRIMARY KEY AUTOINCREMENT. Better Auth uses generateId:"serial"
- * and omits `id` from INSERT, which an older `id TEXT NOT NULL` schema rejects. Sessions are
- * ephemeral, so just recreate the table.
+ * Better Auth omits `id` from INSERT (generateId:"serial"), which an older `id TEXT NOT NULL`
+ * rejects. Sessions are ephemeral, so the table is recreated empty.
  */
 function fixSessionsSchema(client: Database) {
   try {
@@ -71,9 +56,7 @@ function fixSessionsSchema(client: Database) {
     if (cols.length === 0) return; // table doesn't exist yet
     const idCol = cols.find((c) => c.name === "id");
     if (!idCol) return;
-    // INTEGER PRIMARY KEY is an alias for rowid - auto-generates on insert
     if (idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1) return;
-    // Wrong type (e.g. TEXT NOT NULL) - recreate as autoincrement
     client
       .prepare(`CREATE TABLE "sessions_patch" (
       "id"        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +69,6 @@ function fixSessionsSchema(client: Database) {
       "updatedAt" TEXT NOT NULL
     )`)
       .run();
-    // Sessions are short-lived - skip copying stale rows
     client.prepare('DROP TABLE "sessions"').run();
     client.prepare('ALTER TABLE "sessions_patch" RENAME TO "sessions"').run();
     client
@@ -115,10 +97,7 @@ const REBUILT_ACCOUNT_COLUMNS = [
   "updatedAt",
 ] as const;
 
-/**
- * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT - some upgraded deployments have a
- * NOT NULL non-rowid column, failing inserts that omit it. Accounts are durable, so preserve rows.
- */
+/** Same `id` problem as sessions, but accounts are durable, so rows are preserved. */
 function fixAccountsSchema(client: Database) {
   try {
     const cols = client.prepare('PRAGMA table_info("accounts")').all() as Array<{
@@ -132,10 +111,8 @@ function fixAccountsSchema(client: Database) {
     if (!idCol) return;
     const idIsCorrect = idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1;
 
-    // The whole shape the rebuild below produces, not just `id`: a table can have a sound id and
-    // still be missing a column or the identity index, and returning early on `id` alone would
-    // leave it that way. `accounts_provider_account_idx` is the one that matters most - without it
-    // nothing stops two rows claiming the same (providerId, accountId).
+    // Check the whole rebuilt shape, not just `id`: without the unique provider index nothing
+    // stops two rows claiming the same (providerId, accountId).
     const columnNames = new Set(cols.map((c) => c.name));
     const hasAllColumns = REBUILT_ACCOUNT_COLUMNS.every((name) => columnNames.has(name));
 
@@ -184,9 +161,7 @@ function fixAccountsSchema(client: Database) {
     const accountRows = client
       .prepare('SELECT * FROM "accounts" ORDER BY "id"')
       .all() as LegacyAccountRow[];
-    // Better Auth keys external identities by (providerId, accountId). Never
-    // merge a collision implicitly: two legacy rows may belong to different
-    // users, and choosing either one could turn a migration into account takeover.
+    // Never merge a (providerId, accountId) collision: picking either owner could be a takeover.
     const identityOwners = new Map<string, number | string>();
     for (const row of accountRows) {
       const key = JSON.stringify([row.providerId, row.accountId]);
@@ -223,9 +198,7 @@ function fixAccountsSchema(client: Database) {
         "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope", "password", "createdAt", "updatedAt"
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const row of accountRows) {
-        // A table old enough to need this repair may hold non-numeric TEXT ids, which the
-        // rebuilt INTEGER PRIMARY KEY rejects. Nothing references accounts.id, so let
-        // AUTOINCREMENT assign a fresh one rather than failing the repair.
+        // Non-numeric TEXT ids get a fresh one; nothing references accounts.id.
         const id = Number.isInteger(Number(row.id)) ? Number(row.id) : null;
         insert.run(
           id,
@@ -262,13 +235,11 @@ function fixAccountsSchema(client: Database) {
 }
 
 /**
- * Pre-migration patch for deployments that ran an older 0020 with different column names. 0021
- * renames columns in many tables but not `accounts`, `sessions` or `verifications`, so snake_case
- * survivors break Better Auth. Runs before `migrate()`.
+ * For deployments that ran an older 0020: 0021 skips `accounts`, `sessions` and `verifications`,
+ * so their snake_case survivors break Better Auth.
  */
 export function repairLegacySqliteSchema(client: Database) {
   // ── users ────────────────────────────────────────────────────────────────────
-  // Columns added by 0020 that older deployments may be missing
   addColumnIfMissing(
     client,
     "users",
@@ -280,8 +251,6 @@ export function repairLegacySqliteSchema(client: Database) {
   addColumnIfMissing(client, "users", "display_username", "displayUsername", "TEXT");
 
   // ── accounts ─────────────────────────────────────────────────────────────────
-  // 0020 should create these camelCase; older versions used snake_case, and 0021 does not
-  // rename accounts columns - fix them here.
   renameColumnIfNeeded(client, "accounts", "user_id", "userId");
   renameColumnIfNeeded(client, "accounts", "account_id", "accountId");
   renameColumnIfNeeded(client, "accounts", "provider_id", "providerId");
@@ -295,8 +264,6 @@ export function repairLegacySqliteSchema(client: Database) {
   fixAccountsSchema(client);
 
   // ── sessions ─────────────────────────────────────────────────────────────────
-  // Better Auth omits `id` from INSERT (generateId:"serial") and relies on AUTOINCREMENT, so an
-  // older `id TEXT NOT NULL` schema fails. Recreate; sessions are ephemeral.
   fixSessionsSchema(client);
   renameColumnIfNeeded(client, "sessions", "user_id", "userId");
   renameColumnIfNeeded(client, "sessions", "expires_at", "expiresAt");

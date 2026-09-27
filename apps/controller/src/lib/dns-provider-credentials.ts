@@ -1,10 +1,7 @@
 /**
- * DNS provider credentials at rest and in Caddy's config: the half of the provider registry that
- * needs `secret`.
- *
- * Split from dns-providers.ts because that file is reached from client components through the
- * module catalog, and `secret` pulls in `node:crypto` - which Vite's browser build externalizes to
- * a stub that throws the moment the Settings page loads.
+ * DNS provider credentials at rest and in Caddy's config. Split from dns-providers.ts, which
+ * client components reach: `secret` pulls in `node:crypto`, which Vite's browser build stubs
+ * with one that throws when the Settings page loads.
  */
 
 import {
@@ -54,10 +51,8 @@ export function decryptProviderCredentials(
 }
 
 /**
- * The Caddy DNS challenge config for `issuer.challenges.dns`, from a provider + credentials.
- * The challenge options (propagation_delay / propagation_timeout) are hoisted out of the
- * credential map to the challenge level, falling back to the provider's own defaults;
- * `resolvers` comes from the global DNS resolver settings and is passed in separately.
+ * The Caddy DNS challenge config for `issuer.challenges.dns`. Challenge options are hoisted out
+ * of the credentials to the challenge level; `resolvers` comes from the global DNS settings.
  */
 export function buildDnsChallengeConfig(
   providerName: string,
@@ -69,9 +64,7 @@ export function buildDnsChallengeConfig(
 
   const decrypted = decryptProviderCredentials(providerName, credentials);
 
-  // Build provider config: { name: "cloudflare", api_token: "..." }.
-  // Challenge option keys configure the DNS challenge itself, not the
-  // provider module, so they are emitted at the challenge level below.
+  // Challenge option keys configure the challenge, not the provider module, so they go below.
   const providerConfig: Record<string, string> = { name: providerName };
   for (const [key, value] of Object.entries(decrypted)) {
     if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
@@ -84,9 +77,8 @@ export function buildDnsChallengeConfig(
     dnsChallenge.resolvers = dnsResolvers;
   }
 
-  // Challenge tuning: a stored option value wins over the provider default.
-  // The "-1" disable value is emitted as a number because Caddy parses
-  // duration strings with time.ParseDuration, which rejects a bare "-1".
+  // A stored option wins over the provider default. "-1" is emitted as a number because
+  // time.ParseDuration rejects a bare "-1".
   for (const key of CHALLENGE_OPTION_KEYS) {
     const value = decrypted[key] || def.challengeDefaults?.[key];
     if (value) {

@@ -1,9 +1,6 @@
 /**
- * The first-run setup state machine.
- *
- * The stage is derived from what exists rather than counted, so the cases worth pinning are the
- * ones where "what exists" is ambiguous: an operator halfway through, an upgrade from a release
- * that had no setup flow, and a restart in the middle of either.
+ * The first-run setup state machine. The stage is derived from what exists, so the cases pinned
+ * are the ambiguous ones: halfway through, an upgrade from before setup, a restart in either.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -257,8 +254,7 @@ describe('the migration offer', () => {
   });
 
   it('sends a migration that left the accounts behind on to account creation', async () => {
-    // The old database is still sitting there and nothing can sign in yet, which is exactly the
-    // shape that used to mean "offer the migration". Recording the source is what separates
+    // The old database is still there and nothing can sign in yet. Recording the source separates
     // "not dealt with" from "dealt with, and it brought no users".
     const directory = pointAtLegacyDatabase();
     try {
@@ -276,11 +272,9 @@ describe('the migration offer', () => {
 });
 
 /**
- * The OAuth branch of the account step stores a provider and nothing else: the user row is created
- * later, by Better Auth's callback, which pins every federated sign-up to `role: "user"`. Without
- * this promotion an instance set up against an IdP could never finish setup - the settings step
- * demanded an admin session, and the only place group-to-role mapping can be configured is that
- * same step. `saveSetupSettings` calls this as it saves, so completing setup is what confers it.
+ * The OAuth account step stores only a provider; Better Auth's callback pins the user it creates
+ * to `role: "user"`, and only an admin can finish setup. `saveSetupSettings` promotes them as
+ * it saves.
  */
 describe('promoteFirstSetupAdmin', () => {
   async function addUserWithAccount(

@@ -36,41 +36,32 @@ async function groupNames(ids: number[]): Promise<string[]> {
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
   const userId = Number(session.user.id);
-  // For the module names the gate's tooltip gives; the catalog is already loaded for the request.
+  // For the module names in the gate's tooltip.
   const t = await getTranslations();
 
-  // Every read below is independent, so they share one round trip; this runs on every dashboard
-  // navigation, which is what makes the serial version worth avoiding.
+  // Parallel: this runs on every dashboard navigation.
   const [mustChangePassword, gravatar, moduleGate, updates, stagedSet, morePins, tableDensity] =
     await Promise.all([
       requiresLegacyPasswordChange(userId),
       isGravatarEnabled(),
-      // Resolved once for the whole dashboard rather than per page: every page that
-      // shows a module-backed control needs the same answer, and it only changes
-      // when an admin saves Settings → Caddy Build.
+      // Once for the whole dashboard: every page needs the same answer, and it changes only when
+      // an admin saves Settings > Caddy Build.
       getModuleGateState((module) => caddyModuleName(t, module)),
-      // A cache read, and a background refresh when it has gone stale - never a network round trip
-      // on the render path. See lib/updates.ts.
+      // A cache read that refreshes in the background, never a network call on render.
       getUpdateStatus(),
-      // Only admins reach Settings, so nobody else pays for this: one indexed read of a table that
-      // is empty unless someone is mid-edit.
+      // Only admins reach Settings, so nobody else pays for this read.
       session.user.role === "admin" ? stagedKeys(userId) : null,
-      // One indexed read per request, for the phone's More drawer. Null means the user never chose,
-      // which is also what keeps the drawer offering to be customized.
+      // Null means never chosen, which keeps the phone's More drawer offering to be customized.
       getMoreDrawerPins(userId),
-      // The same shape of read, for how tightly this user's tables are set.
       getTableDensity(userId),
     ]);
 
-  // Gate the whole dashboard rather than individual pages: a user still on a
-  // bcrypt hash must land on the reset screen no matter which URL they opened.
-  // The reset page lives outside this layout, so this cannot loop.
+  // Here, not per page: a bcrypt-hash user must reach the reset screen from any URL. The reset
+  // page is outside this layout, so this cannot loop.
   if (mustChangePassword) {
     redirect("/password-change");
   }
 
-  // auth() reads email/role fresh from the database, so the session already
-  // carries everything the avatar needs.
   const avatar = resolveAvatar(
     { name: session.user.name, email: session.user.email, avatarUrl: session.user.image },
     64,

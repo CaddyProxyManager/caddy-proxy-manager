@@ -1,7 +1,6 @@
 /**
- * Regression (L11): the X-CPM-* identity headers were built from raw names. A group named
- * "admins,ops" read as two groups upstream, and a non-Latin-1 name made the Headers constructor
- * throw, answering every verify for that user with a 500.
+ * Regression (L11): identity headers built from raw names split "admins,ops" into two groups, and
+ * a non-Latin-1 name made Headers throw, 500ing every verify for that user.
  */
 import { describe, expect, it } from 'bun:test';
 import { encodeGroupsHeaderValue, encodeIdentityHeaderValue } from '@/src/lib/identity-header';

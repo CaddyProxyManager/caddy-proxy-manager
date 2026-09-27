@@ -13,11 +13,10 @@ import {
 } from "@/src/lib/locale";
 
 interface LocaleContextValue {
-  /** The locale actually rendering, whatever chose it. */
   locale: Locale;
   /** What the cookie says - "unset"/"detected" both render as automatic in the switcher. */
   preference: LocalePreference;
-  /** Pick a language, or pass null to go back to following the browser. */
+  /** Null goes back to following the browser. */
   setLocale: (locale: Locale | null) => void;
 }
 
@@ -43,12 +42,8 @@ function persist(value: string | null) {
 }
 
 /**
- * Holds the language preference and hands the locale to Astryx, whose own components (pagination,
- * dialogs, table controls) carry strings this app never writes.
- *
- * Messages are not passed down here: switching writes the cookie and calls `router.refresh()`, so
- * the catalog is re-read on the server by `src/i18n/request.ts` and arrives through the RSC
- * payload. That keeps exactly one catalog in the bundle rather than every locale we ship.
+ * Also hands the locale to Astryx, whose components carry their own strings. Messages come via
+ * the RSC payload after `router.refresh()`, so the bundle holds one catalog, not every locale.
  */
 export function LocaleProvider({
   locale,
@@ -73,9 +68,7 @@ export function LocaleProvider({
     [router],
   );
 
-  // `Accept-Language` is not the whole story: Chrome trims the header to a single language for
-  // fingerprinting reasons while `navigator.languages` keeps the full ordered list. So a user whose
-  // first choice we do not ship can still land on their second here, where the server could not.
+  // Chrome trims `Accept-Language` to one language; `navigator.languages` keeps the full list.
   useEffect(() => {
     if (preference.source === "chosen") return;
 
@@ -86,7 +79,7 @@ export function LocaleProvider({
       persist(preferenceCookieValue({ source: "detected", locale: detected }));
       router.refresh();
     } else if (preference.source === "unset" || preference.locale !== detected) {
-      // Already rendering the right language - record it without a round trip.
+      // Already right - record it without a round trip.
       persist(preferenceCookieValue({ source: "detected", locale: detected }));
     }
   }, [locale, preference, router]);

@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 
-// low-disk-write.yml turns these diagnostic system-log tables off with `"@remove"`; on stock
-// ClickHouse they flush every few seconds even when idle, writing several GB/day. Keep in sync
-// with that file and DISABLED_SYSTEM_LOGS in src/lib/clickhouse/client.ts.
+// Stock ClickHouse writes several GB/day to these even idle. Keep in sync with
+// low-disk-write.yml and DISABLED_SYSTEM_LOGS in src/lib/clickhouse/client.ts.
 const DISABLED_SYSTEM_LOGS = [
   'metric_log',
   'asynchronous_metric_log',
@@ -34,12 +33,10 @@ function makeClient(): ClickHouseClient {
 test.describe('ClickHouse internal system logs disabled', () => {
   test('none of the disabled diagnostic system-log tables exist', async () => {
     const ch = makeClient();
-    // Table names are hard-coded safe identifiers, so an inline IN list is fine.
+    // Hard-coded identifiers, so an inline IN list is safe.
     const inList = DISABLED_SYSTEM_LOGS.map((n) => `'${n}'`).join(', ');
     try {
-      // remove="1" stops ClickHouse from ever setting up these log queues, so
-      // the tables are never created. If the override is dropped or unmounted,
-      // they reappear in system.tables and this assertion fails.
+      // remove="1" means the tables are never created; a dropped override brings them back.
       const result = await ch.query({
         query: `SELECT name FROM system.tables WHERE database = 'system' AND name IN (${inList}) ORDER BY name`,
         format: 'JSONEachRow',

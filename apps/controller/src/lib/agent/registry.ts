@@ -1,20 +1,7 @@
 /**
- * Every agent currently attached to this controller, and the only way to reach one.
- *
- * The agent dials in and holds a GraphQL subscription open over SSE; the controller can no longer
- * call out. So "reaching an agent" is pushing onto a queue this map is holding, and an agent that
- * is not in here is unreachable no matter what the database says about it.
- *
- * This file deliberately knows nothing about SSE. It used to encode the frames itself, which was
- * fine while it owned the response; the transport is the GraphQL server's now, so what `attach`
- * hands back is an async iterable of events and the framing happens above it. The keepalive moved
- * into the protocol as a `ping` event for the same reason.
- *
- * In memory, deliberately. A connection is a property of *this* process - the socket lives here or
- * nowhere - so persisting it would only produce rows describing streams that no longer exist. The
- * consequence to know about: this controller is a single container, and a second replica would
- * each hold half the fleet with no way to reach the other half. If that day comes, this is the file
- * that needs a broker behind it, not the callers.
+ * The only way to reach an agent: it dials in, so one missing here is unreachable whatever the
+ * database says. In memory because a connection belongs to this process; a second replica would
+ * hold half the fleet, and a broker would go here, not in the callers. Transport-agnostic.
  */
 
 import { randomUUID } from "node:crypto";
@@ -33,17 +20,15 @@ import {
   type CertificateFileRequest,
 } from "@cpm/shared";
 
-/** One attached agent. */
 type Connection = {
   agentId: string;
-  /** Operator-facing name, from the agents row. Used in messages, never for routing. */
+  /** For messages, never for routing. */
   name: string;
   agentRowId: number;
   connectedAt: number;
-  /** Writes one SSE frame. Returns false once the stream is gone. */
+  /** False once the stream is gone. */
   send: (event: AgentServerEvent) => boolean;
   close: () => void;
-  /** Last status this agent posted, or null before its first report. */
   status: AgentStatus | null;
   lastSeenAt: number;
 };
@@ -77,24 +62,12 @@ export class AgentCommandError extends Error {
 // ─── Attaching ───────────────────────────────────────────────────────────────
 
 export type AttachedAgent = {
-  /**
-   * The events to publish, in order, until the agent goes away.
-   *
-   * Returning an iterable rather than a stream is what lets the GraphQL layer own the transport:
-   * the same source would serve a websocket or a poll without this file changing.
-   */
+  /** An iterable, not a stream, so the GraphQL layer owns the transport. */
   events: AsyncIterableIterator<AgentServerEvent>;
-  /** Push new desired state to this agent alone. */
   push: (state: AgentDesiredState) => void;
 };
 
-/**
- * Attach an agent and hand back the stream to respond with.
- *
- * A second connection from the same agent replaces the first rather than joining it: an agent that
- * reconnected after a network partition has an old stream this process still believes in, and
- * leaving both attached would double every command it is sent.
- */
+/** A reconnect replaces the old stream; keeping both after a partition would double commands. */
 export function attach(params: {
   agentId: string;
   agentRowId: number;
@@ -109,9 +82,7 @@ export function attach(params: {
     connections.delete(params.agentId);
   }
 
-  // A queue rather than a stream: events are produced by whoever is pushing commands, and consumed
-  // by the subscription at its own pace. `pending` holds what has been produced and not yet taken;
-  // `waiting` holds a consumer that arrived first. Exactly one of the two is ever non-empty.
+  // At most one of `pending` (produced, not taken) and `waiting` (consumer came first) is set.
   const pending: AgentServerEvent[] = [];
   let waiting: ((event: IteratorResult<AgentServerEvent>) => void) | null = null;
   let closed = false;
@@ -158,8 +129,7 @@ export function attach(params: {
         waiting = resolve;
       });
     },
-    // Called when the consumer stops - the agent hung up, or the server is shutting the
-    // subscription down. Either way this connection is over.
+    // The consumer stopped: the agent hung up or the subscription is shutting down.
     return() {
       detach(params.agentId);
       return Promise.resolve({ value: undefined, done: true } as IteratorResult<AgentServerEvent>);
@@ -207,8 +177,7 @@ export function detach(agentId: string): void {
   connection.close();
   connections.delete(agentId);
 
-  // Fail anything still waiting on this agent rather than letting it run to its own timeout: the
-  // answer is already known, and a caller holding a request open for another minute helps nobody.
+  // Fail waiters now rather than letting them run to their timeout.
   for (const [id, waiter] of waiters) {
     if (id.startsWith(`${agentId}:`)) {
       clearTimeout(waiter.timer);
@@ -252,16 +221,8 @@ export function recordStatus(agentId: string, status: AgentStatus): void {
 // ─── Desired state ───────────────────────────────────────────────────────────
 
 /**
- * Push desired state to every attached agent, computed for each one.
- *
- * A builder rather than a state, because two agents no longer want the same thing: the hosts
- * pinned to each decide its ports, and its own module selection decides its build. Returning null
- * skips that agent - a state that could not be computed must leave the agent on the last one it
- * had rather than replacing it with a guess.
- *
- * Sequential on purpose. Each build runs several queries, and a fleet of twenty agents all
- * recomputing at once on every host save is a thundering herd against the controller's own
- * database for work nothing is waiting on.
+ * State is built per agent; null skips one, leaving it on its last state rather than a guess.
+ * Sequential so a large fleet does not stampede the database on every host save.
  */
 export async function broadcastDesiredState(
   build: (agent: ConnectedAgent) => Promise<AgentDesiredState | null>,
@@ -276,11 +237,7 @@ export async function broadcastDesiredState(
   }
 }
 
-/**
- * Ask every attached agent to restart Caddy and then itself. Returns how many were asked.
- *
- * Nothing is awaited: the agents answer with their absence, and the caller is about to exit too.
- */
+/** Returns how many were asked. Not awaited: the caller is about to exit too. */
 export function broadcastRestart(reason: string): number {
   let asked = 0;
   for (const agent of connectedAgents()) {
@@ -294,13 +251,7 @@ export function broadcastRestart(reason: string): number {
 
 // ─── Commands ────────────────────────────────────────────────────────────────
 
-/**
- * Send a Caddy admin call to one agent and wait for its answer.
- *
- * This is the only request/response left in a protocol that is otherwise desired state, and the
- * only place the controller blocks on an agent. The timeout is what keeps a wedged agent from
- * holding a page render open forever.
- */
+/** The one place the controller blocks on an agent; the timeout bounds a wedged one. */
 export function dispatchCaddyAdmin(
   agentId: string,
   request: CaddyAdminProxyRequest,
@@ -308,10 +259,7 @@ export function dispatchCaddyAdmin(
   return dispatch(agentId, { kind: "caddy-admin", request });
 }
 
-/**
- * Ask one agent to run `caddy validate` on a config. Only for an agent whose status lists the
- * `caddy-validate` capability: an older one never answers, and this would wait out the timeout.
- */
+/** Only for an agent listing `caddy-validate`: an older one never answers and this times out. */
 export function dispatchCaddyValidate(
   agentId: string,
   request: CaddyValidateRequest,
@@ -319,7 +267,7 @@ export function dispatchCaddyValidate(
   return dispatch(agentId, { kind: "caddy-validate", request });
 }
 
-/** A page of one agent's log. Only for an agent listing `log-read`; see dispatchCaddyValidate. */
+/** Only for an agent listing `log-read`; see dispatchCaddyValidate. */
 export function dispatchLogRead(
   agentId: string,
   request: LogReadRequest,
@@ -327,7 +275,7 @@ export function dispatchLogRead(
   return dispatch(agentId, { kind: "log-read", request });
 }
 
-/** Caddy's stored certificates, or one of them. Only for an agent listing `certificates`. */
+/** Only for an agent listing `certificates`. */
 export function dispatchCertificateList(agentId: string): Promise<CaddyAdminProxyResponse> {
   return dispatch(agentId, { kind: "certificate-list", request: {} });
 }
@@ -372,7 +320,7 @@ function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyRe
   });
 }
 
-/** Resolve whatever is waiting on these results. Unknown ids are stale and dropped. */
+/** Unknown ids are stale and dropped. */
 export function settleResults(agentId: string, results: AgentCommandResult[]): void {
   for (const result of results) {
     const waiter = waiters.get(result.id);
@@ -390,7 +338,7 @@ export function settleResults(agentId: string, results: AgentCommandResult[]): v
   if (connection) connection.lastSeenAt = Date.now();
 }
 
-/** Test seam: drop all state so one suite's connections cannot leak into the next. */
+/** Test seam. */
 export function resetRegistry(): void {
   for (const connection of connections.values()) connection.close();
   connections.clear();

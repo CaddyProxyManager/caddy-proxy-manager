@@ -1,15 +1,7 @@
 /**
- * Every settings page, in the order the navigation shows them, and the blocks each one carries.
- *
- * A page is a list of blocks rather than one form because most settings are two fields: as its own
- * route each was a title, a breadcrumb and an acre of empty pane. A block keeps the name that page
- * had - it is the heading inside the page, the anchor a link lands on, and the id its catalog
- * entry and its staged-change label are still keyed by - so nothing an operator learned is lost by
- * the merge.
- *
- * Lives outside SettingsClient because several things render from it: the sidebar, which the
- * dashboard layout owns while a settings route is open, the page itself, and the command palette.
- * One list keeps a page from appearing in the nav and nowhere else, or the reverse.
+ * Every settings page in nav order, and its blocks. A block keeps the id of the page it once was,
+ * so anchors, catalog keys and staged-change labels survived the merge. One list for the sidebar,
+ * the page and the command palette, so none of them can disagree.
  */
 
 import {
@@ -28,37 +20,17 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { useTranslations } from "next-intl";
 
-/**
- * One block of a settings page: what used to be a page of its own.
- *
- * `id` is that page's id, unchanged. It is the block's anchor (`/settings/dns#dns-resolvers`), the
- * key of its `settings.blocks.*` heading, and what `LEGACY_SECTION_PAGES` redirects an old link to.
- */
+/** `id` is the anchor, the `settings.blocks.*` key, and where legacy links redirect. */
 export type SettingsBlock = {
   id: string;
-  /** The heading inside the page: the name this block's page had. */
   name: string;
-  /** The line under that heading, which was that page's description. */
   desc: string;
   /**
-   * Environment variables that configure this block, shown as tokens beside its heading.
-   *
-   * Beside the heading rather than the page's title: a page holds several blocks now, and a token
-   * under the title would claim the variable configures all of them. A variable that sets one
-   * field alone is rendered next to that field by the block itself; what is listed here is what
-   * governs the block as a whole.
-   *
-   * An operator arrives from a `.env` file, so the variable name is the handle they already have.
-   * Only variables that set a value this block shows belong here: a near-miss sends someone to a
-   * screen that cannot change what they came to change. The ones a database setting supersedes are
-   * in `src/lib/settings/registry.ts`, which is where their precedence is defined.
+   * Variables governing the whole block, shown beside its heading. Only ones that set a value
+   * this block shows: a near-miss sends someone to a screen that cannot change it.
    */
   env?: readonly string[];
-  /**
-   * Variables the search should match that are not worth showing. For a block configured by a
-   * whole family of variables, `env` carries the prefix and this carries the members, so typing
-   * any one of them still lands on the page.
-   */
+  /** Searchable but not shown, e.g. the members of a family whose prefix is in `env`. */
   envSearch?: readonly string[];
 };
 
@@ -250,9 +222,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "oauth",
             name: "OAuth Providers",
             desc: "OAuth/OIDC SSO providers",
-            // A provider's whole configuration is one family of variables, and `runEnvProviderSync`
-            // reads every one of them into `oauth_providers` at startup. Nineteen tokens beside the
-            // heading would drown it, so the prefix is shown and the members stay searchable.
+            // Nineteen tokens would drown the heading, so only the prefix is shown.
             env: ["OAUTH_*"],
             envSearch: [
               "OAUTH_ENABLED",
@@ -388,30 +358,21 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
 ];
 
-/** Flat lookup for a route segment, so an unknown page can fall back rather than 404. */
 export const SETTINGS_ITEMS: SettingItem[] = SETTINGS_GROUPS.flatMap((group) => group.items);
 
 export function findSettingsItem(id: string): SettingItem | undefined {
   return SETTINGS_ITEMS.find((item) => item.id === id);
 }
 
-/** The group a page belongs to, for the breadcrumb the content pane renders. */
 export function groupForSection(id: string): SettingsGroup | undefined {
   return SETTINGS_GROUPS.find((group) => group.items.some((item) => item.id === id));
 }
 
-/** Every block of every page, flat: what the message test and the search iterate. */
 export const SETTINGS_BLOCKS: readonly SettingsBlock[] = SETTINGS_ITEMS.flatMap(
   (item) => item.blocks,
 );
 
-/**
- * Where a block lives now, for the block ids that used to be routes of their own.
- *
- * `/settings/authentik` was a page until these were merged, and it is a link in the docs and in
- * whatever an operator bookmarked. Rather than answer those with the overview, the route redirects
- * to the page that carries the block, anchored at it.
- */
+/** Block ids that were once routes, so docs links and bookmarks redirect to the anchor. */
 export const LEGACY_SECTION_PAGES: ReadonlyMap<string, { page: string; anchor: string }> = new Map(
   SETTINGS_ITEMS.flatMap((item) =>
     item.blocks
@@ -420,13 +381,7 @@ export const LEGACY_SECTION_PAGES: ReadonlyMap<string, { page: string; anchor: s
   ),
 );
 
-/**
- * The link to a page, or to a block on the page that carries it.
- *
- * Everything that used to link to `/settings/<section>` goes through this, so a caller does not
- * have to know which ids became anchors - and none of them has to be updated again if a block
- * moves to another page.
- */
+/** Callers link through this so none needs updating when a block moves page. */
 export function settingsHref(id: string): string {
   const legacy = LEGACY_SECTION_PAGES.get(id);
   return legacy ? `/settings/${legacy.page}#${legacy.anchor}` : `/settings/${id}`;
@@ -435,16 +390,12 @@ export function settingsHref(id: string): string {
 // ─── Messages ────────────────────────────────────────────────────────────────
 
 /*
- * The English above stays the source, and the screens render the `settings.sections.*`,
- * `settings.blocks.*` and `settings.navGroups.*` catalog entries through these instead. All three
- * are keyed by id at runtime, which TypeScript cannot check against the catalog, so
- * `tests/unit/settings-sections-messages.test.ts` asserts every page, block and group has an entry
- * that reads exactly as it does here.
+ * Screens render the catalog entries, keyed by id at runtime where tsc cannot check them, so
+ * `tests/unit/settings-sections-messages.test.ts` asserts each matches the English above.
  */
 
 type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
 
-/** The one place the narrowing is given up, for the reason above. */
 type DynamicTranslate = (key: string) => string;
 
 function dynamic(t: SettingsTranslator): DynamicTranslate {
@@ -464,12 +415,10 @@ export function settingsSectionDescription(t: SettingsTranslator, item: SettingI
   return dynamic(t)(`sections.${sectionMessageName(item.id)}.desc`);
 }
 
-/** A block's heading: the name the page it came from had. */
 export function settingsBlockName(t: SettingsTranslator, id: string): string {
   return dynamic(t)(`blocks.${sectionMessageName(id)}.name`);
 }
 
-/** The line under a block's heading, which was that page's description. */
 export function settingsBlockDescription(t: SettingsTranslator, id: string): string {
   return dynamic(t)(`blocks.${sectionMessageName(id)}.desc`);
 }

@@ -44,8 +44,7 @@ jobs:
           version="$(jq -er .version package.json)"
           tag="v${version}"
 
-          # A dependency bump touches package.json too, so the release turns on the version having
-          # changed across the push - not merely on the file having been written.
+          # A dependency bump touches package.json too, so compare the version itself.
           if [ -n "${BEFORE:-}" ] && git rev-parse -q --verify "${BEFORE}^{commit}" >/dev/null; then
             before_version="$(git show "${BEFORE}:package.json" 2>/dev/null | jq -er .version 2>/dev/null || true)"
             if [ "$version" = "$before_version" ]; then
@@ -92,8 +91,7 @@ jobs:
           # ghcr rejects an uppercase path; metadata-action lowercases the same way at build time.
           image_base="ghcr.io/$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
 
-          # What a deployment carries on disk. `docker compose pull` cannot deliver a change to any
-          # of these, which is what makes it worth calling out.
+          # On disk, so `docker compose pull` cannot deliver a change to them.
           deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy)
 
           deploy_changed=""
@@ -132,8 +130,7 @@ jobs:
               echo "First tagged release - take \`docker-compose.yml\` and \`.env.example\` from the archive below."
             fi
             echo
-            # The archive is flat and self-contained; say so, and flag both differences from the
-            # repository so nobody diffs the two and files a bug.
+            # Flag both differences from the repository so nobody diffs the two and files a bug.
             echo "The archive holds every file at its top level and deploys as it unpacks -"
             echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
             echo "Its \`docker-compose.yml\` differs from the copy in the repository in exactly two"
@@ -170,50 +167,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          # One archive rather than three loose assets. These files are only useful together, and
-          # an archive also carries `.env.example` under its real name -- GitHub refuses a leading
-          # dot on an asset and was publishing it as `default.env.example`.
-          #
-          # tar.gz rather than zip: every target platform can open it without extra tooling, since
-          # Windows has shipped bsdtar as `tar.exe` in System32 since 1803.
-          #
-          # Everything sits flat at the archive root, staged here rather than tarred from the
-          # checkout. `low-disk-write.yml` says nothing on its own once it is out of the tree, so
-          # it carries its directory as a `clickhouse-` prefix instead -- the same rename the
-          # `#label` on the old loose asset was doing. Whole directory, not the one file, so a
-          # second override added under docker/clickhouse ships without touching this step.
-          #
-          # A flat archive would leave docker-compose.yml binding a path that is not there, so the
-          # staged copy is rewritten to mount the override from beside itself. Only the staged
-          # copy: the checkout keeps ./docker/clickhouse/, which is the layout the repo and the
-          # e2e stack run from. The result is an archive that deploys as it unpacks -- extract the
-          # three files into one directory and `docker compose up -d` needs nothing moved.
+          # An archive, as GitHub renames a dotfile asset (`.env.example`); tar.gz opens on
+          # Windows too. Flat, each directory a file prefix, and the staged compose file
+          # rewritten to mount from beside itself so it deploys as it unpacks.
           staging="$(mktemp -d)"
           entries=(docker-compose.yml .env.example)
           cp docker-compose.yml .env.example "$staging/"
-          # docker/socket-proxy gets the same treatment: compose bind-mounts its HAProxy template, and
-          # a missing source becomes an empty directory that the proxy cannot render.
+          # A missing bind source becomes an empty directory the proxy cannot render.
           for dir in clickhouse socket-proxy; do
             for f in "docker/${dir}"/*; do
               entry="${dir}-$(basename "$f")"
               cp "$f" "${staging}/${entry}"
               entries+=("$entry")
             done
-            # Host side only. The container side stays where the service actually reads the file.
+            # Host side only.
             sed -i "s#\./docker/${dir}/#./${dir}-#g" "$staging/docker-compose.yml"
           done
 
-          # Pin this release's own images to this release's version.
-          #
-          # The repository copy tracks `:latest` deliberately -- on main, between releases, that is
-          # the tag which exists. But an archive is a snapshot of one release, and shipping it
-          # alongside a floating tag meant the two drifted the moment the next release published:
-          # someone deploying v3.0.0's files got whatever `latest` had become, and a redeploy months
-          # later silently upgraded the containers under compose files that had not changed.
-          #
-          # Scoped to the three images this project publishes. The rest are other people's images,
-          # already pinned by tag and digest on their own cadence, and rewriting them to our version
-          # would name tags that do not exist -- which is what the assertions below are really guarding.
+          # A snapshot with `:latest` would silently upgrade on a later redeploy. Only our three
+          # images: third-party ones are pinned already, and our version would name missing tags.
           sed -i -E \
             "s#(image: ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
             "$staging/docker-compose.yml"
@@ -226,18 +198,14 @@ jobs:
             fi
           done
 
-          # A sed that reached too far is the other half of the same worry: every other image line
-          # must still say exactly what the checkout says. Compared, not listed, so a Dependabot
-          # bump to one of those pins cannot break the release.
+          # Nor too far. Compared, not listed, so a Dependabot bump cannot break the release.
           if ! diff <(grep -E '^[[:space:]]*image:' docker-compose.yml | grep -vE '/(web|caddy|agent):') \
                     <(grep -E '^[[:space:]]*image:' "$staging/docker-compose.yml" | grep -vE '/(web|caddy|agent):'); then
             echo "::error::staged docker-compose.yml changed a third-party image reference"
             exit 1
           fi
 
-          # A sed that matched nothing is the failure worth catching here: it would ship a compose
-          # file pointing at a directory the archive does not contain, and nothing downstream
-          # would notice until a deploy failed.
+          # A sed that matched nothing would ship mounts of a directory the archive lacks.
           if grep -qE '\./docker/' "$staging/docker-compose.yml"; then
             echo "::error::staged docker-compose.yml still references ./docker/"
             grep -nE '\./docker/' "$staging/docker-compose.yml"
@@ -257,9 +225,7 @@ jobs:
           name="caddy-proxy-manager-${TAG}-deploy.tar.gz"
           tar -czf "$name" -C "$staging" "${entries[@]}"
 
-          # The dotfile is half the reason this is an archive, so it is worth asserting rather
-          # than trusting: tar stores the name it was given, but a release that quietly shipped
-          # `.env.example` under some other name would look fine until someone tried to deploy.
+          # Asserted: a misnamed `.env.example` would look fine until someone deployed.
           for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
             if ! tar -tzf "$name" | grep -qxF "$want"; then
               echo "::error::${name} is missing ${want}"
@@ -304,12 +270,10 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          # Dispatched, not left to the tag push: a tag created with GITHUB_TOKEN starts no
-          # workflow, and workflow_dispatch is the documented exception. --ref so metadata-action
-          # reads the version off the tag.
+          # A tag pushed with GITHUB_TOKEN starts no workflow; dispatch is the exception. --ref so
+          # metadata-action reads the version off the tag.
           gh workflow run docker-build-trusted.yml --ref "$TAG"
           echo "Dispatched docker-build-trusted at ${TAG}"
-          # The docs site publishes per release rather than per push. On main, not the tag: the
-          # github-pages environment deploys from main only.
+          # The docs publish per release. On main: github-pages deploys from main only.
           gh workflow run site.yml --ref main
           echo "Dispatched site"

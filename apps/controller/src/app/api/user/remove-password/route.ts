@@ -8,12 +8,8 @@ import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/r
 import { verifyPassword } from "@/src/lib/password";
 
 /**
- * Remove the signed-in user's password, so their linked providers are the only way in.
- *
- * The inverse of unlink-oauth, and guarded the same way from the other side: that one refuses to
- * leave an account without a password, this one refuses to leave it without a provider. The
- * current password is asked for again, because a borrowed session should not be enough to lock
- * the owner out of the one credential they hold themselves.
+ * The inverse of unlink-oauth: refuses to leave the account without a provider. Asks for the
+ * current password, so a borrowed session cannot lock the owner out.
  */
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -32,8 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("errors.demoAdminProtected") }, { status: 403 });
     }
 
-    // Shares the change-password budget: both verify the same password, and a separate counter
-    // would double the guesses anyone holding the session gets.
+    // Shares change-password's budget, or a session holder would get twice the guesses.
     const rateLimitKey = `password-change:${userId}`;
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {

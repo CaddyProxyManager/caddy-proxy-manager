@@ -1,18 +1,7 @@
 /**
- * The schema, as SDL.
- *
- * Two rules decide whether something is a field or a `JSON` blob:
- *
- * - **A field** when the shape is stable and worth querying - an id, a name, a domain list, a
- *   timestamp, a foreign key. These are what a client filters, sorts and displays on.
- * - **`JSON`** when the model layer owns the shape - load-balancer settings, WAF overrides,
- *   geoblock rules, mTLS configuration. Those change with the product and are validated by
- *   functions that already exist; restating them here would be thousands of lines of schema that
- *   can drift out of step with the validator, while looking authoritative.
- *
- * Mutations take the same JSON body the REST route took, and hand it to the same model function.
- * That is deliberate: it is what makes a GraphQL mutation and its `/api/v1/` counterpart provably
- * equivalent, which is what the parity tests assert.
+ * Stable, queryable shapes are fields; shapes the model layer owns and validates are `JSON`, so
+ * the schema cannot drift from the validator. Mutations take REST's JSON body into the same model
+ * function, which is what the parity tests assert.
  */
 
 export const typeDefs = /* GraphQL */ `

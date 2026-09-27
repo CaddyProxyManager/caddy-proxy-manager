@@ -17,19 +17,12 @@ import * as sqliteSchema from '../../src/lib/db/schema.sqlite';
 export const testDialect = process.env.TEST_DB === 'sqlite' ? 'sqlite' : 'postgres';
 
 /**
- * Per-test isolation is a PostgreSQL *schema*, not a database. Both were measured: creating a
- * database from a migrated template costs about the same as creating a schema and replaying the
- * DDL (~25ms either way, 32-way concurrent), but `DROP DATABASE` forces a checkpoint and fsyncs
- * the file deletions - 14.5s to drop 32, against 0.4s for 32 `DROP SCHEMA`s. Dropping is not
- * optional: a test file creates a database per test, and leaking them exhausts max_connections
- * long before the suite ends.
+ * Per-test isolation is a PostgreSQL *schema*, not a database: `DROP DATABASE` checkpoints and
+ * fsyncs (14.5s for 32, against 0.4s for schemas), and leaked databases exhaust max_connections.
  */
 const MIGRATIONS_DIR = resolve(import.meta.dir, '../../drizzle', testDialect);
 
-/**
- * Set by scripts/with-test-db.ts, which starts the throwaway server. Absent means the suite was
- * invoked as bare `bun test`, which cannot work without one.
- */
+/** Set by scripts/with-test-db.ts; bare `bun test` has no server and cannot work. */
 function adminUrl(): string {
   const url = process.env.TEST_POSTGRES_URL;
   if (!url) {
@@ -42,10 +35,8 @@ function adminUrl(): string {
 }
 
 /**
- * Every migration, in the order drizzle's journal records - not just the initial one. The journal
- * is the source of truth rather than a directory glob, so a test schema is built exactly the way a
- * deployment is. Reading the one file was correct while `0000_initial` was the only migration, and
- * silently wrong the moment a second one existed.
+ * Every migration, in the order drizzle's journal records, so a test schema is built exactly the
+ * way a deployment is.
  */
 function migrationSql(): string {
   const journal = JSON.parse(
@@ -72,9 +63,7 @@ function ddlFor(schemaName: string): string {
   return scoped;
 }
 
-/**
- * Typed as the app's `Db` so tests can call tables imported from src/lib/db/schema on the handle.
- */
+/** Typed as the app's `Db` so tests can use tables from src/lib/db/schema on the handle. */
 export type TestDb = Db;
 
 type Live = { sql: SQL; schemaName: string } | { sqlite: Database };
@@ -83,10 +72,8 @@ const live: Live[] = [];
 let adminPool: SQL | undefined;
 
 /**
- * Where the current test's schemas start in `live`. Everything before it was created while the
- * test file was being imported - the `vi.mock('src/lib/db')` files build one database for the
- * whole file and clear tables between tests - and dropping those after the first test would take
- * the rest of the file down with it.
+ * Where the current test's schemas start in `live`. Earlier ones were created at import by files
+ * that build one database for the whole file; dropping them would break the rest of it.
  */
 let testBoundary = 0;
 
@@ -96,9 +83,8 @@ function admin(): SQL {
 }
 
 /**
- * A fresh, fully migrated PostgreSQL schema with all tables. Each call is isolated from every
- * other. `max: 1` because the handle's `search_path` is per connection - a pool would hand later
- * queries a connection still pointed at public.
+ * A fresh, fully migrated PostgreSQL schema. `max: 1` because `search_path` is per connection -
+ * a pool would hand later queries a connection still pointed at public.
  */
 export async function createTestDb(): Promise<TestDb> {
   if (testDialect === 'sqlite') {
@@ -120,13 +106,8 @@ export async function createTestDb(): Promise<TestDb> {
 }
 
 /**
- * A fresh, empty PostgreSQL *database* and the URL that reaches it, for the handful of tests that
- * boot the real src/lib/db module rather than mocking it - that module reads DATABASE_URL and
- * connects itself, so it cannot be pointed at one of the schemas above.
- *
- * Migrations are not applied: a caller booting the db module gets them from its own startup, and a
- * caller seeding a pre-migration state needs to run them itself, in order, through drizzle's
- * migrator so the journal is written.
+ * A fresh, empty PostgreSQL *database*, for tests that boot the real src/lib/db module (it reads
+ * DATABASE_URL itself). Unmigrated: a caller seeding a pre-migration state runs them itself.
  */
 export async function createTestDatabase(): Promise<{ url: string; drop: () => Promise<void> }> {
   if (testDialect === 'sqlite') {
@@ -148,8 +129,8 @@ export async function createTestDatabase(): Promise<{ url: string; drop: () => P
   url.pathname = `/${name}`;
   return {
     url: url.toString(),
-    // Slow (DROP DATABASE fsyncs), so this is deliberately not wired into the afterEach that
-    // handles schemas - the few callers drop their own, and the throwaway server dies with the run.
+    // Slow (DROP DATABASE fsyncs), so not in the schema afterEach; the throwaway server dies with
+    // the run.
     drop: async () => {
       await admin().unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
     },
@@ -177,10 +158,9 @@ export async function cleanupTestDbs(): Promise<void> {
 }
 
 /**
- * A stand-in for the `db` module's default export, forwarding to whichever database the current
- * test uses. Bun evaluates a mock factory's getters once at link time, so Vitest's
- * `get default() { return db }` would capture `undefined`. This has a stable identity, resolves
- * every read against `current()`, and binds methods so drizzle sees the right `this`.
+ * Stand-in for the `db` module's default export. Bun evaluates a mock factory's getters once at
+ * link time, so `get default() { return db }` would capture `undefined`; this resolves each read
+ * against `current()` and binds methods so drizzle sees the right `this`.
  */
 export function currentDb(current: () => TestDb): TestDb {
   return new Proxy({} as TestDb, {

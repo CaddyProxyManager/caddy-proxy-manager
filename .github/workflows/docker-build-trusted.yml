@@ -1,8 +1,7 @@
 name: Build and Push Docker Images (Trusted)
 
-# Released versions only. The Release workflow creates the v* tag and dispatches this run at it - a
-# tag created with GITHUB_TOKEN starts nothing on its own - so the dispatch trigger stays, and the
-# gate job below is what refuses any ref that is not a release tag on main.
+# Released versions only. Release dispatches this at its v* tag (a GITHUB_TOKEN tag triggers
+# nothing); the gate job refuses any ref that is not a release tag on main.
 on:
   push:
     tags:
@@ -13,9 +12,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# One build per ref. Pushing twice in quick succession supersedes the older run
-# rather than stacking another 3-image matrix beside it; tags get their own ref
-# and so never cancel each other.
+# A newer run on the same ref supersedes the older; distinct tags never cancel each other.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -45,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # A dispatch on a branch used to publish :<branch> and :sha-* images of unreviewed code.
+          # Otherwise a branch dispatch publishes images of unreviewed code.
           if [ "$REF_TYPE" != "tag" ] || ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::images are published only from a vX.Y.Z tag, not ${REF_TYPE} '${TAG}'"
             exit 1
@@ -66,8 +63,7 @@ jobs:
             echo "newest=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # docker-compose.yml runs :latest, and 3.0.0 has only prereleases so far, so :latest follows
-          # them. Once a stable v3+ tag exists, only stable releases move it.
+          # docker-compose.yml runs :latest, so it follows 3.0.0 prereleases until a stable v3+.
           stable_exists=false
           if git tag -l 'v*' | grep -v -- '-' | grep -Eq '^v([3-9]|[1-9][0-9]+)\.'; then
             stable_exists=true
@@ -82,9 +78,7 @@ jobs:
     name: "${{ matrix.name }}"
     needs: gate
     runs-on: ubuntu-latest
-    # A wedged build step inherits the runner's 6-hour default and burns the
-    # whole budget silently. Healthy runs land in a couple of minutes; anything
-    # past half an hour is broken, and should fail fast enough to notice.
+    # Healthy runs take minutes; a wedged one would otherwise burn the 6-hour default.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -130,16 +124,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         env:
-          # Default is `manifest` alone, which annotates the per-arch manifests and leaves the
-          # multi-arch index bare - and the index is what GHCR reads for the package page's
-          # description and "linked repository". Both levels, so the two agree.
+          # The default leaves the multi-arch index bare, and GHCR reads its package page from it.
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
-          # Per-image identity. Without these the action derives title and description from the
-          # repository, so all three images would claim to be the same thing; the Dockerfiles carry
-          # the same values for local `docker compose build`. Everything else - version, revision,
-          # created, source, licenses - the action fills in from the tag and the repo.
+          # Otherwise all three images take the repository's title and description. The
+          # Dockerfiles repeat these for local builds.
           labels: |
             org.opencontainers.image.title=${{ matrix.title }}
             org.opencontainers.image.description=${{ matrix.description }}
@@ -150,8 +140,7 @@ jobs:
             org.opencontainers.image.description=${{ matrix.description }}
             org.opencontainers.image.vendor=SilentSpud
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
-          # The floating tags are the gate's decision, not the action's: its latest=auto would add
-          # :latest for any stable semver tag, re-dispatched old ones included.
+          # The gate decides floating tags: latest=auto would move :latest for a re-dispatched old tag.
           flavor: |
             latest=false
           tags: |
@@ -162,7 +151,7 @@ jobs:
             type=sha
             type=raw,value=latest,enable=${{ needs.gate.outputs.latest == 'true' }}
 
-      # The tag without its v, baked into the UI and the OpenAPI spec. The gate guarantees a v* tag.
+      # Baked into the UI and OpenAPI spec. The gate guarantees a v* tag.
       - name: Compute app version
         id: app-version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"

@@ -1,11 +1,6 @@
 /**
- * The two halves of OIDC back-channel logout that touch the database: remembering which IdP
- * session a CPM session came from, and ending sessions when the IdP says that one is over.
- *
- * Binding has the same shape as the group sync next door, and for the same reason: the `sid` is a
- * claim in the ID token, which is written with the account row, while the thing it has to be
- * stored on is the session row created moments later. So the account hook parks it and the session
- * hook consumes it.
+ * OIDC back-channel logout's database half. The `sid` arrives with the account row but belongs on
+ * the session row created moments later: the account hook parks it, the session hook takes it.
  */
 
 import { and, eq, inArray } from "drizzle-orm";
@@ -51,13 +46,7 @@ export function clearPendingSessionBindings(): void {
   pending.clear();
 }
 
-/**
- * Park the `sid` from an ID token being written to an account row.
- *
- * Called from the account hooks, where the token is still in hand. Providers that issue no `sid`
- * park nothing, and their sessions stay unbound - a logout token from one of those can only be
- * honoured by subject, which is what the spec expects of it anyway.
- */
+/** No `sid`, no binding: that provider's logout tokens are honoured by subject, per the spec. */
 export function recordSessionBindingFromIdToken(
   userId: number,
   providerId: string,
@@ -71,7 +60,6 @@ export function recordSessionBindingFromIdToken(
   recordPendingSessionBinding({ userId, providerId, sid });
 }
 
-/** Called after better-auth creates a session: stamp it with the IdP session it belongs to. */
 export async function bindSessionToIdpSession(userId: number, sessionId: number): Promise<void> {
   if (pending.size === 0 || !Number.isFinite(userId) || !Number.isFinite(sessionId)) return;
   const entry = consumePendingSessionBinding(userId);
@@ -85,31 +73,20 @@ export async function bindSessionToIdpSession(userId: number, sessionId: number)
 
 export type RevocationTarget = {
   providerId: string;
-  /** The IdP subject, when the logout token named one. */
   subject: string | null;
-  /** The IdP session id, when the logout token named one. */
   sessionId: string | null;
 };
 
 export type RevocationResult = {
-  /** CPM sessions deleted. Zero is a success: the user may simply not have been signed in. */
+  /** Zero is a success: the user may simply not have been signed in. */
   sessions: number;
-  /** Users whose sessions were ended, for the audit trail. */
   userIds: number[];
 };
 
 /**
- * End the sessions a logout token names.
- *
- * A `sid` ends exactly the session it names, which is the whole point of the claim - and it wins
- * over any `sub` alongside it, which most providers send too. Reading both as "end this session,
- * and also every other one" would make session-scoped logout impossible to ask for. Only a token
- * with no `sid` at all ends every session that subject has, because then there is nothing finer to
- * go on.
- *
- * Forward-auth sessions go either way. They are minted from a CPM session but outlive it, so a
- * proxied host would keep letting the user in after their SSO session ended - and unlike CPM's own
- * sessions they carry no `sid` to narrow by, so all of the user's are dropped.
+ * A `sid` wins over the `sub` most providers also send, or session-scoped logout could not be asked
+ * for; only a token without one ends every session. Forward-auth sessions outlive CPM's and carry
+ * no `sid`, so all of the user's go either way.
  */
 export async function revokeSessionsForLogoutToken(
   target: RevocationTarget,

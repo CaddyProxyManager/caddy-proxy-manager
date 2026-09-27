@@ -11,19 +11,18 @@ import type {
   PowerSearchFilter,
 } from "@astryxdesign/core/PowerSearch";
 
-/** One filter the list understands. Its value lives in the query string under `param`. */
+/** Its value lives in the query string under `param`. */
 export type UrlSearchField = {
   param: string;
   label: string;
 } & (
   | /** Free text, matched across several columns. The first one is what typing alone searches. */
   { kind: "text" }
-  /** One exact value, typed. */
   | { kind: "exact" }
   | { kind: "enum"; values: ReadonlyArray<EnumItem> }
 );
 
-// Astryx ships these operator labels in every locale it has, so they need no catalog entries here.
+// Astryx ships these labels in every locale; no catalog entries needed.
 const CONTAINS = { key: "contains", i18nKey: "@astryx.powersearch.operator.contains" } as const;
 const IS = { key: "is", i18nKey: "@astryx.powersearch.operator.is" } as const;
 
@@ -75,10 +74,8 @@ function filtersFromUrl(
 }
 
 /**
- * A list's search box as structured filters, for lists that can be narrowed on more than one column.
- *
- * The query string stays the source of truth - the server page reads it, and a filtered view can be
- * linked - so each field is one parameter, and a second token on the same field replaces the first.
+ * The query string stays the source of truth (server-read, linkable): one parameter per field, so a
+ * second token on a field replaces the first.
  */
 export function UrlPowerSearch({
   name,
@@ -88,13 +85,13 @@ export function UrlPowerSearch({
   resultCount,
   width = 640,
 }: {
-  /** Identifies the config to Astryx; never shown. */
+  /** Never shown. */
   name: string;
   fields: ReadonlyArray<UrlSearchField>;
   label: string;
   placeholder: string;
   resultCount?: number;
-  /** Wider than a plain search box by default: tokens and the result count share the row. */
+  /** Wide by default: tokens and the result count share the row. */
   width?: number | string;
 }) {
   const router = useRouter();
@@ -103,8 +100,7 @@ export function UrlPowerSearch({
   const query = searchParams.toString();
   const [filters, setFilters] = useState(() => filtersFromUrl(fields, new URLSearchParams(query)));
 
-  // Back/forward and links change the URL under the component. Reset during render rather than in
-  // an effect, which would need `fields` - a new array every render - as a dependency.
+  // Reset in render, not an effect, which would depend on `fields` - a new array every render.
   const [syncedQuery, setSyncedQuery] = useState(query);
   if (syncedQuery !== query) {
     setSyncedQuery(query);
@@ -140,8 +136,7 @@ export function UrlPowerSearch({
       startIcon={<Search />}
       resultCount={resultCount}
       tokenOverflowBehavior="unfocusedInline"
-      // Astryx's table pulls itself up by its cell padding, which swallows the page's gap and leaves
-      // the bar touching the column headers.
+      // Astryx's table pulls itself up by its cell padding, swallowing the gap.
       style={{ width, maxWidth: "100%", marginBottom: "var(--spacing-4)" }}
     />
   );

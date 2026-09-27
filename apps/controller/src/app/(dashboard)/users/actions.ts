@@ -149,11 +149,7 @@ async function deleteUserActionUntranslated(userId: number) {
   revalidatePath("/users");
 }
 
-/*
- * Failures here used to reach the browser as an unhandled rejection and show the reader nothing.
- * They return an ActionState now, translated on the server, which UsersClient renders - the same
- * shape the proxy-host and L4 actions already use.
- */
+/* Failures return a translated ActionState, or the browser gets an unhandled rejection. */
 
 export async function createUserAction(formData: FormData): Promise<ActionState> {
   try {
@@ -216,10 +212,7 @@ export async function deleteUserAction(userId: number): Promise<ActionState> {
   }
 }
 
-/**
- * For someone who lost their authenticator and backup codes. Their sessions go too: the reset
- * often follows a lost or stolen device, and is a clean point to sign in fresh.
- */
+/** Sessions go too: the reset often follows a lost or stolen device. */
 async function resetUserTwoFactorActionUntranslated(userId: number) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);

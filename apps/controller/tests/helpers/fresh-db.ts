@@ -7,23 +7,9 @@ export type ReloadedDb = {
 };
 
 /**
- * Re-evaluate the database layer against whatever DATABASE_URL currently says.
- *
- * Three modules have to move together. src/lib/db/schema.ts picks its dialect's tables from
- * DATABASE_URL, src/lib/db/connection.ts creates the driver (and refuses a schema of the other
- * dialect), and src/lib/db.ts runs the migrations. Putting a `?fresh=` suffix on db.ts alone reuses
- * the cached connection and schema, so the "reloaded" module would still be pointed at whichever
- * database the very first import opened, holding that dialect's tables.
- *
- * All three are re-evaluated here, in dependency order, and the plain specifiers are pointed at the
- * new copies so the live bindings other modules already read through are rewritten too.
- *
- * The returned namespaces are the authoritative ones for the caller. Prefer them over importing the
- * plain specifier afterwards: `vi.mock` is global and last-write-wins, so a later reload in the same
- * file (a test covering more than one backend) would move the plain specifier out from under you.
- *
- * Callers must set process.env.DATABASE_URL and clear the __DRIZZLE_DB__ / __DB_CLIENT__ /
- * __MIGRATIONS_RAN__ globals before calling.
+ * Reloads schema, connection and db together (db alone keeps the cached connection) and repoints
+ * the plain specifiers. Prefer the returned namespaces: a later reload moves the plain ones. Set
+ * DATABASE_URL and clear __DRIZZLE_DB__/__DB_CLIENT__/__MIGRATIONS_RAN__ first.
  */
 export async function reloadDbModule(): Promise<ReloadedDb> {
   const schema = (await import(

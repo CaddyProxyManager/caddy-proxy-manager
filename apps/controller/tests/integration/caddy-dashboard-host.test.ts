@@ -1,12 +1,6 @@
 /**
- * What buildCaddyDocument emits for the dashboard CPM serves itself.
- *
- * The unit tests cover the row's shape. What only shows up here is whether that row reaches the
- * document at all, and what happens when a stored host claims the same domain: routes are sorted
- * by host specificity, and two rows naming the same exact domain tie, so the managed one has to be
- * the one Caddy reaches first. Otherwise a host somebody creates for the dashboard's domain would
- * shadow the route the dashboard is reached through - and the page that would undo that mistake is
- * the one that stops answering.
+ * Whether the dashboard row reaches the document, and that it wins a tie with a stored host on the
+ * same exact domain - otherwise that host would shadow the route the operator needs to undo it.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -194,9 +188,8 @@ describe('the dashboard host in the generated config', () => {
 
     const order = hostsInOrder((await buildCaddyDocument()) as CaddyDocument);
 
-    // Two different exact domains never compete for a request, so their relative order is the
-    // specificity sort's business and not something this feature should assert. What matters is
-    // that adding the managed host did not displace anything.
+    // Distinct exact domains never compete, so their order is the specificity sort's business;
+    // what matters is that the managed host displaced nothing.
     expect(order).toContain('app.example.com');
     expect(order).toContain('cpm.example.com');
     expect(upstreamDials((await buildCaddyDocument()) as CaddyDocument)).toContain('backend:8080');

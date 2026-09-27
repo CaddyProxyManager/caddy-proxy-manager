@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { fresh } from '@/tests/helpers/fresh';
 
-// Reset the module between tests so the in-memory Map is cleared
+// Reloaded per test so the in-memory Map is cleared.
 let registerFailedAttempt: typeof import('@/src/lib/rate-limit').registerFailedAttempt;
 let isRateLimited: typeof import('@/src/lib/rate-limit').isRateLimited;
 let resetAttempts: typeof import('@/src/lib/rate-limit').resetAttempts;
@@ -57,12 +57,10 @@ describe('rate-limit', () => {
   });
 
   it('blocked entry unblocks after blockedUntil passes', async () => {
-    // Trigger block
     for (let i = 0; i < 5; i++) {
       await registerFailedAttempt(KEY);
     }
 
-    // Mock Date.now to be far in the future (past block window)
     const future = Date.now() + 16 * 60 * 1000; // 16 minutes
     vi.spyOn(Date, 'now').mockReturnValue(future);
 
@@ -71,16 +69,13 @@ describe('rate-limit', () => {
   });
 
   it('window expires without max attempts resets attempts', async () => {
-    // Make a few attempts
     for (let i = 0; i < 3; i++) {
       await registerFailedAttempt(KEY);
     }
 
-    // Jump past the window (default 5 minutes)
     const future = Date.now() + 6 * 60 * 1000;
     vi.spyOn(Date, 'now').mockReturnValue(future);
 
-    // Now should be treated as first attempt
     const result = await registerFailedAttempt(KEY);
     expect(result.blocked).toBe(false);
   });
@@ -108,8 +103,7 @@ describe('rate-limit', () => {
   });
 });
 
-// Regression (H5): the only brute-force limit was keyed on a client-chosen header, so rotating it
-// gave unlimited guesses against one account.
+// Regression (H5): a limit keyed only on a client-chosen header allowed unlimited guesses.
 describe('per-account backoff', () => {
   let mod: typeof import('@/src/lib/rate-limit');
 
@@ -135,7 +129,7 @@ describe('per-account backoff', () => {
 
     for (let i = 0; i < 40; i++) mod.registerAccountFailure(account, t0);
     expect(mod.accountRetryAfterMs(account, t0)).toBe(mod.ACCOUNT_MAX_DELAY_MS);
-    // Capped, not permanent: the owner can always try again once the delay passes.
+    // Capped, not permanent, so the owner is never locked out for good.
     expect(mod.accountRetryAfterMs(account, t0 + mod.ACCOUNT_MAX_DELAY_MS)).toBe(0);
   });
 

@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update user avatar
     const updatedUser = await updateUserProfile(userId, {
       avatarUrl: avatarUrl,
     });
@@ -46,7 +45,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("auth.apiErrors.userNotFound") }, { status: 404 });
     }
 
-    // Audit log
     await createAuditEvent({
       userId,
       action: avatarUrl ? "avatar_updated" : "avatar_deleted",

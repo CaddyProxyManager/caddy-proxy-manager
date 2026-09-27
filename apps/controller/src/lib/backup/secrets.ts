@@ -22,7 +22,7 @@ function mapStrings(input: unknown, map: (text: string) => string): unknown {
   return input;
 }
 
-/** Applies `map` to a column value and, when the value is JSON text, to every string inside it. */
+/** Also to every string inside JSON text. */
 function mapTextColumn(value: string, needle: string, map: (text: string) => string): string {
   if (!value.includes(needle)) return value;
   const whole = map(value);

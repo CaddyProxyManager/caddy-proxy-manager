@@ -68,9 +68,8 @@ t_matches "ip_hash keeps one client on one upstream" '^origin-[ab]$' "$seen"
 
 # ── Health checking ─────────────────────────────────────────────────────────
 #
-# One real upstream and one that refuses connections. Active health checks must
-# notice and stop sending traffic to the dead one; without them, roughly half
-# the requests would fail.
+# One real upstream and one refusing connections; without health checks roughly half the
+# requests would fail.
 
 hc=$(domain_for "lb-health")
 create_host_or_fail "a health-checked host can be created" "$(jq -nc --arg d "$hc" '{

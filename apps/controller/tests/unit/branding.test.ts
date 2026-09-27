@@ -1,9 +1,6 @@
 /**
- * Favicon validation.
- *
- * The load-bearing part is type sniffing. The stored type is what the favicon route hands back as
- * `Content-Type`, and the browser's claim about an upload is attacker-controlled - so a file that
- * could be stored as one thing and served as another is the bug worth pinning here.
+ * Favicon type sniffing: the stored type becomes the route's Content-Type, and the browser's claim
+ * about an upload is attacker-controlled.
  */
 import { describe, expect, it } from 'bun:test';
 import { MAX_FAVICON_BYTES, sniffFaviconType } from '@/src/lib/branding';
@@ -40,8 +37,7 @@ describe('favicon type sniffing', () => {
   });
 
   it('refuses a file that is not an image', () => {
-    // The case that matters: something the browser is willing to call an image, whose bytes are a
-    // document. It is refused on its bytes, so the claim never reaches the route's Content-Type.
+    // Claimed as an image, bytes of a document: refused on its bytes.
     expect(
       sniffFaviconType(new TextEncoder().encode('<html><script>alert(1)</script>')),
     ).toBeNull();
@@ -63,8 +59,7 @@ describe('favicon type sniffing', () => {
   });
 
   it('caps the upload well under the server action body limit', () => {
-    // next.config.mjs allows 2 MB per action. The cap has to be below it, or the failure an
-    // operator sees is a framework rejection with no message rather than ours.
+    // Below next.config.mjs's 2 MB action limit, or the framework rejects it with no message.
     expect(MAX_FAVICON_BYTES).toBeLessThan(2 * 1024 * 1024);
   });
 });

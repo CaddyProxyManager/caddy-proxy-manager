@@ -21,7 +21,6 @@ test.describe
       // whoami-server listens on port 80 by default
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
-      // Fill in the path prefix rewrite field
       await page.getByLabel('Path Prefix Rewrite').fill('/api');
 
       await turnOffForceHttps(page);

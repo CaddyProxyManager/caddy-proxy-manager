@@ -6,8 +6,7 @@ services:
       context: .
       dockerfile: docker/web/Dockerfile
       args:
-        # User and group IDs for rootless operation
-        # Match your host user to avoid permission issues: id -u / id -g
+        # Rootless; match your host user (id -u / id -g) to avoid permission issues.
         PUID: ${PUID:-10001}
         PGID: ${PGID:-10001}
     restart: unless-stopped
@@ -22,44 +21,30 @@ services:
 
       # Only used with no agent. Caddy's name on the internal caddy-admin network; see caddy below.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
-      # Pinned as admin.listen into a config loaded with no agent in between, as the agent pins every
-      # config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
+      # Pinned as admin.listen when no agent does it. Must match caddy's CADDY_ADMIN_LISTEN.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
-      # Re-apply this controller's config to a Caddy that drifted from it. A Settings field; this is
-      # the first-start default. Off only on a controller sharing a Caddy it does not own.
+      # First-start default of a Settings field. Off only when sharing a Caddy this does not own.
       CADDY_MONITOR_ENABLED: ${CADDY_MONITOR_ENABLED:-true}
 
       # Where generated certificates are written. Defaults to <workdir>/data/certs.
       CERTS_DIRECTORY: ${CERTS_DIRECTORY:-}
 
-      # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
-      # PostgreSQL, unless DATABASE_URL names a SQLite file. Passed as discrete fields rather than
-      # folded into a URL: the password arrives here by interpolation and nothing encodes it, so a
-      # `/` in it used to end the URL's authority early and the app would try to connect to a host
-      # nobody configured. As fields there is no delimiter to collide with.
-      # Defaulted, not hard-coded: the bundled `postgres` service is what these point at when the
-      # operator sets nothing, and overriding them is how you point the app at a server of your
-      # own. Hard-coding the host and port would have left DATABASE_URL as the only way to do that,
-      # which is exactly the escape hatch these fields exist to avoid needing.
+      # Fields, not a URL: the interpolated password is never encoded, so a `/` in it would end the
+      # URL's authority early. Defaulted to the bundled service; override to use your own server.
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-cpm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
-      # Empty rather than `false`: the app reads an unset value as off, and `${VAR:-}` is what
-      # Compose produces for a variable nobody set.
       POSTGRES_SSL: ${POSTGRES_SSL:-}
 
-      # Overrides all of the above when set, for a server that needs something a URL can say and
-      # the fields cannot - an sslmode, a search_path, a connection option. Remember that a
-      # password inside a URL has to be percent-encoded. `file:/app/data/cpm.db` uses SQLite
-      # instead. A pre-3.0 SQLite file is migrated through the in-app flow, not by pointing this at it.
+      # Overrides the fields, for options only a URL can say; percent-encode its password.
+      # `file:/app/data/cpm.db` is SQLite. A pre-3.0 file is migrated in-app, not pointed at here.
       DATABASE_URL: ${DATABASE_URL:-}
 
-      # Connections the database pool may open. The real default, not `${VAR:-}`: it is read as
-      # Number(), which turns the empty string that form produces into 0.
+      # The real default, not `${VAR:-}`: Number("") is 0.
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
 
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
@@ -67,10 +52,8 @@ services:
       # Renames the app in the sidebar, login card, and page titles.
       APP_NAME: ${APP_NAME:-}
 
-      # Seeds the managed dashboard host that setup turns on, so CPM proxies its own dashboard.
-      # Read once, at the end of setup: after that the stored setting is what the route is built
-      # from, and this line only matters again on a fresh database. Left unset, setup falls back to
-      # the hostname in BASE_URL. Caddy reads the same variable for its placeholder site.
+      # Seeds the managed dashboard host once, at the end of setup (default: BASE_URL's hostname);
+      # after that the stored setting wins. Caddy reads it for its placeholder site.
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
 
       # Users without an icon fall back to Gravatar, which their browser fetches directly.
@@ -80,11 +63,8 @@ services:
       # Simulate Caddy and the agent instead of configuring anything. See .env.example.
       DEMO_MODE: ${DEMO_MODE:-false}
 
-      # Optional. Compose always sets these, to the empty string when .env names neither; the app
-      # trims and reads blank as absent, which means first-run setup creates the administrator in
-      # the browser instead. Setting both seeds one at startup and skips that flow; in production
-      # the password must then be 12+ chars with upper, lower, digit and special, or it refuses to
-      # start.
+      # Blank: first-run setup creates the admin in the browser. Both set seeds one at startup;
+      # in production the password then needs 12+ chars with upper, lower, digit and special.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
@@ -92,8 +72,7 @@ services:
       AUTH_ALLOW_SELF_REGISTRATION: ${AUTH_ALLOW_SELF_REGISTRATION:-false}
       AUTH_ALLOW_OAUTH_REGISTRATION: ${AUTH_ALLOW_OAUTH_REGISTRATION:-false}
 
-      # Let the IdP's claims set a new user's role/status. When false, OAuth-created
-      # accounts are forced to user/active no matter what the IdP sends.
+      # When false, OAuth-created accounts are user/active whatever the IdP's claims say.
       AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS: ${AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS:-false}
 
       # OIDC-only: no local accounts and no bootstrap admin. Enable only once OAuth works.
@@ -102,8 +81,7 @@ services:
       # Only behind a proxy that rewrites Host, and only when BASE_URL cannot cover it.
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-false}
 
-      # Force a reset for users still on a pre-argon2id bcrypt hash. Leave empty to let
-      # the Settings -> Security toggle decide; setting it here locks that toggle.
+      # Force a reset for pre-argon2id bcrypt hashes. Setting it locks the Settings toggle.
       AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH: ${AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH:-}
 
       # Better Auth request rate limiting, and the separate login throttle.
@@ -126,8 +104,8 @@ services:
       OAUTH_ALLOW_AUTO_LINKING: ${OAUTH_ALLOW_AUTO_LINKING:-false}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-}
 
-      # Group-based roles. Either name each role's groups below (comma-separated, any one
-      # grants it), or set a prefix to derive <prefix>Admin, <prefix>User and <prefix>Viewer.
+      # Name each role's groups (comma-separated, any one grants it), or set a prefix to derive
+      # <prefix>Admin, <prefix>User and <prefix>Viewer.
       OAUTH_ROLE_MAPPING: ${OAUTH_ROLE_MAPPING:-false}
       OAUTH_GROUPS_CLAIM: ${OAUTH_GROUPS_CLAIM:-}
       OAUTH_GROUP_PREFIX: ${OAUTH_GROUP_PREFIX:-}
@@ -138,33 +116,25 @@ services:
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
-      # Update checking. A Settings toggle, so these are only a first-start default; the repository
-      # is the image namespace this deployment pulls from, which a fork changes to its own.
+      # First-start defaults of Settings fields. A fork sets the repository to its own namespace.
       UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-true}
       UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/silentspud/caddy-proxy-manager}
 
-      # Optional analytics and GeoIP. Both are Settings toggles now: a stored value wins over the
-      # variable, and the agent starts or stops ClickHouse to match - so neither the profile nor
-      # these need setting on a stack with an agent. They remain for a first start, and for a
-      # deployment with no agent, where Docker is the only thing that can start ClickHouse.
-      # Unset means "decide from whether the credentials below are configured", which is what
-      # earlier releases did.
+      # Settings toggles; the agent starts ClickHouse to match, so these matter only for a first
+      # start or a deployment with no agent. Unset decides from whether the credentials are set.
       ANALYTICS_ENABLED: ${ANALYTICS_ENABLED:-}
       GEOIP_ENABLED: ${GEOIP_ENABLED:-}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
-      # Days of analytics kept before deletion.
       CLICKHOUSE_RETENTION_DAYS: ${CLICKHOUSE_RETENTION_DAYS:-30}
-      # MaxMind credentials for the GeoLite2 databases, which the controller downloads onto its data
-      # volume itself. Prefer Settings → GeoIP, where the licence key is encrypted at rest.
+      # Prefer Settings -> GeoIP, where the licence key is encrypted at rest.
       GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID:-}
       GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
-      # Hours between checks for newer databases. A Settings field; this is a first-start default.
       GEOIP_UPDATE_INTERVAL_HOURS: ${GEOIP_UPDATE_INTERVAL_HOURS:-24}
 
-      # Settings fields with a first-start default here, like the ones above.
+      # First-start defaults of Settings fields.
       FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       # Variables that override a stored value, for getting back into a locked-out instance.
@@ -177,12 +147,10 @@ services:
     volumes:
       # Also holds the GeoLite2 databases, under geoip/.
       - caddy-manager-data:/app/data
-      # Caddy's logs are read by the agent now, not here. Still mounted because the controller
-      # generates the log configuration and an operator reaching for them expects them present.
+      # The agent reads these; kept because an operator reaching for the logs expects them here.
       - caddy-logs:/logs
       - acme-ca:/acme-ca
-    # Not on Caddy: the agent starts Caddy once it is paired, so waiting for it here would hold the
-    # controller down until an agent that needs the controller to pair had somehow paired.
+    # Not on Caddy: the agent starts it after pairing, which needs this controller up.
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,11 +180,8 @@ services:
         # Match your host user to avoid permission issues: id -u / id -g
         PUID: ${PUID:-10000}
         PGID: ${PGID:-10000}
-    # Behind a profile so `docker compose up` does not start it. The agent does, once it is paired
-    # and the controller has a configuration to serve - an unpaired host must not answer 80 and 443
-    # with a default page. The agent also stops it when the agent itself is stopped, and starts it
-    # again as soon as it comes back with a pairing - before the controller answers, so a reboot
-    # with the controller unreachable still serves. `restart: unless-stopped` covers a crash.
+    # Profiled so `docker compose up` skips it: the agent starts it once paired, so an unpaired
+    # host does not answer 80 and 443, and again on its own restart before the controller answers.
     profiles: ["caddy"]
     restart: unless-stopped
     ports:
@@ -229,22 +194,17 @@ services:
       # - "9090:9090"
     environment:
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-caddyproxymanager.com}
-      # What the Caddyfile binds the admin API to until the first config arrives: a name only the
-      # caddy-admin network resolves. The agent's CADDY_ADMIN_LISTEN and the healthcheck match it.
+      # The admin bind until the first config: a name only caddy-admin resolves. The agent's
+      # CADDY_ADMIN_LISTEN and the healthcheck match it.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
     volumes:
       - caddy-data:/data
       - caddy-config:/config
-      # A bind mount in place of this volume must be readable as well as writable by caddy's
-      # PUID/PGID. Caddy's log roller lists the directory to gzip and prune old rolled files; if the
-      # permission class caddy falls into has w+x but no r (e.g. "other" on a 0773 dir that caddy
-      # neither owns nor shares a group with), rotation keeps working but cleanup silently stops
-      # and the disk fills. On the host: chgrp <PGID> <host-dir> && chmod 2770 <host-dir>
+      # A bind mount here needs r as well as w+x for caddy, or log rotation silently stops pruning
+      # and the disk fills: chgrp <PGID> <host-dir> && chmod 2770 <host-dir>
       - caddy-logs:/logs
-      # The agent's copy of the MaxMind databases: the agent fetches them from the controller onto
-      # its own volume, which it can write without running as root. Only the geoip subdirectory, and
-      # read-only - the rest of that volume holds the agent's pairing secrets. A volume subpath needs
-      # Docker Engine 26 or later.
+      # The agent's GeoIP copy. Only geoip/, read-only: the rest of that volume holds the agent's
+      # pairing secrets. A volume subpath needs Docker Engine 26+.
       - type: volume
         source: agent-data
         target: /usr/share/GeoIP
@@ -255,8 +215,7 @@ services:
     networks:
       # Where users attach the containers Caddy proxies to.
       caddy-network: {}
-      # The admin API's only bind. The alias exists on this network alone, so the name resolves to
-      # this address and an upstream on caddy-network cannot reach the API.
+      # The alias exists here alone, so an upstream on caddy-network cannot reach the API.
       caddy-admin:
         aliases:
           - caddy-admin
@@ -268,32 +227,28 @@ services:
       retries: 3
       start_period: 10s
 
-  # Narrows the Docker API the agent can call; not a security boundary. It matches URL prefixes and
-  # never sees a body, so the container create that recreates Caddy could as well ask for a
-  # privileged container with / bind-mounted: whatever drives the agent is root on this host. The
-  # real controls are the agent validating what it is told and staying minimal. See SECURITY.md.
+  # Not a security boundary: it matches URL prefixes and never sees a body, so whatever drives the
+  # agent is root on this host. The real control is the agent validating input. See SECURITY.md.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
     image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     restart: unless-stopped
     environment:
-      # Each grant is used by the agent's compose calls. Containers: create, start, stop and inspect
-      # caddy and clickhouse. Networks: compose inspects them on every up. Volumes and images: a
-      # managed service's first start creates its volume and pulls its image.
+      # All used by the agent's compose: networks are inspected on every up, and a managed
+      # service's first start creates its volume and pulls its image.
       CONTAINERS: 1
       POST: 1
       NETWORKS: 1
       VOLUMES: 1
       IMAGES: 1
       SECRETS: 0
-      # Recompiling Caddy: BuildKit's gRPC API and the session that streams the build context, both
-      # piped to the socket unfiltered once matched (see the mounted config). Set both 0 to disable
-      # the "Rebuild Caddy" button; everything else keeps working.
+      # BuildKit, for "Rebuild Caddy"; piped unfiltered once matched (see the mounted config).
+      # Both 0 disables only that button.
       GRPC: 1
       SESSION: 1
       # On in the image's defaults; nothing the agent runs reads the event stream.
       EVENTS: 0
-      # Deny everything else by default. BUILD is the legacy builder, which cannot build Caddy's image.
+      # BUILD is the legacy builder, which cannot build Caddy's image.
       BUILD: 0
       EXEC: 0
       SWARM: 0
@@ -305,63 +260,46 @@ services:
     networks:
       - socket-proxy
 
-  # Recreates the caddy container for the two changes a reload cannot apply:
-  # L4 port changes and Caddy module selection.
   agent:
     container_name: caddy-proxy-manager-agent
     image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
-    # The agent stops Caddy before it exits, and allows that 40 seconds; Docker's default of 10
-    # would kill it part-way through.
+    # It allows stopping Caddy 40s on exit; Docker's default 10s would kill it part-way.
     stop_grace_period: 1m
     build:
       context: .
       dockerfile: docker/agent/Dockerfile
       args:
-        # The agent's own user. Not PUID/PGID, which already mean two different users to web and
-        # caddy.
+        # Not PUID/PGID, which already mean two different users to web and caddy.
         PUID: ${AGENT_PUID:-10002}
         PGID: ${AGENT_PGID:-10002}
     restart: unless-stopped
     environment:
       DATA_DIR: /data
-      # The controller's volume, read-only: the bootstrap token it leaves for this agent, and - once,
-      # on upgrade - the state agents kept there before they had a volume of their own.
+      # Read-only: the bootstrap token, and once, on upgrade, state agents kept there before.
       CONTROLLER_DATA_DIR: /controller-data
       COMPOSE_DIR: /compose
       AGENT_MODE: ${AGENT_MODE:-standalone}
-      # Where the agent dials to reach its controller. The compose service name works for an agent
-      # in this stack; an agent on another host needs the controller's reachable address instead,
-      # and pairs with `docker exec -it <agent> cpm-agent --pair --host <that address> --code <code>`,
-      # confirming the controller name it shows.
+      # An agent on another host needs the controller's reachable address, and pairs with
+      # `docker exec -it <agent> cpm-agent --pair --host <that address> --code <code>`.
       CONTROLLER_URL: ${CONTROLLER_URL:-http://web:3000}
-      # Plain http to a controller address that is not private (loopback, a compose name, RFC 1918,
-      # a tailnet) is refused, because pairing sends the shared secret over it. true accepts that.
+      # Plain http to a non-private address is refused: pairing sends the shared secret over it.
       CONTROLLER_ALLOW_INSECURE_HTTP: ${CONTROLLER_ALLOW_INSECURE_HTTP:-false}
-      # Every Caddy admin call the controller makes is proxied through the agent, because the
-      # agent is the only thing that knows where its Caddy is. This is that address.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
-      # Pinned as admin.listen into every config the agent forwards, since the controller's own admin
-      # block binds every interface, caddy-network included. Must match caddy's CADDY_ADMIN_LISTEN.
+      # The controller's admin block binds every interface, caddy-network included, so the agent
+      # pins this into every config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
-      # Analytics: the agent parses this host's Caddy logs and relays the events to the controller,
-      # which writes them. Nothing to configure here - the controller decides whether analytics are
-      # on at all.
-      # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
-      # Seconds before starting clickhouse on the controller's behalf is abandoned. Generous: its
-      # first start pulls the image.
+      # Generous: clickhouse's first start pulls the image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
-      # What the services the agent runs interpolate. It never reads .env, which holds
-      # SESSION_SECRET and POSTGRES_PASSWORD, so these are forwarded from it here instead. A variable
-      # an override file interpolates into caddy or clickhouse belongs here too.
+      # The agent never reads .env (it holds the secrets), so what caddy and clickhouse
+      # interpolate, including from an override file, is forwarded here.
       PUID: ${PUID:-}
       PGID: ${PGID:-}
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-    # The agent runs as its own user, so it reaches other containers' files through their groups.
     group_add:
       # Caddy's, to read its logs and truncate the WAF audit log. Must match caddy's PGID.
       - "${CADDY_GID:-10000}"
@@ -371,14 +309,11 @@ services:
       # Its database, socket and compose overrides, and the GeoIP databases Caddy mounts from here.
       - agent-data:/data
       - caddy-manager-data:/controller-data:ro
-      # The directory, because a single-file mount of an override that does not exist would create a
-      # directory on the host. .env stays unread (--env-file /dev/null; keep it 0600), but anything
-      # else here that other users can read - an override file, .git - the agent can read.
+      # The directory: a single-file mount of a missing override creates a directory on the host.
+      # .env stays unread (keep it 0600), but the agent can read anything else others can.
       - .:/compose:ro
-      # Caddy's access and WAF logs, which this container is the one that reads.
       - caddy-logs:/logs
-    # No longer waits on Caddy: the agent is what starts Caddy, so depending on it was a deadlock
-    # the moment Caddy stopped being started by compose.
+    # Never on Caddy: the agent is what starts it, so waiting on it deadlocks.
     depends_on:
       docker-socket-proxy:
         condition: service_started
@@ -389,10 +324,8 @@ services:
       # Egress, for a controller on another host.
       - caddy-network
 
-  # The controller's database. No profile, so it runs even when DATABASE_URL picks SQLite: the
-  # default stack should not depend on a variable to have a database. Unpublished on purpose -
-  # nothing outside the compose network needs it, and publishing 5432 is how a database ends up on
-  # the internet.
+  # No profile, so the default stack has a database without setting a variable. Unpublished on
+  # purpose: publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
     image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
@@ -401,11 +334,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
       POSTGRES_USER: ${POSTGRES_USER:-cpm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
-    # The parent directory, as the 18+ images expect: the cluster lives in a versioned
-    # subdirectory (18/docker), so a later major can sit beside it for `pg_upgrade --link`.
-    # A volume still holding a 17 cluster at its root makes this refuse to start rather than
-    # initialise an empty database next to it - the upgrade is a dump and restore, see
-    # "Upgrading from PostgreSQL 17" in the README.
+    # The parent directory, as 18+ expects (the cluster is in 18/docker). A 17 cluster at the root
+    # refuses to start; see "Upgrading from PostgreSQL 17" in the README.
     volumes:
       - postgres-data:/var/lib/postgresql
     networks:
@@ -417,9 +347,8 @@ services:
       retries: 5
       start_period: 30s
 
-  # Optional. The profile is what keeps it out of a plain `docker compose up`; the agent enables it
-  # per-invocation with `--profile clickhouse` when Settings → Analytics asks for it, so listing it
-  # in COMPOSE_PROFILES is only needed on a deployment with no agent.
+  # The agent passes `--profile clickhouse` when Settings -> Analytics asks for it;
+  # COMPOSE_PROFILES is needed only with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
     image: clickhouse/clickhouse-server:26.8.12.53-alpine@sha256:7f30b4a043809529fde991aaab4c35bba2c9b167b2a5653df8c9694f30329b20
@@ -428,12 +357,8 @@ services:
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
-      # `:-` rather than `:?`, because the agent supplies this from the Settings page by putting it
-      # in the environment of the `docker compose` it runs - and interpolation happens while this
-      # file is parsed, so a `:?` here fails every invocation that so much as mentions the project,
-      # `stop` included, on a deployment that keeps its password in the database instead of .env.
-      # An empty value still cannot start ClickHouse; the controller refuses to enable analytics
-      # without one, which is where that check now lives.
+      # Not `:?`: interpolation runs on every invocation naming the project, and a deployment may
+      # keep this in the database. The controller refuses to enable analytics without one.
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       # No CREATE USER, GRANT or ROLE: the controller needs only table DDL, and nothing but the
       # controller holds this account.
@@ -444,8 +369,7 @@ services:
     networks:
       - analytics
     healthcheck:
-      # Expanded by the container's shell, so the password stays out of the healthcheck command
-      # `docker inspect` prints.
+      # Expanded by the container's shell, so `docker inspect` does not print the password.
       test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
       interval: 30s
       timeout: 10s
@@ -459,23 +383,18 @@ services:
 networks:
   caddy-network:
     driver: bridge
-    # Dual-stack. Without this Docker gives the network IPv4 only, and a proxy host with an IPv6
-    # upstream has no route to it however the containers themselves are configured.
+    # Otherwise IPv4 only, and an IPv6 upstream has no route.
     enable_ipv6: true
-  # Caddy's admin API, web and the agent. Internal, like the two after it: nothing on them needs
-  # egress, and a container on caddy-network cannot reach them.
+  # Internal, like the rest: nothing on them needs egress, and caddy-network cannot reach them.
   caddy-admin:
     driver: bridge
     internal: true
-  # PostgreSQL and web.
   database:
     driver: bridge
     internal: true
-  # ClickHouse and web, which writes to it and reads it. Agents relay their events through web.
   analytics:
     driver: bridge
     internal: true
-  # The agent's route to the Docker API; internal, with no external connectivity.
   socket-proxy:
     driver: bridge
     internal: true

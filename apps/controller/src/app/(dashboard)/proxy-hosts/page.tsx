@@ -47,8 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
-  // An operator reaches this page too; what they see on it is decided per host. Null from
-  // visibleIdFilter is an admin - no restriction - which is why it is not `?? []`.
+  // Operators see hosts per grant. Null from visibleIdFilter means admin, hence not `?? []`.
   const access = await requireAccess();
   const visible = visibleIdFilter(access, "proxyHost");
   const visibleIds = visible === null ? null : [...visible];
@@ -59,8 +58,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     sortDir: sortDirParam,
     state: stateParam,
   } = await searchParams;
-  // The list tabs are a filter on the query, not on the page that came back: filtering client-side
-  // would make "Disabled 2" show nothing whenever both disabled hosts sat on a later page.
+  // Filtered in the query: client-side, "Disabled 2" shows nothing when both sit on a later page.
   const enabled = stateParam === "enabled" ? true : stateParam === "disabled" ? false : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
@@ -68,8 +66,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const sortBy = sortByParam || undefined;
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
-  // One round trip for everything that does not depend on which hosts came back. The header
-  // counts the whole (visible, searched) set rather than this page.
+  // The header counts the whole visible, searched set, not this page.
   const [
     hosts,
     total,
@@ -82,7 +79,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     tailscaleSettings,
     generalSettings,
     agents,
-    // These are safe to fail if the RBAC migration hasn't been applied yet
+    // Safe to fail before the RBAC migration has run.
     mtlsRoles,
     issuedClientCerts,
     allUsers,
@@ -109,10 +106,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listCrsPlugins(),
   ]);
 
-  // Only the hosts on this page: the map is for the edit dialog, and loading the fleet's whole
-  // assignment table to fill in twenty-five rows would grow with the deployment for no gain.
-  // The traffic column is best-effort: with analytics off or unreachable, `available` is false and
-  // the column is dropped instead of the list failing.
+  // Assignments for this page's hosts only, not the fleet. Traffic is best-effort: unavailable
+  // analytics drops the column instead of failing the list.
   const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
   const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
   const [assignments, traffic, faAccessEntries] = await Promise.all([
@@ -125,7 +120,6 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       Math.floor(Date.now() / 1000),
       hosts.map((host) => ({ id: host.id, domains: host.domains })),
     ),
-    // Build forward auth access map for hosts that have CPM forward auth enabled
     Promise.all(faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => []))),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
@@ -164,15 +158,10 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         accessLists={accessLists}
         authentikDefaults={authentikDefaults}
         forwardAuthDefaults={forwardAuthDefaults}
-        // Prefills the domains field of a new host. Empty when setup has not run, which is the
-        // same as having no default: the field simply starts blank.
+        // Empty before setup has run: the field just starts blank.
         defaultDomain={generalSettings?.defaultDomain ?? ""}
-        // Only what the host form needs to warn accurately: whether the feature is on, whether a
-        // key exists at all, and the node a host inherits. Never the key itself.
-        //
-        // Always a value, never null: settings that have never been saved mean Tailscale is off and
-        // no key is stored, which is exactly when the form's warnings matter most. Passing null
-        // there left the fields unable to tell "off" from "not known" and silenced both.
+        // Never the key itself. Never null: unsaved settings mean off with no key, exactly when
+        // the warnings matter, and null cannot tell "off" from "not known".
         tailscaleDefaults={{
           enabled: tailscaleSettings?.enabled ?? false,
           hasAuthKey: (tailscaleSettings?.authKey ?? "").trim().length > 0,

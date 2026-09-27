@@ -68,10 +68,7 @@ const HOSTS: Row[] = [
 
 const AGENTS = { total: 3, connected: 2 };
 
-/**
- * The proxy host list: the real table and tiles, sorting and filtering for real off the query
- * string. In the app the server does both; here this component does, off the rows above.
- */
+/** The real table and tiles; the server sorts and filters in the app, this component does here. */
 function ProxyHostsTableDemoContent() {
   const t = useTranslations("proxyHosts");
   const router = useRouter();
@@ -120,8 +117,7 @@ function ProxyHostsTableDemoContent() {
       id: "domain",
       label: "Domain",
       sortKey: "domain",
-      // The docs column is narrower than the app's, so protections ride under the domain here
-      // rather than taking a column of their own - every value is still on the row.
+      // The docs column is narrower than the app's, so protections ride under the domain.
       render: (r) => (
         <VStack gap={1}>
           <VStack gap={0}>
@@ -263,10 +259,7 @@ function ProxyHostsTableDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Content goes inside DemoSurface, which provides the message catalog it translates from. */
 export default function ProxyHostsTableDemo() {
   return (
     <DemoSurface>

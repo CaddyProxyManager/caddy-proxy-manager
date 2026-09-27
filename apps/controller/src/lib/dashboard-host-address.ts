@@ -1,20 +1,9 @@
-/**
- * Browser-safe helpers for the dashboard host.
- *
- * dashboard-host.ts reads the server config and resolves DNS, so a client component can import only
- * types from it. Anything the settings page runs in the browser lives here instead, with nothing
- * but a type import back.
- */
+/** Browser-safe: dashboard-host.ts reads server config and resolves DNS. Type imports only. */
 import type { DashboardHostSettings } from "./dashboard-host";
 
 /**
- * The controller address for an agent's pairing command, when the dashboard host gives it one.
- *
- * Only while the host is on: a stored domain with the route switched off is a name nothing answers
- * on. Over HTTPS the bare domain is enough - the agent reads a bare public name as https on 443.
- * Over HTTP it needs the scheme and :80 spelled out, because the agent reads `http://` without a
- * port as the controller's own 3000, which is not where Caddy serves the dashboard. `insecure`
- * flags that case, which an agent refuses for a public address unless told it may.
+ * Only while the host is on. Over HTTP it spells out :80, since the agent reads a portless
+ * `http://` as 3000; `insecure` flags that, which an agent refuses for a public address by default.
  */
 export function pairingHostFor(
   settings: DashboardHostSettings | null,

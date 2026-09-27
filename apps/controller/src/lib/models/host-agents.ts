@@ -1,20 +1,13 @@
 /**
- * Which agents serve which hosts.
- *
- * The rule this file exists to keep in one place: **a host with no assignments is served by every
- * agent**. That is the pre-assignment behaviour, so an upgrade changes nothing, and it is also the
- * only sane reading of "unassigned" - a host nobody has placed still has to be served somewhere,
- * and silently serving it nowhere would take a site down the moment the feature shipped.
- *
- * Assignments name the `agents.id` row rather than the agent's self-asserted `agentId`, because a
- * host is placed on a paired agent an operator picked from a list, and that list is the table.
+ * Keeps one rule in one place: **a host with no assignments is served by every agent**, so
+ * upgrades change nothing and no host is silently served nowhere. Assignments name `agents.id`,
+ * not the self-asserted `agentId`.
  */
 
 import { and, eq, inArray } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { l4ProxyHostAgents, proxyHostAgents } from "../db/schema";
 
-/** Which host table an assignment belongs to. */
 export type HostKind = "http" | "l4";
 
 const TABLES = {
@@ -22,12 +15,7 @@ const TABLES = {
   l4: { table: l4ProxyHostAgents, hostColumn: l4ProxyHostAgents.l4ProxyHostId },
 } as const;
 
-/**
- * Host id → the agent row ids it is pinned to.
- *
- * A host absent from the map has no assignments, which means every agent. Callers must go through
- * {@link servedByAgent} rather than reading the map directly, so that reading lives in one place.
- */
+/** Absent means every agent; read it only through {@link servedByAgent}. */
 export type HostAssignments = Map<number, number[]>;
 
 export async function listHostAssignments(kind: HostKind): Promise<HostAssignments> {
@@ -44,12 +32,7 @@ export async function listHostAssignments(kind: HostKind): Promise<HostAssignmen
   return assignments;
 }
 
-/**
- * Whether `agentRowId` serves this host.
- *
- * `null` for the agent means "no particular agent" - the fleet-wide document a single-agent
- * deployment and every unit test build - and then every host is in.
- */
+/** A `null` agent is the fleet-wide document, which includes every host. */
 export function servedByAgent(
   assignments: HostAssignments,
   hostId: number,
@@ -61,7 +44,7 @@ export function servedByAgent(
   return assigned.includes(agentRowId);
 }
 
-/** The agent row ids one host is pinned to. Empty means every agent. */
+/** Empty means every agent. */
 export async function agentIdsForHost(kind: HostKind, hostId: number): Promise<number[]> {
   const { table, hostColumn } = TABLES[kind];
   const rows = await db
@@ -71,7 +54,7 @@ export async function agentIdsForHost(kind: HostKind, hostId: number): Promise<n
   return rows.map((row) => row.agentId).sort((a, b) => a - b);
 }
 
-/** The same, for a batch of hosts - one query rather than one per row on a list page. */
+/** One query rather than one per row on a list page. */
 export async function agentIdsForHosts(
   kind: HostKind,
   hostIds: number[],
@@ -94,12 +77,8 @@ export async function agentIdsForHosts(
 }
 
 /**
- * Replace a host's assignments.
- *
- * Diffed rather than delete-then-insert: the two run as separate statements here, and a reader
- * between them would see the host as unassigned, which under the rule above means *every* agent -
- * a brief fleet-wide exposure of a host being narrowed to one node. Deleting only what is leaving
- * never passes through that state.
+ * Diffed, not delete-then-insert: a reader between the two would see "unassigned", i.e. every
+ * agent - a brief fleet-wide exposure of a host being narrowed.
  */
 export async function setHostAgents(
   kind: HostKind,
@@ -130,12 +109,7 @@ export async function setHostAgents(
   }
 }
 
-/**
- * Parse an assignment list off a form or API payload.
- *
- * Anything unparseable becomes the empty list, which is "every agent" - the same thing the field
- * being absent means, so an older client that does not know about assignments keeps working.
- */
+/** Unparseable means empty ("every agent"), as absent does, so older clients keep working. */
 export function parseAgentIds(value: unknown): number[] {
   const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   const ids: number[] = [];

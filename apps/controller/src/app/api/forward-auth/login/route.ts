@@ -25,18 +25,15 @@ import {
   resetAttempts,
 } from "@/src/lib/rate-limit";
 
-/** Forward auth login - validates credentials and starts the exchange flow, given a rid. */
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
-    // CSRF: verify the request originates from the CPM portal, on whichever of this instance's own
-    // addresses it was served from.
+    // CSRF: the portal may be served from any of this instance's own addresses.
     if (!(await isPublicOrigin(request.headers.get("origin")))) {
       return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 
-    // Credential sign-in does not exist in OIDC-only mode; the portal falls
-    // back to the provider buttons.
+    // The portal falls back to the provider buttons.
     if (await localUsersDisabled()) {
       return NextResponse.json({ error: t("passwordSignInDisabled") }, { status: 403 });
     }
@@ -60,13 +57,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("tooManyLoginAttempts") }, { status: 429 });
     }
 
-    // Before the password, so a request without a live intent learns nothing about the credentials.
+    // Before the password, so a request without a live intent learns nothing about credentials.
     if (!(await hasLiveRedirectIntent(rid))) {
       return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
     }
 
-    // Unless the host this sign-in is for has opted out, the same gate as the dashboard's: one
-    // solve, one attempt, spent whatever the password turns out to be.
+    // Same gate as the dashboard's unless this host opted out: one solve, one attempt.
     const captchaGated =
       (await getActiveCaptcha()) !== null && (await redirectIntentWantsCaptcha(rid));
     if (
@@ -82,7 +78,6 @@ export async function POST(request: NextRequest) {
       ? { "Set-Cookie": CAPTCHA_PASS_CLEAR_COOKIE }
       : {};
 
-    // Authenticate using the same logic as the credentials provider
     const email = `${username}@localhost`;
     const user = await db.query.users.findFirst({
       where: (table, operators) => operators.eq(table.email, email),
@@ -123,8 +118,7 @@ export async function POST(request: NextRequest) {
     resetAttempts(ip);
     resetAccountFailures(account);
 
-    // The password was right, but it's only half of a sign-in with 2FA on. The intent stays
-    // unspent until the code checks out.
+    // Half a sign-in with 2FA on: the intent stays unspent until the code checks out.
     if (user.twoFactorEnabled) {
       return NextResponse.json(
         { needsSecondFactor: true, challenge: issuePortalChallenge(user.id, rid) },

@@ -20,8 +20,7 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
-  // Outside the try: the catch below answers in the reader's language too. The profile screen and
-  // the forced password change both show `error` as it comes.
+  // Outside the try so the catch answers in the reader's language too; callers show `error` as is.
   const t = await getTranslations();
   try {
     const session = await auth();
@@ -29,8 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("auth.apiErrors.unauthorized") }, { status: 401 });
     }
 
-    // No local passwords exist in OIDC-only mode - setting one would create a
-    // credential path around the IdP.
+    // In OIDC-only mode a local password would be a way in around the IdP.
     if (await localUsersDisabled()) {
       return NextResponse.json(
         { error: t("auth.apiErrors.passwordManagementDisabled") },
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("errors.demoAdminProtected") }, { status: 403 });
     }
 
-    // Rate limit password change attempts to prevent brute-forcing current password
+    // Stops brute-forcing the current password.
     const rateLimitKey = `password-change:${session.user.id}`;
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {
@@ -79,7 +77,6 @@ export async function POST(request: NextRequest) {
 
     const currentSession = await getCurrentSessionInfo(request);
 
-    // If user has a password, verify current password
     if (user.passwordHash) {
       if (!currentPassword) {
         return NextResponse.json(
@@ -97,9 +94,8 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (!isFreshSession(currentSession)) {
-      // A first password is a new way in, and a password lets the IdP be unlinked afterwards - so a
-      // borrowed session must not be enough, as remove-password already insists. With no current
-      // password to ask for, a recent provider sign-in is the proof.
+      // A first password is a new way in (and lets the IdP be unlinked), so a borrowed session is
+      // not enough; with no current password to ask for, a recent provider sign-in is the proof.
       return NextResponse.json(
         {
           error: t("profile.reauthRequiredToSetPassword", {
@@ -111,19 +107,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Password verified successfully - reset rate limit counter
     resetAttempts(rateLimitKey);
 
-    // Hash new password
     const newPasswordHash = await hashPassword(newPassword);
 
-    // Update password
     await updateUserPassword(userId, newPasswordHash);
 
     // A changed password has to end whoever else was signed in with the old one.
     await revokeSessionsAfterPasswordChange(userId, currentSession?.id ?? null);
 
-    // Audit log
     await createAuditEvent({
       userId,
       action: user.passwordHash ? "password_changed" : "password_set",

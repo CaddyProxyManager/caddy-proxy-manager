@@ -1,11 +1,8 @@
 "use server";
 
 /**
- * The first-run setup actions.
- *
- * Every one of these re-checks the stage before it writes. The pages guard too, but a page guard is
- * a redirect and these are the endpoints that actually create an administrator - an unauthenticated
- * POST to a setup action on a configured instance would otherwise be a way to mint one.
+ * Each action re-checks the stage before writing: a page guard is only a redirect, and these are
+ * what create an administrator, so an unauthenticated POST could otherwise mint one.
  */
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -17,13 +14,7 @@ import { hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
 
 export type SetupActionState = { error: string | null };
 
-/**
- * Refuse to run once anything can sign in.
- *
- * `hasAnySignIn`, not the completion flag: the account step is over the moment an account exists,
- * whether or not the operator has finished the settings step. Checking the flag instead would leave
- * this open for the whole of the rest of setup.
- */
+/** `hasAnySignIn`, not the completion flag, which would leave this open for the rest of setup. */
 async function assertAccountStepOpen(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
     const t = await getTranslations("setup.errors");

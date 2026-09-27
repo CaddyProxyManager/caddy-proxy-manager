@@ -47,10 +47,7 @@ function downloadCodes(codes: string[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Turning TOTP on, off, and replacing backup codes. Every step re-asks for the password: a session
- * left open on someone's desk should not be enough to take over, or remove, the second factor.
- */
+/** Every step re-asks for the password: an open session must not be enough to change 2FA. */
 export function TwoFactorSection({
   enabled,
   hasPassword,
@@ -72,8 +69,7 @@ export function TwoFactorSection({
   const [busy, setBusy] = useState(false);
 
   const close = () => {
-    // Refreshed only once the codes are put away: on the setup page the refresh navigates off it,
-    // and it must not take codes that are shown only once along with it.
+    // Only once the codes are put away: the refresh navigates off codes shown only once.
     if (flow.kind === "codes") router.refresh();
     setFlow({ kind: "closed" });
     setPassword("");

@@ -47,10 +47,7 @@ type SettingsTogglesProps = {
   preserveHostHeader?: boolean;
   skipHttpsValidation?: boolean;
   enabled?: boolean;
-  /**
-   * Off for the managed dashboard host, whose on/off switch is its own setting - and whose form
-   * already posts an `enabled` field this one would collide with.
-   */
+  /** Off for the dashboard host, whose form already posts its own `enabled` field. */
   showEnabled?: boolean;
 };
 
@@ -110,8 +107,7 @@ export function SettingsToggles({
     enabled,
   });
   const settings = showEnabled ? SETTINGS : SETTINGS.filter((setting) => !setting.hostOnly);
-  // Walks the `requires` chain. A prerequisite that isn't rendered (the dashboard host has no HSTS
-  // toggle) never blocks.
+  // A prerequisite that isn't rendered (the dashboard host has no HSTS toggle) never blocks.
   const isBlocked = (setting: ToggleSetting): boolean => {
     const parent = settings.find((s) => s.key === setting.requires);
     return parent !== undefined && (!values[parent.key] || isBlocked(parent));
@@ -127,8 +123,6 @@ export function SettingsToggles({
           <input type="hidden" name="enabledPresent" value="1" />
           <input type="hidden" name="enabled" value={values.enabled ? "on" : ""} />
 
-          {/* Banner carries the enabled/paused state semantically, replacing a
-              border and background tinted with primary/5 when active. */}
           <Banner
             status={values.enabled ? "success" : "warning"}
             title={values.enabled ? t("proxyHostEnabledTitle") : t("proxyHostPausedTitle")}

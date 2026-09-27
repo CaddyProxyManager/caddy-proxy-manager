@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# The rig itself: name resolution, reachability of every simulated destination,
-# and the network restrictions the rest of the suite depends on.
-#
-# These run first because a failure here explains every later failure.
+# The rig itself. Runs first because a failure here explains every later failure.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "infrastructure"
@@ -20,16 +17,12 @@ t_ok "origin container names resolve" getent hosts origin-a
 
 # ── Network restriction ─────────────────────────────────────────────────────
 #
-# The compose network is `internal: true`. Nothing in the rig may reach the
-# internet - which is also what proves the ACME tests are talking to Pebble and
-# not accidentally to a public CA.
+# `internal: true`, which is also what proves the ACME tests reach Pebble, not a public CA.
 
 t_fails "the client cannot route to a public address" \
   curl -sS --max-time 5 -o /dev/null http://1.1.1.1/
 
-# `grep -v '^;'` because bind-tools 9.20 (Alpine 3.24) prints its own diagnostics, such as
-# ";; no servers could be reached", on stdout beside the answer that `+short` asks for - which is
-# the very thing being asserted absent. An address would not start with a semicolon.
+# bind-tools 9.20 prints ";; no servers could be reached" on stdout even with `+short`.
 external=$(dig +short +time=2 +tries=1 example.com @172.28.0.5 2>/dev/null | grep -v '^;' | tail -n1)
 t_eq "public DNS names do not resolve" "" "$external"
 
@@ -44,8 +37,7 @@ t_eq "L7 origin B answers directly" "200" "$FETCH_CODE"
 fetch "https://origin-tls:8443/__health" -k
 t_eq "HTTPS origin answers directly" "200" "$FETCH_CODE"
 
-# The HTTPS origin's certificate is deliberately issued for a name it is not
-# reachable under; later tests rely on that mismatch.
+# Deliberately issued for a name it is not reachable under; later tests rely on that.
 tls_name=$(printf '' | openssl s_client -connect origin-tls:8443 2>/dev/null \
   | openssl x509 -noout -subject 2>/dev/null)
 t_contains "HTTPS origin serves a hostname-mismatched certificate" \
@@ -63,16 +55,13 @@ fetch "$CPM_API/api/health"
 t_eq "the CPM API reports healthy" "200" "$FETCH_CODE"
 t_eq "the health payload is well formed" "ok" "$(fetch_json '.status')"
 
-# Caddy's admin API pins the origins it accepts, which is what stops a page in the operator's
-# browser reconfiguring the proxy. The Host header is not part of that check: binding to 0.0.0.0
-# (needed so the web container can reach it) makes Caddy skip Host validation, so the Origin check
-# is all that remains - and all that is pinned here.
+# Binding 0.0.0.0 makes Caddy skip Host validation, so the Origin pin is all that stops a page in
+# the operator's browser reconfiguring the proxy.
 admin_code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
   -H 'Origin: http://attacker.example' "http://caddy:2019/config/" 2>/dev/null)
 t_eq "the Caddy admin API refuses a foreign Origin" "403" "$admin_code"
 
-# Same-origin requests from the network are allowed by design: the admin port is
-# not published to the host, so reachability is bounded by the network itself.
+# Allowed by design: the admin port is not published, so the network bounds reachability.
 admin_ok=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "http://caddy:2019/config/" 2>/dev/null)
 t_eq "the Caddy admin API answers a same-origin request" "200" "$admin_ok"
 

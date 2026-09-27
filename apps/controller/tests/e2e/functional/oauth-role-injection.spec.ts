@@ -33,19 +33,16 @@ test.describe('OAuth - a hostile IdP cannot inject a privileged role', () => {
     page,
     browser,
   }) => {
-    // Admin-authenticated context (storageState) used for setup + assertions.
     const admin = page.request;
 
-    // Remove any leftover federated user from a previous run for determinism.
+    // A leftover user from a previous run would make the result meaningless.
     const stale = await findEvilUser(admin);
     if (stale)
       await admin
         .delete(`${API}/users/${stale.id}`, { headers: { Origin: ORIGIN } })
         .catch(() => {});
 
-    // 1. Register the hostile IdP as an OAuth provider.
-    //    issuer/token/userinfo use the in-network alias (also the token `iss`);
-    //    the browser-facing authorize URL uses the published localhost port.
+    // Server-side URLs use the in-network alias (also the token `iss`); authorize the host port.
     const provName = `Mock Evil IdP ${Date.now()}`;
     const createResp = await admin.post(`${API}/oauth-providers`, {
       headers: { Origin: ORIGIN },
@@ -66,10 +63,7 @@ test.describe('OAuth - a hostile IdP cannot inject a privileged role', () => {
 
     let createdUserId: number | undefined;
     try {
-      // 2. Complete an OAuth sign-in in a CLEAN context (no admin session), so
-      //    we exercise real federated signup, not the admin session. The empty
-      //    storageState is required - browser.newContext() otherwise inherits
-      //    the project's admin storageState and /login redirects to "/".
+      // An explicitly empty storageState: newContext() otherwise inherits the admin session.
       const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const oauthPage = await ctx.newPage();
       try {
@@ -80,8 +74,7 @@ test.describe('OAuth - a hostile IdP cannot inject a privileged role', () => {
         await expect(button).toBeVisible({ timeout: 15_000 });
         await button.click();
 
-        // mock-oauth2-server (interactiveLogin:false) auto-issues a code and the
-        // app completes the callback, landing back on the dashboard ("/").
+        // interactiveLogin:false auto-issues a code, landing back on "/".
         await oauthPage.waitForURL(
           (url) => {
             try {
@@ -102,7 +95,6 @@ test.describe('OAuth - a hostile IdP cannot inject a privileged role', () => {
         await ctx.close();
       }
 
-      // 3. The federated user must exist and must NOT be an admin.
       const evil = await findEvilUser(admin);
       expect(evil, 'federated user should have been created').toBeDefined();
       createdUserId = evil!.id;

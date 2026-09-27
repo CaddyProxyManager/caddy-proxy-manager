@@ -10,9 +10,8 @@ const APPLIED = CADDY_MODULES.filter((module) => INITIAL_MODULES[module.id] !== 
   .map((module) => module.modulePath)
   .sort();
 
-// `/api/caddy-build` reports what the running Caddy was built with. Registered at import, so it is
-// in place before the fields ask on mount. Nothing is saved here, so what is wanted is always what
-// is built - which is also why Rebuild, offered only once the two differ, never appears.
+// Registered at import, so it is in place before the fields ask on mount. Nothing is saved, so
+// wanted always equals built and Rebuild never appears.
 if (typeof window !== "undefined") {
   serveApi(async (url) =>
     url.pathname === "/api/caddy-build"

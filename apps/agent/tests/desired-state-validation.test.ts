@@ -1,9 +1,6 @@
 /**
- * Desired state is checked on the agent, whatever the controller claims to have validated.
- *
- * The agent holds the Docker socket, so a frame from a compromised controller - or from anyone
- * on-path to it - must not be able to turn a port, a module or a credential into a privileged
- * container or a hijacked `docker` child.
+ * The agent re-checks desired state: it holds the Docker socket, so a compromised or on-path
+ * controller must not turn a field into a privileged container or hijacked `docker` child.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -38,7 +35,7 @@ beforeEach(() => {
   process.env.DATA_DIR = dir;
   process.env.COMPOSE_DIR = dir;
   process.env.AGENT_MODE = "standalone";
-  // Pinned so composeArgs asks Docker nothing and every spawn below is one under test.
+  // So composeArgs asks Docker nothing and every spawn is one under test.
   process.env.COMPOSE_PROJECT_NAME = "proj";
   process.env.COMPOSE_HOST_DIR = "/srv/cpm";
   delete process.env.COMPOSE_EXTRA_FILE;
@@ -164,7 +161,7 @@ describe("operations refuse an invalid frame", () => {
     expect(store.l4PortsStatus().state).toBe("failed");
     expect(store.l4PortsStatus().error).toContain("Invalid port mapping");
     expect(store.appliedL4Ports()).toEqual(["443:443"]);
-    // The refusal took no lock, so the next valid frame is not reported as busy.
+    // The refusal took no lock.
     expect(() => operations.applyCaddyBuild(["github.com/a/b"])).not.toThrow();
   });
 

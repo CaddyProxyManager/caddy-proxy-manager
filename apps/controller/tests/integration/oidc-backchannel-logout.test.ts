@@ -1,9 +1,6 @@
 /**
- * What a back-channel logout does to the database: which sessions it ends, and how a CPM session
- * comes to know which IdP session it belongs to in the first place.
- *
- * Token verification lives in tests/unit/oidc-logout-token.test.ts; by the time anything here runs
- * the token has already been proved genuine, so these are the consequences of believing it.
+ * What a back-channel logout does to the database, and how a session learns its IdP session.
+ * Token verification is tests/unit/oidc-logout-token.test.ts; here the token is already genuine.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

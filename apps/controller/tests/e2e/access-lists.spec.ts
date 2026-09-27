@@ -7,7 +7,6 @@ import { waitForHydration } from '../helpers/hydration';
 
 const API = 'http://localhost:3000/api/v1/access-lists';
 
-/** Helper: create an access list via the REST API and return its data. */
 async function apiCreateList(
   page: Page,
   name: string,
@@ -26,7 +25,6 @@ async function apiCreateList(
   return body as { id: number; name: string; entries: { id: number; username: string }[] };
 }
 
-/** Helper: delete an access list via the REST API (silent on 404). */
 async function apiDeleteList(page: Page, id: number) {
   if (id < 0) return;
   await page.request
@@ -63,8 +61,7 @@ test.describe('Access Lists - page load', () => {
 
   test('shows sort buttons (Recent, Name, Members, Usage)', async ({ page }) => {
     await page.goto('/access-lists');
-    // The sort rail is a SegmentedControl, which exposes its choices as a radio
-    // group rather than as buttons.
+    // A SegmentedControl: its choices are radios, not buttons.
     for (const label of ['Recent', 'Name', 'Members', 'Usage']) {
       await expect(page.getByRole('radio', { name: label })).toBeVisible();
     }
@@ -75,7 +72,6 @@ test.describe('Access Lists - page load', () => {
 
 test.describe('Access Lists - empty state', () => {
   test('shows "Select an access list" when no list is selected', async ({ page }) => {
-    // Delete all lists first to ensure empty state
     const res = await page.request.get(API);
     const lists = (await res.json()) as { id: number }[];
     for (const l of lists) {
@@ -127,12 +123,9 @@ test.describe('Access Lists - create dialog', () => {
     await dialog.getByPlaceholder(/internal.*engineering/i).fill(listName);
     await dialog.getByRole('button', { name: /create list/i }).click();
 
-    // Dialog closes
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    // Name appears as heading in detail pane
     await expect(page.getByRole('heading', { name: listName })).toBeVisible({ timeout: 10_000 });
 
-    // Cleanup
     const res = await page.request.get(API);
     const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
@@ -153,7 +146,6 @@ test.describe('Access Lists - create dialog', () => {
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Test description')).toBeVisible({ timeout: 10_000 });
 
-    // Cleanup
     const res = await page.request.get(API);
     const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
@@ -173,12 +165,10 @@ test.describe('Access Lists - create dialog', () => {
     await dialog.getByRole('button', { name: /create list/i }).click();
 
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    // Detail header should show "1 member" badge
     await expect(page.getByText('1 member', { exact: false }).first()).toBeVisible({
       timeout: 10_000,
     });
 
-    // Cleanup
     const res = await page.request.get(API);
     const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
@@ -264,8 +254,7 @@ test.describe('Access Lists - rail interaction', () => {
     await expect(page.getByRole('heading', { name: listB.name })).toBeVisible({ timeout: 5_000 });
   });
 
-  // The search input exists in the server-rendered markup, so a fill that lands before hydration
-  // is silently discarded when React takes over the controlled input. See helpers/hydration.ts.
+  // A fill before hydration is discarded when React takes over the input (helpers/hydration.ts).
   test('search filters lists in the rail', async ({ page }) => {
     await page.goto('/access-lists');
     await waitForHydration(page);
@@ -332,7 +321,6 @@ test.describe('Access Lists - rail interaction', () => {
     await waitForHydration(page);
     await page.getByRole('radio', { name: 'Members', exact: true }).click();
 
-    // listB has 2 members, listA has 1 - listB should appear before listA
     const items = page.locator('ul > li');
     const count = await items.count();
     const texts: string[] = [];
@@ -484,8 +472,7 @@ test.describe('Access Lists - members tab', () => {
     await expect(page.getByText('Weak', { exact: true })).toBeVisible();
 
     await pwInput.fill('MyStr0ng!Pass#2026xyz');
-    // Anchored: an unanchored /strong/i also matches the hidden "Generate strong
-    // password" tooltip, which .first() was picking up.
+    // Anchored: /strong/i also matches the hidden "Generate strong password" tooltip.
     await expect(page.getByText(/^(strong|excellent)$/i)).toBeVisible();
   });
 
@@ -493,7 +480,6 @@ test.describe('Access Lists - members tab', () => {
     await page.getByRole('button', { name: /add member/i }).click();
     await expect(page.getByPlaceholder('alice.chen')).toBeVisible();
 
-    // The Cancel button inside the add-member form (not tab area)
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByPlaceholder('alice.chen')).not.toBeVisible();
   });
@@ -606,10 +592,7 @@ test.describe('Access Lists - members empty state', () => {
 
 // ── Settings tab ─────────────────────────────────────────────────────────────
 
-/**
- * The settings tab's Name / Description inputs. The "New access list" dialog is a native <dialog>
- * that stays in the DOM when closed, so a bare getByLabel is ambiguous - only one pair is visible.
- */
+/** The closed "New access list" <dialog> stays in the DOM, so a bare getByLabel is ambiguous. */
 function settingsNameField(page: Page) {
   return page.getByLabel(/^Name/).filter({ visible: true });
 }
@@ -697,9 +680,7 @@ test.describe('Access Lists - settings tab', () => {
 
     await page.getByRole('button', { name: /delete list permanently/i }).click();
 
-    // List should be removed from the rail
     await expect(page.locator('ul').getByText(list.name)).not.toBeVisible({ timeout: 10_000 });
-    // Prevent afterEach from trying to delete again
     list = { ...list, id: -1 };
   });
 });
@@ -787,7 +768,6 @@ test.describe('Access Lists - keyboard shortcuts', () => {
   });
 
   test('Cmd+K opens the global command palette, not the rail search', async ({ page }) => {
-    // The shortcut belongs to the palette on every page now; the rail search is a click away.
     await page.goto('/access-lists');
     await waitForHydration(page);
     await page.locator('body').click();

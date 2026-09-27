@@ -94,8 +94,7 @@ export default async function WafPage({ searchParams }: PageProps) {
   };
   const offset = (page - 1) * PER_PAGE;
 
-  // The settings form here saves through a staged action, so read it the way the settings pages do:
-  // against this operator's staged set. Otherwise a staged edit looks discarded after a reload.
+  // The form stages, so read against the staged set or an edit looks discarded after a reload.
   const overlay = await stagedOverlay(Number(session.user.id));
 
   const [

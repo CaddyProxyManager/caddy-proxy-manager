@@ -1,9 +1,6 @@
 /**
- * A translator over the real English catalog, for tests that call a server action directly.
- *
- * `getTranslations` needs a request scope, and a unit test has none - next-intl resolves to its
- * client build and throws. Mocking it with the real catalog rather than an identity function keeps
- * the assertions honest: a test still fails if the message it expects is renamed or deleted.
+ * `getTranslations` throws without a request scope. Mocked with the real English catalog, not an
+ * identity function, so a test still fails if its expected message is renamed or deleted.
  */
 import messages from '../../messages/en.json';
 
@@ -41,7 +38,6 @@ export function testTranslator(namespace?: string) {
   });
 }
 
-/** The shape `vi.mock('next-intl/server', ...)` needs. */
 export function nextIntlServerMock() {
   return {
     getTranslations: async (namespace?: string) => testTranslator(namespace),

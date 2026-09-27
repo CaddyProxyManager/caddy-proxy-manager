@@ -7,9 +7,8 @@ banner "TLS certificates"
 
 # ── ACME issuance ───────────────────────────────────────────────────────────
 #
-# The rig has no route to the internet, so a valid certificate here can only
-# have come from Pebble, obtained over a real ACME order with a real HTTP-01
-# challenge served by Caddy on port 80.
+# The rig has no internet route, so a valid certificate can only have come from
+# Pebble over a real HTTP-01 order.
 
 acme_domain=$(domain_for "acme")
 create_host_or_fail "an auto-managed host can be created" "$(jq -nc --arg d "$acme_domain" \
@@ -133,9 +132,8 @@ t_ne "an imported certificate with no PEM is rejected" "201" "$API_STATUS"
 
 # ── Wildcards ───────────────────────────────────────────────────────────────
 #
-# A wildcard cannot be issued over HTTP-01, so CPM refuses an auto-managed
-# wildcard host unless a DNS provider is configured. With an explicit
-# certificate attached the restriction does not apply.
+# HTTP-01 cannot issue a wildcard, so an auto-managed one needs a DNS provider;
+# an explicit certificate lifts that.
 
 api POST /api/v1/proxy-hosts \
   '{"name":"auto wildcard","domains":["*.auto-wild.cpm.test"],"upstreams":["origin-a:8080"]}'

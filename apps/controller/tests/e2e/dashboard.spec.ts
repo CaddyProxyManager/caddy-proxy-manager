@@ -1,26 +1,14 @@
 /**
- * E2E: dashboard overview - resource shortcuts, the metric tiles, and the chart and
- * server log those tiles drive. The log holds both requests and controller changes; the
- * tile row picks which of them, with Requests blending the two. Nothing is selected on
- * load: the chart overlays every series and the log holds everything, and selecting the
- * active tile a second time comes back here.
- *
- * The e2e stack has no proxied traffic, so the traffic bands render their empty states.
- * That is the state worth pinning: it is what a fresh install sees, and the case where
- * the two sources must behave differently - server events are recorded whether or not
- * access logging was ever switched on.
+ * E2E: dashboard overview. The e2e stack has no proxied traffic, so traffic bands show their empty
+ * states - what a fresh install sees, and where the two log sources must differ: server events are
+ * recorded whether or not access logging was ever on.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
 
 /**
- * Select a metric tile the way a pointer does: on the card surface, which SelectableCard's
- * useClickableContainer forwards to its hidden checkbox. Returns the checkbox for assertions.
- *
- * Not `checkbox.click({ force: true })`. The checkbox is a 1px clipped sr-only input, and for
- * the first tens of milliseconds after load Chromium cannot compute its content quads - which
- * Playwright reports as "not visible" and, under `force`, throws on instead of retrying. The
- * card is a real box, so an unforced click waits out that window like any other.
+ * Clicks the card surface, not `checkbox.click({ force: true })`: for the first ms after load the
+ * 1px sr-only checkbox has no content quads, and `force` throws on that instead of retrying.
  */
 async function selectTile(page: Page, name: string) {
   const checkbox = page.getByRole('checkbox', { name, exact: true });
@@ -40,17 +28,12 @@ test.describe('Dashboard home page', () => {
   });
 
   test('shows stat cards for Proxy Hosts, Certificates, and Access Lists', async ({ page }) => {
-    // Each stat card is a ClickableCard whose accessible name is built as
-    // `${label}: ${count}` - label first, then the number.
     await expect(page.getByRole('link', { name: /^Proxy Hosts:\s*\d+/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Certificates:\s*\d+/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Access Lists:\s*\d+/ })).toBeVisible();
   });
 
-  /**
-   * ClickableCard's visually-hidden <a> exists only to name the card; the click target is the card
-   * surface. Click the parent, and match the exact accessible name to stay off the sidebar links.
-   */
+  /** The hidden <a> only names the card; the exact name keeps this off the sidebar links. */
   async function clickCard(page: Page, name: string | RegExp) {
     await page.getByRole('link', { name }).locator('xpath=..').click();
   }
@@ -97,8 +80,7 @@ test.describe('Dashboard home page', () => {
   test('selecting a tile drives the chart below it', async ({ page }) => {
     const tile = await selectTile(page, '5xx responses');
     await expect(tile).toBeChecked();
-    // The chart is titled by whichever tile is selected, so the heading is the visible
-    // proof that the selection reached the bands below.
+    // The heading is the visible proof the selection reached the bands below.
     await expect(page.getByRole('heading', { name: '5xx responses', level: 2 })).toBeVisible();
   });
 
@@ -119,15 +101,13 @@ test.describe('Dashboard home page', () => {
 
   test('shows the server log and names both its sources', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Server log', level: 2 })).toBeVisible();
-    // Requests is the blended view, so the note has to account for both stores and for
-    // only one of them being gated on access logging.
+    // Blended view: the note covers both stores, only one of which is gated on access logging.
     await expect(
       page.getByText(/traffic_events in ClickHouse, changes from the audit log/i),
     ).toBeVisible();
   });
 
   test('the Server events tile narrows the log to controller changes', async ({ page }) => {
-    // The log keeps its name; what changes is the population and the source note.
     await expect(page.getByRole('heading', { name: 'Server log', level: 2 })).toBeVisible();
 
     await selectTile(page, 'Server events');
@@ -144,15 +124,12 @@ test.describe('Dashboard home page', () => {
   });
 
   test('server events survive an empty traffic window', async ({ page }) => {
-    // No proxied traffic in the e2e stack, so there is no series to plot.
     await expect(page.getByText(/No traffic in this range/i)).toBeVisible();
 
-    // A tile that asks only for requests has nothing to show.
     await selectTile(page, '5xx responses');
     await expect(page.getByText(/No requests match this tile/i)).toBeVisible();
 
-    // The audit log is recorded regardless, so the same log still has the sign-in that
-    // got us here once the tile asks for it. That difference is why the tile exists.
+    // The audit log is recorded regardless, so the sign-in that got us here still shows.
     await selectTile(page, 'Server events');
     await expect(page.getByRole('main').getByRole('row').nth(1)).toBeVisible();
   });

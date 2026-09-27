@@ -31,7 +31,6 @@ function makeCa(commonName: string) {
   };
 }
 
-/** Client certificate signed by the given CA. */
 function makeClientCert(ca: ReturnType<typeof makeCa>, commonName: string) {
   const keys = forge.pki.rsa.generateKeyPair(2048);
   const cert = forge.pki.createCertificate();
@@ -59,10 +58,7 @@ function makeClientCert(ca: ReturnType<typeof makeCa>, commonName: string) {
   };
 }
 
-/**
- * Regression: a CA must not be deletable while a host trusts one of its issued certs. The original
- * guard checked only the deprecated `mtls.ca_certificate_ids`. Exercises the real DELETE.
- */
+/** Regression: the original guard checked only the deprecated `mtls.ca_certificate_ids`. */
 test.describe('mTLS - CA delete guard (in-use protection)', () => {
   // RSA keygen via node-forge is CPU-heavy; give the test room.
   test.setTimeout(60_000);
@@ -74,7 +70,6 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
     const ca = makeCa('E2E Guard CA');
     const client = makeClientCert(ca, 'e2e-guard-device');
 
-    // 1. Create the CA + issued client cert via the REST API.
     const caResp = await page.request.post(API_CA, {
       headers: { Origin: origin },
       data: { name: 'E2E Guard CA', certificatePem: ca.pem, privateKeyPem: ca.keyPem },
@@ -97,7 +92,6 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
     expect(certResp.ok()).toBeTruthy();
     const certRow = (await certResp.json()) as { id: number };
 
-    // 2. Create a host whose mTLS config trusts that cert (current model).
     const hostResp = await page.request.post(API_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -116,7 +110,6 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
 
     let hostDeleted = false;
     try {
-      // 3. Deleting the CA must be blocked, naming the offending host.
       const blocked = await page.request.delete(`${API_CA}/${caRow.id}`, {
         headers: { Origin: origin },
       });
@@ -125,11 +118,10 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
       expect(blockedBody.error ?? '').toMatch(/in use by proxy host/i);
       expect(blockedBody.error ?? '').toContain('E2E Guard Host');
 
-      // 4. The CA and its issued cert must still exist (guard ran before cascade).
+      // The guard runs before the cascade.
       expect((await page.request.get(`${API_CA}/${caRow.id}`)).status()).toBe(200);
       expect((await page.request.get(`${API_CLIENT_CERTS}/${certRow.id}`)).status()).toBe(200);
 
-      // 5. Remove the reference, then deletion succeeds (and cascades the cert).
       const delHost = await page.request.delete(`${API_HOSTS}/${hostRow.id}`, {
         headers: { Origin: origin },
       });

@@ -8,12 +8,8 @@ export type ActivityBucket = {
 };
 
 /**
- * A bar per bucket, for "was anything unusual happening" at a glance.
- *
- * Drawn as divs rather than an SVG so the bars inherit the theme's colours directly and scale with
- * the container without a viewBox to keep in sync. The whole strip is one image to assistive
- * technology with the peak named, because forty individually labelled bars are noise to read
- * through and the peak is the only part anyone acts on.
+ * Divs, not SVG, so bars take theme colours and scale without a viewBox. One image to assistive
+ * technology with the peak named: forty labelled bars are noise, and the peak is what matters.
  */
 export function ActivityStrip({
   buckets,

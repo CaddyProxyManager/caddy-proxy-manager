@@ -11,7 +11,7 @@ export type PageHeaderProps = {
   action?: {
     label: string;
     onClick?: () => void;
-    /** A link instead of a handler, for an action that lives on another page. */
+    /** For an action that lives on another page. */
     href?: string;
     icon?: ReactNode;
     /** Greys out the primary action, e.g. when a required Caddy module is off. */
@@ -27,10 +27,9 @@ export function PageHeader({ title, action }: PageHeaderProps) {
         <>
           <Button
             className="cpm-desktop-only"
-            // The page's one creating action, so it wears the accent like the phone's floating
-            // button does rather than the secondary grey Astryx defaults to.
+            // The accent, matching the phone's floating button, not Astryx's secondary grey.
             variant="primary"
-            // Large, so the action fills the header row beside the title rather than floating in it.
+            // Fills the header row beside the title rather than floating in it.
             size="lg"
             label={action.label}
             icon={action.icon ?? <Plus />}
@@ -38,8 +37,7 @@ export function PageHeader({ title, action }: PageHeaderProps) {
             href={action.href}
             isDisabled={action.isDisabled}
           />
-          {/* The same action as a floating button on a phone, where the corner is reachable and the
-              header is not. */}
+          {/* On a phone the corner is reachable and the header is not. */}
           <Fab
             label={action.label}
             icon={action.icon}

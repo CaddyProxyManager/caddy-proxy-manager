@@ -1,16 +1,8 @@
 "use client";
 
 /**
- * The migration offer: which old database, how much of it, or none at all.
- *
- * Every candidate is shown with what is actually in it - users, proxy hosts, certificates, and
- * when it was last written - because on a host with a backup beside the live file those counts are
- * the only way to tell them apart, and choosing wrong migrates the wrong data with nothing to
- * signal it afterwards.
- *
- * The groups below are the same question at a finer grain. The one people actually come here to
- * answer is whether to keep the old accounts: an installation being handed to someone else wants
- * the proxy hosts and none of the users, and before this it was all or nothing.
+ * Which old database to migrate, and which parts. Candidates show their counts and last write,
+ * the only way to tell a live file from a backup beside it; groups let a handover skip the users.
  */
 import { useMemo, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -47,10 +39,7 @@ export type Candidate = {
   certificates: number;
   groupCounts: Record<MigrationGroupId, number>;
   lastUpdatedAt: string | null;
-  /**
-   * Whether this file's secrets are encrypted with a `SESSION_SECRET` this deployment does not
-   * have - decided on the server, which is the only side that can try the key.
-   */
+  /** Encrypted with a `SESSION_SECRET` we lack; decided server-side, the only side with the key. */
   needsLegacyKey: boolean;
 };
 
@@ -60,7 +49,6 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** A label and the value it settles, for the confirmation summary. */
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <HStack gap={3} justify="between" align="center">
@@ -85,39 +73,28 @@ export default function SetupMigrateClient({
 }) {
   const t = useTranslations("setup");
   const [selected, setSelected] = useState(candidates[0]?.path ?? "");
-  // Everything, to start: an operator who reads none of this and presses the button gets the
-  // migration they would have got before there was anything to choose.
+  // Everything by default, so pressing straight through migrates it all.
   const [picked, setPicked] = useState<MigrationGroupId[]>(ALL_MIGRATION_GROUP_IDS);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  // The old deployment's SESSION_SECRET, when this file's secrets need one. Held only long enough
-  // to be posted: the import re-encrypts everything under the current key, so nothing keeps it.
+  // Never stored: the import re-encrypts everything under the current key.
   const [legacyKey, setLegacyKey] = useState("");
-  // Set when the server asks for the key despite the probe not having done so - a database whose
-  // secret was rotated more than once, where the sample read but something later did not.
+  // The server asked though the probe did not: a secret rotated more than once.
   const [keyDemanded, setKeyDemanded] = useState(false);
-  // Set once the import has succeeded, which swaps the page for the restart dialog.
   const [imported, setImported] = useState<{
     next: string;
     migratedSignIn: boolean;
     restartToken: string;
   } | null>(null);
-  // The confirmation sheet, and the form it submits from outside itself.
   const [confirming, setConfirming] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const candidate = candidates.find((entry) => entry.path === selected);
 
-  /**
-   * What will actually be migrated, and which of it the operator no longer controls.
-   *
-   * A group that something ticked depends on is shown ticked and locked rather than quietly added:
-   * "Certificates" turning itself on the moment proxy hosts are chosen is only confusing if the
-   * checkbox does not say why it happened.
-   */
+  /** A dependency of a ticked group shows ticked and locked, not silently added, so it says why. */
   const { effective, lockedBy } = useMemo(() => {
     const resolved = new Set(withRequiredGroups(picked));
-    // Ids rather than labels, so the names are translated where they are rendered.
+    // Ids, not labels, so names are translated where rendered.
     const locks = new Map<MigrationGroupId, MigrationGroupId[]>();
     const chosen = new Set(picked);
 
@@ -136,8 +113,7 @@ export default function SetupMigrateClient({
     event.preventDefault();
     setError(null);
     setRunning(true);
-    // Out of the way before anything can fail: the error banner sits on the page behind the
-    // sheet, so leaving it open would hide the only explanation of what went wrong.
+    // Close first: an open sheet would hide the error banner behind it.
     setConfirming(false);
 
     try {
@@ -152,8 +128,7 @@ export default function SetupMigrateClient({
 
       if (!body.ok) {
         setError(body.error);
-        // Either code means the field belongs on screen: the first because the server found
-        // secrets the probe did not, the second so a mistyped key can be corrected in place.
+        // Either code shows the field: secrets the probe missed, or a mistyped key to fix.
         if (body.code) setKeyDemanded(true);
         return;
       }
@@ -163,9 +138,7 @@ export default function SetupMigrateClient({
         restartToken: body.restartToken,
       });
     } catch {
-      // The import copies thirty tables and can outlast a proxy's idle timeout. Saying so beats a
-      // bare "failed", because trying again on a half-populated database is the one thing not to
-      // do here.
+      // Can outlast a proxy's idle timeout; a bare "failed" invites a retry onto a half-full db.
       setError(t("migrationConnectionDropped"));
     } finally {
       setRunning(false);
@@ -180,15 +153,11 @@ export default function SetupMigrateClient({
 
   const migratingUsers = effective.has("users");
   const migratingOAuth = effective.has("oauthProviders");
-  // The probe answers for the file; `keyDemanded` is the server having asked anyway. Once the field
-  // is on screen it stays, so a wrong key does not make the box the operator is fixing disappear.
+  // Once shown the field stays, so a wrong key does not hide the box being fixed.
   const needsLegacyKey = (candidate?.needsLegacyKey ?? false) || keyDemanded;
   const blocked = effective.size === 0 || running || (needsLegacyKey && !legacyKey.trim());
 
-  /**
-   * What the confirmation counts. Split on `effective` rather than `picked`, so a group that was
-   * locked on by a dependency is counted as coming across - which is what will happen.
-   */
+  /** On `effective`, not `picked`, so dependency-locked groups count as coming across. */
   const { copying, leaving } = useMemo(() => {
     const tally = (included: boolean) =>
       MIGRATION_GROUPS.filter((group) => effective.has(group.id) === included).reduce(
@@ -373,8 +342,7 @@ export default function SetupMigrateClient({
               description={t("emptyDatabaseRequiredDescription")}
             />
 
-            {/* Opens the confirmation rather than submitting: the import is one-way, and the
-                selection above is easy to get wrong in a way nothing later can undo. */}
+            {/* Confirms first: the import is one-way and the selection easy to get wrong. */}
             <Button
               variant="primary"
               label={running ? t("migrate.submitPending") : t("migrate.submit")}
@@ -388,12 +356,11 @@ export default function SetupMigrateClient({
           label={t("migrate.confirmTitle")}
           isOpen={confirming}
           onOpenChange={setConfirming}
-          // A swipe or a scrim tap is the same answer as Cancel here, so nothing is blocked.
+          // A swipe or scrim tap means Cancel here, so nothing is blocked.
           purpose="info"
         >
-          {/* Only while open: the sheet stays mounted for its own motion, and its copy repeats
-              the page's - a closed sheet contributing a second copy of the chosen path is a
-              duplicate for find-in-page, for a screen reader, and for any locator. */}
+          {/* Only while open: a closed, still-mounted sheet would duplicate the page's text for
+              find-in-page, screen readers and locators. */}
           {confirming && (
             <VStack gap={4} padding={4}>
               <VStack gap={2}>
@@ -445,12 +412,10 @@ export default function SetupMigrateClient({
               <VStack gap={2}>
                 <Button
                   variant="primary"
-                  // Named for the outcome rather than repeating the trigger: two buttons with the
-                  // same accessible name is ambiguous to a screen reader.
+                  // Not the trigger's name: two buttons with one accessible name are ambiguous.
                   label={t("migrate.confirmStart")}
                   isDisabled={blocked}
-                  // requestSubmit rather than a submit button: the sheet renders in its own dialog,
-                  // so a button inside it is not associated with the form above.
+                  // The sheet is its own dialog, so a submit button here has no form.
                   onClick={() => formRef.current?.requestSubmit()}
                 />
                 <Button

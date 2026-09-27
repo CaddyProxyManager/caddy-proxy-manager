@@ -1,12 +1,6 @@
 /**
- * Syntax tokenizers for the config languages this app edits.
- *
- * Astryx's own tokenizer covers JSON and HTML. It does not know Caddyfile, SecLang or Dockerfile,
- * and there is no upstream grammar for the first two worth pulling in - so they are described here
- * as a short list of patterns, in the same shape `CodeBlock` accepts for a custom tokenizer.
- *
- * This is readability, not validation: Caddy's adapter and Coraza's parser are what decide whether
- * a snippet is correct, and they say so on save.
+ * Tokenizers for Caddyfile, SecLang and Dockerfile, which Astryx's tokenizer lacks and have no
+ * upstream grammar worth pulling in. Readability only: Caddy and Coraza validate on save.
  */
 
 import { flatTokensToLines, tokenize, type TokenLine } from "@astryxdesign/core/CodeBlock";
@@ -19,10 +13,7 @@ export type CodeEditorLanguage =
   | "seclang"
   | "plaintext";
 
-/**
- * What the language is called in the corner of the editor. Names, so not translated - plain text
- * is described in words rather than named, and comes from the message catalog in CodeEditor.
- */
+/** Names, so not translated; plain text is described in words, from the catalog in CodeEditor. */
 export const LANGUAGE_LABELS: Record<Exclude<CodeEditorLanguage, "plaintext">, string> = {
   json: "JSON",
   caddyfile: "Caddyfile",
@@ -32,17 +23,9 @@ export const LANGUAGE_LABELS: Record<Exclude<CodeEditorLanguage, "plaintext">, s
 };
 
 /**
- * A pattern and the token type it paints. Types are Astryx's - anything else renders unstyled.
- *
- * Rules are tried in order at each position and the first match wins, so the ones that swallow
- * other syntax (comments, strings) have to come first. Every group inside a pattern must be
- * non-capturing: the rules are compiled into one alternation and the group index is what identifies
- * which rule matched.
- *
- * A rule that has to sit at the start of its line matches the indentation as well - `^[ \t]*…`
- * rather than a `(?<=^[ \t]*)` lookbehind, which is not supported in every engine and would throw
- * where the pattern is built rather than where it is used. Those rules are marked `indented`, and
- * the scanner moves the token past the whitespace so the highlight still starts on the first glyph.
+ * Types are Astryx's; others render unstyled. First match wins, so comments and strings go first,
+ * and groups must be non-capturing since the group index identifies the rule. Line-start rules
+ * match `^[ \t]*` (lookbehind throws on some engines) and are marked `indented` to skip it.
  */
 type Rule = readonly [RegExp, string] | readonly [RegExp, string, "indented"];
 
@@ -50,8 +33,7 @@ const CADDYFILE: readonly Rule[] = [
   [/#.*/, "comment"],
   [/"(?:[^"\\]|\\.)*"/, "string"],
   [/`[^`]*`/, "string"],
-  // {env.FOO}, {http.request.uri}, {args[0]} - the source of most Caddyfile confusion, so they are
-  // coloured apart from the strings they usually sit inside.
+  // The source of most Caddyfile confusion, so coloured apart from the strings they sit in.
   [/\{[^}\s]*\}/, "variable"],
   [/@[\w.-]+/, "type"],
   [/\b\d+(?:\.\d+)?(?:ms|s|m|h|d|kb|mb|gb)?\b/, "number"],
@@ -64,9 +46,7 @@ const SECLANG: readonly Rule[] = [
   [/"(?:[^"\\]|\\.)*"/, "string"],
   [/'(?:[^'\\]|\\.)*'/, "string"],
   [/^[ \t]*Sec[A-Za-z]+/, "keyword", "indented"],
-  // @contains, @ipMatch, @rx - the operator is the part of a rule people scan for.
   [/@[A-Za-z]+/, "operator"],
-  // REQUEST_URI, REQUEST_HEADERS:User-Agent, ARGS. Screaming case is how SecLang spells a variable.
   [/\b[A-Z][A-Z0-9_]{2,}(?::[\w.-]+)?\b/, "variable"],
   [/\b\d+\b/, "number"],
   [/[|,]/, "punctuation"],
@@ -103,9 +83,8 @@ const SOURCES: Partial<Record<CodeEditorLanguage, [readonly Rule[], string]>> = 
 };
 
 /**
- * Compiled on first use rather than at module scope. A `RegExp` this file cannot build would
- * otherwise throw while the module was being imported, which no caller can catch and which would
- * take the whole editor down rather than only its colour - `tokenizeCode` catches it here instead.
+ * Compiled on first use: a bad `RegExp` at module scope would throw uncatchably on import, taking
+ * the whole editor down rather than only its colour.
  */
 const cache = new Map<CodeEditorLanguage, Compiled>();
 
@@ -121,7 +100,6 @@ function compiledFor(language: CodeEditorLanguage): Compiled | undefined {
   return compiled;
 }
 
-/** How much of a match is the indentation a line-anchored rule had to swallow to anchor itself. */
 function indentLength(text: string): number {
   let length = 0;
   while (text[length] === " " || text[length] === "\t") length += 1;
@@ -137,9 +115,8 @@ function scan(code: string, compiled: Compiled): { type: string; start: number; 
     // Group n+1 is rule n; exactly one of them is defined on any match.
     const rule = match.findIndex((group, index) => index > 0 && group !== undefined) - 1;
     if (rule >= 0 && match[0]) {
-      // A line-anchored rule matched from the line start, so the token begins after the indent.
-      // The renderer slices each line by these offsets and would otherwise paint the whitespace
-      // and shift every following token on the line.
+      // The renderer slices lines by these offsets, and would otherwise paint the indent and shift
+      // every following token.
       const offset = compiled.indented[rule] ? indentLength(match[0]) : 0;
       tokens.push({
         type: compiled.types[rule] as string,
@@ -156,9 +133,8 @@ function scan(code: string, compiled: Compiled): { type: string; start: number; 
 }
 
 /**
- * Tokens for one snippet, per line, with line-relative offsets - the shape Astryx's own
- * `CodeBlock` works in. Empty for plaintext, and for anything that fails to tokenize: a field
- * that renders as unhighlighted text is a far better outcome than one that throws.
+ * Per line, line-relative offsets, as Astryx's `CodeBlock` takes them. Empty for plaintext or on
+ * failure: unhighlighted text beats a field that throws.
  */
 export function tokenizeCode(code: string, language: CodeEditorLanguage): TokenLine[] {
   if (language === "plaintext" || !code) return [];

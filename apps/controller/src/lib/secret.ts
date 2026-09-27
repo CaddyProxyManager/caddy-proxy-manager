@@ -14,21 +14,9 @@ function deriveKeyLegacy(sessionSecret: string = config.sessionSecret): Buffer {
 }
 
 /**
- * Decrypt with a session secret that is not this deployment's own.
- *
- * The migration flow is the only caller: a pre-3.0 database carries its secrets encrypted under
- * the `SESSION_SECRET` that installation ran with, which is rarely the one the new deployment was
- * given. Rather than making the operator adopt the old secret forever, the importer asks for it
- * once and re-encrypts everything under the current key on the way in.
- *
- * Both derivations are tried, for the same reason `decryptSecret` tries both: a database old
- * enough to predate the HKDF change holds values under the SHA-256 key, and one that was upgraded
- * part-way holds a mixture. No grace-period check here - the cutoff exists to push a running
- * deployment off the legacy key, and refusing to read a legacy value during the one operation that
- * would re-encrypt it has it exactly backwards.
- *
- * Returns null rather than throwing: every caller is asking "is this the right secret", and a
- * wrong answer is an expected outcome there, not an error.
+ * For the migration: a pre-3.0 database's secrets are under its own `SESSION_SECRET`. Both
+ * derivations are tried, as in `decryptSecret`, but with no grace-period cutoff - refusing a legacy
+ * value in the one operation that re-encrypts it is backwards. Null, not a throw, on a wrong key.
  */
 export function decryptSecretWith(value: string, sessionSecret: string): string | null {
   if (!isEncryptedSecret(value)) return value;
@@ -84,11 +72,8 @@ const LEGACY_KEY_CUTOFF =
     : new Date(LEGACY_KEY_CUTOFF_ENV || "2026-06-01T00:00:00Z");
 
 /**
- * Decrypt a value that was encrypted with encryptSecret.
- *
- * @param context Optional human-readable label describing what is being
- * decrypted (e.g. `DNS provider "cloudflare" credential "api_token"`).
- * Included in error messages so users can tell which stored value failed.
+ * @param context Label for what is being decrypted (e.g. `DNS provider "cloudflare" credential
+ * "api_token"`), included in errors so users can tell which stored value failed.
  */
 export function decryptSecret(value: string, context?: string): string {
   if (!value) return "";
@@ -99,11 +84,9 @@ export function decryptSecret(value: string, context?: string): string {
     "This usually happens when SESSION_SECRET changed after the value was stored. " +
     "Fix: re-enter the affected token/secret in the UI to re-encrypt it with the current key, or restore the previous SESSION_SECRET.";
 
-  // Try new HKDF key first
   try {
     return _decryptWithKey(value, deriveKey());
   } catch (hkdfError: unknown) {
-    // Only fall back to legacy key within the grace period
     if (LEGACY_KEY_CUTOFF && new Date() > LEGACY_KEY_CUTOFF) {
       throw new Error(
         `[secret] Failed to decrypt stored secret${label}: HKDF decryption failed and the legacy key grace period has expired. ` +

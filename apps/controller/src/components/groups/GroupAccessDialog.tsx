@@ -1,15 +1,8 @@
 "use client";
 
 /**
- * What a group is mapped from, and what it may manage.
- *
- * Two things that look unrelated share a dialog because they are the two halves of one decision:
- * an IdP group arrives under a name the operator did not choose, and the point of naming it here
- * is to hand it the grants below.
- *
- * Capability is chosen per section rather than per row. A group that may edit some of its hosts
- * and only look at others is expressible in the database, but the UI for it is a dropdown on every
- * row of three lists, and nobody asked for that yet.
+ * Mapping and grants share a dialog: naming an IdP group is for handing it grants. Capability is
+ * per section, not per row - the database allows it, but nobody asked for a dropdown per row.
  */
 
 import { useState } from "react";
@@ -27,7 +20,6 @@ export type NamedResource = { id: number; name: string };
 export type ProviderOption = { id: string; name: string };
 
 export type GroupAccess = {
-  /** IdP group names, one per line, and the provider each applies to. */
   mappings: { providerId: string | null; externalName: string }[];
   proxyHostIds: number[];
   l4ProxyHostIds: number[];
@@ -60,8 +52,7 @@ export function GroupAccessDialog({
 }) {
   const t = useTranslations("groups");
 
-  // One provider for the whole list: mixing providers row by row is expressible in the database
-  // and has no operator asking for it. "Any provider" is what a single-IdP deployment wants.
+  // One provider for the whole list; nobody asked to mix them per row.
   const [providerId, setProviderId] = useState<string>(
     initial.mappings.find((m) => m.providerId)?.providerId ?? ANY_PROVIDER,
   );

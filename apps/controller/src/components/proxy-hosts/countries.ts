@@ -1,8 +1,4 @@
-/**
- * The ISO 3166-1 alpha-2 codes the geoblock picker offers. Codes only: their names come from
- * `regionName` in the reader's locale, so the picker is not English-only and agrees with the
- * analytics map on what each code is called.
- */
+/** ISO 3166-1 alpha-2 codes only: `regionName` localizes them, matching the analytics map. */
 export const COUNTRY_CODES: readonly string[] = [
   "AF",
   "AX",

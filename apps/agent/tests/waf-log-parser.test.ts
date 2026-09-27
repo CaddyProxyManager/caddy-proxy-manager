@@ -1,8 +1,3 @@
-/**
- * Moved here with the parser it covers: the Caddy log is a file on the agent's host, so this
- * is where it is read. The mocks the controller's copy needed are gone - these are pure
- * functions, and the module's imports are real dependencies of this package now.
- */
 import { describe, it, expect } from "bun:test";
 import {
   extractBracketField,
@@ -11,10 +6,8 @@ import {
 } from "../src/analytics/waf-log-parser";
 
 /**
- * Regression (#233): rule attribution must come from the audit entry's own `messages` array (part
- * H), not a join against waf-rules.log - that only lands when both lines fall in the same 30s parse
- * tick, and when it misses `parseLine` dropped the whole event unless blocked. Each test here
- * passes an EMPTY ruleMap to simulate the miss.
+ * Regression (#233): attribution comes from the entry's `messages` (part H); the waf-rules.log join
+ * misses across a 30s tick. Each test passes an EMPTY ruleMap to simulate that.
  */
 describe("rule attribution from the audit entry itself", () => {
   const CRS_XSS =
@@ -79,8 +72,7 @@ describe("rule attribution from the audit entry itself", () => {
   });
 
   it("still drops audit entries with no rule match and no interruption", () => {
-    // Coraza logs every 4xx/5xx under SecAuditLogRelevantStatus even when no rule
-    // fired; those are ordinary traffic and must not show up as WAF events.
+    // Coraza logs every 4xx/5xx even when no rule fired.
     expect(parseLine(auditLine({ interrupted: false }), new Map())).toBeNull();
   });
 
@@ -166,8 +158,7 @@ describe("parseLine host header contract", () => {
   });
 
   it("stores host header verbatim - port suffix is preserved (downstream must strip)", () => {
-    // Some HTTPS clients (e.g. HTTP/2 :authority, explicit "Host: foo:443" header)
-    // include the port. Suppression code in settings/actions.ts must normalize.
+    // Some clients include the port; suppression in settings/actions.ts must normalize it.
     const row = parseLine(makeAuditLine("app.example.com:443"), ruleMap);
     expect(row?.host).toBe("app.example.com:443");
   });

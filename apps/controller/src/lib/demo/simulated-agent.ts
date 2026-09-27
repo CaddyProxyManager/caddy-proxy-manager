@@ -1,10 +1,6 @@
 /**
- * An agent that lives inside the controller, for demo mode.
- *
- * It attaches to the registry like a real one and speaks the same protocol, so every page that
- * reads an agent's status - builds, ports, services, analytics - has something to show. What it
- * does with a request is only ever bookkeeping: ports are "published" and Caddy is "rebuilt" by
- * waiting and then reporting success, and admin calls land on an in-memory Caddy.
+ * An in-controller agent for demo mode, speaking the real protocol so every agent-status page has
+ * something to show. Operations only wait and report success; admin calls hit an in-memory Caddy.
  */
 import {
   AGENT_STATUS_HEARTBEAT_MS,
@@ -29,7 +25,7 @@ import { createSimulatedCaddy } from "./simulated-caddy";
 export const DEMO_AGENT_ID = "de300000000000000000000000000000";
 const DEMO_AGENT_NAME = "Demo agent";
 
-/** How long each simulated operation "runs". A real rebuild takes minutes; a demo should not. */
+/** A real rebuild takes minutes; a demo should not. */
 export type SimulationDelays = { ports: number; build: number; services: number };
 const DEFAULT_DELAYS: SimulationDelays = { ports: 1_500, build: 6_000, services: 3_000 };
 
@@ -44,17 +40,15 @@ const sameServices = (
 ) => b !== null && Object.entries(a).every(([name, on]) => b[name as ManagedServiceName] === on);
 
 /**
- * Attach the demo agent, pairing it on first start. Null when an operator disabled its row.
- *
- * Unpairing it from Settings detaches it like any other agent, and it stays gone until the next
- * start re-creates it - which is what an operator exploring the demo would expect to see.
+ * Null when an operator disabled its row. Unpaired, it stays gone until the next start re-creates
+ * it, as someone exploring the demo would expect.
  */
 export async function startSimulatedAgent(
   delays: SimulationDelays = DEFAULT_DELAYS,
 ): Promise<SimulatedAgent | null> {
   const row =
     (await findAgentRowByAgentId(DEMO_AGENT_ID)) ??
-    // The secret is never used: nothing signs a request for an agent that is not on a network.
+    // Never used: nothing signs requests for an agent that is not on a network.
     (await insertPairedAgent({
       name: DEMO_AGENT_NAME,
       agentId: DEMO_AGENT_ID,
@@ -80,7 +74,6 @@ export async function startSimulatedAgent(
 
   const report = () => recordStatus(DEMO_AGENT_ID, structuredClone(status));
 
-  /** Run `finish` after `ms`, as the real agent's operations complete in the background. */
   const later = (ms: number, finish: () => void) => {
     const timer = setTimeout(() => {
       timers.delete(timer);
@@ -90,7 +83,7 @@ export async function startSimulatedAgent(
     timers.add(timer);
   };
 
-  // One pending completion per operation: a newer desired state supersedes the one still "running".
+  // A newer desired state supersedes the one still "running".
   const running: Partial<Record<keyof SimulationDelays, object>> = {};
   const start = (op: keyof SimulationDelays, finish: () => void) => {
     const token = {};
@@ -101,7 +94,7 @@ export async function startSimulatedAgent(
       finish();
     });
   };
-  // Asked for what is already applied, as when a change is reverted mid-"build": nothing to run.
+  // Already applied, as when a change is reverted mid-"build": nothing to run.
   const settle = (op: keyof SimulationDelays, current: { state: string }) => {
     if (running[op] === undefined) return;
     running[op] = undefined;
@@ -140,7 +133,7 @@ export async function startSimulatedAgent(
       });
     } else settle("services", status.services.status);
 
-    // With analytics on, a real host has an access log; saying otherwise would show a warning.
+    // A real host with analytics on has an access log; saying otherwise would show a warning.
     status.analytics = {
       enabled: state.fleetConfig.analytics,
       accessLogPresent: state.fleetConfig.analytics,
@@ -149,7 +142,7 @@ export async function startSimulatedAgent(
   }
 
   function execute(command: AgentCommand): void {
-    // Never sent: this agent lists no capabilities. Accepted anyway, as the in-memory Caddy would.
+    // Never sent, as this agent lists no capabilities; accepted anyway, like the in-memory Caddy.
     const answer = (text: string, status = 200) => ({ status, text, headers: {} });
     let response: ReturnType<typeof answer>;
     switch (command.kind) {
@@ -210,14 +203,14 @@ export async function startSimulatedAgent(
           execute(event.command);
           break;
         case "restart":
-          // A real agent restarts Caddy and exits. There is neither here.
+          // A real agent restarts Caddy and exits; there is neither here.
           console.log(`[demo] agent restart requested: ${event.reason}`);
           break;
       }
     }
   })()
     .catch((error: unknown) => console.warn("[demo] simulated agent stopped:", error))
-    // Ended by an unpair or by a newer attach. Not detach: after the latter, that is someone else's.
+    // By an unpair or a newer attach. Not detach: after the latter, that is someone else's.
     .finally(quiesce);
 
   return { agentId: DEMO_AGENT_ID, agentRowId: row.id, stop };

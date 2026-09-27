@@ -1,9 +1,6 @@
 /**
- * Relaying parsed rows to the controller.
- *
- * The parser advances its place in the log only when a relay resolves, so what is pinned is that a
- * refusal propagates, and that a batch too large for one request is split rather than refused
- * every pass forever.
+ * Relaying parsed rows. The parser advances only when a relay resolves, so a refusal must
+ * propagate and an oversized batch must be split rather than refused every pass forever.
  */
 import { afterEach, describe, expect, it } from "bun:test";
 import { MAX_ANALYTICS_REQUEST_BYTES, type TrafficEventRow } from "@cpm/shared";

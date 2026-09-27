@@ -1,11 +1,4 @@
-/**
- * Shape rules for the message catalog itself.
- *
- * These exist because the first extraction pass broke all of them: prose lifted out of JSX kept the
- * source's line breaks and indentation, and the HTML entities JSX had been resolving at compile
- * time became literal `&apos;` once the text was a JSON string. Neither fails a build - they render
- * to the user and look like typos.
- */
+/** Catalog shape rules: none of these fail a build, they render to the user as typos. */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator, IntlErrorCode } from 'next-intl';
 import messages from '../../messages/en.json';
@@ -28,18 +21,14 @@ describe('message catalog', () => {
   });
 
   it('wraps no message by hand', () => {
-    // Line breaks belong to layout. A translator cannot reproduce them, and the CSS that wraps the
-    // English will wrap every other language too.
+    // Line breaks belong to layout, which wraps every language alike.
     const offenders = ALL.filter(([, value]) => /\n|\t| {2,}/.test(value)).map(([key]) => key);
     expect(offenders).toEqual([]);
   });
 
   it('parses every message, so none renders as its own key', () => {
-    // A placeholder written as `<host>` reads as an unclosed rich-text tag. next-intl cannot parse
-    // it and shows the key instead - `settings.dashboardPortEscapeDescription` did exactly that.
-    // Quote a literal one: `'<host>'`. Missing values fail differently (FORMATTING_ERROR) and are
-    // ignored here. The empty values object matters: without one the translator returns a message
-    // with no placeholders verbatim, never parsing it, and this test would pass on the bug.
+    // `<host>` reads as an unclosed rich-text tag and renders the key; quote it as `'<host>'`.
+    // The empty values object matters: without it the message is returned unparsed.
     const unparseable: string[] = [];
     const t = createTranslator({
       locale: 'en',
@@ -72,8 +61,7 @@ describe('message catalog', () => {
   });
 
   it('names keys in camelCase, with no entity fragments left by slugging', () => {
-    // settings.registry.* is the exception: those segments are the registry's own storage names
-    // (`app_name`), because that is what settingMessageName() looks them up by.
+    // settings.registry.* uses storage names (`app_name`), which settingMessageName() looks up.
     const offenders = ALL.filter(([key]) => !key.startsWith('settings.registry.'))
       .filter(([key]) => key.split('.').some((part) => !/^[a-z][A-Za-z0-9]*$/.test(part)))
       .map(([key]) => key);
@@ -97,8 +85,8 @@ describe('message catalog source', () => {
     const { join } = await import('node:path');
     const text = readFileSync(join(import.meta.dir, '../../messages/en.json'), 'utf8');
     const duplicates: string[] = [];
-    // JSON.parse keeps the last of a repeated key, so the keys are read off the text itself. Every
-    // string is a token, so a `{name}` placeholder inside a value never counts as a brace.
+    // JSON.parse keeps the last of a repeated key, so keys are read off the text; strings are
+    // tokens, so a `{name}` placeholder never counts as a brace.
     const stack: Set<string>[] = [];
     for (const token of text.matchAll(/"((?:[^"\\]|\\.)*)"(\s*:)?|[{}]/g)) {
       if (token[0] === '{') stack.push(new Set());

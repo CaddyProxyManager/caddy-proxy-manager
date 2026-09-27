@@ -45,7 +45,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
   const [impName, setImpName] = useState("");
   const [impPem, setImpPem] = useState("");
 
-  // Controlled inputs need seeding on open; the old markup used defaultValue.
+  // Controlled inputs, so they need seeding on every open.
   useEffect(() => {
     if (!open) return;
     setEditName(cert?.name ?? "");

@@ -1,7 +1,6 @@
 /**
- * Coraza's audit log, turned into WAF events. Runs on the agent for the same reason the access-log
- * parser does: the file is on this host. Its two seams are the same - the parse offset lives in the
- * agent's SQLite, and the rows are relayed to the controller.
+ * Coraza's audit log, turned into WAF events. On the agent because the file is on this host; the
+ * offset lives in the agent's SQLite and the rows are relayed to the controller.
  */
 import { existsSync, statSync, truncateSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
@@ -14,9 +13,8 @@ import { geoipCountryDb, wafAuditLogPath, wafRulesLogPath } from "./paths";
 const AUDIT_LOG = wafAuditLogPath();
 const RULES_LOG = wafRulesLogPath();
 const BATCH_SIZE = 200;
-// Coraza's SecAuditLog writes straight to AUDIT_LOG with no rotation of its own (unlike
-// access.log/waf-rules.log, which roll through Caddy's file writer). Once fully ingested,
-// truncate it in place past this size so it can't grow unbounded and fill the disk.
+// SecAuditLog has no rotation of its own (unlike the Caddy-written logs), so once fully ingested
+// it is truncated in place past this size.
 const AUDIT_LOG_TRUNCATE_THRESHOLD = 100 * 1024 * 1024;
 
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
@@ -26,7 +24,6 @@ let stopped = false;
 
 // ── state helpers ─────────────────────────────────────────────────────────────
 
-/** Set once at startup; every state read and write goes through it. */
 let store: AgentStore | null = null;
 
 export function bindStore(next: AgentStore): void {
@@ -69,8 +66,7 @@ function lookupCountry(ip: string): string | null {
 }
 
 // ── WAF rules log parsing ─────────────────────────────────────────────────────
-// Caddy's http.handlers.waf logger emits one JSON line per matched rule holding a ModSecurity
-// message, e.g. `[id "941100"] [msg "XSS Attack ..."] [unique_id "abc123"]`. Mapped by unique_id.
+// One JSON line per matched rule holding a ModSecurity message, mapped by unique_id.
 
 interface RuleInfo {
   ruleId: number | null;
@@ -78,8 +74,7 @@ interface RuleInfo {
   severity: string | null;
 }
 
-// One regex per field name, built on first use: this runs several times per audit message and
-// per rules-log line, and the field set is four fixed strings.
+// Cached per field name: this runs several times per audit message and rules-log line.
 const bracketFieldPatterns = new Map<string, RegExp>();
 
 export function extractBracketField(msg: string, field: string): string | null {
@@ -92,13 +87,12 @@ export function extractBracketField(msg: string, field: string): string | null {
   return m ? m[1] : null;
 }
 
-// Anomaly-evaluation rules only report the accumulated score, not a specific attack, so they
-// must never be picked as an event's rule.
+// They report the accumulated score, not a specific attack, so they are never an event's rule.
 function isAnomalyEvaluationRule(ruleId: number | null): boolean {
   return ruleId === 949110 || ruleId === 980130;
 }
 
-/** Build RuleInfo from a ModSecurity-format rule string, or null if it isn't a specific attack rule. */
+/** RuleInfo from a ModSecurity rule string, or null if it is not a specific attack rule. */
 export function ruleInfoFromMessage(msg: string): RuleInfo | null {
   const ruleIdStr = extractBracketField(msg, "id");
   const ruleId = ruleIdStr ? parseInt(ruleIdStr, 10) : null;
@@ -122,7 +116,6 @@ async function readRulesLog(
       const msg = entry.msg ?? "";
       const uniqueId = extractBracketField(msg, "unique_id");
       if (!uniqueId) continue;
-      // Keep only the first detection rule per unique_id
       if (ruleMap.has(uniqueId)) continue;
       const info = ruleInfoFromMessage(msg);
       if (!info) continue;
@@ -141,35 +134,31 @@ interface CorazaAuditEntry {
   transaction?: {
     id?: string;
     client_ip?: string;
-    // unix_timestamp is nanoseconds since epoch
     unix_timestamp?: number;
     timestamp?: string;
-    // is_interrupted: true means the request was blocked/detected by the WAF
+    // true when the WAF blocked or detected the request
     is_interrupted?: boolean;
     request?: {
       method?: string;
       uri?: string;
-      // header values are arrays of strings (lowercase keys)
+      // lowercase keys
       headers?: Record<string, string[]>;
     };
   };
-  // Populated when audit log part H (or K) is enabled: one entry per matched rule, carrying
-  // the ModSecurity-format rule string.
+  // Only with audit part H (or K): one ModSecurity rule string per matched rule.
   messages?: { message?: string; error_message?: string }[];
 }
 
 /**
- * The first specific (non anomaly-evaluation) matched rule from a Coraza audit entry's own
- * `messages` array, which carries the same string waf-rules.log gets when audit part H is on.
- * Reading it from the entry makes attribution deterministic; a join loses events on tick edges.
+ * First specific matched rule from the entry's own `messages` (audit part H). Deterministic,
+ * where a join against waf-rules.log loses events on tick edges.
  */
 export function ruleInfoFromAuditEntry(entry: CorazaAuditEntry): RuleInfo | null {
   for (const m of entry.messages ?? []) {
     const msg = m.error_message || m.message || "";
     if (!msg) continue;
     const info = ruleInfoFromMessage(msg);
-    // Keep looking past anomaly-evaluation rules - a real attack rule usually
-    // precedes them, but ordering is not guaranteed.
+    // A real attack rule usually precedes the anomaly-evaluation ones, but not always.
     if (info && info.ruleId !== null) return info;
   }
   return null;
@@ -191,7 +180,6 @@ export function parseLine(line: string, ruleMap: Map<string, RuleInfo>): WafEven
 
   const req = tx.request ?? {};
 
-  // unix_timestamp is nanoseconds; fall back to parsing timestamp string
   let ts: number;
   if (tx.unix_timestamp) {
     ts = Math.floor(tx.unix_timestamp / 1e9);
@@ -201,18 +189,15 @@ export function parseLine(line: string, ruleMap: Map<string, RuleInfo>): WafEven
     ts = Math.floor(Date.now() / 1000);
   }
 
-  // Host header is an array under lowercase key
   const hostArr = req.headers?.host ?? req.headers?.Host;
   const host = Array.isArray(hostArr) ? (hostArr[0] ?? "") : (hostArr ?? "");
 
-  // Prefer the rule carried by the audit entry itself; fall back to the
-  // waf-rules.log join only for Coraza builds that don't populate `messages`.
+  // The waf-rules.log join is only for Coraza builds that don't populate `messages`.
   const ruleInfo = ruleInfoFromAuditEntry(entry) ?? (tx.id ? ruleMap.get(tx.id) : undefined);
 
   const blocked = tx.is_interrupted ?? false;
 
-  // Only store events where a specific rule matched or the request was blocked.
-  // Audit log entries without any rule match are clean requests and can be discarded.
+  // No rule match and not blocked is a clean request.
   if (!blocked && !ruleInfo) return null;
 
   return {
@@ -235,9 +220,8 @@ async function readAuditLog(startOffset: number): Promise<{ lines: string[]; new
 }
 
 /**
- * Reset the stored audit-log position so the next pass starts from the top. Used when the tracked
- * file is gone or replaced: an offset from a different inode would park the parser past EOF, since
- * the rotation guard only fires when the file is *smaller* than last recorded.
+ * For a file gone or replaced: an offset from another inode parks the parser past EOF, since the
+ * rotation guard only fires when the file shrinks.
  */
 async function resetAuditLogState(): Promise<void> {
   await setState("waf_audit_log_offset", "0");
@@ -245,9 +229,7 @@ async function resetAuditLogState(): Promise<void> {
   await setState("waf_audit_log_inode", "0");
 }
 
-// Warn once per episode so a deleted audit log - or one we are never allowed to truncate -
-// doesn't spam a line every 30s, while still surfacing the condition instead of failing
-// silently the way this used to.
+// Once per episode, so a missing or untruncatable audit log is surfaced without a line every 30s.
 let warnedAuditLogMissing = false;
 let warnedTruncateFailed = false;
 
@@ -268,8 +250,7 @@ export async function initWafLogParser(): Promise<void> {
 export async function parseNewWafLogEntries(): Promise<void> {
   if (stopped) return;
 
-  // Coraza holds the audit log open, so a deleted file keeps receiving writes on the unlinked inode
-  // and is never recreated - returning silently left ingestion dead with no trace. Surface it, and
+  // Coraza keeps writing to the unlinked inode and never recreates the file, so surface it and
   // clear the stale offset so a recreated file is read from the start.
   if (!existsSync(AUDIT_LOG)) {
     if (!warnedAuditLogMissing) {
@@ -317,9 +298,7 @@ export async function parseNewWafLogEntries(): Promise<void> {
       return;
     }
 
-    // Restart from the top when the file was rotated (shrank) or replaced by a different
-    // inode. Size alone is not enough: a delete-and-recreate that already grew past the last
-    // recorded size would strand the stored offset beyond EOF with no way back.
+    // Size alone misses a delete-and-recreate that already grew past the stored offset.
     const replaced = storedInode !== 0 && currentInode !== storedInode;
     const startOffset = currentSize < storedSize || replaced ? 0 : storedOffset;
     if (replaced) {
@@ -340,19 +319,16 @@ export async function parseNewWafLogEntries(): Promise<void> {
       }
     }
 
-    // Persist progress BEFORE truncating. Truncation is a best-effort disk guard that fails with
-    // EACCES when the file is not group-writable for the agent, and doing it first froze these
-    // offsets - so every later pass re-read and re-inserted the same tail forever.
+    // Before truncating: truncation fails with EACCES when the file is not group-writable, and a
+    // frozen offset re-inserts the same tail on every pass.
     await setState("waf_audit_log_offset", String(newOffset));
     await setState("waf_audit_log_size", String(currentSize));
     await setState("waf_audit_log_inode", String(currentInode));
 
-    // Having read through to the current end of file, truncation is safe: Coraza appends via
-    // O_APPEND, so writes after truncation land at the new (empty) end of file.
+    // Safe once read to EOF: Coraza writes with O_APPEND, so later writes land at the new end.
     if (newOffset === currentSize && currentSize > AUDIT_LOG_TRUNCATE_THRESHOLD) {
       try {
         truncateSync(AUDIT_LOG, 0);
-        // Same inode, now empty - keep tracking it, just rewind.
         await setState("waf_audit_log_offset", "0");
         await setState("waf_audit_log_size", "0");
         warnedTruncateFailed = false;

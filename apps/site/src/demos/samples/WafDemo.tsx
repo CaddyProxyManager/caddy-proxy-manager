@@ -14,7 +14,7 @@ const PLUGINS = [
   { id: 3, name: "phpmyadmin-rule-exclusions", description: null },
 ];
 
-/** Seeded as a host that has been through detect mode and come out with one exclusion, a preset and a plugin. */
+/** A host past detect mode: one exclusion, a preset and a plugin. */
 export default function WafDemo() {
   return (
     <DemoSurface>

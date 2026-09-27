@@ -1,9 +1,6 @@
 /**
- * Asking MaxMind whether a newer database exists.
- *
- * The endpoint is a third party's, so the request shape and the response parsing are pinned here
- * rather than trusted: the credentials go in a Basic header, each edition is its own repeated
- * query parameter, and one malformed row must not lose the others.
+ * The MaxMind endpoint is a third party's, so the request shape and parsing are pinned: Basic auth,
+ * one repeated query parameter per edition, and one malformed row must not lose the others.
  */
 import { describe, it, expect } from 'bun:test';
 import { editionsBehind, fetchGeoipMetadata } from '../../src/lib/geoip/update-check';
@@ -117,8 +114,7 @@ describe('editionsBehind', () => {
   });
 
   it('does not count a database downloaded the same day it was built', () => {
-    // The file is written hours after the build stamp, so a naive timestamp compare would call
-    // every fresh download stale.
+    // The file is written hours after the build stamp; a naive compare calls every download stale.
     expect(
       editionsBehind({ 'GeoLite2-Country': '2026-09-08' }, [
         { edition: 'GeoLite2-Country', updatedAt: new Date('2026-09-08T00:30:00Z') },

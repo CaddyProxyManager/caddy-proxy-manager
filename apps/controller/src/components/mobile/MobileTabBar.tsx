@@ -13,7 +13,7 @@ const DOUBLE_TAP_MS = 350;
 
 type TabSpec = {
   key: string;
-  /** Visibility and href come from this destination. */
+  /** Supplies visibility and href. */
   destination: DestinationId;
   labelKey: "overview" | "hosts" | "agents" | "analytics";
   /** Every path this tab owns - Hosts owns both host pages. */
@@ -36,13 +36,7 @@ function owns(pathname: string, path: string): boolean {
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
 }
 
-/**
- * The phone's primary navigation: four named destinations and More.
- *
- * It replaces the hamburger drawer rather than sitting beside it - two persistent navigation bars
- * cost a screen's worth of chrome for the same job. Everything the four tabs cannot name lives
- * behind More.
- */
+/** Replaces the hamburger drawer rather than adding a second persistent nav bar. */
 export function MobileTabBar({
   role,
   isMoreOpen,
@@ -66,7 +60,7 @@ export function MobileTabBar({
     return destination !== undefined && canSee(destination, role);
   });
   const tabOwnsPath = tabs.some((tab) => tab.owns.some((path) => owns(pathname, path)));
-  // More is where you are whenever no named tab is - a page reached through the drawer, or /more.
+  // More is active whenever no named tab owns the path.
   const isMoreActive = isMoreOpen || !tabOwnsPath;
 
   const handleMore = () => {

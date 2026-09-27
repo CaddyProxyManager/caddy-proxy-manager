@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * Users as a list-detail page: accounts in a searchable rail, the selected account on the right.
- *
- * The shape the admin consoles on Mobbin converge on (Zoho CRM, Canny, Pinterest Business): a rail
- * row is avatar, name, email and a role badge; the detail leads with the person and their state,
- * keeps the actions in its header, and lays the rest out as sections - details, then the groups
- * they belong to. Creating and editing happen in dialogs, so the list never reflows under a form.
+ * Users as a list-detail page. Creating and editing happen in dialogs, so the list never reflows
+ * under a form.
  */
 import { useEffect, useMemo, useState } from "react";
 import { ViewAsDialog } from "@/components/users/ViewAsDialog";
@@ -134,7 +130,6 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
-  // These actions used to fail silently: nothing caught them and nothing was shown.
   const [error, setError] = useState<string | null>(null);
   // A just-created account is selected once the refreshed list delivers it: its id is only known
   // after the server has rendered the row, so the create dialog hands over the email instead.
@@ -474,7 +469,7 @@ function UserDetail({
         }}
       />
 
-      {/* Both actions used window.confirm, which is unstyled and not announced as a dialog. */}
+      {/* Not window.confirm: unstyled, and not announced as a dialog. */}
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}

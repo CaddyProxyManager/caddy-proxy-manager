@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Proxy host lifecycle, and the plain reverse-proxy behaviour every other test
-# builds on: does a created host actually reach its upstream, does an updated
-# host move, does a disabled or deleted host stop being served.
+# Proxy host lifecycle and the plain reverse-proxy behaviour every other test
+# builds on.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "proxy hosts - CRUD and basic proxying"
@@ -40,8 +39,7 @@ t_eq "it reaches the configured origin" "origin-a" "$(fetch_json '.origin')"
 t_eq "the path is passed through unchanged" "/hello" "$(fetch_json '.path')"
 t_eq "the query string is passed through unchanged" "x=1" "$(fetch_json '.query')"
 
-# Caddy's reverse_proxy keeps the client's Host by default, which is what most
-# virtual-hosted upstreams need to route correctly.
+# Virtual-hosted upstreams need the client's Host kept.
 t_eq "the original Host header is forwarded" "$domain" "$(fetch_json '.host')"
 
 t_eq "X-Forwarded-Proto reflects the client's scheme" "https" \
@@ -51,8 +49,7 @@ t_contains "X-Forwarded-For carries the client address" "$CLIENT_IP" \
 t_eq "X-Forwarded-Host carries the requested host" "$domain" \
   "$(fetch_json '.headers["x-forwarded-host"]')"
 
-# The origin sees Caddy, not the client - proof the connection really is proxied
-# rather than the DNS entry pointing at the backend.
+# Proves the request is proxied, not DNS pointing at the backend.
 t_eq "the upstream's peer is Caddy" "$CADDY_IP" "$(fetch_json '.peer')"
 
 fetch "https://$domain/echo" -X POST -H 'Content-Type: text/plain' --data-binary 'payload-from-client'
@@ -93,8 +90,7 @@ api PUT "/api/v1/proxy-hosts/$host_id" "$(jq -nc --arg d "$domain" '{
 t_eq "the host can be disabled" "200" "$API_STATUS"
 t_eq "the disabled flag round-trips" "false" "$(jqr '.enabled')"
 
-# A disabled host is dropped from the Caddy config entirely: no route and no
-# TLS automation policy, so the handshake itself has nothing to answer with.
+# Dropped entirely, TLS policy included, so the handshake has nothing to answer.
 if wait_for "the disabled host to stop answering" 30 \
      bash -c "! curl -sS --max-time 5 --cacert '$CA_BUNDLE' -o /dev/null 'https://$domain/'"; then
   pass "a disabled host is no longer served"

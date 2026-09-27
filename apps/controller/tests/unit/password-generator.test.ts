@@ -55,9 +55,8 @@ describe('generatePassword', () => {
   });
 
   it('spreads characters evenly across the alphabet', () => {
-    // A modulo taken straight off a uint32 would favour the front of the alphabet. The bias is
-    // far too small to see here; what this catches is a coarse mistake - a truncated alphabet, a
-    // draw folded into too small a range - that would skew the distribution visibly.
+    // A modulo bias is too small to see here; this catches a coarse mistake - a truncated alphabet,
+    // a draw folded into too small a range - that would skew the distribution visibly.
     const sample = Array.from({ length: 4_000 }, () => generatePassword(32)).join('');
     const counts = new Map<string, number>();
     for (const character of sample) {

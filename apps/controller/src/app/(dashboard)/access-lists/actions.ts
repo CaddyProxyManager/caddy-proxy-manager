@@ -100,8 +100,7 @@ async function regeneratePasswordActionUntranslated(
 ) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
-  // Remove old entry and add new one with same username
-  // We need to get the username first
+  // Replaced as remove-and-add under the same username, which has to be read first.
   const listBefore = await getAccessList(accessListId);
   if (!listBefore) throw domainError("accessListNotFound");
   const entry = listBefore.entries.find((e) => e.id === entryId);

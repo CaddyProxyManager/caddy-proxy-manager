@@ -1,9 +1,6 @@
 /**
- * A restart the controller asks for over the stream ends this process, after restarting Caddy.
- *
- * The controller sends it as it restarts itself after migrating its database. Caddy is restarted
- * only when it is running: before setup finishes it is not, and starting it here would answer 80
- * and 443 before the controller has said it may.
+ * Sent as the controller restarts after migrating its database. Caddy is restarted only when
+ * running: before setup it is not, and starting it would answer 80 and 443 too early.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

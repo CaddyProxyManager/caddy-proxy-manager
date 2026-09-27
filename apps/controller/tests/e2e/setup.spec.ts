@@ -1,16 +1,7 @@
 /**
- * First-run setup, in a browser.
- *
- * Runs against `web-setup` (port 3004): its own empty database and no `ADMIN_USERNAME`, so nothing
- * can sign in and the instance is genuinely in the setup flow rather than being shown the screens
- * out of context.
- *
- * One page for the whole block, created once. Setup is a sequence an operator walks through in a
- * single session - Playwright's default of a fresh context per test would sign them out between
- * every step, which is neither what happens nor what is worth pinning.
- *
- * The integration tests already cover the state machine. What only a browser shows is that the
- * redirects land, the forms submit, and each step leads to the next.
+ * First-run setup against `web-setup` (:3004), which has an empty database and no ADMIN_USERNAME.
+ * One page for the whole block: setup is one session, and a fresh context per test would sign the
+ * operator out between steps. Integration tests cover the state machine; this covers navigation.
  */
 import { type Page, expect, test } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
@@ -22,14 +13,13 @@ const PASSWORD = 'SetupPassword2026!';
 
 let page: Page;
 
-/** Fill an input by name: FormRow labels are divs, not `<label for>`. */
+/** By name: FormRow labels are divs, not `<label for>`. */
 function field(name: string) {
   return page.locator(`input[name="${name}"]`);
 }
 
 test.beforeAll(async ({ browser }) => {
-  // No storage state: the suite's default is an authenticated admin on the *other* instance, and
-  // carrying it here would send a cookie this one has never issued.
+  // The suite's default storage state belongs to the other instance.
   const context = await browser.newContext({
     baseURL: SETUP_ORIGIN,
     storageState: { cookies: [], origins: [] },
@@ -51,22 +41,18 @@ test.describe('First-run setup', () => {
   });
 
   test('the login page redirects into setup rather than offering a form nothing can answer', async () => {
-    // The bug this pins: /login used to be public and returned before the setup check ran, so a
-    // fresh deployment showed a sign-in form for an account that did not exist, with no way
-    // forward but guessing the URL.
+    // /login is public, so it must still hit the setup check.
     await page.goto('/login');
     await expect(page).toHaveURL(/\/setup$/);
   });
 
   test('choosing the agent role explains that agents are set up elsewhere', async () => {
     await page.goto('/setup');
-    // Every interaction below a fresh `goto` waits for React first: the setup screens are
-    // server-rendered, so a radio click or a fill that lands before hydration is simply lost.
+    // A click or fill that lands before hydration is lost.
     await waitForHydration(page);
     await page.getByRole('radio', { name: 'Agent' }).click();
 
     await expect(page.getByText('Agents are set up separately')).toBeVisible();
-    // And there is a way back - a dead end here would leave an operator with no route to finishing.
     await page.getByRole('button', { name: 'Back to controller setup' }).click();
     await expect(page.getByRole('button', { name: /create account and sign in/i })).toBeVisible();
   });
@@ -90,7 +76,6 @@ test.describe('First-run setup', () => {
     await page.getByRole('button', { name: /create account and sign in/i }).click();
 
     await expect(page.getByText('The two passwords do not match.')).toBeVisible();
-    // Still on setup: a refused submission that navigated would look like success.
     await expect(page).toHaveURL(/\/setup$/);
   });
 
@@ -102,8 +87,7 @@ test.describe('First-run setup', () => {
     await field('passwordConfirmation').fill(PASSWORD);
     await page.getByRole('button', { name: /create account and sign in/i }).click();
 
-    // To the login page on purpose: the point of this step is to prove the credentials work before
-    // any more configuration is entered.
+    // Login on purpose: prove the credentials before more configuration is entered.
     await expect(page).toHaveURL(/\/login$/, { timeout: 30_000 });
   });
 
@@ -117,28 +101,23 @@ test.describe('First-run setup', () => {
   });
 
   test('the settings step shows the values it is about to take over', async () => {
-    // The point of this screen: an operator has to see what is being copied into the database
-    // before they can be told to delete it from their .env.
+    // The operator must see what is copied into the database before deleting it from .env.
     await expect(page.getByRole('heading', { name: 'Finish setting up' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Public URL' })).toHaveValue(SETUP_ORIGIN);
   });
 
   test('the defaults a first certificate needs are asked for here, not afterwards', async () => {
-    // The ACME contact is the address Let's Encrypt warns about an expiring certificate at, and it
-    // was previously only reachable once setup had finished - by which time the first certificate
-    // may already have been issued with nobody to tell.
+    // Asked before the first certificate is issued, or expiry warnings have nobody to go to.
     await expect(page.getByRole('textbox', { name: 'ACME contact email' })).toBeVisible();
 
-    // Prefilled from the public URL rather than left blank: it is required, and an empty required
-    // field is the one thing that can stop setup finishing.
+    // Required, so prefilled: an empty required field would block finishing.
     await expect(page.locator('input[name="defaultDomain"]')).toHaveValue(
       new URL(SETUP_ORIGIN).hostname,
     );
   });
 
   test('the dashboard host is a choice here, and opens off without a usable name', async () => {
-    // This instance is reached at localhost with no DASHBOARD_DOMAIN, so there is no name to
-    // claim - the switch opens off and the domain is not asked for until it is on.
+    // Reached at localhost with no DASHBOARD_DOMAIN, so there is no name to claim.
     const proxy = page.getByRole('switch', { name: 'Reverse proxy this dashboard' });
     await expect(proxy).not.toBeChecked();
     await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toBeHidden();
@@ -146,37 +125,32 @@ test.describe('First-run setup', () => {
     await proxy.click();
     await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toHaveValue('');
 
-    // Back off so the rest of this file finishes setup without claiming a domain.
+    // Off again so later tests finish setup without a domain.
     await proxy.click();
     await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toBeHidden();
   });
 
   test('an identity provider can be configured here, not only on the account step', async () => {
-    // The account step asks about OAuth only when it is the *only* way in. This instance created a
-    // local administrator, so before this card the OAUTH_ half of a .env had nowhere to go.
+    // The account step asks about OAuth only when it is the only way in.
     await expect(page.getByRole('textbox', { name: 'Display name' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Issuer URL' })).toBeVisible();
 
-    // Optional: blank is the ordinary answer, and the tests below finish setup without it.
     await expect(page.getByRole('textbox', { name: 'Display name' })).toHaveValue('');
   });
 
   test('a half-filled provider is refused rather than quietly skipped', async () => {
-    // A name with no secret is a provider that cannot work; skipping it silently would leave the
-    // operator believing they had configured single sign-on.
+    // Skipping it silently would leave the operator believing SSO was configured.
     await page.getByRole('textbox', { name: 'Display name' }).fill('Partly');
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
 
     await expect(page.getByText(/needs a display name, issuer URL/i)).toBeVisible();
     await expect(page).toHaveURL(/\/setup\/settings$/);
 
-    // Put it back to blank so the rest of this file finishes setup without a provider.
     await page.getByRole('textbox', { name: 'Display name' }).fill('');
   });
 
   test('the optional containers are switches, with their settings behind them', async () => {
-    // This instance runs with an empty CLICKHOUSE_PASSWORD, so analytics infer off - and the whole
-    // point of the gate is that the rest of the group is not asked about until it is on.
+    // An empty CLICKHOUSE_PASSWORD here makes analytics infer off.
     const analytics = page.getByRole('switch', { name: 'Enable analytics' });
     await expect(analytics).toBeVisible();
     await expect(analytics).not.toBeChecked();
@@ -190,13 +164,11 @@ test.describe('First-run setup', () => {
   });
 
   test('enabling analytics without a password is refused rather than half-applied', async () => {
-    // The ClickHouse container will not start without one, so this is a state that cannot become
-    // true. Refusing here is what stops setup finishing with analytics on and nothing recording.
+    // ClickHouse will not start without one, so analytics would be on with nothing recording.
     await expect(page.getByRole('switch', { name: 'Enable analytics' })).toBeChecked();
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
 
     await expect(page.getByText(/needs a ClickHouse password/i)).toBeVisible();
-    // Still on the settings step: nothing was saved and setup is not finished.
     await expect(page).toHaveURL(/\/setup\/settings$/);
   });
 
@@ -206,20 +178,15 @@ test.describe('First-run setup', () => {
   });
 
   test('saving the settings restarts the app, then opens the dashboard', async () => {
-    // Past the file's 60s default: a container really does stop and start here.
+    // A real container restart happens here.
     test.setTimeout(180_000);
 
-    // The restart is part of finishing, not a detail of it: this process resolved its settings and
-    // listed its OAuth providers against a database that had neither, and coming back is what
-    // applies the Caddy configuration a dashboard host would need.
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
     await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
       timeout: 30_000,
     });
 
-    // Container down, container up, then the dashboard. Generous: this is a real restart of a real
-    // container, and the compose healthcheck alone allows 20s of start period. This instance is
-    // reached at localhost and claimed no dashboard domain, so it comes back on the same origin.
+    // No dashboard domain was claimed, so it comes back on the same origin.
     await expect(page).toHaveURL(new RegExp(`^${SETUP_ORIGIN}/?$`), { timeout: 180_000 });
   });
 
@@ -232,8 +199,7 @@ test.describe('First-run setup', () => {
   });
 
   test('the account it created can sign in from scratch', async ({ browser }) => {
-    // A fresh context: the assertion is that the credentials work, not that the session from the
-    // setup flow is still around.
+    // A fresh context, so this proves the credentials rather than the setup session.
     const context = await browser.newContext({
       baseURL: SETUP_ORIGIN,
       storageState: { cookies: [], origins: [] },

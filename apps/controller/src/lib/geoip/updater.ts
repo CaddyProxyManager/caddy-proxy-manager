@@ -1,10 +1,6 @@
 /**
- * Downloading the MaxMind databases, which the geoipupdate container used to do.
- *
- * A timer in this process asks MaxMind's metadata endpoint what it has built and downloads only an
- * edition that is missing or whose build differs from the one on disk. The build each file came
- * from is stored rather than read off its mtime: a download that lands on the day MaxMind publishes
- * a second build would otherwise read as current until the next one.
+ * Downloads a MaxMind edition only when missing or its build differs. The build is stored, not
+ * read off the mtime, or a download landing the day of a second build would read as current.
  */
 
 import { randomBytes } from "node:crypto";
@@ -19,13 +15,13 @@ import { checkGeoipUpdates, geoipCredentials } from "./update-check";
 
 const DOWNLOAD_URL = "https://download.maxmind.com/geoip/databases";
 
-/** How often the timer wakes to see whether a check is due. The interval itself is a setting. */
+/** How often to see whether a check is due; the interval itself is a setting. */
 const WAKE_MS = 15 * 60 * 1000;
 
 /** Generous: City is tens of megabytes over whatever link this host has. */
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 
-/** Several times the largest archive. Only there so an endless body cannot exhaust memory. */
+/** Several times the largest archive; only stops an endless body exhausting memory. */
 export const MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
 
 const STATE_KEY = "geoip_downloads";
@@ -34,7 +30,6 @@ const STATE_KEY = "geoip_downloads";
 const METADATA_MARKER = Buffer.from([0xab, 0xcd, 0xef, ...Buffer.from("MaxMind.com", "ascii")]);
 const METADATA_SEARCH_BYTES = 128 * 1024;
 
-/** One edition that would not download: its English, and the code when it had one. */
 export type GeoipDownloadFailure = {
   edition: string;
   message: string;
@@ -42,25 +37,24 @@ export type GeoipDownloadFailure = {
 };
 
 export type GeoipDownloadState = {
-  /** When the updater last ran with GeoIP enabled and credentials set, or null if never. */
+  /** Last run with GeoIP enabled and credentials set. */
   ranAt: string | null;
-  /** Why the last run failed, when any part of it did, joined in English. */
+  /** Joined in English. */
   error: string | null;
-  /** The same failures one by one, so a page can say them in its reader's language. */
+  /** One by one, so a page can say them in its reader's language. */
   failures: GeoipDownloadFailure[];
-  /** Edition to the MaxMind build date, ISO `YYYY-MM-DD`, of the file on disk. */
+  /** MaxMind build date (`YYYY-MM-DD`) of each file on disk. */
   builds: Partial<Record<GeoipEdition, string>>;
 };
 
 export type GeoipUpdateResult = {
   downloaded: GeoipEdition[];
-  /** Every failure of the run, the check's included, joined in English. */
+  /** Every failure, the check's included, joined in English. */
   error: string | null;
-  /** The check's failure, when it failed; see `geoipUpdateErrorMessage`. */
+  /** See `geoipUpdateErrorMessage`. */
   checkError?: { message: string; code: StoredErrorCode | null } | null;
-  /** The downloads that failed. */
   failures?: GeoipDownloadFailure[];
-  /** Set when nothing was attempted, so a caller can say why. */
+  /** Why nothing was attempted. */
   skipped?: "disabled" | "unconfigured";
 };
 
@@ -69,16 +63,13 @@ export async function getGeoipDownloadState(): Promise<GeoipDownloadState> {
   return {
     ranAt: stored?.ranAt ?? null,
     error: stored?.error ?? null,
-    // A state stored before failures were kept one by one has only the joined English.
+    // Older stored states have only the joined English.
     failures: stored?.failures ?? [],
     builds: stored?.builds ?? {},
   };
 }
 
-/**
- * Read a body into memory, refusing more than `maxBytes`. Counted as it streams, since
- * Content-Length is the sender's claim and may be absent.
- */
+/** Counted as it streams: Content-Length is the sender's claim and may be absent. */
 export async function readCapped(
   response: Response,
   maxBytes = MAX_ARCHIVE_BYTES,
@@ -114,11 +105,7 @@ export async function readCapped(
   return bytes;
 }
 
-/**
- * Fetch one edition's `.tar.gz` from MaxMind.
- *
- * `fetchImpl` is a parameter so the redirect and error handling can be tested without the network.
- */
+/** `fetchImpl` lets the redirect and error handling be tested without the network. */
 export async function fetchGeoipArchive(
   edition: GeoipEdition,
   accountId: string,
@@ -136,8 +123,7 @@ export async function fetchGeoipArchive(
     signal,
   });
 
-  // MaxMind redirects to presigned storage, which refuses a request carrying a second credential,
-  // so the Authorization header must not follow the redirect.
+  // Presigned storage refuses a second credential, so Authorization must not follow the redirect.
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location");
     if (!location) throw domainError("maxmindRedirectWithoutLocation");
@@ -153,21 +139,14 @@ export async function fetchGeoipArchive(
   return readCapped(response);
 }
 
-/**
- * Whether `bytes` ends like a MaxMind database: cheaper than opening it, and enough to refuse an
- * error page that arrived with a 200.
- */
+/** Cheaper than opening it, and enough to refuse an error page that arrived with a 200. */
 export function looksLikeMmdb(bytes: Uint8Array): boolean {
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const from = Math.max(0, buffer.byteLength - METADATA_SEARCH_BYTES);
   return buffer.subarray(from).lastIndexOf(METADATA_MARKER) !== -1;
 }
 
-/**
- * Pull `<edition>.mmdb` out of MaxMind's archive, with the build date its directory is named for.
- *
- * The archive holds `<edition>_<YYYYMMDD>/` with the database, a licence and a copyright notice.
- */
+/** The build date comes from the archive's `<edition>_<YYYYMMDD>/` directory name. */
 export async function extractGeoipDatabase(
   archive: Uint8Array,
   edition: GeoipEdition,
@@ -189,12 +168,7 @@ export async function extractGeoipDatabase(
   throw domainError("geoipDatabaseMissing", { edition });
 }
 
-/**
- * Swap a database into place.
- *
- * Through a uniquely named file in the same directory: the agent route may be streaming the old one,
- * and a rename leaves that read on the file it opened rather than a half-written one.
- */
+/** Via rename: the agent route may be streaming the old file, and keeps reading what it opened. */
 export function installGeoipDatabase(edition: GeoipEdition, bytes: Uint8Array): void {
   const target = geoipDatabasePath(edition);
   mkdirSync(dirname(target), { recursive: true });
@@ -210,11 +184,7 @@ export function installGeoipDatabase(edition: GeoipEdition, bytes: Uint8Array): 
 
 let inFlight: Promise<GeoipUpdateResult> | null = null;
 
-/**
- * Bring every edition up to date with MaxMind, and tell the agents when anything changed.
- *
- * Never throws: failures are recorded in the stored state, where the settings page reads them.
- */
+/** Never throws: failures are stored, where the settings page reads them. */
 export function updateGeoipDatabases(fetchImpl: typeof fetch = fetch): Promise<GeoipUpdateResult> {
   if (inFlight) return inFlight;
   inFlight = run(fetchImpl)
@@ -235,22 +205,21 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
 
   const state = await getGeoipDownloadState();
   const builds = { ...state.builds };
-  // Also what the settings page reports as "last checked", so each tick keeps that current.
+  // Also the settings page's "last checked", so each tick keeps that current.
   const check = await checkGeoipUpdates(GEOIP_EDITIONS, fetchImpl);
 
   const downloaded: GeoipEdition[] = [];
-  // Download failures only: a failed check is already stored, and shown, by the check itself.
+  // Download failures only: the check stores its own.
   const failures: GeoipDownloadFailure[] = [];
   for (const edition of GEOIP_EDITIONS) {
     const available = check.available[edition];
-    // With the check failed the answer is unknown, and a file already here is kept rather than
-    // downloaded blind against MaxMind's daily download limit.
+    // With the check failed, an existing file is kept rather than spend MaxMind's daily limit.
     const current =
       existsSync(geoipDatabasePath(edition)) &&
       (available === undefined || builds[edition] === available);
     if (current) continue;
 
-    // Sequentially: three archives at once over one link is no faster and harder to read when it fails.
+    // Sequential: parallel is no faster over one link and harder to read when it fails.
     try {
       const archive = await fetchGeoipArchive(edition, accountId, licenseKey, fetchImpl);
       const { bytes, build } = await extractGeoipDatabase(archive, edition);
@@ -284,7 +253,7 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
   );
 
   if (downloaded.length > 0) {
-    // Every push has agents re-check the route, and the new ETag makes them download.
+    // Agents re-check the route on every push; the new ETag makes them download.
     const { pushFleetConfig } = await import("../agent/fleet-config");
     await pushFleetConfig();
   }
@@ -297,12 +266,7 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
   };
 }
 
-/**
- * Whether the configured interval has passed since the last run.
- *
- * Measured from the stored run rather than from process start, so a restart does not reset the
- * clock, and a changed interval applies at the next wake without a timer to reschedule.
- */
+/** From the stored run: a restart keeps the clock, and a new interval needs no reschedule. */
 export function geoipUpdateDue(
   ranAt: string | null,
   intervalHours: number,
@@ -327,7 +291,7 @@ async function updateIfDue(): Promise<void> {
 
 let timer: NodeJS.Timeout | null = null;
 
-/** Check now if a check is due, and again at every wake. Idempotent. */
+/** Idempotent. */
 export function startGeoipUpdater(): void {
   if (timer) return;
   const wake = () => {

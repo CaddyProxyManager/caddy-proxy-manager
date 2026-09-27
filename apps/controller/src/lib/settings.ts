@@ -34,7 +34,6 @@ export type GeneralSettings = {
 };
 
 export type AvatarSettings = {
-  /** Fall back to Gravatar for users who have no icon of their own. */
   gravatarEnabled: boolean;
 };
 
@@ -56,11 +55,7 @@ export type AuthentikSettings = {
   authEndpoint?: string;
 };
 
-/**
- * Defaults a new proxy host's forward-auth block is prefilled from, so an operator running one
- * auth server for the whole fleet types its address once rather than per host. Nothing is applied
- * from here: a host carries its own block, and this only seeds the form.
- */
+/** Only prefills a new host's forward-auth form; nothing is applied from here. */
 export type ForwardAuthSettings = {
   provider: "authelia" | "custom";
   /** Base URL of the auth server, e.g. http://authelia:9091 */
@@ -80,32 +75,26 @@ export type LoggingSettings = {
 };
 
 export type TrustedProxiesSettings = {
-  // Proxy ranges to trust for X-Forwarded-For / client IP resolution at the server level
-  // (Caddy `trusted_proxies`). Accepts CIDRs, bare IPs, and the "private_ranges" shorthand.
-  // Empty = disabled (current behaviour).
+  // CIDRs, bare IPs or "private_ranges". Empty disables it.
   ranges: string[];
-  // Headers Caddy reads the real client IP from (Caddy `client_ip_headers`). Empty = Caddy's
-  // X-Forwarded-For default; useful for e.g. Cf-Connecting-Ip.
+  // Empty means Caddy's X-Forwarded-For default.
   client_ip_headers?: string[];
-  // Only trust client_ip_headers from the configured proxies, rejecting spoofed values from
-  // untrusted peers (Caddy `trusted_proxies_strict`).
   strict?: boolean;
-  // When true, use `ranges` as the default trusted-proxy list for global geoblocking so the
-  // two settings can't silently disagree.
+  // Reuse `ranges` for global geoblocking so the two cannot silently disagree.
   default_geoblock?: boolean;
 };
 
 export type DnsSettings = {
   enabled: boolean;
-  resolvers: string[]; // Primary DNS resolvers (e.g., "1.1.1.1", "9.9.9.9")
-  fallbacks?: string[]; // Fallback DNS resolvers if primary fails
-  timeout?: string; // DNS query timeout (e.g., "5s")
+  resolvers: string[];
+  fallbacks?: string[];
+  timeout?: string; // Caddy duration, e.g. "5s"
 };
 
 export type DnsProviderSettings = {
-  /** Configured providers: keyed by provider name, value is credential map */
+  /** Provider name -> credential map. */
   providers: Record<string, Record<string, string>>;
-  /** Name of the default provider (null = no DNS-01 challenges) */
+  /** Null means no DNS-01 challenges. */
   default: string | null;
 };
 
@@ -119,27 +108,23 @@ export type UpstreamDnsResolutionSettings = {
 export type GeoBlockSettings = {
   enabled: boolean;
 
-  // Block rules
-  block_countries: string[]; // ISO 3166-1 alpha-2, e.g. ["CN", "RU"]
+  block_countries: string[]; // ISO 3166-1 alpha-2
   block_continents: string[]; // AF, AN, AS, EU, NA, OC, SA
   block_asns: number[];
   block_cidrs: string[];
   block_ips: string[];
 
-  // Allow rules (win over block rules)
+  // Allow rules win over block rules.
   allow_countries: string[];
   allow_continents: string[];
   allow_asns: number[];
   allow_cidrs: string[];
   allow_ips: string[];
 
-  // Trusted proxies for X-Forwarded-For parsing
   trusted_proxies: string[];
-  // When true, block requests whose real client IP cannot be determined (e.g. from a trusted
-  // proxy with no usable XFF entry). Default: false (fail-open).
+  // Block when the real client IP cannot be determined. Off (fail-open) by default.
   fail_closed: boolean;
 
-  // Block response customization
   response_status: number; // default 403
   response_body: string; // default "Forbidden"
   response_headers: Record<string, string>;
@@ -147,8 +132,8 @@ export type GeoBlockSettings = {
 };
 
 export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
-  // A staged value stands in for the stored row, so the config builder and every form read the
-  // same pending state without knowing staging exists. See ./settings/staging-context.ts.
+  // A staged value stands in for the stored row, so readers see pending state unawares.
+  // See ./settings/staging-context.ts.
   const staged = currentStagingScope()?.overlay.get(key);
   const raw = staged ?? (await storedSettingValue(key));
 
@@ -175,8 +160,7 @@ export async function setSetting<T>(key: string, value: T): Promise<void> {
   const payload = JSON.stringify(value);
   const now = nowIso();
 
-  // Inside a capturing scope the write is a staged edit, not a commit. The scope belongs to one
-  // action invocation, so an action that writes several keys stages them together.
+  // Inside a capturing scope this stages instead; one scope per action stages its keys together.
   const capture = currentStagingScope()?.capture;
   if (capture) {
     capture.set(key, payload);
@@ -204,17 +188,15 @@ export async function clearSetting(key: string): Promise<void> {
 }
 
 /**
- * The legacy Cloudflare settings. The token comes back as stored, like Tailscale's auth key: its
- * readers only test for presence, and the dns_provider migration hands it to a reader that decrypts
- * on use. A row written before tokens were encrypted still reads as plaintext until its next save.
+ * The token comes back as stored (maybe encrypted, maybe legacy plaintext): readers only test
+ * presence, and the dns_provider migration decrypts on use.
  */
 export async function getCloudflareSettings(): Promise<CloudflareSettings | null> {
   return await getSetting<CloudflareSettings>("cloudflare");
 }
 
 export async function saveCloudflareSettings(settings: CloudflareSettings): Promise<void> {
-  // encryptSecret passes an already-encrypted token through, which is what a form re-saving the
-  // stored value sends.
+  // encryptSecret passes an already-encrypted token through, as a re-saved form sends.
   await setSetting("cloudflare", { ...settings, apiToken: encryptSecret(settings.apiToken ?? "") });
 }
 
@@ -222,10 +204,7 @@ export async function getGeneralSettings(): Promise<GeneralSettings | null> {
   const stored = await getSetting<GeneralSettings & { primaryDomain?: string }>("general");
   if (!stored) return null;
 
-  // `primaryDomain` is what every release before this one wrote, and what a pre-3.0 database
-  // still holds after the migration copies its `settings` rows across verbatim. Read either name
-  // and answer with the current one, so an upgrade does not present an empty field and quietly
-  // overwrite the operator's domain the first time the form is saved.
+  // Pre-3.0 databases still hold `primaryDomain`; without this the first save would blank it.
   const { primaryDomain, ...rest } = stored;
   return { ...rest, defaultDomain: stored.defaultDomain ?? primaryDomain ?? "" };
 }
@@ -234,10 +213,7 @@ export async function saveGeneralSettings(settings: GeneralSettings): Promise<vo
   await setSetting("general", settings);
 }
 
-/**
- * How the dashboard is served through Caddy. Null until setup has decided, which the managed-host
- * builder reads as "off".
- */
+/** Null until setup has decided, which the managed-host builder reads as off. */
 export async function getDashboardSettings(): Promise<DashboardHostSettings | null> {
   return await getSetting<DashboardHostSettings>("dashboard");
 }
@@ -255,14 +231,7 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
   await setSetting("avatars", settings);
 }
 
-/**
- * Whether icons may fall back to Gravatar.
- *
- * Resolution is the registry first - a stored value, then AVATAR_GRAVATAR - and only then the
- * older JSON blob the Settings page used to write. The blob stays in the chain for deployments
- * that have not been through the migration, which is what lifts it into the registry key; without
- * that fallback, upgrading would silently reset the toggle.
- */
+/** The registry first, then the legacy blob for unmigrated deployments, or upgrading resets it. */
 export async function isGravatarEnabled(): Promise<boolean> {
   const [{ gravatarEnabled }, { resolveSetting }] = await Promise.all([
     import("./settings/registry"),
@@ -283,13 +252,7 @@ export async function savePasswordPolicySettings(settings: PasswordPolicySetting
   await setSetting("password_policy", settings);
 }
 
-/**
- * Whether a bcrypt-hashed user must change their password.
- *
- * Same order as isGravatarEnabled: the registry (stored, then the environment variable), then the
- * older JSON blob for deployments that have not migrated yet. This one is tri-state - null means
- * "no opinion", which is why an unset registry value has to fall through rather than read as false.
- */
+/** Same order as isGravatarEnabled, but tri-state: a null registry value falls through. */
 export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
   const [{ requirePasswordChangeOnLegacyHash }, { resolveSetting }] = await Promise.all([
     import("./settings/registry"),
@@ -409,8 +372,7 @@ export async function getDnsProviderSettings(): Promise<DnsProviderSettings | nu
   const raw = await getSetting<Record<string, unknown>>("dns_provider");
   if (!raw) return null;
 
-  // Normalize the old single-provider { provider, credentials } shape into the multi-provider
-  // { providers, default } shape.
+  // The legacy single-provider shape.
   if ("provider" in raw && "credentials" in raw && !("providers" in raw)) {
     const name = raw.provider as string;
     const creds = raw.credentials as Record<string, string>;
@@ -454,13 +416,10 @@ export type WafSettings = {
   preset_ids?: number[];
   // crs_plugins ids; emitted only alongside the CRS.
   plugin_ids?: number[];
-  // Request body limits, in bytes. Unset means Coraza's own default applies
-  // (12.5 MiB from @coraza.conf-recommended when load_owasp_crs is on, else
-  // 128 MiB). Coraza caps both at 1 GiB - see CORAZA_MAX_BODY_LIMIT.
+  // Bytes. Unset means Coraza's default (12.5 MiB with the CRS, else 128 MiB); capped at 1 GiB.
   request_body_limit?: number;
   request_body_in_memory_limit?: number;
-  // ProcessPartial inspects the leading bytes and forwards the rest instead of
-  // rejecting oversized uploads outright.
+  // ProcessPartial inspects the leading bytes and forwards the rest rather than rejecting.
   request_body_limit_action?: "Reject" | "ProcessPartial";
 };
 
@@ -475,8 +434,7 @@ export async function saveWafSettings(s: WafSettings): Promise<void> {
   await setSetting("waf", s);
 }
 
-// Global error pages, applied as fallback error routes across every proxy host. Per-host error
-// pages take precedence over these.
+// Fallbacks for every proxy host; per-host error pages win.
 export type ErrorPagesSettings = {
   rules: ErrorPageRule[];
 };
@@ -492,18 +450,15 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 // ─── Tailscale ───────────────────────────────────────────────────────────────
 
 /**
- * Tailscale node defaults. The auth key comes back exactly as stored - encrypted - because this is
- * also what the Settings page reads; decrypting here would put the key one careless prop away from
- * the browser. Config generation decrypts it explicitly.
+ * The auth key stays encrypted: the Settings page reads this too, and decrypting here would put
+ * the key one careless prop from the browser. Config generation decrypts it explicitly.
  */
 export async function getTailscaleSettings(): Promise<TailscaleSettings | null> {
   const value = await getSetting<unknown>("tailscale");
   if (value === null) return null;
 
   try {
-    // The stored blob is normalized on the way in, so a failure here means it was hand-edited or
-    // written by an older shape. Treating that as "not configured" is safer than throwing on every
-    // config apply, which would take every other host down with it.
+    // Throwing here would fail every config apply, taking every other host down with it.
     return normalizeTailscaleSettings(value);
   } catch (error) {
     console.warn("Ignoring invalid Tailscale settings", error);
@@ -520,14 +475,12 @@ export async function saveTailscaleSettings(value: TailscaleSettings): Promise<v
   });
 }
 
-/** The effective settings when nothing has been saved yet, so callers need no null branch. */
 export function defaultTailscaleSettings(): TailscaleSettings {
   return { ...DEFAULT_TAILSCALE_SETTINGS, tags: [] };
 }
 
 // ─── Caddy build ─────────────────────────────────────────────────────────────
 
-/** Which Caddy plugins this deployment's image is built with. */
 export type CaddyBuildSettings = {
   /** Built-in module id -> enabled. Absent ids fall back to enabled. */
   modules: Record<string, boolean>;
@@ -542,8 +495,7 @@ export async function saveCaddyBuildSettings(s: CaddyBuildSettings): Promise<voi
   await setSetting("caddy_build", s);
 }
 
-// Response for requests that do not match any configured proxy host. A missing
-// setting (or mode "caddy") preserves Caddy's native routing/HTTPS behavior.
+// Unmatched requests. Missing (or mode "caddy") keeps Caddy's native behaviour.
 export async function getDefaultResponseSettings(): Promise<DefaultResponseSettings | null> {
   const value = await getSetting<unknown>("default_response");
   if (value === null) return null;

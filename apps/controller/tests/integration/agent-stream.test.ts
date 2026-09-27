@@ -1,10 +1,6 @@
 /**
- * The connection registry: the only way the controller reaches an agent.
- *
- * Since the controller stopped dialling out, "is this agent reachable" is entirely a question about
- * this map. The properties worth pinning are the ones that used to be the transport's problem and
- * are now this file's: a command must not outlive its agent, a reconnect must not leave two live
- * streams, and a result must not be settleable by an agent it was not issued to.
+ * A command must not outlive its agent, a reconnect must not leave two live streams, and a
+ * result must not be settleable by an agent it was not issued to.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { AgentDesiredState, AgentServerEvent, AgentStatus } from '@cpm/shared';
@@ -43,12 +39,7 @@ function status(agentId: string): AgentStatus {
   };
 }
 
-/**
- * Attach an agent and start collecting the events the controller sends it.
- *
- * The registry deals in events rather than SSE bytes now - framing is the GraphQL server's job -
- * so this collects what the subscription would publish, with no parser in between.
- */
+/** Collects events, not SSE bytes: framing is the GraphQL server's job. */
 function connect(agentId: string, name = agentId) {
   const { events } = attach({
     agentId,
@@ -63,8 +54,7 @@ function connect(agentId: string, name = agentId) {
 
   const pump = (async () => {
     for await (const event of events) {
-      // Keepalives are part of the protocol now. They are asserted on in their own test; letting
-      // them into this list would make every ordering assertion depend on timing.
+      // Keepalives have their own test; here they would make ordering depend on timing.
       if (event.type !== 'ping') frames.push(event);
     }
   })().catch(() => {
@@ -93,8 +83,7 @@ describe('attaching', () => {
     const second = connect('a1');
     await Bun.sleep(5);
 
-    // One entry, and the *new* stream is the live one - a second connection after a partition must
-    // not leave the old one attached, or every command would be sent twice.
+    // The *new* stream wins, or every command after a partition would be sent twice.
     expect(connectedAgents()).toHaveLength(1);
     await broadcastDesiredState(async () => ({ ...STATE, caddyEnabled: false }));
     await Bun.sleep(5);
@@ -173,8 +162,7 @@ describe('commands', () => {
     await Bun.sleep(5);
     detach('a1');
 
-    // Failed immediately rather than left to time out: the answer is already known, and holding a
-    // page render open for another minute helps nobody.
+    // Immediately, rather than holding a page render open until the timeout.
     await expect(pending).rejects.toThrow(AgentNotConnectedError);
   });
 
@@ -190,8 +178,7 @@ describe('commands', () => {
 
     settleResults('a2', [{ id, ok: true, response: { status: 200, text: 'stolen', headers: {} } }]);
 
-    // Still pending: a2 must not be able to answer for a1. Settled properly so the test does not
-    // leave a live timer behind.
+    // a2 must not answer for a1. Settled properly so no live timer is left behind.
     let settled = false;
     void pending.then(() => {
       settled = true;
@@ -219,8 +206,7 @@ describe('broadcast', () => {
   });
 
   it('builds a separate state for each agent, and skips the ones that would not build', async () => {
-    // The whole point of the per-agent push: two agents can want different ports, and one whose
-    // state cannot be computed must be left on the last one it had rather than handed a guess.
+    // Agents can want different ports; one whose state cannot be computed keeps its last one.
     const a = connect('a1');
     const b = connect('a2');
     await Bun.sleep(5);

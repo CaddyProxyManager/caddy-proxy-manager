@@ -59,7 +59,6 @@ export type WafPluginRow = {
 /** `key` tells apart two registries' plugins of the same name. */
 type RegistryRow = CrsRegistryListing & { key: string };
 
-/** The registry's status, as a token colour and the catalog key naming it. */
 const STATUS = {
   tested: { color: "green", key: "tested" },
   "being-tested": { color: "yellow", key: "beingTested" },
@@ -67,7 +66,7 @@ const STATUS = {
   draft: { color: "gray", key: "draft" },
 } as const;
 
-/** A commit sha reads as noise at full length; a tag is kept as it is. */
+/** A full commit sha reads as noise; a tag is kept as it is. */
 function shortVersion(version: string): string {
   return /^[0-9a-f]{40}$/.test(version) ? version.slice(0, 7) : version;
 }
@@ -356,8 +355,7 @@ export function WafPluginsPanel({
   ];
 
   return (
-    // gap 10 rather than the list pages' 6: two cards stacked need more air between them than a
-    // header and its table do.
+    // Two stacked cards need more air than the list pages' header and table.
     <VStack gap={10}>
       <Card>
         <VStack gap={4}>

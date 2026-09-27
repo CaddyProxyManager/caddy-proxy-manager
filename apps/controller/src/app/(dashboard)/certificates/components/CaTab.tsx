@@ -266,8 +266,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
               {formatRelativeDate(t, ca.createdAt)}
             </Text>
           </HStack>
-          {/* The desktop table expands in place; on mobile the panel simply
-              follows the card, since there is no row to expand into. */}
+          {/* On mobile there is no row to expand into, so the panel follows the card. */}
           <IssuedCertsPanel ca={ca} />
         </VStack>
       </Card>

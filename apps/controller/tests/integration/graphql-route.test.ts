@@ -1,15 +1,7 @@
 /**
- * The GraphQL endpoint over HTTP, rather than the schema underneath it.
- *
- * This exists because of a bug the other GraphQL tests could not have found. They call `graphql()`
- * and `subscribe()` directly with a hand-built context, which means the transport - Yoga, the
- * route handler, and the request body they share - was never exercised. The agent's signature is
- * checked against the bytes it sent, and reading those bytes needs a clone taken *before* Yoga
- * parses the document; a clone taken afterwards throws "Body is disturbed or locked" from inside
- * the resolver. Every unit test passed. The agent could not connect, so Caddy never started, and
- * about a hundred end-to-end tests failed on a Caddy that was never running.
- *
- * So: anything that depends on the request itself belongs here, driven through the real handler.
+ * The GraphQL endpoint over HTTP. The agent's signature needs a body clone taken *before* Yoga
+ * parses it, which unit tests calling `graphql()` directly never exercised - Caddy never started
+ * and ~100 e2e tests failed. Anything depending on the request itself belongs here.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -99,7 +91,6 @@ describe('the endpoint over HTTP', () => {
 
     // The bug, named: a clone taken after Yoga read the body fails exactly this way.
     expect(seen).not.toContain('Body is disturbed or locked');
-    // And the positive: the subscription opened and pushed its first event.
     expect(seen).toContain('hello');
   });
 
@@ -108,9 +99,8 @@ describe('the endpoint over HTTP', () => {
     // HTML page, and would take the agent protocol down with it.
     const response = await post({ query: '{ proxyHosts { id } }' });
 
-    // A GraphQL error, not an HTML redirect. The exact refusal depends on which credential the
-    // request looked like it was presenting, and that belongs to api-auth; what matters here is
-    // that the endpoint answered in its own protocol.
+    // A GraphQL error, not an HTML redirect. Which refusal belongs to api-auth; this only checks
+    // the endpoint answered in its own protocol.
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('json');
     const payload = (await response.json()) as { errors?: { message: string }[] };

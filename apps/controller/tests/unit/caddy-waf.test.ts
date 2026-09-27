@@ -1,7 +1,6 @@
 /**
- * src/lib/caddy-waf.ts. Key regression: with WAF on but OWASP CRS not loaded, the directives must
- * contain no @-prefixed Include paths - those resolve only from the embedded coraza-coreruleset
- * filesystem, mounted when load_owasp_crs=true, so including them fails the config load.
+ * With WAF on but CRS off, no @-prefixed Include may appear: those resolve only from the embedded
+ * coraza-coreruleset filesystem, mounted when load_owasp_crs=true, and fail the config load.
  */
 import { describe, it, expect } from 'bun:test';
 import {
@@ -23,9 +22,8 @@ const baseWaf = {
   custom_directives: '',
 };
 
-// SecRuleEngine mode is interpolated into the directive block and WAF settings are persisted
-// without validation, so an unrecognised mode must never reach the config - it would smuggle in
-// SecLang past the custom_directives allowlist.
+// Mode is interpolated into SecLang and stored unvalidated, so an unknown one would smuggle
+// directives past the allowlist.
 
 describe('buildWafHandler - SecRuleEngine mode sanitising', () => {
   function directives(mode: string): string {
@@ -55,8 +53,7 @@ describe('buildWafHandler - SecRuleEngine mode sanitising', () => {
 
   it('always emits the audit log parts the event parser depends on', () => {
     const out = directives('On');
-    // Part H carries the matched rules that waf-log-parser reads for rule
-    // attribution; losing it silently strips rule id/message/severity.
+    // waf-log-parser reads part H for rule attribution.
     expect(out).toContain('SecAuditLogParts ABFHZ');
     expect(out).toContain('SecAuditLog /logs/waf-audit.log');
     expect(out).toContain('SecAuditLogFormat JSON');
@@ -75,7 +72,6 @@ describe('buildWafHandler - without OWASP CRS', () => {
 
   it('does NOT include any @-prefixed Include when load_owasp_crs is false', () => {
     const handler = buildWafHandler({ ...baseWaf, load_owasp_crs: false });
-    // Guard against any future @-prefixed file references leaking in
     expect(handler.directives).not.toMatch(/Include @/);
   });
 
@@ -111,7 +107,6 @@ describe('buildWafHandler - without OWASP CRS', () => {
       load_owasp_crs: false,
       custom_directives: '   ',
     });
-    // The directives string should end with the last standard directive
     expect((handler.directives as string).trimEnd()).not.toMatch(/\s+$/);
   });
 
@@ -125,9 +120,7 @@ describe('buildWafHandler - without OWASP CRS', () => {
     expect(handler.directives).toContain('SecRequestBodyNoFilesLimit 536870912');
   });
 
-  // Coraza refuses to build a WAF above 1 GiB, and coraza-caddy builds it while
-  // Caddy loads the config - so an out-of-range value doesn't just fail this
-  // host, it makes Caddy reject the whole document.
+  // Coraza builds the WAF as Caddy loads the config, so one bad value rejects the whole document.
   it('drops body limits Coraza would refuse rather than breaking the config load', () => {
     const handler = buildWafHandler({
       ...baseWaf,
@@ -289,7 +282,6 @@ describe('resolveEffectiveWaf - no per-host config', () => {
 
 describe('resolveEffectiveWaf - merge mode (regression: host.enabled=false must opt out)', () => {
   it('returns null when host explicitly disables WAF in merge mode (the bug fix)', () => {
-    // This was the bug: host.enabled=false in merge mode was ignored and global WAF applied anyway
     const result = resolveEffectiveWaf(globalWaf, { enabled: false, waf_mode: 'merge' });
     expect(result).toBeNull();
   });
@@ -309,7 +301,6 @@ describe('resolveEffectiveWaf - merge mode (regression: host.enabled=false must 
     });
     expect(result).not.toBeNull();
     expect(result!.load_owasp_crs).toBe(true);
-    // Both global and host custom directives are present
     expect(result!.custom_directives).toContain('9002');
     expect(result!.custom_directives).toContain('9003');
   });
@@ -347,7 +338,6 @@ describe('resolveEffectiveWaf - override mode', () => {
     });
     expect(result).not.toBeNull();
     expect(result!.custom_directives).toBe('SecRule ARGS "@contains evil" "id:9003,deny"');
-    // Global directives are NOT included
     expect(result!.custom_directives).not.toContain('9002');
     expect(result!.load_owasp_crs).toBe(true);
   });
@@ -360,13 +350,8 @@ describe('resolveEffectiveWaf - override mode', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dedicated request body limit settings (#252)
-//
-// Coraza's WAF is built while Caddy loads the config, so every value emitted
-// here has to satisfy Coraza's validation up front: <= 1 GiB, and the
-// in-memory limit no larger than the request limit. A violation rejects the
-// whole config document, leaving every host unapplied.
-// ---------------------------------------------------------------------------
+// Dedicated request body limit settings (#252). Every value must pass Coraza's checks (<= 1 GiB,
+// in-memory <= request) or the whole config document is rejected.
 
 describe('buildWafHandler - request body limit settings', () => {
   it('emits the configured limits as SecLang directives', () => {
@@ -422,7 +407,7 @@ describe('buildWafHandler - request body limit settings', () => {
     expect(directives).not.toContain('SecRequestBodyLimitAction');
   });
 
-  // Coraza validates the FINAL values, so the corrective line at the end wins.
+  // Coraza checks the final values, so the corrective line at the end wins.
   it('clamps an in-memory limit that would exceed the request limit', () => {
     const directives = buildWafHandler({
       ...baseWaf,
@@ -496,8 +481,7 @@ describe('findInvalidBodyLimitDirective', () => {
   });
 });
 
-// A dropped line used to vanish without a word, which is how "SecRuleUpdateActionById does
-// nothing" reads as a CPM bug rather than a refused directive (upstream discussion #146).
+// A silently dropped line reads as a CPM bug rather than a refused directive (upstream #146).
 describe('filterCustomDirectives', () => {
   it('keeps allowed directives, comments and blank lines', () => {
     const raw = [
@@ -560,8 +544,7 @@ describe('filterCustomDirectives', () => {
   });
 });
 
-// Coraza joins continued lines before it evaluates a directive, so the allowlist has to as well:
-// checked line by line, a rule split across lines was judged in pieces (upstream #149).
+// Coraza joins continued lines before evaluating, so the allowlist must too (upstream #149).
 describe('filterCustomDirectives - multi-line directives', () => {
   it('keeps a rule continued across lines, verbatim', () => {
     const raw = [
@@ -866,7 +849,6 @@ describe('parseBodyLimitMib', () => {
   });
 
   it('raises the code it was given, worded as the form used to word it', () => {
-    // The field name is part of each message rather than spliced in, so the four read in full.
     const cases = [
       ['wafRequestBodyLimitInvalid', 'Request body limit'],
       ['wafInMemoryBodyLimitInvalid', 'In-memory body limit'],

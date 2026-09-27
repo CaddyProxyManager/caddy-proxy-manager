@@ -39,9 +39,7 @@ type Props = {
 
 export function WafFields({ value, showModeSelector = true }: Props) {
   const t = useTranslations("proxyHosts");
-  // The WAF is the Coraza plugin and nothing else. Without it compiled in, a
-  // saved rule set is inert, so the switch reports why instead of accepting
-  // configuration that will never run.
+  // Without Coraza compiled in, rules are inert, so the switch says why instead.
   const moduleDisabledReason = useDisabledReason("waf");
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [wafMode, setWafMode] = useState<WafMode>(value?.waf_mode ?? "merge");
@@ -98,8 +96,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               </Text>
             </VStack>
           </HStack>
-          {/* Disabled controls emit no pointer events, so the explanation is
-              attached by wrapping rather than as a prop on the Switch. */}
+          {/* Wrapped: disabled controls emit no pointer events for a tooltip. */}
           <ModuleGated feature="waf">
             <Switch
               label={t("enableWebApplicationFirewall")}
@@ -117,17 +114,13 @@ export function WafFields({ value, showModeSelector = true }: Props) {
           </Text>
         )}
 
-        {/* Unmounted when off, so the fields below are neither focusable nor
-            submitted - the old max-h-0 wrapper left them in the tab order. */}
-        {/* Not gated on moduleDisabledReason: WafRuleExclusions carries the
-            hidden wafExcludedRuleIds input, and parseWafConfig reads a missing
-            one as "no exclusions". Unmounting it here would wipe the operator's
-            suppression list on the next save. */}
+        {/* Unmounted when off, so nothing below is focusable or submitted. Not gated on
+            moduleDisabledReason: a missing wafExcludedRuleIds input reads as "no exclusions"
+            and would wipe the list on save. */}
         {enabled && (
           <VStack gap={4}>
             {showModeSelector && (
               <>
-                {/* Real radio-group semantics, replacing clickable divs. */}
                 <SegmentedControl
                   label={t("globalRuleHandling")}
                   value={wafMode}

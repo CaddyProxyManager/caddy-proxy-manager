@@ -55,7 +55,6 @@ const POSTGRES: L4ProxyHost = {
   updatedAt: "2026-09-01T12:00:00Z",
 };
 
-/** The fields worth reading back, in the order the form asks for them. */
 const SHOWN = [
   "name",
   "protocol",
@@ -69,10 +68,7 @@ const SHOWN = [
   "geoblockEnabled",
 ];
 
-/**
- * The L4 host editor, both ways in. Saving is answered in the browser, and what the form posted is
- * printed underneath - the matcher and PROXY protocol choices are only really visible there.
- */
+/** Prints what the form posted: the matcher and PROXY protocol choices are only visible there. */
 export default function L4HostEditorDemo() {
   const [open, setOpen] = useState<"create" | "edit" | null>(null);
   const [posted, setPosted] = useState<string | null>(null);

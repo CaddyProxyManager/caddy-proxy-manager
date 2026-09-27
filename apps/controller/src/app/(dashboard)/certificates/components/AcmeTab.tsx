@@ -32,7 +32,6 @@ type Inventory = { certificates: Stored[]; renewing: Set<string>; unreadable: nu
 /** Expiring within this is worth a warning; Caddy itself renews at a third of the lifetime left. */
 const SOON_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** "example.com +2" - the primary domain plus a count of the rest. */
 function domainSummary(r: AcmeHost) {
   return r.domains.length > 1 ? `${r.domains[0]} +${r.domains.length - 1}` : r.domains[0];
 }
@@ -88,7 +87,6 @@ function useInventory() {
   useEffect(() => {
     refresh();
   }, [refresh]);
-  // While anything is renewing, watch for the new certificate.
   useEffect(() => {
     if (!inventory || inventory.renewing.size === 0) return;
     const timer = setInterval(refresh, 5000);

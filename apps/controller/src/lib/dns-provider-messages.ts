@@ -1,14 +1,7 @@
 /**
- * Reads the `settings.dnsProviders.*` catalog on behalf of the DNS Providers settings screen.
- *
- * `dns-providers.ts` keeps its English as the source: the same registry backs the Caddy config,
- * `/api/v1/dns-providers` and GraphQL, and those machine responses stay English. The screen asks
- * here instead, by provider name and field key - both only known at runtime, so
- * `tests/unit/dns-provider-messages.test.ts` asserts every provider and field has an entry, and
- * that the English entries render exactly what the registry says.
- *
- * Only the type is imported from the registry: its values pull in the secret helpers, which have no
- * place in a client bundle.
+ * The DNS Providers screen's catalog lookups. `dns-providers.ts` stays English for the Caddy config
+ * and APIs; keys are runtime values, so tests/unit/dns-provider-messages.test.ts checks coverage.
+ * Only the registry's type is imported: its values pull secret helpers into the client bundle.
  */
 
 import type { useTranslations } from "next-intl";

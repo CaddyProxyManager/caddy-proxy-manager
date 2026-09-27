@@ -1,7 +1,6 @@
 /**
- * An L4 host's upstream becomes a raw layer-4 dial from inside the Caddy container, which can reach
- * the admin API. An operator with a manage grant pointing one at caddy-admin:2019 would publish the
- * whole admin API on the host's listen port, so newly added admin-port targets need an admin.
+ * An L4 upstream is a raw dial from inside Caddy's container: an operator aiming one at
+ * caddy-admin:2019 would publish the admin API. New admin-port targets need an admin.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Outside the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

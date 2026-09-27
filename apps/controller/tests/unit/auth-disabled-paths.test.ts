@@ -1,9 +1,7 @@
 /**
- * Better Auth serves every endpoint it has unless told otherwise, and several of them change a
- * credential behind the app's back: its change-password updates `accounts` but not the
- * `users.passwordHash` sign-in verifies, with only its own 8-character minimum. The username probe
- * enumerates accounts for anyone. Driven through a real instance, so the paths are proven to match
- * the way Better Auth normalizes them rather than merely listed.
+ * Several Better Auth endpoints bypass the app: its change-password skips `users.passwordHash` and
+ * the policy, and the username probe enumerates accounts. A real instance proves the disabled
+ * paths match how it normalizes them.
  */
 import { describe, expect, it } from 'bun:test';
 import { betterAuth } from 'better-auth';

@@ -10,15 +10,11 @@ import {
 } from "@/src/lib/models/forward-auth";
 import { logAuditEvent } from "@/src/lib/audit";
 
-/**
- * Forward auth session login: turns an existing NextAuth session into a forward auth session.
- * Called when the portal finds the user already signed in (e.g. after OAuth).
- */
+/** Turns a dashboard session into a forward auth one, for a portal visitor already signed in. */
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
-    // CSRF: verify the request originates from the CPM portal, on whichever of this instance's own
-    // addresses it was served from.
+    // CSRF: only the portal, on whichever of this instance's own addresses served it.
     if (!(await isPublicOrigin(request.headers.get("origin")))) {
       return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
@@ -39,7 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
-    // Consume the redirect intent - returns the server-stored redirect URI
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {
       return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
@@ -60,7 +55,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("noAccessToApplication") }, { status: 403 });
     }
 
-    // Create forward auth session and exchange code
     const { session: faSession } = await createForwardAuthSession(userId, intent.audience);
     const { rawCode } = await createExchangeCode(faSession.id, intent.redirectUri, intent.audience);
 

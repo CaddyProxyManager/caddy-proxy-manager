@@ -1,15 +1,12 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 
-// db returns the configured proxy-host domain rows; clickhouse returns hosts
-// observed in traffic. getAnalyticsHosts merges them and flags which ones are
-// actually configured as proxy hosts in Caddy (issue #171).
+// getAnalyticsHosts merges configured and observed hosts, flagging the configured ones (#171).
 const { allMock, queryDistinctHostsMock } = vi.hoisted(() => ({
   allMock: vi.fn(),
   queryDistinctHostsMock: vi.fn(),
 }));
-// `.from()` resolves rather than exposing `.all()`: the query is awaited now that the data layer
-// has to work against PostgreSQL too. allMock stays the control point for each test's rows.
+// `.from()` resolves rather than exposing `.all()`, since the query is awaited under PostgreSQL.
 vi.mock('@/src/lib/db', () => ({
   default: {
     select: vi.fn().mockReturnValue({ from: vi.fn(() => Promise.resolve(allMock())) }),

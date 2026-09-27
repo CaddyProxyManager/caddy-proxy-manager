@@ -24,11 +24,7 @@ type AccessList = {
   usedBy: UsedBy[];
 };
 
-/**
- * One of each state the rail tells apart: two lists doing their job, one nobody uses, and one with
- * no members that a host still points at - which is the one that matters, because that host now
- * refuses every request.
- */
+/** One of each state the rail tells apart, including an empty list a host still uses. */
 const LISTS: AccessList[] = [
   {
     id: 1,
@@ -99,11 +95,7 @@ const MEMBER_COLUMNS: Column<Member>[] = [
   },
 ];
 
-/**
- * The two-pane shape of the access lists page: pick a list in the rail, and its members and the
- * hosts it protects fill the pane under it. Passwords are bcrypt-hashed on save, so nothing here
- * shows one.
- */
+/** Passwords are bcrypt-hashed on save, so nothing here shows one. */
 function AccessListDemoContent() {
   const t = useTranslations("accessLists");
   const [selectedId, setSelectedId] = useState(1);
@@ -133,8 +125,7 @@ function AccessListDemoContent() {
                 hosts: list.usedBy.length,
               })}
               endContent={
-                // No members outranks unused, as on the page: it is the one that changes what a
-                // host serves.
+                // No members outranks unused: it changes what a host serves.
                 list.members.length === 0 ? (
                   <Badge variant="error" label={t("noMembersBadge")} />
                 ) : list.usedBy.length === 0 ? (
@@ -146,7 +137,7 @@ function AccessListDemoContent() {
           ))}
         </List>
       </Card>
-      {/* The totals the page's rail ends with, for the whole set rather than the list in view. */}
+      {/* For the whole set, not the list in view. */}
       <Text type="supporting" color="secondary">
         {t("railSummary", {
           lists: LISTS.length,
@@ -163,8 +154,7 @@ function AccessListDemoContent() {
         </Text>
       </VStack>
 
-      {/* Above the tabs, where the page puts it: whichever tab is open, a host that answers nobody
-          is the first thing to know. */}
+      {/* Above the tabs: a host that answers nobody is the first thing to know. */}
       {isEmpty && selected.usedBy.length > 0 && (
         <Banner
           status="warning"
@@ -227,10 +217,7 @@ function AccessListDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Inside DemoSurface, which provides the message catalog useTranslations reads. */
 export default function AccessListDemo() {
   return (
     <DemoSurface>

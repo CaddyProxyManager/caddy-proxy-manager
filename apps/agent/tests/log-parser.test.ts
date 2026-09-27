@@ -1,8 +1,4 @@
-/**
- * Moved here with the parser it covers: the Caddy log is a file on the agent's host, so this
- * is where it is read. The mocks the controller's copy needed are gone - these are pure
- * functions, and the module's imports are real dependencies of this package now.
- */
+/** Pure functions, so no mocks: the module's imports are real dependencies of this package. */
 import { describe, it, expect } from "bun:test";
 import {
   collectBlockedSignatures,
@@ -242,8 +238,7 @@ describe("log-parser", () => {
 
     it("marks a handled request whose block signature arrived in a previous pass", () => {
       const ts = 1700000600;
-      // Pass 1: only the "request blocked" line is present (the tick boundary
-      // fell before the "handled request" row was written).
+      // Pass 1: the tick boundary fell before the "handled request" row.
       const carried = collectBlockedSignatures([
         JSON.stringify({
           ts,

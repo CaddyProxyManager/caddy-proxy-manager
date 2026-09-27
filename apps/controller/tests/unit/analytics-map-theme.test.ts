@@ -12,16 +12,12 @@ import {
   type MapPalette,
 } from '../../src/app/(dashboard)/analytics/map-theme';
 
-/**
- * Builds the palette the way the component does, through the real Astryx theme rather than a stub:
- * the failure this guards is a token renamed or dropped upstream, which a fixture would hide.
- */
+/** The real Astryx theme, not a stub, which would hide a token renamed or dropped upstream. */
 function paletteFor(mode: 'light' | 'dark'): MapPalette {
   const tokens = resolveThemeTokens(neutralTheme, { mode });
   return mapPalette(mode, (name) => tokens[name] ?? '');
 }
 
-/** Every colour string the palette feeds into a MapLibre paint property. */
 function paintColors(p: MapPalette): string[] {
   return [p.ocean, p.empty, ...p.ramp, p.highlight, p.outline];
 }
@@ -32,9 +28,7 @@ describe('analytics map palette', () => {
   it.each([...MODES])('resolves every token to a concrete colour in %s mode', (mode) => {
     for (const color of paintColors(paletteFor(mode))) {
       expect(color).not.toBe('');
-      // MapLibre paints in WebGL and cannot resolve CSS custom properties or a
-      // light-dark() pair - an unresolved token would reach the GPU as garbage
-      // and silently paint nothing.
+      // WebGL cannot resolve CSS tokens or light-dark(); it would silently paint nothing.
       expect(color).not.toContain('light-dark');
       expect(color).not.toContain('var(');
     }
@@ -42,8 +36,7 @@ describe('analytics map palette', () => {
 
   it.each([...MODES])('produces colours MapLibre can parse in %s mode', (mode) => {
     for (const color of paintColors(paletteFor(mode))) {
-      // Color.parse returns undefined rather than throwing on a bad value, so
-      // an unparseable colour would otherwise fail silently at paint time.
+      // Color.parse returns undefined rather than throwing.
       expect(Color.parse(color), `unparseable: ${color}`).toBeDefined();
     }
   });
@@ -52,8 +45,7 @@ describe('analytics map palette', () => {
     const light = paletteFor('light');
     const dark = paletteFor('dark');
 
-    // Same three stops, opposite order: "more traffic" has to read as darker on
-    // a light ocean and lighter on a dark one.
+    // More traffic reads darker on a light ocean and lighter on a dark one.
     expect([...dark.ramp]).toEqual([...light.ramp].reverse());
     expect(new Set(light.ramp).size).toBe(3);
   });
@@ -83,8 +75,7 @@ describe('analytics map palette', () => {
     expect(hoverLayerFor(p).paint?.['fill-color']).toBe(p.highlight);
     expect(outlineLayerFor(p).paint?.['line-color']).toBe(p.outline);
 
-    // The fill is an interpolate expression; the stops must appear in ramp
-    // order after the "no traffic" colour.
+    // Stops in ramp order after the "no traffic" colour.
     const fill = fillLayerFor(p).paint?.['fill-color'] as unknown[];
     expect(fill.slice(0, 3)).toEqual(['interpolate', ['linear'], ['coalesce', ['get', 'norm'], 0]]);
     expect(fill.slice(3)).toEqual([0, p.empty, 0.001, p.ramp[0], 0.4, p.ramp[1], 1, p.ramp[2]]);

@@ -164,8 +164,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw domainError("caCertificateNotFound");
   }
 
-  // Issued client certificates belonging to this CA, plus any mTLS roles that include them - used
-  // both to detect references below and to cascade-delete afterwards.
+  // For the reference check below and the cascade after it.
   const issuedCerts = await db
     .select({ id: issuedClientCertificates.id })
     .from(issuedClientCertificates)
@@ -182,9 +181,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     for (const row of roleRows) affectedRoleIds.add(row.roleId);
   }
 
-  // A host is "in use" if it trusts one of the CA's issued certs (trusted_client_cert_ids), a role
-  // containing one (trusted_role_ids), or the deprecated whole-CA list (ca_certificate_ids). The
-  // old guard checked only the deprecated field.
+  // Through an issued cert, a role holding one, or the deprecated whole-CA list.
   const allHosts = await db
     .select({ meta: proxyHosts.meta, name: proxyHosts.name })
     .from(proxyHosts);
@@ -206,7 +203,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
   });
 
   if (referencing.length > 0) {
-    // Still a 409 over REST. The names go as a list, so the delete dialog formats them for its reader.
+    // A 409 over REST; the names go as a list for the dialog to format.
     throw domainError(
       "caCertificateInUse",
       { names: referencing.map((h) => h.name) },
@@ -214,8 +211,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     );
   }
 
-  // Cascade-delete the CA's issued certs and role mappings by hand: the schema declares
-  // onDelete: "cascade", but bun:sqlite leaves PRAGMA foreign_keys OFF, so it never fires.
+  // By hand: bun:sqlite leaves PRAGMA foreign_keys OFF, so the schema's cascade never fires.
   if (issuedCertIds.length > 0) {
     await db
       .delete(mtlsCertificateRoles)

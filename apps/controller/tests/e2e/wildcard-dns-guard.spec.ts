@@ -1,7 +1,4 @@
-/**
- * E2E: a wildcard proxy host requires a DNS provider - wildcard certs need ACME DNS-01, so an
- * auto-managed wildcard host is rejected without one. Exact domains are unaffected.
- */
+/** Wildcard certs need ACME DNS-01, so an auto-managed wildcard host needs a DNS provider. */
 import { test, expect } from '@playwright/test';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
@@ -77,7 +74,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
       for (const id of createdIds) {
         await page.request.delete(`${API_PROXY_HOSTS}/${id}`, { headers });
       }
-      // GET redacts credential values, so the prior configuration cannot be restored - clear it.
+      // GET redacts credentials, so the prior configuration cannot be restored.
       await page.request.put(API_DNS_PROVIDER, {
         headers,
         data: { providers: {}, default: null },

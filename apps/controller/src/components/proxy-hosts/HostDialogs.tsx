@@ -57,11 +57,7 @@ type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
 export const NONE_VALUE = "__none__";
 
-/**
- * Close the dialog a second after the action succeeds, once. Keyed on the status alone: `onClose`
- * is a new function on every parent render, and depending on it re-armed a fresh, never-cleared
- * timer each time the page revalidated while the status stayed "success".
- */
+/** Keyed on status alone: `onClose` is new each render and would re-arm an uncleared timer. */
 function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -74,7 +70,6 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   }, [state.status]);
 }
 
-/** The action result banner, shared by all three dialogs. */
 function ActionStatus({ status, message }: { status: string; message?: string }) {
   if (status === "idle" || !message) return null;
   return <Banner status={status === "error" ? "error" : "success"} title={message} />;
@@ -94,7 +89,7 @@ export function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">)
   return list.entries.length === 0 && (list.ipRules?.length ?? 0) === 0;
 }
 
-/** Access list options, naming the empty ones: picking one closes the host rather than guarding it. */
+/** Names the empty ones: picking one closes the host rather than guarding it. */
 export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
   return toOptions(
     accessLists.map((list) => ({
@@ -105,7 +100,6 @@ export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
   );
 }
 
-/** A warning on the picker while the chosen list admits nobody. */
 export function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
   const chosen = accessLists.find((list) => String(list.id) === accessListId);
   return chosen && accessListIsEmpty(chosen)
@@ -137,11 +131,7 @@ export function CreateHostDialog({
   authentikDefaults: AuthentikSettings | null;
   forwardAuthDefaults: ForwardAuthSettings | null;
   tailscaleDefaults?: TailscaleHostDefaults | null;
-  /**
-   * Settings → General's default domain, prefilled so the common case is editing a subdomain
-   * rather than typing the whole name. Only for a genuinely new host: duplicating one carries
-   * the original's domains, which is what the operator opened the dialog to change.
-   */
+  /** Prefilled for a new host only: a duplicate carries the domains the operator came to change. */
   defaultDomain?: string;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];

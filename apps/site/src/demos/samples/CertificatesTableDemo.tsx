@@ -50,8 +50,7 @@ const CERTS: Row[] = [
 
 function CertificatesTableDemoContent() {
   const t = useTranslations("certificates");
-  // ACME certificates are renewed by Caddy on the agent, so only the imported ones have an expiry
-  // the controller can count - which is why the tiles split them the way the page does.
+  // Only imported certificates have an expiry the controller can count, hence the split.
   const acme = CERTS.filter((c) => c.issuer === "Let's Encrypt").length;
   const imported = CERTS.length - acme;
   const expired = CERTS.filter((c) => c.status === "error").length;

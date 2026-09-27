@@ -6,7 +6,7 @@ import { applyCaddyConfig } from "@/src/lib/caddy";
 import { CADDY_MODULES } from "@/src/lib/caddy-modules";
 import { getCaddyBuildSettings, saveCaddyBuildSettings } from "@/src/lib/settings";
 
-// The catalog is fixed at build time, so it is shaped once rather than per GET.
+// Fixed at build time.
 const AVAILABLE = CADDY_MODULES.map((m) => ({
   id: m.id,
   name: m.name,
@@ -16,10 +16,7 @@ const AVAILABLE = CADDY_MODULES.map((m) => ({
   features: m.features,
 }));
 
-/**
- * GET /api/v1/caddy/modules - the catalog, the current selection, and how it differs from the
- * running image. The catalog ships along because module ids are what PUT expects.
- */
+/** GET /api/v1/caddy/modules - with the catalog, since module ids are what PUT expects. */
 export async function GET(request: NextRequest) {
   try {
     await requireApiAdmin(request);
@@ -37,10 +34,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * PUT /api/v1/caddy/modules - replace the selection. Does not rebuild; the container keeps its
- * module set until POST /api/caddy-build. The diff says what a rebuild would change.
- */
+/** PUT /api/v1/caddy/modules - no rebuild until POST /api/caddy-build. */
 export async function PUT(request: NextRequest) {
   try {
     await requireApiAdmin(request);
@@ -50,9 +44,7 @@ export async function PUT(request: NextRequest) {
       customModules: body?.customModules,
     });
 
-    // The same refusal the Settings UI applies. Without it this endpoint is a way around the
-    // guard: disabling a module something still uses would be accepted here, and the config
-    // builder would then quietly stop emitting that feature's handlers.
+    // As in Settings, or disabling an in-use module would silently drop that feature's handlers.
     const conflict = await describeModuleConflicts(settings);
     if (conflict) {
       return NextResponse.json({ error: conflict }, { status: 409 });
@@ -60,9 +52,7 @@ export async function PUT(request: NextRequest) {
 
     await saveCaddyBuildSettings(settings);
 
-    // Regenerate the config so it stops naming any module just switched off, matching what the
-    // Settings save does. A stale config would hand the next rebuild something its binary can't
-    // load.
+    // As Settings does: a stale config would name a module the next rebuild cannot load.
     await applyCaddyConfig();
 
     return NextResponse.json({ selection: settings, diff: await getCaddyBuildDiff() });

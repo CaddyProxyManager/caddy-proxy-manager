@@ -1,7 +1,6 @@
 /**
- * What an administrator may do to an account, shared by the Users page actions, `/api/v1/users`
- * and GraphQL. Each used to keep its own rules, and a string one of them never checked went
- * straight into the role column.
+ * Account rules shared by the Users actions, `/api/v1/users` and GraphQL, so no path can write an
+ * unchecked string into the role column.
  */
 
 import { domainError } from "./domain-error";
@@ -43,15 +42,11 @@ export function assertNotSelf(
   if (actorId === targetId) throw domainError(code);
 }
 
-/**
- * Email syntax for an account an administrator creates or edits. Not in the model: an OAuth sign-in
- * writes whatever address its provider asserts, and refusing it there would lock that user out.
- */
+/** Not in the model: OAuth writes what its provider asserts, and refusing would lock users out. */
 export function assertEmailAddress(email: string): void {
   if (!isEmailAddress(email)) throw domainError("emailInvalid");
 }
 
-/** The password policy, for a password an administrator chooses on someone else's behalf. */
 export function assertAcceptablePassword(password: string): void {
   if (!isPasswordAcceptable(password)) {
     throw domainError("passwordDoesNotMeetPolicy", { min: MIN_PASSWORD_LENGTH });

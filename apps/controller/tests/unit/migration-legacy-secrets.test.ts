@@ -1,10 +1,6 @@
 /**
- * Carrying encrypted values across a change of SESSION_SECRET.
- *
- * The fixtures here are built with the on-disk format written out by hand rather than by calling
- * `encryptSecret`, because that is the point: production code can only produce ciphertext under the
- * key this deployment holds, and what the importer has to read is ciphertext under a key it does
- * not. Writing the format explicitly also pins it - a change to the envelope breaks these first.
+ * Fixtures write the on-disk format by hand: `encryptSecret` only uses this deployment's key, and
+ * the importer reads another's. It also pins the envelope format.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -20,7 +16,7 @@ import {
 } from '@/src/lib/migration/legacy-secrets';
 import { decryptSecret, encryptSecret } from '@/src/lib/secret';
 
-/** What tests/helpers/env.ts gives this process, i.e. the key the importer re-encrypts under. */
+/** From tests/helpers/env.ts: the key the importer re-encrypts under. */
 const CURRENT = 'test-session-secret-for-unit-tests-12345';
 const OLD = 'the-previous-deployments-session-secret-9876';
 
@@ -41,8 +37,7 @@ describe('createRekeyer', () => {
   it('re-encrypts an old value under the current key', () => {
     const rekeyed = createRekeyer(OLD)(encryptWith('cloudflare-api-token', OLD));
 
-    // Readable by this deployment now, which is the whole point - and re-encrypted, not passed
-    // through, so the old secret is of no further use after the import.
+    // Re-encrypted, not passed through, so the old secret is useless after the import.
     expect(decryptSecret(rekeyed)).toBe('cloudflare-api-token');
   });
 
@@ -103,9 +98,7 @@ describe('createRekeyer', () => {
 });
 
 describe('probeLegacySecrets', () => {
-  // beforeAll rather than at describe scope, and torn down in afterAll rather than by a final
-  // test: this suite runs its tests in a randomised order, so a cleanup step written as a test
-  // deletes the directory out from under the ones that have not run yet.
+  // Torn down in afterAll, not a final test: the order is randomised.
   let directory: string;
   beforeAll(() => {
     directory = mkdtempSync(join(tmpdir(), 'cpm-legacy-secrets-'));

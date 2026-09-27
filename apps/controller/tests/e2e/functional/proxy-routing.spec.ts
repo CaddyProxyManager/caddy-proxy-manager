@@ -33,8 +33,7 @@ test.describe
     });
 
     test('unknown domain is not proxied to the echo server', async () => {
-      // The reply for an unmatched route is configuration-dependent (default response), so only
-      // upstream isolation is asserted here.
+      // The unmatched reply depends on the default response, so only isolation is asserted.
       const res = await httpGet('no-such-route.test');
       expect(res.body).not.toContain(ECHO_BODY);
     });
@@ -42,9 +41,7 @@ test.describe
     test('disabled proxy host stops routing traffic', async ({ page }) => {
       await page.goto('/proxy-hosts');
       const row = page.locator('tr', { hasText: 'Functional Proxy Test' });
-      // Toggle the enabled switch (shadcn Switch renders as button with role="switch")
       await row.getByRole('switch').click();
-      // Give Caddy time to reload config
       await page.waitForTimeout(3_000);
 
       // Disabling the final host can remove Caddy's HTTP listener entirely; a native response
@@ -56,7 +53,6 @@ test.describe
         // No HTTP listener is a valid outcome when no managed route remains.
       }
 
-      // Re-enable
       await row.getByRole('switch').click();
       await page.waitForTimeout(2_000);
     });

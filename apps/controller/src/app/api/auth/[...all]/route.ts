@@ -27,10 +27,7 @@ export const dynamic = "force-dynamic";
 const PASSWORD_SIGN_IN_PATHS = new Set(CREDENTIAL_SIGN_IN_PATHS.map((path) => `/api/auth${path}`));
 const TWO_FACTOR_MANAGE = new Set(TWO_FACTOR_MANAGE_PATHS.map((path) => `/api/auth${path}`));
 
-/**
- * How a signed-in user's own 2FA change is logged. Confirming a new authenticator hits verify-totp
- * with no sign-in challenge cookie, which tells it apart from a code entered while signing in.
- */
+/** Confirming a new authenticator hits verify-totp with no sign-in challenge cookie. */
 function twoFactorManageAudit(
   pathname: string,
   cookies: string | null,
@@ -55,7 +52,7 @@ async function isDemoAdminRequest(request: Request): Promise<boolean> {
   return session?.user ? isDemoAdmin(Number(session.user.id)) : false;
 }
 
-/** better-auth keys its rate limiter on CLIENT_IP_HEADER alone, so a client-sent copy is replaced. */
+/** better-auth rate-limits on CLIENT_IP_HEADER alone, so a client-sent copy is replaced. */
 async function withClientIp(request: Request): Promise<Request> {
   const headers = new Headers(request.headers);
   headers.delete(CLIENT_IP_HEADER);
@@ -72,7 +69,6 @@ async function withClientIp(request: Request): Promise<Request> {
   } as RequestInit);
 }
 
-/** The name a password sign-in is for, as sent. */
 async function signInName(request: Request): Promise<string | null> {
   try {
     const body = (await request.json()) as { username?: unknown; email?: unknown };
@@ -129,8 +125,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Enforced here, not only by the form: the endpoint is reachable without it. After the throttle,
-  // so a request refused for that does not spend the solve.
+  // The endpoint is reachable without the form. After the throttle, so a refusal keeps the solve.
   const captcha = await getActiveCaptcha();
   // No name, no pass: an empty one would be the account key of the username "@localhost".
   if (
@@ -154,10 +149,7 @@ export async function POST(request: Request) {
   return response;
 }
 
-/**
- * The session hook skips password sign-ins, because the two-factor plugin may yet delete the
- * session it made. One that comes back without a challenge is final, so it's recorded here.
- */
+/** The session hook skips password sign-ins, as the 2FA plugin may yet delete that session. */
 async function auditCompletedSignIn(response: Response): Promise<void> {
   try {
     const body = (await response.clone().json()) as {

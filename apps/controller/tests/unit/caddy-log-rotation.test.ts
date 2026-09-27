@@ -1,6 +1,6 @@
 /**
- * Regression: Caddy's file-writer rotation defaults silently stopped compressing and cleaning up
- * rolled logs, filling the host disk (11GB+). Roll settings are now spelled out explicitly.
+ * Regression: Caddy's rotation defaults stopped compressing and pruning rolled logs, filling the
+ * disk (11GB+), so roll settings are spelled out.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -11,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

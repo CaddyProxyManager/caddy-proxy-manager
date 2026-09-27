@@ -1,12 +1,7 @@
 /**
- * Keeping the CRS plugin registries, and a verdict on each plugin in them, without making a page
- * wait on GitHub.
- *
- * A timer re-reads every configured registry on the set interval and checks each plugin's latest
- * release the way an install would. A verdict is stored against the release it was reached for,
- * so a pass only fetches a plugin whose release has changed: after the first pass that is the
- * registry reads and one API call per repository, inside the unauthenticated limit of 60 an hour.
- * A pass cut short by that limit keeps what it finished and resumes on the next one.
+ * Refreshes the CRS plugin registries and a verdict per plugin on a timer, so no page waits on
+ * GitHub. Verdicts are keyed by release, so after the first pass only changed releases are fetched,
+ * inside the 60-an-hour limit; a pass cut short resumes on the next.
  */
 
 import { DomainError, type StoredErrorCode, storedErrorCode } from "../domain-error";

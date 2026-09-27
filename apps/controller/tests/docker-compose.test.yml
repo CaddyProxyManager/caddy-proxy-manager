@@ -1,11 +1,8 @@
 services:
-  # Creates the extra database the additional web instance below needs. The base compose file's
-  # postgres service makes only one.
+  # The init script creates the extra databases the web instances below need.
   postgres:
-    # Durability buys nothing for a database `down -v` deletes, and fsync is the dominant cost of
-    # every write the suite makes. Mirrors scripts/with-test-db.ts, which does the same for the
-    # unit suite. Two web containers share this server, so the default of 100 connections is
-    # tighter here than it looks.
+    # No durability for a database `down -v` deletes (as scripts/with-test-db.ts); several web
+    # containers share it, so 100 connections is too tight.
     command:
       - postgres
       - -c
@@ -19,17 +16,13 @@ services:
     volumes:
       - ./apps/controller/tests/postgres-init.sql:/docker-entrypoint-initdb.d/10-e2e.sql:ro
 
-  # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
-  # runtime - deliberately, so the tests run the image that ships - so seeding happens in this
-  # throwaway container, which mounts the same data volume and opens the same SQLite file.
-  # `profiles` keeps it out of `docker compose up`; see tests/helpers/seed.ts.
+  # Seeds fixtures: the shipped web image has no Bun CLI. The profile keeps it out of `up`; see
+  # tests/helpers/seed.ts.
   db-seed:
     image: oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61
     profiles: ["tools"]
     working_dir: /app
     entrypoint: ["bun"]
-    # No data volume any more: seeding talks to the postgres service over the network, not to a
-    # file on the shared volume.
     networks:
       - database
 
@@ -41,7 +34,6 @@ services:
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
       BASE_URL: http://localhost:3000
       NEXTAUTH_URL: http://localhost:3000
-      # OAuth via Dex OIDC provider
       OAUTH_ENABLED: "true"
       OAUTH_PROVIDER_NAME: "Dex"
       OAUTH_CLIENT_ID: cpm-test-client
@@ -51,11 +43,8 @@ services:
       OAUTH_TOKEN_URL: http://dex:5556/dex/token
       OAUTH_USERINFO_URL: http://dex:5556/dex/userinfo
       OAUTH_ALLOW_AUTO_LINKING: "true"
-      # Allow OAuth sign-in to create new accounts - the OAuth e2e tests
-      # (forward-auth-oauth, oauth-role-injection) exercise federated signup.
-      # Closed by default in production (see config.auth.allowOauthRegistration).
+      # forward-auth-oauth and oauth-role-injection exercise federated signup.
       AUTH_ALLOW_OAUTH_REGISTRATION: "true"
-      # Disable Better Auth rate limiting for E2E tests (many rapid auth requests)
       AUTH_RATE_LIMIT_ENABLED: "false"
 
   web-registration-enabled:
@@ -70,17 +59,14 @@ services:
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3001
       NEXTAUTH_URL: http://localhost:3001
-      # Fields rather than a URL, matching docker-compose.yml: the password is interpolated in
-      # and a URL would have to encode it. Only the database differs from the base stack's.
+      # Fields, not a URL, which would have to encode the interpolated password.
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: cpm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: cpm_registration
       CADDY_API_URL: http://caddy:2019
-      # This controller shares the stack's Caddy but has its own empty database, so its idea of
-      # the desired state is "nothing". Only the instance that owns a Caddy may heal it, or the
-      # two monitors would overwrite each other's configuration every pass.
+      # Shares the stack's Caddy with an empty database: two monitors would overwrite each other.
       CADDY_MONITOR_ENABLED: "false"
       AUTH_ALLOW_SELF_REGISTRATION: "true"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -88,9 +74,7 @@ services:
       CLICKHOUSE_PASSWORD: ""
     volumes:
       - caddy-manager-registration-data:/app/data
-    # Not caddy: the agent owns Caddy's lifecycle now and stops it while unpaired, so waiting on
-    # it here deadlocks `up --wait` against the agent doing exactly what it should. This service
-    # is a second controller for the registration tests and never talks to Caddy anyway.
+    # Never caddy: the agent starts it, so waiting on it deadlocks `up --wait`.
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,20 +91,15 @@ services:
   clickhouse:
     environment:
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
-    # Expose the HTTP interface so retention/TTL e2e tests can query directly. caddy-network too,
-    # because analytics is internal and an internal network cannot publish a port.
+    # For the retention tests; caddy-network because an internal network cannot publish a port.
     ports:
       - "8123:8123"
     networks:
       - caddy-network
-  # Still behind the `caddy` profile it inherits from docker-compose.yml, so `up` does not start
-  # it - the agent does, once it has paired and the controller has a configuration to serve. That
-  # is production behaviour and the suite follows it: starting Caddy here instead had the agent
-  # immediately stop it for being unpaired, which `up --wait` then reported as a container that
-  # exited. global-setup waits for Caddy separately, after the agent has had its say.
+  # Still behind its profile: the agent starts it once paired, and would stop one started here,
+  # which `up --wait` reports as an exit. global-setup waits for Caddy separately.
   caddy:
-    # Alias so the Step-CA container can resolve the ACME test domain to Caddy
-    # for HTTP-01 / TLS-ALPN-01 challenge validation (functional/acme-custom-ca.spec.ts).
+    # So Step-CA can reach the ACME test domain for challenges (functional/acme-custom-ca.spec.ts).
     networks:
       caddy-network:
         aliases:
@@ -133,34 +112,26 @@ services:
       - "15433:15433"
       # L4 test ports (UDP)
       - "15353:15353/udp"
-  # Skip any local docker-compose.override.yml and use this file instead,
-  # so the agent recreates caddy with the correct "-test" volume names.
+  # This file instead of a local override, so the agent recreates caddy on the "-test" volumes.
   agent:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/docker-compose.test.yml
-      # No SESSION_SECRET or POSTGRES_PASSWORD: the agent reads no env file and supplies placeholders
-      # for both itself.
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
   # ── First-run setup, on instances that have never been set up ────────────────
-  # Two more, rather than resetting the main one: setup is single-use by design, so an instance
-  # that has completed it cannot show those screens again. They are deliberately pointed at a dead
-  # Caddy admin address - the setup screens never touch Caddy, and sharing the suite's Caddy would
-  # let an empty database's startup apply wipe the routes the other tests just created.
+  # Setup is single-use, hence fresh instances. A dead Caddy admin address, or an empty database's
+  # startup apply would wipe the routes the other tests created.
   web-setup:
     container_name: caddy-proxy-manager-web-setup
     image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
-    # Finishing setup stops the process on purpose, so it runs from the configuration it stored.
-    # Without a restart policy it would stop and stay stopped, and the rest of the setup spec would
-    # have nothing to talk to.
+    # Finishing setup exits on purpose, to restart from the stored configuration.
     restart: unless-stopped
     ports:
       - "3004:3000"
     environment:
       NODE_ENV: production
       SESSION_SECRET: "test-setup-session-secret-32chars!xxxYY"
-      # No ADMIN_USERNAME or ADMIN_PASSWORD, and no OAuth: nothing can sign in, which is what puts
-      # this instance in the setup flow rather than past it.
+      # No admin credentials and no OAuth: that is what puts it in the setup flow.
       BASE_URL: http://localhost:3004
       NEXTAUTH_URL: http://localhost:3004
       POSTGRES_HOST: postgres
@@ -190,8 +161,7 @@ services:
   web-migrate:
     container_name: caddy-proxy-manager-web-migrate
     image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
-    # Like web-setup: finishing a migration stops the process on purpose, so it runs from the
-    # database it just imported.
+    # Like web-setup: finishing a migration exits on purpose.
     restart: unless-stopped
     ports:
       - "3005:3000"
@@ -209,8 +179,7 @@ services:
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
       CLICKHOUSE_PASSWORD: ""
-      # The database the migration screens offer. The test writes it into the bind mount below at
-      # run time, so the application discovers it on disk exactly as it would on a real upgrade.
+      # The test writes it into the bind mount, so it is discovered as on a real upgrade.
       LEGACY_SQLITE_PATH: /legacy/caddy-proxy-manager.db
     volumes:
       - web-migrate-data:/app/data
@@ -228,7 +197,6 @@ services:
       retries: 12
       start_period: 20s
 
-  # Dex OIDC provider for OAuth E2E tests
   dex:
     image: dexidp/dex:v2.45.1
     command: ["dex", "serve", "/etc/dex/config.yml"]
@@ -238,11 +206,8 @@ services:
       - "5556:5556"
     networks:
       - caddy-network
-  # Hostile mock OIDC provider for the OAuth role-injection (H3) test.
-  # Dex cannot emit custom claims, so this mock injects a `role: admin` claim
-  # into every issued token to verify the app never lets an IdP set privileged
-  # fields. Browser reaches it at localhost:5557; the web container reaches it at
-  # mock-oidc:8080 (which is also the token `iss`, matching the provider issuer).
+  # Hostile IdP for the role-injection (H3) test: Dex cannot emit custom claims, so this injects
+  # `role: admin`. The browser uses localhost:5557; mock-oidc:8080 is also the token `iss`.
   mock-oidc:
     image: ghcr.io/navikt/mock-oauth2-server:6.0.2
     environment:
@@ -253,28 +218,23 @@ services:
       - "5557:8080"
     networks:
       - caddy-network
-  # Lightweight echo server reachable by Caddy as "echo-server:8080".
-  # Returns a fixed body so tests can assert the proxy routed the request.
   echo-server:
     image: hashicorp/http-echo
     command: ["-text=echo-ok", "-listen=:8080"]
     networks:
       - caddy-network
-  # Second echo server for load-balancing tests.
-  # Returns a different body so tests can distinguish which upstream served the request.
+  # A different body, so load-balancing tests can tell the upstreams apart.
   echo-server-2:
     image: hashicorp/http-echo
     command: ["-text=echo-server-2", "-listen=:8080"]
     networks:
       - caddy-network
-  # Request-echo server: reflects the full HTTP request (method + path + headers) in the response body.
-  # Used by path-prefix-rewrite tests to assert that Caddy rewrote the path before forwarding.
+  # Reflects the request, so path-prefix-rewrite tests can see the path Caddy forwarded.
   whoami-server:
     image: traefik/whoami
     networks:
       - caddy-network
-  # Stands in for Authelia, reachable by Caddy as "mock-forward-auth:9091". Backs the generic
-  # forward-auth functional tests; see the file for what each endpoint answers.
+  # Stands in for Authelia in the forward-auth functional tests.
   mock-forward-auth:
     image: node:22-alpine
     command: ["node", "/server.js"]
@@ -282,8 +242,6 @@ services:
       - ./apps/controller/tests/mock-forward-auth/server.js:/server.js:ro
     networks:
       - caddy-network
-  # TCP echo server for L4 proxy tests.
-  # Listens on port 9000 and echoes back anything sent to it with a prefix.
   tcp-echo:
     image: cjimti/go-echo
     platform: linux/amd64
@@ -292,19 +250,13 @@ services:
       NODE_NAME: "tcp-echo-ok"
     networks:
       - caddy-network
-  # UDP echo server for L4 proxy tests.
-  # Simple socat-based UDP echo: reflects any datagram back to sender.
   udp-echo:
     image: alpine/socat
     command: ["UDP4-RECVFROM:9001,fork", "EXEC:cat"]
     networks:
       - caddy-network
 
-  # Internal ACME CA (Step-CA) for the custom-ACME functional test (issue #192).
-  # Auto-initializes a root CA + ACME provisioner named "acme" on first boot,
-  # serving its directory at https://step-ca:9000/acme/acme/directory.
-  # Caddy reaches the test domain via the "acme-e2e.test" alias on the caddy
-  # service for HTTP-01 / TLS-ALPN-01 challenge validation.
+  # ACME CA for the custom-ACME test (#192), at https://step-ca:9000/acme/acme/directory.
   step-ca:
     container_name: caddy-proxy-manager-step-ca
     image: smallstep/step-ca:0.30.2

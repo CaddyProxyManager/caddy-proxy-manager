@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * A timestamp in the reader's time zone, with the UTC instant in a tooltip for matching it against
- * logs. The zone comes from next-intl, which the server and the browser both configure from the
- * time zone cookie (`lib/time-zone.ts`), so the two renders agree.
+ * The zone is next-intl's, which server and browser both set from the cookie (`lib/time-zone.ts`),
+ * so the two renders agree. The UTC tooltip is for matching logs.
  */
 
 import type { ReactNode } from "react";
@@ -13,10 +12,7 @@ import { formatUtc, toDate } from "@/src/lib/date-format";
 
 export type TimestampStyle = "dateTime" | "dateTimeShort" | "date" | "time";
 
-/**
- * Plain Intl options without a zone: the zone is the provider's, which is the point. Not next-intl's
- * own options type, which the docs site's `next-intl` shim does not re-export.
- */
+/** No zone: that is the provider's. Not next-intl's type, which the docs site shim lacks. */
 type TimestampOptions = Pick<Intl.DateTimeFormatOptions, "dateStyle" | "timeStyle">;
 
 export const TIMESTAMP_STYLES: Record<TimestampStyle, TimestampOptions> = {
@@ -26,7 +22,6 @@ export const TIMESTAMP_STYLES: Record<TimestampStyle, TimestampOptions> = {
   time: { timeStyle: "medium" },
 };
 
-/** Wraps something that states a time - a sentence, a badge - in the UTC tooltip. */
 export function UtcTooltip({
   value,
   children,

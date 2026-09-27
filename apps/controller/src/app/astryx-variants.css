@@ -1,94 +1,54 @@
 /**
- * Component variants this app adds to the neutral theme.
- *
- * Written by hand rather than through `defineTheme({extends: neutralTheme, ...})`: extending a
- * built theme produces an unbuilt one, and <Theme> injects an unbuilt theme's CSS from a client
- * effect - no SSR rule, so the sign-in screen would paint unstyled first. The layer and @scope
- * below are the same ones `astryx theme build` emits, so these rules land in the cascade exactly
- * where the theme's own component overrides do.
- *
- * Each variant here also needs its name added to the matching *VariantMap in src/types/astryx.d.ts.
+ * By hand, not `defineTheme({extends})`: an extended theme is unbuilt, and <Theme> injects that CSS
+ * from a client effect, so sign-in would paint unstyled first. Layer and @scope match what
+ * `astryx theme build` emits. Each variant also needs its name in src/types/astryx.d.ts.
  */
 
 @layer astryx-theme {
   @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
     /**
-     * The accent, in the theme's pink family.
-     *
-     * The neutral theme's accent is near-black in light mode and near-white in dark: a primary
-     * button is a black pill, a switched-on switch is white. The phone chrome already paints its
-     * selection and its one primary action in pink - the active tab, the current drawer tile, a
-     * narrowed filter chip, the floating action button - so the desktop was the one width without
-     * it. Pointing the accent token at the same hue carries it to every Astryx control that reads
-     * the token: primary Button, Switch, Slider, the Tab underline, the current page in Pagination,
-     * a checked box or radio, the NavIcon in the rail header, Spinner, and the keyboard focus ring,
-     * whose colour defaults to the accent.
-     *
-     * --color-on-accent is left as the theme has it: white on the light-mode plum (#70003f), #111
-     * on the dark-mode pink (#ffa9ca), both comfortably over 4.5:1. --color-text-accent is also
-     * untouched - it is what Link and Text color="accent" read, and a pink accent does not mean
-     * pink prose.
+     * Pink accent, matching the phone chrome, for every control that reads the token. The theme's
+     * --color-on-accent already clears 4.5:1 on it; --color-text-accent stays, since Link reads it
+     * and a pink accent does not mean pink prose.
      */
     :scope {
       --color-accent: var(--color-text-pink);
 
-      /* Dark mode only; each light half is the theme's own. Secondary ink - the field labels,
-         stat captions and descriptions - was #9e9e9e, which at the 10-12px those labels are set in
-         read as disabled beside white values. #bdbdbd keeps the step down from primary white and is
-         11.2:1 on the black page, 9.2:1 on a desktop card. Green ink on its own green ground
-         (green badges, success banners) was #90ca90 on #2b422b, 6:1 but dim; #b6e8b6 lifts it to
-         7.9:1 there. The success colour, a separate token at #a4d6a3, follows it: it is the text of
-         a success message and the fill behind a success badge's dark ink. */
+      /* Dark halves only. The theme's secondary ink read as disabled at label sizes, and its green
+         on green was dim; success follows green, being both a message's text and a badge's fill. */
       --color-text-secondary: light-dark(#474747, #bdbdbd);
       --color-text-green: light-dark(#00490b, #b6e8b6);
       --color-success: light-dark(#00490b, #b6e8b6);
     }
 
     /**
-     * The selected rail row, in the tonal treatment the phone's More drawer gives the page you are
-     * on: the accent's muted ground with the accent's own text on it. The theme's selected row is
-     * the same neutral tint it uses for hover, so beside pink controls the current page read as a
-     * row the pointer happened to be over. The icon inherits the row's colour, so it follows.
-     *
-     * A later layer wins over the component's own rule in every state, hover included - which is
-     * the theme's behaviour too: its selected row paints the same tint at rest and under the
-     * pointer. Under forced colors the UA remaps both properties to Highlight/HighlightText exactly
-     * as it does for the theme's rule, so nothing is lost there.
+     * Tonal, like the phone's More drawer: the theme's selected row is its hover tint, so the
+     * current page read as a row the pointer was over. Forced colors remap it like the theme's.
      */
     .astryx-side-nav-item[data-selected="selected"] {
       background-color: var(--color-background-pink);
       color: var(--color-text-pink);
     }
 
-    /**
-     * Button `tonal` - the accent at a lower weight, mirroring how the theme already renders
-     * `destructive`: the muted ground with its own text colour on top, and hover/pressed overlays
-     * in that same hue so the interaction tint does not read as neutral grey. Borderless, because
-     * every Astryx button variant is.
-     */
+    /* Button `tonal`, built like the theme's `destructive`: overlays in its own hue, so the
+       interaction tint does not read as neutral grey. */
     .astryx-button[data-variant="tonal"] {
       background-color: var(--color-background-pink);
       color: var(--color-text-pink);
-      /* 5% and 10% match the alpha the theme uses for destructive's overlays (0D/1A). Mixed from
-         the variant's own text colour, so it steps toward more contrast in both modes: darker on
-         the light ground, lighter on the dark one. */
+      /* destructive's overlay alphas (0D/1A), mixed from the text colour so both modes gain
+         contrast. */
       --color-overlay-hover: color-mix(in srgb, var(--color-text-pink) 5%, transparent);
       --color-overlay-pressed: color-mix(in srgb, var(--color-text-pink) 10%, transparent);
     }
 
-    /* The ring matches the surface it rings, the same reason destructive re-colours its own.
-       Width, style and offset still come from the shared focus outline. */
+    /* The ring matches its surface, as destructive's does. */
     .astryx-button[data-variant="tonal"]:focus-visible {
       outline-color: var(--color-border-pink);
     }
   }
 }
 
-/**
- * The page is pure black in dark mode at every width, so a desktop reads as the same theme as the
- * phone. On OLED an unlit pixel draws no power, so the gutter between cards costs nothing to show.
- * Light mode is untouched: the token keeps the neutral theme's light half.
- */
+/* Pure black in dark mode at every width, so desktop and phone read as one theme. */
 @layer astryx-theme {
   @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
     :scope {
@@ -98,16 +58,8 @@
 }
 
 /**
- * Phone palette: the rest of the OLED-friendly dark theme, below the same 767px edge the rest of
- * the app uses for narrow. Light mode is untouched - each token keeps its light half and changes
- * only the dark.
- *
- * - Cards go to #262626. The neutral theme paints --color-background-card the same #1b1b1b as its
- *   body, so a card is separated by its border alone; on a black page the fill does that job, at
- *   1.39:1 against the page.
- * - Primary ink steps down to #ebebeb. Pure white on pure black is where OLED smearing shows during
- *   a scroll, and it is the ink that moves, not the page - lifting the page off black would give up
- *   the reason it is black. Still 17.6:1 on the page and 12.7:1 on a card.
+ * Phone dark palette. The theme's cards match its body, so on black the fill has to separate them;
+ * primary ink drops off pure white because white on black is where OLED smears during a scroll.
  */
 @layer astryx-theme {
   @media (max-width: 767px) {
@@ -121,11 +73,9 @@
 }
 
 /**
- * Touch-sized controls. Every Astryx control height reads --size-element-sm/md/lg, which default
- * to 28/32/36px - none of them reaches the 44px a fingertip needs. Raising the three tokens on a
- * coarse pointer lifts every button, input and select at once, and leaves a mouse-driven desktop
- * exactly as it was. This is the same override the theme's own `adaptations` API documents, as a
- * rule: the built theme cannot take adaptations without injecting its CSS at runtime.
+ * Touch-sized controls: the default heights never reach the 44px a fingertip needs. This is the
+ * theme's `adaptations` override as a rule, since a built theme cannot take adaptations without
+ * injecting its CSS at runtime.
  */
 @layer astryx-theme {
   @media (pointer: coarse) {
@@ -140,15 +90,9 @@
 }
 
 /**
- * Table text at one size, the way admin tables almost all do it (Tailscale, Render, Vanta, Cloudflare
- * and the rest): every value in a row is body size, a second line under a name drops one step and
- * goes grey, headings and status badges sit a step below body, and a value too long for its column
- * truncates - with the whole of it in a tooltip - rather than the text shrinking to fit. Nothing
- * here follows the viewport.
- *
- * Cells ask for sm (12px) and xsm (10px) all over, which read as fine print beside the heading, so
- * inside a cell those tokens are body size too. The table captures the theme's small size first,
- * for the two places that still want it: a token cannot be redefined in terms of itself.
+ * Table values at body size, truncating rather than shrinking: cells ask for the small sizes all
+ * over, which read as fine print. The table captures the small size first for the places that
+ * still want it, since a token cannot be redefined in terms of itself.
  */
 @layer astryx-theme {
   @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
@@ -163,15 +107,14 @@
       vertical-align: middle;
     }
 
-    /* A value truncates only if everything around it can narrow: a flex item will not shrink
-       below its content unless told, so a name and its domain spilled into the next column instead
-       of reaching the ellipsis. Icons keep their size. */
+    /* A flex item will not shrink below its content unless told, so without this a value spills
+       into the next column instead of reaching the ellipsis. */
     .astryx-table-cell .astryx-stack,
     .astryx-table-cell .astryx-stack > :not(.astryx-icon) {
       min-width: 0;
     }
 
-    /* 16px a side rather than 12, so neighbouring values never read as one. */
+    /* Wider than the theme's, so neighbouring values never read as one. */
     .astryx-table-cell,
     .astryx-table-header-cell {
       padding-inline: var(--spacing-4);
@@ -187,8 +130,7 @@
       text-overflow: clip;
     }
 
-    /* The second line of a two-line cell - a host's domain under its name. Grey comes from the
-       Text itself; the size is set here so every table agrees. */
+    /* A two-line cell's second line, sized here so every table agrees. */
     .cpm-cell-lines > :nth-child(2) {
       --text-body-size: var(--cpm-table-small);
       --text-code-size: var(--cpm-table-small);

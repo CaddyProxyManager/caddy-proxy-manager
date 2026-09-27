@@ -17,11 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The summary a migrated deployment sees once setup finishes: its old database to keep, and the
- * command that tidies its `.env`.
- *
- * Only reachable by a deployment that recorded a migration, so an ordinary first-run setup is not
- * shown instructions about a file it never had.
+ * What a migrated deployment sees after setup: the old database to keep and the `.env` cleanup.
+ * A first-run setup never gets here, so it is not told about a file it never had.
  */
 export default async function SetupDonePage() {
   const session = await auth();
@@ -31,9 +28,8 @@ export default async function SetupDonePage() {
   const source = await getMigrationSource();
   if (!source) redirect("/");
 
-  // Derived from what is in the database, not from reading the file: the environment usually comes
-  // from Compose, Swarm or Kubernetes rather than a `.env` beside the app, and none of those are
-  // visible from in here. What the app does know for certain is which settings it now stores.
+  // From the database, not the file: the env usually comes from Compose, Swarm or Kubernetes,
+  // none visible from here, but the app knows for certain which settings it now stores.
   const settings = await resolveAllSettings();
   const cleanup = planEnvCleanup(
     SETTING_DEFINITIONS.filter(
@@ -41,10 +37,8 @@ export default async function SetupDonePage() {
     ).map((definition) => definition.env),
   );
 
-  // The dashboard's own domain, when setup claimed one and it answers there: this page is the one
-  // place a migrated deployment is not handed over automatically, so its last button is where that
-  // happens. Asked rather than assumed - the check is bounded, and a button onto a domain whose
-  // DNS does not arrive here yet is worse than one that stays where the operator already is.
+  // A migrated deployment is not handed over to its dashboard domain automatically, so the last
+  // button does it - only if the domain answers, since its DNS may not point here yet.
   const dashboardSettings = await getDashboardSettings();
   const dashboard = (await dashboardHostAnswers(dashboardSettings))
     ? dashboardHostOrigin(dashboardSettings)

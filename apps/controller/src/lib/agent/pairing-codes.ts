@@ -1,17 +1,7 @@
 /**
- * The one-time codes an operator carries from this controller to an agent.
- *
- * Minted here now, where it used to be minted by the agent and read off its logs. That inversion is
- * the point of the whole flow: an operator installing an agent on a new host has a browser open on
- * the controller already, and asking them to go and read the new host's container logs was the step
- * that made remote agents awkward to add.
- *
- * Two kinds. The live code pairs an agent this controller has never seen. A re-pair code is minted
- * for one existing agent and replaces only that agent's secret - the recovery path for a host whose
- * database was rebuilt, and the only way an already-paired agentId gets a new secret.
- *
- * Held in memory only. A code that survived a restart would keep working after the operator had
- * given up on it, and a restart is exactly when they will come back for a fresh one.
+ * One-time pairing codes. The live code pairs a new agent; a re-pair code replaces one existing
+ * agent's secret and nothing else. In memory only: a code must not outlive a restart, which is
+ * exactly when an operator comes back for a fresh one.
  */
 
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
@@ -21,24 +11,20 @@ import { resetWindows, takeFromWindow, windowSpent } from "../rate-limit";
 export type PairingCode = { code: string; expiresAt: number };
 
 /**
- * Wrong guesses a code survives, from every caller together.
- *
- * The per-client throttle stops one caller; this stops many. At most 200 guesses reach a code in
- * its five minutes, so the odds of hitting one of 24^6 (about 1.9e8) are roughly 1 in 950,000 per
- * code an operator mints - while one client, held to 5 a minute, cannot burn a code by itself.
+ * Across all callers: 200 guesses at 24^6 (about 1.9e8) is roughly 1 in 950,000 per code, while
+ * one client, held to 5 a minute, cannot burn a code by itself.
  */
 const MAX_FAILURES_PER_CODE = 200;
 
-/** Wrong guesses one client address may make per window before it is refused outright. */
 const MAX_FAILURES_PER_CLIENT = 5;
 const CLIENT_WINDOW_MS = 60_000;
-/** The rate-limit window key prefix; its table is bounded against a caller rotating addresses. */
+/** Its table is bounded against a caller rotating addresses. */
 const CLIENT_WINDOW_PREFIX = "pair-client:";
 
 type LiveCode = PairingCode & { failures: number };
 
 let current: LiveCode | null = null;
-/** Re-pair codes, keyed by the agentId each one may re-pair. */
+/** Keyed by the agentId each one may re-pair. */
 const repairCodes = new Map<string, LiveCode>();
 
 function secureEquals(a: string, b: string): boolean {
@@ -58,18 +44,16 @@ function mint(now: number): LiveCode {
   };
 }
 
-/** The live code, minting a new one if none is valid. */
 export function ensurePairingCode(now = Date.now()): PairingCode {
   if (!current || current.expiresAt <= now) current = mint(now);
   return { code: current.code, expiresAt: current.expiresAt };
 }
 
-/** Throw the live code away, so the next read mints a fresh one. */
 export function revokePairingCode(): void {
   current = null;
 }
 
-/** A fresh code that re-pairs this agent and nothing else, replacing any earlier one for it. */
+/** Replaces any earlier code for this agent. */
 export function mintRepairCode(agentId: string, now = Date.now()): PairingCode {
   const live = mint(now);
   repairCodes.set(agentId, live);
@@ -83,12 +67,8 @@ export function revokeRepairCode(agentId: string): void {
 export type RedeemResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Check a submitted code against one live code, burning it on success unless `keep` is set.
- *
- * Burning it is what makes it one-time: a code that stayed valid for its whole five minutes would
- * let anyone who saw the operator's screen pair a second agent. `keep` is the preview's check - it
- * says whether the code is right without using it up - and a wrong guess still costs the code's
- * budget, so previewing is no cheaper a way to guess than pairing.
+ * Burns the code on success, unless `keep` (the preview). A wrong guess costs the budget either
+ * way, so previewing is no cheaper a way to guess.
  */
 function redeem(
   live: LiveCode | null | undefined,
@@ -117,14 +97,12 @@ function redeem(
   return { ok: true };
 }
 
-/** Redeem the live code, for an agent this controller has not paired before. */
 export function redeemPairingCode(submitted: string, now = Date.now()): RedeemResult {
   return redeem(current, submitted, now, () => {
     current = null;
   });
 }
 
-/** Whether the live code is right, without spending it. */
 export function checkPairingCode(submitted: string, now = Date.now()): RedeemResult {
   return redeem(
     current,
@@ -137,7 +115,6 @@ export function checkPairingCode(submitted: string, now = Date.now()): RedeemRes
   );
 }
 
-/** Whether this agent's re-pair code is right, without spending it. */
 export function checkRepairCode(
   agentId: string,
   submitted: string,
@@ -156,7 +133,7 @@ export function checkRepairCode(
   );
 }
 
-/** Redeem the re-pair code minted for this agent. The live code never re-pairs anyone. */
+/** The live code never re-pairs anyone. */
 export function redeemRepairCode(
   agentId: string,
   submitted: string,
@@ -177,7 +154,6 @@ export function redeemRepairCode(
 
 // ─── Per-client throttle ─────────────────────────────────────────────────────
 
-/** Whether this client has used up its wrong guesses for the current window. */
 export function clientThrottled(client: string, now = Date.now()): boolean {
   return windowSpent(`${CLIENT_WINDOW_PREFIX}${client}`, MAX_FAILURES_PER_CLIENT, now);
 }
@@ -192,7 +168,7 @@ export function recordFailedGuess(client: string, now = Date.now()): void {
   );
 }
 
-/** Test seam: forget every code and every throttle so one suite cannot see another's. */
+/** Test seam. */
 export function resetPairingCodes(): void {
   current = null;
   repairCodes.clear();

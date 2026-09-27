@@ -1,9 +1,6 @@
 /**
- * The two long-running operations, and the rule that only one may run at a time.
- *
- * Both end in `docker compose up caddy`, so overlapping them would have two recreates racing for
- * the same container - one of which would win with the other's overrides half-written. The lock is
- * process-wide because the agent is the only writer of these files on its host.
+ * Long-running operations, one at a time: overlapping recreates race for the same container with
+ * each other's overrides half-written. Process-wide, as the agent is the only writer on its host.
  */
 
 import {
@@ -44,13 +41,7 @@ export class Operations {
     private readonly docker: DockerHost,
   ) {}
 
-  /**
-   * Clear a status left mid-flight by a killed agent.
-   *
-   * Without this the UI spins forever on an operation that is provably not running - this process
-   * has just started, so nothing it launched can still be in progress - with its button disabled
-   * and no way back except editing the database by hand.
-   */
+  /** A status left mid-flight by a killed agent would spin forever, its button disabled. */
   clearStaleStatuses(): void {
     const l4 = this.store.l4PortsStatus();
     if (l4.state === "applying" || l4.state === "pending") {
@@ -81,16 +72,9 @@ export class Operations {
   }
 
   /**
-   * Reconcile the published ports with the ones this agent last applied.
-   *
-   * This runs at startup and is not bookkeeping - it is the only thing that keeps layer-4 routing
-   * alive across a host reboot. The operator's `docker compose up` starts Caddy from the base
-   * files, which do not include the generated port override, so a restarted stack comes up with
-   * every L4 port unpublished. Nothing else would notice until someone opened the UI.
-   *
-   * With nothing recorded, Docker is adopted as the baseline instead: that is either this agent's
-   * first run or a stack whose ports an operator manages by hand, and re-applying an empty list
-   * over either would unpublish ports the agent never published.
+   * The only thing keeping L4 routing alive across a reboot: a plain `docker compose up` omits the
+   * port override. With nothing recorded Docker is adopted instead, or an empty list would
+   * unpublish ports the agent never published.
    */
   async restorePublishedPorts(): Promise<void> {
     const recorded = this.store.appliedL4Ports();
@@ -101,7 +85,7 @@ export class Operations {
       return;
     }
 
-    // Compose's own spelling on both sides, both sorted, so this compares sets rather than text.
+    // Compose's spelling on both sides, both sorted, so this compares sets.
     const same =
       recorded.length === published.length && recorded.every((port, i) => port === published[i]);
     if (same) return;
@@ -119,16 +103,9 @@ export class Operations {
 
   // ─── L4 ports ──────────────────────────────────────────────────────────────
 
-  /**
-   * Publish a new port set on the Caddy container.
-   *
-   * Returns as soon as the work is accepted, not when it finishes: recreating a container takes
-   * seconds and a rebuild takes minutes, and holding the controller's request open for either would
-   * make its own HTTP client time out mid-operation.
-   */
+  /** Returns once accepted: holding the controller's request open would time it out. */
   applyL4Ports(ports: string[]): void {
-    // Checked before the lock and before any file is written: a frame carrying one bad entry is
-    // refused whole, since publishing the rest would report a port set nobody asked for.
+    // Refused whole: publishing the rest would report a port set nobody asked for.
     const invalid = invalidL4Port(ports);
     if (invalid !== null) {
       const error = `Invalid port mapping ${JSON.stringify(invalid)}`;
@@ -226,8 +203,7 @@ export class Operations {
 
       const build = await this.docker.buildCaddy();
       if (!build.ok) {
-        // Say what is still serving. After a failed rebuild the operator's first question is
-        // whether the proxy just went down, and the answer is no: the old image is untouched.
+        // Say the old image still serves: the operator's first question is whether the proxy died.
         const detail = build.timedOut
           ? `The build was abandoned after ${this.config.buildTimeoutSeconds}s.`
           : tail(build.output, 10);
@@ -255,8 +231,7 @@ export class Operations {
 
       const health = await this.docker.waitForCaddyHealth();
       if (health !== "healthy") {
-        // Unhealthy right after a module change usually means the running config references a
-        // plugin the new binary no longer has, which Caddy refuses wholesale.
+        // Usually the running config naming a plugin the new binary lacks.
         const message =
           `Caddy was rebuilt but its health check reports "${health}". Check the Caddy ` +
           `container logs - a config referencing a removed module will fail to load.`;
@@ -269,9 +244,7 @@ export class Operations {
         return;
       }
 
-      // Recorded here and nowhere else: only after a successful build, recreate and health check
-      // is the new module set genuinely in the running binary. Writing it earlier would tell the
-      // controller a module is available while the old image is still serving.
+      // Only now is the set in the running binary, so only now may the controller rely on it.
       this.store.setAppliedCaddyModules(modules);
       this.store.setCaddyBuildStatus({
         state: "applied",
@@ -293,13 +266,8 @@ export class Operations {
   // ─── Optional services ─────────────────────────────────────────────────────
 
   /**
-   * Reconcile which optional compose services are running with what the controller asked for.
-   *
-   * Reconciled every time rather than diffed against what was last applied, for the same reason
-   * restorePublishedPorts exists: after a host reboot the operator's own `docker compose up` brings
-   * the stack back without these profiles, so bookkeeping saying "clickhouse is on" would describe
-   * a container that is not running. `up -d` and `stop` are both no-ops when the service is already
-   * in the requested state, which makes reconciling cheaper than being clever about it.
+   * Reconciled every time, not diffed: after a reboot a plain `up` omits these profiles, so records
+   * would lie. `up -d` and `stop` are no-ops when already in the requested state.
    */
   applyManagedServices(request: ManagedServicesRequest): void {
     this.begin("services");
@@ -324,9 +292,8 @@ export class Operations {
     triggeredAt: string,
   ): Promise<void> {
     try {
-      // Handed to every invocation, `stop` included, so each resolves the project to the identical
-      // configuration. Compose interpolates the whole file before deciding what to act on, so
-      // varying these between calls makes it see a service as changed that nothing has touched.
+      // To every call, `stop` included: compose interpolates the whole file, and varying these
+      // makes it see an untouched service as changed.
       const env = composeEnv(request.env);
 
       const failures: string[] = [];
@@ -342,7 +309,6 @@ export class Operations {
           applied[name] = enable;
           continue;
         }
-        // Each service is independent, so one failing must not leave the rest unattempted.
         const detail = result.timedOut
           ? `abandoned after ${this.config.serviceTimeoutSeconds}s`
           : tail(result.output, 4);

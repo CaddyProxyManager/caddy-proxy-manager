@@ -1,10 +1,6 @@
 /**
- * The load balancing policies and health-check fields that reach Caddy's JSON.
- *
- * Every shape asserted here was first run through `caddy validate` against the shipped image, which
- * rejects an unknown field outright - `unknown field "weight"` rather than ignoring it. That
- * matters more than usual: Caddy refuses the *whole* document, so one host with a bad field takes
- * every route down with it, which is exactly the bug the layer-4 cases below pin.
+ * Every shape here was checked with `caddy validate`: an unknown field refuses the *whole*
+ * document, so one bad host takes every route down - the bug the layer-4 cases pin.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -15,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -69,7 +64,7 @@ async function httpHostWithLb(loadBalancer: Lb, upstreams = ['a:80', 'b:80', 'c:
   return JSON.parse(JSON.stringify(await buildCaddyDocument()));
 }
 
-/** The reverse_proxy handler of the first host, wherever the builder placed it. */
+/** Wherever the builder placed it. */
 function reverseProxy(doc: unknown): Record<string, unknown> {
   const found: Record<string, unknown>[] = [];
   const walk = (node: unknown) => {
@@ -100,8 +95,7 @@ describe('selection policies', () => {
   });
 
   it('falls back to round_robin when the weights do not match the upstreams', async () => {
-    // Padding would silently drop a backend to weight 0 and take it out of rotation, with nothing
-    // in the UI to say so. An unweighted rotation is the honest degradation.
+    // Padding would silently drop a backend to weight 0; unweighted is the honest degradation.
     const doc = await httpHostWithLb({
       enabled: true,
       policy: 'weighted_round_robin',
@@ -170,8 +164,7 @@ describe('active health check fields', () => {
   });
 
   it('keeps the probe body and the expected body apart', async () => {
-    // `body` is what the probe sends; `expect_body` is the regexp the response must match. Caddy
-    // names them that way round, and swapping them makes every check fail closed.
+    // `body` is sent, `expect_body` matched; swapping them makes every check fail closed.
     const doc = await httpHostWithLb({
       enabled: true,
       policy: 'round_robin',
@@ -186,8 +179,7 @@ describe('active health check fields', () => {
   });
 
   it('refuses a header value carrying a newline', async () => {
-    // It would forge a second header on every probe - a request Caddy makes on a timer against the
-    // operator's own backend.
+    // It would forge a second header on every timed probe against the operator's backend.
     const doc = await httpHostWithLb({
       enabled: true,
       policy: 'round_robin',
@@ -235,7 +227,7 @@ describe('passive health check fields', () => {
 
 // ─── Layer 4 ─────────────────────────────────────────────────────────────────
 
-/** The layer4 `proxy` handler, which has a different and much smaller schema. */
+/** A different, much smaller schema. */
 function l4Proxy(doc: unknown): Record<string, unknown> {
   const found: Record<string, unknown>[] = [];
   const walk = (node: unknown) => {
@@ -266,9 +258,7 @@ async function l4HostWithLb(loadBalancer: Lb) {
 
 describe('layer 4 emits only what caddy-l4 defines', () => {
   it('never emits retries, try_duration or try_interval', async () => {
-    // caddy-l4's load_balancing takes selection_policy and nothing else. These were being emitted
-    // before, and Caddy answers `unknown field` by refusing the entire document - so one L4 host
-    // with retries set took down every route in the config.
+    // caddy-l4's load_balancing takes only selection_policy; anything else refuses the document.
     const doc = await l4HostWithLb({
       enabled: true,
       policy: 'round_robin',

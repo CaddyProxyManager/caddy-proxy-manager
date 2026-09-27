@@ -1,9 +1,6 @@
 /**
- * Forwarding a controller's request to this agent's own Caddy.
- *
- * The agent is the only thing that knows where its Caddy is. Routing admin traffic through it is
- * what makes a remote agent work at all: otherwise the controller would recreate a container on
- * one host while configuring a Caddy on another, and the two would silently disagree.
+ * Forwards the controller's admin requests to this agent's Caddy, which only the agent can locate;
+ * otherwise a remote host's Caddy and its container would be managed on different machines.
  */
 
 import http from "node:http";
@@ -11,12 +8,8 @@ import https from "node:https";
 import type { CaddyAdminProxyRequest, CaddyAdminProxyResponse } from "@cpm/shared";
 
 /**
- * Paths a controller may ask for.
- *
- * An allowlist rather than a sanitiser: Caddy's admin API can also stop the server and load
- * arbitrary config at arbitrary paths, and the controller needs exactly four things from it. A
- * path that is not one of these is a sign the request did not come from this application, whatever
- * signed it.
+ * An allowlist, not a sanitiser: the admin API can also stop the server or load config anywhere,
+ * and the controller needs only these. Anything else did not come from this app, whoever signed it.
  */
 const ALLOWED_PATHS: ReadonlyArray<RegExp> = [
   /** Replace the whole config - the apply path. */
@@ -42,12 +35,7 @@ export { loadsConfig, pinAdminListen } from "@cpm/shared";
 
 export class CaddyAdminUnreachable extends Error {}
 
-/**
- * Send one request to Caddy's admin API.
- *
- * node:http rather than fetch, for the same reason the controller used to: fetch sends Sec-Fetch-*
- * headers, which trip Caddy's CORS origin enforcement and turn every admin call into a 403.
- */
+/** node:http, not fetch: its Sec-Fetch-* headers trip Caddy's origin check and 403 every call. */
 export async function forwardToCaddy(
   adminRoot: string,
   request: CaddyAdminProxyRequest,

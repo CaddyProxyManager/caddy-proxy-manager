@@ -1,13 +1,6 @@
 "use client";
 
-/**
- * The bar that says something is pending, and the sheet that applies it.
- *
- * Present on every settings screen rather than on the one being edited, because a change set spans
- * sections: an operator who edits DNS on one page and geo-blocking on another has one pending
- * apply, not two, and a bar that only appeared on the page they happened to be on would hide half
- * of it.
- */
+/** On every settings screen: one change set spans sections, and a per-page bar would hide half. */
 
 import { useState, useTransition } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -29,13 +22,7 @@ import { sectionForStorageKey, stagedChangeLabel } from "@/src/lib/settings/sect
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
 
-/**
- * Discard and Review & apply, for the settings header.
- *
- * Was a bar pinned to the foot of the page. It moved into the header because the apply control
- * should have one address: an operator who scrolls a long section must not have to hunt for it,
- * and a floating bar over the last form field was the thing it most often covered.
- */
+/** In the header, so the apply control has one address and covers no form field. */
 export function StagedControls({ view }: { view: StagedView }) {
   const t = useTranslations("settings");
   const [open, setOpen] = useState(false);
@@ -71,7 +58,7 @@ export function StagedControls({ view }: { view: StagedView }) {
   );
 }
 
-/** Which configuration Caddy is running, and whether the last apply got there. Opens the history. */
+/** Which configuration Caddy runs, and whether the last apply got there. */
 export function RevisionPill({ staged }: { staged: StagedView }) {
   const t = useTranslations("settings");
   if (staged.currentRevision === null) {
@@ -153,8 +140,7 @@ function ReviewSheet({
             {view.changes.map((change) => (
               <HStack key={change.key} gap={2} vAlign="start">
                 <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
-                  {/* The block it came from, as a way back to it: reviewing a change set and
-                      wanting another look at one of them is the same click either way. */}
+                  {/* A way back to the block it came from. */}
                   {change.sectionId ? (
                     <Link href={settingsHref(change.sectionId)} onClick={onClose}>
                       {stagedChangeLabel(t, change)}
@@ -163,8 +149,7 @@ function ReviewSheet({
                     <Text type="label">{stagedChangeLabel(t, change)}</Text>
                   )}
                   {change.fields.length > 0 ? (
-                    // One link per field: the review sheet is where an operator asks "what did I
-                    // change", and the answer should be able to take them back to the control.
+                    // One link per field, back to the control.
                     <HStack gap={2} wrap="wrap">
                       {change.fields.map((field) => (
                         <Link
@@ -262,10 +247,7 @@ function ReviewSheet({
   );
 }
 
-/**
- * What a past apply changed, named the way the change list above names it. The stored summary is
- * the raw storage keys, so it only shows for a revision whose keys column cannot be read.
- */
+/** The stored summary is raw storage keys, so it shows only when the keys column is unreadable. */
 export function revisionSummary(
   t: ReturnType<typeof useTranslations<"settings">>,
   format: ReturnType<typeof useFormatter>,
@@ -280,7 +262,7 @@ export function revisionSummary(
   return format.list(new Set(labels), { type: "unit" });
 }
 
-/** Colours come from the status tokens rather than raw hex, so the diff follows the theme. */
+/** Status tokens, so the diff follows the theme. */
 const DIFF_BACKGROUND: Record<DiffLine["kind"], string | undefined> = {
   added: "var(--color-success-muted)",
   removed: "var(--color-error-muted)",
@@ -305,8 +287,7 @@ export function DiffView({ lines }: { lines: DiffLine[] }) {
     >
       {lines.map((line, index) => (
         <div
-          // A diff line has no identity beyond its position: the same text recurs, and the list is
-          // replaced wholesale each render, so no state can follow a reorder to the wrong row.
+          // Text recurs and the list is replaced wholesale, so no state can follow a reorder.
           // biome-ignore lint/suspicious/noArrayIndexKey: position is the only identity a diff line has
           key={`${index}-${line.kind}`}
           style={{

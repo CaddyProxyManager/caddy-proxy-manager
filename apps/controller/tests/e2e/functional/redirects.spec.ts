@@ -20,10 +20,7 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('echo-server:8080');
 
-      // Inject redirect rules and form flags directly.
-      // redirects_json is a hidden input rendered by RedirectsFields whose value
-      // reflects React state; setting .value just before submit works because no
-      // React render cycle fires between the injection and form data collection.
+      // No render fires between setting the hidden input's .value and submit, so it sticks.
       await turnOffForceHttps(page);
       await injectFormFields(page, {
         redirectsJson: JSON.stringify([

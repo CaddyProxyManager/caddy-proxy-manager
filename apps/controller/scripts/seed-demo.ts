@@ -1,20 +1,8 @@
 /**
- * Fill a DEMO_MODE database with something to look at.
- *
  *   DEMO_MODE=true DATABASE_URL=... bun scripts/seed-demo.ts [--reset]
  *
- * A demo whose every page is an empty state teaches nobody what this does, and screenshots of it
- * are worse. So this writes a plausible small deployment - proxy hosts with the options a real one
- * uses, the people who run it, and a month of traffic behind them.
- *
- * Everything goes through the models rather than into the tables, so what lands is what the UI
- * would have written: audit entries, `meta` blobs, normalised domains. Each host creation ends in
- * an apply, which is why demo mode is not optional here - `installDemoCaddy` puts that apply in
- * memory, and without it this would try to configure whatever Caddy the environment points at.
- *
- * The traffic goes wherever the demo keeps analytics: a SQLite file beside the database, unless
- * CLICKHOUSE_PASSWORD points it at a real ClickHouse (src/lib/clickhouse/sqlite-store.ts). The
- * generator is src/lib/demo/traffic.ts, which the running demo also uses to keep adding traffic.
+ * Through the models, so rows match what the UI writes. DEMO_MODE is required: each host create
+ * applies, and `installDemoCaddy` keeps that in memory instead of hitting a real Caddy.
  */
 import { eq, ne } from "drizzle-orm";
 
@@ -37,9 +25,9 @@ const { createUser } = await import("../src/lib/models/user");
 
 installDemoCaddy();
 
-/** Whoever owns this deployment. Everything seeded is attributed to them, as the UI would. */
+/** Everything seeded is attributed to the owner, as the UI would. */
 async function actorId(): Promise<number> {
-  // What the app would do on its first start, so `bun run demo` can seed before the server exists.
+  // As the app's first start would, so `bun run demo` can seed before the server exists.
   if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
     await (await import("../src/lib/init-db")).ensureAdminUser();
   }
@@ -55,10 +43,7 @@ async function actorId(): Promise<number> {
   return admin.id;
 }
 
-/**
- * Clear what a previous run wrote, in foreign-key order, so re-seeding is not a game of guessing
- * which rows are new. The administrator survives: it is the account you sign in with.
- */
+/** In foreign-key order. The administrator survives: it is the account you sign in with. */
 async function reset(actor: number): Promise<void> {
   await db.delete(schema.proxyHosts);
   await db.delete(schema.l4ProxyHosts);
@@ -90,7 +75,7 @@ async function seedPeople(actor: number): Promise<void> {
   }
 
   for (const person of PEOPLE) {
-    // No password: these accounts exist to populate the lists and to own things, not to sign in.
+    // No password: these only populate lists and own things.
     const user = await createUser({
       email: person.email,
       name: person.name,
@@ -224,7 +209,7 @@ async function seedHosts(actor: number): Promise<string[]> {
   );
 
   console.log(`Seeded ${HOSTS.length} proxy hosts, 2 L4 hosts, 1 access list, 1 certificate`);
-  // A disabled host answers nothing, so it has no traffic to invent.
+  // A disabled host has no traffic.
   return HOSTS.filter((host) => host.enabled !== false).map((host) => host.domain);
 }
 
@@ -242,7 +227,7 @@ async function seedTraffic(domains: string[]): Promise<void> {
     return;
   }
   await initClickHouse();
-  // Nothing here is incremental, so a second run without this would show twice the traffic.
+  // Not incremental: a second run would double the traffic.
   if (RESET) await clearAnalyticsEvents();
 
   const now = Math.floor(Date.now() / 1000);
@@ -252,11 +237,7 @@ async function seedTraffic(domains: string[]): Promise<void> {
   );
 }
 
-/**
- * Switch analytics on, which is also what makes the simulated agent report an access log. With a
- * ClickHouse named in the environment, store its connection too; without one the demo's SQLite
- * store needs nothing more.
- */
+/** Also makes the simulated agent report an access log; stores a ClickHouse from env if any. */
 async function enableAnalytics(): Promise<void> {
   const registry = await import("../src/lib/settings/registry");
   const { saveSettings } = await import("../src/lib/settings/resolve");

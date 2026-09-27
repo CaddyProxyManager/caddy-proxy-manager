@@ -32,8 +32,7 @@ export default async function ProfilePage() {
     gravatarEnabled,
   ] = await Promise.all([
     getUserById(userId),
-    // OAuth connection state comes from the authoritative accounts table - the
-    // informational users.provider/subject columns are only a projection (#261).
+    // The accounts table is authoritative; users.provider/subject are a projection (#261).
     listUserOAuthProviders(userId),
     getProviderDisplayList(),
     listApiTokens(userId),

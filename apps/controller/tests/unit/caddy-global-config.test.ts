@@ -1,7 +1,4 @@
-/**
- * The global Caddyfile merges by addition only. Every refusal here is something CPM rebuilds on each
- * apply, so letting it through would mean a config that silently fights the operator.
- */
+/** Addition only: each refusal is something CPM rebuilds per apply and would silently fight. */
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { type CaddyAdminTransport, setCaddyAdminTransport } from '@/src/lib/caddy-admin';

@@ -18,13 +18,9 @@ import { DemoSurface } from "../DemoSurface";
 
 type Range = "24h" | "7d" | "30d";
 
-/** Three of the page's intervals, labelled as it labels them. */
 const RANGES: Range[] = ["24h", "7d", "30d"];
 
-/**
- * A week of traffic against a small deployment, shaped the way real traffic is: a working-hours
- * curve with a quiet night, and a scanner that shows up as a flat trickle of blocked requests.
- */
+/** Shaped like real traffic: a working-hours curve, a quiet night, a flat trickle of blocks. */
 const SERIES: Record<Range, { labels: string[]; ok: number[]; blocked: number[] }> = {
   "24h": {
     labels: ["00", "03", "06", "09", "12", "15", "18", "21"],
@@ -61,10 +57,7 @@ const COUNTRIES = [
 
 const TOTAL_REQUESTS = COUNTRIES.reduce((sum, c) => sum + c.requests, 0);
 
-/**
- * A plausible breakdown for one country, derived from its totals the way the page gets one from
- * /api/analytics/country - hosts, response classes and user agents, each summing to the country.
- */
+/** Derived from the country's totals, each part summing to them, like /api/analytics/country. */
 function breakdownFor(country: (typeof COUNTRIES)[number]): CountryBreakdownData {
   const r = country.requests;
   const part = (share: number) => Math.round(r * share);
@@ -113,7 +106,6 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** A labelled bar, for the breakdowns the app draws as a map or a donut. */
 function Bar({
   label,
   value,
@@ -190,7 +182,7 @@ function AnalyticsDemoContent() {
     [theme, data.labels],
   );
 
-  // The same switch the map carries: one ranking, recoloured - here re-sorted - by the chosen count.
+  // Like the map's switch: one ranking, re-sorted by the chosen count.
   const ranked = [...COUNTRIES].sort((a, b) => b[metric] - a[metric]);
   const maxCountry = Math.max(...COUNTRIES.map((c) => c[metric]));
   const selectedCountry = COUNTRIES.find((c) => c.code === selected) ?? null;
@@ -282,7 +274,6 @@ function AnalyticsDemoContent() {
               onChange={setMetric}
             />
             {ranked.map((country) => (
-              // The whole row opens the country's breakdown, as a click on the map does.
               <button
                 key={country.code}
                 type="button"
@@ -336,10 +327,7 @@ function AnalyticsDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Content goes inside DemoSurface, which provides the catalog useTranslations reads. */
 export default function AnalyticsDemo() {
   return (
     <DemoSurface>

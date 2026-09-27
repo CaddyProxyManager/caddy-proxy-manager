@@ -1,8 +1,4 @@
-/**
- * The password rule is defined once and enforced in four places (admin env validation,
- * change-password, the forced-reset screen, .p12 export). These pin the rule itself, and - through
- * the real English catalog - the sentence it is reported as.
- */
+/** One rule, four enforcement points; pinned along with its English wording from the catalog. */
 import { describe, it, expect } from 'bun:test';
 import messages from '../../messages/en.json';
 import {
@@ -15,10 +11,7 @@ import { passwordPolicyHint, passwordPolicyMessage } from '@/src/lib/password-po
 
 const VALID = 'CorrectHorse1!';
 
-/**
- * Resolves against messages/en.json the way next-intl would, so a renamed or deleted key fails
- * here rather than rendering the key itself to a user.
- */
+/** Resolves like next-intl, so a renamed key fails here rather than rendering raw. */
 function t(key: string, values: Record<string, string | number> = {}): string {
   const template = key.split('.').reduce<unknown>((node, part) => {
     if (node === undefined || node === null || typeof node !== 'object') return undefined;
@@ -97,9 +90,7 @@ describe('passwordPolicyMessage', () => {
 });
 
 describe('passwordPolicy.rule messages', () => {
-  // The forced password update renders its checklist as `passwordPolicy.rule.${violation}`, a key
-  // composed at runtime that the typed catalog cannot check. Every violation the policy can report
-  // needs a rule line, or the checklist shows the raw key.
+  // `passwordPolicy.rule.${violation}` is composed at runtime, so tsc cannot check it.
   it('has a checklist line for every violation', () => {
     const everyViolation = passwordPolicyViolations('');
     expect(everyViolation).toHaveLength(4);
@@ -113,8 +104,7 @@ describe('passwordPolicy.rule messages', () => {
 
 describe('passwordPolicyHint', () => {
   it('describes the rule it is shown next to', () => {
-    // The hint is the only thing a user reads before typing, so it should not
-    // drift from the length actually enforced.
+    // The hint must not drift from the length actually enforced.
     expect(passwordPolicyHint(t)).toContain(String(MIN_PASSWORD_LENGTH));
   });
 });

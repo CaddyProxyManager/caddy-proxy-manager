@@ -5,16 +5,16 @@ import type { AvatarSize } from "@astryxdesign/core/Avatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 
 interface UserAvatarProps {
-  /** Sources and initial, resolved on the server by resolveAvatar(). */
+  /** From resolveAvatar() on the server. */
   avatar: ResolvedAvatar;
-  /** Display name - drives the initials, the alt text, and the tooltip. */
+  /** Drives the initials, alt text and tooltip. */
   alt?: string;
   size?: AvatarSize;
-  /** Omit the built-in tooltip where the name is already visible beside it. */
+  /** Off where the name is already visible beside it. */
   tooltip?: boolean;
 }
 
-/** Renders a user's icon. Astryx's Avatar cascades `src` → `fallbackSrc` (Gravatar) → initials. */
+/** Astryx's Avatar falls back from `src` to `fallbackSrc` (Gravatar) to initials. */
 export function UserAvatar({ avatar, alt, size = "md", tooltip }: UserAvatarProps) {
   return (
     <Avatar

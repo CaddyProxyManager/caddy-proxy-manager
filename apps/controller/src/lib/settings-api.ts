@@ -1,11 +1,6 @@
 /**
- * Settings groups as the operator APIs see them: `/api/v1/settings/[group]` and GraphQL's
- * `settings` / `saveSettings`.
- *
- * One implementation, because the two used to disagree. GraphQL read the group name as a storage
- * key - so it could read any row, secrets included - and saved the same way, which wrote orphan
- * rows for hyphenated groups, skipped each group's own saver (and the encryption inside it) and
- * never applied the result to Caddy.
+ * Settings groups for both `/api/v1/settings/[group]` and GraphQL, in one implementation: reading
+ * a group name as a storage key reached any row, secrets included, and skipped each group's saver.
  */
 
 import { applyCaddyConfig } from "./caddy";
@@ -104,8 +99,7 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     get: getForwardAuthSettings,
     save: saveForwardAuthSettings as (data: never) => Promise<void>,
     storageKey: "forward_auth",
-    // Nothing in the generated config reads it - it only seeds the host form - but the apply is
-    // what pushes the new value to the agents, and every other group here does the same.
+    // Nothing in the config reads it, but the apply is what pushes the value to the agents.
     applyCaddy: true,
   },
   metrics: {
@@ -188,8 +182,7 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     applyCaddy: false,
   },
   tailscale: {
-    // Defaulted rather than null, so a GET before anything is saved still describes the shape a
-    // PUT has to send - the node name in particular, which hosts inherit.
+    // Not null, so a GET before any save still shows the shape a PUT must send.
     get: async () => (await getTailscaleSettings()) ?? defaultTailscaleSettings(),
     save: saveTailscaleSettings as (data: never) => Promise<void>,
     storageKey: "tailscale",
@@ -198,15 +191,15 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   },
 };
 
-/** Own keys only: a group named `constructor` must not find Object's. */
-/** Every group the REST API serves; each needs a case in `validateSettingsGroup` too. */
+/** Each needs a case in `validateSettingsGroup` too. */
 export const SETTINGS_GROUPS = Object.keys(SETTINGS_HANDLERS);
 
+/** Own keys only: a group named `constructor` must not find Object's. */
 export function isSettingsGroup(group: string): boolean {
   return Object.hasOwn(SETTINGS_HANDLERS, group);
 }
 
-/** A save that validated and was stored, but Caddy refused. The message is safe to show. */
+/** Stored, but Caddy refused. The message is safe to show. */
 export class SettingsApplyError extends Error {
   constructor(
     message: string,
@@ -217,10 +210,7 @@ export class SettingsApplyError extends Error {
   }
 }
 
-/**
- * A group's value as an API client may see it, or null for a group that does not exist.
- * `sensitive` marks a redacted credential group, which must not be cached on the way out.
- */
+/** `sensitive` marks a redacted credential group, which must not be cached on the way out. */
 export async function readSettingsGroup(
   group: string,
 ): Promise<{ value: unknown; sensitive: boolean } | null> {
@@ -233,12 +223,7 @@ export async function readSettingsGroup(
   return { value: value ?? {}, sensitive: false };
 }
 
-/**
- * Validate, save and apply one group, rolling the stored value back if Caddy refuses it.
- *
- * Throws `SettingsValidationError` or `DefaultResponseValidationError` for a payload or group it
- * refuses, and `SettingsApplyError` when the apply fails. Callers answer an unknown group first.
- */
+/** Rolls the stored value back if Caddy refuses it. Callers answer an unknown group first. */
 export async function saveSettingsGroup(group: string, input: unknown): Promise<void> {
   if (!isSettingsGroup(group)) {
     throw new SettingsValidationError("Unknown settings group");
@@ -247,8 +232,7 @@ export async function saveSettingsGroup(group: string, input: unknown): Promise<
   const validated = validateSettingsGroup(group, input);
 
   await withSettingsUpdateLock(async () => {
-    // Preserve the exact local stored value (including encrypted credentials),
-    // rather than the effective or redacted GET representation, for rollback.
+    // The stored value, encrypted credentials included, not the redacted GET shape.
     const previousValue = await getSetting<unknown>(handler.storageKey);
     await handler.save(validated as never);
 
@@ -271,9 +255,7 @@ export async function saveSettingsGroup(group: string, input: unknown): Promise<
         );
       }
 
-      // Caddy's load is atomic, but a failure may also happen after load while
-      // synchronizing instances. Best-effort reapply confirms the active
-      // configuration matches the restored database state.
+      // The load is atomic, but a failure can land after it while syncing instances.
       try {
         await applyCaddyConfig();
       } catch (restoreApplyError) {

@@ -1,9 +1,6 @@
 /**
- * Running the log parsers, and starting or stopping them as the controller's configuration changes.
- *
- * Analytics are optional, so this is entirely driven by what the controller pushes: its `analytics`
- * flag starts the parsers and the relay behind them, and a deployment that never enables analytics
- * never opens a log file at all.
+ * Starts and stops the log parsers from the controller's pushed `analytics` flag, so a deployment
+ * that never enables analytics never opens a log file.
  */
 
 import type { FleetConfig } from "@cpm/shared";
@@ -24,25 +21,19 @@ import {
   bindStore as bindWafStore,
 } from "./waf-log-parser";
 
-/** How often each log is read. Matches what the controller used before this moved. */
 const PARSE_INTERVAL_MS = 30_000;
 
 let timers: NodeJS.Timeout[] = [];
 let running = false;
 
-/** How often the MaxMind databases are re-checked. They are published a couple of times a week. */
+/** MaxMind publishes a couple of times a week. */
 const GEOIP_REFRESH_MS = 24 * 60 * 60_000;
 
 let geoipTimer: NodeJS.Timeout | null = null;
 
 /**
- * Apply a pushed configuration.
- *
- * Idempotent: the controller pushes on every startup and whenever the settings change, and a
- * repeat of the configuration already in force must not restart a working parser.
- *
- * `controllerId` names which paired controller pushed this, so the GeoIP fetch and the analytics
- * relay can be signed with the secret shared with that controller.
+ * Idempotent: pushed on every startup and settings change, and a repeat must not restart a working
+ * parser. `controllerId` picks the secret the GeoIP fetch and relay are signed with.
  */
 export async function applyFleetConfig(
   store: AgentStore,
@@ -60,12 +51,7 @@ export async function applyFleetConfig(
   scheduleGeoipSync(store, config, controllerId);
 }
 
-/**
- * Fetch the GeoIP databases now, and daily after that.
- *
- * Skipped only when the controller offered none. The agent beside the controller fetches too:
- * Caddy reads the agent's copy, not the controller's.
- */
+/** The agent beside the controller fetches too: Caddy reads the agent's copy. */
 function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId: string): void {
   if (geoipTimer) {
     clearInterval(geoipTimer);
@@ -91,11 +77,9 @@ function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId:
   geoipTimer.unref();
 }
 
-/** Where relayed rows go: the controller this agent is paired with, signed with its secret. */
 function analyticsSink(store: AgentStore, controllerId: string): AnalyticsSink | null {
   const secret = store.findController(controllerId)?.secret;
   const url = store.pairedControllerUrl();
-  // Both exist for any agent that is connected; without either there is nothing to sign or send.
   if (!secret || !url) return null;
   return { client: new ControllerClient(url, store.agentId()), secret };
 }
@@ -105,8 +89,7 @@ async function start(): Promise<void> {
   await initLogParser();
   await initWafLogParser();
 
-  // Each tick is guarded: a parse that throws must not kill the interval and leave analytics
-  // silently stopped for the life of the process.
+  // A parse that throws must not kill the interval and silently stop analytics.
   timers = [
     setInterval(() => {
       void parseNewLogEntries().catch((error: unknown) => {
@@ -136,16 +119,11 @@ export async function stop(): Promise<void> {
   console.log("[analytics] log parsers stopped");
 }
 
-/**
- * Resume from whatever the controller last pushed.
- *
- * Called at startup so an agent that restarts keeps writing analytics without waiting for the
- * controller to notice it came back.
- */
+/** At startup, so a restarted agent keeps writing analytics before the controller notices. */
 export async function resumeFleetConfig(store: AgentStore): Promise<void> {
   const stored = store.fleetConfig();
   if (!stored) return;
-  // Whichever controller is paired: an agent polls exactly one.
+  // An agent polls exactly one controller.
   const controller = store.listControllers()[0];
   if (!controller) return;
   await applyFleetConfig(store, stored, controller.controllerId);

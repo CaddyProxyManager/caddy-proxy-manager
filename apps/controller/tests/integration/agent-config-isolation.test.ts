@@ -1,13 +1,6 @@
 /**
- * One agent's answers may only ever shape its own config.
- *
- * A paired agent is less trusted than the controller. Before this, every Caddyfile snippet was
- * adapted by whichever agent attached first and its answer nested, unmodified, into the document
- * loaded onto every agent - so one rogue agent could route traffic on every host in the fleet. The
- * health monitor had the same shape: one agent's `/config/` decided when the whole fleet reloaded.
- *
- * These run on the production transport, so a request reaches the fake agent it is routed to
- * exactly as it would reach a real one.
+ * One agent's answers may only shape its own config, or a rogue agent could route traffic on every
+ * host in the fleet. Runs on the production transport, so routing is exercised for real.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -18,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -44,7 +36,6 @@ import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { clearAgentEnv, startFakeAgent, type FakeAgent } from '../helpers/fake-agent';
 import * as schema from '../../src/lib/db/schema';
 
-/** What Caddy's /adapt answers for a snippet, carrying these routes. */
 function adapted(routes: unknown[]): string {
   return JSON.stringify({ result: { apps: { http: { servers: { srv0: { routes } } } } } });
 }
@@ -110,8 +101,7 @@ describe('routing a Caddy admin request', () => {
 
   it('does not fall back to a direct connection when the pinned agent is gone', async () => {
     await startFakeAgent();
-    // The direct transport throws its own "used inside a test" error, so this message proves the
-    // request never reached it.
+    // The direct transport would throw its own error, so this proves it was never reached.
     await expect(
       agentCaddyAdminTransport({ path: '/config/', method: 'GET', agentId: 'gone' }),
     ).rejects.toThrow(/No agent is connected/);
@@ -124,7 +114,6 @@ describe('a rogue agent', () => {
     const rogue = await startFakeAgent({ caddyAdmin: { status: 200, text: EVIL } });
     const honest = await startFakeAgent({ caddyAdmin: { status: 200, text: BENIGN } });
 
-    // Saving applies the config to both.
     await createProxyHost(
       {
         name: 'app',
@@ -157,8 +146,7 @@ describe('a rogue agent', () => {
     const steadyLoads = loadsOn(steady).length;
     const restartedLoads = loadsOn(restarted).length;
 
-    // Serving anything but the config it was given reads as "Caddy restarted", which is what
-    // triggers a re-apply - here the default Caddyfile's own non-empty http app.
+    // Any config but the one given reads as "Caddy restarted", triggering a re-apply.
     restarted.state.caddyAdmin = {
       status: 200,
       text: '{"apps":{"http":{"servers":{"srv0":{"listen":[":80"]}}}}}',

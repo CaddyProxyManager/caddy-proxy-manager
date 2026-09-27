@@ -56,10 +56,7 @@ const HOSTS: Row[] = [
 
 const protocolOf = (row: Row) => (row.listen.endsWith("/udp") ? "udp" : "tcp");
 
-/**
- * The L4 list: tiles, the TCP/UDP tabs and the real table. In the app the tabs filter the query;
- * here this component filters the rows above off the same `protocol` parameter.
- */
+/** The app's tabs filter the query; here the rows are filtered off the same `protocol` param. */
 function L4HostsTableDemoContent() {
   const t = useTranslations("l4ProxyHosts");
   const router = useRouter();
@@ -145,10 +142,7 @@ function L4HostsTableDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Inside DemoSurface, which provides the catalog useTranslations reads. */
 export default function L4HostsTableDemo() {
   return (
     <DemoSurface>

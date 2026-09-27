@@ -16,12 +16,8 @@ import {
 } from "./settings";
 
 /**
- * One thing still using a module the selection turns off. Naming what uses it ("3 enabled L4 proxy
- * hosts") is what makes the refusal actionable.
- *
- * Data rather than a sentence, so the settings action can say it in the reader's language through
- * `moduleConflictMessage`; `describeModuleConflicts` says it in English for `/api/v1`. A test keeps
- * the two wordings equal.
+ * Data, not a sentence, so the settings action can translate it (`moduleConflictMessage`) while
+ * `/api/v1` keeps English. A test keeps the two wordings equal.
  */
 export type ModuleConflict =
   | { kind: "l4Hosts" | "hostWaf" | "hostGeoblock" | "tailnetHosts"; count: number }
@@ -50,13 +46,11 @@ export function englishModuleConflict(conflict: ModuleConflict): string {
   }
 }
 
-/** The whole refusal in English, or null when nothing conflicts. */
 export function englishModuleConflicts(conflicts: readonly ModuleConflict[]): string | null {
   if (conflicts.length === 0) return null;
   return `Cannot disable those modules yet: ${conflicts.map(englishModuleConflict).join("; ")}. Turn the feature off first.`;
 }
 
-/** Why a selection cannot be applied yet, in English for `/api/v1`, or null. */
 export async function describeModuleConflicts(
   settings: CaddyBuildSettings,
   agentRowId?: number,
@@ -64,7 +58,6 @@ export async function describeModuleConflicts(
   return englishModuleConflicts(await findModuleConflicts(settings, agentRowId));
 }
 
-/** Everything still using a module the selection turns off; empty when it can be applied. */
 export async function findModuleConflicts(
   settings: CaddyBuildSettings,
   agentRowId?: number,
@@ -77,11 +70,7 @@ export async function findModuleConflicts(
   const blockerOff = !enabled.has("caddy-blocker");
   const tailscaleOff = !enabled.has("caddy-tailscale");
 
-  // Scoped to what this agent actually serves. A host pinned to a different agent has no bearing
-  // on whether *this* binary needs a module, and counting it would refuse a legitimate selection
-  // with a reason the operator cannot act on - the host is not on this agent to turn off.
-  //
-  // Each read still happens only when its module is off; they are just issued together.
+  // Scoped to this agent: a host pinned elsewhere would refuse with a reason nobody can act on.
   const [httpAssignments, l4Assignments, l4HostIds, waf, geoblock, allHosts, dnsProviders] =
     await Promise.all([
       agentRowId === undefined ? null : listHostAssignments("http"),
@@ -110,8 +99,7 @@ export async function findModuleConflicts(
     problems.push({ kind: "globalGeoblock" });
   }
 
-  // Per-host config counts as much as the global switch: WAF and geoblocking can be on per host
-  // with the global off. Checking only globals let an operator disable a module a dozen hosts used.
+  // WAF and geoblocking can be on per host with the global switch off.
   if (allHosts) {
     const hosts = allHosts.filter((host) => servesHttp(host.id));
     if (wafOff) {
@@ -123,15 +111,13 @@ export async function findModuleConflicts(
       if (count > 0) problems.push({ kind: "hostGeoblock", count });
     }
     if (tailscaleOff) {
-      // Worth refusing rather than warning: a tailnet-only host stops being served at all - the
-      // config drops it rather than publishing it, which looks like the host simply vanished.
+      // Refused, not warned: the config would silently drop a tailnet-only host.
       const count = hosts.filter((h) => h.enabled && h.tailscale?.serve).length;
       if (count > 0) problems.push({ kind: "tailnetHosts", count });
     }
   }
 
-  // Every configured provider, not just the default: a certificate can pin its own through
-  // providerOptions.provider, so a non-default provider with credentials on file is likely busy.
+  // Not just the default: a certificate can pin its own provider.
   const defaultProvider = dnsProviders?.default ?? null;
   for (const provider of Object.keys(dnsProviders?.providers ?? {})) {
     if (enabled.has(dnsModuleId(provider))) continue;
@@ -144,20 +130,15 @@ export async function findModuleConflicts(
   return problems;
 }
 
-/** Which hosts the snippet warning names. The settings action says it, in the reader's language. */
 export type CaddyfileSnippetWarning = {
-  /** Enabled hosts with a custom Caddyfile snippet. */
   count: number;
-  /** The first few of those, by name. */
+  /** The first few, by name. */
   names: string[];
-  /** How many more there are beyond `names`. */
+  /** How many beyond `names`. */
   more: number;
 };
 
-/**
- * A non-blocking heads-up about per-host Caddyfile snippets, or null. Only Caddy's adapter could
- * say which plugin a snippet needs, and only for the binary running now - so warn, don't refuse.
- */
+/** Warns, not refuses: only Caddy's adapter knows which plugin a snippet needs. */
 export async function describeCaddyfileSnippetWarning(
   settings: CaddyBuildSettings,
 ): Promise<CaddyfileSnippetWarning | null> {

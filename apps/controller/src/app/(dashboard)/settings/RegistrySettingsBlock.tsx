@@ -1,16 +1,6 @@
 "use client";
 
-/**
- * A block of registry settings, drawn from their definitions.
- *
- * These are the settings that used to be readable here and changeable only in `.env`. They are
- * saved like any other: a stored value wins over the variable, so once a field here is saved the
- * line in `.env` stops deciding anything and can go. A field still answered by the environment
- * says so, since that is the one case where what is on screen did not come from this form.
- *
- * Generic on purpose. The definition knows whether it is text, a number or a switch, and what it
- * will accept, so this renders what it is told rather than repeating those decisions.
- */
+/** Renders from the registry definitions rather than repeating their decisions. */
 
 import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,15 +14,14 @@ import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { FormCard, StatusAlert } from "@/src/components/ui/FormLayout";
 
-/** One setting as the server resolved it, with what a control needs to render it. */
 export type RegistryField = {
-  /** The setting key, which is also the name the field posts under. */
+  /** Also the name the field posts under. */
   key: string;
   env: string;
   label: string;
   description: string;
   source?: "stored" | "environment" | "default";
-  /** The variable overrides what is stored, so this cannot be changed from here. */
+  /** The variable overrides what is stored. */
   pinned?: boolean;
 } & (
   | { kind: "text"; value: string; maxLength?: number; placeholder?: string }
@@ -46,7 +35,7 @@ export function RegistrySettingsBlock({
   state,
   formAction,
 }: {
-  /** Which block this is, so the action knows which settings the submission may write. */
+  /** Tells the action which settings the submission may write. */
   block: string;
   fields: readonly RegistryField[];
   state: { success: boolean; message?: string } | null;
@@ -55,9 +44,7 @@ export function RegistrySettingsBlock({
   const t = useTranslations("settings");
   const router = useRouter();
 
-  // Pull the page's server data again once a save lands, so the fields show what was stored
-  // rather than what the form held. Saving revalidates on the server, but the page already open
-  // keeps the payload it rendered from until something asks for a new one.
+  // The open page keeps its old payload after a server revalidate until asked for a new one.
   useEffect(() => {
     if (state?.success) router.refresh();
   }, [state, router]);
@@ -75,8 +62,7 @@ export function RegistrySettingsBlock({
               key={field.key}
               field={field}
               badgeLabel={field.pinned ? t("envPinned") : t("envOverride")}
-              // In place of the description, not beside it: what the setting does is not what a
-              // reader needs while the control is greyed out and they wonder why.
+              // Replaces the description: a greyed-out control needs the why, not the what.
               description={
                 field.pinned ? t("envPinnedHelp", { variable: field.env }) : field.description
               }
@@ -88,13 +74,7 @@ export function RegistrySettingsBlock({
   );
 }
 
-/**
- * A field's value, kept in step with the server's.
- *
- * React resets a form once its action has run, which leaves a control showing what it held before
- * the save even though the save succeeded - a checkbox that flicks back off reads as a refusal.
- * The server has just re-rendered with what it stored, so that is what the control goes back to.
- */
+/** React resets a form after its action, so a saved checkbox flicks back off unless re-synced. */
 function useFieldValue<T>(serverValue: T): [T, (next: T) => void] {
   const [value, setValue] = useState(serverValue);
   const [seen, setSeen] = useState(serverValue);
@@ -106,14 +86,8 @@ function useFieldValue<T>(serverValue: T): [T, (next: T) => void] {
 }
 
 /**
- * One field, holding its own value.
- *
- * Each kind draws its own `EnvLabelledField` rather than sharing one, because that wrapper hides
- * the control's label and points its own at it - which it can only do to a design-system control
- * passed as its direct child, not to a component wrapping one.
- *
- * Controlled, like every other field on these screens: the page's save bar decides a form is
- * dirty by what its controls hold, and an uncontrolled input never tells React that changed.
+ * Each kind draws its own `EnvLabelledField`, which only relabels a direct design-system child.
+ * Controlled, because the save bar reads dirtiness from what the controls hold.
  */
 function FieldControl({
   field,
@@ -124,8 +98,7 @@ function FieldControl({
   badgeLabel: string;
   description: string;
 }) {
-  // Where the value still comes from. Said only when it is the variable, since that is the one
-  // case where what is on screen did not come from this form.
+  // Only for the variable: the one case where the value did not come from this form.
   const badge = field.source === "environment" ? <Badge variant="blue" label={badgeLabel} /> : null;
 
   if (field.kind === "boolean")

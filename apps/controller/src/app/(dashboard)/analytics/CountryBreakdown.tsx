@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * One country's slice of the traffic, opened by choosing it on the map or in the table.
- *
- * The map and the table answer "where is traffic coming from"; this answers the follow-up neither
- * can - to what, and how it was answered. Every figure is a column the access log actually records
- * (host, status, user agent, client IP); there is no ASN or network column, so there is no
- * breakdown by network.
+ * One country's slice of the traffic: to what, and how it was answered. Only columns the access log
+ * records; there is no ASN column, so no breakdown by network.
  */
 
 import { useEffect, useState } from "react";
@@ -33,7 +29,6 @@ export type CountryBreakdownData = {
 
 type Row = { label: string; count: number };
 
-/** A labelled count with a bar scaled to the largest in its list. */
 function RankedList({ title, rows, color }: { title: string; rows: Row[]; color: string }) {
   const format = useFormatter();
   const top = rows.reduce((max, row) => Math.max(max, row.count), 0);
@@ -75,12 +70,7 @@ function RankedList({ title, rows, color }: { title: string; rows: Row[]; color:
   );
 }
 
-/**
- * Fetches one country's breakdown for the page's current range and hosts, and renders it.
- *
- * The fetching and the drawing are separate so the docs site - which has no API behind it - can
- * render the same view from sample data.
- */
+/** Fetching is split from drawing so the docs site, with no API, can render sample data. */
 export function CountryBreakdown({
   code,
   query,
@@ -88,9 +78,8 @@ export function CountryBreakdown({
   onClose,
 }: {
   code: string;
-  /** The page's current range and host filter, as the query string every analytics call shares. */
   query: string;
-  /** Everything in the range, so the header can say what share of it this country is. */
+  /** So the header can say what share of it this country is. */
   totalRequests: number;
   onClose: () => void;
 }) {
@@ -125,7 +114,6 @@ export function CountryBreakdown({
   );
 }
 
-/** The breakdown itself: a header, then hosts, response classes and user agents side by side. */
 export function CountryBreakdownView({
   code,
   data,
@@ -144,9 +132,8 @@ export function CountryBreakdownView({
   const locale = useLocale();
   const format = useFormatter();
 
-  // Named in the UI's locale rather than the browser's, so the header matches the map's popup and
-  // the server and client render the same text. "XX" is the code for requests GeoIP could not
-  // place, which no locale has a name for.
+  // The UI's locale, not the browser's, so it matches the map popup and server and client agree.
+  // "XX" is traffic GeoIP could not place, which no locale names.
   const name = code === "XX" ? t("unplacedCountry") : regionName(code, locale);
   const share = totalRequests > 0 && data ? ((data.total / totalRequests) * 100).toFixed(1) : null;
 

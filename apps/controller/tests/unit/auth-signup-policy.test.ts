@@ -1,7 +1,4 @@
-/**
- * Self-registration goes through Better Auth's own sign-up route, which only knows its 8-character
- * floor. The before-hook holds it to the app's password policy instead, worded from the catalog.
- */
+/** Better Auth's sign-up route knows only its 8-character floor; the before-hook applies ours. */
 import { describe, it, expect } from 'bun:test';
 import { signUpPasswordError } from '../../src/lib/auth-signup-policy';
 import { testTranslator } from '../helpers/next-intl';

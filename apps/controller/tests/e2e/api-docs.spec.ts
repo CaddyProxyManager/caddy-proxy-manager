@@ -1,4 +1,3 @@
-/** E2E: API Docs page - the page loads and Swagger UI renders the OpenAPI spec. Admin only. */
 import { test, expect } from '@playwright/test';
 
 test.describe('API Docs page', () => {

@@ -14,8 +14,7 @@ export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
 const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;
-// docker-compose.yml hard-requires SESSION_SECRET, and .env is gitignored -- without this the
-// stack will not interpolate anywhere there is no local .env, CI included.
+// docker-compose.yml requires SESSION_SECRET and .env is gitignored, so CI has none.
 const ENV = {
   ...process.env,
   CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026',
@@ -94,13 +93,10 @@ async function seedAuthState(): Promise<void> {
 
   try {
     await page.goto('http://localhost:3000/login');
-    // Wait for React before touching the form: until it hydrates the click runs the browser's
-    // native submit, which GETs /login with the credentials in the query string and never reaches
-    // the auth API. Seeding is the whole suite's prerequisite, so a miss here fails every spec.
+    // Before hydration the form submits natively - a GET with the credentials in the query.
     await waitForHydration(page);
     await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
 
-    // Wait for redirect away from /login
     await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 });
     console.log(`[global-setup] Login succeeded, landed on: ${page.url()}`);
 

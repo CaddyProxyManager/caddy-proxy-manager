@@ -179,11 +179,7 @@ export async function deleteCertificate(id: number, actorUserId: number) {
   await applyCaddyConfig();
 }
 
-/**
- * Encrypt private keys and remove arbitrary provider-option fields written by
- * older releases. The scan is idempotent and intentionally does not rely on a
- * one-time flag, so restored legacy backups are repaired on the next startup.
- */
+/** Idempotent, with no one-time flag, so a restored legacy backup is repaired on next startup. */
 export async function migrateLegacyCertificateStorage(): Promise<number> {
   const rows = await db
     .select({

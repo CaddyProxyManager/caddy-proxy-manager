@@ -1,11 +1,6 @@
 /**
- * Per-host WAF body limits must be rejected at write time when Coraza would
- * refuse them (#252).
- *
- * coraza-caddy builds its WAF while Caddy loads the config, so an out-of-range
- * limit doesn't fail just this host - Caddy rejects the entire config document
- * and every host stops being reconfigured. Failing the write keeps a bad value
- * from ever reaching the config builder.
+ * Body limits Coraza would refuse are rejected at write time (#252): at load time Caddy rejects
+ * the whole document, not just this host.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -13,13 +8,11 @@ import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-// bun evaluates a vi.mock factory synchronously while linking, so the helpers it needs
-// are imported above it rather than awaited inside it.
+// Bun mock factories run synchronously, so their helpers are imported up here.
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

@@ -1,13 +1,8 @@
 "use client";
 
 /**
- * The frame a settings page's blocks render in: the heading over each one, the list of them down
- * the side, and the one bar that saves whichever of them were edited.
- *
- * Each block is still its own form and its own server action - what the merge removed is the
- * button per card. Five Save buttons down one page made the page read as five pages stacked, and
- * the operator has to press Review and apply afterwards regardless, so the page now says how many
- * blocks are unsaved and saves them together.
+ * The frame a settings page's blocks render in. Each block keeps its own form and server action;
+ * one page-level bar replaces the per-card Save buttons and submits whichever were edited.
  */
 
 import {
@@ -30,13 +25,11 @@ import { EnvTokens } from "@/src/components/ui/EnvTokens";
 import { type SettingsBlock, settingsBlockDescription, settingsBlockName } from "./sections";
 
 /**
- * A form the page-level bar must not submit: it asks something first, or its button does more
- * than save. Set as an attribute on the `<form>` rather than tracked in React state, because the
- * bar finds its forms in the DOM - it never sees the components that drew them.
+ * A form the page bar must not submit (it confirms first, or does more than save). An attribute,
+ * because the bar finds forms in the DOM, not through React.
  */
 export const SKIP_PAGE_SAVE = { "data-page-save": "off" } as const;
 
-/** One block: its heading, the variables that configure it, and the form it came with. */
 export function SettingsBlockShell({
   block,
   showHeading,
@@ -49,13 +42,11 @@ export function SettingsBlockShell({
 }) {
   const t = useTranslations("settings");
   return (
-    // The anchor a legacy link lands on, and what the side list scrolls to. scroll-margin keeps
-    // the heading clear of the sticky header the frame draws above it.
+    // Anchor for legacy links and the side list; scroll-margin clears the sticky header.
     <VStack
       gap={3}
       id={block.id}
-      // Also as a data attribute: the dirty tracker keys each form's baseline on the block it is
-      // in, and an id is something the design system's own elements have too.
+      // The dirty tracker keys baselines on this; ids also appear on design-system elements.
       data-settings-block={block.id}
       style={{ scrollMarginTop: "var(--spacing-5)" }}
     >
@@ -78,12 +69,8 @@ export function SettingsBlockShell({
 }
 
 /**
- * Scroll to, and focus, the control a `?field=` link names.
- *
- * The review sheet lists the fields inside a staged change, and each one links here. A settings
- * key is one blob for a whole block, so without this the closest a link could get is the block.
- * Named by its form field rather than by an id: the design system generates ids, and the name is
- * what the change was recorded under anyway.
+ * Focuses the control a `?field=` link from the review sheet names. By field name, because the
+ * design system generates ids and the name is what the change was recorded under.
  */
 export function FocusField() {
   const params = useSearchParams();
@@ -91,8 +78,7 @@ export function FocusField() {
 
   useEffect(() => {
     if (!field) return;
-    // A frame later: the blocks fill their fields on mount, and a control that is not there yet
-    // cannot be focused.
+    // A frame later: blocks fill their fields on mount.
     const frame = requestAnimationFrame(() => {
       const control = document.querySelector<HTMLElement>(`[name="${CSS.escape(field)}"]`);
       if (!control) return;
@@ -105,15 +91,11 @@ export function FocusField() {
   return null;
 }
 
-/** Where a block sits on the page, for the list beside it. */
 export type PageAnchor = { id: string; label: string };
 
 /**
- * The blocks of this page, down the side.
- *
- * Only from three blocks up: with two, the list names what is already on screen. Clicking one
- * marks it rather than watching the scroll position - a settings page is read by jumping to the
- * thing you came for, and an observer that argues with the jump is worse than no highlight.
+ * Only from three blocks up. Highlights on click rather than scroll position, because a scroll
+ * observer argues with the jump.
  */
 export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
   const t = useTranslations("settings");
@@ -154,18 +136,8 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
 }
 
 /**
- * What identifies a form across re-renders: the block it belongs to, and its place in it.
- *
- * Not the element, because React can replace a form's DOM node while the page is open and a
- * baseline held against the old node is then lost - what replaced it holds the operator's edits,
- * so it reads as untouched and the save bar disappears with unsaved work still on screen.
- *
- * Not the fields it submits either: a form that reveals a field when a selector changes - the
- * default response growing a status and a body - would look like a different form the moment it
- * did, and lose its baseline exactly when there was something to save.
- *
- * The block a form sits in is marked for this, and is as stable as the page itself. A block with
- * more than one form tells them apart by their order within it.
+ * Block id plus position. Not the element (React can replace the node and drop the baseline) and
+ * not its fields (a form that reveals a field would look like a new form and lose its baseline).
  */
 function formKey(form: HTMLFormElement): string {
   const block = form.closest("[data-settings-block]");
@@ -174,12 +146,11 @@ function formKey(form: HTMLFormElement): string {
   return `${block.getAttribute("data-settings-block")}#${forms.indexOf(form)}`;
 }
 
-/** The controls a form submits, by the value each holds right now. */
 function controlValues(form: HTMLFormElement): Map<Element, string> {
   const values = new Map<Element, string>();
   for (const element of form.elements) {
     const control = element as HTMLInputElement;
-    // React's own bookkeeping inputs, and anything nameless, are not settings.
+    // $ACTION* inputs are React's bookkeeping, not settings.
     if (!control.name || control.name.startsWith("$ACTION")) continue;
     if (control.type === "file") {
       const file = control.files?.[0];
@@ -193,7 +164,7 @@ function controlValues(form: HTMLFormElement): Map<Element, string> {
   return values;
 }
 
-/** The same, keyed by field name, which is what survives a form being re-rendered. */
+/** Keyed by field name, which survives a re-render. */
 function valuesByName(form: HTMLFormElement): Map<string, string> {
   const values = new Map<string, string>();
   for (const [control, value] of controlValues(form)) {
@@ -202,12 +173,7 @@ function valuesByName(form: HTMLFormElement): Map<string, string> {
   return values;
 }
 
-/**
- * The smallest thing around a control that holds its label: its field.
- *
- * What the pink border is set on, because the bordered element is the design system's business -
- * an input's own box, a checkbox's indicator - and marking the field lets one rule reach either.
- */
+/** The smallest ancestor holding a label; marking it lets one CSS rule reach any control's box. */
 function fieldOf(control: Element, form: HTMLFormElement): Element | null {
   for (let node = control.parentElement; node && node !== form; node = node.parentElement) {
     if (node.querySelector("label")) return node;
@@ -216,12 +182,8 @@ function fieldOf(control: Element, form: HTMLFormElement): Element | null {
 }
 
 /**
- * The labels that name a control.
- *
- * Usually the ones pointing at its id - all of them, because a field drawn by EnvLabelledField
- * has the visible label beside the control and the design system's own, hidden, inside it. A
- * switch or checkbox submits through a hidden input with no id of its own, so that one takes the
- * labels of the smallest thing around it that has any, which is its own field.
+ * All labels for its id (EnvLabelledField draws two). A switch's hidden input has no id, so it
+ * takes the labels of its nearest labelled ancestor.
  */
 function labelsFor(control: Element, form: HTMLFormElement): Element[] {
   const id = (control as HTMLInputElement).id;
@@ -237,19 +199,9 @@ function labelsFor(control: Element, form: HTMLFormElement): Element[] {
 }
 
 /**
- * Mark which labels and fields hold something unsaved: typed here and not saved, or saved into
- * the change set and not applied to Caddy yet.
- *
- * The label carries it because that is the part a reader scans down a page of settings, and the
- * field because that is where the control they would go and fix is; `globals.css` colours both.
- * Written to the DOM rather than held in React state: the labels belong to the design system's
- * inputs, which take a string, so there is no prop to pass this through - and the tracker is
- * already reading these same elements.
- *
- * Collected first and written after, because a control that submits through a nameless hidden
- * input borrows the labels of whatever encloses it, which can be a field another control already
- * claimed. Clearing as it went, a clean control like that wiped the mark its neighbour had just
- * earned.
+ * Marks labels and fields as unsaved in the DOM, since design-system labels take no such prop.
+ * Collected before writing: a hidden input borrows a neighbour's labels, and clearing as it went
+ * wiped the mark the neighbour had just earned.
  */
 function markUnsaved(
   form: HTMLFormElement,
@@ -260,9 +212,7 @@ function markUnsaved(
   const fields = new Set<Element>();
   for (const [control, value] of controlValues(form)) {
     const before = baseline.get((control as HTMLInputElement).name);
-    // Two ways to be unsaved: typed and not saved yet, or saved into the change set and not
-    // applied. The second is what a page shows on its first load, which the baseline cannot see -
-    // the field already holds the staged value, so it matches itself.
+    // Staged-but-unapplied fields match their own baseline on load, hence the separate set.
     const unsaved =
       staged.has((control as HTMLInputElement).name) || (before !== undefined && before !== value);
     if (!unsaved) continue;
@@ -281,7 +231,6 @@ function markUnsaved(
   for (const field of fields) field.setAttribute("data-unsaved-field", "true");
 }
 
-/** What a form would submit right now, as one comparable string. A file counts by name and size. */
 function serializeForm(form: HTMLFormElement): string {
   const entries: string[] = [];
   for (const [key, value] of new FormData(form)) {
@@ -291,36 +240,30 @@ function serializeForm(form: HTMLFormElement): string {
 }
 
 /**
- * The forms inside `container` that differ from what they held when the page loaded or last saved.
- *
- * The same comparison `useFormDirty` makes for a single form, for every form on the page at once:
- * by value, so typing a change and undoing it reads as clean, and on a frame after each event,
- * because a switch writes its hidden input from React state after the click that set it.
+ * `useFormDirty` for every form on the page. Checked a frame after each event, because a switch
+ * writes its hidden input from React state after the click.
  */
 function useDirtyForms(
   container: RefObject<HTMLElement | null>,
   staged: ReadonlySet<string>,
 ): {
   dirty: HTMLFormElement[];
-  /** Take what the forms hold now as the saved state, and show the page as clean. */
+  /** Take what the forms hold now as the saved state. */
   accept: () => void;
 } {
   const [dirty, setDirty] = useState<HTMLFormElement[]>([]);
-  // Set by the effect, called by the bar: the baselines live in the effect's closure.
+  // A ref: the baselines live in the effect's closure.
   const accept = useRef(() => {});
 
   useEffect(() => {
     const root = container.current;
     if (!root) return;
 
-    // Every form on the page: a form the bar may not submit still has fields worth marking.
+    // A form the bar may not submit still has fields worth marking.
     const forms = () => [...root.querySelectorAll("form")];
-    // The ones the bar counts and submits. A form that asks something first keeps its own button.
     const saveable = () => forms().filter((form) => form.getAttribute("data-page-save") !== "off");
-    // Keyed by what the form submits rather than by the element, so a form React re-creates is
-    // still the same form and keeps the baseline the operator's edits are measured against.
+    // Keyed by formKey so a form React re-creates keeps its baseline.
     const baselines = new Map<string, string>();
-    // The same baseline, per field, so a label can say whether its own field is the changed one.
     const fieldBaselines = new Map<string, Map<string, string>>();
     let frame = 0;
 
@@ -332,7 +275,7 @@ function useDirtyForms(
         markUnsaved(form, valuesByName(form), staged);
       }
     };
-    // A frame later, once the fields that fill themselves on mount have done so.
+    // A frame later, once fields have filled themselves on mount.
     const baselineFrame = requestAnimationFrame(() => {
       rebaseline();
       setDirty([]);
@@ -350,9 +293,7 @@ function useDirtyForms(
         setDirty((previous) => {
           for (const form of forms()) {
             const key = formKey(form);
-            // A form whose fields this has not seen before: one rendered after the first frame.
-            // What it holds now is its baseline - nothing has edited it yet - and its staged
-            // fields still need marking.
+            // Rendered after the first frame: unedited, so what it holds now is its baseline.
             let fields = fieldBaselines.get(key);
             if (!fields) {
               fields = valuesByName(form);
@@ -402,13 +343,7 @@ function useDirtyForms(
   return { dirty, accept: () => accept.current() };
 }
 
-/**
- * The page's blocks, and the bar that saves the edited ones.
- *
- * Saving submits each dirty form in turn. They are separate server actions on purpose - one per
- * settings group, each validating its own shape - and `stagedSettingsAction` takes the update lock,
- * so the writes queue rather than race.
- */
+/** Submits each dirty form in turn; `stagedSettingsAction` takes the update lock, so they queue. */
 export function PageSaveBar({
   stagedFields,
   children,
@@ -425,9 +360,7 @@ export function PageSaveBar({
 
   const save = useCallback(() => {
     for (const form of dirty) form.requestSubmit();
-    // Clean as soon as it is sent, rather than when the server answers: these fields are React
-    // state, so React does not reset them after its action and nothing else says the values on
-    // screen are now the stored ones. An action that fails says so in its own block's banner.
+    // Clean on send: React state fields are not reset after the action. Failures show per block.
     accept();
   }, [dirty, accept]);
 
@@ -435,8 +368,7 @@ export function PageSaveBar({
     <>
       <div ref={container}>{children}</div>
       {dirty.length > 0 && (
-        // Sticky rather than fixed: the pane it sits in is what scrolls, and a fixed bar would
-        // float over the rail and the header too.
+        // Sticky, not fixed: the pane scrolls, and fixed would float over the rail and header.
         <div
           style={{
             position: "sticky",
@@ -457,8 +389,7 @@ export function PageSaveBar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  // A reload, not a form reset: these fields are React state, and resetting the
-                  // DOM would leave the inputs showing what the components still believe.
+                  // A DOM reset would desync from the React state these fields hold.
                   onClick={() => window.location.reload()}
                   label={t("pageDiscard")}
                 />
@@ -468,8 +399,7 @@ export function PageSaveBar({
                   size="sm"
                   onClick={save}
                   label={t("save")}
-                  // The page has other Save buttons - a card that saves something which is not a
-                  // setting, such as the favicon - so this one is addressable on its own.
+                  // Other Save buttons exist on the page (e.g. the favicon card).
                   data-testid="settings-page-save"
                 />
               </HStack>

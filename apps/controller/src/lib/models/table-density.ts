@@ -3,15 +3,10 @@ import db, { nowIso } from "../db";
 import { settings } from "../db/schema";
 import { DEFAULT_TABLE_DENSITY, isTableDensity, type TableDensity } from "../table-density";
 
-/**
- * A user's table density, stored the way the More drawer's pins are: one settings row per user,
- * written straight to the table. setSetting would stage it for Review & apply, and a personal
- * display choice is not instance configuration - it has nothing to apply and belongs in nobody's
- * staged diff.
- */
+/** Written straight to the table: setSetting would stage a personal choice for Review & apply. */
 const keyFor = (userId: number) => `ui:table_density:${userId}`;
 
-/** The saved density, or the default for a user who never chose or whose row cannot be read. */
+/** The default when unset or unreadable. */
 export async function getTableDensity(userId: number): Promise<TableDensity> {
   const [row] = await db
     .select({ value: settings.value })

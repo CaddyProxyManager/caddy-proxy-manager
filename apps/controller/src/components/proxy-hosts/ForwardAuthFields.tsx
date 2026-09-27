@@ -12,7 +12,7 @@ import type { ForwardAuthProvider, ProxyHost } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
-/** Kept in step with DEFAULT_AUTHELIA_FORWARD_AUTH_* in the model, which is what actually stores them. */
+/** Kept in step with DEFAULT_AUTHELIA_FORWARD_AUTH_* in the model, which stores them. */
 const AUTHELIA_DEFAULT_ENDPOINT = "/api/authz/forward-auth";
 const AUTHELIA_DEFAULT_HEADERS = [
   "Remote-User",
@@ -53,10 +53,7 @@ function formDefaults(
   };
 }
 
-/**
- * An auth server this app does not run - Authelia and anything else that answers a forward-auth
- * subrequest. The Authentik section beside it stays its own thing: that one knows about outposts.
- */
+/** An external forward-auth server. Authentik stays separate: it knows about outposts. */
 export function ForwardAuthFields({
   forwardAuth,
   defaults,
@@ -92,7 +89,7 @@ export function ForwardAuthFields({
     setExcludedPaths(next.excludedPaths);
   }, [initial, defaults]);
 
-  /** Switching preset refills the two fields the preset owns, unless the host set them itself. */
+  /** Refills the preset's two fields unless the host set them itself. */
   const onProviderChange = (next: ForwardAuthProvider) => {
     setProvider(next);
     if (next !== "authelia") return;
@@ -125,8 +122,7 @@ export function ForwardAuthFields({
           />
         </HStack>
 
-        {/* Unmounted rather than disabled when off, as the Authentik section does: a disabled
-            control is left out of the FormData, and a hidden one must not take focus. */}
+        {/* Unmounted, not disabled: a disabled control drops out of the FormData. */}
         {enabled && (
           <VStack gap={4}>
             <Selector

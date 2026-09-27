@@ -26,8 +26,7 @@ export async function createApiTokenAction(
 
   const expiresAt = formData.get("expires_at") ? String(formData.get("expires_at")) : undefined;
 
-  // The model refuses a long name, a full quota and a bad expiry with a code; this says it in the
-  // reader's language before the client shows the thrown message.
+  // The model refuses with codes; translate them before the client shows the message.
   const { rawToken } = await withTranslatedErrors(() =>
     createApiToken(name, userId, expiresAt || undefined),
   );

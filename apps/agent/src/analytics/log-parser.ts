@@ -1,10 +1,6 @@
 /**
- * Caddy's access log, turned into analytics rows.
- *
- * This runs on the agent rather than the controller because the log is a file on *this* host: a
- * controller elsewhere cannot read it at all. Moved here verbatim apart from its two seams - the
- * parse offset now lives in the agent's own SQLite, and the rows are relayed to the controller,
- * which writes them.
+ * Caddy's access log, turned into analytics rows. On the agent because the log is a file on this
+ * host; the offset lives in the agent's SQLite and the rows are relayed to the controller.
  */
 import { existsSync, statSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
@@ -17,19 +13,17 @@ import { accessLogPath, geoipCountryDb } from "./paths";
 const LOG_FILE = accessLogPath();
 const BATCH_SIZE = 500;
 
-/** Set once at startup; every state read and write goes through it. */
 let store: AgentStore | null = null;
 
 export function bindStore(next: AgentStore): void {
   store = next;
 }
 
-/** Whether Caddy is writing an access log on this host. The controller has no way to see this. */
+/** The controller has no way to see this. */
 export function accessLogPresent(): boolean {
   return existsSync(LOG_FILE);
 }
 
-// GeoIP reader - null if mmdb not available
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
 const geoCache = new Map<string, string | null>();
 
@@ -113,26 +107,20 @@ function consumeBlockedSignature(blocked: BlockedSignatures, key: string): boole
   return blocked.has(key);
 }
 
-// How long an unmatched "request blocked" signature is carried across parse passes while waiting
-// for its paired "handled request" row to be written.
 const BLOCKED_CARRYOVER_WINDOW_SEC = 120;
 
-// Signatures collected in one pass but not yet matched to a "handled request" row. caddy-blocker
-// logs "request blocked" immediately before Caddy logs the "handled request", so a parse-tick
-// boundary can fall between the two lines; carrying them forward lets the next pass mark them.
+// "request blocked" is logged just before its "handled request", so a parse pass can end between
+// them; unmatched signatures carry into the next pass.
 let pendingBlocked: Map<string, number> = new Map();
 
-// Counted signatures from caddy-blocker's "request blocked" entries, so the matching "handled
-// request" rows can be marked without using status === 403 (which also catches upstream 403s).
-// `into` merges new signatures onto carried-over ones.
+// Marks blocked rows by signature, not status 403, which upstreams send too.
 export function collectBlockedSignatures(
   lines: string[],
   into?: Map<string, number>,
 ): Map<string, number> {
   const blocked = into ?? new Map<string, number>();
   for (const line of lines) {
-    // Every line is parsed again by parseLine, so skip the JSON work for the vast majority that
-    // cannot be a block. Caddy's encoder never escapes the letters of a message value.
+    // Cheap prefilter: parseLine parses every line anyway, and Caddy never escapes message letters.
     if (!line.includes("request blocked")) continue;
     let entry: CaddyLogEntry;
     try {
@@ -148,9 +136,7 @@ export function collectBlockedSignatures(
   return blocked;
 }
 
-// Drop carried-over signatures older than the carry-over window so the pending map can't grow
-// unbounded when a "request blocked" line never gets a paired "handled request" row. The
-// timestamp is the first field of the key.
+// Bounds the pending map when a block never gets its "handled request" row.
 export function pruneBlockedSignatures(
   blocked: Map<string, number>,
   refTs: number,
@@ -175,7 +161,6 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
     return null;
   }
 
-  // Only process "handled request" log entries
   if (entry.msg !== "handled request") return null;
 
   const req = entry.request ?? {};
@@ -202,8 +187,7 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
   };
 }
 
-// Re-exported so existing callers/tests keep importing `readLines` from here. The implementation
-// lives in ./log-read because waf-log-parser needs the same newline-safe offset accounting.
+// Lives in ./log-read, which waf-log-parser shares; callers and tests import it from here.
 export async function readLines(
   startOffset: number,
   file: string = LOG_FILE,
@@ -240,21 +224,16 @@ export async function parseNewLogEntries(): Promise<void> {
       return;
     }
 
-    // Detect log rotation: file shrank
+    // A shrunk file was rotated.
     const startOffset = currentSize < storedSize ? 0 : storedOffset;
 
     const { lines, newOffset } = await readLines(startOffset);
 
     if (lines.length > 0) {
-      // Merge signatures carried over from the previous pass (a "request blocked" line whose
-      // "handled request" row hadn't been written yet).
       const blocked = collectBlockedSignatures(lines, pendingBlocked);
       const rows = lines.map((l) => parseLine(l, blocked)).filter((r) => r !== null);
       await insertBatch(rows);
-      // Unconsumed signatures are unmatched blocks; carry the recent ones forward and drop stale
-      // ones so the map can't grow forever.
-      // A loop rather than Math.max(...spread): a backlog of a few hundred thousand rows would
-      // overflow the argument list.
+      // A loop, not Math.max(...spread): a large backlog would overflow the argument list.
       let latestTs = rows.length ? -Infinity : Math.floor(Date.now() / 1000);
       let blockedRows = 0;
       for (const r of rows) {

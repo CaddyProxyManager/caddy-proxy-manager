@@ -40,10 +40,8 @@ export async function syncEnvOAuthProviders(): Promise<void> {
   };
 
   if (existing && existing.source === "env") {
-    // Update existing env-sourced provider
     await updateOAuthProvider(existing.id, { name, ...data });
   } else if (!existing) {
-    // Create new env-sourced provider
     await createOAuthProvider({ name, ...data, source: "env" });
   }
   // If a UI-sourced provider with the same name exists, don't overwrite it

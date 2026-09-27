@@ -10,10 +10,6 @@ const TCP_PORT = 15432;
 const TCP_PORT_2 = 15433;
 const UDP_PORT = 15353;
 
-// ---------------------------------------------------------------------------
-// TCP routing
-// ---------------------------------------------------------------------------
-
 test.describe
   .serial('L4 TCP Proxy Routing', () => {
     test('setup: create TCP proxy host pointing at tcp-echo', async ({ page }) => {
@@ -87,10 +83,6 @@ test.describe
     });
   });
 
-// ---------------------------------------------------------------------------
-// UDP routing
-// ---------------------------------------------------------------------------
-
 test.describe
   .serial('L4 UDP Proxy Routing', () => {
     test('setup: create UDP proxy host pointing at udp-echo', async ({ page }) => {
@@ -128,7 +120,6 @@ test.describe
       const res = await udpSend('127.0.0.1', UDP_PORT, 'should-fail', 2000);
       expect(res.received).toBe(false);
 
-      // Re-enable
       await row.getByRole('switch').click();
       await page.waitForTimeout(2_000);
     });

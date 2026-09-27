@@ -1,8 +1,7 @@
 /**
- * Regression: the identity headers a forward-auth host copies onto the upstream must use Go's
- * canonical MIME casing. Caddy resolves `{http.reverse_proxy.header.<name>}` by literal lookup, so
- * `X-CPM-User` resolves to nothing - and the `not vars <placeholder> ""` guard then skips the copy
- * route entirely, so every app behind forward auth sees an anonymous request.
+ * Regression: copied identity headers must use Go's canonical casing. Caddy looks the placeholder
+ * up literally, so `X-CPM-User` resolved to nothing, the empty guard skipped the copy, and every
+ * app behind forward auth saw an anonymous request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -13,8 +12,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -168,8 +166,7 @@ describe('CPM forward auth - identity header copy', () => {
     expect(routes.length).toBe(4);
 
     for (const route of routes) {
-      // A guard that reads a different placeholder from the value it protects
-      // would drop the header whenever the two disagree.
+      // A guard reading a different placeholder would drop the header when they disagree.
       expect(route.matchKey).toBe(route.setValue);
       expect(route.setValue).toBe(`{http.reverse_proxy.header.${route.setKey}}`);
     }
@@ -187,8 +184,7 @@ describe('Authentik forward auth - identity header copy', () => {
           enabled: true,
           outpostDomain: 'outpost.goauthentik.io',
           outpostUpstream: 'authentik:9000',
-          // Deliberately non-canonical: an operator typing the header the way
-          // Authentik's docs write it must not silently lose the value.
+          // Non-canonical, as Authentik's docs write it; the value must not be lost.
           copyHeaders: ['X-AUTHENTIK-USERNAME', 'x-authentik-email'],
         },
       },

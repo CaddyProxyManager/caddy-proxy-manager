@@ -1,7 +1,6 @@
 /**
- * What buildCaddyDocument emits once a module is switched off. Caddy validates a posted config as
- * one document, so a handler naming an absent module takes every host offline - the handler must
- * not appear at all. The Caddyfile escape hatch is covered too: an unadaptable snippet is skipped.
+ * Caddy validates a posted config as one document, so a handler naming an absent module takes every
+ * host offline and must not appear at all. An unadaptable Caddyfile snippet is skipped.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -70,15 +68,11 @@ const GEOBLOCK: GeoBlockSettings = {
   redirect_url: '',
 };
 
-/**
- * Pretend a rebuild already completed with exactly these module paths - the agent's *applied* set,
- * which it reports only after a build has succeeded, not the selection that requested it.
- */
+/** The agent's *applied* set, reported only after a build succeeds - not the selection. */
 function setAppliedModules(specs: string[]) {
   agent.state.appliedModules = specs;
 }
 
-/** Select every catalog module except the named ids. */
 async function selectAllModulesExcept(...disabledIds: string[]) {
   await saveCaddyBuildSettings({
     modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, !disabledIds.includes(m.id)])),
@@ -128,7 +122,6 @@ function installAdapter(options: { failAdapt?: boolean } = {}) {
   });
 }
 
-/** Every handler name appearing anywhere in the document. */
 function handlerNames(document: unknown): string[] {
   const found: string[] = [];
   const walk = (node: unknown) => {
@@ -199,8 +192,7 @@ describe('geoblock gating', () => {
   });
 
   it('omits the blocker handler when it is selected but not yet compiled in', async () => {
-    // Enabling a module does not put it in the running binary - only a rebuild
-    // does. Emitting the handler in between would fail the whole config.
+    // Only a rebuild puts a module in the binary; emitting it before would fail the whole config.
     setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('caddy-blocker-plugin')));
     await selectAllModulesExcept();
     await saveGeoBlockSettings(GEOBLOCK);
@@ -271,8 +263,7 @@ describe('layer 4 gating', () => {
   });
 
   it('omits the whole layer4 app once caddy-l4 is deselected', async () => {
-    // There is no partial version of this: without the plugin there is no
-    // `layer4` key for Caddy to unmarshal, so the key must be absent entirely.
+    // Without the plugin there is no `layer4` to unmarshal, so the key must be absent entirely.
     setAppliedModules(ALL_MODULE_PATHS);
     await selectAllModulesExcept('caddy-l4');
 
@@ -288,12 +279,10 @@ describe('per-host Caddyfile', () => {
     await createHost({ customCaddyfile: 'handle /status* {\n  respond "ok" 200\n}' });
 
     const document = await buildCaddyDocument();
-    // A subroute, not flattened handlers - the adapted route carries its own
-    // path matcher and flattening would apply it to every request.
+    // Flattening would apply the adapted route's path matcher to every request.
     expect(handlerNames(document)).toContain('subroute');
     expect(handlerNames(document)).toContain('reverse_proxy');
-    // Matched on the adapted body rather than the handler name: static_response
-    // also shows up for the unrelated HTTP-to-HTTPS redirect route.
+    // static_response also appears in the HTTP-to-HTTPS redirect route.
     expect(JSON.stringify(document)).toContain('"body":"ok"');
   });
 
@@ -306,8 +295,7 @@ describe('per-host Caddyfile', () => {
     installAdapter({ failAdapt: true });
     const document = await buildCaddyDocument();
 
-    // One host's stale escape hatch must not take the other hosts down, and
-    // must not block the very edit needed to fix it.
+    // Nor may it block the very edit needed to fix it.
     expect(handlerNames(document)).toContain('reverse_proxy');
     expect(JSON.stringify(document)).not.toContain('"body":"ok"');
   });

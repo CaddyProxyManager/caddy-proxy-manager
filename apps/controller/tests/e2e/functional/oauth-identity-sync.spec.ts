@@ -1,25 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Regression (#261): OAuth link/unlink did not synchronize the CPM user state.
- *
- * Better Auth stores federated identities in the `accounts` table, while the
- * Profile page (and admin user list) read the informational `users.provider` /
- * `users.subject` columns. Three symptoms were reported:
- *
- *   1. OAuth auto-link created a working accounts row but left
- *      users.provider/subject empty - OAuth sign-in worked while the Profile
- *      page claimed the account was NOT linked.
- *   2. "Link <provider>" from the Profile page completed at the IdP but was
- *      never reflected in the Profile UI (same staleness).
- *   3. "Unlink OAuth Account" deleted the accounts rows but left
- *      users.provider/subject populated - the Profile page kept claiming the
- *      account was linked.
- *
- * The hostile IdP is `mock-oauth2-server` (interactiveLogin:false) with three
- * issuers (linker-a/b/c) that all issue identities for the CPM admin email
- * (testadmin@localhost) but with distinct `sub` values, so each test links a
- * fresh identity regardless of cleanup order.
+ * #261: Better Auth's `accounts` rows must be projected onto `users.provider`/`subject`, which the
+ * Profile page reads. Three mock issuers (linker-a/b/c) issue the admin's email with distinct
+ * `sub`s, so each test links a fresh identity regardless of cleanup order.
  */
 
 const BASE_URL = 'http://localhost:3000';
@@ -54,7 +38,6 @@ async function getAdminUser(
   return admin!;
 }
 
-/** Create a mock-IdP-backed OAuth provider with auto-link enabled. */
 async function createLinkerProvider(
   request: import('@playwright/test').APIRequestContext,
   issuerId: string,
@@ -90,7 +73,6 @@ async function deleteProvider(
     .catch(() => {});
 }
 
-/** Restore the admin user to a password-only identity after a test. */
 async function unlinkAdmin(request: import('@playwright/test').APIRequestContext) {
   await request
     .post(`${BASE_URL}/api/user/unlink-oauth`, {
@@ -100,11 +82,7 @@ async function unlinkAdmin(request: import('@playwright/test').APIRequestContext
     .catch(() => {});
 }
 
-/**
- * Complete a real OAuth sign-in in a clean (sessionless) browser context.
- * mock-oauth2-server auto-issues the authorization code, so the flow finishes
- * without any user interaction.
- */
+/** In a sessionless context; the mock IdP auto-issues the code, so no interaction is needed. */
 async function oauthSignInAsAdmin(
   browser: import('@playwright/test').Browser,
   providerName: string,
@@ -144,8 +122,7 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
   const providerIds: string[] = [];
 
   test.afterEach(async ({ request }) => {
-    // Restore the pre-test state even when assertions fail, so a broken run
-    // does not poison the admin identity for the rest of the suite.
+    // Even on failure, or the admin identity is poisoned for the rest of the suite.
     await unlinkAdmin(request);
     for (const id of providerIds.splice(0)) {
       await deleteProvider(request, id);
@@ -161,17 +138,14 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     const provider = await createLinkerProvider(admin, 'linker-a');
     providerIds.push(provider.id);
 
-    // Real federated sign-in against the existing admin account (same email).
     await oauthSignInAsAdmin(browser, provider.name);
 
-    // The accounts-table link must be projected onto the user record…
     const adminUser = await getAdminUser(admin);
     expect(adminUser.provider, 'users.provider must reflect the linked OAuth identity').toBe(
       provider.id,
     );
     expect(adminUser.subject, 'users.subject must carry the IdP sub claim').toBe('linker-sub-a');
 
-    // …and the Profile page must show the account as linked.
     await page.goto('/profile');
     await expect(page.getByText(/your account is linked to/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(provider.name).first()).toBeVisible();
@@ -183,7 +157,6 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     const provider = await createLinkerProvider(admin, 'linker-b');
     providerIds.push(provider.id);
 
-    // Admin is signed in via storageState; link from the Profile page.
     await page.goto('/profile');
     const linkButton = page.getByRole('button', {
       name: new RegExp(`^link ${provider.name}$`, 'i'),
@@ -191,7 +164,6 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     await expect(linkButton).toBeVisible({ timeout: 15_000 });
     await linkButton.click();
 
-    // The IdP auto-issues and the callback returns to /profile - now linked.
     await expect(page.getByText(/your account is linked to/i)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(provider.name).first()).toBeVisible();
 
@@ -209,21 +181,18 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     const provider = await createLinkerProvider(admin, 'linker-c');
     providerIds.push(provider.id);
 
-    // Set up the linked state through a real OAuth sign-in…
     await oauthSignInAsAdmin(browser, provider.name);
     expect((await getAdminUser(admin)).provider).toBe(provider.id);
 
-    // …then unlink from the Profile page.
     await page.goto('/profile');
     const unlinkButton = page.getByRole('button', { name: /unlink oauth account/i });
     await expect(unlinkButton).toBeVisible({ timeout: 15_000 });
     await unlinkButton.click();
-    // Scoped to the dialog: the change- and remove-password forms carry a current-password field too.
+    // Scoped: the password forms carry a current-password field too.
     const unlinkDialog = page.getByRole('dialog', { name: /unlink oauth account/i });
     await unlinkDialog.getByLabel(/current password/i).fill(ADMIN_PASSWORD);
     await unlinkDialog.getByRole('button', { name: /^unlink oauth$/i }).click();
 
-    // The page reloads and must show the account as no longer linked.
     await expect(page.getByText(/link an oauth provider to enable single sign-on/i)).toBeVisible({
       timeout: 30_000,
     });
@@ -231,10 +200,6 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     const adminUser = await getAdminUser(admin);
     expect(adminUser.provider, 'users.provider must fall back to credentials').toBe('credentials');
     expect(adminUser.subject, 'users.subject must be cleared').toBeNull();
-
-    // OAuth sign-in with the unlinked identity must NOT silently re-link while
-    // auto-link remains on - actually it may re-link (trusted provider), which
-    // is by design; what matters is the unlink itself fully unlinked the
-    // identity at unlink time, which the assertions above verify.
+    // A later sign-in may re-link while auto-link is on; that is by design.
   });
 });

@@ -15,7 +15,7 @@ function base32Decode(input: string): Buffer {
   return Buffer.from(bytes);
 }
 
-/** The current 6-digit code for the key an authenticator app is shown (RFC 6238, SHA-1, 30 s). */
+/** RFC 6238, SHA-1, 30 s. */
 export function totpCode(base32Secret: string, now = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(now / 1000 / 30)));

@@ -1,7 +1,4 @@
-/**
- * The Caddy module registry and custom-module validation - the contract between the Dockerfile that
- * compiles the binary, the config builder, and the UI, none of which can check each other.
- */
+/** The contract between the Dockerfile, config builder and UI, which can't check each other. */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -25,7 +22,6 @@ const DOCKERFILE = readFileSync(resolve(moduleDir, '../../../../docker/caddy/Doc
 const GO_MOD = readFileSync(resolve(moduleDir, '../../../../docker/caddy/go.mod'), 'utf-8');
 const GO_TOOLS = readFileSync(resolve(moduleDir, '../../../../docker/caddy/tools.go'), 'utf-8');
 
-/** Module paths carrying a pinned version in the Caddy build's go.mod. */
 function pinnedModulePaths(): Set<string> {
   const requireBlock = GO_MOD.match(/require \(([\s\S]*?)\)/);
   expect(requireBlock, 'go.mod must declare a require block').toBeTruthy();
@@ -38,7 +34,6 @@ function pinnedModulePaths(): Set<string> {
   );
 }
 
-/** The whitespace-separated module list from the Dockerfile's ARG default. */
 function dockerfileDefaultModules(): string[] {
   const match = DOCKERFILE.match(/ARG CADDY_MODULES="([\s\S]*?)"/);
   expect(match, 'Dockerfile must declare a CADDY_MODULES ARG with a default').toBeTruthy();
@@ -57,9 +52,7 @@ describe('caddy module registry', () => {
   });
 
   it('covers every DNS provider exactly once', () => {
-    // A provider with no module would offer credentials for a plugin that is
-    // never compiled in, and the DNS-01 challenge would fail at issuance time
-    // with nothing in the UI to explain it.
+    // Else DNS-01 fails at issuance for a plugin never compiled in, with no UI explanation.
     for (const provider of DNS_PROVIDERS) {
       const module = findCaddyModule(dnsModuleId(provider.name));
       expect(module, `no module registered for DNS provider ${provider.name}`).toBeDefined();
@@ -81,9 +74,7 @@ describe('caddy module registry', () => {
   });
 
   it('pins every catalog module in the Caddy build go.mod', () => {
-    // build.sh resolves a bare path to `path@version` by looking it up here. A module missing a
-    // pin still compiles, but floats to whatever is latest at build time - which is the
-    // reproducibility hole go.mod exists to close, and it fails silently.
+    // An unpinned module still compiles but silently floats to latest.
     const pinned = pinnedModulePaths();
     const unpinned = CADDY_MODULES.map((m) => m.modulePath).filter((p) => !pinned.has(p));
     expect(unpinned).toEqual([]);
@@ -95,37 +86,28 @@ describe('caddy module registry', () => {
   });
 
   it('blank-imports every pin from tools.go, so `go mod tidy` keeps them', () => {
-    // The pins only survive tidy because tools.go imports them; a module added to go.mod but not
-    // there is silently dropped the next time Dependabot opens a PR, which is how the require
-    // block got emptied once already. cel-go is deliberately absent from both: it has no package
-    // at its module root and reaches the build transitively, pinned by the replace directive.
+    // Pins survive tidy only via tools.go imports, or Dependabot drops them. cel-go is absent from
+    // both on purpose: no root package, pinned by the replace directive.
     const imported = new Set([...GO_TOOLS.matchAll(/^\s*_ "([^"]+)"$/gm)].map(([, path]) => path));
     const unimported = [...pinnedModulePaths()].filter((p) => !imported.has(p));
     expect(unimported).toEqual([]);
   });
 
   it('records the resolved module list inside the image', () => {
-    // The label this replaced came out empty on every build that did not pass
-    // --build-arg, because ARG is scoped per stage and the runtime stage had no
-    // default. Writing the file from the same variable the build loops over is
-    // what keeps the record and the binary from disagreeing.
+    // Written from the variable the build loops over, so record and binary agree.
     expect(DOCKERFILE).toContain('> /caddy-modules.txt');
-    // Shell interpolation of the build arg, not a JS template placeholder.
     expect(DOCKERFILE).toContain(['"$', '{CADDY_MODULES}"'].join(''));
-    // The arg reaches build.sh as an environment variable, not as a positional or a here-doc.
     expect(DOCKERFILE).toMatch(/CADDY_MODULES="\$\{CADDY_MODULES\}".*sh \.\/build\.sh/s);
     expect(DOCKERFILE).toContain(
       'COPY --from=builder /caddy-modules.txt /etc/caddy/caddy-modules.txt',
     );
-    // Exact versions ride alongside, for auditing an image without rebuilding it.
     expect(DOCKERFILE).toContain(
       'COPY --from=builder /caddy-modules.resolved.txt /etc/caddy/caddy-modules.resolved.txt',
     );
   });
 
   it('declares the module ARG only in the stage that consumes it', () => {
-    // A second declaration in the runtime stage would need its own copy of the
-    // default list, and the two would drift the next time a module is added.
+    // A second declaration would need its own copy of the list, and drift.
     const declarations = DOCKERFILE.split('\n').filter((l) => l.startsWith('ARG CADDY_MODULES'));
     expect(declarations).toHaveLength(1);
   });
@@ -157,8 +139,7 @@ describe('caddy module registry', () => {
 
 describe('normalizeModulePath', () => {
   it('strips a pasted scheme and trailing slash', () => {
-    // Module paths get copied out of a browser address bar more often than out
-    // of a go.mod file.
+    // Paths get pasted from an address bar more often than from go.mod.
     expect(normalizeModulePath('https://github.com/owner/repo/')).toBe('github.com/owner/repo');
     expect(normalizeModulePath('  github.com/owner/repo  ')).toBe('github.com/owner/repo');
   });
@@ -197,9 +178,7 @@ describe('validateCustomModule', () => {
     ['github.com/owner/repo|tee'],
     ['github.com/owner/repo\nRUN evil'],
   ])('rejects shell metacharacters in %s', (path) => {
-    // These land verbatim in a shell loop inside the Dockerfile, where word
-    // splitting is what separates one module from the next. The allowlist is
-    // the only thing between a pasted path and arbitrary build-time execution.
+    // Word-split in a Dockerfile shell loop: the allowlist is all that stops build-time execution.
     expect(ok(path)).toMatch(/Invalid module path/);
   });
 

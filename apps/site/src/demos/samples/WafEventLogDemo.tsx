@@ -42,11 +42,7 @@ const SEVERITY_VARIANTS = {
   NOTICE: "info",
 } as const;
 
-/**
- * A morning's traffic against one small deployment: two real attacks blocked, one scanner walking
- * the tree, and one false positive from an application posting HTML in a form - which is the event
- * the suppression flow in the prose exists for.
- */
+/** Includes one false positive (HTML posted in a form) for the prose's suppression flow. */
 const EVENTS: Event[] = [
   {
     id: 1,
@@ -156,7 +152,7 @@ type Stats = {
   ruleIdsTriggered: number;
 };
 
-/** What the page's stats query returns, counted off the rows above. */
+/** Counted off the rows above. */
 const STATS: Stats = {
   total: EVENTS.length,
   blocked: EVENTS.filter((e) => e.blocked).length,
@@ -165,7 +161,6 @@ const STATS: Stats = {
   ruleIdsTriggered: new Set(EVENTS.map((e) => e.ruleId)).size,
 };
 
-/** The page's five tiles. */
 function StatsBar({ stats }: { stats: Stats }) {
   const t = useTranslations("waf");
   const items = [
@@ -194,7 +189,7 @@ function StatsBar({ stats }: { stats: Stats }) {
   );
 }
 
-/** The same tiles folded into one card on a phone: the blocked count leads, the rest sit under it. */
+/** The tiles folded into one card on a phone. */
 function WafStatusCard({ stats }: { stats: Stats }) {
   const t = useTranslations("waf");
   const rest = [
@@ -238,10 +233,7 @@ function WafStatusCard({ stats }: { stats: Stats }) {
   );
 }
 
-/**
- * The panel the app opens beside the list for an event: what fired, on what, and the two ways
- * out. Beside rather than over the list, so reading the next event does not mean closing this one.
- */
+/** Beside the list, not over it, so reading the next event does not mean closing this one. */
 function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
   return (
     <Card padding={4}>
@@ -299,13 +291,12 @@ function WafEventLogDemoContent() {
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  // The field is mounted all along, only hidden, so autofocus would never fire: focus it when the
-  // icon reveals it instead.
+  // The field is only hidden, never unmounted, so autofocus would never fire.
   useEffect(() => {
     if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
   }, [searchOpen]);
 
-  // The same parameters the page's server reads, answered here off the rows above.
+  // The page server's parameters, answered off the rows above.
   const query = params.toString();
   const rows = useMemo(() => {
     const filter = new URLSearchParams(query);
@@ -439,16 +430,14 @@ function WafEventLogDemoContent() {
     },
   ];
 
-  // On a phone the event replaces the list, which may have been scrolled well down: bring its top
-  // into view rather than opening it somewhere above the fold.
+  // The list it replaces may have been scrolled well down.
   useEffect(() => {
     if (isNarrow && selected) detailRef.current?.scrollIntoView({ block: "start" });
   }, [isNarrow, selected]);
 
   return (
     <VStack gap={4}>
-      {/* The search icon the page's header carries on a phone, where the field hides until it
-            is wanted. */}
+      {/* On a phone the field hides behind the header's search icon. */}
       <HStack justify="end" className="cpm-mobile-flex">
         <IconButton
           variant="ghost"
@@ -465,8 +454,7 @@ function WafEventLogDemoContent() {
         <WafStatusCard stats={STATS} />
       </div>
 
-      {/* Always there on a desktop; on a phone once the icon asks for it, or while a search is
-            applied so the filter never hides. */}
+      {/* On a phone, also shown while a search is applied so the filter never hides. */}
       <div
         ref={searchWrapRef}
         className={searchOpen || filtered ? undefined : "cpm-desktop-only"}
@@ -496,8 +484,7 @@ function WafEventLogDemoContent() {
           <Detail event={selected} onClose={() => setSelectedId(null)} />
         </VStack>
       ) : (
-        /* The same wrapping split the page uses: side by side when there is room, the panel
-            under the table when there is not. */
+        /* Side by side when there is room, the panel under the table when not. */
         <HStack gap={4} vAlign="start" wrap="wrap">
           <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
             <DataTable
@@ -522,10 +509,7 @@ function WafEventLogDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Inside DemoSurface, which provides the message catalog useTranslations reads. */
 export default function WafEventLogDemo() {
   return (
     <DemoSurface>

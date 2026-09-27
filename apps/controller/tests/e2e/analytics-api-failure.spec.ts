@@ -1,14 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Analytics page resilience when the API misbehaves. The endpoints answer failures with
- * `{ error: "…" }` and a 5xx; `response.json()` without checking `response.ok` landed that object
- * in array-typed state and the first `.map()` threw, blanking the page. Routes are stubbed.
+ * Unchecked `response.json()` once put a failure's `{ error }` into array state and the first
+ * `.map()` blanked the page. Routes are stubbed.
  */
 
 const ANALYTICS_API = '**/api/analytics/**';
 
-/** Collects uncaught render errors - the symptom of the original crash. */
+/** Uncaught render errors were the symptom of the original crash. */
 function trackPageErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
@@ -16,8 +15,7 @@ function trackPageErrors(page: Page): string[] {
 }
 
 async function pageShellRendered(page: Page) {
-  // The header renders above the data section; if the component tree crashed,
-  // React unmounts it along with everything else.
+  // A crashed tree unmounts the header too.
   await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('radio', { name: '24h' })).toBeVisible();
 }
@@ -45,10 +43,7 @@ test.describe('Analytics API failures', () => {
   test('error banner still appears when the server sends an empty error message', async ({
     page,
   }) => {
-    // @clickhouse/client throws an AggregateError with an empty `message` on
-    // ECONNREFUSED, which reaches the browser as {"error":""}. An empty string
-    // is falsy, so a naive `{error && <Banner/>}` renders nothing and the user
-    // is left with a silently blank page.
+    // ECONNREFUSED reaches the browser as {"error":""}, and `{error && <Banner/>}` skips it.
     const errors = trackPageErrors(page);
     await page.route(ANALYTICS_API, (route) =>
       route.fulfill({
@@ -66,8 +61,7 @@ test.describe('Analytics API failures', () => {
   });
 
   test('page survives when only the hosts endpoint fails', async ({ page }) => {
-    // This is the exact original crash: `allHosts.some is not a function`.
-    // Everything else succeeds, so the map must still render.
+    // The original crash: `allHosts.some is not a function`.
     const errors = trackPageErrors(page);
     await page.route('**/api/analytics/hosts', (route) =>
       route.fulfill({

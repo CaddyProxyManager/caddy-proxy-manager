@@ -1,9 +1,6 @@
 /**
- * Audit summaries are stored in English and translated by reading that English back into its
- * values (see src/lib/audit-summary.ts). The message keys that produces are composed at runtime, so
- * TypeScript cannot check them against the catalog - this does instead. Every pattern renders its
- * message from the English catalog and has to read the same values back, which fails for a pattern
- * with no message and for a message whose English has drifted from what the call site stores.
+ * Summaries are stored in English and parsed back (src/lib/audit-summary.ts), with runtime keys
+ * tsc cannot check. Each pattern must round-trip through its English catalog message.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';
@@ -82,7 +79,7 @@ describe('auditSummaryText', () => {
         summary: 'Enabled the WAF on grafana.example.com',
       }),
     ).toBe('Enabled the WAF on grafana.example.com');
-    // A known sentence under an action it was never written for is not assumed to mean the same.
+    // A known sentence under a different action is not assumed to mean the same.
     expect(
       auditSummaryText(t, {
         entityType: 'user',

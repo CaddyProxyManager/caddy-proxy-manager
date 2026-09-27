@@ -1,12 +1,6 @@
 "use client";
 
-/**
- * The card, alert and submit primitives every settings-shaped form in the app is built from.
- *
- * These lived inside SettingsClient.tsx until the setup flow needed the same shapes. Extracted
- * rather than copied so the two stay identical - a setup page that looks subtly unlike the
- * settings page it is about to hand over to reads as a different application.
- */
+/** Shared by Settings and setup, so a setup page never looks subtly unlike Settings. */
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -41,9 +35,8 @@ export function FormCard({
     <Card padding={4}>
       <VStack gap={4}>
         {title && (
-          // level 2 because every caller renders these under the page's own h1 - the Settings
-          // detail pane and each setup step. Its own stack, and a tighter gap than the card's, so
-          // the rule reads as part of the heading rather than as the first row of content.
+          // Level 2 under every caller's h1. A tighter gap, so the rule reads as part of the
+          // heading rather than as the first row of content.
           <VStack gap={2}>
             <Heading level={2}>{title}</Heading>
             <Divider />
@@ -63,21 +56,17 @@ export function FormCard({
   );
 }
 
-/**
- * Left-aligned submit button, the footer every settings form ends with. Plain "Save" unless a form
- * does something more than save - the card title already says what is being saved.
- */
+/** Plain "Save" unless a form does more: the card title already says what is saved. */
 export function SaveButton({ label, isDisabled }: { label?: string; isDisabled?: boolean }) {
   const t = useTranslations("ui");
   const anchor = useRef<HTMLInputElement>(null);
   const isDirty = useFormDirty(anchor);
   return (
     <HStack justify="start">
-      {/* No name, so it submits nothing: it is only how this button finds the form it belongs to. */}
+      {/* No name, so it submits nothing: it only lets this button find its form. */}
       <input ref={anchor} type="hidden" />
       <Button
         type="submit"
-        // The accent colour is the cue that something on this form has not been saved yet.
         variant={isDirty ? "primary" : "secondary"}
         label={label ?? t("save")}
         isDisabled={isDisabled}
@@ -86,7 +75,7 @@ export function SaveButton({ label, isDisabled }: { label?: string; isDisabled?:
   );
 }
 
-/** What the form would submit right now, as one comparable string. A file counts by name and size. */
+/** One comparable string. A file counts by name and size. */
 function serializeForm(form: HTMLFormElement): string {
   const entries: string[] = [];
   for (const [key, value] of new FormData(form)) {
@@ -96,12 +85,8 @@ function serializeForm(form: HTMLFormElement): string {
 }
 
 /**
- * Whether the enclosing form differs from what it held when it was last loaded or saved.
- *
- * Compared by value rather than by "was anything touched", so typing a change and then undoing it
- * reads as clean again. The check runs a frame after each event: switches and selectors write their
- * hidden inputs from React state, which lands after the click that caused it - hence the
- * MutationObserver as well, for a value no event announces.
+ * By value, so an undone change reads clean. A frame after each event, plus a MutationObserver:
+ * switches write their hidden inputs from React state, after the click, and announce nothing.
  */
 function useFormDirty(anchor: RefObject<HTMLInputElement | null>): boolean {
   const [isDirty, setIsDirty] = useState(false);
@@ -111,8 +96,7 @@ function useFormDirty(anchor: RefObject<HTMLInputElement | null>): boolean {
     if (!form) return;
 
     let baseline: string | null = null;
-    // Its own frame, which a check never cancels: a form whose fields update themselves while
-    // mounting fires checks at once, and sharing one handle left the baseline unset for good.
+    // Never cancelled by a check: fields updating on mount would leave the baseline unset.
     const baselineFrame = requestAnimationFrame(() => {
       baseline = serializeForm(form);
     });

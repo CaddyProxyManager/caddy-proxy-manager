@@ -7,7 +7,7 @@ import { StickyNote } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { HOST_DESCRIPTION_MAX_LENGTH } from "@/src/lib/host-description-limit";
 
-/** Free-text notes on a host, shared by the HTTP and L4 editors. */
+/** Shared by the HTTP and L4 editors. */
 export function HostNotesField({
   value,
   onChange,

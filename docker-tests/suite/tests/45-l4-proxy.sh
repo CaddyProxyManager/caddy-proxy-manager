@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Layer 4 proxying: raw TCP and UDP streams with no HTTP awareness, plus the
-# connection matchers that let several services share one listener.
-#
-# The client reaches these on Caddy's own address rather than a test domain -
-# an L4 listener has no virtual hosting, it is just a port.
+# Layer 4 TCP/UDP and connection matchers. Reached on Caddy's own address: an L4 listener has no
+# virtual hosting.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "layer 4 proxying"
@@ -13,7 +10,6 @@ UDP_PORT=19002
 HOSTMATCH_PORT=19003
 DISABLED_PORT=19004
 
-# Round-trips one line through a TCP listener and returns everything read back.
 tcp_probe() {  # tcp_probe HOST PORT MESSAGE
   printf '%s\nQUIT\n' "$3" | timeout 12 socat -t3 - "TCP:$1:$2" 2>/dev/null
 }
@@ -51,8 +47,7 @@ reply=$(tcp_probe caddy "$TCP_PORT" "ping-through-l4")
 t_contains "the TCP stream reaches the destination" "HELLO origin-tcp" "$reply"
 t_contains "the TCP stream carries data both ways" "ECHO origin-tcp ping-through-l4" "$reply"
 
-# Several exchanges on one connection - a stream proxy must not close after the
-# first line the way a request/response proxy would.
+# A stream proxy must not close after the first line like a request/response proxy.
 multi=$(printf 'one\ntwo\nthree\nQUIT\n' | timeout 12 socat -t3 - "TCP:caddy:$TCP_PORT" 2>/dev/null)
 t_contains "a long-lived connection stays open (first)" "ECHO origin-tcp one" "$multi"
 t_contains "a long-lived connection stays open (last)" "ECHO origin-tcp three" "$multi"
@@ -83,9 +78,7 @@ else
 fi
 
 # ── Connection matchers ─────────────────────────────────────────────────────
-#
-# One listener, two routes, chosen by the HTTP Host header inside the stream.
-# Caddy has to peek at the connection without terminating it.
+# Routed by the Host header inside the stream, which Caddy must peek without terminating.
 
 match_a=$(domain_for "l4-match-a")
 match_b=$(domain_for "l4-match-b")

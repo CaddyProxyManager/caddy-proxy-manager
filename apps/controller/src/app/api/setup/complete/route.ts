@@ -20,8 +20,7 @@ import {
 import { activateDashboardHost, dashboardHostOrigin, isHostname } from "@/src/lib/dashboard-host";
 import { dashboardSettingsFromHost } from "@/src/lib/dashboard-host-options";
 import { updateProxyHost } from "@/src/lib/models/proxy-hosts";
-// SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
-// JSON groups and one to the registry, and this route now saves through both.
+// Not the registry's SettingValidationError: this is the JSON groups', and the route uses both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
 import { isEmailAddress } from "@/src/lib/email-address";
 import {
@@ -33,31 +32,19 @@ import {
 } from "@/src/lib/setup";
 
 /**
- * POST /api/setup/complete - save the last step's configuration and finish setup.
- *
- * A route handler rather than a server action, for the reason app/api/setup/migrate/route.ts gives:
- * a server action re-renders the page it was called from, and this page redirects the moment
- * `getSetupState` answers "complete" - so the operator was thrown to the dashboard before the
- * restart could be explained, let alone performed. A fetch leaves the page mounted, which is what
- * lets the restart dialog happen in front of them.
- *
- * Whoever completes setup is the administrator. A signed-in session is required - this step runs
- * after the sign-in setup insists on, so there is a real user by now - but demanding that they
- * already *be* an admin made the OAuth branch of the account step a dead end: it stores a provider
- * and no user, so the user row is created by Better Auth's callback with `role: "user"`, and the
- * only place group-to-role mapping can be turned on is this very step. Promoting here rather than
- * relaxing the check outright matters: finishing setup with nobody an admin would leave a
- * completed instance with no way to reach Settings at all.
+ * POST /api/setup/complete. A route, not an action: an action re-renders the page, which redirects
+ * once setup is complete, before the restart dialog can show (see ../migrate/route.ts).
+ * Whoever completes setup is promoted to admin: the OAuth account step creates its user as "user".
  */
 
 export type CompleteSetupResponse =
   | {
       ok: true;
-      /** Where to go once the app is back, as a path on whichever origin answers. */
+      /** A path on whichever origin answers once the app is back. */
       next: string;
-      /** `restartToken` lets this browser, and only this one, ask /api/setup/restart. */
+      /** Lets this browser, and only this one, ask /api/setup/restart. */
       restartToken: string;
-      /** The origin the dashboard host now claims, to prefer over this one. Null when it has none. */
+      /** The dashboard host's origin, to prefer over this one. */
       dashboardOrigin: string | null;
     }
   | { ok: false; error: string };
@@ -81,35 +68,28 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const formData = await request.formData();
 
-  // Before the writes below, so the rest of this runs as an administrator. A no-op when the
-  // account step already made one, which is every local-account setup - and for a second,
-  // ordinary user reaching this step, which is what the check below still refuses.
+  // A no-op once an admin exists, so a second ordinary user is still refused below.
   const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
   if (!promoted && session.user.role !== "admin") {
     return json({ ok: false, error: t("adminToFinish") }, 403);
   }
 
-  // Read from the registry rather than iterating the form, so a setting the form did not post is
-  // still considered. Booleans compare against "on": the Switch wrapper in
-  // components/ui/FormBooleanControls always submits a hidden input, empty when off, so a
-  // presence check would read every toggle as true.
+  // Booleans compare against "on": FormBooleanControls always submits a hidden input, empty when
+  // off, so a presence check would read every toggle as true.
   const resolved = await resolveAllSettings();
   const values: Record<string, unknown> = {};
 
   for (const definition of SETTING_DEFINITIONS) {
     const raw = formData.get(definition.key);
 
-    // A gate is stored tri-state but rendered as a switch, and setup is where the choice becomes
-    // explicit: write a definite yes or no rather than the null that means "infer it".
+    // A gate is tri-state; setup writes a definite answer rather than the null that means "infer".
     if (definition.gate) {
       values[definition.key] = raw === "on";
       continue;
     }
 
     if (typeof definition.default === "boolean") {
-      // Nothing posted means the field was not rendered - a gated group whose switch is off. Left
-      // alone rather than written false, which is what keeps a stored credential from being
-      // cleared by turning its feature off.
+      // Not rendered (its gate is off): left alone so turning a feature off keeps its credential.
       if (raw === null) continue;
       values[definition.key] = raw === "on";
       continue;
@@ -118,10 +98,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (raw === null) continue;
     const text = String(raw);
 
-    // A secret is never sent to the browser, so a blank one means "leave it alone" rather than
-    // "clear it". Carry the resolved value across instead: the point of this step is that the
-    // operator can delete the variable from their .env afterwards, which only holds if the value
-    // actually lands in the database.
+    // A blank secret means "keep it". Carry the resolved value into the database so the operator
+    // can then delete the variable from .env.
     if (definition.secret && text === "") {
       const current = resolved.get(definition.key)?.value;
       if (typeof current === "string" && current !== "") {
@@ -133,9 +111,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     values[definition.key] = text;
   }
 
-  // Refused rather than saved and quietly ignored, matching the Settings page: the ClickHouse
-  // container will not start without a password, so "analytics on, no password" cannot become true.
-  // `values` already carries a blank secret's stored value, so this sees what will actually land.
+  // ClickHouse will not start without a password, so refuse rather than save a dead setting.
   if (values[analyticsEnabled.key] === true) {
     const password = values[clickhousePassword.key] ?? resolved.get(clickhousePassword.key)?.value;
     if (typeof password !== "string" || password.trim() === "") {
@@ -143,13 +119,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
   }
 
-  // Not a registry setting: `general` is a JSON object older than the registry, and the Settings
-  // page and the v1 API both read it from there. Validated through the same function that API
-  // route uses rather than by hand, so the rules and the wording cannot drift apart.
-  //
-  // The two refusals an operator can actually cause are checked first, in their language. The
-  // validator's own wording is REST's - field paths like `general.acmeEmail` - and stays only as
-  // the backstop for anything this form cannot post.
+  // `general` predates the registry. The two refusals an operator can cause are checked first, in
+  // their language; the shared validator's REST wording is only the backstop.
   const defaultDomain = String(formData.get("defaultDomain") ?? "").trim();
   const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
   if (defaultDomain.length === 0 || defaultDomain.length > 253) {
@@ -159,9 +130,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     return json({ ok: false, error: t("acmeEmailInvalid") }, 400);
   }
 
-  // Only posted while the card's switch is on - the domain field is hidden otherwise, the same way a
-  // gated group's fields are. Checked here, before anything is written, because the save below is
-  // best-effort and would otherwise swallow a typo into a dashboard that never comes up.
+  // Checked before any write: the save below is best-effort and would swallow a typo.
   const dashboardEnabled = formData.get("dashboardEnabled") === "on";
   const dashboardDomain = String(formData.get("dashboardDomain") ?? "").trim();
   if (dashboardEnabled && !isHostname(dashboardDomain)) {
@@ -172,8 +141,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     general = validateSettingsGroup("general", {
       defaultDomain,
-      // Omitted rather than empty when blank: the validator treats the key as optional, and
-      // storing "" would hand an empty contact to the ACME issuer instead of leaving it unset.
+      // Omitted when blank: "" would hand the ACME issuer an empty contact.
       ...(acmeEmail === "" ? {} : { acmeEmail }),
     }) as GeneralSettings;
   } catch (error) {
@@ -194,21 +162,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     return json({ ok: false, error: t("settingsSaveFailed") }, 500);
   }
 
-  // Analytics and GeoIP decide whether a container runs, and the operator has just chosen. Without
-  // this, setup would finish with ClickHouse still stopped and the client still holding whatever it
-  // resolved before the form was filled in. Never throws - see the function's own note.
+  // Otherwise ClickHouse stays stopped and the client keeps what it resolved before. Never throws.
   await propagateOptionalFeatureSettings();
 
   const providerError = await createProviderFromForm(formData);
   if (providerError) return json({ ok: false, error: providerError }, 400);
 
-  // CPM proxies its own dashboard from here on, unless the operator switched that off, so their
-  // first look at the product is a working host rather than an empty list. Switched off, nothing is
-  // stored: no dashboard settings already reads as off, and the Settings page seeds the domain the
-  // same way this form did. Over HTTP: whether HTTPS would work is a question only
-  // the reachability check can answer, and it cannot answer it until the route is live. Best-effort
-  // on purpose - a settings write failing is not a reason to refuse a setup that has already saved
-  // everything it was asked to.
+  // Over HTTP: only the reachability check can say HTTPS works, once the route is live.
+  // Best-effort: everything else asked for is already saved.
   try {
     if (dashboardEnabled) {
       const copyFrom = copySourceFromForm(formData);
@@ -224,17 +185,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   await markSetupCompleted();
 
-  // A deployment that migrated has one more thing owed to it: its old database back, and a .env it
-  // can safely replace. Everyone else goes to the dashboard.
   const migrated = (await getMigrationSource()) !== null;
 
-  // Read back rather than rebuilt from the form: the write above is best-effort, and a dashboard
-  // origin nothing was stored for would send the operator to a domain this instance never claimed.
-  //
-  // Not offered to a migrated deployment, whatever it claimed: the summary it is owed is behind the
-  // session it has, and a session belongs to one address. Sent to the dashboard's domain it would
-  // meet a sign-in page instead, and the summary is not shown twice. Its own last button goes
-  // there.
+  // Read back, as the write above is best-effort. Not for a migrated deployment: its summary is
+  // behind this origin's session, and the dashboard's domain would show a sign-in page instead.
   const dashboardOrigin = migrated ? null : dashboardHostOrigin(await getDashboardSettings());
 
   return json(
@@ -248,7 +202,6 @@ export async function POST(request: NextRequest): Promise<Response> {
   );
 }
 
-/** The stored host the operator chose to copy into the dashboard host, if they did. */
 function copySourceFromForm(formData: FormData): number | null {
   if (formData.get("dashboardCopySettings") !== "on") return null;
   const id = Number(formData.get("dashboardCopyFromHostId"));
@@ -256,13 +209,8 @@ function copySourceFromForm(formData: FormData): number | null {
 }
 
 /**
- * Take the dashboard's domain away from the host its settings were copied from.
- *
- * The dashboard host wins the tie for an exact domain, so the old host would otherwise sit in the
- * list looking like it serves a name it never answers for. A host with no other domain is
- * disabled rather than deleted - it keeps its settings, and switching it back on is one click. One
- * with other domains keeps serving those. Best-effort, like the rest of the dashboard host here:
- * the copy has already been saved, and the shadowed host is harmless.
+ * The dashboard host wins the domain, so the source would list a name it never answers. Disabled,
+ * not deleted, when it has no other domain. Best-effort: a shadowed host is harmless.
  */
 async function retireCopiedHost(
   host: { id: number; domains: string[] },
@@ -282,15 +230,8 @@ async function retireCopiedHost(
 }
 
 /**
- * Create the identity provider the settings step offered, if it was filled in.
- *
- * Returns a message rather than throwing, so a mistyped issuer leaves the operator on the form
- * with the rest of their configuration already saved rather than losing the page.
- *
- * Blank is the ordinary answer: a deployment signing in with a local administrator has no provider
- * to describe, and the card is optional for that reason. Partly filled is not - a name with no
- * client secret is a provider that cannot work, and silently skipping it would leave the operator
- * believing they had configured single sign-on.
+ * Returns a message rather than throwing, so a typo keeps the operator on the form. Blank is fine;
+ * partly filled is refused, since skipping it would leave them believing SSO was configured.
  */
 async function createProviderFromForm(formData: FormData): Promise<string | null> {
   const read = (key: string) => String(formData.get(key) ?? "").trim();
@@ -311,14 +252,12 @@ async function createProviderFromForm(formData: FormData): Promise<string | null
     return t("issuerMustBeUrl");
   }
 
-  // Re-checked here rather than trusted from the render: the page was drawn before the form was
-  // filled in, and the account step can have created a provider in between.
+  // Not trusted from the render: the account step can have created one since.
   if ((await listOAuthProviders()).length > 0) {
     return null;
   }
 
-  // Narrowed rather than cast: this is a posted string that createOAuthProvider stores as a role,
-  // so anything unrecognised falls back instead of being written.
+  // Narrowed, not cast: an unrecognised posted role falls back instead of being stored.
   const posted = read("idpDefaultRole");
   const defaultRole = isAppRole(posted) ? posted : "user";
 

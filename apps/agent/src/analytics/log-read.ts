@@ -1,9 +1,8 @@
 import { createReadStream } from "node:fs";
 
 /**
- * Read complete (newline-terminated) lines from `startOffset`. The offset advances only past the
- * last newline, so a half-written line is re-read next pass rather than split into an unparseable
- * fragment. A missing file yields zero lines.
+ * The offset advances only past the last newline, so a half-written line is re-read next pass
+ * rather than split. A missing file yields zero lines.
  */
 export async function readLines(
   startOffset: number,
@@ -25,8 +24,7 @@ export async function readLines(
       const buf = pending.length ? Buffer.concat([pending, chunk]) : chunk;
       let start = 0;
       let nl: number;
-      // Hoisting the search out of the condition would mean calling indexOf twice per iteration.
-      // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic buffer walk
+      // biome-ignore lint/suspicious/noAssignInExpressions: hoisting it would call indexOf twice
       while ((nl = buf.indexOf(0x0a, start)) !== -1) {
         const line = buf.subarray(start, nl).toString("utf8").trim();
         if (line) lines.push(line);
@@ -34,7 +32,6 @@ export async function readLines(
       }
       pending = start === 0 ? buf : buf.subarray(start);
     });
-    // Complete bytes = everything except the trailing incomplete line.
     stream.on("end", () =>
       resolve({ lines, newOffset: startOffset + totalBytes - pending.length }),
     );

@@ -17,9 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, authMethod, viewAsGroupIds } = await requireApiUser(request);
 
-    // Credential creation requires an interactive, cookie-authenticated session.
-    // Otherwise a stolen (possibly short-lived) bearer token could mint a new,
-    // non-expiring token and survive revocation or expiry of the original.
+    // A stolen bearer token must not mint a successor that outlives its revocation or expiry.
     if (authMethod !== "session") {
       return NextResponse.json(
         { error: "API tokens can only be created from an authenticated session" },
@@ -37,7 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    // Validate expires_at before passing to createApiToken
     if (
       body.expires_at !== undefined &&
       body.expires_at !== null &&

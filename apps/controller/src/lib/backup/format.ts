@@ -75,7 +75,7 @@ export async function sealBackup(
   ]);
 }
 
-/** The header alone, without the passphrase. Throws on anything that isn't a backup. */
+/** Without the passphrase. Throws on anything that isn't a backup. */
 export function readBackupHeader(file: Buffer): { header: BackupHeader; body: string } {
   const text = file.toString("utf8");
   const first = text.indexOf("\n");

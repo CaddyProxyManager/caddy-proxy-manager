@@ -1,7 +1,6 @@
 /**
- * With no agent attached, the controller loads its document straight onto Caddy. That document binds
- * the admin API to every interface, so the direct path pins CADDY_ADMIN_LISTEN the way the agent does,
- * or the first apply would put the API back on the network Caddy shares with its upstreams.
+ * The document binds the admin API to every interface, so the direct path must pin
+ * CADDY_ADMIN_LISTEN as the agent does, or the API lands on the upstreams' network.
  */
 import { describe, it, expect } from 'bun:test';
 import { directRequestBody } from '../../src/lib/caddy-admin';

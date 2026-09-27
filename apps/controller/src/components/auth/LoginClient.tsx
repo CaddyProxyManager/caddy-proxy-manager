@@ -29,15 +29,14 @@ import { twoFactorError } from "@/src/lib/two-factor-error";
 
 interface LoginClientProps {
   enabledProviders: SignInProvider[];
-  /** False in OIDC-only mode: there are no local accounts to sign in with. */
+  /** False in OIDC-only mode. */
   localLoginEnabled?: boolean;
-  /** Display name from APP_NAME, so a rebranded instance is named consistently. */
   appName?: string;
-  /** A refused single sign-on attempt, already put into words by the page. */
+  /** A refused SSO attempt, already translated by the page. */
   initialError?: string | null;
-  /** Solved on the username step before the password is asked for. Null when none is configured. */
+  /** Solved on the username step. */
   captcha?: CaptchaWidgetConfig | null;
-  /** The page's CSP nonce, which Cap needs for the scripts it injects. */
+  /** Cap needs it for the scripts it injects. */
   cspNonce?: string;
 }
 
@@ -58,18 +57,14 @@ export default function LoginClient({
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  // Identifier first: the username is asked for on its own, and the password only once there is
-  // a name to attach it to. Step one never checks whether that name exists - see below.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
-  // The password was right and the account wants a code. The challenge lives in Better Auth's
-  // own short-lived cookie, so all this has to remember is that it was asked for.
+  // The 2FA challenge lives in Better Auth's cookie; this only remembers it was asked for.
   const [onCodeStep, setOnCodeStep] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setLoginError });
 
-  // After the commit that unhides the field, not from the handler that asked for it: `focus()` on
-  // an element still inside a `hidden` subtree is a no-op, and a handler - or a rAF scheduled from
-  // one - can run before React has removed the attribute.
+  // After the commit that unhides the field: focus() inside a `hidden` subtree is a no-op, and a
+  // handler (or its rAF) can run before React removes the attribute.
   useEffect(() => {
     if (onPasswordStep) {
       passwordRef.current?.focus();
@@ -79,9 +74,7 @@ export default function LoginClient({
   const signIn = async (trimmedUsername: string) => {
     setLoginPending(true);
 
-    // `signIn.username` is added at runtime by the usernameClient plugin. The plugin's
-    // $InferServerPlugin types fail to merge into the client signature in some environments,
-    // so we cast a stable shape here.
+    // usernameClient's inferred types fail to merge in some environments, so cast a stable shape.
     type SignInUsername = (input: { username: string; password: string }) => Promise<{
       data: { twoFactorRedirect?: boolean } | null;
       error: { status?: number; code?: string; message?: string } | null;
@@ -90,21 +83,19 @@ export default function LoginClient({
     const { data, error } = await signInUsername({ username: trimmedUsername, password });
 
     if (error?.code === "CAPTCHA_REQUIRED") {
-      // The pass lapsed while the password was being typed. The widget comes back on this step,
-      // with the password kept, so solving it and pressing Sign in again is all it takes.
+      // The pass lapsed while typing; the widget returns on this step with the password kept.
       captchaStep.spent("expired");
       setLoginPending(false);
       return;
     }
 
     if (error) {
-      // The attempt spent the pass, right password or not; the next one needs a new solve.
+      // Any attempt spends the pass.
       captchaStep.spent();
-      // By code, not Better Auth's `message`: that is English whatever the reader's language.
+      // By code: Better Auth's `message` is always English.
       setLoginError(signInErrorMessage(error, (key) => tErrors(key)));
       setLoginPending(false);
-      // Keep the name on screen: the operator has to be able to tell a typo in it from a wrong
-      // password, and sending them back to step one hides the evidence.
+      // Keep the name on screen so a typo in it can be told from a wrong password.
       setOnPasswordStep(true);
       return;
     }
@@ -148,9 +139,7 @@ export default function LoginClient({
     event.preventDefault();
     setLoginError(null);
 
-    // Read from state, not FormData: Astryx withholds an input's `name` while it is disabled, and
-    // these fields disable themselves once a sign-in is pending, so a FormData read here would be
-    // racing that re-render.
+    // Not FormData: Astryx drops `name` from disabled inputs, and these disable while pending.
     const trimmedUsername = username.trim();
 
     if (!trimmedUsername) {
@@ -158,14 +147,10 @@ export default function LoginClient({
       return;
     }
 
-    // Step one advances for any username, real or not. Resolving it - to say the account is
-    // unknown, or to send it to the provider it belongs to - would answer "does this name exist?"
-    // for anyone who asks, which the single-screen form never did.
+    // Advances for any username: resolving it would tell anyone whether the account exists.
     if (!onPasswordStep) {
       if (!(await captchaStep.pass(trimmedUsername))) return;
-      // A password manager fills both fields at once even though only one is on screen, so a
-      // filled password means there is nothing to ask for: submit rather than showing a step whose
-      // only field is already complete.
+      // A password manager may have filled the hidden password already.
       if (!password) {
         setOnPasswordStep(true);
         return;
@@ -175,7 +160,7 @@ export default function LoginClient({
         setLoginError(t("passwordRequired"));
         return;
       }
-      // After a failed attempt: the widget is back on this step, and this redeems it.
+      // After a failed attempt the widget is back on this step.
       if (!(await captchaStep.pass(trimmedUsername))) return;
     }
 
@@ -186,8 +171,7 @@ export default function LoginClient({
     setLoginError(null);
     setOauthPending(providerId);
     try {
-      // Without errorCallbackURL a refused sign-in lands on Better Auth's bare error page; back
-      // here, the page can say what happened and what to do instead.
+      // Otherwise a refused sign-in lands on Better Auth's bare error page.
       await authClient.signIn.social({
         provider: providerId,
         callbackURL: "/",
@@ -240,7 +224,7 @@ export default function LoginClient({
             />
           )}
 
-          {/* SSO only: there is no username to enter first, so the providers are the whole form. */}
+          {/* SSO only: the providers are the whole form. */}
           {!localLoginEnabled && hasProviders && providerList}
 
           {localLoginEnabled && onCodeStep && (
@@ -250,10 +234,8 @@ export default function LoginClient({
           {localLoginEnabled && !onCodeStep && (
             <>
               {/*
-                One form across both steps, with the password field mounted throughout and hidden
-                until it is asked for. Splitting it into two forms is what costs identifier-first
-                its password managers: they fill a username and a password together, and a password
-                field that is not in the document yet cannot be filled.
+                One form with the password always mounted: password managers fill both fields at
+                once, and cannot fill one that is not in the document yet.
               */}
               <form onSubmit={handleSubmit}>
                 <VStack gap={3}>
@@ -321,8 +303,6 @@ export default function LoginClient({
 
               {hasProviders && (
                 <>
-                  {/* The credentials form now comes first, so the divider introduces the
-                      providers rather than the form it used to sit above. */}
                   <Divider label={t("ssoDivider")} />
                   {providerList}
                 </>

@@ -1,7 +1,4 @@
-/**
- * src/lib/crs-plugins/registry.ts against a fake GitHub: reading the registry, resolving a
- * release, and refusing a plugin that could not load in Caddy before anything is stored.
- */
+/** src/lib/crs-plugins/registry.ts against a fake GitHub; an unloadable plugin is never stored. */
 import { describe, it, expect } from 'bun:test';
 import {
   fetchCrsPluginRelease,
@@ -106,7 +103,7 @@ describe('fetchCrsPluginRelease', () => {
     expect(release.configRules).toBe('# enabled by default');
     expect(release.beforeRules).toContain('id:9507100');
     expect(release.afterRules).toBe('');
-    // The listing's download_url points elsewhere; files come from the repository it listed.
+    // Files come from the listed repository, not the listing's download_url.
     expect(github.requested.some((url) => url.includes('evil.example'))).toBe(false);
   });
 

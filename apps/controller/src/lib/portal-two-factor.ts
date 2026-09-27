@@ -38,10 +38,7 @@ export function issuePortalChallenge(userId: number, rid: string, now = Date.now
   return `${userId}.${expiresAt}.${nonce}.${signature(userId, rid, expiresAt, nonce)}`;
 }
 
-/**
- * The user a challenge was issued to, counting this call as one attempt, or null when it is
- * forged, expired, for another intent, or out of attempts.
- */
+/** Counts as one attempt; null when forged, expired, for another intent, or out of attempts. */
 export function redeemPortalChallenge(
   challenge: string | null | undefined,
   rid: string,

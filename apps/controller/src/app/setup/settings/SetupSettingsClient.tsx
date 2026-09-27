@@ -1,20 +1,9 @@
 "use client";
 
 /**
- * The last setup step: everything that used to live in `.env`, rendered from the registry.
- *
- * Fields are generated rather than written out, so adding a setting to
- * src/lib/settings/registry.ts puts it on this page and on the migration screen at the same time.
- * Every field names the variable it can also be set by, so an operator can match it to a `.env`
- * line. One whose value came from the environment is marked as well - that is the cue that saving
- * here is what lets them delete it.
- *
- * The Defaults card is the exception, and is written out by hand because it is not a registry
- * setting: primary domain and ACME contact live together in the `general` JSON object that
- * predates the registry, and moving them would change where the Settings page and the v1 API read
- * them from. They are here because the ACME contact is the address Let's Encrypt warns about
- * expiring certificates at, and an instance that finishes setup without one issues its first
- * certificate with nobody to tell.
+ * The last setup step, rendered from the settings registry. The Defaults card is hand-written:
+ * it lives in the older `general` object, and is here because without an ACME contact the first
+ * certificate is issued with nobody to warn about its expiry.
  */
 import { type ComponentProps, type FormEvent, useEffect, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -48,7 +37,7 @@ export type SettingField = {
   kind: "string" | "number" | "boolean" | "tristate";
   secret: boolean;
   generatable: boolean;
-  /** Switches its whole group on and off. At most one per group; see the registry's `gate`. */
+  /** At most one per group; see the registry's `gate`. */
   gate: boolean;
   value: string | number | boolean | null;
   source: "stored" | "environment" | "default";
@@ -59,7 +48,6 @@ export type GeneralFields = { defaultDomain: string; acmeEmail: string };
 export type DashboardCard = {
   enabled: boolean;
   domain: string;
-  /** Whether the domain came from DASHBOARD_DOMAIN. */
   fromEnvironment: boolean;
 };
 
@@ -84,7 +72,6 @@ export type OAuthPrefill = {
   syncGroups: boolean;
 };
 
-/** The variable config.ts reads each identity-provider field from. */
 const OAUTH_ENV = {
   providerName: "OAUTH_PROVIDER_NAME",
   issuer: "OAUTH_ISSUER",
@@ -107,9 +94,8 @@ const OAUTH_ENV = {
 } as const satisfies Record<keyof OAuthPrefill, string>;
 
 export type OAuthCard = {
-  /** Providers already configured. Non-empty means this card has nothing to add. */
+  /** Non-empty means this card has nothing to add. */
   existing: string[];
-  /** Whether the prefill came from OAUTH_* rather than being blank defaults. */
   fromEnvironment: boolean;
   prefill: OAuthPrefill;
 };
@@ -136,7 +122,6 @@ export default function SetupSettingsClient({
   const t = useTranslations("setup");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  /** What the save answered, which is what turns this page into the restart dialog. */
   const [finished, setFinished] = useState<{
     next: string;
     restartToken: string;
@@ -164,9 +149,8 @@ export default function SetupSettingsClient({
   );
 
   /**
-   * Save through a route handler rather than a server action, so the page survives its own success.
-   * An action re-renders the page it was called from, and this one redirects the moment setup
-   * reads as complete - which is precisely when the restart still has to be explained.
+   * A route handler, not an action: an action re-renders this page, which redirects the moment
+   * setup is complete - exactly when the restart still has to be explained.
    */
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -178,8 +162,7 @@ export default function SetupSettingsClient({
         method: "POST",
         body: new FormData(event.currentTarget),
       });
-      // Spelled out rather than imported from the route, as the migration screen does: a client
-      // component reaching into a route module is a server import waiting to be bundled.
+      // Not imported from the route: that is a server import waiting to be bundled.
       const body = (await response.json()) as
         | { ok: true; next: string; restartToken: string; dashboardOrigin: string | null }
         | { ok: false; error: string };
@@ -219,7 +202,6 @@ export default function SetupSettingsClient({
     );
   }
 
-  /** Whether a field is on screen: everything, minus the groups whose gate is switched off. */
   const isVisible = (field: SettingField) => {
     if (field.gate) return true;
     const gate = fields.find((other) => other.group === field.group && other.gate);
@@ -249,9 +231,7 @@ export default function SetupSettingsClient({
             <FormCard title={t("defaults")}>
               <VStack gap={3}>
                 <TextInput
-                  // NATIVE_REQUIRED as well as isRequired, matching the Settings page: isRequired
-                  // marks the field, the attribute is what stops an empty one being posted. The
-                  // save refuses it either way; the browser refusing first is a better answer.
+                  // isRequired only marks the field; the native attribute stops an empty post.
                   {...NATIVE_REQUIRED}
                   label={t("defaultDomain")}
                   description={t("defaultDomainHelp")}
@@ -331,9 +311,8 @@ export default function SetupSettingsClient({
                         onChange={change(gate.key)}
                       />
                     )}
-                    {/* Hidden rather than disabled when the gate is off: an unrendered field posts
-                        nothing, and the save skips what it was not sent - so turning analytics off
-                        leaves the ClickHouse password stored rather than clearing it. */}
+                    {/* Hidden, not disabled: an unrendered field posts nothing, so turning
+                        analytics off keeps the ClickHouse password rather than clearing it. */}
                     {rest.filter(isVisible).map((field) => (
                       <SettingRow
                         key={field.key}
@@ -358,12 +337,8 @@ export default function SetupSettingsClient({
 }
 
 /**
- * The dashboard's domain is already a migrated host's, and the dashboard host is about to take it.
- *
- * The dashboard host wins that tie, so leaving it unsaid would quietly stop the old host answering.
- * Copying is on by default: a host on this domain was almost certainly the old way of reaching this
- * dashboard, and its certificate, access list and HTTPS are what the operator's users already rely
- * on. What happens to the old host is spelled out, because the save changes it.
+ * The dashboard host wins a domain tie, so the old host would quietly stop answering. Copying is
+ * on by default: that host was almost certainly the old way to reach this dashboard.
  */
 function ClaimedDomainNotice({
   claim,
@@ -401,7 +376,6 @@ function ClaimedDomainNotice({
   );
 }
 
-/** A field's name, the variable it can also be set by, and whether that variable is what set it. */
 function FieldLabel({
   label,
   env,
@@ -423,11 +397,8 @@ function FieldLabel({
 }
 
 /**
- * A switch with its label drawn beside it, since the Switch's own label only takes a string.
- *
- * The Switch keeps that label, visually hidden, as its accessible name. It generates its input id
- * internally, so the visible label learns it after mount and points at it, which keeps a click on
- * the text toggling the switch.
+ * Switch's own label only takes a string. Its input id is generated internally, so the visible
+ * label learns it after mount to keep a click on the text toggling the switch.
  */
 function LabeledSwitch({
   label,
@@ -474,7 +445,6 @@ function LabeledSwitch({
   );
 }
 
-/** A text input whose visible label carries the variable it can also be set by. */
 function LabeledTextInput({
   label,
   env,
@@ -492,14 +462,7 @@ function LabeledTextInput({
   );
 }
 
-/**
- * The switch that decides whether a group's feature runs at all.
- *
- * Its own component rather than a `kind` on SettingRow: this one is stored tri-state but must post
- * a definite yes or no. Setup is where the operator makes the choice explicit, so "leave it to be
- * inferred" is not an answer worth offering here - the switch arrives showing whatever is inferred
- * today, and saving pins it.
- */
+/** Stored tri-state but posts a definite yes or no: setup is where the choice gets pinned. */
 function GateSwitch({
   field,
   value,
@@ -543,8 +506,7 @@ function SettingRow({
     />
   );
 
-  // Tri-state: unset means "no opinion, let the Security toggle decide", which a text box cannot
-  // express and a switch cannot represent as a third value.
+  // Unset means "let the Security toggle decide", a third value a switch cannot hold.
   if (field.kind === "tristate") {
     return (
       <VStack gap={1}>
@@ -585,8 +547,7 @@ function SettingRow({
       ? t("secretKeepCurrent", { description: field.description })
       : field.description;
 
-  // Only a secret this deployment gets to choose; a licence key or a client secret is issued
-  // elsewhere, and generating one there would just produce a value that does not work.
+  // A licence key or client secret is issued elsewhere; generating one would not work.
   if (field.secret && field.generatable) {
     return (
       <VStack gap={1}>
@@ -620,17 +581,8 @@ function SettingRow({
 }
 
 /**
- * Configure an identity provider, or say why there is nothing to do.
- *
- * Every field is optional and the whole card is skipped when the core three are blank, because a
- * deployment signing in with a local administrator has no provider to describe. Leaving it out
- * entirely was the old behaviour, and it meant the OAUTH_* half of a `.env` had no home on this
- * page at all - the account step asks about OAuth only on the branch where it is the *only* way
- * in, so an operator who made a local administrator was never asked, and never told they could
- * stop setting those variables.
- *
- * Everything past the core four is behind a disclosure. Sixteen inputs open on a setup screen
- * reads as sixteen decisions to make; four reads as the four that are actually required.
+ * Skipped when the core three are blank. The account step asks about OAuth only when it is the
+ * sole way in, so without this the OAUTH_* variables had no home. The rest sit in a disclosure.
  */
 function IdentityProviderCard({
   card,

@@ -1,10 +1,6 @@
 import type { Certificate } from "./models/certificates";
 
-/**
- * The ordinary certificate API is intentionally write-only for private keys.
- * Keep this as an explicit allowlist so future model fields are not
- * automatically serialized across the API boundary.
- */
+/** An allowlist, so private keys and future model fields never cross the API by default. */
 export type CertificateApiResponse = {
   id: number;
   name: string;

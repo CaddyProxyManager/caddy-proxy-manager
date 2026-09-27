@@ -29,12 +29,10 @@ test.describe('Proxy Hosts', () => {
 
     await page.getByLabel('Name').fill('E2E Test Host');
     await page.getByLabel(/^domains/i).fill('e2etest.local');
-    // Upstream field uses placeholder text, not a label
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
 
     await page.getByRole('button', { name: /^create$/i }).click();
 
-    // Dialog should close and host appear in table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible({
       timeout: 10000,
@@ -45,12 +43,10 @@ test.describe('Proxy Hosts', () => {
     const sortBtn = page.getByRole('button', { name: 'Name / Domain' });
     await expect(sortBtn).toBeVisible({ timeout: 10_000 });
 
-    // Click to sort ascending
     await sortBtn.click();
     await expect(page).toHaveURL(/sortBy=name/);
     await expect(page).toHaveURL(/sortDir=asc/);
 
-    // Click again to toggle to descending
     await sortBtn.click();
     await expect(page).toHaveURL(/sortDir=desc/);
   });
@@ -63,12 +59,9 @@ test.describe('Proxy Hosts', () => {
     await expect(page).toHaveURL(/sortBy=enabled/);
   });
 
-  /**
-   * Regression (#119): Advanced Options were not saved - the form used camelCase field names while
-   * the server action expected snake_case.
-   */
+  /** Regression (#119): the form posted camelCase field names, the action read snake_case. */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
-    // Create a host (defaults: HSTS Subdomains OFF, as in the schema; Skip HTTPS OFF)
+    // Defaults: HSTS Subdomains and Skip HTTPS both off.
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -85,7 +78,6 @@ test.describe('Proxy Hosts', () => {
     });
 
     try {
-      // Find the created host in the API to verify initial state
       const listResp = await page.request.get(API_PROXY_HOSTS);
       const hosts = (await listResp.json()) as Array<{
         id: number;
@@ -98,14 +90,12 @@ test.describe('Proxy Hosts', () => {
       expect(created!.hstsSubdomains).toBe(false);
       expect(created!.skipHttpsHostnameValidation).toBe(false);
 
-      // Open edit dialog for the host
       const row = page.locator('tr', { hasText: 'Advanced Options Test' });
       await row.getByRole('button').first().click();
       await page.getByRole('menuitem', { name: /edit/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
-      // Locate Advanced Options toggles via their hidden _present inputs, which
-      // uniquely identify each row and avoid ambiguity with ancestor divs.
+      // Via the hidden _present inputs, which are unique where ancestor divs are not.
       const dialog = page.getByRole('dialog');
       const hstsSwitch = dialog
         .locator('div:has(> input[name="hstsSubdomainsPresent"])')
@@ -114,22 +104,18 @@ test.describe('Proxy Hosts', () => {
         .locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])')
         .getByRole('switch');
 
-      // Verify initial state matches what was saved
       await expect(hstsSwitch).not.toBeChecked();
       await expect(skipSwitch).not.toBeChecked();
 
-      // Toggle HSTS Subdomains ON and Skip HTTPS Validation ON
       await hstsSwitch.click();
       await skipSwitch.click();
 
       await expect(hstsSwitch).toBeChecked();
       await expect(skipSwitch).toBeChecked();
 
-      // Save the changes
       await dialog.getByRole('button', { name: /save changes/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
-      // Verify via API that the settings were actually persisted
       const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.id}`);
       const after = (await afterResp.json()) as {
         hstsSubdomains: boolean;
@@ -138,7 +124,6 @@ test.describe('Proxy Hosts', () => {
       expect(after.hstsSubdomains).toBe(true);
       expect(after.skipHttpsHostnameValidation).toBe(true);
 
-      // Reopen edit dialog and verify UI reflects saved state
       await row.getByRole('button').first().click();
       await page.getByRole('menuitem', { name: /edit/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -159,13 +144,11 @@ test.describe('Proxy Hosts', () => {
         .first()
         .click();
     } finally {
-      // Cleanup: delete the test host
       const listResp2 = await page.request.get(API_PROXY_HOSTS);
       const hosts2 = (await listResp2.json()) as Array<{ id: number; name: string }>;
       const toDelete = hosts2.find((h) => h.name === 'Advanced Options Test');
       if (toDelete) {
-        // Mutating requests are same-origin checked; without this header the
-        // cleanup 403s and leaves the host behind for every later run.
+        // Mutating requests are same-origin checked; without it the cleanup 403s silently.
         await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.id}`, {
           headers: { Origin: 'http://localhost:3000' },
         });
@@ -173,16 +156,12 @@ test.describe('Proxy Hosts', () => {
     }
   });
 
-  /**
-   * Regression (#120): toggling a host off and on via the row switch wiped redirects, rewrite and
-   * location_rules, which were not in existingMeta when updateProxyHost got only { enabled }.
-   */
+  /** Regression (#120): the row switch sent only { enabled }, wiping redirects and rewrite. */
   test('toggling enabled/disabled preserves redirects and rewrite config (#120)', async ({
     page,
   }) => {
     const origin = new URL(page.url()).origin;
 
-    // Create a host with redirect rules and a rewrite config via the REST API
     const createResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -210,14 +189,12 @@ test.describe('Proxy Hosts', () => {
         timeout: 10000,
       });
 
-      // Click the Switch in the row to disable the host
       const row = page.locator('tr', { hasText: 'Toggle Persistence Test' });
       const rowSwitch = row.getByRole('switch').first();
       await expect(rowSwitch).toBeChecked();
       await rowSwitch.click();
       await expect(rowSwitch).not.toBeChecked({ timeout: 10000 });
 
-      // Verify redirects and rewrite survive the disable toggle
       const afterDisable = (await (
         await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
       ).json()) as {
@@ -229,11 +206,9 @@ test.describe('Proxy Hosts', () => {
       expect(afterDisable.redirects).toHaveLength(1);
       expect(afterDisable.rewrite).toBeDefined();
 
-      // Re-enable
       await rowSwitch.click();
       await expect(rowSwitch).toBeChecked({ timeout: 10000 });
 
-      // Verify redirects and rewrite survive the re-enable toggle
       const afterEnable = (await (
         await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
       ).json()) as {
@@ -272,8 +247,7 @@ test.describe('Proxy Hosts', () => {
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
       await page.locator('input[name="authEndpoint"]').fill(defaultSettings.authEndpoint);
       await page.getByRole('button', { name: 'Save', exact: true }).click();
-      // Settings saves stage rather than write through, and the host form prefills from the applied
-      // defaults - so the change has to be applied before the dialog can reflect it.
+      // Saves stage, and the host form prefills from applied defaults, so apply first.
       await expectStaged(page);
       await applyStagedChanges(page);
 
@@ -316,10 +290,7 @@ test.describe('Proxy Hosts', () => {
     }
   });
 
-  /**
-   * Regression (#232): Authentik defaults reached the create dialog but not the edit one, which
-   * never accepted an `authentikDefaults` prop - so the required Outpost fields stayed blank.
-   */
+  /** Regression (#232): the edit dialog never took `authentikDefaults`, leaving Outpost blank. */
   test('edit host Authentik fields are prefilled from global defaults (#232)', async ({ page }) => {
     const origin = new URL(page.url()).origin;
     const defaultSettings = {
@@ -395,10 +366,7 @@ test.describe('Proxy Hosts', () => {
     }
   });
 
-  /**
-   * The other half of #232: defaults must only fill blanks. A host with its own Authentik config
-   * must keep it when the edit dialog opens, never be overwritten by the global defaults.
-   */
+  /** The other half of #232: defaults only fill blanks, never overwrite a host's own config. */
   test('edit host keeps its own Authentik values instead of global defaults (#232)', async ({
     page,
   }) => {
@@ -435,8 +403,7 @@ test.describe('Proxy Hosts', () => {
       id: number;
       authentik: { outpostDomain: string | null; outpostUpstream: string | null } | null;
     };
-    // Guard the test itself: if the payload shape drifts, the host would be stored
-    // without its own config and this test would silently assert the default path.
+    // If the payload shape drifts, this would silently assert the default path instead.
     expect(created.authentik?.outpostDomain).toBe(hostSettings.outpostDomain);
     expect(created.authentik?.outpostUpstream).toBe(hostSettings.outpostUpstream);
 
@@ -481,10 +448,7 @@ test.describe('Proxy Hosts', () => {
     }
   });
 
-  /**
-   * Regression: the per-host geoblock "Override global" toggle was dropped - `parseGeoBlockConfig`
-   * returned `geoblock_mode` while ProxyHostInput uses `geoblockMode`, so the spread lost it.
-   */
+  /** Regression: `parseGeoBlockConfig` returned `geoblock_mode`, but the input reads camelCase. */
   test('per-host geoblock override mode persists after save', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -493,7 +457,6 @@ test.describe('Proxy Hosts', () => {
     await page.getByLabel(/^domains/i).fill('geoblock-override.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9991');
 
-    // Enable per-host geoblock (the rose-colored card with a Switch).
     const dialog = page.getByRole('dialog');
     const geoCard = dialog.locator('div:has(> input[name="geoblockPresent"])');
     await geoCard.scrollIntoViewIfNeeded();
@@ -501,7 +464,6 @@ test.describe('Proxy Hosts', () => {
     await geoSwitch.click();
     await expect(geoSwitch).toBeChecked();
 
-    // Mode is a SegmentedControl - a radiogroup, not a pair of tiles.
     await geoCard.getByRole('radio', { name: 'Override global' }).click();
 
     await dialog.getByRole('button', { name: /^create$/i }).click();
@@ -512,7 +474,6 @@ test.describe('Proxy Hosts', () => {
       timeout: 10000,
     });
 
-    // Verify the API reflects the override mode (this is what was broken).
     const listResp = await page.request.get(API_PROXY_HOSTS);
     const hosts = (await listResp.json()) as Array<{
       id: number;
@@ -523,7 +484,6 @@ test.describe('Proxy Hosts', () => {
     expect(created).toBeDefined();
     expect(created!.geoblockMode).toBe('override');
 
-    // Reopen the edit dialog and confirm the mode tile is still selected.
     const row = page.locator('tr', { hasText: 'Geoblock Override Host' });
     await row.getByRole('button').first().click();
     await page.getByRole('menuitem', { name: /edit/i }).click();
@@ -532,11 +492,9 @@ test.describe('Proxy Hosts', () => {
     const editGeoCard = page
       .getByRole('dialog')
       .locator('div:has(> input[name="geoblockPresent"])');
-    // Assert the selection through the radiogroup's own state rather than a
-    // highlight class, which the design system no longer emits.
+    // The radiogroup's state, not a highlight class, which the design system no longer emits.
     await expect(editGeoCard.getByRole('radio', { name: 'Override global' })).toBeChecked();
 
-    // Switch back to merge and verify that round-trips too.
     await editGeoCard.getByRole('radio', { name: 'Merge with global' }).click();
     await page
       .getByRole('dialog')
@@ -551,7 +509,6 @@ test.describe('Proxy Hosts', () => {
   });
 
   test('delete proxy host removes it from table', async ({ page }) => {
-    // Create one to delete
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -565,33 +522,25 @@ test.describe('Proxy Hosts', () => {
       timeout: 10000,
     });
 
-    // Open the dropdown menu for that row and click Delete
     const row = page.locator('tr', { hasText: 'Host To Delete' });
     await row.getByRole('button').first().click();
     await page.getByRole('menuitem', { name: /delete/i }).click();
 
-    // Confirm dialog
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /^delete$/i }).click();
 
-    // Wait for dialog to close, then verify the row is gone from the table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
     await expect(page.locator('tbody').getByText('Host To Delete')).not.toBeVisible({
       timeout: 5000,
     });
   });
 
-  /**
-   * The Features column renders a "Forward Auth" badge when a host has CPM forward auth enabled.
-   * This badge was previously missing even though the feature was fully supported.
-   */
   test('Forward Auth feature badge shows for hosts with CPM forward auth enabled', async ({
     page,
   }) => {
     const origin = new URL(page.url()).origin;
 
-    // Host WITH forward auth enabled. Names deliberately avoid the substring "Forward Auth" so the
-    // badge assertions (exact:true) match the badge text and never the host's name cell.
+    // Names avoid "Forward Auth" so the exact badge assertions never match a name cell.
     const withResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -608,7 +557,6 @@ test.describe('Proxy Hosts', () => {
     };
     expect(withHost.cpmForwardAuth?.enabled).toBe(true);
 
-    // Host WITHOUT forward auth - used to confirm the badge is conditional
     const withoutResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -628,7 +576,6 @@ test.describe('Proxy Hosts', () => {
         timeout: 10000,
       });
 
-      // The host without forward auth must NOT render the badge.
       const disabledRow = page.locator('tr', { hasText: 'Plain Proxy Host' });
       await expect(disabledRow).toBeVisible({ timeout: 10000 });
       await expect(disabledRow.getByText('Forward Auth', { exact: true })).toHaveCount(0);
@@ -643,10 +590,8 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression: the index-key row-identity bug. Keying rows on the array index made React reconcile
-   * later rows onto their predecessors' DOM nodes, so uncommitted input state surfaced in the wrong
-   * row. Controlled inputs hide it from value assertions, so each node is stamped with an expando
-   * React never touches and the survivors are checked after a delete.
+   * Regression: index keys reconciled rows onto their predecessors' DOM nodes. Controlled inputs
+   * hide that from value assertions, so nodes are stamped with an expando React never touches.
    */
   test('removing an upstream keeps every other row on its own DOM node', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
@@ -661,8 +606,6 @@ test.describe('Proxy Hosts', () => {
     await addresses.nth(1).fill('second:2222');
     await addresses.nth(2).fill('third:3333');
 
-    // Tag the live DOM nodes. An expando survives re-render untouched, so a tag
-    // that moves to a different row means React reused that row's element.
     await addresses.evaluateAll((nodes) => {
       nodes.forEach((node, i) => {
         (node as HTMLElement & { __rowProbe?: string }).__rowProbe = `probe-${i}`;
@@ -675,9 +618,7 @@ test.describe('Proxy Hosts', () => {
     await expect(addresses.nth(0)).toHaveValue('second:2222');
     await expect(addresses.nth(1)).toHaveValue('third:3333');
 
-    // The surviving rows must still be the elements they were typed into. With
-    // index keys these read ['probe-0', 'probe-1'] - rows 2 and 3 rendered into
-    // the nodes that belonged to rows 1 and 2.
+    // With index keys these read ['probe-0', 'probe-1'].
     const probes = await addresses.evaluateAll((nodes) =>
       nodes.map((node) => (node as HTMLElement & { __rowProbe?: string }).__rowProbe ?? null),
     );

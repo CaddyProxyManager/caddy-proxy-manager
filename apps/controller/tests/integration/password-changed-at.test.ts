@@ -1,9 +1,6 @@
 /**
- * users.passwordChangedAt - when a login password was last set.
- *
- * The rule worth pinning is what does *not* count as a change: the environment-seeded admin is
- * rehashed on every start, so a new hash on its row says nothing, and dating it would report a
- * password change at every restart.
+ * users.passwordChangedAt. The env-seeded admin is rehashed on every start, so a new hash on its
+ * row is not a change - dating it would report one at every restart.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

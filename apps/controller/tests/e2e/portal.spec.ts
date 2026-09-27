@@ -33,13 +33,12 @@ test.describe('Portal login page', () => {
 
   test('shows error with invalid credentials', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    // The portal's credential form is the same shape as /login's - onSubmit with preventDefault,
-    // so it submits natively until React attaches.
+    // onSubmit with preventDefault submits natively until React attaches.
     await waitForHydration(page);
 
     await signInWithCredentials(page, 'wronguser', 'wrongpass');
 
-    // Should show an error message (use .first() to avoid matching Next.js route announcer)
+    // .first(): the route announcer matches too.
     await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10_000 });
   });
 
@@ -49,8 +48,7 @@ test.describe('Portal login page', () => {
 
     await expect(page.getByLabel('Username')).toHaveAttribute('aria-required', 'true');
 
-    // The password field is mounted from the first paint but hidden, and a hidden subtree is out
-    // of the accessibility tree - so the assertion has to follow it onto the second step.
+    // Mounted but hidden, so out of the accessibility tree until the second step.
     await submitUsername(page, 'someone');
     await expect(page.getByLabel('Password')).toHaveAttribute('aria-required', 'true');
   });
@@ -76,13 +74,11 @@ test.describe('Portal login page', () => {
 
   test('shows OAuth sign-in button when OIDC is enabled', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    // Dex is configured in the test stack - the OAuth button should appear
     await expect(page.getByRole('button', { name: /Continue with Dex/i })).toBeVisible();
   });
 
   test('shows both OAuth button and credential form', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    // Both auth methods should be available
     await expect(page.getByRole('button', { name: /Continue with Dex/i })).toBeVisible();
     await expect(page.getByLabel('Username')).toBeVisible();
     // The credential form now comes first, so the separator introduces the providers below it.
@@ -90,11 +86,8 @@ test.describe('Portal login page', () => {
   });
 
   test('preserves ?rid= parameter for OAuth return flow', async ({ page }) => {
-    // When returning from OAuth, the portal gets ?rid=<opaque>
-    // With a fake rid it should still show the login form (not "No redirect destination")
     await page.goto('/portal?rid=abc123fakeopaqueid');
     await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
-    // It has a redirect (the rid), so it should show the form, not the "no destination" message
     await expect(page.getByText('No redirect destination specified.')).not.toBeVisible();
   });
 });

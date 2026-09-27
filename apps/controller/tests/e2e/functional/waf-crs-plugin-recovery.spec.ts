@@ -1,10 +1,6 @@
 /**
- * Functional: a CRS plugin that passes the install checks but that Coraza will not compile.
- *
- * Coraza builds the WAF while Caddy loads its config, so such a plugin would make the real Caddy
- * refuse every config. The controller has to recognise Caddy's refusal, find the plugin by
- * switching them off and on, and load the config without it. The plugins are seeded straight into
- * the database: installing one would need GitHub.
+ * Functional: a CRS plugin Coraza will not compile makes Caddy refuse every config, so the
+ * controller must find and drop it. Seeded into the database, since installing needs GitHub.
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';
@@ -26,8 +22,7 @@ function globalWaf(pluginIds: number[]) {
   };
 }
 
-/** Passes every static check, the linter's included, but Go's regexp refuses the reversed range,
- * and Coraza's error quotes no rule id. Seeded, so the install-time dry run never sees it. */
+/** Passes every static check, but Go's regexp refuses the reversed range and names no rule id. */
 const BROKEN_RULE = 'SecRule ARGS "@rx [z-a]" "id:9599100,phase:1,pass,nolog"';
 const WORKING_RULE = 'SecRule ARGS "@rx x" "id:9598100,phase:1,pass,nolog"';
 
@@ -81,9 +76,7 @@ test.describe
     });
 
     test('the config still loads: the host is served', async ({ page }) => {
-      // The host's WAF merges with the global one. Saved before the global selects the plugins,
-      // since the save-time dry run would refuse the broken one - this recovery is for a plugin
-      // that got past those checks, which seeding the selection stands in for.
+      // Saved before the global selects the plugins, or the save-time dry run would refuse it.
       await createProxyHost(page, {
         name: 'Functional WAF Plugin Recovery Test',
         domain: DOMAIN,

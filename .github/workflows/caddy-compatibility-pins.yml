@@ -35,20 +35,16 @@ jobs:
 
       - name: Verify updated Caddy image
         if: steps.changes.outputs.changed == 'true'
-        # Compose interpolates the whole file before it builds anything, and
-        # docker-compose.yml declares these two with `:?`. A runner has no .env, so without
-        # them this aborts before the caddy build it is meant to verify. Values are never
-        # used -- nothing here starts a container. Keep this list in step with every `:?` in
-        # docker-compose.yml: the step only runs when the pins move, so a missing one stays
-        # hidden behind weeks of green "no changes" runs.
+        # Placeholders for docker-compose.yml's `:?` variables, which abort interpolation on a
+        # runner with no .env. Keep in step with every `:?`: this only runs when pins move, so a
+        # missing one hides behind weeks of green runs.
         env:
           SESSION_SECRET: pin-verify-interpolation-placeholder
           POSTGRES_PASSWORD: pin-verify-interpolation-placeholder
         run: docker compose build caddy
 
-      # Opened with GITHUB_TOKEN, and nothing that token does starts a workflow: test and e2e never
-      # run on this PR by themselves, so auto-merge would wait forever. Close and reopen it (or push
-      # to the branch) as a maintainer to run the checks main requires. No PAT, by design.
+      # GITHUB_TOKEN starts no workflows, so a maintainer closes and reopens the PR to run the
+      # required checks. No PAT, by design.
       - name: Open compatibility-pin pull request
         if: steps.changes.outputs.changed == 'true'
         env:
