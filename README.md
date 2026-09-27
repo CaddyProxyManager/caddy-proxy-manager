@@ -1011,7 +1011,7 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 **Custom directives** - any ModSecurity SecLang syntax is accepted, e.g.:
 
 ```text
-SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
+SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"
 ```
 
 Directives are checked twice before they are stored, because Coraza compiles every WAF while Caddy loads its config and one refused rule would stop every host's config from loading. The editor marks what Coraza would refuse as you type - unknown variables, operators and actions, malformed or duplicate rules, regular expressions Go's RE2 cannot compile - and blocks the save on an error. On save the agent then has Caddy validate the WAFs the change produces, in a short-lived network-less container from the Caddy image and without loading them, which catches what only a merged config shows: rule ids colliding with the CRS or between the global settings and a host. The error names the host and quotes Coraza. The second check needs a paired agent whose Caddy container exists; without one the save goes ahead on the first check alone.

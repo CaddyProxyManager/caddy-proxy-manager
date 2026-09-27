@@ -17,6 +17,7 @@ import { WafRuleExclusions } from "./WafRuleExclusions";
 import { WafPresetPicker } from "./WafPresetPicker";
 import { WafPluginPicker } from "./WafPluginPicker";
 import { WafQuickTemplates } from "./WafQuickTemplates";
+import { HOST_TEMPLATE_ID_OFFSET } from "@/lib/waf-templates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
@@ -240,16 +241,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <WafQuickTemplates
-              onInsert={(snippet) =>
-                setCustomDirectives((prev) =>
-                  prev
-                    ? `${prev}
-${snippet}`
-                    : snippet,
-                )
-              }
-            />
+            <WafQuickTemplates idOffset={HOST_TEMPLATE_ID_OFFSET} onInsert={setCustomDirectives} />
           </VStack>
         )}
       </VStack>

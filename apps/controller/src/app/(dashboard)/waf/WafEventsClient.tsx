@@ -1563,16 +1563,7 @@ export default function WafEventsClient({
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description={t("customDirectivesHelp")}
               />
-              <WafQuickTemplates
-                onInsert={(snippet) =>
-                  setWafCustomDirectives((prev) =>
-                    prev
-                      ? `${prev}
-${snippet}`
-                      : snippet,
-                  )
-                }
-              />
+              <WafQuickTemplates onInsert={setWafCustomDirectives} />
               <Banner status="info" title={t("exclusionsTabHelp")} />
               <SaveButton label={t("save")} />
             </VStack>

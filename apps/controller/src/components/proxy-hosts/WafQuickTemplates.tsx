@@ -5,10 +5,19 @@ import { Button } from "@astryxdesign/core/Button";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
-import { WAF_QUICK_TEMPLATES } from "@/lib/waf-templates";
+import { WAF_QUICK_TEMPLATES, appendQuickTemplate } from "@/lib/waf-templates";
 
-/** Shared by the global WAF settings and the host WAF card. */
-export function WafQuickTemplates({ onInsert }: { onInsert: (snippet: string) => void }) {
+/**
+ * Shared by the global WAF settings and the host WAF card. `onInsert` takes an updater, so the
+ * inserted id can move past the ids already in the directives.
+ */
+export function WafQuickTemplates({
+  idOffset = 0,
+  onInsert,
+}: {
+  idOffset?: number;
+  onInsert: (update: (directives: string) => string) => void;
+}) {
   const t = useTranslations("waf");
   return (
     <VStack gap={2}>
@@ -24,7 +33,9 @@ export function WafQuickTemplates({ onInsert }: { onInsert: (snippet: string) =>
             variant="secondary"
             icon={<Copy />}
             label={t(`templates.${template.id}`)}
-            onClick={() => onInsert(template.snippet)}
+            onClick={() =>
+              onInsert((directives) => appendQuickTemplate(directives, template, idOffset))
+            }
           />
         ))}
       </HStack>
