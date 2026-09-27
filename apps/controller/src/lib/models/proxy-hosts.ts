@@ -1031,9 +1031,7 @@ function sanitizeAuthentikMeta(
   }
 
   if (Array.isArray(meta.copy_headers)) {
-    const headers = meta.copy_headers
-      .map((header) => header?.trim())
-      .filter((header): header is string => Boolean(header));
+    const headers = sanitizeHeaderNames(meta.copy_headers);
     if (headers.length > 0) {
       normalized.copy_headers = headers;
     }
@@ -1856,9 +1854,7 @@ function normalizeAuthentikInput(
   }
 
   if (input.copyHeaders !== undefined) {
-    const headers = (input.copyHeaders ?? [])
-      .map((header) => header?.trim())
-      .filter((header): header is string => Boolean(header));
+    const headers = sanitizeHeaderNames(input.copyHeaders);
     if (headers.length > 0) {
       next.copy_headers = headers;
     } else {
