@@ -199,7 +199,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
         if (!inventory)
           return (
             <Text size="sm" color="secondary">
-              …
+              ...
             </Text>
           );
         if (!cert)
