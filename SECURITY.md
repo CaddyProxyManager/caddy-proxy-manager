@@ -116,8 +116,9 @@ with, and add their own. Two consequences are worth stating plainly:
 
 - **Rebuilding needs `GRPC: 1` and `SESSION: 1`** on `docker-socket-proxy`, the
   default. Image builds add little to an API that is already root-equivalent
-  (see above), but set both to `0` to opt out; the rest of the application is
-  unaffected and images can be built by hand instead.
+  (see above), but set both to `0` to opt out, with `CADDY_BUILD_MODE=external`
+  on the agent: you build the image, and the agent only loads it. A custom
+  module is then compiled by you, not by whoever controls the agent.
 
 Only admins can reach either surface. Custom Caddy configuration is likewise admin-only, and so is
 pointing an upstream at Caddy's admin port, a unix socket or a placeholder: an operator granted a

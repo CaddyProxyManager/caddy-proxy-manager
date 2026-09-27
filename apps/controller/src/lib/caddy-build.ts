@@ -22,9 +22,11 @@ import { domainError } from "./domain-error";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
 import {
+  caddyBuildAgents,
   getAgentStatusFor,
   getAllAgentStatuses,
   requestCaddyBuild,
+  requestCaddyImageLoad,
   tryGetAgentStatus,
 } from "./agent/client";
 import { getAgentBuildSettings } from "./models/agents";
@@ -259,6 +261,35 @@ export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildSt
   await applyCaddyConfig();
 
   return requestCaddyBuild(resolveModuleSpecs(settings));
+}
+
+/** `?agent=<row id>` on the build routes; absent or malformed is the fleet. */
+export function parseAgentRowId(raw: string | null): number | undefined {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * External mode's rebuild: the operator built the image, and each targeted agent loads it. The
+ * config is re-applied first for the same reason a rebuild does it.
+ */
+export async function loadCaddyImage(agentRowId?: number): Promise<CaddyBuildStatus> {
+  if (caddyBuildAgents(agentRowId).external.length === 0) {
+    throw domainError("caddyImageNoExternalAgent", {}, { status: 409 });
+  }
+  const { applyCaddyConfig } = await import("./caddy");
+  await applyCaddyConfig();
+
+  const results = await requestCaddyImageLoad(agentRowId);
+  const failed = results.filter((result) => !result.ok);
+  if (failed.length === results.length && failed[0] && !failed[0].ok) {
+    throw domainError(
+      "caddyImageLoadFailed",
+      { agent: failed[0].agent, error: failed[0].error },
+      { status: 502 },
+    );
+  }
+  return { state: "pending", triggeredAt: new Date().toISOString() };
 }
 
 /** The agent's last word on the rebuild - one named agent's, or the primary's. */

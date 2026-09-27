@@ -18,6 +18,8 @@ import type { AgentConfig } from "./config";
 
 export const L4_OVERRIDE_FILE = "docker-compose.l4-ports.yml";
 export const BUILD_OVERRIDE_FILE = "docker-compose.caddy-build.yml";
+/** Written by docker/caddy/Dockerfile: the CADDY_MODULES the image was built with. */
+export const CADDY_MODULE_LIST_PATH = "/etc/caddy/caddy-modules.txt";
 
 export type CommandResult = { ok: boolean; exitCode: number; output: string; timedOut: boolean };
 
@@ -242,8 +244,22 @@ export class DockerHost {
     );
   }
 
+  /** In external mode a missing image must fail, not fall through to a build it has no grant for. */
+  private noBuild(): string[] {
+    return this.config.caddyBuildMode === "external" ? ["--no-build"] : [];
+  }
+
   async recreateCaddy(): Promise<CommandResult> {
-    return this.compose(["up", "-d", "--no-deps", "--pull", "never", "--force-recreate", "caddy"]);
+    return this.compose([
+      "up",
+      "-d",
+      "--no-deps",
+      "--pull",
+      "never",
+      ...this.noBuild(),
+      "--force-recreate",
+      "caddy",
+    ]);
   }
 
   /**
@@ -251,9 +267,10 @@ export class DockerHost {
    * explicitly: inferring it from the service name fails on older compose v2.
    */
   async startCaddy(): Promise<CommandResult> {
-    return this.compose(["--profile", "caddy", "up", "-d", "--no-deps", "caddy"], {
-      timeoutSeconds: this.config.serviceTimeoutSeconds,
-    });
+    return this.compose(
+      ["--profile", "caddy", "up", "-d", "--no-deps", ...this.noBuild(), "caddy"],
+      { timeoutSeconds: this.config.serviceTimeoutSeconds },
+    );
   }
 
   /** Restart Caddy in place. Its profile is named for the same reason startCaddy names it. */
@@ -284,6 +301,57 @@ export class DockerHost {
       timeoutSeconds: this.config.buildTimeoutSeconds,
       readsBuildContext: true,
     });
+  }
+
+  /**
+   * Pulls first, for an image pushed to a registry under the same tag; a local-only tag fails the
+   * pull, which is ignored. `up` recreates only when the tag now names another image.
+   */
+  async loadCaddyImage(): Promise<CommandResult> {
+    const pull = await this.compose(
+      ["--profile", "caddy", "pull", "--ignore-pull-failures", "caddy"],
+      { timeoutSeconds: this.config.serviceTimeoutSeconds },
+    );
+    if (!pull.ok) return pull;
+    return this.compose(
+      ["--profile", "caddy", "up", "-d", "--no-deps", "--pull", "never", "--no-build", "caddy"],
+      { timeoutSeconds: this.config.serviceTimeoutSeconds },
+    );
+  }
+
+  /** The reference Caddy's container was created from, or null when there is no container. */
+  async caddyImageRef(): Promise<string | null> {
+    const result = await run(
+      ["docker", "inspect", "--format", "{{.Config.Image}}", this.config.caddyContainerName],
+      { timeoutSeconds: 15 },
+    );
+    const ref = result.ok ? result.output.trim() : "";
+    return ref.length > 0 ? ref : null;
+  }
+
+  /**
+   * The module list baked into the image Caddy runs. Copied out rather than read in a throwaway
+   * container: the archive endpoint is a plain GET, and a stopped container still answers it.
+   */
+  async readCaddyModuleList(): Promise<CaddyModuleList> {
+    const local = join(tmpdir(), `cpm-caddy-modules-${randomUUID()}.txt`);
+    try {
+      const copy = await run(
+        ["docker", "cp", `${this.config.caddyContainerName}:${CADDY_MODULE_LIST_PATH}`, local],
+        { timeoutSeconds: 30 },
+      );
+      if (!copy.ok) {
+        return /could not find the file|no such container:path/i.test(copy.output)
+          ? { state: "missing" }
+          : { state: "unreadable", reason: tail(copy.output, 3) };
+      }
+      const modules = parseCaddyModuleList(readFileSync(local, "utf-8"));
+      return modules === null
+        ? { state: "unreadable", reason: `${CADDY_MODULE_LIST_PATH} is not a module list.` }
+        : { state: "found", modules };
+    } finally {
+      rmSync(local, { force: true });
+    }
   }
 
   /** So no caller reports success on a container that started and immediately died. */
@@ -505,6 +573,20 @@ export class DockerHost {
       await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
     }
   }
+}
+
+export type CaddyModuleList =
+  | { state: "found"; modules: string[] }
+  /** An image not built from docker/caddy/Dockerfile: nothing says what it carries. */
+  | { state: "missing" }
+  | { state: "unreadable"; reason: string };
+
+/** Whitespace-separated, as the Dockerfile writes CADDY_MODULES; null if any entry is not a spec. */
+export function parseCaddyModuleList(contents: string): string[] | null {
+  if (contents.length > 256 * 1024) return null;
+  const modules = contents.split(/\s+/).filter(Boolean);
+  if (modules.length > 1024) return null;
+  return invalidCaddyModule(modules) === null ? modules : null;
 }
 
 /** Where the copied config sits in the validation container. /tmp is writable in any image. */

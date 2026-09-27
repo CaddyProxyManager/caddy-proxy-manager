@@ -70,6 +70,45 @@ function lastCompose(): string[] {
   return found;
 }
 
+describe("external build mode", () => {
+  afterEach(() => {
+    delete process.env.CADDY_BUILD_MODE;
+  });
+
+  it("never lets compose fall through to a build, which the socket proxy may not allow", async () => {
+    process.env.CADDY_BUILD_MODE = "external";
+    const host = new DockerHost(loadConfig());
+    await host.startCaddy();
+    expect(lastCompose()).toContain("--no-build");
+    await host.recreateCaddy();
+    expect(lastCompose()).toContain("--no-build");
+  });
+
+  it("builds on a missing image as before in agent mode", async () => {
+    const host = new DockerHost(config);
+    await host.startCaddy();
+    expect(lastCompose()).not.toContain("--no-build");
+  });
+
+  it("pulls before loading, and recreates without building", async () => {
+    await new DockerHost(config).loadCaddyImage();
+    const composes = spawned.filter((a) => a[0] === "docker" && a[1] === "compose");
+    expect(composes.at(-2)).toContain("--ignore-pull-failures");
+    expect(composes.at(-1)).toContain("--no-build");
+    expect(composes.at(-1)).not.toContain("--force-recreate");
+  });
+
+  it("tells a missing module list from a daemon that cannot be read", async () => {
+    results.push({
+      exitCode: 1,
+      stdout: "Error: Could not find the file /etc/caddy/caddy-modules.txt",
+    });
+    expect(await new DockerHost(config).readCaddyModuleList()).toEqual({ state: "missing" });
+    results.push({ exitCode: 1, stdout: "Cannot connect to the Docker daemon" });
+    expect((await new DockerHost(config).readCaddyModuleList()).state).toBe("unreadable");
+  });
+});
+
 describe("compose invocation", () => {
   it("recreates only the caddy service", async () => {
     // A bare `up -d` would recreate this agent partway through its own operation.

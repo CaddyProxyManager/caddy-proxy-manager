@@ -23,6 +23,12 @@ export type StatusDeps = {
   docker: DockerHost;
 };
 
+/** Only a plausible id: anything else would fail the controller's decoder and the whole report. */
+function numericId(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  return /^\d{1,10}$/.test(trimmed) ? trimmed : "";
+}
+
 export async function buildStatus({ config, store, docker }: StatusDeps): Promise<AgentStatus> {
   return {
     agentId: store.agentId(),
@@ -36,6 +42,15 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
     caddyBuild: {
       applied: store.appliedCaddyModules(),
       status: store.caddyBuildStatus(),
+      ...(config.caddyBuildMode === "external"
+        ? {
+            external: {
+              image: store.caddyImage(),
+              puid: numericId(process.env.PUID),
+              pgid: numericId(process.env.PGID),
+            },
+          }
+        : {}),
     },
     services: {
       applied: store.appliedManagedServices() as Record<ManagedServiceName, boolean> | null,

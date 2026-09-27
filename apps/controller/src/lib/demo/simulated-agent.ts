@@ -158,6 +158,9 @@ export async function startSimulatedAgent(
       case "certificate-read":
         response = answer("", 404);
         break;
+      case "caddy-image-load":
+        response = answer("");
+        break;
       default:
         response = caddy(command.request);
     }

@@ -307,12 +307,18 @@ export function dispatchCertificateRead(
   return dispatch(agentId, { kind: "certificate-read", request });
 }
 
+/** Only for an agent listing `caddy-image` and reporting `caddyBuild.external`. */
+export function dispatchCaddyImageLoad(agentId: string): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "caddy-image-load", request: {} });
+}
+
 type CommandBody =
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
   | { kind: "log-read"; request: LogReadRequest }
   | { kind: "certificate-list"; request: Record<string, never> }
-  | { kind: "certificate-read"; request: CertificateFileRequest };
+  | { kind: "certificate-read"; request: CertificateFileRequest }
+  | { kind: "caddy-image-load"; request: Record<string, never> };
 
 function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyResponse> {
   const connection = connections.get(agentId);

@@ -14,6 +14,7 @@ import {
   type CertificateFileRequest,
   type CertificateFiles,
   decodeCertificateFiles,
+  type ExternalCaddyImage,
   decodeCertificateList,
   decodeLogReadResponse,
   type L4PortsStatus,
@@ -28,6 +29,7 @@ import {
   type ConnectedAgent,
   connectedAgents,
   dispatchCaddyAdmin,
+  dispatchCaddyImageLoad,
   dispatchCaddyValidate,
   dispatchLogRead,
   dispatchCertificateList,
@@ -146,6 +148,45 @@ export async function requestCaddyBuild(_modules: string[]): Promise<CaddyBuildS
   if (connectedAgents().length === 0) throw noAgentError();
   await pushDesiredState();
   return { state: "pending", triggeredAt: new Date().toISOString() };
+}
+
+/** A connected agent that loads an operator-built image rather than building one. */
+export type ExternalBuildAgent = { agentRowId: number; name: string; external: ExternalCaddyImage };
+
+/** One agent's answer, or the fleet's; `builders` counts the ones that still build for themselves. */
+export function caddyBuildAgents(agentRowId?: number): {
+  external: ExternalBuildAgent[];
+  builders: number;
+} {
+  const agents = connectedAgents().filter(
+    (agent) => agentRowId === undefined || agent.agentRowId === agentRowId,
+  );
+  const external: ExternalBuildAgent[] = [];
+  for (const agent of agents) {
+    const image = agent.status?.caddyBuild.external;
+    if (image && agent.status?.capabilities?.includes("caddy-image")) {
+      external.push({ agentRowId: agent.agentRowId, name: agent.name, external: image });
+    }
+  }
+  return { external, builders: agents.length - external.length };
+}
+
+/** Starts the load and returns: a recreate outlasts the command timeout, so status reports it. */
+export async function requestCaddyImageLoad(agentRowId?: number): Promise<AgentResult<null>[]> {
+  const targets = caddyBuildAgents(agentRowId).external;
+  const byRow = new Map(connectedAgents().map((agent) => [agent.agentRowId, agent.agentId]));
+  return Promise.all(
+    targets.map(async (target): Promise<AgentResult<null>> => {
+      const agentId = byRow.get(target.agentRowId);
+      if (!agentId) return { agent: target.name, ok: false, error: noAgentError().message };
+      try {
+        await dispatchCaddyImageLoad(agentId);
+        return { agent: target.name, ok: true, value: null };
+      } catch (error) {
+        return { agent: target.name, ok: false, error: describe(error) };
+      }
+    }),
+  );
 }
 
 // ─── Caddy admin ─────────────────────────────────────────────────────────────

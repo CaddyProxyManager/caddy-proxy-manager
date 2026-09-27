@@ -3,7 +3,7 @@
 /** Save only records; Rebuild restarts the proxy, hence two separately-confirmed buttons. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Hammer, Plus, Trash2 } from "lucide-react";
+import { Hammer, PackageCheck, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -30,6 +30,7 @@ import {
 } from "@/src/lib/caddy-modules";
 import { caddyModuleDescription, caddyModuleName } from "@/src/lib/caddy-module-messages";
 import { extractErrorMessage } from "@/src/lib/actions";
+import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy-image-build";
 
 type BuildStatus = {
   state: "idle" | "pending" | "building" | "applied" | "failed";
@@ -46,7 +47,16 @@ type BuildDiff = {
   needsRebuild: boolean;
 };
 
-type BuildResponse = { diff: BuildDiff; status: BuildStatus };
+/** An agent that loads an operator-built image; see `caddyBuildAgents`. */
+type ExternalAgent = { name: string; image: string | null; puid: string; pgid: string };
+
+type BuildResponse = {
+  diff: BuildDiff;
+  status: BuildStatus;
+  /** Targeted agents that build their own image. */
+  builders: number;
+  external: ExternalAgent[];
+};
 
 type CustomModuleRow = CaddyCustomModule & { uid: string };
 
@@ -169,28 +179,29 @@ export function CaddyBuildFields({
     return Array.from(new Set([...builtIn, ...custom])).sort();
   }, [modules, customModules]);
 
-  const dockerfilePreview = useMemo(
+  // The first external agent's image and ids; a fleet of them usually shares one build.
+  const externalAgent = build?.external[0] ?? null;
+  const externalOnly = Boolean(externalAgent) && build?.builders === 0;
+  const buildCommand = useMemo(
     () =>
-      [
-        "# The build argument the rebuild passes to docker/caddy/Dockerfile.",
-        "# Copy this into your own build if you would rather not use the agent:",
-        '#   docker compose build --build-arg CADDY_MODULES="..." caddy',
-        "",
-        "xcaddy build controller \\",
-        ...previewSpecs.map((spec) => `  --with ${spec} \\`),
-        "  --output /usr/bin/caddy",
-      ].join("\n"),
-    [previewSpecs],
+      caddyImageBuildCommand({
+        modules: previewSpecs,
+        image: externalAgent?.image ?? null,
+        puid: externalAgent?.puid ?? "",
+        pgid: externalAgent?.pgid ?? "",
+      }),
+    [previewSpecs, externalAgent],
   );
 
+  // External mode's rebuild is loading the image the operator built; same errors, same poll.
   const handleRebuild = async () => {
     setRebuilding(true);
     setRebuildError(null);
+    const path = externalOnly ? "/api/caddy-build/image" : "/api/caddy-build";
     try {
-      const res = await fetch(
-        target === FLEET ? "/api/caddy-build" : `/api/caddy-build?agent=${target}`,
-        { method: "POST" },
-      );
+      const res = await fetch(target === FLEET ? path : `${path}?agent=${target}`, {
+        method: "POST",
+      });
       if (!res.ok) {
         // These abort before the agent writes a status, so the poll would never see them.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -261,7 +272,18 @@ export function CaddyBuildFields({
         rebuilding={rebuilding}
         onRebuild={handleRebuild}
         inFlight={Boolean(inFlight)}
+        external={externalOnly}
       />
+
+      {build && build.external.length > 0 && build.builders > 0 && (
+        <Banner
+          status="info"
+          title={t("externalAgentsTitle")}
+          description={t("externalAgentsNote", {
+            names: build.external.map((agent) => agent.name).join(", "),
+          })}
+        />
+      )}
 
       <Banner
         status="info"
@@ -357,11 +379,18 @@ export function CaddyBuildFields({
 
       <CodeEditor
         label={t("buildCommandPreview")}
-        language="dockerfile"
-        value={dockerfilePreview}
+        language="plaintext"
+        value={buildCommand}
         isReadOnly
         height="md"
-        description={t("modulesSelected", { count: enabledCount })}
+        description={
+          externalAgent
+            ? t("buildCommandHelpExternal", {
+                count: enabledCount,
+                image: caddyImageTag(externalAgent.image),
+              })
+            : t("buildCommandHelpAgent", { count: enabledCount })
+        }
       />
 
       {/* The controls above are React state; these carry it to the server action. */}
@@ -414,11 +443,14 @@ function RebuildBanner({
   rebuilding,
   onRebuild,
   inFlight,
+  external,
 }: {
   build: BuildResponse | null;
   rebuilding: boolean;
   onRebuild: () => void;
   inFlight: boolean;
+  /** Every targeted agent loads an operator-built image, so the action is a load. */
+  external: boolean;
 }) {
   const t = useTranslations("caddyModules");
   if (!build) return null;
@@ -442,10 +474,10 @@ function RebuildBanner({
       icon={inFlight ? <Spinner size="sm" /> : undefined}
       title={
         inFlight
-          ? (status.message ?? t("rebuildingCaddy"))
+          ? (status.message ?? t(external ? "loadingImage" : "rebuildingCaddy"))
           : status.state === "failed"
-            ? t("lastRebuildFailed")
-            : t("rebuildRequired")
+            ? t(external ? "lastLoadFailed" : "lastRebuildFailed")
+            : t(external ? "imageRequired" : "rebuildRequired")
       }
       description={
         <VStack gap={2}>
@@ -476,7 +508,7 @@ function RebuildBanner({
           )}
           {!inFlight && (
             <Text type="body" size="xsm" color="secondary">
-              {t("rebuildDescription")}
+              {t(external ? "externalRebuildDescription" : "rebuildDescription")}
             </Text>
           )}
         </VStack>
@@ -485,8 +517,8 @@ function RebuildBanner({
         <Button
           variant="secondary"
           size="sm"
-          icon={<Hammer />}
-          label={t("rebuildCaddy")}
+          icon={external ? <PackageCheck /> : <Hammer />}
+          label={t(external ? "loadImage" : "rebuildCaddy")}
           isLoading={rebuilding}
           isDisabled={rebuilding || inFlight}
           onClick={onRebuild}

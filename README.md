@@ -423,6 +423,7 @@ it win even then.
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
 | `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
 | `DEMO_MODE` | Run with no Caddy at all: admin calls go to an in-memory Caddy, a simulated agent reports builds, ports and services as done, and real agents are refused pairing and connection. No certificate is ordered and no DNS provider is called. Environment-only so a demo's visitors cannot turn it off | `false` | No |
+| `CADDY_IMAGE` | The image the `caddy` service runs. Set it to an image you built with the agent in external mode (`CADDY_BUILD_MODE`) - never the shipped name, or loading it would pull the registry's copy over yours. Forwarded to the agent, which runs Compose | `ghcr.io/silentspud/caddy-proxy-manager/caddy:latest` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 
 ### The agent's environment
@@ -444,6 +445,7 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `CADDY_ADMIN_LISTEN` | Pinned as `admin.listen` in every config the agent forwards to Caddy, replacing the controller's bind-every-interface default. `docker-compose.yml` sets `caddy-admin:2019` here and on the `caddy` service, whose Caddyfile binds the same address until the first config arrives - a name only the internal `caddy-admin` network resolves | Unset (forwarded as sent) |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
+| `CADDY_BUILD_MODE` | `agent` builds Caddy's image when the module selection changes. `external` never builds: you build the image and **Settings → Caddy Build** loads it, so the socket proxy's `GRPC` and `SESSION` can be `0`. See [Building the Caddy image yourself](#building-the-caddy-image-yourself). Startup fails on any other value | `agent` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
@@ -1273,11 +1275,38 @@ reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
 
 Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
-default in `docker-compose.yml`), which BuildKit builds through. Set both to `0` to opt
-out: everything else keeps working,
-and you can run `docker compose build caddy` yourself. Note that a hand-run build
-does not tell the agent anything, so the app keeps assuming the shipped module set
-until a rebuild goes through the agent.
+default in `docker-compose.yml`), which BuildKit builds through. To keep build access
+away from the agent, build the image yourself instead.
+
+#### Building the Caddy image yourself
+
+Set `CADDY_BUILD_MODE=external` for the agent, and `GRPC: 0` and `SESSION: 0` on
+`docker-socket-proxy`. The agent then never builds. **Settings → Caddy Build** shows the
+`docker build` command for your selection in place of the Rebuild button. It builds from
+this release's tag on GitHub, so it needs no checkout and runs anywhere Docker can
+build:
+
+```bash
+docker build \
+  -f docker/caddy/Dockerfile \
+  --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
+  --build-arg PUID=10000 --build-arg PGID=10000 \
+  -t caddy-proxy-manager-caddy:custom \
+  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.3.0
+```
+
+Build it on the agent's host, or elsewhere and push it to a registry. The first time,
+set `CADDY_IMAGE` to that tag in `.env` and run `docker compose up -d agent` so the
+agent's Compose sees it. Then click **Load built image**: the agent pulls the tag if it
+is a registry image, recreates Caddy if the tag now names a different image, and waits
+for it to report healthy.
+
+The agent takes the applied module set from the image itself, from
+`/etc/caddy/caddy-modules.txt`, which the Dockerfile writes from `CADDY_MODULES`. It reads
+it again whenever it starts Caddy, so a swap made behind its back is picked up on its
+next restart. An image built some other way has no such file and is treated as having
+no plugins: the app then generates config any Caddy can load, and every feature that
+needs a module stays off until you load an image that lists it.
 
 Every image records what it was compiled with, so you can check a container
 directly rather than inferring it:

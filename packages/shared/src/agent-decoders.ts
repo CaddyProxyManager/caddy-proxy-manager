@@ -11,6 +11,7 @@ import {
   type AgentStatus,
   type CaddyAdminProxyResponse,
   type CaddyCertificate,
+  type ExternalCaddyImage,
   type CertificateFiles,
   type LogAccessProblemKind,
   type LogAccessReport,
@@ -91,6 +92,15 @@ function operation<S extends string>(value: unknown, path: string, states: reado
   };
 }
 
+function externalImage(value: unknown, path: string): ExternalCaddyImage {
+  const raw = object(value, path);
+  return {
+    image: raw.image === null ? null : string(raw.image, `${path}.image`, 1024),
+    puid: string(raw.puid, `${path}.puid`, 16),
+    pgid: string(raw.pgid, `${path}.pgid`, 16),
+  };
+}
+
 const PROBLEM_KINDS: readonly LogAccessProblemKind[] = [
   "unreadable",
   "notTruncatable",
@@ -144,6 +154,9 @@ export function decodeAgentStatus(value: unknown): AgentStatus {
               string(m, path, 1024),
             ),
       status: operation(build.status, "status.caddyBuild.status", BUILD_STATES),
+      ...(build.external === undefined
+        ? {}
+        : { external: externalImage(build.external, "status.caddyBuild.external") }),
     },
     services: {
       applied:

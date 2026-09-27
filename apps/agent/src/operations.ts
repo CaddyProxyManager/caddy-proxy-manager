@@ -10,6 +10,8 @@ import {
 } from "@cpm/shared";
 import {
   BUILD_OVERRIDE_FILE,
+  CADDY_MODULE_LIST_PATH,
+  type CaddyModuleList,
   composeEnv,
   type DockerHost,
   invalidCaddyModule,
@@ -170,6 +172,87 @@ export class Operations {
   }
 
   // ─── Caddy build ───────────────────────────────────────────────────────────
+
+  /**
+   * External mode's "applied": what the image Caddy runs says it carries. One with no list counts
+   * as no plugins, which only costs features; assuming the catalog could fail every config load.
+   */
+  async syncModulesFromImage(): Promise<CaddyModuleList> {
+    const list = await this.docker.readCaddyModuleList();
+    if (list.state === "unreadable") return list;
+    this.store.setAppliedCaddyModules(list.state === "found" ? list.modules : []);
+    const image = await this.docker.caddyImageRef();
+    if (image) this.store.setCaddyImage(image);
+    return list;
+  }
+
+  /**
+   * External mode's rebuild: load whatever the operator built under Caddy's image reference.
+   * Throws when busy before it returns; the promise settles when the load does.
+   */
+  loadCaddyImage(): Promise<void> {
+    this.begin("caddy-build");
+    const triggeredAt = new Date().toISOString();
+    this.store.setCaddyBuildStatus({
+      state: "building",
+      message: "Loading the Caddy image you built.",
+      triggeredAt,
+    });
+    return this.runCaddyImageLoad(triggeredAt).finally(() => {
+      this.running = null;
+    });
+  }
+
+  private async runCaddyImageLoad(triggeredAt: string): Promise<void> {
+    const failed = (message: string, error: string) =>
+      this.store.setCaddyBuildStatus({ state: "failed", message, triggeredAt, error });
+    try {
+      const load = await this.docker.loadCaddyImage();
+      if (!load.ok) {
+        const detail = tail(load.output, 5);
+        failed(
+          `Loading the Caddy image failed; the running container was left untouched. ${detail}`,
+          detail,
+        );
+        return;
+      }
+
+      // Before the health wait: a binary missing a module the running config names never turns
+      // healthy, and the controller has to stop emitting that module either way.
+      const list = await this.syncModulesFromImage();
+      if (list.state === "unreadable") {
+        failed(
+          `Caddy was recreated, but its module list could not be read: ${list.reason}`,
+          list.reason,
+        );
+        return;
+      }
+
+      const health = await this.docker.waitForCaddyHealth();
+      if (health !== "healthy") {
+        failed(
+          `Caddy's health check reports "${health}" on the new image. Check the Caddy container ` +
+            "logs - a config referencing a module the image lacks will fail to load.",
+          `health=${health}`,
+        );
+        return;
+      }
+
+      const image = this.store.caddyImage() ?? "the image";
+      this.store.setCaddyBuildStatus({
+        state: "applied",
+        message:
+          list.state === "found"
+            ? `Loaded ${image} with ${list.modules.length} module(s).`
+            : `Loaded ${image}, which has no ${CADDY_MODULE_LIST_PATH}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.`,
+        triggeredAt,
+        appliedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failed(`Loading the Caddy image failed: ${message}`, message);
+    }
+  }
 
   applyCaddyBuild(modules: string[]): void {
     const invalid = invalidCaddyModule(modules);

@@ -61,6 +61,25 @@ commit. It is compiled from source at build time.
 The [agent](../agent/) runs the build and recreates the Caddy container when it finishes, reporting
 progress as it goes. The running Caddy keeps serving until the new binary is ready.
 
+## Building the image yourself
+
+Building needs BuildKit access through the Docker socket proxy. To keep that away from the agent,
+set `CADDY_BUILD_MODE=external` on it and `GRPC: 0` and `SESSION: 0` on `docker-socket-proxy`. The
+agent then never builds, and this page shows a `docker build` command for your selection in place
+of the Rebuild button. It builds from this release's tag on GitHub, so it runs anywhere Docker can
+build, without a checkout.
+
+1. Run the command, on the agent's host or anywhere else. Push the image to a registry if it was
+   built elsewhere.
+2. The first time, set `CADDY_IMAGE` to its tag in `.env` and run `docker compose up -d agent`.
+   Use a tag of your own, not the shipped image's name.
+3. Click **Load built image**. The agent pulls the tag if it is in a registry, recreates Caddy if
+   it now names a different image, and waits for it to report healthy.
+
+The agent learns which modules the image has from `/etc/caddy/caddy-modules.txt`, which the
+Dockerfile writes. An image built another way has no such file and is treated as having no
+plugins, so the config stays loadable and every feature needing a module stays off.
+
 ## HTTP cache storage
 
 **Settings → Caddy Build → HTTP Cache** picks where the Caddy cache keeps entries. Memory is

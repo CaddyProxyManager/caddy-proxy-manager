@@ -86,12 +86,17 @@ consequences worth knowing before touching either side:
   for that agent (the Re-pair action), never the shared code.
 - **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
-  Three are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
+  Four are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
   Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
   Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
   `certificates`: `certificate-list` and `certificate-read` look into Caddy's storage from a
   throwaway container mounting its volumes read-only (`apps/agent/src/certificates.ts`).
+  `caddy-image`: `caddy-image-load` starts loading an operator-built image and answers at once,
+  since a recreate outlasts the timeout; only an agent reporting `caddyBuild.external` gets it.
+- **With `CADDY_BUILD_MODE=external` the agent never builds Caddy's image.** A module diff is
+  not acted on; the applied set is read from `/etc/caddy/caddy-modules.txt` in the image Caddy
+  runs, on every start and on each load. An image without that file counts as no plugins.
 - **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"

@@ -2,12 +2,19 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { extractErrorMessage } from "@/src/lib/actions";
-import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/lib/caddy-build";
+import { caddyBuildAgents } from "@/src/lib/agent/client";
+import {
+  applyCaddyBuild,
+  getCaddyBuildDiff,
+  getCaddyBuildStatus,
+  parseAgentRowId,
+} from "@/src/lib/caddy-build";
 import { DomainError } from "@/src/lib/domain-error";
 
 /**
  * GET /api/caddy-build - the module diff plus the agent's rebuild status. Polled by the settings
- * panel: compiling Caddy takes minutes, too long for a server action to hold open.
+ * panel: compiling Caddy takes minutes, too long for a server action to hold open. `external`
+ * lists the agents that load an operator-built image instead, and `builders` the rest.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,15 +26,16 @@ export async function GET(request: NextRequest) {
       getCaddyBuildDiff(agentRowId),
       getCaddyBuildStatus(agentRowId),
     ]);
-    return NextResponse.json({ diff, status });
+    const { external, builders } = caddyBuildAgents(agentRowId);
+    return NextResponse.json({
+      diff,
+      status,
+      builders,
+      external: external.map(({ name, external: image }) => ({ name, ...image })),
+    });
   } catch (error) {
     return apiErrorResponse(error);
   }
-}
-
-function parseAgentRowId(raw: string | null): number | undefined {
-  const parsed = Number.parseInt(raw ?? "", 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 /** POST /api/caddy-build - write the build override and trigger the agent. */

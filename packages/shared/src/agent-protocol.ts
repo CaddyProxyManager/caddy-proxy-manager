@@ -60,6 +60,19 @@ export type AgentOperationStatus<TState extends string> = {
 
 export type L4PortsStatus = AgentOperationStatus<L4PortsState>;
 export type CaddyBuildStatus = AgentOperationStatus<CaddyBuildState>;
+
+/** `external`: the operator builds Caddy's image and the agent only loads it (CADDY_BUILD_MODE). */
+export const CADDY_BUILD_MODES = ["agent", "external"] as const;
+export type CaddyBuildMode = (typeof CADDY_BUILD_MODES)[number];
+
+/** What an operator building the image needs, reported by an agent that will not build it. */
+export type ExternalCaddyImage = {
+  /** The reference Caddy's container was created from; null before its first start. */
+  image: string | null;
+  /** The image bakes Caddy's user in, so these must match the host's; "" when unset. */
+  puid: string;
+  pgid: string;
+};
 export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
 
 /**
@@ -95,6 +108,8 @@ export type AgentStatus = {
      */
     applied: string[] | null;
     status: CaddyBuildStatus;
+    /** Only from an agent in external mode; absent means it builds the image itself. */
+    external?: ExternalCaddyImage;
   };
   services: {
     /** Recorded, not probed: `docker compose ps` per service is too slow for every render. */
@@ -115,7 +130,12 @@ export type AgentStatus = {
   capabilities?: AgentCapability[];
 };
 
-export const AGENT_CAPABILITIES = ["caddy-validate", "log-read", "certificates"] as const;
+export const AGENT_CAPABILITIES = [
+  "caddy-validate",
+  "log-read",
+  "certificates",
+  "caddy-image",
+] as const;
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
 /**
@@ -403,6 +423,11 @@ export type AgentCommand = {
   | { kind: "certificate-list"; request: Record<string, never> }
   /** Likewise: a 200 whose text is `CertificateFiles`, or a 404. */
   | { kind: "certificate-read"; request: CertificateFileRequest }
+  /**
+   * Under `caddy-image`: start loading the operator's image. A 200 once started, as a recreate
+   * outlasts the command timeout; the outcome is reported in `caddyBuild.status`.
+   */
+  | { kind: "caddy-image-load"; request: Record<string, never> }
 );
 
 export type AgentServerEvent =

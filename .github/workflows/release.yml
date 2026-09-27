@@ -186,12 +186,13 @@ jobs:
 
           # A snapshot with `:latest` would silently upgrade on a later redeploy. Only our three
           # images: third-party ones are pinned already, and our version would name missing tags.
+          # Caddy's is the default inside `${CADDY_IMAGE:-...}`, so an own build can replace it.
           sed -i -E \
-            "s#(image: ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
+            "s#(image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
             "$staging/docker-compose.yml"
 
           for service in web caddy agent; do
-            if ! grep -qE "image: ghcr\.io/.*/${service}:${VERSION}\$" "$staging/docker-compose.yml"; then
+            if ! grep -qE "image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/.*/${service}:${VERSION}\\}?\$" "$staging/docker-compose.yml"; then
               echo "::error::staged docker-compose.yml does not pin ${service} to ${VERSION}"
               grep -n 'image:' "$staging/docker-compose.yml"
               exit 1

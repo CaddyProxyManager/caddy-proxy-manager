@@ -172,7 +172,8 @@ services:
 
   caddy:
     container_name: caddy-proxy-manager-caddy
-    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
+    # An image you build yourself, with the agent's CADDY_BUILD_MODE=external. See the README.
+    image: ${CADDY_IMAGE:-ghcr.io/silentspud/caddy-proxy-manager/caddy:latest}
     build:
       context: .
       dockerfile: docker/caddy/Dockerfile
@@ -243,7 +244,7 @@ services:
       IMAGES: 1
       SECRETS: 0
       # BuildKit, for "Rebuild Caddy"; piped unfiltered once matched (see the mounted config).
-      # Both 0 disables only that button.
+      # Both 0 disables only that button: pair it with the agent's CADDY_BUILD_MODE=external.
       GRPC: 1
       SESSION: 1
       # On in the image's defaults; nothing the agent runs reads the event stream.
@@ -289,6 +290,8 @@ services:
       # pins this into every config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
+      # `external`: never build Caddy's image, only load the one you built (CADDY_IMAGE below).
+      CADDY_BUILD_MODE: ${CADDY_BUILD_MODE:-agent}
       # Generous: clickhouse's first start pulls the image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
@@ -297,6 +300,7 @@ services:
       PUID: ${PUID:-}
       PGID: ${PGID:-}
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
+      CADDY_IMAGE: ${CADDY_IMAGE:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}

@@ -449,8 +449,12 @@ export class AgentLifecycle {
       }
 
       // Null means never rebuilt (the shipped image), not "skip", or no first rebuild ever runs.
+      // External mode never builds: the operator does, and loads the result on request.
       const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
-      if (!sameList(state.caddyModules, appliedModules)) {
+      if (
+        this.deps.config.caddyBuildMode === "agent" &&
+        !sameList(state.caddyModules, appliedModules)
+      ) {
         operations.applyCaddyBuild(state.caddyModules);
       }
 
@@ -495,6 +499,7 @@ export class AgentLifecycle {
     if (command.kind === "caddy-validate") return this.runValidate(command.id, command.request);
     if (command.kind === "log-read") return this.runLogRead(command.id, command.request);
     if (command.kind === "certificate-list") return this.runCertificateList(command.id);
+    if (command.kind === "caddy-image-load") return this.runCaddyImageLoad(command.id);
     if (command.kind === "certificate-read") {
       return this.runCertificateRead(command.id, command.request);
     }
@@ -537,6 +542,28 @@ export class AgentLifecycle {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  private runCaddyImageLoad(id: string): AgentCommandResult {
+    if (this.deps.config.caddyBuildMode !== "external") {
+      return {
+        id,
+        ok: false,
+        code: "BAD_REQUEST",
+        error: "This agent builds Caddy's image itself; set CADDY_BUILD_MODE=external to load one.",
+      };
+    }
+    let loading: Promise<void>;
+    try {
+      loading = this.deps.operations.loadCaddyImage();
+    } catch (busy) {
+      if (!(busy instanceof OperationBusyError)) throw busy;
+      return { id, ok: false, code: "BUSY", error: `${busy.running} is already running.` };
+    }
+    // Both ends reported now, not on the next heartbeat: the panel is polling for them.
+    void this.reportStatus();
+    void loading.then(() => this.reportStatus());
+    return { id, ok: true, response: { status: 200, text: "", headers: {} } };
   }
 
   private async runCertificateList(id: string): Promise<AgentCommandResult> {
@@ -612,10 +639,18 @@ export class AgentLifecycle {
   }
 
   private async startCaddy(): Promise<void> {
-    if (await this.deps.docker.caddyRunning()) return;
-    console.log("[agent] starting Caddy");
-    const result = await this.deps.docker.startCaddy();
-    if (!result.ok) console.error("[agent] could not start Caddy:", result.output);
+    if (!(await this.deps.docker.caddyRunning())) {
+      console.log("[agent] starting Caddy");
+      const result = await this.deps.docker.startCaddy();
+      if (!result.ok) console.error("[agent] could not start Caddy:", result.output);
+    }
+    // Also when already running: the operator may have swapped the image while the agent was down.
+    if (this.deps.config.caddyBuildMode === "external") {
+      const list = await this.deps.operations.syncModulesFromImage();
+      if (list.state === "unreadable") {
+        console.warn(`[agent] could not read Caddy's module list: ${list.reason}`);
+      }
+    }
   }
 
   private async stopCaddy(reason: string): Promise<void> {

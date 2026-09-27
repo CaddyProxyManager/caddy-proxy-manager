@@ -4,7 +4,7 @@
  */
 
 import { resolve } from "node:path";
-import type { AgentMode } from "@cpm/shared";
+import type { AgentMode, CaddyBuildMode } from "@cpm/shared";
 import {
   ControllerAddressError,
   checkControllerTransport,
@@ -42,6 +42,8 @@ export type AgentConfig = {
   composeExtraFile: string | null;
   /** Test rigs only. */
   composeSkipOverride: boolean;
+  /** `external`: never build Caddy's image, only load the one the operator built. */
+  caddyBuildMode: CaddyBuildMode;
   buildTimeoutSeconds: number;
   /** Generous: the first start pulls the image, and a retry over a slow link only repeats. */
   serviceTimeoutSeconds: number;
@@ -69,6 +71,12 @@ function resolveMode(): AgentMode {
   const raw = optional("AGENT_MODE") ?? "standalone";
   if (raw === "standalone" || raw === "managed") return raw;
   throw new Error(`AGENT_MODE must be "standalone" or "managed"; got "${raw}".`);
+}
+
+function resolveBuildMode(): CaddyBuildMode {
+  const raw = optional("CADDY_BUILD_MODE") ?? "agent";
+  if (raw === "agent" || raw === "external") return raw;
+  throw new Error(`CADDY_BUILD_MODE must be "agent" or "external"; got "${raw}".`);
 }
 
 /** CLI flags beat the environment: fixing a bad `CONTROLLER_URL` must not need a compose edit. */
@@ -139,6 +147,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     composeHostDir: optional("COMPOSE_HOST_DIR"),
     composeExtraFile: optional("COMPOSE_EXTRA_FILE"),
     composeSkipOverride: optional("COMPOSE_SKIP_OVERRIDE") !== null,
+    caddyBuildMode: resolveBuildMode(),
     buildTimeoutSeconds: positiveInteger("CADDY_BUILD_TIMEOUT", 1800),
     serviceTimeoutSeconds: positiveInteger("SERVICE_START_TIMEOUT", 900),
     healthTimeoutSeconds: positiveInteger("CADDY_HEALTH_TIMEOUT", 60),

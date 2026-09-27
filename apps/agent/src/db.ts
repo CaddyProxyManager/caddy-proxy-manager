@@ -52,6 +52,7 @@ const L4_STATUS_KEY = "l4_ports_status";
 const BUILD_STATUS_KEY = "caddy_build_status";
 const APPLIED_PORTS_KEY = "applied_l4_ports";
 const APPLIED_MODULES_KEY = "applied_caddy_modules";
+const CADDY_IMAGE_KEY = "caddy_image";
 const FLEET_CONFIG_KEY = "fleet_config";
 const SERVICES_STATUS_KEY = "managed_services_status";
 const APPLIED_SERVICES_KEY = "applied_managed_services";
@@ -201,6 +202,15 @@ export class AgentStore {
 
   setAppliedCaddyModules(modules: string[]): void {
     this.writeState(APPLIED_MODULES_KEY, JSON.stringify(modules));
+  }
+
+  /** External mode: the image the module list was last read from. Stored, as status runs often. */
+  caddyImage(): string | null {
+    return this.readState(CADDY_IMAGE_KEY);
+  }
+
+  setCaddyImage(image: string): void {
+    this.writeState(CADDY_IMAGE_KEY, image);
   }
 
   /**

@@ -24,6 +24,8 @@ if (typeof window !== "undefined") {
             needsRebuild: false,
           },
           status: { state: "applied", appliedAt: "2026-09-20T09:12:00Z" },
+          builders: 1,
+          external: [],
         })
       : null,
   );
