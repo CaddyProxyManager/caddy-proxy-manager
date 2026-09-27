@@ -26,6 +26,8 @@ interface PortalLoginFormProps {
   rid: string;
   hasRedirect: boolean;
   targetDomain: string;
+  /** Why this sign-in cannot go ahead; shown in place of the form. */
+  errorMessage?: string | null;
   enabledProviders?: SignInProvider[];
   /** False in OIDC-only mode. */
   localLoginEnabled?: boolean;
@@ -70,6 +72,7 @@ export default function PortalLoginForm({
   rid,
   hasRedirect,
   targetDomain,
+  errorMessage = null,
   enabledProviders = [],
   localLoginEnabled = true,
   existingSession,
@@ -251,6 +254,24 @@ export default function PortalLoginForm({
         description={t("missingDestinationDescription")}
         hasShield={false}
       />
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <PortalCard
+        title={t("authenticationRequired")}
+        description={
+          targetDomain
+            ? t.rich("signInToAccess", {
+                host: targetDomain,
+                host_: (chunks) => <strong>{chunks}</strong>,
+              })
+            : t("signInToContinue")
+        }
+      >
+        <Banner status="error" title={t("couldNotSignIn")} description={errorMessage} />
+      </PortalCard>
     );
   }
 

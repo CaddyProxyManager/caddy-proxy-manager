@@ -2,9 +2,19 @@ import { passwordPolicyViolationsInEnglish } from "./password-policy-message";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
 const DEFAULT_ADMIN_PASSWORD = "admin";
-const DISALLOWED_SESSION_SECRETS = new Set([
+/** Publicly known: refused at startup, yet still tried for decryption so their data can move off. */
+export const DISALLOWED_SESSION_SECRETS: ReadonlySet<string> = new Set([
   "change-me-in-production",
   "dev-secret-change-in-production-12345678901234567890123456789012",
+  // .env.example
+  "your-secure-session-secret-here-min-32-chars",
+]);
+/** Examples from .env.example and the README, current and past. They pass the password policy. */
+const DISALLOWED_ADMIN_PASSWORDS: ReadonlySet<string> = new Set([
+  "Your-Secure-P@ssw0rd-Here!",
+  "YourStr0ng-P@ssw0rd123!",
+  "YourStr0ng-P@ssw0rd!",
+  "Your-Str0ng-P@ssw0rd!",
 ]);
 const DEFAULT_CADDY_URL =
   process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
@@ -38,7 +48,8 @@ const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
 const isDevelopment = process.env.NODE_ENV === "development";
 const isBuildPhase =
   process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
-const isRuntimeProduction = isProduction && isNodeRuntime && !isBuildPhase;
+// Any NODE_ENV but development, so "staging" or a typo does not skip the checks.
+const isRuntimeProduction = !isDevelopment && isNodeRuntime && !isBuildPhase;
 
 function resolveSessionSecret(): string {
   const rawSecret = process.env.SESSION_SECRET ?? null;
@@ -73,7 +84,9 @@ function resolveSessionSecret(): string {
     if (DISALLOWED_SESSION_SECRETS.has(secret)) {
       throw new Error(
         "SESSION_SECRET is using a known insecure placeholder value. " +
-          "Generate a secure secret with: openssl rand -base64 32",
+          "Generate a secure secret with: openssl rand -base64 32. " +
+          "Secrets stored under the placeholder are re-encrypted with the new one automatically on the next start; " +
+          "for any other rotation, put the old value in SESSION_SECRET_PREVIOUS.",
       );
     }
     if (secret.length < MIN_SESSION_SECRET_LENGTH) {
@@ -112,6 +125,8 @@ function resolveAdminCredentials(): { username: string | null; password: string 
     // Runtime only: the production build imports this with whatever the image carries.
     if (password === DEFAULT_ADMIN_PASSWORD) {
       errors.push("ADMIN_PASSWORD must not be 'admin'");
+    } else if (DISALLOWED_ADMIN_PASSWORDS.has(password)) {
+      errors.push("ADMIN_PASSWORD is an example value from the documentation; choose your own");
     } else {
       for (const failure of passwordPolicyViolationsInEnglish(password)) {
         errors.push(`ADMIN_PASSWORD ${failure}`);
@@ -147,9 +162,24 @@ function getSessionSecret() {
   return _sessionSecret;
 }
 
+/**
+ * Comma-separated; the whole value is kept as one entry too, in case a secret contains a comma.
+ * Never checked like SESSION_SECRET: it only ever decrypts.
+ */
+function resolvePreviousSessionSecrets(): string[] {
+  const raw = process.env.SESSION_SECRET_PREVIOUS?.trim();
+  if (!raw) return [];
+  const entries = [raw, ...raw.split(",").map((entry) => entry.trim())];
+  return [...new Set(entries.filter(Boolean))];
+}
+
 export const config = {
   get sessionSecret() {
     return getSessionSecret();
+  },
+  /** Keys a rotation left behind, tried for decryption only. Read per access so tests can vary it. */
+  get previousSessionSecrets(): string[] {
+    return resolvePreviousSessionSecrets();
   },
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",

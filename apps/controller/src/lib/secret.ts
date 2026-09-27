@@ -1,8 +1,9 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import { config } from "./config";
+import { config, DISALLOWED_SESSION_SECRETS } from "./config";
 import { derivePurposeKey } from "./derived-key";
 
-const PREFIX = "enc:v1:";
+export const ENCRYPTED_SECRET_PREFIX = "enc:v1:";
+const PREFIX = ENCRYPTED_SECRET_PREFIX;
 const IV_LENGTH = 12;
 
 function deriveKey(sessionSecret: string = config.sessionSecret): Buffer {
@@ -48,17 +49,29 @@ export function sealSecretColumn(table: string, column: string, value: string): 
   return SECRET_COLUMNS[table]?.includes(column) ? encryptSecret(value) : value;
 }
 
-export function encryptSecret(value: string): string {
-  if (!value) return "";
-  if (isEncryptedSecret(value)) return value;
-
+function encryptWithCurrentKey(value: string): string {
   const iv = randomBytes(IV_LENGTH);
-  const key = deriveKey();
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(), iv);
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   return `${PREFIX}${iv.toString("base64")}:${tag.toString("base64")}:${ciphertext.toString("base64")}`;
+}
+
+export function encryptSecret(value: string): string {
+  if (!value) return "";
+  if (isEncryptedSecret(value)) return value;
+  return encryptWithCurrentKey(value);
+}
+
+/**
+ * Secrets that may decrypt but never encrypt: SESSION_SECRET_PREVIOUS, then the public placeholders
+ * older installs ran with, which reveal nothing by being tried.
+ */
+export function previousSessionSecrets(): string[] {
+  const secrets = new Set([...config.previousSessionSecrets, ...DISALLOWED_SESSION_SECRETS]);
+  secrets.delete(config.sessionSecret);
+  return [...secrets];
 }
 
 /**
@@ -71,6 +84,58 @@ const LEGACY_KEY_CUTOFF =
     ? null
     : new Date(LEGACY_KEY_CUTOFF_ENV || "2026-06-01T00:00:00Z");
 
+function legacyKeyAllowed(): boolean {
+  return !LEGACY_KEY_CUTOFF || new Date() <= LEGACY_KEY_CUTOFF;
+}
+
+/** For a value the current HKDF key could not open. Throws with a recovery hint when none can. */
+function decryptWithFallbackKeys(
+  value: string,
+  context: string | undefined,
+  currentKeyError: unknown,
+): { plaintext: string; source: "legacy" | "previous" } {
+  const withLegacy = legacyKeyAllowed();
+  let lastError = currentKeyError;
+
+  if (withLegacy) {
+    try {
+      return { plaintext: _decryptWithKey(value, deriveKeyLegacy()), source: "legacy" };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  for (const secret of previousSessionSecrets()) {
+    const keys = withLegacy ? [deriveKey(secret), deriveKeyLegacy(secret)] : [deriveKey(secret)];
+    for (const key of keys) {
+      try {
+        return { plaintext: _decryptWithKey(value, key), source: "previous" };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  const label = context ? ` for ${context}` : "";
+  const recoveryHint =
+    "This usually happens when SESSION_SECRET changed after the value was stored. " +
+    "Fix: set SESSION_SECRET_PREVIOUS to the secret the value was stored with and restart " +
+    "(startup re-encrypts it with the current key), or re-enter the affected token/secret in the UI.";
+
+  if (!withLegacy) {
+    throw new Error(
+      `[secret] Failed to decrypt stored secret${label}: HKDF decryption failed with the current key and SESSION_SECRET_PREVIOUS, and the legacy key grace period has expired. ` +
+        recoveryHint +
+        " Set LEGACY_KEY_CUTOFF_DATE=never to temporarily restore legacy key support.",
+      { cause: lastError },
+    );
+  }
+  throw new Error(
+    `[secret] Failed to decrypt stored secret${label}: decryption failed with the current (HKDF) and legacy keys, and with SESSION_SECRET_PREVIOUS. ` +
+      recoveryHint,
+    { cause: lastError },
+  );
+}
+
 /**
  * @param context Label for what is being decrypted (e.g. `DNS provider "cloudflare" credential
  * "api_token"`), included in errors so users can tell which stored value failed.
@@ -79,34 +144,32 @@ export function decryptSecret(value: string, context?: string): string {
   if (!value) return "";
   if (!isEncryptedSecret(value)) return value;
 
-  const label = context ? ` for ${context}` : "";
-  const recoveryHint =
-    "This usually happens when SESSION_SECRET changed after the value was stored. " +
-    "Fix: re-enter the affected token/secret in the UI to re-encrypt it with the current key, or restore the previous SESSION_SECRET.";
-
   try {
     return _decryptWithKey(value, deriveKey());
-  } catch (hkdfError: unknown) {
-    if (LEGACY_KEY_CUTOFF && new Date() > LEGACY_KEY_CUTOFF) {
-      throw new Error(
-        `[secret] Failed to decrypt stored secret${label}: HKDF decryption failed and the legacy key grace period has expired. ` +
-          recoveryHint +
-          " Set LEGACY_KEY_CUTOFF_DATE=never to temporarily restore legacy key support.",
-        { cause: hkdfError },
-      );
-    }
+  } catch (currentKeyError: unknown) {
+    const { plaintext, source } = decryptWithFallbackKeys(value, context, currentKeyError);
     console.warn(
-      "[secret] HKDF decryption failed; retrying with legacy SHA-256 key. Re-encrypt this secret to remove the legacy key dependency.",
+      source === "legacy"
+        ? "[secret] Decrypted a stored secret with the legacy SHA-256 key. Re-encrypt this secret to remove the legacy key dependency."
+        : "[secret] Decrypted a stored secret with a previous SESSION_SECRET. Keep SESSION_SECRET_PREVIOUS set until " +
+            "a restart has re-encrypted it with the current key.",
     );
-    try {
-      return _decryptWithKey(value, deriveKeyLegacy());
-    } catch (legacyError: unknown) {
-      throw new Error(
-        `[secret] Failed to decrypt stored secret${label}: decryption failed with both the current (HKDF) and legacy keys. ` +
-          recoveryHint,
-        { cause: legacyError },
-      );
-    }
+    return plaintext;
+  }
+}
+
+/**
+ * The value under the current key when only a fallback key opens it; null when it is not
+ * encrypted or needs nothing. Throws like decryptSecret when no key opens it.
+ */
+export function reencryptSecret(value: string, context?: string): string | null {
+  if (!value || !isEncryptedSecret(value)) return null;
+  try {
+    _decryptWithKey(value, deriveKey());
+    return null;
+  } catch (currentKeyError: unknown) {
+    const { plaintext } = decryptWithFallbackKeys(value, context, currentKeyError);
+    return encryptWithCurrentKey(plaintext);
   }
 }
 

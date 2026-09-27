@@ -29,7 +29,7 @@ export default function WafDemo() {
             preset_ids: [1],
             plugin_ids: [2],
             custom_directives:
-              'SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,pass,nolog,ctl:ruleRemoveById=942100"\n',
+              'SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"\n',
           }}
         />
       </WafPresetOptionsProvider>

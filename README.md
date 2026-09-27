@@ -389,6 +389,8 @@ it win even then.
 | Failed sign-ins before lockout | `LOGIN_MAX_ATTEMPTS` | `5` |
 | Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
+| Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
+| Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/silentspud/caddy-proxy-manager` |
 | Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |
@@ -421,7 +423,8 @@ it win even then.
 
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
-| `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts, and rotating it makes every stored secret unreadable | None | **Yes** |
+| `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts. To rotate it, see `SESSION_SECRET_PREVIOUS` | None | **Yes** |
+| `SESSION_SECRET_PREVIOUS` | The secret(s) `SESSION_SECRET` replaced, comma-separated. Only ever decrypts: each start re-encrypts what still needs it under `SESSION_SECRET`, two-factor secrets included, so one restart with it set completes a rotation and it can then be removed. OAuth sign-in tokens no key opens are dropped; the next sign-in stores new ones. Sessions end with the rotation either way | Unset | No |
 | `POSTGRES_PASSWORD` | Password for the database. Provisions the bundled `postgres` service and is what the app authenticates with. Any characters; it is never put through a URL | None | **Yes** |
 | `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates, and what the app connects as | `cpm` / `cpm` | No |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Where the app looks for PostgreSQL. Set these to use a server other than the bundled one | `postgres` / `5432` | No |
@@ -431,7 +434,7 @@ it win even then.
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
 | `CPM_APP_ROOT` / `CPM_HEALTHCHECK_URL` | Bootstrap paths for the `cpm-server` binary, used before the app starts | Executable's directory / `http://127.0.0.1:${PORT}/api/health` | No |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** - [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** - [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely. Applied again only when either value changes, which also ends the admin's sessions and re-enables it; a password changed in the UI survives restarts | None | No |
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
@@ -795,8 +798,9 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 **Limitations:**
 - In-memory rate limiting (not suitable for multi-instance deployments)
 - `SESSION_SECRET` encrypts every secret the database holds - DNS credentials, private keys, agent
-  secrets, two-factor secrets. Rotating it makes all of them unreadable; a backup restores them
-  under a new one
+  secrets, two-factor secrets. Rotate it by moving the old value to `SESSION_SECRET_PREVIOUS`, which
+  the next start re-encrypts everything away from; changing it without that makes them unreadable.
+  A backup restores them under a new one
 
 ---
 
@@ -1018,7 +1022,7 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 **Custom directives** - any ModSecurity SecLang syntax is accepted, e.g.:
 
 ```text
-SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
+SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"
 ```
 
 Directives are checked twice before they are stored, because Coraza compiles every WAF while Caddy loads its config and one refused rule would stop every host's config from loading. The editor marks what Coraza would refuse as you type - unknown variables, operators and actions, malformed or duplicate rules, regular expressions Go's RE2 cannot compile - and blocks the save on an error. On save the agent then has Caddy validate the WAFs the change produces, in a short-lived network-less container from the Caddy image and without loading them, which catches what only a merged config shows: rule ids colliding with the CRS or between the global settings and a host. The error names the host and quotes Coraza. The second check needs a paired agent whose Caddy container exists; without one the save goes ahead on the first check alone.

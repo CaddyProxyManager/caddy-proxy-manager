@@ -106,6 +106,8 @@ interface UserData {
   subject: string | null;
   /** Never the hash itself - this crosses to the browser. */
   hasPassword: boolean;
+  /** What the login page signs them in with; null when it cannot without OAuth. */
+  signInUsername: string | null;
   twoFactorEnabled: boolean;
   role: string;
   avatarUrl: string | null;
@@ -568,6 +570,11 @@ export default function ProfileClient({
             <MetadataList>
               <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
               <MetadataListItem label={t("name")}>{user.name || t("notSet")}</MetadataListItem>
+              {user.signInUsername && (
+                <MetadataListItem label={t("signInUsername")}>
+                  {user.signInUsername}
+                </MetadataListItem>
+              )}
               <MetadataListItem label={t("role")}>
                 <Badge label={user.role} />
               </MetadataListItem>
@@ -725,22 +732,33 @@ export default function ProfileClient({
                     description={t("oauthOnlyDescription")}
                   />
                 ) : hasPassword ? (
-                  <HStack gap={2} wrap="wrap">
-                    <Button
-                      variant="secondary"
-                      icon={<Unlink />}
-                      label={t("unlinkOauthAccount")}
-                      onClick={() => setUnlinkDialogOpen(true)}
-                    />
-                    {/* The other way to end up with one sign-in method: keep the provider, drop
-                        the password. */}
-                    <Button
-                      variant="secondary"
-                      icon={<Lock />}
-                      label={t("removePassword")}
-                      onClick={() => setRemovePasswordDialogOpen(true)}
-                    />
-                  </HStack>
+                  <VStack gap={2}>
+                    {!user.signInUsername && (
+                      <Banner
+                        status="info"
+                        title={t("unlinkDisabledTitle")}
+                        description={t("unlinkSignInUnavailable")}
+                      />
+                    )}
+                    <HStack gap={2} wrap="wrap">
+                      {user.signInUsername && (
+                        <Button
+                          variant="secondary"
+                          icon={<Unlink />}
+                          label={t("unlinkOauthAccount")}
+                          onClick={() => setUnlinkDialogOpen(true)}
+                        />
+                      )}
+                      {/* The other way to end up with one sign-in method: keep the provider, drop
+                          the password. */}
+                      <Button
+                        variant="secondary"
+                        icon={<Lock />}
+                        label={t("removePassword")}
+                        onClick={() => setRemovePasswordDialogOpen(true)}
+                      />
+                    </HStack>
+                  </VStack>
                 ) : (
                   <Banner
                     status="info"

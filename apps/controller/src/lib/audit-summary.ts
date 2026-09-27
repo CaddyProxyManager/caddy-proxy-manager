@@ -108,6 +108,12 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   },
   {
     entityType: "user",
+    action: "update",
+    message: "userSignInUsernameChanged",
+    pattern: /^Changed user (?<id>.+?) sign-in username to (?<username>.+)$/s,
+  },
+  {
+    entityType: "user",
     action: "delete",
     message: "userDeleted",
     pattern: /^Deleted user (?<id>.+)$/s,

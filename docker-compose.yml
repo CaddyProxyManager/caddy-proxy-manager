@@ -18,6 +18,8 @@ services:
 
       # Required, and unique per instance. Generate with: openssl rand -base64 32
       SESSION_SECRET: ${SESSION_SECRET:?ERROR - SESSION_SECRET is required}
+      # The value before a rotation; decrypt-only, and re-encrypted away at startup.
+      SESSION_SECRET_PREVIOUS: ${SESSION_SECRET_PREVIOUS:-}
 
       # Only used with no agent. Caddy's name on the internal caddy-admin network; see caddy below.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
@@ -148,6 +150,8 @@ services:
 
       # First-start defaults of Settings fields.
       FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
+      FORWARD_AUTH_ALLOWED_PORTS: ${FORWARD_AUTH_ALLOWED_PORTS:-}
+      FORWARD_AUTH_SEQUENTIAL_USER_IDS: ${FORWARD_AUTH_SEQUENTIAL_USER_IDS:-}
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       # Variables that override a stored value, for getting back into a locked-out instance.
       SETTINGS_ENV_OVERRIDE: ${SETTINGS_ENV_OVERRIDE:-}

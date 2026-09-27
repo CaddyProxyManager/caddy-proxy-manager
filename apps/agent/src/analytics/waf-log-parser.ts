@@ -4,7 +4,13 @@
  */
 import { existsSync, statSync, truncateSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
-import type { WafEventRow } from "@cpm/shared";
+import {
+  type WafEventRow,
+  auditEntryCarriesCredentials,
+  redactAuditEntry,
+  redactWafRuleText,
+  storedAuditRawData,
+} from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { relayWafEvents } from "./relay";
 import { readLines } from "./log-read";
@@ -192,8 +198,18 @@ export function parseLine(line: string, ruleMap: Map<string, RuleInfo>): WafEven
   const hostArr = req.headers?.host ?? req.headers?.Host;
   const host = Array.isArray(hostArr) ? (hostArr[0] ?? "") : (hostArr ?? "");
 
-  // The waf-rules.log join is only for Coraza builds that don't populate `messages`.
-  const ruleInfo = ruleInfoFromAuditEntry(entry) ?? (tx.id ? ruleMap.get(tx.id) : undefined);
+  // Read from the redacted entry so rule_message matches what raw_data keeps. The waf-rules.log
+  // join is only for Coraza builds that don't populate `messages`, and is not redacted yet.
+  const redacted = redactAuditEntry(entry);
+  const joined = tx.id ? ruleMap.get(tx.id) : undefined;
+  const ruleInfo =
+    ruleInfoFromAuditEntry(redacted) ??
+    (joined && {
+      ...joined,
+      ruleMessage:
+        joined.ruleMessage &&
+        redactWafRuleText(joined.ruleMessage, auditEntryCarriesCredentials(entry)),
+    });
 
   const blocked = tx.is_interrupted ?? false;
 
@@ -206,11 +222,11 @@ export function parseLine(line: string, ruleMap: Map<string, RuleInfo>): WafEven
     client_ip: clientIp,
     country_code: lookupCountry(clientIp),
     method: req.method ?? "",
-    uri: req.uri ?? "",
+    uri: redacted.transaction?.request?.uri ?? "",
     rule_id: ruleInfo?.ruleId ?? null,
     rule_message: ruleInfo?.ruleMessage ?? null,
     severity: ruleInfo?.severity ?? null,
-    raw_data: line,
+    raw_data: storedAuditRawData(line, redacted),
     blocked,
   };
 }

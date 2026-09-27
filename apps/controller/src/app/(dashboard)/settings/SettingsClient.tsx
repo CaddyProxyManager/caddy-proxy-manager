@@ -117,6 +117,7 @@ import {
 } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
+import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { HttpCacheSection } from "./HttpCacheSection";
@@ -171,6 +172,8 @@ type Props = {
   updates: UpdateStatus;
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
   registry: Record<string, readonly RegistryField[]>;
+  /** Picked out on the server: the registry module is not browser-safe. */
+  sequentialUserIdsField?: RegistryField;
   analytics: AnalyticsView;
   geoip: GeoipView;
   email: EmailSettingsView;
@@ -225,6 +228,7 @@ export default function SettingsClient({
   hasFavicon,
   updates,
   registry,
+  sequentialUserIdsField,
   analytics,
   geoip,
   email,
@@ -269,6 +273,10 @@ export default function SettingsClient({
   const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [signInState, signInFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [agentRegistryState, agentRegistryFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
+  const [forwardAuthRegistryState, forwardAuthRegistryFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
   );
@@ -495,11 +503,20 @@ export default function SettingsClient({
       />
     ),
     "forward-auth": (
-      <ForwardAuthSection
-        forwardAuth={forwardAuth}
-        forwardAuthState={forwardAuthState}
-        forwardAuthFormAction={forwardAuthFormAction}
-      />
+      <>
+        <SequentialUserIdsBanner field={sequentialUserIdsField} />
+        <ForwardAuthSection
+          forwardAuth={forwardAuth}
+          forwardAuthState={forwardAuthState}
+          forwardAuthFormAction={forwardAuthFormAction}
+        />
+        <RegistrySettingsBlock
+          block="forward-auth"
+          fields={registry["forward-auth"] ?? []}
+          state={forwardAuthRegistryState}
+          formAction={forwardAuthRegistryFormAction}
+        />
+      </>
     ),
     geoip: <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />,
     email: <EmailServerSection email={email} state={emailState} formAction={emailFormAction} />,

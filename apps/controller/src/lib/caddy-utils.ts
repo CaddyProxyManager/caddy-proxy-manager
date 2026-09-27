@@ -17,6 +17,19 @@ export function expandPrivateRanges(proxies: string[]): string[] {
   return proxies.flatMap((p) => (p === "private_ranges" ? PRIVATE_RANGES_CIDRS : [p]));
 }
 
+// ── Host placeholders ────────────────────────────────────────────────────────
+
+const HOST_PLACEHOLDER_RE = /(?<!\\)\{(?=(?:file|env|system)\.)/g;
+
+/**
+ * Caddy expands `{file.*}`, `{env.*}` and `{system.*}` in response bodies and header values, so
+ * operator-written text could read the Caddy host. A backslashed brace is served literally, minus
+ * the backslash; request placeholders (`{http.*}`) keep working.
+ */
+export function escapeHostPlaceholders(value: string): string {
+  return value.replace(HOST_PLACEHOLDER_RE, "\\{");
+}
+
 // ── Header names ─────────────────────────────────────────────────────────────
 
 /** Go's canonical form ("X-Cpm-User"): Caddy's header placeholders look names up literally. */
@@ -30,6 +43,87 @@ export function canonicalHeaderName(name: string): string {
 /** The `{http.reverse_proxy.header.*}` placeholder, however the caller spelled the name. */
 export function upstreamHeaderPlaceholder(name: string): string {
   return `{http.reverse_proxy.header.${canonicalHeaderName(name)}}`;
+}
+
+/**
+ * The client's own credentials, not an identity assertion: excluded paths, basic auth and the auth
+ * server itself need them, so the identity strip leaves them alone.
+ */
+const CLIENT_CREDENTIAL_HEADERS = new Set(["authorization", "proxy-authorization", "cookie"]);
+
+/** Past this, 2^n spellings would bloat the config; only the uniform ones are listed. */
+const MAX_ENUMERATED_HEADER_SEPARATORS = 6;
+
+function isClientCredentialHeader(name: string): boolean {
+  return CLIENT_CREDENTIAL_HEADERS.has(name.toLowerCase().replace(/_/g, "-"));
+}
+
+/** `name` itself first, then every mix of "-" and "_" at its separators. */
+function headerSeparatorSpellings(name: string): string[] {
+  const parts = name.split(/[-_]/);
+  const separators = parts.length - 1;
+  if (separators > MAX_ENUMERATED_HEADER_SEPARATORS) {
+    return [name, parts.join("-"), parts.join("_")];
+  }
+  const spellings = [name];
+  for (let mask = 0; mask < 1 << separators; mask++) {
+    let spelling = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      spelling += (mask & (1 << (i - 1)) ? "_" : "-") + parts[i];
+    }
+    spellings.push(spelling);
+  }
+  return spellings;
+}
+
+/** Deduplicated as Caddy matches them: its delete folds case, not "-" and "_". */
+function uniqueSpellings(names: readonly string[]): string[] {
+  const unique = new Map<string, string>();
+  for (const name of names) {
+    for (const spelling of headerSeparatorSpellings(name)) {
+      const key = spelling.toLowerCase();
+      if (!unique.has(key)) unique.set(key, spelling);
+    }
+  }
+  return [...unique.values()];
+}
+
+/**
+ * Deletes client copies of the identity headers an auth server vouches for, in every separator
+ * spelling: CGI/WSGI upstreams fold "-" and "_" into one variable (HTTP_X_CPM_USER).
+ */
+export function buildIdentityHeaderStripHandler(
+  headerNames: readonly string[],
+): Record<string, unknown> | null {
+  const names = uniqueSpellings(headerNames.filter((name) => !isClientCredentialHeader(name)));
+  return names.length > 0 ? { handler: "headers", request: { delete: names } } : null;
+}
+
+/**
+ * The 2xx handle_response routes: copy each header the auth server answered with a value. A listed
+ * credential header escapes the strip, so it is removed here when the answer has none - the
+ * upstream must only ever see the auth server's value.
+ */
+export function buildAuthResponseCopyRoutes(
+  headerNames: readonly string[],
+): Record<string, unknown>[] {
+  const routes: Record<string, unknown>[] = [{ handle: [{ handler: "vars" }] }];
+  for (const rawName of headerNames) {
+    // Canonical, since the placeholder is looked up literally in Go's canonicalised map.
+    const headerName = canonicalHeaderName(rawName);
+    const placeholder = upstreamHeaderPlaceholder(headerName);
+    routes.push({
+      handle: [{ handler: "headers", request: { set: { [headerName]: [placeholder] } } }],
+      match: [{ not: [{ vars: { [placeholder]: [""] } }] }],
+    });
+    if (isClientCredentialHeader(headerName)) {
+      routes.push({
+        handle: [{ handler: "headers", request: { delete: uniqueSpellings([headerName]) } }],
+        match: [{ vars: { [placeholder]: [""] } }],
+      });
+    }
+  }
+  return routes;
 }
 
 // ── Type helpers ─────────────────────────────────────────────────────────────

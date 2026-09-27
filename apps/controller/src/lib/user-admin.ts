@@ -3,7 +3,8 @@
  * unchecked string into the role column.
  */
 
-import { domainError } from "./domain-error";
+import { domainError, domainErrorMessage } from "./domain-error";
+import { LOGIN_USERNAME_MAX_LENGTH, LOGIN_USERNAME_MIN_LENGTH } from "./login-username";
 import { isEmailAddress } from "./email-address";
 import { APP_ROLES, type AppRole } from "./oidc-groups";
 import { isPasswordAcceptable, MIN_PASSWORD_LENGTH } from "./password-policy";
@@ -45,6 +46,14 @@ export function assertNotSelf(
 /** Not in the model: OAuth writes what its provider asserts, and refusing would lock users out. */
 export function assertEmailAddress(email: string): void {
   if (!isEmailAddress(email)) throw domainError("emailInvalid");
+}
+
+/** For a username that is not even a string, which the model never sees. */
+export function signInUsernameRulesMessage(): string {
+  return domainErrorMessage("signInUsernameInvalid", {
+    min: LOGIN_USERNAME_MIN_LENGTH,
+    max: LOGIN_USERNAME_MAX_LENGTH,
+  });
 }
 
 export function assertAcceptablePassword(password: string): void {

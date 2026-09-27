@@ -36,6 +36,7 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
+import { toSafeChartLabel } from "@/src/lib/chart-labels";
 
 import { useChartTheme } from "./chart-theme";
 import { settingsHref } from "../settings/sections";
@@ -540,7 +541,7 @@ export default function AnalyticsClient() {
         chartTheme.series.cyan,
         chartTheme.series.orange,
       ],
-      labels: protocols.map((p) => p.proto),
+      labels: protocols.map((p) => toSafeChartLabel(p.proto)),
       legend: { position: "bottom", labels: { colors: chartTheme.labelColor } },
       dataLabels: { style: { colors: [chartTheme.onSeries] } },
       plotOptions: { pie: { donut: { size: "65%" } } },
@@ -557,7 +558,9 @@ export default function AnalyticsClient() {
       plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
       dataLabels: { enabled: false },
       xaxis: {
-        categories: userAgents.map((u) => parseUA(u.userAgent, t("unknownUserAgent"))),
+        categories: userAgents.map((u) =>
+          toSafeChartLabel(parseUA(u.userAgent, t("unknownUserAgent"))),
+        ),
         labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
       },
       yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },

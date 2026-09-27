@@ -31,6 +31,22 @@ export async function register() {
       // Let the app start; errors surface when users reach the features.
     }
 
+    const { ensureUserUuids } = await import("./lib/models/user");
+    try {
+      const filled = await ensureUserUuids();
+      if (filled > 0) console.log(`Assigned forward-auth UUIDs to ${filled} user(s)`);
+    } catch (error) {
+      console.error("Failed to assign user UUIDs:", error);
+    }
+
+    // Only reports: a stored username is never changed on startup.
+    const { warnAboutSignInUsernamesToReview } = await import("./lib/models/user");
+    try {
+      await warnAboutSignInUsernamesToReview();
+    } catch (error) {
+      console.error("Failed to check sign-in usernames:", error);
+    }
+
     // After the seed, so an env-configured deployment is recognised by the account it just made.
     const { backfillSetupCompletion } = await import("./lib/setup");
     try {
@@ -60,18 +76,64 @@ export async function register() {
       }
     }
 
+    // Whether a pass below rewrote secrets, leaving their old bytes in SQLite's free pages.
+    let rewroteSecrets = false;
+
     // Older releases stored plaintext secrets; repair before any handler reads the rows.
     const { migrateLegacyCertificateStorage } = await import("./lib/models/certificates");
     const { migrateLegacyCaCertificateStorage } = await import("./lib/models/ca-certificates");
     try {
       const migrated =
         (await migrateLegacyCertificateStorage()) + (await migrateLegacyCaCertificateStorage());
+      rewroteSecrets ||= migrated > 0;
       if (migrated > 0) {
         console.log(`Hardened ${migrated} legacy certificate record(s)`);
       }
     } catch (error) {
       console.error("Failed to harden legacy certificate storage");
       if (process.env.NODE_ENV === "production") throw error;
+    }
+
+    const { encryptPlaintextDnsCredentials } = await import("./lib/settings/plaintext-credentials");
+    try {
+      const encrypted = await encryptPlaintextDnsCredentials();
+      rewroteSecrets ||= encrypted > 0;
+      if (encrypted > 0) {
+        console.log(`Encrypted DNS provider credentials stored in plaintext (${encrypted} row(s))`);
+      }
+    } catch (error) {
+      console.error("Failed to encrypt plaintext DNS provider credentials:", error);
+    }
+
+    // Before anything decrypts to build the Caddy config, so a rotation costs one restart.
+    const { reencryptStoredSecrets } = await import("./lib/secret-rotation");
+    try {
+      const { reencrypted, failed, clearedOAuthTokens } = await reencryptStoredSecrets();
+      rewroteSecrets ||= reencrypted > 0 || clearedOAuthTokens > 0;
+      if (reencrypted > 0) {
+        console.log(`Re-encrypted ${reencrypted} stored secret(s) with the current SESSION_SECRET`);
+      }
+      if (clearedOAuthTokens > 0) {
+        console.log(
+          `Cleared ${clearedOAuthTokens} stored OAuth token(s) no key decrypts; the next sign-in stores new ones`,
+        );
+      }
+      if (failed > 0) {
+        console.warn(
+          `${failed} stored secret(s) listed above could not be decrypted with SESSION_SECRET or ` +
+            "SESSION_SECRET_PREVIOUS; re-enter them or set SESSION_SECRET_PREVIOUS to the secret they were stored with",
+        );
+      }
+    } catch (error) {
+      // Values left behind still decrypt through the fallback keys.
+      console.error("Failed to re-encrypt stored secrets:", error);
+    }
+
+    // secure_delete covers deletes from now on; VACUUM drops what earlier ones and the passes
+    // above left in the file. Once per database, then only after a rewrite.
+    const { purgeDeletedDatabaseContent } = await import("./lib/db/connection");
+    if (purgeDeletedDatabaseContent(rewroteSecrets)) {
+      console.log("Vacuumed the database so deleted and replaced secrets no longer remain in it");
     }
 
     // Before the startup apply, so the config lands on the demo agent's in-memory Caddy.

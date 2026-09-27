@@ -31,6 +31,10 @@ describe('proxy security headers', () => {
 
       expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+'/);
       expect(csp).toContain("frame-ancestors 'none'");
+      // default-src does not cover these, so each needs saying.
+      expect(csp).toContain("base-uri 'none'");
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).toContain("form-action 'self'");
       expect(forwardedCsp(response)).toBe(csp);
       expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
       expect(response.headers.get('permissions-policy')).toContain('camera=()');

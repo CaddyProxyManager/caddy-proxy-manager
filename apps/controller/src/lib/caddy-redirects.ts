@@ -1,3 +1,4 @@
+import { escapeHostPlaceholders } from "./caddy-utils";
 import type { RedirectRule } from "./models/proxy-hosts";
 
 /** RE2 escaping for a literal path segment inside `path_regexp`. */
@@ -19,14 +20,14 @@ export function buildRedirectRoute(rule: RedirectRule): Record<string, unknown> 
         {
           handler: "static_response",
           status_code: rule.status,
-          headers: { Location: [rule.to] },
+          headers: { Location: [escapeHostPlaceholders(rule.to)] },
         },
       ],
     };
   }
 
   // With a "/" or "" target, an appended "//evil.example" (or "/\") is protocol-relative.
-  const base = rule.to.replace(/\/+$/, "");
+  const base = escapeHostPlaceholders(rule.to).replace(/\/+$/, "");
   const unsafe: Record<string, unknown>[] = [{ path_regexp: { pattern: "^/[/\\\\]" } }];
   const handle: Record<string, unknown>[] = [];
   if (rule.preservePath === "suffix") {

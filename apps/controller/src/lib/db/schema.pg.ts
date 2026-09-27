@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { uuidv7 } from "../uuidv7";
 import { isoTimestamp } from "./columns.pg";
 
 export const users = pgTable(
@@ -32,11 +33,14 @@ export const users = pgTable(
     emailVerified: boolean("emailVerified").notNull().default(false),
     // Set by Better Auth's two-factor plugin once TOTP is verified; local accounts only.
     twoFactorEnabled: boolean("twoFactorEnabled").notNull().default(false),
+    // Forward auth's opaque user id. Nullable: rows from raw SQL are filled by `ensureUserUuids`.
+    uuid: text("uuid").$defaultFn(() => uuidv7()),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
   (table) => ({
     emailUnique: uniqueIndex("users_email_unique").on(table.email),
+    uuidUnique: uniqueIndex("users_uuid_unique").on(table.uuid),
   }),
 );
 

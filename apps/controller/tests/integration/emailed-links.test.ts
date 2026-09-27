@@ -22,6 +22,10 @@ vi.mock('../../src/lib/db', () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+  // Setting a first password writes the user and its credential account together.
+  runInTransaction: async (build: (tx: typeof ctx.db) => unknown[]) => {
+    for (const statement of build(ctx.db)) await statement;
+  },
 }));
 
 import { eq } from 'drizzle-orm';

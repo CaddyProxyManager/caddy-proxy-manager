@@ -99,6 +99,48 @@ describe('parseWafRow', () => {
     expect(parseWafRow({ ...waf, rule_id: 1.5 })).toBeNull();
     expect(parseWafRow({ ...waf, rule_id: 2 ** 31 })).toBeNull();
   });
+
+  // An agent from before redaction sends the audit entry raw, and the controller stores it.
+  it('redacts what an older agent sent unredacted, and leaves a redacted row as it is', () => {
+    const entry = {
+      transaction: {
+        id: 'tx-old',
+        client_ip: '203.0.113.9',
+        unix_timestamp: 1,
+        request: {
+          method: 'GET',
+          uri: '/feed?token=URI-SECRET&q=1',
+          headers: { host: ['example.com'], cookie: ['session=COOKIE-SECRET'] },
+        },
+      },
+      messages: [
+        {
+          error_message:
+            '[id "942100"] [msg "SQLi"] [data "Matched Data: x found within REQUEST_COOKIES:session: COOKIE-SECRET"]',
+        },
+      ],
+    };
+    // Nanoseconds past a JS number's precision, as Coraza writes them.
+    const raw = JSON.stringify(entry).replace(
+      '"unix_timestamp":1',
+      '"unix_timestamp":1700000000123456789',
+    );
+    const row = parseWafRow({
+      ...waf,
+      uri: '/feed?token=URI-SECRET&q=1',
+      rule_message: 'REQUEST_COOKIES:session=MSG-SECRET',
+      raw_data: raw,
+    });
+    expect(row?.uri).toBe('/feed?token=[redacted]&q=1');
+    expect(row?.rule_message).toBe('REQUEST_COOKIES:session=[redacted]');
+    expect(row?.raw_data).not.toMatch(/SECRET/);
+    expect(row?.raw_data).toContain('"unix_timestamp":1700000000123456789');
+    expect(parseWafRow(row)).toEqual(row);
+  });
+
+  it('drops audit data it cannot read as an audit entry', () => {
+    expect(parseWafRow({ ...waf, raw_data: 'cookie: session=SECRET' })?.raw_data).toBeNull();
+  });
 });
 
 describe('ingestAnalytics', () => {

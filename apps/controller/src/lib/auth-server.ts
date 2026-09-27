@@ -27,6 +27,8 @@ import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
 import { DISABLED_AUTH_PATHS } from "./auth-disabled-paths";
 import { getAppName } from "./app-name";
+import { DomainError } from "./domain-error";
+import { isValidLoginUsername, LOGIN_USERNAME_MAX_LENGTH } from "./login-username";
 import {
   hasTwoFactorChallengeCookie,
   isCredentialSignInPath,
@@ -293,6 +295,12 @@ async function createAuth(baseURL: string): Promise<any> {
       before: createAuthMiddleware(async (ctx) => {
         // Checked first so every other auth request skips loading the translator.
         if (ctx.path !== SIGN_UP_EMAIL_PATH) return;
+        // A registrant cannot choose a username (applySignInNameRules). Dropped before the
+        // username plugin's hook, which would copy displayUsername in and say whether it is taken.
+        if (ctx.body && typeof ctx.body === "object") {
+          delete ctx.body.username;
+          delete ctx.body.displayUsername;
+        }
         const { getTranslations } = await import("next-intl/server");
         const message = signUpPasswordError(ctx.path, ctx.body, await getTranslations());
         if (message) throw new APIError("BAD_REQUEST", { message });
@@ -302,11 +310,35 @@ async function createAuth(baseURL: string): Promise<any> {
       user: {
         create: {
           // AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true opts out of enforceSafeUserDefaults.
-          before: async (user: Record<string, unknown>) => {
-            if (policy.allowOauthRoleFromClaims) {
-              return { data: user };
+          before: async (user: Record<string, unknown>, context?: { path?: string } | null) => {
+            const { applySignInNameRules } = await import("./models/user");
+            const selfRegistered = context?.path === SIGN_UP_EMAIL_PATH;
+            let named: Record<string, unknown>;
+            try {
+              named = await applySignInNameRules(user, selfRegistered);
+            } catch (error) {
+              // The reply an existing email gets, whatever the reason, so names cannot be probed.
+              if (selfRegistered && error instanceof DomainError) {
+                throw new APIError("UNPROCESSABLE_ENTITY", {
+                  message: "User already exists. Use another email.",
+                  code: "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+                });
+              }
+              throw error;
             }
-            return { data: enforceSafeUserDefaults(user) };
+            if (policy.allowOauthRoleFromClaims) {
+              return { data: named };
+            }
+            return { data: enforceSafeUserDefaults(named) };
+          },
+          after: async (user: { id: string | number }) => {
+            // The user exists by now; a failure here must not fail the sign-up.
+            try {
+              const { releaseContestedSignInUsername } = await import("./models/user");
+              await releaseContestedSignInUsername(Number(user.id));
+            } catch (error) {
+              console.warn("[auth-server] Checking the new user's username failed:", error);
+            }
           },
         },
       },
@@ -379,6 +411,24 @@ async function createAuth(baseURL: string): Promise<any> {
       },
       session: {
         create: {
+          // Refused as a wrong password is, so a disabled account's password is not confirmed.
+          before: async (
+            session: { userId: string | number },
+            context?: { path?: string } | null,
+          ) => {
+            const [user] = await db
+              .select({ status: schema.users.status })
+              .from(schema.users)
+              .where(eq(schema.users.id, Number(session.userId)))
+              .limit(1);
+            if (user?.status === "active") return;
+            throw new APIError(
+              "UNAUTHORIZED",
+              context?.path === "/sign-in/username"
+                ? { message: "Invalid username or password", code: "INVALID_USERNAME_OR_PASSWORD" }
+                : { message: "Invalid email or password", code: "INVALID_EMAIL_OR_PASSWORD" },
+            );
+          },
           after: async (session, context) => {
             const userId =
               typeof session.userId === "string" ? Number(session.userId) : session.userId;
@@ -428,8 +478,8 @@ async function createAuth(baseURL: string): Promise<any> {
     plugins: [
       // Cast via unknown: the plugin's `email: string` vs BetterAuthPlugin's `email?: any`.
       username({
-        maxUsernameLength: 255,
-        usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),
+        maxUsernameLength: LOGIN_USERNAME_MAX_LENGTH,
+        usernameValidator: isValidLoginUsername,
       }) as unknown as BetterAuthPlugin,
       genericOAuth({ config: oauthConfigs }),
       // TOTP and backup codes only: a code by mail would come from the inbox a reset link opens.

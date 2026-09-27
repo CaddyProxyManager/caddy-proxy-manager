@@ -7,7 +7,7 @@ import {
   getCurrentSessionInfo,
   isFreshSession,
 } from "@/src/lib/auth";
-import { getUserById, updateUserPassword } from "@/src/lib/models/user";
+import { getUserById, getUserPasswordHash, updateUserPassword } from "@/src/lib/models/user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
@@ -76,8 +76,10 @@ export async function POST(request: NextRequest) {
     }
 
     const currentSession = await getCurrentSessionInfo(request);
+    // Self-registration keeps the hash on the credential account only.
+    const currentHash = await getUserPasswordHash(user);
 
-    if (user.passwordHash) {
+    if (currentHash) {
       if (!currentPassword) {
         return NextResponse.json(
           { error: t("auth.apiErrors.currentPasswordRequired") },
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const isValid = await verifyPassword(currentPassword, user.passwordHash);
+      const isValid = await verifyPassword(currentPassword, currentHash);
       if (!isValid) {
         await registerFailedAttempt(rateLimitKey);
         return NextResponse.json(
@@ -118,10 +120,10 @@ export async function POST(request: NextRequest) {
 
     await createAuditEvent({
       userId,
-      action: user.passwordHash ? "password_changed" : "password_set",
+      action: currentHash ? "password_changed" : "password_set",
       entityType: "user",
       entityId: userId,
-      summary: user.passwordHash ? "User changed their password" : "User set a password",
+      summary: currentHash ? "User changed their password" : "User set a password",
     });
 
     return NextResponse.json({

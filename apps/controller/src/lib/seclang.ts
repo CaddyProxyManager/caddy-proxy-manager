@@ -10,6 +10,16 @@
  */
 export type SeclangDirective = { text: string | null; lines: string[]; start: number };
 
+// Go's unicode.IsSpace, which strings.TrimSpace strips: JavaScript's \s minus U+FEFF, plus U+0085.
+const GO_SPACE =
+  "\\t\\n\\v\\f\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const GO_TRIM = new RegExp(`^[${GO_SPACE}]+|[${GO_SPACE}]+$`, "g");
+
+/** Go's strings.TrimSpace, which Coraza applies to every line and to action keys and values. */
+export function goTrimSpace(s: string): string {
+  return s.replace(GO_TRIM, "");
+}
+
 /**
  * Groups lines as Coraza's parser.go does (`\` continues, backtick blocks, comments skipped even
  * mid-rule), so the allowlist judges what Coraza evaluates, not a split rule in pieces.
@@ -21,7 +31,7 @@ export function seclangDirectives(raw: string): SeclangDirective[] {
   let pendingStart = 0;
   let inBackticks = false;
   raw.split("\n").forEach((line, index) => {
-    const trimmed = line.trim();
+    const trimmed = goTrimSpace(line);
     if (!trimmed || trimmed.startsWith("#")) {
       if (pending.length > 0) pending.push(line);
       else out.push({ text: "", lines: [line], start: index });
@@ -179,10 +189,13 @@ export type SeclangLintOptions = {
   crsLoaded?: boolean;
 };
 
-type ParsedAction = { key: string; value: string };
+export type ParsedAction = { key: string; value: string };
 
-/** Splits an action list the way parseActions does: commas outside single quotes, `\` escaping. */
-function parseActions(actions: string): { actions: ParsedAction[]; unclosedQuote: boolean } {
+/**
+ * Splits an action list the way parseActions does: commas outside single quotes, `\` escaping,
+ * Go-trimmed keys and values, and one pair of quotes off a value (MaybeRemoveQuotes).
+ */
+export function parseActions(actions: string): { actions: ParsedAction[]; unclosedQuote: boolean } {
   const out: ParsedAction[] = [];
   let beforeKey = -1;
   let afterKey = -1;
@@ -190,12 +203,8 @@ function parseActions(actions: string): { actions: ParsedAction[]; unclosedQuote
   const push = (end: number) => {
     const hasValue = afterKey !== -1;
     const keyEnd = hasValue ? afterKey : end;
-    const key = actions
-      .slice(beforeKey + 1, keyEnd)
-      .trim()
-      .toLowerCase();
-    let value = hasValue ? actions.slice(afterKey + 1, end).trim() : "";
-    if (value.length >= 2 && value[0] === "'" && value.endsWith("'")) value = value.slice(1, -1);
+    const key = goTrimSpace(actions.slice(beforeKey + 1, keyEnd)).toLowerCase();
+    const value = hasValue ? stripQuotes(goTrimSpace(actions.slice(afterKey + 1, end))) : "";
     out.push({ key, value });
   };
   // From 1, as Coraza does: a leading character can never close a key.
@@ -255,6 +264,29 @@ function splitRule(data: string): { vars: string; operator: string; actions: str
   if (rest.length === 0) return { vars, operator: stripQuotes(cut.quoted), actions: "" };
   if (rest.length < 2 || rest[0] !== '"' || !rest.endsWith('"')) return null;
   return { vars, operator: stripQuotes(cut.quoted), actions: stripQuotes(rest) };
+}
+
+/**
+ * A SecRule, SecAction or SecDefaultAction cut as evaluateLine and parseActionOperator cut it:
+ * the operator (SecRule only, `\"` unescaped) and the raw action list. Null for any other
+ * directive, or one Coraza cannot parse.
+ */
+export function splitRuleDirective(
+  text: string,
+): { operator: string | null; actions: string } | null {
+  const space = text.indexOf(" ");
+  if (space === -1) return null;
+  const directive = text.slice(0, space).toLowerCase();
+  let opts = text.slice(space + 1);
+  if (opts.length >= 3 && opts[0] === '"' && opts.endsWith('"')) {
+    opts = opts.replace(/^"+|"+$/g, "");
+  }
+  if (directive === "secaction" || directive === "secdefaultaction") {
+    return { operator: null, actions: stripQuotes(opts) };
+  }
+  if (directive !== "secrule") return null;
+  const rule = splitRule(opts);
+  return rule && { operator: rule.operator.replace(/\\"/g, '"'), actions: rule.actions };
 }
 
 /**

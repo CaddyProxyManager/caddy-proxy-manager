@@ -5,7 +5,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import type {
@@ -46,6 +46,27 @@ CREATE TABLE IF NOT EXISTS parse_state (
 );
 `;
 
+/**
+ * The umask usually leaves the store world-readable, and it holds each controller's secret in
+ * plaintext. Group bits stay for operators who back the volume up through a group. The
+ * controller's twin is apps/controller/src/lib/db/sqlite-hygiene.ts; @cpm/shared reaches browsers.
+ */
+export function restrictFileModes(path: string): void {
+  if (path === ":memory:") return;
+  for (const file of [path, `${path}-journal`, `${path}-wal`, `${path}-shm`]) {
+    try {
+      if (!existsSync(file)) continue;
+      const mode = statSync(file).mode & 0o7777;
+      if (mode & 0o007) chmodSync(file, mode & ~0o007);
+    } catch (error) {
+      console.warn(
+        `Could not restrict permissions on ${file}:`,
+        (error as NodeJS.ErrnoException).code ?? error,
+      );
+    }
+  }
+}
+
 const AGENT_ID_KEY = "agent_id";
 const CONTROLLER_URL_KEY = "controller_url";
 const L4_STATUS_KEY = "l4_ports_status";
@@ -66,7 +87,10 @@ export class AgentStore {
     this.db = new Database(path, { create: true });
     // WAL so a long-running rebuild writing progress cannot block a status read.
     this.db.exec("PRAGMA journal_mode = WAL");
+    // Pairing secrets are stored as-is; a replaced one must not linger in a free page.
+    this.db.exec("PRAGMA secure_delete = ON");
     this.db.exec(SCHEMA);
+    restrictFileModes(path);
   }
 
   close(): void {

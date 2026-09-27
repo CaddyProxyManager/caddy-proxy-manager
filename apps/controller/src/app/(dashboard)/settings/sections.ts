@@ -332,6 +332,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "forward-auth",
             name: "Forward Auth Defaults",
             desc: "Defaults for hosts authenticating through an external auth server",
+            envSearch: ["FORWARD_AUTH_ALLOWED_PORTS"],
           },
         ],
       },

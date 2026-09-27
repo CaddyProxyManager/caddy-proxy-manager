@@ -83,8 +83,14 @@ export async function getCaCertificatePrivateKey(id: number): Promise<string | n
     where: (table, { eq }) => eq(table.id, id),
   });
   if (!cert?.privateKeyPem) return null;
-  // Plain text until the startup pass has sealed it; decryptSecret passes that through.
-  return decryptSecret(cert.privateKeyPem, `CA certificate ${id} private key`);
+  try {
+    // Plain text until the startup pass has sealed it; decryptSecret passes that through.
+    return decryptSecret(cert.privateKeyPem, `CA certificate ${id} private key`);
+  } catch (error) {
+    // The raw error names key derivations; the admin needs to know what to do instead.
+    console.error("Failed to decrypt the private key of CA certificate %d:", id, error);
+    throw domainError("caCertificatePrivateKeyUnavailable", {}, { status: 409 });
+  }
 }
 
 export async function getCaCertificate(id: number): Promise<CaCertificate | null> {

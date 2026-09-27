@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
-import { getUserById } from "@/src/lib/models/user";
+import { getPasswordSignInUsername, getUserById, getUserPasswordHash } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { verifyPassword } from "@/src/lib/password";
@@ -50,8 +50,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: tApi("userNotFound") }, { status: 404 });
     }
 
-    if (!user.passwordHash) {
+    // The login page must still work: a username plus the password on the credential account.
+    const passwordHash = await getUserPasswordHash(user);
+    if (!passwordHash) {
       return NextResponse.json({ error: t("unlinkPasswordRequired") }, { status: 400 });
+    }
+    if (!(await getPasswordSignInUsername(userId))) {
+      return NextResponse.json({ error: t("unlinkSignInUnavailable") }, { status: 400 });
     }
 
     const oauthAccounts = await db
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (!currentPassword) {
       return NextResponse.json({ error: t("currentPasswordRequired") }, { status: 400 });
     }
-    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    if (!(await verifyPassword(currentPassword, passwordHash))) {
       await registerFailedAttempt(rateLimitKey);
       return NextResponse.json({ error: t("currentPasswordIncorrect") }, { status: 401 });
     }

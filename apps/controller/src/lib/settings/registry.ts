@@ -454,6 +454,33 @@ export const loginBlockMs = numberSetting({
   max: 24 * 60 * 60 * 1000,
 });
 
+export const forwardAuthAllowedPorts = stringSetting({
+  name: "forward_auth_allowed_ports",
+  env: "FORWARD_AUTH_ALLOWED_PORTS",
+  group: "authentication",
+  label: "Forward-auth ports",
+  description:
+    "Non-default ports that CPM forward-auth sites are served on, comma-separated. Caddy matches " +
+    "a host whatever the port, so a sign-in on a port that is neither listed here nor the " +
+    "default for http or https is refused.",
+  default: "",
+  pattern: /^\d{1,5}(?:\s*,\s*\d{1,5})*$/,
+  patternHint: "must be a comma-separated list of port numbers",
+  maxLength: 512,
+});
+
+/** Upgraded installs have this stored as true by migration: their upstreams keyed on the number. */
+export const forwardAuthSequentialUserIds = booleanSetting({
+  name: "forward_auth_sequential_user_ids",
+  env: "FORWARD_AUTH_SEQUENTIAL_USER_IDS",
+  group: "authentication",
+  label: "Numeric forward-auth user IDs",
+  description:
+    "Send X-CPM-User-Id as the sequential account number instead of a UUID. Sequential ids reveal " +
+    "how many accounts exist. Changing this changes the id every upstream sees for every user.",
+  default: false,
+});
+
 // ── Email ────────────────────────────────────────────────────────────────────
 
 /** Unset keeps meaning "on once a server is named", so SMTP_HOST alone is enough. */
@@ -720,6 +747,8 @@ export const SETTING_DEFINITIONS = [
   loginMaxAttempts,
   loginWindowMs,
   loginBlockMs,
+  forwardAuthAllowedPorts,
+  forwardAuthSequentialUserIds,
   smtpEnabled,
   smtpHost,
   smtpPort,

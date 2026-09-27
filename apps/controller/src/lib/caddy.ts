@@ -16,8 +16,11 @@ import {
   parseUpstreamTarget,
   toDurationMs,
   canonicalHeaderName,
+  buildAuthResponseCopyRoutes,
+  buildIdentityHeaderStripHandler,
   upstreamHeaderPlaceholder,
   stripCaddyPlaceholders,
+  escapeHostPlaceholders,
   isReservedL4ListenAddress,
 } from "./caddy-utils";
 import {
@@ -118,6 +121,7 @@ import {
   type CrsPluginRules,
   WEBSOCKET_ATTEMPT_MATCHERS,
   resolveEffectiveWaf,
+  wafDirectiveSource,
 } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import { buildRedirectRoute } from "./caddy-redirects";
@@ -135,7 +139,12 @@ import {
 import { buildHttpCacheApp } from "./http-cache";
 import { buildHostCacheHandler, type HostCacheMeta, withHostCache } from "./host-cache";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
-import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
+import {
+  FORWARD_AUTH_PORTAL_TARGET_HEADER,
+  FORWARD_AUTH_PROXY_HOST_ID_HEADER,
+  FORWARD_AUTH_PROXY_PROOF_HEADER,
+  getForwardAuthProxyProof,
+} from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
 import {
   CaddyApplyError,
@@ -1088,8 +1097,10 @@ export function buildErrorPageRoute(rule: ErrorPageRule, hosts?: string[]): Cadd
       {
         handler: "static_response",
         status_code: "{http.error.status_code}",
-        body: rule.body,
-        headers: { "Content-Type": [rule.contentType || "text/html; charset=utf-8"] },
+        body: escapeHostPlaceholders(rule.body),
+        headers: {
+          "Content-Type": [escapeHostPlaceholders(rule.contentType || "text/html; charset=utf-8")],
+        },
       },
     ],
     terminal: true,
@@ -1606,7 +1617,18 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       // WebSocket upgrades included: routing them around the WAF let any request claiming to be
       // one skip inspection (#195). coraza-caddy >= 2.6 passes the 101 hijack through.
-      handlers.unshift(buildWafHandler(effectiveWaf, context.wafPresets, context.crsPlugins));
+      handlers.unshift(
+        buildWafHandler(
+          effectiveWaf,
+          context.wafPresets,
+          context.crsPlugins,
+          wafDirectiveSource(
+            context.globalWaf ?? null,
+            meta.waf,
+            `proxy host "${row.name}" (${domains.join(", ")})`,
+          ),
+        ),
+      );
     }
 
     // Ahead of the WAF, so a refused upgrade never costs a Coraza transaction.
@@ -1675,7 +1697,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           status_code: block.status,
         };
         if (block.body) {
-          handle.body = block.body;
+          handle.body = escapeHostPlaceholders(block.body);
         }
         const matcher: Record<string, unknown> = { path: [safePath] };
         if (allowPatterns.length > 0) {
@@ -1947,42 +1969,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     }
 
     if (authentik) {
-      const handleResponseRoutes: Record<string, unknown>[] = [
-        {
-          handle: [{ handler: "vars" }],
-        },
-      ];
-
-      // Add header copying for each configured header. The name is canonicalised because the
-      // placeholder that reads the value back is matched literally against Go's canonical
-      // header key - see upstreamHeaderPlaceholder.
-      for (const rawHeaderName of authentik.copyHeaders) {
-        const headerName = canonicalHeaderName(rawHeaderName);
-        const placeholder = upstreamHeaderPlaceholder(headerName);
-        handleResponseRoutes.push({
-          handle: [
-            {
-              handler: "headers",
-              request: {
-                set: {
-                  [headerName]: [placeholder],
-                },
-              },
-            } as Record<string, unknown>,
-          ],
-          match: [
-            {
-              not: [
-                {
-                  vars: {
-                    [placeholder]: [""],
-                  },
-                },
-              ],
-            },
-          ],
-        });
-      }
+      const handleResponseRoutes = buildAuthResponseCopyRoutes(authentik.copyHeaders);
 
       const trustedProxies = expandPrivateRanges(authentik.trustedProxies);
 
@@ -2023,12 +2010,14 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
 
       const authMode = resolvePathAuthMode(authentik.protectedPaths, authentik.excludedPaths);
+      // On every route: unprotected ones never ask the outpost, and the copy only sets non-empty values.
+      const authentikStripHandler = buildIdentityHeaderStripHandler(authentik.copyHeaders);
 
       appendForwardAuthPathModeRoutes({
         hostRoutes,
         domainGroups,
         authMode,
-        baseHandlers: handlers,
+        baseHandlers: authentikStripHandler ? [authentikStripHandler, ...handlers] : handlers,
         authHandler: forwardAuthHandler,
         reverseProxyHandler: hostProxyHandler,
         locationRules,
@@ -2043,16 +2032,10 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       // An auth server this app does not run (Authelia, tinyauth, ...). The strip handler goes on
       // the shared chain so excluded and whitelisted paths cannot pass a caller-set Remote-User
       // through - the copy step only overwrites when the auth server answered with a value.
-      const forwardAuthHandlers =
-        forwardAuth.copyHeaders.length > 0
-          ? [
-              {
-                handler: "headers",
-                request: { delete: [...forwardAuth.copyHeaders] },
-              } as Record<string, unknown>,
-              ...handlers,
-            ]
-          : handlers;
+      const forwardAuthStripHandler = buildIdentityHeaderStripHandler(forwardAuth.copyHeaders);
+      const forwardAuthHandlers = forwardAuthStripHandler
+        ? [forwardAuthStripHandler, ...handlers]
+        : handlers;
 
       appendForwardAuthPathModeRoutes({
         hostRoutes,
@@ -2083,35 +2066,35 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
         // Security: strip client-supplied CPM identity headers on EVERY route - unauthenticated
         // ones have nothing else to remove them, and the copy only overwrites non-empty values.
-        const cpmStripHeadersHandler: Record<string, unknown> = {
-          handler: "headers",
-          request: {
-            delete: [...CPM_COPY_HEADERS],
-          },
-        };
-        const cpmHandlers = [cpmStripHeadersHandler, ...handlers];
+        const cpmStripHeadersHandler = buildIdentityHeaderStripHandler(CPM_COPY_HEADERS);
+        const cpmHandlers = cpmStripHeadersHandler
+          ? [cpmStripHeadersHandler, ...handlers]
+          : handlers;
+        const cpmHandleResponseRoutes = buildAuthResponseCopyRoutes(CPM_COPY_HEADERS);
 
-        const cpmHandleResponseRoutes: Record<string, unknown>[] = [
-          { handle: [{ handler: "vars" }] },
-        ];
-        for (const headerName of CPM_COPY_HEADERS) {
-          const placeholder = upstreamHeaderPlaceholder(headerName);
-          cpmHandleResponseRoutes.push({
+        // Verify hands back the target already encoded for a query value, so "&", "#", "+" and "%"
+        // in it survive; without one, Caddy escapes the whole URI itself.
+        const portalTargetPlaceholder = upstreamHeaderPlaceholder(
+          FORWARD_AUTH_PORTAL_TARGET_HEADER,
+        );
+        const portalRedirect = (location: string): Record<string, unknown> => ({
+          handler: "static_response",
+          status_code: 302,
+          headers: { Location: [location] },
+        });
+        const cpmPortalRedirectRoutes: Record<string, unknown>[] = [
+          {
+            match: [{ not: [{ vars: { [portalTargetPlaceholder]: [""] } }] }],
+            handle: [portalRedirect(`${portalBaseUrl}/portal?rd=${portalTargetPlaceholder}`)],
+          },
+          {
             handle: [
-              {
-                handler: "headers",
-                request: {
-                  set: { [headerName]: [placeholder] },
-                },
-              } as Record<string, unknown>,
+              portalRedirect(
+                `${portalBaseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri_escaped}`,
+              ),
             ],
-            match: [
-              {
-                not: [{ vars: { [placeholder]: [""] } }],
-              },
-            ],
-          });
-        }
+          },
+        ];
 
         const cpmForwardAuthHandler: Record<string, unknown> = {
           handler: "reverse_proxy",
@@ -2128,6 +2111,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
                 "X-Forwarded-Host": ["{http.request.hostport}"],
                 "X-Forwarded-Proto": ["{http.request.scheme}"],
                 [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
+                [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: [String(row.id)],
               },
             },
           },
@@ -2138,21 +2122,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             },
             {
               match: { status_code: [401, 403] },
-              routes: [
-                {
-                  handle: [
-                    {
-                      handler: "static_response",
-                      status_code: 302,
-                      headers: {
-                        Location: [
-                          `${portalBaseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`,
-                        ],
-                      },
-                    },
-                  ],
-                },
-              ],
+              routes: cpmPortalRedirectRoutes,
             },
           ],
           trusted_proxies: [
@@ -2181,6 +2151,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
                     "X-Forwarded-Host": ["{http.request.hostport}"],
                     "X-Forwarded-Proto": ["{http.request.scheme}"],
                     [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
+                    [FORWARD_AUTH_PROXY_HOST_ID_HEADER]: [String(row.id)],
                   },
                 },
               },
@@ -2497,7 +2468,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     ] as const) {
       if (domains.length === 0) continue;
 
-      const groups = groupMtlsDomainsByCaSet(domains, mTlsDomainMap);
+      const groups = groupMtlsDomainsByCaSet(domains, mTlsDomainMap, mTlsDomainLeafOverride);
       for (const domainGroup of groups.values()) {
         for (const priorityGroup of groupHostPatternsByPriority(domainGroup)) {
           const mTlsAuth = buildAuth(priorityGroup, mode);
@@ -3875,7 +3846,7 @@ function parseAuthentikConfig(
     Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0
       ? meta.copy_headers
           .map((header) => header?.trim())
-          .filter((header): header is string => Boolean(header))
+          .filter((header): header is string => Boolean(header) && HEADER_NAME_PATTERN.test(header))
       : DEFAULT_AUTHENTIK_HEADERS;
 
   const trustedProxies =
@@ -4001,21 +3972,7 @@ function buildGenericForwardAuthHandler(
   cfg: ForwardAuthRouteConfig,
   api401: boolean,
 ): Record<string, unknown> {
-  // Canonical casing is required, not cosmetic: Caddy resolves the placeholder by literal lookup
-  // in Go's canonicalised header map - see upstreamHeaderPlaceholder.
-  const handleResponseRoutes: Record<string, unknown>[] = [{ handle: [{ handler: "vars" }] }];
-  for (const headerName of cfg.copyHeaders) {
-    const placeholder = upstreamHeaderPlaceholder(headerName);
-    handleResponseRoutes.push({
-      handle: [
-        {
-          handler: "headers",
-          request: { set: { [headerName]: [placeholder] } },
-        } as Record<string, unknown>,
-      ],
-      match: [{ not: [{ vars: { [placeholder]: [""] } }] }],
-    });
-  }
+  const handleResponseRoutes = buildAuthResponseCopyRoutes(cfg.copyHeaders);
 
   const handleResponse: Record<string, unknown>[] = [
     { match: { status_code: [2] }, routes: handleResponseRoutes },

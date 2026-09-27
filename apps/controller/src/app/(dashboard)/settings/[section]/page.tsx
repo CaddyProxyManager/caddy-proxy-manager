@@ -44,6 +44,7 @@ import { getPublicBaseUrl } from "@/src/lib/public-url";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { registryFields } from "../registry-fields";
+import { forwardAuthSequentialUserIds } from "@/src/lib/settings/registry";
 import { captchaSettingsView, getCaptchaSettings } from "@/src/lib/captcha/settings";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
@@ -280,6 +281,9 @@ export default async function SettingsSectionPage({
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,
       }}
       registry={registry}
+      sequentialUserIdsField={registry["forward-auth"]?.find(
+        (field) => field.key === forwardAuthSequentialUserIds.key,
+      )}
       analytics={analytics}
       geoip={geoip}
       email={email}

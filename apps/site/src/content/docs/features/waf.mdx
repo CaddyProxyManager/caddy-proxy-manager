@@ -142,13 +142,23 @@ Presets and custom directives accept the same SecLang: `SecRule`, `SecAction`, `
 trailing backslash:
 
 ```text
-SecRule REQUEST_URI "@beginsWith /api/" \
+SecRule REQUEST_FILENAME "@rx \A/api/(?:[^.]|\.[^.])*\.?\z" \
     "id:9001,phase:1,pass,nolog,ctl:ruleRemoveById=942100"
 ```
 
+Match a path on `REQUEST_FILENAME`, the decoded path, and refuse `..` in it: the raw
+`REQUEST_URI` of `/api/../admin` starts with `/api/`, and an upstream that resolves dot-segments
+serves `/admin`. The quick templates do both.
+
 Anything that would switch the engine off or rewrite rules - `SecRuleEngine`, `ctl:ruleEngine`,
 `SecRuleRemoveById` and the other `SecRule*` mutations, or `Include` - is refused when you save,
-with the offending lines named. To stop a rule from firing, suppress it instead.
+with the offending lines named, and so are `setenv` and the operators that read the container's
+files or run a program (`@inspectFile`, `@pmFromFile`, `@ipMatchFromFile`, `@validateSchema`). The
+exception is a data file of the embedded CRS, such as `@pmFromFile @owasp_crs/unix-shell.data`,
+while the CRS is loaded. To stop a rule from firing, suppress it instead.
+
+A stored line that a newer release refuses does not block saving anything else, but it is left
+out of the config, and the WAF page lists it until you rewrite or remove it.
 
 ## Before anything is saved
 

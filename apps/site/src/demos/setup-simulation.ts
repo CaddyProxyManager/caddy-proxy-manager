@@ -551,6 +551,20 @@ export const SETTING_FIELDS: Array<{
     value: 900_000,
   },
   {
+    key: "config:forward_auth_allowed_ports",
+    env: "FORWARD_AUTH_ALLOWED_PORTS",
+    group: "authentication",
+    kind: "string",
+    value: "",
+  },
+  {
+    key: "config:forward_auth_sequential_user_ids",
+    env: "FORWARD_AUTH_SEQUENTIAL_USER_IDS",
+    group: "authentication",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:smtp_enabled",
     env: "SMTP_ENABLED",
     group: "email",
