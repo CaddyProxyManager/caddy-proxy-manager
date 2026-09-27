@@ -8,6 +8,7 @@ import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { emailReady } from "@/src/lib/email/config";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -44,6 +45,7 @@ export default async function UsersPage() {
       users={safeUsers}
       groups={groups}
       localUsersEnabled={!(await localUsersDisabled())}
+      emailEnabled={await emailReady()}
     />
   );
 }

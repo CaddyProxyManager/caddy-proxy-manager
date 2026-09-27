@@ -36,6 +36,7 @@ import { autoPairingDisabled } from "@/src/lib/agent/bootstrap";
 import { getFavicon } from "@/src/lib/branding";
 import { getUpdateStatus } from "@/src/lib/updates";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
+import { emailSettingsView } from "@/src/lib/email/view";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import { config } from "@/src/lib/config";
@@ -129,6 +130,7 @@ export default async function SettingsSectionPage({
     agentOptions,
     autoPairingOff,
     publicBaseUrl,
+    email,
   ] = await Promise.all([
     withStagedReads(overlay, () =>
       Promise.all([
@@ -171,6 +173,8 @@ export default async function SettingsSectionPage({
     autoPairingDisabled().catch(() => false),
     // Outside the staged scope: the callback URLs shown must be the ones sign-in uses right now.
     getPublicBaseUrl(),
+    // Never staged either: its actions write straight through.
+    emailSettingsView(),
   ]);
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
 
@@ -278,6 +282,7 @@ export default async function SettingsSectionPage({
       registry={registry}
       analytics={analytics}
       geoip={geoip}
+      email={email}
       // Container management needs an agent to run compose; the settings still save without one.
       canManageServices={agentStatuses.some((result) => result.ok)}
       baseUrl={publicBaseUrl}

@@ -369,7 +369,11 @@
       "userDeleted": "Deleted user {id}",
       "userProfileUpdated": "Updated user {id} profile",
       "userRoleChanged": "Changed user {id} role to {role}",
-      "userStatusChanged": "Changed user {id} status to {status}"
+      "userStatusChanged": "Changed user {id} status to {status}",
+      "passwordLinkSent": "Emailed a password link to user {email}",
+      "passwordReset": "User reset their password from an emailed link",
+      "passwordResetRequested": "User asked for a password reset link",
+      "passwordSetFromInvite": "User set a password from an invitation"
     }
   },
   "auth": {
@@ -442,7 +446,8 @@
         "capVerifiedAria": "Verified. You can continue.",
         "capErrorAria": "Verification failed. Try again.",
         "capWasmDisabled": "Enable WebAssembly for much faster verification"
-      }
+      },
+      "forgotPassword": "Forgot your password?"
     },
     "missingDestinationDescription": "No redirect destination specified.",
     "missingProviderDescription": "Single sign-on is the only way to sign in, but no provider is configured.",
@@ -495,6 +500,33 @@
       "unknown": "Sign-in did not complete. Try again.",
       "usernameTooLong": "Username is too long",
       "usernameTooShort": "Username is too short"
+    },
+    "passwordReset": {
+      "requestMetaTitle": "Reset your password",
+      "requestSubtitle": "Enter your username or email address and we will send you a link to choose a new password.",
+      "identifier": "Username or email",
+      "identifierHelp": "The link goes to the email address on the account.",
+      "requestSubmit": "Send reset link",
+      "requestSentTitle": "Check your email",
+      "requestSent": "If an account matches, a link to reset its password is on its way. It works once, within an hour.",
+      "requestFailed": "The request could not be sent. Try again in a moment.",
+      "tooMany": "Too many requests. Wait a while and try again.",
+      "backToSignIn": "Back to sign in",
+      "metaTitle": "Choose a new password",
+      "heading": "Choose a new password",
+      "subtitle": "Other devices signed in to this account are signed out once it is saved.",
+      "inviteHeading": "Set your password",
+      "inviteSubtitle": "Choose the password you will sign in with.",
+      "checking": "Checking your link…",
+      "invalidTitle": "This link no longer works",
+      "invalidBody": "It has expired, has already been used, or a newer one has been sent since.",
+      "requestAnother": "Send a new link",
+      "doneTitle": "Password saved",
+      "doneBody": "Sign in with your new password.",
+      "signIn": "Sign in",
+      "submit": "Save new password",
+      "inviteSubmit": "Set password",
+      "failed": "The password could not be saved. Try again."
     }
   },
   "caCertificates": {
@@ -1092,7 +1124,12 @@
     "httpCacheFastlyApiKeyRequired": "Fastly purging needs an API token.",
     "httpCacheFastlyServiceIdRequired": "Fastly purging needs the service ID.",
     "httpCacheStorageNeedsEndpoint": "{storage} storage needs at least one server address.",
-    "agentNotReported": "Connected, but has not reported yet."
+    "agentNotReported": "Connected, but has not reported yet.",
+    "emailNotConfigured": "Email is not set up. Name an SMTP server and a sender address under Settings → Email first.",
+    "emailSendFailed": "The mail server did not accept the message: {detail}",
+    "emailSendFailedUnknown": "The email could not be sent.",
+    "passwordLinkInvalid": "This link has expired or has already been used.",
+    "passwordLinkSsoAccount": "This account signs in through single sign-on, so it has no password to set."
   },
   "groups": {
     "viewAsGroup": "View as an operator in this group",
@@ -2277,7 +2314,8 @@
       "analytics": "Analytics",
       "application": "Application",
       "authentication": "Sign-in and accounts",
-      "geoip": "GeoIP"
+      "geoip": "GeoIP",
+      "email": "Email"
     },
     "groupsClaim": "Groups claim",
     "groupsClaimHelp": "Claim holding the user's groups. Use dots for nested claims, e.g. resource_access.cpm.roles. Remember to request a matching scope above.",
@@ -2470,6 +2508,42 @@
       "update_image_repository": {
         "description": "Where this deployment's images come from, without the image name - the update check reads its tags. Point it at your own namespace if you run a fork, or it will report releases you cannot pull.",
         "label": "Image repository"
+      },
+      "smtp_enabled": {
+        "description": "Password reset links, invitations and certificate alerts go out through the SMTP server below. If left unset, email is on whenever a server is named.",
+        "label": "Send email"
+      },
+      "smtp_host": {
+        "description": "The host name or address of the mail server to relay through.",
+        "label": "SMTP server"
+      },
+      "smtp_port": {
+        "description": "Usually 587 for STARTTLS, 465 for implicit TLS and 25 for an unencrypted relay.",
+        "label": "SMTP port"
+      },
+      "smtp_security": {
+        "description": "starttls upgrades the connection and refuses a server that cannot; tls encrypts from the first byte; none sends in the clear, for a relay on a trusted network only.",
+        "label": "SMTP encryption"
+      },
+      "smtp_username": {
+        "description": "Leave empty for a relay that accepts mail without signing in.",
+        "label": "SMTP username"
+      },
+      "smtp_password": {
+        "description": "Sent only after the connection is encrypted, unless encryption is set to none.",
+        "label": "SMTP password"
+      },
+      "smtp_from": {
+        "description": "The From address on every message, shown under the application name. Many servers refuse one the account is not allowed to send as.",
+        "label": "Sender address"
+      },
+      "email_alert_recipients": {
+        "description": "Comma-separated addresses that certificate alerts go to. If left empty they go to every active administrator.",
+        "label": "Alert recipients"
+      },
+      "certificate_expiry_alert_days": {
+        "description": "Email the alert recipients once a certificate has fewer days than this left. Caddy renews on its own well before then, so an alert means renewal is failing. 0 turns alerts off.",
+        "label": "Certificate alert threshold (days)"
       }
     },
     "releaseUpdates": "Release updates",
@@ -2714,6 +2788,10 @@
       "observability": {
         "name": "Observability",
         "desc": "Analytics collection, the metrics endpoint and the access log"
+      },
+      "email": {
+        "name": "Email",
+        "desc": "The SMTP server resets, invitations and alerts are sent through"
       }
     },
     "blocks": {
@@ -2840,6 +2918,14 @@
       "captcha": {
         "name": "CAPTCHA",
         "desc": "A challenge to solve before the password is asked for"
+      },
+      "email": {
+        "name": "SMTP Server",
+        "desc": "The server this instance sends mail through, and the address it sends as"
+      },
+      "certificateAlerts": {
+        "name": "Certificate Alerts",
+        "desc": "Who is told when a certificate is about to expire"
       }
     },
     "dnsProviders": {
@@ -3415,6 +3501,50 @@
       "capInstanceUrlHelp": "Where your Cap Standalone server is reached by browsers and by this server, without the site key.",
       "oidcOnlyTitle": "Not shown in OIDC-only mode",
       "oidcOnlyBody": "There is no username step while local accounts are disabled, so the CAPTCHA only applies once they are enabled again."
+    },
+    "email": {
+      "saved": "Email settings saved.",
+      "saveFailed": "Failed to save the email settings.",
+      "incompleteTitle": "Email is on, but nothing can be sent yet",
+      "incompleteBody": "Name an SMTP server and a sender address, then save.",
+      "enabled": "Send email",
+      "enabledHelp": "Password reset links, user invitations and certificate alerts go out through this server. Off, the sign-in page offers no password reset.",
+      "host": "SMTP server",
+      "hostHelp": "The host name or address of the mail server to relay through.",
+      "security": "Encryption",
+      "securityHelp": "Choose what the server supports. Changing it also changes the port, unless you set a custom one.",
+      "securityModes": {
+        "starttls": "STARTTLS (usually port 587)",
+        "tls": "Implicit TLS (usually port 465)",
+        "none": "None - trusted networks only (usually port 25)"
+      },
+      "port": "Port",
+      "username": "Username",
+      "usernameHelp": "Leave empty for a relay that accepts mail without signing in.",
+      "password": "Password",
+      "passwordHelp": "Stored encrypted, and never shown again once saved.",
+      "passwordStored": "A password is stored. Leave this empty to keep it.",
+      "from": "Sender address",
+      "fromHelp": "The From address on every message, shown under the application name. Many servers refuse one the account is not allowed to send as.",
+      "testRecipient": "Send a test message to",
+      "testRecipientPlaceholder": "Your own address",
+      "testHelp": "Uses the saved settings. Leave empty to send it to yourself.",
+      "testNeedsSave": "Save a server and a sender address first; the test uses the saved settings.",
+      "testSend": "Send test email",
+      "testSending": "Sending…",
+      "testSent": "Test message sent to {email}.",
+      "testFailed": "The test message could not be sent.",
+      "testInvalidRecipient": "Enter a valid email address to send the test to.",
+      "alertDays": "Alert threshold (days)",
+      "alertDaysHelp": "Email once a certificate has fewer days than this left. Caddy renews managed certificates well before then, so an alert about one means its renewal is failing. 0 turns alerts off.",
+      "alertRecipients": "Recipients",
+      "alertRecipientsHelp": "Comma-separated addresses. If left empty, alerts go to every active administrator with a deliverable address.",
+      "alertRecipientsPlaceholder": "Every active administrator",
+      "alertsNeedEmailTitle": "Alerts wait for email",
+      "alertsNeedEmailBody": "Nothing is sent until the SMTP server above is set up.",
+      "alertsLastChecked": "Certificates last checked {when}",
+      "alertsNeverChecked": "Certificates have not been checked yet. The first check runs a few minutes after the controller starts, then twice a day.",
+      "alertsFailed": "The last check failed: {error}"
     }
   },
   "setup": {
@@ -3835,7 +3965,16 @@
     "signInLocal": "Username and password",
     "signInMethod": "Sign-in method",
     "statusFilterLabel": "Filter users by status",
-    "subject": "Provider subject"
+    "subject": "Provider subject",
+    "setupMethod": "Password",
+    "setupMethodPassword": "Set one now",
+    "setupMethodInvite": "Email an invitation",
+    "inviteHelp": "They are emailed a link to choose their own password. It works once, within 7 days.",
+    "inviteSent": "Invitation sent to {email}.",
+    "resetLinkSent": "Password reset link sent to {email}.",
+    "inviteNotSent": "The user was created, but the invitation was not sent: {error} Send it again from their details.",
+    "sendResetLink": "Email a reset link",
+    "sendInvite": "Send invitation"
   },
   "waf": {
     "addRuleById": "Add Rule by ID",
@@ -4089,5 +4228,36 @@
     "groupPages": "Pages",
     "groupSettings": "Settings",
     "searchButton": "Search…"
+  },
+  "email": {
+    "footer": "Sent by {appName} at {url}",
+    "test": {
+      "subject": "{appName}: test message",
+      "body": "This message confirms that {appName} can send email through {host}."
+    },
+    "passwordReset": {
+      "subject": "Reset your {appName} password",
+      "intro": "Someone asked to reset the password for {email} on {appName}.",
+      "action": "Choose a new password",
+      "expiry": "The link works once, within {minutes} minutes.",
+      "ignore": "If it was not you, ignore this message. Your password has not changed."
+    },
+    "invite": {
+      "subject": "You have been invited to {appName}",
+      "intro": "{inviter} created an account for {email} on {appName}.",
+      "signIn": "Your username is {username}. Choose a password to sign in with.",
+      "action": "Set your password",
+      "expiry": "The link works once, within {days} days. Ask for a new invitation if it runs out."
+    },
+    "certificateAlert": {
+      "subject": "{count, plural, one {A certificate needs} other {# certificates need}} attention on {appName}",
+      "intro": "These certificates expire within {days, plural, one {# day} other {# days}}, or already have:",
+      "expiring": "{name} ({where}) expires on {date}, in {days, plural, =0 {less than a day} one {# day} other {# days}}",
+      "expired": "{name} ({where}) expired on {date}",
+      "sourceImported": "imported",
+      "sourceAgent": "managed on {agent}",
+      "action": "Open certificates",
+      "once": "Each certificate is reported once as it nears expiry and once more if it expires."
+    }
   }
 }

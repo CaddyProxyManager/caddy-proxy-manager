@@ -67,7 +67,9 @@ A DNS provider is a compiled-in Caddy module. If the one you want is greyed out,
 ## Manual imports
 
 Bring your own certificate and key. Expiry is tracked, and the page counts down to the next import
-to lapse, so one that is about to expire is visible rather than a surprise.
+to lapse, so one that is about to expire is visible rather than a surprise. With
+[email](../email/#certificate-alerts) set up, the administrators are also told by mail - about an
+imported certificate nearing expiry, and about a managed one Caddy has failed to renew.
 
 ## The built-in CA
 

@@ -104,10 +104,16 @@ export async function geoipView(t: Parameters<typeof storedErrorMessage>[0]): Pr
  * ClickHouse password in `.env` opens setup with analytics on, not off while running.
  */
 export async function gateDefaults(): Promise<Record<string, boolean>> {
-  const [analytics, geoip] = await Promise.all([isAnalyticsEnabled(), geoipEnabled()]);
+  const { readSmtpConfig } = await import("../email/config");
+  const [analytics, geoip, email] = await Promise.all([
+    isAnalyticsEnabled(),
+    geoipEnabled(),
+    readSmtpConfig(),
+  ]);
   return {
     [registry.analyticsEnabled.key]: analytics,
     [registry.geoipEnabled.key]: geoip,
+    [registry.smtpEnabled.key]: email.status !== "off",
   };
 }
 

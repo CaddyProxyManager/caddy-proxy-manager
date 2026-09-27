@@ -43,6 +43,7 @@ import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import {
   createUserAction,
   updateUserRoleAction,
@@ -50,6 +51,7 @@ import {
   updateUserInfoAction,
   deleteUserAction,
   resetUserTwoFactorAction,
+  sendPasswordLinkAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
 
@@ -93,6 +95,8 @@ type Props = {
   groups?: GroupSummary[];
   /** False in OIDC-only mode: accounts come from the IdP, not from this page. */
   localUsersEnabled?: boolean;
+  /** Email is set up, so accounts can be invited and sent password links. */
+  emailEnabled?: boolean;
 };
 
 type StatusFilter = "all" | "active" | "disabled";
@@ -122,7 +126,12 @@ function isExternal(user: UserEntry) {
   return !!user.provider && user.provider !== "local" && user.provider !== "credentials";
 }
 
-export default function UsersClient({ users, groups = [], localUsersEnabled = true }: Props) {
+export default function UsersClient({
+  users,
+  groups = [],
+  localUsersEnabled = true,
+  emailEnabled = false,
+}: Props) {
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const t = useTranslations("users");
   const router = useRouter();
@@ -283,6 +292,7 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
               key={selected.id}
               user={selected}
               groups={groups}
+              canSendPasswordLink={localUsersEnabled && emailEnabled}
               onDone={refresh}
             />
           ) : (
@@ -298,6 +308,7 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
       {localUsersEnabled && (
         <CreateUserDialog
           open={createOpen}
+          emailEnabled={emailEnabled}
           onClose={() => setCreateOpen(false)}
           onError={setError}
           onCreated={(email) => {
@@ -317,10 +328,12 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
 function UserDetail({
   user,
   groups,
+  canSendPasswordLink,
   onDone,
 }: {
   user: UserEntry;
   groups: GroupSummary[];
+  canSendPasswordLink: boolean;
   /** null after a successful change, the message after a failed one. */
   onDone: (message: string | null) => void;
 }) {
@@ -328,6 +341,7 @@ function UserDetail({
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | "reset2fa" | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
   const name = userLabel(user);
 
   return (
@@ -425,13 +439,40 @@ function UserDetail({
               )}
             </MetadataListItem>
             <MetadataListItem label={t("passwordChanged")}>
-              {!user.hasPassword ? (
-                t("passwordNone")
-              ) : user.passwordChangedAt ? (
-                <Timestamp value={user.passwordChangedAt} style="dateTimeShort" />
-              ) : (
-                t("passwordChangedUnknown")
-              )}
+              <HStack gap={2} vAlign="center" wrap="wrap">
+                <Text type="body" size="sm">
+                  {!user.hasPassword ? (
+                    t("passwordNone")
+                  ) : user.passwordChangedAt ? (
+                    <Timestamp value={user.passwordChangedAt} style="dateTimeShort" />
+                  ) : (
+                    t("passwordChangedUnknown")
+                  )}
+                </Text>
+                {/* SSO accounts never had a password to reset, and should not be handed one. */}
+                {canSendPasswordLink && !isExternal(user) && !user.isDemoAdmin && !isDisabled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    label={user.hasPassword ? t("sendResetLink") : t("sendInvite")}
+                    isLoading={sendingLink}
+                    isDisabled={sendingLink}
+                    onClick={async () => {
+                      setSendingLink(true);
+                      try {
+                        const result = await sendPasswordLinkAction(user.id);
+                        if (result.status === "error") {
+                          onDone(result.message ?? null);
+                        } else if (result.message) {
+                          toast.success(result.message);
+                        }
+                      } finally {
+                        setSendingLink(false);
+                      }
+                    }}
+                  />
+                )}
+              </HStack>
             </MetadataListItem>
             {user.hasPassword && (
               <MetadataListItem label={t("twoFactor")}>
@@ -595,13 +636,17 @@ function GroupsCard({
   );
 }
 
+type SetupMethod = "password" | "invite";
+
 function CreateUserDialog({
   open,
+  emailEnabled,
   onClose,
   onError,
   onCreated,
 }: {
   open: boolean;
+  emailEnabled: boolean;
   onClose: () => void;
   onError: (message: string | null) => void;
   onCreated: (email: string) => void;
@@ -612,8 +657,10 @@ function CreateUserDialog({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [method, setMethod] = useState<SetupMethod>("password");
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const invite = emailEnabled && method === "invite";
 
   useEffect(() => {
     if (!open) {
@@ -621,6 +668,7 @@ function CreateUserDialog({
       setEmail("");
       setName("");
       setPassword("");
+      setMethod("password");
       setDialogError(null);
     }
   }, [open]);
@@ -641,6 +689,10 @@ function CreateUserDialog({
         id="create-user-form"
         action={async (formData) => {
           formData.set("role", role);
+          if (invite) {
+            formData.set("invite", "on");
+            formData.delete("password");
+          }
           setSubmitting(true);
           try {
             const result = await createUserAction(formData);
@@ -650,6 +702,9 @@ function CreateUserDialog({
             }
             onError(null);
             onCreated(email);
+            // A message on success: the account exists, but its invitation did not go out.
+            if (result.message) toast.warning(result.message);
+            else if (invite) toast.success(t("inviteSent", { email }));
           } finally {
             setSubmitting(false);
           }
@@ -687,16 +742,33 @@ function CreateUserDialog({
             value={role}
             onChange={(v) => setRole(v as Role)}
           />
-          <GeneratedPasswordField
-            data-testid="create-password"
-            label={t("password")}
-            htmlName="password"
-            value={password}
-            onChange={setPassword}
-            placeholder={t("passwordPlaceholder")}
-            isRequired
-            minLength={8}
-          />
+          {emailEnabled && (
+            <SegmentedControl
+              label={t("setupMethod")}
+              layout="fill"
+              value={method}
+              onChange={(v) => setMethod(v as SetupMethod)}
+            >
+              <SegmentedControlItem value="password" label={t("setupMethodPassword")} />
+              <SegmentedControlItem value="invite" label={t("setupMethodInvite")} />
+            </SegmentedControl>
+          )}
+          {invite ? (
+            <Text type="body" size="sm" color="secondary">
+              {t("inviteHelp")}
+            </Text>
+          ) : (
+            <GeneratedPasswordField
+              data-testid="create-password"
+              label={t("password")}
+              htmlName="password"
+              value={password}
+              onChange={setPassword}
+              placeholder={t("passwordPlaceholder")}
+              isRequired
+              minLength={8}
+            />
+          )}
         </VStack>
       </form>
     </AppDialog>

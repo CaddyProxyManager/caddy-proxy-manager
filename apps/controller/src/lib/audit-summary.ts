@@ -430,6 +430,32 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     message: "passwordSet",
     pattern: /^User set a password$/,
   },
+
+  // services/password-links.ts
+  {
+    entityType: "user",
+    action: "password_set",
+    message: "passwordSetFromInvite",
+    pattern: /^User set a password from an invitation$/,
+  },
+  {
+    entityType: "user",
+    action: "password_reset",
+    message: "passwordReset",
+    pattern: /^User reset their password from an emailed link$/,
+  },
+  {
+    entityType: "user",
+    action: "password_reset_requested",
+    message: "passwordResetRequested",
+    pattern: /^User asked for a password reset link$/,
+  },
+  {
+    entityType: "user",
+    action: "password_link_sent",
+    message: "passwordLinkSent",
+    pattern: /^Emailed a password link to user (?<email>.+)$/s,
+  },
   {
     entityType: "user",
     action: "password_removed",

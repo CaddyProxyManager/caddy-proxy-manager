@@ -26,7 +26,7 @@ import {
   startSimulation,
 } from "../setup-simulation";
 
-const SETTING_GROUPS = ["application", "authentication", "analytics", "geoip"] as const;
+const SETTING_GROUPS = ["application", "authentication", "email", "analytics", "geoip"] as const;
 
 /**
  * First-run setup on the real screens, each given what its page would load. Everything server-side
