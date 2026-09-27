@@ -61,4 +61,6 @@ cannot disagree about what a write does.
 ## Health
 
 `/api/health` is public and unauthenticated - it is what the container health check probes. It also
-answers the [dashboard host](../dashboard-host/) reachability probe when asked with a nonce.
+answers the [dashboard host](../dashboard-host/) reachability probe when asked with a nonce. Its
+`boot` field is a random id that changes each time the process starts, which is how setup tells a
+restart that finished between two checks from one that never happened.

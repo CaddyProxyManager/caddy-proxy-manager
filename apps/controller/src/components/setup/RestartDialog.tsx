@@ -2,8 +2,8 @@
 
 /**
  * Migration and setup both leave a process running on answers resolved at boot (settings, OAuth
- * providers, the env backfill), and only a restart applies the new Caddy config. The wait is down
- * first, then up, or the exiting process would satisfy it. No supervisor is valid: it says so.
+ * providers, the env backfill), and only a restart applies the new Caddy config. The wait is in
+ * restart-wait.ts. No supervisor is valid: it says so.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -18,6 +18,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { loadPage } from "@/src/lib/browser-navigation";
+import { type Health, waitForRestart } from "@/src/lib/restart-wait";
 
 const POLL_INTERVAL_MS = 1000;
 const SHUTDOWN_BUDGET_MS = 20_000;
@@ -58,12 +59,14 @@ type Detail =
   | { code: "stillRunning" }
   | { code: "notBack" };
 
-async function isUp(): Promise<boolean> {
+async function health(): Promise<Health> {
   try {
     const response = await fetch("/api/health", { cache: "no-store" });
-    return response.ok;
+    if (!response.ok) return { up: false, boot: null };
+    const body = (await response.json().catch(() => null)) as { boot?: unknown } | null;
+    return { up: true, boot: typeof body?.boot === "string" ? body.boot : null };
   } catch {
-    return false;
+    return { up: false, boot: null };
   }
 }
 
@@ -118,6 +121,8 @@ export default function RestartDialog({
     let cancelled = false;
 
     void (async () => {
+      // Read before asking, so a restart finished between two polls is still recognised.
+      const before = (await health()).boot;
       const deadline = Date.now() + COOLDOWN_BUDGET_MS;
       // Loops only for a cooldown; every other answer leaves it on the first pass.
       for (;;) {
@@ -153,51 +158,38 @@ export default function RestartDialog({
         break;
       }
 
-      // Down first, or the process on its way out would pass the poll.
-      const shutdownBy = Date.now() + SHUTDOWN_BUDGET_MS;
-      while (!cancelled && Date.now() < shutdownBy) {
-        if (!(await isUp())) break;
-        await sleep(POLL_INTERVAL_MS);
-      }
-      if (cancelled) return;
-
-      if (await isUp()) {
-        setDetail({ code: "stillRunning" });
+      const outcome = await waitForRestart(before, {
+        health,
+        sleep,
+        now: Date.now,
+        pollMs: POLL_INTERVAL_MS,
+        shutdownBudgetMs: SHUTDOWN_BUDGET_MS,
+        startupBudgetMs: STARTUP_BUDGET_MS,
+        cancelled: () => cancelled,
+        onDown: () => setPhase("starting"),
+      });
+      if (outcome === null || cancelled) return;
+      if (outcome !== "restarted") {
+        setDetail({ code: outcome });
         setPhase("stalled");
         return;
       }
 
-      setPhase("starting");
-
-      const startupBy = Date.now() + STARTUP_BUDGET_MS;
-      while (!cancelled && Date.now() < startupBy) {
-        if (await isUp()) {
-          if (cancelled) return;
-          setPhase("ready");
-
-          // Caddy is configured as the app starts, so the route can lag it by a moment.
-          if (preferredOrigin) {
-            const dashboardBy = Date.now() + DASHBOARD_BUDGET_MS;
-            while (!cancelled && Date.now() < dashboardBy) {
-              if (await dashboardAnswers()) {
-                if (cancelled) return;
-                goOn(preferredOrigin);
-                return;
-              }
-              await sleep(POLL_INTERVAL_MS);
-            }
+      setPhase("ready");
+      // Caddy is configured as the app starts, so the route can lag it by a moment.
+      if (preferredOrigin) {
+        const dashboardBy = Date.now() + DASHBOARD_BUDGET_MS;
+        while (!cancelled && Date.now() < dashboardBy) {
+          if (await dashboardAnswers()) {
             if (cancelled) return;
+            goOn(preferredOrigin);
+            return;
           }
-
-          goOn();
-          return;
+          await sleep(POLL_INTERVAL_MS);
         }
-        await sleep(POLL_INTERVAL_MS);
+        if (cancelled) return;
       }
-      if (cancelled) return;
-
-      setDetail({ code: "notBack" });
-      setPhase("stalled");
+      goOn();
     })();
 
     return () => {

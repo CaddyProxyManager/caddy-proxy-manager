@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BOOT_ID } from "@/src/lib/boot-id";
 import { MAX_NONCE_LENGTH, PROBE_PARAM, signProbe } from "@/src/lib/reachability-probe";
 
 /**
@@ -11,8 +12,12 @@ export async function GET(request: Request) {
 
   // Bounded before it is signed, so this cannot be used to sign arbitrary content.
   if (nonce && nonce.length <= MAX_NONCE_LENGTH) {
-    return NextResponse.json({ status: "ok", probe: signProbe(nonce) }, { status: 200 });
+    return NextResponse.json(
+      { status: "ok", boot: BOOT_ID, probe: signProbe(nonce) },
+      { status: 200 },
+    );
   }
 
-  return NextResponse.json({ status: "ok" }, { status: 200 });
+  // `boot` lets a restart that happened between two polls still be seen (restart-wait.ts).
+  return NextResponse.json({ status: "ok", boot: BOOT_ID }, { status: 200 });
 }
