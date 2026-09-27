@@ -739,6 +739,8 @@ test.describe('Settings - Updates', () => {
 test.describe('Settings - cross-section navigation', () => {
   test('rapid section switching renders correct content each time', async ({ page }) => {
     await page.goto('/settings/general');
+    // A click before hydration races the router; CI lost the Observability heading to it.
+    await waitForHydration(page);
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
@@ -758,6 +760,7 @@ test.describe('Settings - cross-section navigation', () => {
 
   test('Cmd-K to navigate, then sidebar to navigate back', async ({ page }) => {
     await page.goto('/settings/general');
+    await waitForHydration(page);
 
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
