@@ -197,6 +197,196 @@ describe('forward-auth login', () => {
   });
 });
 
+describe('forward-auth login limits and uniform rejection', () => {
+  let hostId = 0;
+
+  /** A user who may reach the host, keyed by a name no other test uses. */
+  async function addUser(
+    username: string,
+    overrides: Partial<typeof schema.users.$inferInsert> = {},
+  ) {
+    const timestamp = now();
+    const [user] = await ctx.db
+      .insert(schema.users)
+      .values({
+        email: `${username}@localhost`,
+        name: username,
+        role: 'user',
+        provider: 'credentials',
+        subject: username,
+        status: 'active',
+        passwordHash: await hashPassword(PASSWORD),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        ...overrides,
+      })
+      .returning();
+    await ctx.db.insert(schema.forwardAuthAccess).values({
+      proxyHostId: hostId,
+      userId: user.id,
+      groupId: null,
+      createdAt: timestamp,
+    });
+    return user;
+  }
+
+  function post(body: unknown, headers: Record<string, string> = {}, raw?: BodyInit) {
+    return login(
+      new NextRequest('http://localhost:3000/api/forward-auth/login', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost:3000',
+          'content-type': 'application/json',
+          'x-forwarded-for': `203.0.113.${++ipCounter % 250}`,
+          ...headers,
+        },
+        body: raw ?? JSON.stringify(body),
+        // Node's fetch refuses a stream body without it.
+        ...(raw ? { duplex: 'half' } : {}),
+      } as ConstructorParameters<typeof NextRequest>[1]),
+    );
+  }
+
+  async function signIn(username: string, password: string, ip?: string) {
+    const rid = await createRedirectIntent(TARGET);
+    return post({ username, password, rid }, ip ? { 'x-forwarded-for': ip } : {});
+  }
+
+  beforeEach(async () => {
+    ({
+      host: { id: hostId },
+    } = await setup());
+  });
+
+  it('rejects unknown users and wrong passwords the same way', async () => {
+    await addUser('bob');
+    const unknown = await signIn('nobody', PASSWORD);
+    const wrong = await signIn('bob', 'wrong');
+    expect(unknown.status).toBe(401);
+    expect(wrong.status).toBe(401);
+    expect(await unknown.json()).toEqual(await wrong.json());
+    expect((await signIn('bob', PASSWORD)).status).toBe(200);
+  });
+
+  it('runs exactly one password verify for unknown, inactive and password-less users', async () => {
+    await addUser('dave', { status: 'disabled' });
+    await addUser('erin', { passwordHash: null, provider: 'oidc' });
+    const verifySpy = vi.spyOn(Bun.password, 'verify');
+    try {
+      for (const username of ['nobody', 'dave', 'erin']) {
+        verifySpy.mockClear();
+        expect((await signIn(username, PASSWORD)).status).toBe(401);
+        expect(verifySpy).toHaveBeenCalledTimes(1);
+        // The algorithm real accounts use, so the rejection takes as long.
+        expect(String(verifySpy.mock.calls[0][1])).toStartWith('$argon2id$');
+      }
+    } finally {
+      verifySpy.mockRestore();
+    }
+  });
+
+  it('refuses usernames over 256 characters before any credential work', async () => {
+    const verifySpy = vi.spyOn(Bun.password, 'verify');
+    try {
+      const res = await signIn('a'.repeat(257), PASSWORD);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Username is too long' });
+      expect(verifySpy).not.toHaveBeenCalled();
+    } finally {
+      verifySpy.mockRestore();
+    }
+    // 256 characters is still an ordinary, failed login.
+    expect((await signIn('a'.repeat(256), 'nope')).status).toBe(401);
+  });
+
+  it('refuses oversized bodies whether or not Content-Length is declared', async () => {
+    await addUser('frank');
+    const rid = await createRedirectIntent(TARGET);
+    const oversized = {
+      username: 'frank',
+      password: PASSWORD,
+      rid,
+      padding: 'x'.repeat(20 * 1024),
+    };
+
+    const declared = await post(oversized, { 'content-length': String(20 * 1024 + 80) });
+    expect(declared.status).toBe(413);
+
+    const text = new TextEncoder().encode(JSON.stringify(oversized));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < text.length; i += 4096) controller.enqueue(text.slice(i, i + 4096));
+        controller.close();
+      },
+    });
+    expect((await post(undefined, {}, stream)).status).toBe(413);
+
+    expect((await post('not json', {}, 'not json')).status).toBe(400);
+
+    // The intent was not spent, and a normal-sized body still works.
+    expect((await post({ username: 'frank', password: PASSWORD, rid })).status).toBe(200);
+  });
+
+  it('limits one client per account even after it signs in to its own account', async () => {
+    await addUser('heidi');
+    await addUser('mallory');
+    const ip = '192.0.2.10';
+    for (let i = 0; i < 4; i++) {
+      expect((await signIn('heidi', `wrong-${i}`, ip)).status).toBe(401);
+    }
+    // Signing in clears the client's own counter...
+    expect((await signIn('mallory', PASSWORD, ip)).status).toBe(200);
+    // ...but not its failures against heidi: the fifth one blocks that pair.
+    expect((await signIn('heidi', 'wrong-4', ip)).status).toBe(401);
+    expect((await signIn('heidi', PASSWORD, ip)).status).toBe(429);
+
+    // The client can still use its own account, and heidi can sign in elsewhere.
+    expect((await signIn('mallory', PASSWORD, ip)).status).toBe(200);
+    expect((await signIn('heidi', PASSWORD, '198.51.100.201')).status).toBe(200);
+  });
+
+  it('counts concurrent attempts from one client against its limit', async () => {
+    await addUser('kate');
+    const ip = '192.0.2.20';
+    const rids = await Promise.all(Array.from({ length: 12 }, () => createRedirectIntent(TARGET)));
+    const responses = await Promise.all(
+      rids.map((rid, i) =>
+        post({ username: 'kate', password: `wrong-${i}`, rid }, { 'x-forwarded-for': ip }),
+      ),
+    );
+    const statuses = responses.map((res) => res.status);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(5);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(7);
+    expect((await signIn('kate', PASSWORD, ip)).status).toBe(429);
+  });
+
+  it('gives a burst from many clients no more guesses at an account than sequential ones', async () => {
+    await addUser('leo');
+    const rid = await createRedirectIntent(TARGET);
+    const responses = await Promise.all(
+      Array.from({ length: 15 }, (_, i) =>
+        post(
+          { username: 'leo', password: `wrong-${i}`, rid },
+          { 'x-forwarded-for': `10.3.0.${i}` },
+        ),
+      ),
+    );
+    const failures = responses.filter((res) => res.status === 401).length;
+    // Five free failures, then one more before the first delay: what a sequential run gets.
+    expect(failures).toBeGreaterThanOrEqual(5);
+    expect(failures).toBeLessThanOrEqual(6);
+    expect(responses.every((res) => res.status === 401 || res.status === 429)).toBe(true);
+  });
+
+  it('keeps the audit summary short whatever the username', async () => {
+    const { logAuditEvent } = await import('../../src/lib/audit');
+    vi.mocked(logAuditEvent).mockClear();
+    expect((await signIn('z'.repeat(200), 'nope')).status).toBe(401);
+    const [[event]] = vi.mocked(logAuditEvent).mock.calls as unknown as [[{ summary: string }]];
+    expect(event.summary).toEndWith(`: ${'z'.repeat(64)}`);
+  });
+});
+
 describe('forward-auth verify identity headers', () => {
   it('encodes names the Headers constructor would reject, and commas inside group names', async () => {
     const { user, host } = await setup();

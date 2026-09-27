@@ -95,6 +95,35 @@ export function resetAttempts(key: string): void {
   ATTEMPTS.delete(key);
 }
 
+/** Attempts still being checked, per key; an entry lives only while its requests are in flight. */
+const RESERVED = new Map<string, number>();
+
+function holdSlot(map: Map<string, number>, key: string): () => void {
+  map.set(key, (map.get(key) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const remaining = (map.get(key) ?? 1) - 1;
+    if (remaining > 0) map.set(key, remaining);
+    else map.delete(key);
+  };
+}
+
+/**
+ * Holds a place for an attempt whose outcome is not known yet, so a concurrent burst cannot all
+ * pass the check before any of it is counted. Null when blocked or already full. Release it once
+ * the attempt ends, and register a failure separately.
+ */
+export async function reserveAttempt(key: string): Promise<(() => void) | null> {
+  const { maxAttempts, windowMs } = await limits();
+  const now = Date.now();
+  const entry = getEntry(key, now, windowMs);
+  if (entry?.blockedUntil && entry.blockedUntil > now) return null;
+  if ((entry?.attempts ?? 0) + (RESERVED.get(key) ?? 0) >= maxAttempts) return null;
+  return holdSlot(RESERVED, key);
+}
+
 // ─── Per account ─────────────────────────────────────────────────────────────
 
 type AccountEntry = { failures: number; lockedUntil: number; lastFailureAt: number };
@@ -151,6 +180,20 @@ export function registerAccountFailure(account: string, now = Date.now()): numbe
 
 export function resetAccountFailures(account: string): void {
   ACCOUNTS.delete(account);
+}
+
+const ACCOUNTS_RESERVED = new Map<string, number>();
+
+/**
+ * The account's side of `reserveAttempt`: in flight at once, no more than its free failures left,
+ * and one at a time once past them, so a burst from many addresses waits out each delay.
+ */
+export function reserveAccountAttempt(account: string, now = Date.now()): (() => void) | null {
+  if (accountRetryAfterMs(account, now) > 0) return null;
+  const failures = ACCOUNTS.get(account)?.failures ?? 0;
+  const inFlight = Math.max(1, ACCOUNT_FREE_FAILURES - failures);
+  if ((ACCOUNTS_RESERVED.get(account) ?? 0) >= inFlight) return null;
+  return holdSlot(ACCOUNTS_RESERVED, account);
 }
 
 // ─── Fixed windows ───────────────────────────────────────────────────────────

@@ -1,12 +1,14 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { randomBytes } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { verifyPassword } from "@/src/lib/password";
+import { hashPassword, verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { getClientIp } from "@/src/lib/client-ip";
 import { isPublicOrigin } from "@/src/lib/public-url";
 import { hasLiveRedirectIntent, redirectIntentWantsCaptcha } from "@/src/lib/models/forward-auth";
 import { completePortalLogin } from "@/src/lib/forward-auth-portal-login";
+import { beginPortalLoginAttempt } from "@/src/lib/forward-auth-login-limiter";
 import { issuePortalChallenge } from "@/src/lib/portal-two-factor";
 import {
   CAPTCHA_PASS_CLEAR_COOKIE,
@@ -15,15 +17,42 @@ import {
 } from "@/src/lib/captcha/pass";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { logAuditEvent } from "@/src/lib/audit";
-import {
-  accountKey,
-  accountRetryAfterMs,
-  isRateLimited,
-  registerAccountFailure,
-  registerFailedAttempt,
-  resetAccountFailures,
-  resetAttempts,
-} from "@/src/lib/rate-limit";
+import { accountKey, accountRetryAfterMs, isRateLimited } from "@/src/lib/rate-limit";
+
+// The form posts a username, a password and a rid; anything larger is not a login.
+const MAX_BODY_BYTES = 16 * 1024;
+const MAX_USERNAME_LENGTH = 256;
+const AUDITED_USERNAME_LENGTH = 64;
+
+/**
+ * Verified against when there is no usable account, so that answer takes as long as a wrong
+ * password. Hashed once, of a discarded random string, at the cost real accounts use.
+ */
+let dummyPasswordHash: Promise<string> | null = null;
+function getDummyPasswordHash(): Promise<string> {
+  dummyPasswordHash ??= hashPassword(randomBytes(32).toString("base64url"));
+  return dummyPasswordHash;
+}
+
+/** The body as text, or null past MAX_BODY_BYTES; counted as it streams, not trusted from a header. */
+async function readBodyText(request: NextRequest): Promise<string | null> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
@@ -38,13 +67,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("passwordSignInDisabled") }, { status: 403 });
     }
 
-    const body = await request.json();
+    const text = await readBodyText(request);
+    if (text === null) {
+      return NextResponse.json({ error: t("requestTooLarge") }, { status: 413 });
+    }
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(text);
+      body =
+        typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return NextResponse.json({ error: t("invalidRequestBody") }, { status: 400 });
+    }
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
     const rid = typeof body.rid === "string" ? body.rid : "";
 
     if (!username || !password) {
       return NextResponse.json({ error: t("credentialsRequired") }, { status: 400 });
+    }
+    if (username.length > MAX_USERNAME_LENGTH) {
+      return NextResponse.json({ error: t("usernameTooLong") }, { status: 400 });
     }
     if (!rid) {
       return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
@@ -78,45 +121,48 @@ export async function POST(request: NextRequest) {
       ? { "Set-Cookie": CAPTCHA_PASS_CLEAR_COOKIE }
       : {};
 
-    const email = `${username}@localhost`;
-    const user = await db.query.users.findFirst({
-      where: (table, operators) => operators.eq(table.email, email),
-    });
+    const attempt = await beginPortalLoginAttempt(username, ip);
+    if (!attempt) {
+      return NextResponse.json(
+        { error: t("tooManyLoginAttempts") },
+        { status: 429, headers: spentHeaders },
+      );
+    }
 
-    if (user?.status !== "active" || !user.passwordHash) {
-      await registerFailedAttempt(ip);
-      registerAccountFailure(account);
+    let user: Awaited<ReturnType<typeof db.query.users.findFirst>>;
+    let isValid: boolean;
+    try {
+      const email = `${username}@localhost`;
+      user = await db.query.users.findFirst({
+        where: (table, operators) => operators.eq(table.email, email),
+      });
+      const passwordHash = user?.status === "active" ? user.passwordHash : null;
+      // One verify either way, so a missing, inactive or passwordless account answers as slowly.
+      const matches = await verifyPassword(
+        password,
+        passwordHash || (await getDummyPasswordHash()),
+      );
+      isValid = Boolean(passwordHash) && matches;
+    } catch (error) {
+      attempt.release();
+      throw error;
+    }
+
+    if (!user || !isValid) {
+      await attempt.fail();
       await logAuditEvent({
-        userId: null,
+        userId: user?.id ?? null,
         action: "forward_auth_login_failed",
         entityType: "user",
-        summary: `Forward auth login failed for username: ${username}`,
+        ...(user ? { entityId: user.id } : {}),
+        summary: `Forward auth login failed for username: ${username.slice(0, AUDITED_USERNAME_LENGTH)}`,
       });
       return NextResponse.json(
         { error: t("invalidCredentials") },
         { status: 401, headers: spentHeaders },
       );
     }
-
-    const isValid = await verifyPassword(password, user.passwordHash);
-    if (!isValid) {
-      await registerFailedAttempt(ip);
-      registerAccountFailure(account);
-      await logAuditEvent({
-        userId: user.id,
-        action: "forward_auth_login_failed",
-        entityType: "user",
-        entityId: user.id,
-        summary: `Forward auth login failed for user ${user.email}`,
-      });
-      return NextResponse.json(
-        { error: t("invalidCredentials") },
-        { status: 401, headers: spentHeaders },
-      );
-    }
-
-    resetAttempts(ip);
-    resetAccountFailures(account);
+    attempt.succeed();
 
     // Half a sign-in with 2FA on: the intent stays unspent until the code checks out.
     if (user.twoFactorEnabled) {
