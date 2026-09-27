@@ -69,7 +69,6 @@ describe('captcha pass', () => {
     expect(redeemCaptchaPass(pass, 'alice', now)).toBe(true);
     expect(redeemCaptchaPass(pass, 'alice', now)).toBe(false);
     expect(isValidCaptchaPass(pass, 'alice', now)).toBe(false);
-    // A fresh solve is a fresh pass.
     expect(redeemCaptchaPass(issueCaptchaPass('alice', now), 'alice', now)).toBe(true);
   });
 

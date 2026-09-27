@@ -1,17 +1,14 @@
 #!/usr/bin/env bun
 /**
- * Enforces the suite's coverage ratchet against the lcov report `bun test --coverage` writes.
- * Bun's `coverageThreshold` is per file and the reporter averages per-file percentages; lcov
+ * Bun's `coverageThreshold` is per file and its reporter averages per-file percentages; lcov
  * carries raw hit/found counts, so these numbers are weighted by size.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * A ratchet, not an aspiration: these sit just under what the suite achieves today. Raise them as
- * coverage improves; never lower them to make a build pass. Rebaselined for `bun test`, which
- * reports only the files a test loaded and has no statement or branch metric. They assume the
- * serial `bun run test:coverage`; under `--parallel` both numerator and denominator move.
+ * Just under today's numbers: raise as coverage improves, never lower to pass a build. They assume
+ * the serial `bun run test:coverage`; under `--parallel` both sides of the ratio move.
  */
 const THRESHOLDS = {
   lines: 76,

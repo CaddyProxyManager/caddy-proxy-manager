@@ -1,15 +1,7 @@
 /**
- * POST /api/agent/v1/pair/preview - who a pairing code would pair with, without spending it.
- *
- * `cpm-agent --pair` asks this first and shows the answer, so the operator confirms the controller
- * by name before the code is used. Without it, an address with a typo that happens to reach some
- * other controller is only discovered after the pairing has happened there.
- *
- * Unauthenticated for the same reason the pair route is, and held to the same rules: the code must
- * be right - a controller's name is not handed to anyone who asks - and a wrong one counts against
- * the caller's throttle and the code's own budget exactly as a wrong pairing attempt does.
- * Bootstrap tokens are not previewed: they pair the agent in the controller's own stack, with no
- * operator at a terminal to ask.
+ * POST /api/agent/v1/pair/preview: lets `cpm-agent --pair` confirm the controller by name before
+ * spending the code, so a typo'd address cannot pair elsewhere. Same rules as the pair route: a
+ * wrong code costs the throttle and the code's budget. Bootstrap tokens have no one to ask.
  */
 
 import type { AgentPairPreviewRequest, AgentPairPreviewResponse } from "@cpm/shared";
@@ -25,7 +17,7 @@ import { getClientIp } from "@/src/lib/client-ip";
 import { isDemoMode } from "@/src/lib/demo-mode";
 import { controllerDisplayName } from "@/src/lib/agent/controller-name";
 
-/** A preview body is two short fields; anything larger is not one. */
+/** Two short fields; anything larger is not a preview. */
 const MAX_BODY_BYTES = 4 * 1024;
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -60,9 +52,7 @@ export async function POST(request: Request) {
     recordFailedGuess(client);
     return bad(checked.error, 401);
   }
-  // Only after the code is right: refused before it, a wrong-code caller could tell an agent id
-  // that is disabled here from one that is not. The pair route refuses earlier, because there the
-  // point is not to spend a code on an agent that cannot come back - a preview spends nothing.
+  // After the code check, or a wrong-code caller could probe which agent ids are disabled.
   if (existing && !existing.enabled) return bad("This agent is disabled on the controller.", 403);
 
   const [controllerName, controllerId] = await Promise.all([

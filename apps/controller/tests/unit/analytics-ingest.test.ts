@@ -1,9 +1,6 @@
 /**
- * Checking the rows an agent relays before they reach ClickHouse.
- *
- * An agent is less trusted than the controller, so a row is rebuilt field by field from what
- * passes. A bad row is dropped and counted rather than failing the batch, because a refused batch
- * is resent every pass and would stall that agent's analytics for good.
+ * Agents are less trusted, so relayed rows are rebuilt field by field. A bad row is dropped and
+ * counted, not fatal: a refused batch is resent every pass and would stall analytics for good.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

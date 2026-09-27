@@ -15,12 +15,8 @@ import { waitForHydration } from '../helpers/hydration';
 const SETTINGS_ORIGIN = 'http://localhost:3000';
 
 /**
- * Opens the settings command palette by keyboard.
- *
- * The shortcut binds to `window` in a useEffect, and the control waited for below is
- * server-rendered - so it can be visible a moment before the handler exists, and a single press
- * lands on nothing. Retrying the press is the only way to wait for a listener with no DOM of its
- * own; waiting harder before the first one just moves the race.
+ * Retries the press: the shortcut binds in a useEffect, so the server-rendered control can be
+ * visible before the listener exists, and a listener has no DOM to wait on.
  */
 async function openPaletteWithKeyboard(page: Page) {
   await expect(page.locator(SETTINGS_SIDEBAR).getByText('Search…', { exact: true })).toBeVisible();
@@ -30,7 +26,6 @@ async function openPaletteWithKeyboard(page: Page) {
   }).toPass({ timeout: 15_000 });
 }
 
-/** Navigate to a specific settings section via the sidebar. */
 const goToSection = goToSetting;
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
@@ -52,8 +47,7 @@ test.describe('Settings - page load & layout', () => {
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     await expect(sidebar).toBeVisible();
     for (const group of ['System', 'Networking', 'Security', 'Observability']) {
-      // By the group's own element: `Observability` names a group and a page inside it, and a
-      // plain text match in the rail finds both.
+      // By role: `Observability` names a group and a page inside it, and text matches both.
       await expect(sidebar.getByRole('group', { name: group })).toBeVisible();
     }
   });
@@ -61,8 +55,7 @@ test.describe('Settings - page load & layout', () => {
   test('sidebar shows settings navigation items', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
-    // The rail lists pages. What used to be a page of its own - ACME Server, DNS Resolvers -
-    // is a block on one of these, reachable from the list beside the page rather than the rail.
+    // Pages only - blocks such as ACME Server and DNS Resolvers are not in the rail.
     const expectedItems = [
       'General',
       'Responses',
@@ -94,7 +87,6 @@ test.describe('Settings - page load & layout', () => {
 test.describe('Settings - sidebar navigation', () => {
   test('clicking a nav item switches the detail pane', async ({ page }) => {
     await page.goto('/settings/general');
-    // Default: General
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
     await page
@@ -110,10 +102,8 @@ test.describe('Settings - sidebar navigation', () => {
     await page.goto('/settings/general');
     const breadcrumb = page.getByTestId('settings-breadcrumb');
 
-    // General is under System
     await expect(breadcrumb.getByText('System')).toBeVisible();
 
-    // Navigate to DNS under Networking
     await page.locator(SETTINGS_SIDEBAR).getByRole('link', { name: 'DNS', exact: true }).click();
     await expect(breadcrumb.getByText('Networking')).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
@@ -143,8 +133,7 @@ test.describe('Settings - sidebar navigation', () => {
   test('a page shows its own blocks and no others', async ({ page }) => {
     await page.goto('/settings/general');
 
-    // ACME Server is a block on General, so it is on this page - and Trusted Proxies, which is a
-    // block on Network, must not be in the document at all.
+    // ACME Server is a block on General; Trusted Proxies (on Network) must not be in the document.
     await expect(
       page.getByRole('heading', { level: 1, name: 'General', exact: true }),
     ).toBeVisible();
@@ -154,7 +143,6 @@ test.describe('Settings - sidebar navigation', () => {
     await expect(
       page.getByRole('heading', { level: 2, name: 'Trusted Proxies', exact: true }),
     ).not.toBeVisible();
-    // Nothing is unsaved, so the page offers nothing to save.
     await expect(pageSave(page)).toHaveCount(0);
 
     await page
@@ -203,11 +191,9 @@ test.describe('Settings - Cmd-K palette', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
-    // "geob" is specific enough that cmdk's fuzzy matching cannot reach an unrelated item. It
-    // matches the page by the name of a block on it, which is one of the page's keywords.
+    // Specific enough that cmdk's fuzzy match reaches nothing unrelated; it matches a block name.
     await input.fill('geob');
     await expect(dialog.getByText('Geo-blocking', { exact: true })).toBeVisible();
-    // Non-matching items should be hidden
     await expect(dialog.getByText('Observability', { exact: true })).not.toBeVisible();
   });
 
@@ -218,9 +204,7 @@ test.describe('Settings - Cmd-K palette', () => {
     const input = dialog.getByPlaceholder(/search/i);
     await input.fill('logging');
     await dialog.getByText('Observability', { exact: true }).click();
-    // Palette should close
     await expect(dialog).not.toBeVisible();
-    // Access Logging is a block on the page the palette found by that keyword.
     await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
   });
 
@@ -244,7 +228,7 @@ test.describe('Settings - Cmd-K palette', () => {
 // ─── General section ─────────────────────────────────────────────────────────
 
 test.describe('Settings - General', () => {
-  // FormRow uses <div> labels (not <Label htmlFor>), so we target inputs by name attribute
+  // FormRow uses <div> labels, not <Label htmlFor>, so inputs are found by name.
   test('shows primary domain and ACME email fields', async ({ page }) => {
     await goToSection(page, 'General');
     await expect(page.locator('input[name="defaultDomain"]')).toBeVisible();
@@ -266,24 +250,17 @@ test.describe('Settings - General', () => {
     await savePage(page);
     await expectStaged(page, 10_000);
 
-    // Reload and navigate back
     await goToSection(page, 'General');
     await expect(page.locator('input[name="defaultDomain"]')).toHaveValue('persist-test.local');
 
-    // Reset
     await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
     await savePage(page);
     await expectStaged(page, 10_000);
   });
 
   test('a changed text field still reads as changed after the save', async ({ page }) => {
-    // The text-field half of the form-reset question the toggle test covers, and the answer is that
-    // text is already safe: React re-asserts a controlled input's value on every commit, so the
-    // reset that strands a checkbox is written straight back here. Pinned rather than assumed -
-    // it is the reason ui/FormBooleanControls repairs only the boolean controls, and a change that
-    // made TextInput manage its own value the way the base Switch does would silently break it.
-    // Deliberately no reload before the assertion: the test above reloads, which repopulates from
-    // the database and would hide exactly this.
+    // Pins why ui/FormBooleanControls repairs only booleans: React re-asserts a controlled text
+    // input after the post-action form reset. No reload - repopulating from the database hides it.
     await goToSection(page, 'General');
     const domain = page.locator('input[name="defaultDomain"]');
     const save = pageSave(page);
@@ -294,7 +271,6 @@ test.describe('Settings - General', () => {
     await expectStaged(page, 15_000);
     await expect(domain).toHaveValue('reset-check.local');
 
-    // Put the stored value back, so this leaves the shared stack as it found it.
     await domain.fill(original);
     await save.click();
     await expectStaged(page, 15_000);
@@ -335,9 +311,7 @@ test.describe('Settings - Default Response', () => {
     await behavior.click();
     await page.getByRole('option', { name: 'Custom HTTP response' }).click();
     await page.locator('input[name="status"]').fill('451');
-    // Unique to this run. The page only offers to save what has changed, and a value an earlier
-    // run staged and never applied is still what the form loads with - so a fixed string can be
-    // what is already there, leaving nothing to save.
+    // Unique per run: an earlier run's staged value may already be loaded, leaving nothing to save.
     const body = `Unavailable for legal reasons ${Date.now()}`;
     await page.locator('textarea[name="body"]').fill(body);
     await page
@@ -370,18 +344,11 @@ test.describe('Settings - Default Response', () => {
 
 test.describe('Settings - ACME Server', () => {
   const API_SETTINGS_ACME = 'http://localhost:3000/api/v1/settings/acme';
-  /**
-   * A directory URL of this run's own.
-   *
-   * The reset below puts the applied setting back, but a staged change outlives it: the form
-   * loads what is staged, so a fixed URL can already be in the field and there is then nothing
-   * for the page to offer to save.
-   */
+  /** Unique per run: a staged change outlives the reset, so a fixed URL may leave nothing new. */
   const directoryUrl = () => `https://ca.internal.example.com/acme/${Date.now()}/directory`;
 
   test.afterEach(async ({ page }) => {
-    // Reset to the Let's Encrypt default so other runs start clean. The Origin header is required:
-    // mutating v1 API calls are same-origin checked and 403 without it, which made this a no-op.
+    // Without Origin this 403s and the reset silently does nothing.
     const res = await page.request.put(API_SETTINGS_ACME, {
       headers: { Origin: SETTINGS_ORIGIN },
       data: { caUrl: '', caRootPem: '' },
@@ -421,7 +388,7 @@ test.describe('Settings - ACME Server', () => {
     await saveSetting(page, page.locator('input[name="caUrl"]'), customDir);
     await expectStaged(page, 10_000);
 
-    // Staged, so the API still reports the applied value - which is the point of staging.
+    // Staged, so the API still reports the applied value.
     const staged = await page.request.get(API_SETTINGS_ACME);
     expect((await staged.json()).caUrl ?? '').not.toBe(customDir);
 
@@ -442,15 +409,13 @@ test.describe('Settings - Dashboard Host', () => {
     const domain = page.getByRole('textbox', { name: 'Dashboard domain' });
     if ((await domain.inputValue()) === '') await domain.fill('dashboard-e2e.example.test');
 
-    // The same fields a proxy host has, behind a disclosure.
     await page.getByText('Proxy options', { exact: true }).click();
     const hstsSubdomains = page.getByRole('switch', { name: 'HSTS Subdomains' });
     await expect(hstsSubdomains).toBeVisible();
     const before = await hstsSubdomains.isChecked();
     await hstsSubdomains.click();
 
-    // Its own Save, not the page's bar: this form asks before it saves, so it opts out of the bar
-    // and keeps the button that opens that question.
+    // Its own Save, not the page's bar: this form confirms before saving.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
@@ -470,30 +435,23 @@ test.describe('Settings - DNS Providers', () => {
   test('shows provider selector and add form', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
-    // The provider picker itself, rather than any text matching /select/ - hidden option labels
-    // and helper copy match that pattern too, and the first of them need not be visible.
+    // Not text matching /select/ - hidden option labels match too, and need not be visible.
     await expect(page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]')).toBeVisible();
   });
 
   test('selecting a provider reveals its credential fields', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
-    // Click the provider select and pick one (Cloudflare or first available)
-    // Selector runs with hasSearch, so the trigger is deliberately NOT a combobox - the popup's
-    // search input owns that role. The trigger is the form's only listbox-opening button.
+    // With hasSearch the trigger is not a combobox - the popup's search input owns that role.
     const providerSelect = page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]');
 
     await providerSelect.click();
-    // Select the first non-"Select" option
     const firstProvider = page
       .getByRole('option')
       .filter({ hasNot: page.locator('text=/select/i') })
       .first();
     await firstProvider.click();
-    // Credential input fields should now appear
-    // Most providers have at least one field (API token, etc.)
     const formInputs = page.locator(
-      // The Selector's own popover search box is a text input inside the form, so exclude
-      // comboboxes - otherwise `.first()` picks the hidden search field, not a credential field.
+      // Excludes the Selector's hidden search box, which `.first()` would otherwise pick.
       'form#dnsp-add-form input[type="text"]:not([role="combobox"]), form#dnsp-add-form input[type="password"]',
     );
     await expect(formInputs.first()).toBeVisible({ timeout: 3000 });
@@ -537,12 +495,8 @@ test.describe('Settings - Upstream DNS Pinning', () => {
   });
 
   test('a changed toggle still reads as changed after the save', async ({ page }) => {
-    // React 19 resets the form once the action returns, restoring every control to the value it
-    // mounted with - after the last render, so nothing writes the DOM back. The toggle the operator
-    // just changed snaps visually back to its old position while the new value is what actually
-    // got saved, and the next click then reports the state React already holds, so it appears dead.
-    // See ui/FormBooleanControls. Changing it *before* saving is what makes this reproducible: a
-    // save in the mounted state resets to the same value and hides the bug entirely.
+    // React 19's post-action form reset snaps a toggle back to its mounted value after the last
+    // render (see ui/FormBooleanControls). It must change before saving, or the reset hides it.
     await goToSection(page, 'Upstream DNS Pinning');
     const toggle = page.getByLabel('Enable upstream DNS pinning');
     const save = pageSave(page);
@@ -553,14 +507,11 @@ test.describe('Settings - Upstream DNS Pinning', () => {
 
     await save.click();
     await expectStaged(page, 15_000);
-    // The assertion the fix exists for: the save must not visually undo what was just saved.
     await expect(toggle).toBeChecked({ checked: !initial });
 
-    // And one click still moves it, rather than reporting the state React already holds.
     await toggle.click();
     await expect(toggle).toBeChecked({ checked: initial });
 
-    // Put the stored value back, so this leaves the shared stack as it found it.
     await save.click();
     await expectStaged(page, 15_000);
   });
@@ -616,18 +567,15 @@ test.describe('Settings - OAuth Providers', () => {
     await dialog.getByLabel(/^name/i).fill('E2E Test Provider');
     await dialog.getByLabel(/client id/i).fill('test-client-id-12345');
     await dialog.getByLabel(/client secret/i).fill('test-client-secret-12345');
-    // Skip issuer URL - it's optional and avoids potential OIDC discovery issues
+    // No issuer URL, so no OIDC discovery.
     await dialog.getByRole('button', { name: /create provider/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
-    // Provider should appear in the list
     await expect(page.getByText('E2E Test Provider')).toBeVisible({ timeout: 10_000 });
 
-    // The delete control is labelled "Delete <provider>", which is unique on the
-    // page; "Delete provider" is only its tooltip.
+    // "Delete provider" is only the tooltip.
     await page.getByRole('button', { name: 'Delete E2E Test Provider' }).click();
-    // Confirmation is an AlertDialog (role="alertdialog", not "dialog") whose
-    // action is labelled "Delete provider".
+    // role="alertdialog", not "dialog".
     const confirm = page.getByRole('alertdialog', { name: /delete oauth provider/i });
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: 'Delete provider', exact: true }).click();
@@ -673,8 +621,7 @@ test.describe('Settings - OAuth Providers', () => {
       expect(itemBody).not.toContain('clientSecret');
 
       await goToSection(page, 'OAuth Providers');
-      // Scoping to the card meant guessing at its classes; the button's own accessible name
-      // already carries the provider name, which the timestamp makes unique.
+      // The accessible name carries the timestamped provider name, so no card scoping.
       await page.getByRole('button', { name: `Edit ${providerName}` }).click();
 
       const dialog = page.getByRole('dialog');
@@ -765,7 +712,6 @@ test.describe('Settings - Updates', () => {
     await expect(page.getByRole('heading', { name: 'Release updates' })).toBeVisible();
     await expect(page.getByLabel('Check for updates')).toBeVisible();
 
-    // The substitution the setting exists for: a fork points this at its own namespace.
     await expect(page.locator('input[name="updateImageRepository"]')).toHaveValue(
       /^[a-z0-9.]+\/[a-z0-9._/-]+$/,
     );
@@ -773,8 +719,7 @@ test.describe('Settings - Updates', () => {
   });
 
   test('the repository field takes a different namespace', async ({ page }) => {
-    // Typed, not saved: saving would reach the registry, and this suite must not depend on
-    // ghcr.io being up. What the check does with the value is covered by the unit tests.
+    // Typed, not saved: saving reaches the registry, and this suite must not depend on ghcr.io.
     await goToSection(page, 'Updates');
     const repository = page.locator('input[name="updateImageRepository"]');
     await repository.fill('ghcr.io/somerandomuser/caddy-proxy-manager');
@@ -782,13 +727,9 @@ test.describe('Settings - Updates', () => {
   });
 
   test('turning the check off disables the repository field', async ({ page }) => {
-    // Nothing to point at when no request is going to be made, and it says so rather than
-    // leaving a field that looks live.
     await goToSection(page, 'Updates');
     await page.getByLabel('Check for updates').click();
-    // By role, not by name: a disabled Astryx input drops its name attribute, so the selector the
-    // other tests use stops matching at exactly the moment this asserts. That the field submits
-    // nothing while disabled is why the action treats an absent value as "leave it alone".
+    // By role: a disabled Astryx input drops its name attribute (and so submits nothing).
     await expect(page.getByRole('textbox', { name: 'Image repository' })).toBeDisabled();
   });
 });
@@ -798,9 +739,10 @@ test.describe('Settings - Updates', () => {
 test.describe('Settings - cross-section navigation', () => {
   test('rapid section switching renders correct content each time', async ({ page }) => {
     await page.goto('/settings/general');
+    // A click before hydration races the router; CI lost the Observability heading to it.
+    await waitForHydration(page);
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
-    // Click General → verify heading → click Metrics → verify heading
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
@@ -818,15 +760,14 @@ test.describe('Settings - cross-section navigation', () => {
 
   test('Cmd-K to navigate, then sidebar to navigate back', async ({ page }) => {
     await page.goto('/settings/general');
+    await waitForHydration(page);
 
-    // Use Cmd-K to go to Access Logging
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('access logging');
     await dialog.getByText('Observability', { exact: true }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
 
-    // Then use sidebar to go to General
     await page
       .locator(SETTINGS_SIDEBAR)
       .getByRole('link', { name: 'General', exact: true })
@@ -840,25 +781,19 @@ test.describe('Settings - cross-section navigation', () => {
 test.describe('Settings - mobile layout', () => {
   test.use({ viewport: { width: 393, height: 852 } });
 
-  /**
-   * Settings ships no compact section picker of its own, and a phone has no rail: the tab bar
-   * replaced the app shell's hamburger drawer. The sections are reached from the Settings overview,
-   * whose tiles link to each one.
-   */
+  /** A phone has no rail and no section picker; the overview's tiles link to each section. */
   test('the settings rail is not stacked inline; the overview links to each section', async ({
     page,
   }) => {
     await page.goto('/settings/general');
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
-    // What must not happen is a section link stacked above the content.
     await expect(page.getByRole('link', { name: 'DNS Providers', exact: true })).not.toBeVisible();
 
     await page.goto('/settings');
     const tile = page.getByTestId(/^settings-tile-/).filter({ hasText: 'DNS Providers' });
     await expect(tile).toBeVisible();
     await tile.click();
-    // The tile names a setting; the page it opens is the one that carries it.
     await expect(page.getByRole('heading', { level: 1, name: 'DNS' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
   });
@@ -871,7 +806,7 @@ test.describe('Settings - mobile layout', () => {
     ).toBeVisible();
   });
 
-  /** The ids that used to be routes still are links people hold; they land on the block. */
+  /** Old section ids are links people still hold. */
   test('a link to a setting that moved lands on the page that carries it', async ({ page }) => {
     await page.goto('/settings/metrics');
     await expect(page).toHaveURL(/\/settings\/observability#metrics$/);
@@ -945,12 +880,10 @@ test.describe('Settings - form data round-trip via API', () => {
 
   test('logging settings: change format via UI, verify via API', async ({ page }) => {
     await goToSection(page, 'Access Logging');
-    // Enable logging
     const enableCheckbox = page.getByLabel('Enable access logging');
     if (!(await enableCheckbox.isChecked())) {
       await enableCheckbox.click();
     }
-    // Change format to console
     await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
     await savePage(page);
@@ -973,8 +906,7 @@ test.describe('Settings - form data round-trip via API', () => {
 
 test.describe('Settings - detail header', () => {
   test('header shows the page title with no description under it', async ({ page }) => {
-    // The title stands alone in the header. Each block on the page describes itself under its
-    // own heading, which is where that text went - so this asks the header, not the page.
+    // Asks the header, not the page: each block still has its own description.
     await goToSection(page, 'General');
     const header = page.getByTestId('settings-header');
     await expect(header.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();

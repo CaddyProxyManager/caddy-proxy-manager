@@ -1,9 +1,6 @@
 /**
- * POST /api/setup/complete - the last step of first-run setup.
- *
- * It is a route handler rather than a server action so the page survives its own success, and what
- * it answers with is what the browser needs to finish on its own: where to go, the token that buys
- * one restart, and the domain the dashboard now answers on.
+ * POST /api/setup/complete. A route handler, not an action, so the page survives its own success;
+ * it answers with where to go, the one-restart token, and the dashboard's domain.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -18,8 +15,7 @@ const ctx = vi.hoisted(() => ({
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -36,8 +32,7 @@ vi.mock('@/src/lib/auth', () => ({
   auth: async () => ctx.session,
   checkSameOrigin: () => null,
 }));
-// Starts and stops containers. The save is what this file is about; what it switches on is
-// managed-services' own.
+// Starts and stops containers; that is managed-services' concern, not this file's.
 vi.mock('@/src/lib/settings/optional-features', () => ({
   propagateOptionalFeatureSettings: async () => {},
 }));
@@ -56,7 +51,6 @@ type Body = {
   error?: string;
 };
 
-/** The form the settings step posts, with only the fields a test cares about spelled out. */
 async function complete(fields: Record<string, string> = {}): Promise<{
   status: number;
   body: Body;
@@ -99,8 +93,7 @@ describe('POST /api/setup/complete', () => {
       dashboardDomain: 'CPM.example.com',
     });
 
-    // HTTP: the setup save never turns TLS on, because nothing can have confirmed the domain
-    // reaches here yet.
+    // Nothing can have confirmed the domain reaches here yet, so no TLS.
     expect(body.dashboardOrigin).toBe('http://cpm.example.com');
     expect(await getDashboardSettings()).toMatchObject({
       enabled: true,
@@ -127,8 +120,8 @@ describe('POST /api/setup/complete', () => {
   });
 
   it('sends a migrated deployment to its summary rather than to the dashboard', async () => {
-    // Its summary is behind the session it holds, and a session belongs to one address: handing it
-    // to the dashboard's domain would meet a sign-in page and lose the page it came for.
+    // Its summary is behind a session bound to this address; the dashboard's domain would meet a
+    // sign-in page instead.
     await recordMigrationSource('/data/legacy.db');
 
     const { body } = await complete({

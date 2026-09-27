@@ -1,12 +1,6 @@
 "use client";
 
-/**
- * Which agents serve this host.
- *
- * Nothing ticked means every agent, which is what a host had before it could be assigned at all -
- * so the empty state is the safe one, and the banner says so out loud rather than leaving an
- * operator to guess whether an unticked list means "everywhere" or "nowhere".
- */
+/** Nothing ticked means every agent; the banner says so rather than leave "nowhere" a guess. */
 
 import { useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -34,9 +28,7 @@ export function AgentAssignmentFields({
   const t = useTranslations("agents");
   const [selectedIds, setSelectedIds] = useState<number[]>(selected);
 
-  // Nothing to place it on. Rendering the card anyway would be one more thing to read on a form
-  // that is already long, but the marker still goes out: without it an edit that clears the list
-  // is indistinguishable from a form that never carried the field.
+  // No card, but still the marker: without it a cleared list looks like a form without the field.
   if (agents.length === 0) {
     return <input type="hidden" name="agentAssignmentPresent" value="1" />;
   }

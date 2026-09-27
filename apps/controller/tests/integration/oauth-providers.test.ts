@@ -50,7 +50,6 @@ describe('oauth-providers integration', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].name).toBe('GitHub');
     expect(rows[1].name).toBe('Google');
-    // enabled defaults to true
     expect(rows[0].enabled).toBe(true);
     expect(rows[1].enabled).toBe(true);
   });
@@ -61,11 +60,9 @@ describe('oauth-providers integration', () => {
       clientSecret: encryptSecret(plainSecret),
     });
 
-    // The stored value should be encrypted (starts with enc:v1:)
     expect(provider.clientSecret).not.toBe(plainSecret);
     expect(provider.clientSecret.startsWith('enc:v1:')).toBe(true);
 
-    // Decrypting should yield the original value
     const decrypted = decryptSecret(provider.clientSecret);
     expect(decrypted).toBe(plainSecret);
   });

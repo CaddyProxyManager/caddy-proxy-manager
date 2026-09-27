@@ -1,21 +1,13 @@
 /**
- * First-run setup: what stage a deployment is at, and how it advances.
- *
- * Setup exists because a fresh database no longer has an `ADMIN_USERNAME`/`ADMIN_PASSWORD` to seed
- * an admin from, so there is no way to sign in until someone is asked to make one. It insists on a
- * real sign-in before collecting any other configuration: a wrong OAuth client secret or a
- * mistyped password is otherwise only discovered after everything else has been entered, and the
- * only way out is deleting the database.
- *
- * The stage is derived from what exists rather than tracked as a counter, so a half-finished setup
- * resumes where it left off and the back button cannot desynchronise it. The one piece of stored
- * state is the completion flag, because "signed in, settings not saved yet" and "signed in,
- * finished" are otherwise identical.
+ * First-run setup. A real sign-in comes before any other configuration, or a bad OAuth secret is
+ * found only after everything else is entered. The stage is derived from what exists, so it
+ * resumes and survives the back button; only completion is stored, being otherwise invisible.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
 import db, { nowIso } from "./db";
 import { accounts, settings, users } from "./db/schema";
+import { claimRow, releaseRow } from "./db-claim";
 import { getUserCount } from "./models/user";
 import { listEnabledOAuthProviders } from "./models/oauth-providers";
 import { scanForLegacyDatabases } from "./migration/legacy-database";
@@ -26,24 +18,13 @@ export function hasLegacyDatabase(): boolean {
   return scanForLegacyDatabases().candidates.length > 0;
 }
 
-/**
- * Not a registry setting: this is the flow's own bookkeeping, not something an operator configures,
- * so it is neither rendered on the settings page nor migrated from an environment variable.
- */
+/** Not a registry setting: the flow's own bookkeeping, not something an operator configures. */
 const SETUP_COMPLETED_KEY = "setup:completed";
 
-/**
- * Set when the operator was offered a legacy database and said no. Without it the offer reappears
- * on every request, and there is no way to reach account creation on a host that still has an old
- * file lying about.
- */
+/** Without it the offer reappears on every request and account creation is unreachable. */
 const MIGRATION_DECLINED_KEY = "setup:migration_declined";
 
-/**
- * The legacy file a completed migration read from. Recorded so the final screen can offer it as a
- * backup and name it in the instructions - and so that screen is only reachable by a deployment
- * that actually migrated.
- */
+/** The file a migration read from: the final screen offers it as a backup, and only if set. */
 const MIGRATION_SOURCE_KEY = "setup:migrated_from";
 
 export type SetupStage =
@@ -101,14 +82,13 @@ export async function getMigrationSource(): Promise<string | null> {
 }
 
 /**
- * The restart the migration screen asks for. Once an import brings accounts, restarting is no
- * longer open to anyone, so the browser that ran the import is handed this single-use token for
- * that one request. Stored hashed; the plaintext exists only in the migrate response.
+ * Once an import brings accounts, restarting is no longer open to anyone, so the importing browser
+ * gets this single-use token. Stored hashed; the plaintext is only in the migrate response.
  */
 const RESTART_TOKEN_KEY = "setup:restart_token";
 const RESTART_TOKEN_TTL_MS = 15 * 60 * 1000;
 
-/** When a restart was last accepted. In the database because it has to outlive the exit it allows. */
+/** In the database because it has to outlive the exit it allows. */
 const RESTART_REQUESTED_KEY = "setup:restart_requested_at";
 export const RESTART_COOLDOWN_MS = 60 * 1000;
 
@@ -155,12 +135,7 @@ async function matchRestartToken(token: string | null): Promise<{ value: string 
   return row;
 }
 
-/**
- * Whether `token` is the unexpired one issued, leaving it unspent.
- *
- * For a caller that may still refuse the request afterwards: the token buys one restart, and
- * spending it on an answer of "not yet" would cost the operator the only one they have.
- */
+/** Leaves it unspent, for a caller that may still refuse: the token buys only one restart. */
 export async function restartTokenMatches(token: string | null): Promise<boolean> {
   return (await matchRestartToken(token)) !== null;
 }
@@ -178,10 +153,7 @@ export async function consumeRestartToken(token: string | null): Promise<boolean
   return spent.length > 0;
 }
 
-/**
- * Claim the one restart allowed per cooldown, atomically: the stamp only moves when the previous
- * one is older than the cooldown. ISO timestamps compare correctly as text.
- */
+/** Atomic: the stamp moves only when older than the cooldown. ISO timestamps compare as text. */
 export async function claimRestartSlot(
   now = Date.now(),
 ): Promise<{ ok: true } | { ok: false; retryAfterMs: number }> {
@@ -205,8 +177,8 @@ export async function claimRestartSlot(
     .limit(1);
   const parsed = row ? Date.parse(row.value) : Number.NaN;
   if (row && !Number.isFinite(parsed)) {
-    // A corrupt stamp never compares older than the cutoff, so it would refuse every restart - and
-    // its Retry-After would be NaN. Replace it, still atomically: only if nobody else just did.
+    // A corrupt stamp never compares older, refusing every restart with a NaN Retry-After.
+    // Replace it, still atomically.
     const repaired = await db
       .update(settings)
       .set({ value: stamp, updatedAt: stamp })
@@ -228,12 +200,8 @@ export async function isMigrationDeclined(): Promise<boolean> {
 }
 
 /**
- * Whether the legacy database on this host has already been dealt with, either way.
- *
- * Declining is one way. Having migrated is the other, and it has to be checked separately now that
- * a migration can leave the old accounts behind: the old test was "can anything sign in yet",
- * which such a migration does not satisfy - so the operator would be offered the same file again
- * on their way to creating an account, and importing it twice is not something the flow supports.
+ * Declined or migrated. Checked explicitly because a migration can leave the accounts behind,
+ * and "can anything sign in" would then offer the same file again.
  */
 export async function isMigrationSettled(): Promise<boolean> {
   if (await isMigrationDeclined()) return true;
@@ -248,41 +216,45 @@ export async function markSetupCompleted(): Promise<void> {
   await setFlag(SETUP_COMPLETED_KEY);
 }
 
-/**
- * Whether anything can sign in at all: a local account, or an enabled OAuth provider.
- *
- * Both are checked regardless of mode. A deployment that configured OAuth and later re-enabled
- * local users still has a way in, and sending it back to account creation would be wrong.
- */
+export const SETUP_ACCOUNT_CLAIM = "setup_account_claim";
+const SETUP_PROMOTION_CLAIM = "setup_admin_promotion";
+/** Only a crash leaves a claim behind; after this long it can be taken over. */
+const SETUP_CLAIM_TTL_MS = 10 * 60_000;
+
+/** A claim on a setup step; see `db-claim.ts`. Null when someone else holds it. */
+export function claimSetupStep(key: string, now = Date.now()): Promise<string | null> {
+  return claimRow(key, SETUP_CLAIM_TTL_MS, now);
+}
+
+export function releaseSetupStep(key: string, claim: string): Promise<void> {
+  return releaseRow(key, claim);
+}
+
+/** A local account or an enabled OAuth provider, checked regardless of mode. */
 export async function hasAnySignIn(): Promise<boolean> {
   if ((await getUserCount()) > 0) return true;
   return (await listEnabledOAuthProviders()).length > 0;
 }
 
 /**
- * Make a federated user an administrator if setup is unfinished and nobody else is one yet.
- *
- * Called by the settings step as it saves, so the rule is "whoever completes setup is the
- * administrator" - a deliberate act, rather than a privilege handed out by the act of signing in.
- *
- * It exists because the account step has two branches and only one of them produced an admin.
- * `createFirstAdmin` writes `role: "admin"` outright, but the OAuth branch only stores a provider
- * - the user row is then created by Better Auth's callback, where `enforceSafeUserDefaults`
- * (correctly) pins every federated sign-up to `role: "user"`. Group-to-role mapping cannot cover
- * the gap either: it is configured in the settings step, which is the very step that demanded an
- * admin session. So an instance set up against an IdP had no way to finish setup at all.
- *
- * All three guards matter. Setup being unfinished bounds this to the window the account step
- * already hands out administrator rights in. Requiring that no admin exists means it fires once -
- * a second, ordinary user reaching this step is refused rather than promoted, as is anyone at all
- * once the flow is finished. And requiring a federated account keeps it to the branch that is
- * actually broken: a credential sign-in during setup can only be the admin `createFirstAdmin`
- * just made, so a self-registered local account must never be caught by this.
+ * Whoever completes setup via OAuth becomes admin: `enforceSafeUserDefaults` pins federated
+ * sign-ups to "user", so an IdP-only setup could never finish. Guards: setup unfinished, no admin
+ * yet, and a federated account - a local sign-in here is always `createFirstAdmin`'s admin.
  */
 export async function promoteFirstSetupAdmin(userId: number): Promise<boolean> {
   if (!Number.isFinite(userId)) return false;
   if (await isSetupCompleted()) return false;
+  // Two federated sign-ins at once would otherwise both see "no admin yet".
+  const claim = await claimSetupStep(SETUP_PROMOTION_CLAIM);
+  if (!claim) return false;
+  try {
+    return await promoteUnderClaim(userId);
+  } finally {
+    await releaseSetupStep(SETUP_PROMOTION_CLAIM, claim);
+  }
+}
 
+async function promoteUnderClaim(userId: number): Promise<boolean> {
   const admins = await db
     .select({ id: users.id })
     .from(users)
@@ -313,18 +285,14 @@ export async function promoteFirstSetupAdmin(userId: number): Promise<boolean> {
   return true;
 }
 
-/**
- * The current stage. `signedIn` is passed in because the session is read differently from the
- * proxy, a server component and a route handler, and this module should not have to know which.
- */
+/** `signedIn` is passed in: the proxy, components and route handlers each read it differently. */
 export async function getSetupState(signedIn: boolean): Promise<SetupState> {
   if (await isSetupCompleted()) {
     return { stage: "complete", required: false };
   }
 
   if (!(await hasAnySignIn())) {
-    // Offered before account creation: an operator who has an old database wants its accounts,
-    // not a new one alongside them. Scanning the filesystem is only worth doing in this one state.
+    // Before account creation: an operator with an old database wants its accounts.
     if (!(await isMigrationSettled()) && hasLegacyDatabase()) {
       return { stage: "migrate", required: true };
     }
@@ -344,13 +312,8 @@ export const SETUP_PATHS: Record<SetupStage, string> = {
 };
 
 /**
- * True when the environment still configures a way in - which is what "this deployment predates
- * the setup flow" actually means.
- *
- * This is the whole test for the backfill below, and it has to be the environment rather than
- * "are there any users": an operator halfway through setup has created an account but not saved
- * their settings, and a restart must not mark them finished and drop them into an unconfigured
- * app. Only a deployment carrying the old variables gets skipped past the flow.
+ * "Predates the setup flow". The environment, not "any users": someone halfway through setup has
+ * an account, and a restart must not mark them finished.
  */
 function environmentConfiguresSignIn(): boolean {
   const hasAdminCredentials =
@@ -359,10 +322,7 @@ function environmentConfiguresSignIn(): boolean {
   return hasAdminCredentials || process.env.OAUTH_ENABLED === "true";
 }
 
-/**
- * Mark a pre-existing installation complete so it never sees the setup flow. Called once at
- * startup, after the admin seed.
- */
+/** Called once at startup, after the admin seed. */
 export async function backfillSetupCompletion(): Promise<void> {
   if (await isSetupCompleted()) return;
   if (!environmentConfiguresSignIn()) return;

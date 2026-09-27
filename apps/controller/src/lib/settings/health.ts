@@ -1,13 +1,7 @@
 /**
- * What each settings section is actually doing, for the tiles on the settings home.
- *
- * A tile that only repeated its section's description would be decoration. Every status here is
- * derived from a value this deployment holds - a provider that is set, a database that is on disk,
- * an agent that is connected - so "needs attention" means something checkable went wrong rather
- * than something being merely unconfigured.
- *
- * Nothing in here reads Caddy or the network. The page already gathers agent statuses, and a tile
- * grid that waited on a round trip per section would be slower than the page it replaced.
+ * Every status derives from a value this deployment holds, so "attention" means something
+ * checkable went wrong, not merely unconfigured. No Caddy or network reads: a round trip per tile
+ * is too slow.
  */
 
 import type { useTranslations } from "next-intl";
@@ -28,17 +22,15 @@ export type SectionStatus = "ok" | "attention" | "unset" | "env";
 type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
 
 export type SectionHealth = {
-  /** Matches the section ids the settings navigation uses, so a tile links straight to it. */
+  /** The settings navigation's section id, so a tile links straight to it. */
   id: string;
-  /** Display name, matching what the settings navigation calls the same section. */
   name: string;
   group: "traffic" | "access" | "runtime";
   status: SectionStatus;
-  /** One line of current state, already in the reader's language. Rendered as-is. */
+  /** Already translated; rendered as-is. */
   value: string;
-  /** Why it needs attention, when it does. */
   detail?: string;
-  /** True when this section holds part of the viewer's staged change set. */
+  /** Holds part of the viewer's staged change set. */
   staged?: boolean;
 };
 
@@ -57,14 +49,11 @@ export type HealthInput = {
   agentsConnected: number;
   agentsPaired: number;
   stagedKeys: ReadonlySet<string>;
-  /** Injected so staleness is a pure function of its input rather than of the wall clock. */
+  /** Injected so staleness is a pure function of the input. */
   now?: number;
 };
 
-/**
- * Counts go into the messages as strings: they were template literals before, and ICU would group
- * a number of 1000 or more ("1,000"), which is not what these lines have ever said.
- */
+/** Some counts go in as strings, so ICU does not group them ("1,000"). */
 export function sectionHealth(input: HealthInput, t: SettingsTranslator): SectionHealth[] {
   const staged = (id: string) => storageKeysForSection(id).some((key) => input.stagedKeys.has(key));
 
@@ -102,8 +91,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   });
 
   const ranges = input.trustedProxies?.ranges ?? [];
-  // The pairing that actually misleads people: geo-block reads the client IP, and without a
-  // trusted-proxy range behind another proxy every request looks like it came from that proxy.
+  // Behind another proxy with no trusted range, geo-block sees only that proxy's IP.
   const geoBlockNeedsProxies = Boolean(input.geoBlock?.enabled) && ranges.length === 0;
   sections.push({
     id: "trusted-proxies",
@@ -143,20 +131,14 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     staged: staged("oauth"),
   });
 
-  // Enabled with nothing on disk is the one GeoIP state that silently does nothing: no download has
-  // ever completed, so every lookup misses.
+  // Enabled with nothing on disk silently misses every lookup.
   const geoipEmpty = input.geoip.enabled && input.geoip.installedEditions.length === 0;
   const ageDays = input.geoip.databaseAgeDays;
   const installed = input.geoip.installedEditions.length;
 
-  /**
-   * Behind is the definitive answer, and it needs no threshold: MaxMind has built something newer
-   * than what is on disk, so the updater has demonstrably not fetched it. Age alone cannot tell
-   * that apart from MaxMind simply not having published.
-   */
+  // Behind needs no threshold; age alone cannot tell it from MaxMind not having published.
   const behind = input.geoip.enabled ? input.geoip.editionsBehind : [];
-  // A check that has missed two scheduled runs is its own problem: without it, "behind" is unknowable and
-  // the tile would quietly fall back to guessing from the file's age.
+  // Two missed checks make "behind" unknowable, so that is flagged on its own.
   const now = input.now ?? Date.now();
   const checkAgeMs = input.geoip.lastCheckedAt
     ? now - Date.parse(input.geoip.lastCheckedAt)
@@ -200,8 +182,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   });
 
   const blockedCountries = input.geoBlock?.block_countries?.length ?? 0;
-  // Blocking against a database that is not there fails open, quietly. Blocking against a stale
-  // one fails the other way: ranges reassigned since it was built are matched to the wrong country.
+  // No database fails open, quietly; a stale one matches reassigned ranges to the wrong country.
   const blockingWithoutData = Boolean(input.geoBlock?.enabled) && geoipEmpty;
   const blockingOnStaleData = Boolean(input.geoBlock?.enabled) && behind.length > 0;
   sections.push({
@@ -246,8 +227,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     staged: staged("agent"),
   });
 
-  // `modules` maps a built-in id to whether it is on, and an absent id means on, so only the
-  // explicit `false` entries subtract from the stock build.
+  // An absent id means on, so only explicit `false` subtracts from the stock build.
   const disabled = Object.values(input.caddyBuild?.modules ?? {}).filter(
     (enabled) => enabled === false,
   ).length;
@@ -278,8 +258,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     staged: staged("metrics"),
   });
 
-  // A variable still overriding the toggle is not a fault, but it does mean this page cannot
-  // change it - which is the question an operator is about to ask.
+  // Not a fault, but it explains why this page cannot change the toggle.
   const analyticsFromEnv = input.analytics.source === "environment";
   sections.push({
     id: "analytics",
@@ -296,7 +275,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   return sections;
 }
 
-/** The sections a person should look at, most serious first. Drives the band above the grid. */
+/** Drives the band above the grid. */
 export function needsAttention(sections: SectionHealth[]): SectionHealth[] {
   return sections.filter((section) => section.status === "attention");
 }

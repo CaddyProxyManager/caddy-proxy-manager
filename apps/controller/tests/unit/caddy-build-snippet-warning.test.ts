@@ -1,8 +1,4 @@
-/**
- * The Caddyfile snippet warning is data now, and the settings action says it from the catalog. The
- * English it renders must read as the sentence caddy-build-conflicts.ts used to build by hand -
- * except that one host now "uses" the directives rather than "use" them.
- */
+/** The warning is rendered from the catalog, and its English must still read right. */
 import { describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTranslator } from 'next-intl';
@@ -41,7 +37,7 @@ function hostsWithSnippets(count: number): Host[] {
   }));
 }
 
-/** What the settings action renders, with the same list style it asks the formatter for. */
+/** With the list style the settings action uses. */
 async function render(rebuild: boolean): Promise<string | null> {
   const warning = await describeCaddyfileSnippetWarning({ modules: {}, customModules: [] });
   if (!warning) return null;

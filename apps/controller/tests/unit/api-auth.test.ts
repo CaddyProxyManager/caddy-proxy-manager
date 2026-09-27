@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 
-// Mock the api-tokens model
 vi.mock('@/src/lib/models/api-tokens', () => ({
   validateToken: vi.fn(),
 }));
 
-// Mock next-auth
 vi.mock('@/src/lib/auth', () => ({
   auth: vi.fn(),
   checkSameOrigin: vi.fn(() => null),

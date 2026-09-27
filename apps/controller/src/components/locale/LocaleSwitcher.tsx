@@ -18,12 +18,7 @@ function endonym(locale: Locale): string {
   }
 }
 
-/**
- * Language picker for the SideNav footer, beside the theme toggle.
- *
- * Renders nothing while English is the only catalog - a menu with one entry is a dead control.
- * Ship a second `messages/*.json`, add it to `LOCALES`, and this appears on its own.
- */
+/** Renders nothing while English is the only catalog: a one-entry menu is a dead control. */
 export function LocaleSwitcher() {
   const t = useTranslations("common.locale");
   const { locale, preference, setLocale } = useLocalePreference();

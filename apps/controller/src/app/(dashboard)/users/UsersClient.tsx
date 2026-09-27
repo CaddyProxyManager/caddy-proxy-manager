@@ -1,15 +1,21 @@
 "use client";
 
 /**
- * Users as a list-detail page: accounts in a searchable rail, the selected account on the right.
- *
- * The shape the admin consoles on Mobbin converge on (Zoho CRM, Canny, Pinterest Business): a rail
- * row is avatar, name, email and a role badge; the detail leads with the person and their state,
- * keeps the actions in its header, and lays the rest out as sections - details, then the groups
- * they belong to. Creating and editing happen in dialogs, so the list never reflows under a form.
+ * Users as a list-detail page. Creating and editing happen in dialogs, so the list never reflows
+ * under a form.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserCog, Users as UsersIcon } from "lucide-react";
+import { ViewAsDialog } from "@/components/users/ViewAsDialog";
+import {
+  Ban,
+  CheckCircle2,
+  Eye,
+  Pencil,
+  Plus,
+  Trash2,
+  UserCog,
+  Users as UsersIcon,
+} from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -43,6 +49,7 @@ import {
   updateUserStatusAction,
   updateUserInfoAction,
   deleteUserAction,
+  resetUserTwoFactorAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
 
@@ -50,6 +57,9 @@ type Role = "admin" | "operator" | "user" | "viewer";
 
 type UserEntry = {
   id: number;
+  twoFactorEnabled: boolean;
+  /** The admin looking at the page, who turns their own 2FA off from their Profile instead. */
+  isSelf: boolean;
   email: string;
   name: string | null;
   role: Role;
@@ -113,13 +123,13 @@ function isExternal(user: UserEntry) {
 }
 
 export default function UsersClient({ users, groups = [], localUsersEnabled = true }: Props) {
+  const [viewAsOpen, setViewAsOpen] = useState(false);
   const t = useTranslations("users");
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(users[0]?.id ?? null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
-  // These actions used to fail silently: nothing caught them and nothing was shown.
   const [error, setError] = useState<string | null>(null);
   // A just-created account is selected once the refreshed list delivers it: its id is only known
   // after the server has rendered the row, so the create dialog hands over the email instead.
@@ -172,6 +182,14 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
           <Heading level={1}>{t("users")}</Heading>
+          <IconButton
+            variant="secondary"
+            size="lg"
+            icon={<Eye />}
+            label={t("viewAs.open")}
+            tooltip={t("viewAs.open")}
+            onClick={() => setViewAsOpen(true)}
+          />
           {localUsersEnabled && (
             <Button
               variant="primary"
@@ -254,6 +272,11 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
       detail={
         <VStack gap={4}>
           {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+          <ViewAsDialog
+            open={viewAsOpen}
+            onClose={() => setViewAsOpen(false)}
+            groups={groups.map(({ id, name }) => ({ id, name }))}
+          />
           {selected ? (
             <UserDetail
               // Remounted per user, so an open dialog or a half-typed field never carries across.
@@ -303,7 +326,7 @@ function UserDetail({
 }) {
   const t = useTranslations("users");
   const isDisabled = user.status !== "active";
-  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
+  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | "reset2fa" | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const name = userLabel(user);
 
@@ -410,6 +433,23 @@ function UserDetail({
                 t("passwordChangedUnknown")
               )}
             </MetadataListItem>
+            {user.hasPassword && (
+              <MetadataListItem label={t("twoFactor")}>
+                <HStack gap={2} vAlign="center">
+                  <Text type="body" size="sm">
+                    {user.twoFactorEnabled ? t("twoFactorOn") : t("twoFactorOff")}
+                  </Text>
+                  {user.twoFactorEnabled && !user.isSelf && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t("resetTwoFactor")}
+                      onClick={() => setConfirmKind("reset2fa")}
+                    />
+                  )}
+                </HStack>
+              </MetadataListItem>
+            )}
             <MetadataListItem label={t("created")}>
               <Timestamp value={user.createdAt} style="date" />
             </MetadataListItem>
@@ -429,22 +469,38 @@ function UserDetail({
         }}
       />
 
-      {/* Both actions used window.confirm, which is unstyled and not announced as a dialog. */}
+      {/* Not window.confirm: unstyled, and not announced as a dialog. */}
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}
-        title={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
+        title={
+          confirmKind === "delete"
+            ? t("deleteUser")
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactor")
+              : t("disableUser")
+        }
         description={
           confirmKind === "delete"
             ? t("deleteUserConfirm", { name: user.name ?? user.email })
-            : t("disableUserConfirm", { name: user.name ?? user.email })
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactorConfirm", { name: user.name ?? user.email })
+              : t("disableUserConfirm", { name: user.name ?? user.email })
         }
-        actionLabel={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
+        actionLabel={
+          confirmKind === "delete"
+            ? t("deleteUser")
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactor")
+              : t("disableUser")
+        }
         onAction={async () => {
           const result =
             confirmKind === "delete"
               ? await deleteUserAction(user.id)
-              : await updateUserStatusAction(user.id, "disabled");
+              : confirmKind === "reset2fa"
+                ? await resetUserTwoFactorAction(user.id)
+                : await updateUserStatusAction(user.id, "disabled");
           setConfirmKind(null);
           onDone(result.status === "error" ? (result.message ?? null) : null);
         }}

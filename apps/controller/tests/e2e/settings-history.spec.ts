@@ -32,7 +32,6 @@ test.describe('Settings - revision history', () => {
     const rows = page.getByTestId('revision-list').locator('[data-testid^="revision-"]');
     await expect(rows.first()).toBeVisible();
 
-    // The default comparison is the latest revision against the one before it.
     const comparison = page.getByTestId('revision-comparison');
     await expect(comparison.getByText(/"history-one\.local"/).first()).toBeVisible();
     await expect(comparison.getByText(/"history-two\.local"/).first()).toBeVisible();

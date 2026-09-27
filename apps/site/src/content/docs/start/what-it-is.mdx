@@ -30,12 +30,15 @@ from the database on every apply, so the database is the source of truth and the
 derived - editing Caddy directly will be overwritten on the next apply.
 
 Secrets - DNS provider credentials, private keys, auth keys - are encrypted at rest under the
-deployment's `SESSION_SECRET`.
+deployment's `SESSION_SECRET`. **Settings → Backup** exports all of it as one file sealed with a
+passphrase of your own, which restores onto a new machine; see [backup and
+restore](../../features/settings/#backup-and-restore).
 
 ## What it is not
 
-- **Not a Caddyfile editor.** You can attach a custom Caddyfile snippet to a host, but the normal
-  path is the form.
+- **Not a Caddyfile editor.** You can attach a custom Caddyfile snippet to a host, or add a
+  [global Caddyfile](../../features/caddy-build/#global-caddyfile) to every agent's config, but the
+  normal path is the form, and neither can replace what CPM generates.
 - **Not a DNS server.** It talks to your DNS provider for ACME DNS-01 challenges; it does not host
   your zone.
 - **Not multi-tenant.** [Roles and group grants](../../features/users-and-groups/) delegate

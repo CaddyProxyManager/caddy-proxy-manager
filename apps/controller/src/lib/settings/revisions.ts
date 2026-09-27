@@ -1,11 +1,7 @@
 /**
- * Comparing and restoring applied revisions.
- *
- * A revision records only the keys it committed, before and after, so the state at any revision is
- * reconstructed from the ones around it rather than stored whole: the value a key had at #N is its
- * `before` in the first later revision that touched it. That keeps the `settings` rows that are not
- * configuration - table density, nav order, update-check caches - out of history entirely, and a
- * restore can only ever touch what an apply once changed.
+ * Comparing and restoring revisions. Each stores only the keys it committed, so a key's value at #N
+ * is its `before` in the next revision touching it. Non-config rows stay out of history, and a
+ * restore can only touch what an apply once changed.
  */
 
 import db from "../db";
@@ -29,9 +25,9 @@ export type RevisionKeyDiff = {
 export type RevisionComparison = {
   from: number;
   to: number;
-  /** Null when a revision in the span predates recorded values, so there is nothing to compare. */
+  /** Null when a revision in the span predates recorded values. */
   keys: RevisionKeyDiff[] | null;
-  /** The Caddy config either side, rendered against today's hosts; null when it could not be. */
+  /** Rendered against today's hosts; null when it could not be. */
   config: ConfigDiff | null;
 };
 
@@ -45,7 +41,7 @@ export async function latestRevisionId(): Promise<number> {
   return Number(row?.id ?? 0);
 }
 
-/** Revision ids newest first, for the compare pickers. Capped: nobody scrolls a picker further. */
+/** Capped: nobody scrolls a picker further. */
 export async function revisionIds(limit = 500): Promise<number[]> {
   const rows = await db
     .select({ id: settingsRevisions.id })
@@ -55,7 +51,7 @@ export async function revisionIds(limit = 500): Promise<number[]> {
   return rows.map((row) => row.id);
 }
 
-/** The revision before `id`, or 0 when `id` is the first. Ids are serial, not contiguous. */
+/** Ids are serial, not contiguous. 0 before the first. */
 export async function previousRevisionId(id: number): Promise<number> {
   const [row] = await db
     .select({ id: max(settingsRevisions.id) })
@@ -72,10 +68,7 @@ export async function revisionExists(id: number): Promise<boolean> {
   return Number(row?.total ?? 0) > 0;
 }
 
-/**
- * The oldest revision a restore can reach: the newest one without recorded values, since a
- * restore replays every later revision backwards. 0 when every revision has them.
- */
+/** The newest revision without recorded values, since a restore replays every later one. */
 export async function oldestRestorable(): Promise<number> {
   const [row] = await db
     .select({ id: max(settingsRevisions.id) })
@@ -85,10 +78,8 @@ export async function oldestRestorable(): Promise<number> {
 }
 
 /**
- * Every key the revisions in (`from`, `to`] committed, valued before the first and after the last.
- *
- * Null if any revision in the span predates recorded values: a key it changed has an unknown value
- * on one side, and a comparison or restore that skipped it would present a guess as history.
+ * Keys committed in (`from`, `to`], before the first and after the last. Null if any revision
+ * predates recorded values, rather than present a guess as history.
  */
 export async function revisionSpan(
   from: number,
@@ -126,12 +117,7 @@ function parseValue(raw: string | null): unknown {
   }
 }
 
-/**
- * What changed from revision `from` to revision `to`, either direction.
- *
- * `from` may be 0, the state before the first apply. A backwards comparison is the same span with
- * its sides swapped, which is exactly what a restore from `from` to `to` would do.
- */
+/** Either direction; `from` may be 0. Backwards is the span swapped, as a restore would do it. */
 export async function compareRevisions(from: number, to: number): Promise<RevisionComparison> {
   const low = Math.min(from, to);
   const high = Math.max(from, to);
@@ -180,11 +166,8 @@ export async function compareRevisions(from: number, to: number): Promise<Revisi
 }
 
 /**
- * Stage every value revision `target` had, for this operator to review and apply.
- *
- * Staged rather than applied: a restore is a change set like any other, and the review sheet is
- * where an operator sees what it will do to the Caddy config before it does it. Applying it is a
- * new revision, so history only ever grows and a restore can itself be restored away.
+ * Staged, not applied, so the review sheet shows its effect first. Applying makes a new revision,
+ * so history only grows and a restore can itself be restored away.
  */
 export async function stageRevisionRestore(
   userId: number,
@@ -201,8 +184,7 @@ export async function stageRevisionRestore(
   const stored = await storedValues([...span.keys()]);
   const writes = new Map<string, string>();
   for (const [key, change] of span) {
-    // A key that did not exist then and does not exist now needs nothing, and staging the string
-    // "null" for it would list a change from nothing to nothing.
+    // Absent then and now: staging "null" would list a change from nothing to nothing.
     if (change.before === null && !stored.has(key)) {
       await discardStagedKey(userId, key);
       continue;

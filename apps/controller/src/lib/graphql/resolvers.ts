@@ -1,19 +1,7 @@
 /**
- * Resolvers.
- *
- * Every one of these calls the same model function the matching `/api/v1/` route calls. That is
- * the whole design: validation, audit logging, permission checks and error shapes are the model
- * layer's, so GraphQL and REST cannot disagree about what a mutation does - and the parity tests
- * can assert it rather than trust it.
- *
- * Two things are projected rather than returned whole:
- *
- * - **Users**, because the model row carries `passwordHash` and the OAuth `subject`. Projecting
- *   named fields means a future column cannot start leaking through a resolver nobody revisited.
- * - **Certificates**, for the same reason: the row holds the private key.
- *
- * Everything else is returned as the model shaped it, with the free-form remainder gathered into
- * `config` so nothing is unreachable.
+ * Every resolver calls the model function its `/api/v1/` route calls, so GraphQL and REST cannot
+ * disagree - the parity tests assert it. Users and certificates are projected to named fields, so a
+ * future secret column cannot leak; the rest is returned whole, extras gathered into `config`.
  */
 
 import { applyCaddyConfig as applyCaddy } from "../caddy";
@@ -64,10 +52,11 @@ import { assertNotSelf, assertUserRole } from "../user-admin";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
-/** Fields promoted to real schema fields on ProxyHost; the rest becomes `config`. */
+/** The rest becomes `config`. */
 const PROXY_HOST_SCALAR_FIELDS = new Set([
   "id",
   "name",
+  "description",
   "domains",
   "upstreams",
   "enabled",
@@ -86,6 +75,7 @@ const PROXY_HOST_SCALAR_FIELDS = new Set([
 const L4_SCALAR_FIELDS = new Set([
   "id",
   "name",
+  "description",
   "protocol",
   "listenAddress",
   "upstreams",
@@ -99,10 +89,9 @@ const L4_SCALAR_FIELDS = new Set([
   "updatedAt",
 ]);
 
-/** The page size `/api/v1/audit-log` allows, so neither API can be asked for the whole table. */
+/** As `/api/v1/audit-log`, so neither API can be asked for the whole table. */
 const MAX_AUDIT_LOG_LIMIT = 200;
 
-/** Whatever the type does not name as a field, so nothing on the model is unreachable. */
 function remainder(row: Record<string, unknown>, promoted: Set<string>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([key]) => !promoted.has(key)));
 }
@@ -110,7 +99,7 @@ function remainder(row: Record<string, unknown>, promoted: Set<string>): Record<
 type CertificateRow = Awaited<ReturnType<typeof listCertificates>>[number];
 type UserRow = Awaited<ReturnType<typeof listUsers>>[number];
 
-/** Named fields only. The row carries a private key. */
+/** The row carries a private key. */
 function projectCertificate(row: CertificateRow) {
   return {
     id: row.id,
@@ -123,7 +112,7 @@ function projectCertificate(row: CertificateRow) {
   };
 }
 
-/** Named fields only. The row carries a password hash and the OAuth subject. */
+/** The row carries a password hash and the OAuth subject. */
 function projectUser(row: UserRow) {
   return {
     id: row.id,
@@ -227,9 +216,7 @@ export const resolvers = {
     },
     dnsProviders: async (_: unknown, __: unknown, context: GraphQLContext) => {
       await requireAdmin(context);
-      // `configured` is deliberately not answered here: whether credentials exist is a settings
-      // read per provider, and the REST route does not answer it either. Listing what the build
-      // supports is the question this field is for.
+      // No `configured`: that is a settings read per provider, and REST does not answer it either.
       return DNS_PROVIDERS.map((provider) => ({
         id: provider.name,
         name: provider.displayName,
@@ -252,8 +239,7 @@ export const resolvers = {
     },
     settings: async (_: unknown, args: { group: string }, context: GraphQLContext) => {
       await requireAdmin(context);
-      // The REST route's groups and redaction, not a raw storage key: that read any row, secrets
-      // included.
+      // The REST groups and redaction: a raw storage key would read any row, secrets included.
       const settings = await readSettingsGroup(args.group);
       if (!settings) throw new NotFoundError("Unknown settings group");
       return settings.value;
@@ -385,8 +371,7 @@ export const resolvers = {
       context: GraphQLContext,
     ) => {
       const viewer = await context.viewer();
-      // As over REST: a stolen, possibly short-lived Bearer token must not mint a successor that
-      // outlives its own revocation or expiry.
+      // As over REST: a stolen Bearer token must not mint a successor outliving its revocation.
       if (viewer.authMethod !== "session") {
         throw new ApiAuthError("API tokens can only be created from an authenticated session", 403);
       }
@@ -395,8 +380,7 @@ export const resolvers = {
         viewer.userId,
         args.input.expiresAt ?? undefined,
       );
-      // The only time the secret is ever readable. Named `secret` in the schema because
-      // `rawToken` describes the storage decision rather than what the caller is holding.
+      // The only time the secret is readable.
       return { token: created.token, secret: created.rawToken };
     },
     deleteApiToken: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
@@ -412,10 +396,9 @@ export const resolvers = {
     ) => {
       await requireAdmin(context);
       if (!isSettingsGroup(args.group)) throw new NotFoundError("Unknown settings group");
-      // The REST route's implementation: the group's own saver (and its encryption), the Caddy
-      // apply and the rollback when Caddy refuses.
+      // As REST: the group's saver and encryption, the Caddy apply, and rollback on refusal.
       await saveSettingsGroup(args.group, args.input);
-      // What is now stored, redacted - never the credentials the caller just sent.
+      // Redacted - never the credentials the caller just sent.
       return (await readSettingsGroup(args.group))?.value ?? {};
     },
 

@@ -1,5 +1,4 @@
-# Dex OIDC provider configuration for E2E tests.
-# Provides static test users and a pre-configured OAuth client.
+# Dex for e2e: static test users and a pre-configured OAuth client.
 issuer: http://localhost:5556/dex
 
 storage:
@@ -9,7 +8,7 @@ web:
   http: 0.0.0.0:5556
 
 oauth2:
-  # Speed up tests - short-lived tokens
+  # Short-lived tokens speed up tests
   responseTypes: ["code"]
   skipApprovalScreen: true
 

@@ -21,11 +21,8 @@ type Translator = ReturnType<typeof useTranslations>;
 type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
 
 /**
- * The message to show for a failed action.
- *
- * A `DomainError` carries a code, so it can be said in the reader's language; anything else has
- * only the English sentence it was constructed with, and an unrecognized failure falls back to the
- * caller's own wording. Pass `t` from `await getTranslations()`.
+ * Only a `DomainError` is translated; another Error keeps its English and a non-Error gets the
+ * fallback. Pass `t` from `await getTranslations()`.
  */
 export function actionError(t: Translator, error: unknown, fallbackMessage: string): ActionState {
   return {
@@ -37,10 +34,7 @@ export function actionError(t: Translator, error: unknown, fallbackMessage: stri
 /** What a list param needs from next-intl's formatter; `await getFormatter()` is one. */
 export type ListFormatter = Pick<ReturnType<typeof useFormatter>, "list">;
 
-/**
- * `format` is for codes carrying a list param. Without it a list is joined the way the English
- * joins it, which is right for English and merely readable for anything else.
- */
+/** Without `format`, a list param is joined English-style, which is merely readable elsewhere. */
 export function extractErrorMessage(
   t: Translator,
   error: unknown,
@@ -64,11 +58,8 @@ export function extractErrorMessage(
 }
 
 /**
- * The message for a failure a background job stored: the update check, the GeoIP updater.
- *
- * They run with no reader, so they keep the English they always stored and, when the failure was
- * a `DomainError`, its code beside it. A result stored before the code existed, or a failure that
- * never had one (a refused connection), is shown in the English it was stored in.
+ * For failures a background job stored (update check, GeoIP updater): they have no reader, so they
+ * store English plus the code when there is one; with no code the stored English is shown.
  */
 export function storedErrorMessage(
   t: Translator,

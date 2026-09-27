@@ -1,19 +1,7 @@
 /**
- * What happens when Caddy refuses a config because Coraza could not build the WAF, and a CRS
- * plugin is to blame.
- *
- * Caddy keeps serving its previous config when a load fails, so nothing breaks at once - but every
- * later change would fail the same way until someone guessed which plugin to deselect. Instead the
- * failing plugin is found and switched off, and the config loads without it:
- *
- * 1. A rule id Coraza quoted names the plugin whose range holds it. Most refusals quote one.
- * 2. Otherwise every selected plugin is switched off. If the config still fails, the plugins were
- *    never the problem, nothing is kept switched off, and the original error goes on.
- * 3. Then they are switched back on one at a time, most recently changed first, and any that the
- *    config fails with stays off.
- *
- * Each step is a real load, and Caddy applies whichever succeeds, so the hosts keep every plugin
- * that loads while the rest are being tried.
+ * When Coraza cannot build the WAF, Caddy keeps its old config and every later change fails too,
+ * so the culprit CRS plugin is switched off: the one whose range holds a quoted rule id, else all,
+ * then back on one at a time (newest first). If all-off still fails, nothing stays off.
  */
 
 import { logAuditEvent } from "../audit";

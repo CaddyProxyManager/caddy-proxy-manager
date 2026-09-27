@@ -1,21 +1,7 @@
 /**
- * Copying a vetted legacy SQLite database into the current database, PostgreSQL or SQLite.
- *
- * Four things make this more than a row-for-row copy, and all four are derived from the schema
- * rather than from a list someone has to keep in step with it:
- *
- * 1. **Order.** Foreign keys mean `accounts` cannot land before `users`. The order is a
- *    topological sort of the schema's own foreign keys, so adding a table with a new reference
- *    orders itself.
- * 2. **Booleans.** SQLite stored them as 0/1 and PostgreSQL will not accept an integer in a
- *    boolean column. The columns that need converting are read off the drizzle schema.
- * 3. **Sequences.** Rows keep their ids so foreign keys stay intact, and PostgreSQL does not
- *    advance a `serial` for an explicit id - so every sequence is resynced afterwards. Skipping
- *    this is the bug that made the first post-migration insert fail with a duplicate key.
- * 4. **Selection.** An operator can leave a group behind - most usefully the old accounts. A
- *    table nobody chose is not copied, and the references into it are resolved from the foreign
- *    keys too: a nullable one is nulled, and a table that cannot exist without its parent is
- *    dropped along with it. Neither decision is a list, so a new table gets them for free.
+ * Copies a legacy SQLite database in. Everything derives from the schema, not a list: insert order
+ * from its foreign keys, 0/1 to booleans, serial resync (PostgreSQL ignores explicit ids), and
+ * references into unselected tables nulled, or the row dropped when it cannot exist without them.
  */
 import { Database } from "bun:sqlite";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
@@ -24,6 +10,7 @@ import db from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
+import { sealSecretColumn } from "../secret";
 import {
   ALL_MIGRATION_GROUP_IDS,
   MIGRATION_GROUPS,
@@ -31,35 +18,29 @@ import {
   tablesForSelection,
 } from "./selection";
 
-/** How many rows to insert per statement. Large enough to be fast, small enough to stay readable. */
 const BATCH_SIZE = 250;
 
 export type TableResult = { table: string; copied: number; skipped: number };
 
 export type ImportReport = {
   tables: TableResult[];
-  /** Tables the old database had that this version no longer has, named so nothing looks lost. */
+  /** Named so nothing looks lost. */
   droppedFromSchema: string[];
   /** Tables the selection left behind, so the summary can say what was deliberately not copied. */
   excludedBySelection: string[];
-  /**
-   * Columns emptied because what they pointed at was not migrated, as `table.column`. All of them
-   * are provenance - who created a row, who owned it - never something that grants access.
-   */
+  /** `table.column`; all provenance (who created or owned a row), never access-granting. */
   clearedReferences: string[];
   totalRows: number;
 };
 
 type Reference = {
-  /** The table pointed at. */
   target: string;
-  /** The local columns holding the reference. */
   columns: string[];
   /** True when the row cannot exist at all without its target. */
   required: boolean;
 };
 
-type Described = {
+export type Described = {
   key: string;
   /** Read for its shape only; rows are written to the active backend's table of the same key. */
   table: PgTable;
@@ -70,12 +51,11 @@ type Described = {
   serialColumn: string | null;
 };
 
-function describeTables(): Described[] {
+export function describeTables(): Described[] {
   const described: Described[] = [];
 
   for (const [key, value] of Object.entries(schema)) {
-    // The schema module also exports types and helpers. `is` is the only reliable runtime test:
-    // `$inferSelect` is a type-only phantom and is not present on the object at all.
+    // `is` is the only reliable runtime test: `$inferSelect` is a type-only phantom.
     if (!is(value, PgTable)) continue;
     const table = value as PgTable;
 
@@ -110,13 +90,8 @@ function describeTables(): Described[] {
   return described;
 }
 
-/**
- * Tables ordered so every reference is satisfied before the table that makes it.
- *
- * A self-reference is ignored rather than treated as a cycle - a table pointing at itself only
- * constrains row order within it, which the source database already satisfied.
- */
-function inFkOrder(tables: Described[]): Described[] {
+/** Self-references are ignored: they only constrain row order, which the source satisfied. */
+export function inFkOrder(tables: Described[]): Described[] {
   const byName = new Map(tables.map((table) => [table.name, table]));
   const ordered: Described[] = [];
   const state = new Map<string, "visiting" | "done">();
@@ -154,15 +129,11 @@ function sqliteColumns(source: Database, table: string): Set<string> {
 }
 
 /**
- * Convert one SQLite row into what the PostgreSQL column expects.
- *
- * Only booleans actually differ. Everything else - text, integers, the JSON this app keeps in text
- * columns - round-trips as-is, and coercing it would risk changing values that were already right.
- *
- * `cleared` names columns whose target table is not being migrated. They are emptied rather than
- * carried, because an id pointing into a table that stayed behind is a foreign key violation.
+ * Only booleans differ; coercing anything else risks changing values that were right. `cleared`
+ * columns point into tables left behind, which would violate the foreign key.
  */
 function convertRow(
+  table: string,
   row: Record<string, unknown>,
   columns: Described["columns"],
   available: Set<string>,
@@ -181,21 +152,19 @@ function convertRow(
       converted[column.name] = value === 1;
       continue;
     }
-    // Ciphertext bound to the old deployment's SESSION_SECRET is re-encrypted under this one's.
-    // Applied to every text column rather than to a named list: `rekey` keys off the `enc:v1:`
-    // marker, so it is a no-op on the columns that hold no secret.
-    converted[column.name] = typeof value === "string" ? rekey(value) : (value ?? null);
+    // Re-encrypt under this SESSION_SECRET. Every text column: `rekey` keys off the `enc:v1:`
+    // marker - which misses the plain-text keys a pre-3.0 database kept.
+    converted[column.name] =
+      typeof value === "string"
+        ? sealSecretColumn(table, column.name, rekey(value))
+        : (value ?? null);
   }
   return converted;
 }
 
 /**
- * The tables that can actually be written, given what the operator chose.
- *
- * A group left behind takes more with it than its own tables: `api_tokens.createdBy` is not
- * nullable, so an API token cannot exist without the user it belongs to. Rather than enumerate
- * that, this closes over the required references until nothing more falls out - so a table added
- * later is handled by its own foreign key, not by someone remembering to add it to a list.
+ * Closes over required references (`api_tokens.createdBy` needs its user) until nothing more
+ * falls out, so a new table is handled by its own foreign key rather than a list.
  */
 function resolveIncluded(tables: Described[], chosen: Set<string>): Set<string> {
   const byName = new Map(tables.map((table) => [table.name, table]));
@@ -215,7 +184,7 @@ function resolveIncluded(tables: Described[], chosen: Set<string>): Set<string> 
   }
 }
 
-/** The columns of `table` that point at something not being migrated, and so must be emptied. */
+/** Columns pointing at something not being migrated. */
 function clearedColumns(table: Described, included: Set<string>): Set<string> {
   const cleared = new Set<string>();
   for (const reference of table.references) {
@@ -226,14 +195,8 @@ function clearedColumns(table: Described, included: Set<string>): Set<string> {
 }
 
 /**
- * Copy the chosen groups from `sqlitePath` into the connected database.
- *
- * The destination is expected to be empty - this runs during setup, before anything else has been
- * created - so rows keep their ids and conflicts are skipped rather than merged. Merging two
- * populated databases is a different problem, and guessing at it would silently pick a winner.
- *
- * `groups` defaults to everything, which is both the previous behaviour and the one the setup page
- * offers first.
+ * The destination is expected empty (this runs during setup), so ids are kept and conflicts are
+ * skipped, not merged - merging would silently pick a winner.
  */
 export async function importLegacyDatabase(
   sqlitePath: string,
@@ -248,8 +211,7 @@ export async function importLegacyDatabase(
     const described = inFkOrder(describeTables());
     const known = new Set(described.map((table) => table.name));
 
-    // A table no group claims is migrated regardless: a selection should never be the reason data
-    // silently disappears. The coverage test is what catches an unclaimed table.
+    // A table no group claims is migrated regardless; the coverage test catches it.
     const chosen = tablesForSelection(groups);
     const claimed = new Set(MIGRATION_GROUPS.flatMap((group) => group.tables));
     for (const table of described) {
@@ -262,13 +224,8 @@ export async function importLegacyDatabase(
     const clearedReferences: string[] = [];
     let totalRows = 0;
 
-    // Read and convert everything before writing anything.
-    //
-    // Conversion is where a secret encrypted under the old deployment's SESSION_SECRET is
-    // re-encrypted under this one's, and where a wrong key is discovered. Doing that up front is
-    // the difference between a migration that refuses to start and one that stops halfway with a
-    // partly populated database - which the operator is told never to retry against. A legacy
-    // database is small enough to hold in memory; that is the whole cost of the guarantee.
+    // Convert everything before writing: a wrong SESSION_SECRET must refuse to start, not stop
+    // halfway through a database that must never be retried. Legacy databases fit in memory.
     const prepared: Array<{ table: Described; rows: Array<Record<string, unknown>> }> = [];
 
     for (const table of described) {
@@ -291,11 +248,15 @@ export async function importLegacyDatabase(
         table,
         rows: rows.map((row) => {
           try {
-            return convertRow(row, table.columns, available, cleared, rekey);
+            const converted = convertRow(table.name, row, table.columns, available, cleared, rekey);
+            // Mirrors migration 0015: a list from before "Pass auth to host" always forwarded it.
+            if (table.name === "access_lists" && !available.has("passAuth")) {
+              converted.passAuth = true;
+            }
+            return converted;
           } catch (error) {
             if (error instanceof LegacySecretError) {
-              // Named, because "which of thirty tables" is the first thing anyone asks. The row is
-              // not identified: its id would say little and its contents are the secret itself.
+              // The table, not the row: the row's contents are the secret itself.
               throw new LegacySecretError(error.reason, table.name);
             }
             throw error;
@@ -310,8 +271,7 @@ export async function importLegacyDatabase(
         const batch = rows.slice(index, index + BATCH_SIZE);
         if (batch.length === 0) continue;
 
-        // `returning` so the count is rows actually written: onConflictDoNothing silently drops
-        // duplicates, and reporting the batch size would claim work a re-run did not do.
+        // `returning`, since onConflictDoNothing silently drops duplicates.
         const inserted = await db
           .insert(activeSchema[table.key as keyof typeof activeSchema] as PgTable)
           // biome-ignore lint/suspicious/noExplicitAny: the row shape is per-table, and this loop is generic over all thirty
@@ -332,8 +292,7 @@ export async function importLegacyDatabase(
 
     return {
       tables: results,
-      // Named rather than silently ignored: an operator whose old database had waf_events should
-      // be told those are gone, not left to notice later.
+      // Named, so an operator whose old database had waf_events is told they are gone.
       droppedFromSchema: [...present].filter(
         (name) => !known.has(name) && !name.startsWith("sqlite_") && !name.startsWith("__drizzle"),
       ),
@@ -346,13 +305,8 @@ export async function importLegacyDatabase(
   }
 }
 
-/**
- * Move a serial's sequence past the highest id just inserted.
- *
- * `setval` with a third argument of false would set "next value is this"; the default true means
- * "this was the last value used", which is what a copied table needs.
- */
-async function resyncSequence(table: string, column: string): Promise<void> {
+/** `setval`'s default third argument (true) means "last value used", as a copied table needs. */
+export async function resyncSequence(table: string, column: string): Promise<void> {
   await db.execute(
     sql`SELECT setval(
           pg_get_serial_sequence(${table}, ${column}),

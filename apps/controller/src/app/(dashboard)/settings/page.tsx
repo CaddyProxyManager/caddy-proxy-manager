@@ -24,13 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("settings") };
 }
 
-/**
- * The settings landing page.
- *
- * Reads deliberately less than a section page does: every value here feeds one line on one tile,
- * so pulling the full settings surface to render a summary of it would make the cheapest page in
- * the section the most expensive.
- */
+/** Reads less than a section page: each value feeds one tile line, not a whole form. */
 export default async function SettingsPage() {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
@@ -67,8 +61,7 @@ export default async function SettingsPage() {
     listCertificates(),
     stagedKeys(userId),
     stagedView(userId),
-    // Agent reachability is a property of this process and is never allowed to fail the page: an
-    // unreachable agent is a tile that says so, not a 500.
+    // An unreachable agent is a tile that says so, never a 500.
     listAgents().catch(() => []),
     listAgentOptions()
       .then((options) => options.filter((option) => option.connected).length)

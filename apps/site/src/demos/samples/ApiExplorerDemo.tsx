@@ -11,11 +11,7 @@ import { DemoSurface } from "../DemoSurface";
 
 type Example = { label: string; query: string; response: string };
 
-/**
- * Three queries against the shape the schema actually has: fields for the stable things, a `JSON`
- * scalar for the configuration the model layer owns. The responses are what this deployment would
- * answer - no request leaves the page.
- */
+/** Against the schema's real shape; no request leaves the page. */
 const EXAMPLES: Record<string, Example> = {
   hosts: {
     label: "List proxy hosts",
@@ -115,8 +111,7 @@ export default function ApiExplorerDemo() {
     setSent(false);
   };
 
-  // The delay is the honest part of the illusion: it makes clear the response is an answer to the
-  // query above rather than something that was always on screen.
+  // The delay shows the response answers the query, rather than always being there.
   const send = () => {
     setSending(true);
     setTimeout(() => {

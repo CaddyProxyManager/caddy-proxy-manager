@@ -1,10 +1,7 @@
 /**
- * Whether a desired-state frame starts a Caddy rebuild.
- *
- * The controller only pushes desired state, so this diff is the only trigger a rebuild has. An agent
- * that has never rebuilt records no applied modules, and treating that as "nothing to compare" left
- * the first rebuild on every fresh install silently undone. It is the shipped image instead - which
- * also has to keep an unchanged selection from recompiling Caddy on every reconnect.
+ * Whether a desired-state frame starts a Caddy rebuild - the only trigger one has. With no applied
+ * modules recorded the baseline is the shipped image, or a fresh install's first rebuild is lost
+ * and an unchanged selection recompiles Caddy on every reconnect.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

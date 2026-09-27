@@ -1,32 +1,25 @@
 /**
- * Applies an IdP's group claim to a CPM user: role assignment, and optionally mirrored CPM groups.
- * The claims are read in the OAuth callback's `mapProfileToUser`, which has no user id yet, so the
- * result is parked in a short-lived registry keyed by provider + subject and consumed at session
- * creation.
+ * Applies an IdP's group claim to a CPM user. `mapProfileToUser` has no user id yet, so the result
+ * is parked by provider + subject and consumed at session creation.
  */
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { type AppRole, normalizeGroupName } from "../oidc-groups";
 import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
+import { isLastActiveAdmin, withAdminLock } from "../models/user";
 
 export type PendingOidcSync = {
   providerId: string;
   subject: string;
   providerName: string;
-  /** Role the claims resolved to, or null when role mapping is off. */
+  /** Null when role mapping is off. */
   role: AppRole | null;
-  /** CPM group names mirrored from the claim, empty when group sync is off. */
+  /** Empty when group sync is off. */
   localGroups: string[];
-  /**
-   * The claimed group names, verbatim.
-   *
-   * Carried as well as the mirrored list because the explicit IdP→group mappings live in the
-   * database and `mapProfileToUser` is synchronous - it cannot read them. They are resolved in
-   * `applyGroups`, which is already async and already the only writer of memberships.
-   */
+  /** Verbatim: the explicit mappings are in the database, out of sync `mapProfileToUser`'s reach. */
   claimedGroups: string[];
   syncGroups: boolean;
 };
@@ -66,29 +59,31 @@ export function consumePendingOidcSync(
   return found.entry;
 }
 
-/** Exposed for tests - the registry is process-wide state. */
+/** For tests: the registry is process-wide. */
 export function clearPendingOidcSyncs(): void {
   pending.clear();
 }
 
-async function countOtherActiveAdmins(userId: number): Promise<number> {
-  const rows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
-  return rows.filter((row) => row.id !== userId).length;
+async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> {
+  const role = entry.role;
+  if (role === null) return;
+
+  // Under the admin lock: two reconciliations demoting each other would both see the other admin.
+  await withAdminLock(() => applyRoleLocked(userId, role, entry));
 }
 
-async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> {
-  if (entry.role === null) return;
-
+async function applyRoleLocked(
+  userId: number,
+  role: NonNullable<PendingOidcSync["role"]>,
+  entry: PendingOidcSync,
+): Promise<void> {
   const current = await db.query.users.findFirst({
     where: (table, { eq: equals }) => equals(table.id, userId),
   });
-  if (!current || current.role === entry.role) return;
+  if (!current || current.role === role) return;
 
   // Never let a claim change lock the instance out of its last administrator.
-  if (current.role === "admin" && (await countOtherActiveAdmins(userId)) === 0) {
+  if (current.role === "admin" && (await isLastActiveAdmin(userId))) {
     console.warn(
       `[oidc-group-sync] Skipping demotion of user ${userId} to "${entry.role}": they are the last active admin.`,
     );
@@ -102,7 +97,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
     return;
   }
 
-  await db.update(users).set({ role: entry.role, updatedAt: nowIso() }).where(eq(users.id, userId));
+  await db.update(users).set({ role, updatedAt: nowIso() }).where(eq(users.id, userId));
 
   await logAuditEvent({
     userId,
@@ -116,9 +111,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
 async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void> {
   if (!entry.syncGroups) return;
 
-  // Explicit mappings first, and they win: a claimed group named in one lands in the CPM group it
-  // names, and is then kept out of the prefix mirroring below - otherwise one claim would put the
-  // user in two groups, the mapped one and a mirror of its raw IdP name.
+  // Explicit mappings win and are kept out of the mirroring, or one claim lands in two groups.
   const [explicit, explicitKeys] = await Promise.all([
     mappedGroupNames(entry.claimedGroups, entry.providerId),
     mappedExternalKeys(entry.providerId),
@@ -140,9 +133,8 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   const groupsById = new Map(existingGroups.map((group) => [group.id, group]));
   const memberGroupIds = new Set(memberships.map((m) => m.groupId));
 
-  // A mirrored name joins only an IdP-owned group. A UI group that merely shares the name carries
-  // grants the operator never tied to the IdP, so that claim is skipped - not given a twin, since
-  // names are unique. An explicit mapping is the operator's own choice and may name any group.
+  // A mirrored name joins only an IdP-owned group: a UI group sharing the name carries grants never
+  // tied to the IdP. An explicit mapping may name any group.
   const explicitNames = new Set(explicit.map((name) => name.toLowerCase()));
   const added: string[] = [];
   for (const [key, name] of desired) {
@@ -175,8 +167,7 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
     added.push(group.name);
   }
 
-  // Only IdP-owned groups are reconciled: a group an operator created in the UI keeps whatever
-  // membership they gave it.
+  // Only IdP-owned groups: a UI-created group keeps the membership the operator gave it.
   const removed: string[] = [];
   for (const membership of memberships) {
     const group = groupsById.get(membership.groupId);
@@ -206,10 +197,7 @@ export async function applyOidcSync(userId: number, entry: PendingOidcSync): Pro
   await applyGroups(userId, entry);
 }
 
-/**
- * Called after better-auth creates a session. Finds this user's pending mapping via their linked
- * accounts, so concurrent sign-ins cannot pick up each other's claims.
- */
+/** Looks up via linked accounts, so concurrent sign-ins cannot pick up each other's claims. */
 export async function reconcileOidcUserAfterSignIn(userId: number): Promise<void> {
   if (pending.size === 0 || !Number.isFinite(userId)) return;
 

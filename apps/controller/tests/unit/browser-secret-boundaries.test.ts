@@ -58,9 +58,8 @@ describe('browser secret boundaries', () => {
   });
 
   it('keeps the settings home from handing raw settings blobs to the client', () => {
-    // The home reads credential-bearing blobs (DNS provider tokens among them) to derive one line
-    // of status per tile. Only `sectionHealth`'s output may cross to the client component, and
-    // that carries names and counts - never the blobs it was computed from.
+    // The home reads credential-bearing blobs for tile status; only `sectionHealth`'s names and
+    // counts may cross to the client component.
     const homePage = readFileSync(
       join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
       'utf8',
@@ -69,5 +68,19 @@ describe('browser secret boundaries', () => {
     const props = homePage.match(/<SettingsHome([^/]*)\/>/)?.[1] ?? '';
     expect(props).not.toMatch(/dnsProvider|tailscale|acme=|geoip=|analytics=/);
     expect(props).toMatch(/sections=\{sections\}/);
+  });
+
+  it("sends the profile page whether a password is set, never the user's hash", () => {
+    const profilePage = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/profile/page.tsx'),
+      'utf8',
+    );
+    const profileClient = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/profile/ProfileClient.tsx'),
+      'utf8',
+    );
+    expect(profilePage).not.toMatch(/user=\{user\}/);
+    expect(profilePage).toContain('hasPassword: Boolean(user.passwordHash)');
+    expect(profileClient).not.toContain('passwordHash');
   });
 });

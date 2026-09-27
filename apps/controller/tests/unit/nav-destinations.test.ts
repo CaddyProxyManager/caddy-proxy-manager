@@ -1,9 +1,6 @@
 /**
- * Who sees which page, and what the phone's More drawer holds.
- *
- * The desktop rail, the mobile tab bar, the drawer and the More page all read one list, so these
- * rules are the whole of what keeps them agreeing - and the drawer is saved per user, which means a
- * choice can outlive the role that made it.
+ * Rail, tab bar, drawer and More page all read one list. The drawer is saved per user, so a choice
+ * can outlive the role that made it.
  */
 import { describe, expect, it } from 'bun:test';
 import {
@@ -40,9 +37,9 @@ describe('visibleDestinations', () => {
 });
 
 describe('moreDestinations', () => {
-  it('holds the nine pages the tab bar cannot name, for an admin', () => {
+  it('holds the ten pages the tab bar cannot name, for an admin', () => {
     const more = ids(moreDestinations('admin'));
-    expect(more).toHaveLength(9);
+    expect(more).toHaveLength(10);
     for (const tab of ['overview', 'proxy-hosts', 'l4-proxy-hosts', 'agents', 'analytics']) {
       expect(more).not.toContain(tab);
     }
@@ -69,8 +66,7 @@ describe('resolveDrawer', () => {
   });
 
   it('drops pages the role can no longer open', () => {
-    // A demoted admin keeps a saved drawer that names Settings; showing it would be a door that
-    // only refuses them.
+    // A demoted admin's saved drawer still names Settings.
     expect(ids(resolveDrawer(['settings', 'profile', 'waf'], 'operator'))).toEqual(['profile']);
   });
 

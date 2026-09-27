@@ -24,10 +24,7 @@ export type CaddyDefaultResponseRoute = {
 const HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-/**
- * A default response that cannot be stored. A `DomainError`, so the settings screen says it in the
- * reader's language, while `/api/v1` still catches this class and answers 400 with the English.
- */
+/** A `DomainError` so the screen translates it; `/api/v1` still answers 400 in English. */
 export class DefaultResponseValidationError extends DomainError {
   constructor(code: DomainErrorCode, params: DomainErrorParams = {}) {
     super(code, params, domainErrorMessage(code, params));
@@ -78,11 +75,7 @@ function normalizeHeaders(value: unknown): Record<string, string> | undefined {
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
-/**
- * Validate and canonicalize the persisted/API representation. Keeping this
- * strict prevents a bad setting from being saved and making Caddy reject every
- * subsequent configuration reload.
- */
+/** Strict: a bad stored value would make Caddy reject every later reload. */
 export function normalizeDefaultResponseSettings(value: unknown): DefaultResponseSettings {
   if (!isRecord(value)) {
     invalid("defaultResponseSettingsNotObject");
@@ -135,10 +128,7 @@ export function normalizeDefaultResponseSettings(value: unknown): DefaultRespons
   };
 }
 
-/**
- * The settings form's headers box: one `Name: value` per line, blank lines skipped. Only shape is
- * checked here - `normalizeDefaultResponseSettings` still validates the names and values.
- */
+/** Shape only; `normalizeDefaultResponseSettings` validates the names and values. */
 export function parseDefaultResponseHeaders(value: unknown): Record<string, string> | undefined {
   if (typeof value !== "string" || value.trim().length === 0) return undefined;
 
@@ -163,7 +153,6 @@ function caddyHeaders(
   return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, [value]]));
 }
 
-/** Build the final matcher-less route for CPM's main HTTP server. */
 export function buildDefaultResponseRoute(
   settings: DefaultResponseSettings | null | undefined,
 ): CaddyDefaultResponseRoute | null {

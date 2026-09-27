@@ -35,6 +35,7 @@ import {
   parsePathBlocksConfig,
   parsePathRewritesConfig,
   parseProxyHostOptionUpdates,
+  parseCacheConfig,
   parseRedirectsConfig,
   parseRewriteConfig,
   parseTailscaleConfig,
@@ -51,13 +52,13 @@ export async function createProxyHostAction(
   try {
     const session = await requireAdmin();
     const userId = Number(session.user.id);
+    const boolField = (key: string) =>
+      formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
-    // Parse certificateId safely, then validate it exists and get the sanitized value
     const { certificateId, warning, missing } = await validateAndSanitizeCertificateId(
       parseCertificateId(formData.get("certificateId")),
     );
 
-    // Log warning if certificate was auto-fallback
     if (warning) {
       console.warn(`[createProxyHostAction] ${warning}`);
     }
@@ -65,17 +66,19 @@ export async function createProxyHostAction(
     const host = await createProxyHost(
       {
         name: String(formData.get("name") ?? "Untitled"),
+        description: formData.has("description") ? String(formData.get("description")) : undefined,
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
-        // No checkboxes ticked is the empty list, which means every agent - the same thing the
-        // field being absent means, so a client that predates assignments keeps working.
+        // Empty means every agent, as an absent field does, so older clients keep working.
         agentIds: parseAgentIds(formData.getAll("agentId")),
         certificateId: certificateId,
         accessListId: parseAccessListId(formData.get("accessListId")),
-        sslForced: formData.has("sslForcedPresent")
-          ? parseCheckbox(formData.get("sslForced"))
-          : undefined,
+        // An absent marker takes the model's default, so a form without a toggle keeps it on.
+        sslForced: boolField("sslForced"),
+        hstsEnabled: boolField("hstsEnabled"),
         hstsSubdomains: parseCheckbox(formData.get("hstsSubdomains")),
+        allowWebsocket: boolField("allowWebsocket"),
+        preserveHostHeader: boolField("preserveHostHeader"),
         skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
         enabled: parseCheckbox(formData.get("enabled")),
         customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
@@ -93,6 +96,7 @@ export async function createProxyHostAction(
         mtls: parseMtlsConfig(formData),
         redirects: parseRedirectsConfig(formData),
         rewrite: parseRewriteConfig(formData),
+        cache: parseCacheConfig(formData) ?? null,
         locationRules: parseLocationRulesConfig(formData),
         pathAllows: parsePathAllowsConfig(formData),
         pathBlocks: parsePathBlocksConfig(formData),
@@ -102,7 +106,6 @@ export async function createProxyHostAction(
       userId,
     );
 
-    // Save forward auth access if CPM forward auth is enabled
     const faUserIds = formData
       .getAll("cpmFaUserId")
       .map((v) => Number(v))
@@ -117,7 +120,6 @@ export async function createProxyHostAction(
 
     revalidatePath("/proxy-hosts");
 
-    // Return success with warning if applicable
     const t = await getTranslations("proxyHosts");
     if (missing) {
       const id = String(missing.id);
@@ -142,22 +144,19 @@ export async function updateProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    // An operator may edit a host their groups were granted; creating one stays with admins,
-    // because a grant names a host that already exists. The raw Caddy config fields stay
-    // admin-only too, which updateProxyHost enforces.
+    // Operators may edit granted hosts but not create them: a grant names an existing host.
+    // updateProxyHost keeps the raw Caddy config fields admin-only.
     const access = await requireAccess();
     assertCanManage(access, "proxyHost", id);
     const userId = access.userId;
     const boolField = (key: string) =>
       formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
-    // Parse and validate certificate_id if present
     let certificateId: number | null | undefined;
     let warning: string | undefined;
     let missing: { id: number; cloudflareConfigured: boolean } | undefined;
 
     if (formData.has("certificateId")) {
-      // Validate certificate exists and get sanitized value
       const validation = await validateAndSanitizeCertificateId(
         parseCertificateId(formData.get("certificateId")),
       );
@@ -165,7 +164,6 @@ export async function updateProxyHostAction(
       warning = validation.warning;
       missing = validation.missing;
 
-      // Log warning if certificate was auto-fallback
       if (warning) {
         console.warn(`[updateProxyHostAction] ${warning}`);
       }
@@ -175,13 +173,12 @@ export async function updateProxyHostAction(
       id,
       {
         name: formData.get("name") ? String(formData.get("name")) : undefined,
+        description: formData.has("description") ? String(formData.get("description")) : undefined,
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
         upstreams: formData.get("upstreams")
           ? parseUpstreams(formData.get("upstreams"))
           : undefined,
-        // Gated on the marker, not on the values: an empty list is a real edit ("serve this
-        // everywhere"), and reading it as "field absent" would make clearing the selection
-        // impossible.
+        // Gated on the marker: an empty list is a real edit ("everywhere"), not an absent field.
         agentIds: formData.has("agentAssignmentPresent")
           ? parseAgentIds(formData.getAll("agentId"))
           : undefined,
@@ -195,7 +192,6 @@ export async function updateProxyHostAction(
       userId,
     );
 
-    // Save forward auth access if the section is present in the form
     if (formData.has("cpmForwardAuthPresent")) {
       const faUserIds = formData
         .getAll("cpmFaUserId")
@@ -210,7 +206,6 @@ export async function updateProxyHostAction(
 
     revalidatePath("/proxy-hosts");
 
-    // Return success with warning if applicable
     const t = await getTranslations("proxyHosts");
     if (missing) {
       const id = String(missing.id);

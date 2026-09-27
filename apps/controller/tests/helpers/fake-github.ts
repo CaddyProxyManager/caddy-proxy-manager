@@ -1,8 +1,4 @@
-/**
- * A stand-in for the GitHub endpoints the CRS plugin registry client calls: the registry JSON, a
- * repository's latest release or HEAD commit, its plugins/ listing, and raw files. Records every
- * URL asked for, so a test can assert nothing was fetched from anywhere else.
- */
+/** The GitHub endpoints the CRS plugin client calls; records every URL so tests can assert on them. */
 import type { Fetcher } from '../../src/lib/crs-plugins/registry';
 
 export type FakeRepo = {

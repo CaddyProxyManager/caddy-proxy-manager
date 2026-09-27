@@ -94,11 +94,9 @@ describe('sessions model', () => {
     expect(await revokeUserSession(1, 20)).toBe(false);
     expect((await listUserSessions(2)).map((s) => s.id)).toEqual([20]);
 
-    // Can revoke own.
     expect(await revokeUserSession(1, 10)).toBe(true);
     expect(await listUserSessions(1)).toEqual([]);
 
-    // Revoking a non-existent session returns false.
     expect(await revokeUserSession(1, 9999)).toBe(false);
   });
 

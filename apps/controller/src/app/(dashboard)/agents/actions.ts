@@ -1,11 +1,8 @@
 "use server";
 
 /**
- * The two things an operator can do to an agent they were granted.
- *
- * Rebuilding and renaming, and nothing else. Pairing, unpairing and disabling an agent decide
- * whether the controller talks to that host at all, which is a question about the fleet rather
- * than about the hosts one team runs - so those stay on Settings, behind `requireAdmin`.
+ * Only rebuild and rename for a granted operator: pairing and disabling are fleet questions, so
+ * they stay on Settings behind `requireAdmin`.
  */
 
 import { revalidatePath } from "next/cache";

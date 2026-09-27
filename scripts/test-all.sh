@@ -26,8 +26,7 @@ lint_status=$?
 run_step "Typecheck" bun run typecheck
 typecheck_status=$?
 
-# Coverage rather than a bare run: this is the "check everything" entry point,
-# so it is where the coverage ratchet in scripts/coverage-ratchet.ts belongs.
+# The "check everything" entry point, so the coverage ratchet belongs here.
 run_step "Unit + integration + coverage" bun run test:coverage
 unit_status=$?
 

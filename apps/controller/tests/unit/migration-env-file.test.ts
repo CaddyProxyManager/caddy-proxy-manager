@@ -1,9 +1,6 @@
 /**
- * Planning the `.env` cleanup once the settings live in the database.
- *
- * The app never sees that file, so what is pinned here is the decision: which variables it tells
- * the operator to comment out, which it tells them to leave, and that the command it hands over
- * matches the first list and only the first list.
+ * The app never sees `.env`, so this pins the advice: what to comment out, what to leave, and that
+ * the command it hands over matches the first list only.
  */
 import { describe, expect, it } from 'bun:test';
 import { planEnvCleanup } from '@/src/lib/migration/env-file';
@@ -24,9 +21,7 @@ describe('planEnvCleanup', () => {
       'GEOIPUPDATE_LICENSE_KEY',
     ]);
 
-    // Compose provisions clickhouse from its password and cannot read the database, so commenting
-    // it out would break the next `docker compose up` on a stack with no agent. Only the controller
-    // reads the MaxMind key now, so that one can go.
+    // Compose provisions clickhouse from it and cannot read the database; the MaxMind key can go.
     expect(keep).toEqual(['CLICKHOUSE_PASSWORD']);
     expect(comment).toEqual(['APP_NAME', 'GEOIPUPDATE_LICENSE_KEY']);
     expect(command).not.toContain('CLICKHOUSE_PASSWORD');
@@ -34,8 +29,7 @@ describe('planEnvCleanup', () => {
   });
 
   it('ignores a name that is not a setting', () => {
-    // SESSION_SECRET and DATABASE_URL have to be read before the database can be, so they are not
-    // in the registry at all and must never reach the generated command.
+    // Read before the database can be, so never in the registry or the command.
     const { comment, command } = planEnvCleanup(['SESSION_SECRET', 'DATABASE_URL', 'APP_NAME']);
 
     expect(comment).toEqual(['APP_NAME']);
@@ -45,7 +39,6 @@ describe('planEnvCleanup', () => {
 
   it('has no command when nothing can be removed', () => {
     expect(planEnvCleanup([]).command).toBeNull();
-    // Every migrated variable still being needed by Compose is the same case.
     expect(planEnvCleanup(['CLICKHOUSE_PASSWORD']).command).toBeNull();
   });
 
@@ -57,10 +50,8 @@ describe('planEnvCleanup', () => {
     expect(command).toContain('.env');
     expect(command).toContain('# migrated to the database:');
     expect(command).toContain("migrated='APP_NAME|BASE_URL'");
-    // The names reach sed through a shell variable, so the emitted text must carry a live
-    // `${migrated}` for the shell to expand. `\${` in the template literal that builds this is a
-    // JavaScript escape -- it produces `${`, and the backslash never reaches the shell. Pinned
-    // because it reads like a shell escape at a glance, and a reviewer has already read it as one.
+    // A live `${migrated}` for the shell. The builder's `\${` is a JS escape, not a shell one -
+    // pinned because a reviewer has already misread it.
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal `${` is the assertion
     expect(command).toContain('(${migrated})');
     expect(command).not.toContain('\\${');

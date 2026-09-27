@@ -28,9 +28,8 @@ type Pkcs12ExportOptions = NonNullable<Parameters<typeof forge.pkcs12.toPkcs12As
 };
 
 /**
- * RSA keygen on the crypto threadpool rather than forge's pure-JS version, which blocks the loop
- * for the whole generation (~150-450ms at 4096 bits). Returns forge key objects, so the built
- * certificate and stored PEM stay byte-identical.
+ * On the crypto threadpool: forge's pure-JS keygen blocks the loop ~150-450ms at 4096 bits.
+ * Returns forge key objects, so the certificate and stored PEM stay byte-identical.
  */
 async function generateForgeKeyPair(bits: number) {
   const { privateKey, publicKey } = await generateKeyPairAsync("rsa", {
@@ -95,8 +94,8 @@ export async function deleteCaCertificateAction(
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   try {
-    // Wrapped so a `DomainError` ("not found") is already in the reader's language by the time the
-    // catch below hands its message to the dialog. `requireAdmin` stays outside: its redirect throws.
+    // Translates a DomainError before the catch hands it to the dialog. `requireAdmin` stays
+    // outside: its redirect throws.
     await withTranslatedErrors(() => deleteCaCertificate(id, userId));
     revalidatePath("/certificates");
     return { success: true };
@@ -177,9 +176,8 @@ async function issueClientCertificateActionUntranslated(
   if (!commonName) throw domainError("commonNameRequired");
   if (!exportPassword) throw domainError("exportPasswordRequired");
 
-  // The .p12 leaves this deployment as a file, and forge's PKCS#12 MAC is still SHA-1, so this
-  // password is the only thing between whoever holds the bundle and the client private key. Hold
-  // it to the same bar as a login password rather than accepting anything non-empty.
+  // The .p12 leaves as a file with a SHA-1 MAC, so this password alone guards the private key:
+  // hold it to the login-password bar.
   const t = await getTranslations();
   const exportPasswordError = passwordPolicyMessage(
     t,
@@ -189,8 +187,7 @@ async function issueClientCertificateActionUntranslated(
   if (exportPasswordError) throw new Error(exportPasswordError);
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
-  // A code rather than a sentence: this reaches the issue dialog, `/api/v1/*` and the agent's sync,
-  // and only the first of those has a reader with a language. See `domain-error.ts`.
+  // A code, not a sentence: see `domain-error.ts`.
   if (!caPrivateKeyPem) throw domainError("caCertificatePrivateKeyMissing");
 
   const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
@@ -235,9 +232,8 @@ async function issueClientCertificateActionUntranslated(
   );
   revalidatePath("/certificates");
 
-  // AES-256 unconditionally, with forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF)
-  // raised - this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
-  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo; the PKCS#12 MAC stays SHA-1.
+  // Forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF) raised, since the bundle
+  // leaves as a file. The PKCS#12 MAC stays SHA-1.
   const pkcs12Options = {
     algorithm: "aes256",
     friendlyName: commonName,
@@ -271,9 +267,8 @@ export async function revokeIssuedClientCertificateAction(
 }
 
 /*
- * These three return data, so they cannot report a failure as an `ActionState` the way the
- * proxy-host actions do. They still throw; the wrapper is what turns the code into the reader's
- * language first, since only the server can reach the catalog.
+ * These return data, so they throw rather than return an `ActionState`; the wrapper translates
+ * first, since only the server can reach the catalog.
  */
 
 export async function createCaCertificateAction(formData: FormData) {

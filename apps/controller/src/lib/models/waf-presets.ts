@@ -34,7 +34,7 @@ export type WafPresetInput = {
   directives: string;
 };
 
-/** Where a preset is selected. The dashboard host has no name of its own, so it is a flag. */
+/** The dashboard host has no name of its own, so it is a flag. */
 export type WafPresetUsage = {
   global: boolean;
   dashboard: boolean;
@@ -54,7 +54,7 @@ function toWafPreset(row: PresetRow): WafPreset {
   };
 }
 
-/** What a host form's picker needs: never the directives. */
+/** Never the directives. */
 export function toWafPresetOption(preset: WafPreset): {
   id: number;
   name: string;
@@ -65,7 +65,7 @@ export function toWafPresetOption(preset: WafPreset): {
 
 // ── Validation ───────────────────────────────────────────────────────
 
-/** The same allowlist custom directives pass, applied at write time so nothing is dropped later. */
+/** The custom-directive allowlist, at write time so nothing is dropped later. */
 function validateDirectives(directives: string): string {
   // A browser submits textarea and hidden-input values with CRLF line breaks.
   const trimmed = directives.replace(/\r\n?/g, "\n").trim();
@@ -158,7 +158,6 @@ export async function getWafPreset(id: number): Promise<WafPreset | null> {
   return row ? toWafPreset(row) : null;
 }
 
-/** id -> directives, for the Caddy builder. */
 export async function getWafPresetDirectives(): Promise<Map<number, string>> {
   const rows = await db
     .select({ id: wafPresets.id, directives: wafPresets.directives })
@@ -177,7 +176,7 @@ function presetIdsInMeta(meta: string | null): number[] {
   }
 }
 
-/** Where each preset is selected, keyed by preset id. Presets selected nowhere are absent. */
+/** Presets selected nowhere are absent. */
 export async function getWafPresetUsage(): Promise<Map<number, WafPresetUsage>> {
   const [global, dashboard, hosts] = await Promise.all([
     getWafSettings(),
@@ -229,7 +228,6 @@ export async function createWafPreset(
     summary: `Created WAF preset ${name}`,
   });
 
-  // Nothing selects a new preset yet, so there is no config to apply.
   return toWafPreset(record);
 }
 

@@ -98,8 +98,7 @@ export function compareHostPatterns(a: string, b: string) {
   return compareHostInfo(getHostPatternInfo(a), getHostPatternInfo(b));
 }
 
-// The sorts below parse each pattern once up front; parsing inside the comparator repeats it on
-// every comparison.
+// The sorts below parse once up front rather than on every comparison.
 function compareHostInfo(infoA: HostPatternInfo, infoB: HostPatternInfo) {
   if (infoA.wildcard !== infoB.wildcard) {
     return infoA.wildcard ? 1 : -1;

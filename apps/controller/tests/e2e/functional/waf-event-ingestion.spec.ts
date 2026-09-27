@@ -1,8 +1,6 @@
 /**
- * Functional: WAF event ingestion (#233). waf-blocking.spec.ts proves Coraza *blocks*; nothing
- * asserted a block is *recorded*, leaving the audit log → parser → ClickHouse → API → page pipeline
- * uncovered. The tick-boundary race is pinned in waf-log-parser.test.ts; these prove a real audit
- * log reaches the table with its rule populated. Domain: func-waf-ingest.test
+ * WAF event ingestion (#233): a real block is *recorded*, audit log to page, with its rule set.
+ * The tick-boundary race is pinned in waf-log-parser.test.ts. Domain: func-waf-ingest.test
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';
@@ -10,8 +8,7 @@ import { httpGet, waitForRoute } from '../../helpers/http';
 
 const DOMAIN = 'func-waf-ingest.test';
 
-// waf-log-parser polls on a 30s interval, so a freshly generated event needs
-// more than one cycle of slack before we call it missing.
+// The parser polls every 30s; allow more than one cycle.
 const INGEST_TIMEOUT_MS = 100_000;
 const POLL_INTERVAL_MS = 3_000;
 
@@ -79,9 +76,7 @@ test.describe
       expect(event.blocked).toBe(true);
       expect(event.host).toContain(DOMAIN);
       expect(event.method).toBe('GET');
-      // Rule attribution must be populated. A null rule id means the event landed
-      // without knowing which rule fired - the failure mode behind #233, and the
-      // reason attribution now comes from the audit entry's own `messages` array.
+      // A null rule id was the #233 failure mode.
       expect(event.ruleId).not.toBeNull();
       expect(event.ruleMessage).toBeTruthy();
       expect(event.severity).toBeTruthy();
@@ -102,10 +97,7 @@ test.describe
       const res = await httpGet(DOMAIN, '/ingest-clean-path');
       expect(res.status).toBe(200);
 
-      // Give the parser a couple of cycles, then confirm the clean request never
-      // showed up. Coraza audit-logs some non-matching transactions (part of
-      // SecAuditLogRelevantStatus covers 4xx/5xx), and those must stay out of the
-      // WAF table - the parser drops entries with no rule and no interruption.
+      // Coraza audit-logs some 4xx/5xx with no rule fired; the parser must drop them.
       await new Promise((r) => setTimeout(r, 70_000));
 
       const events = await fetchWafEvents(page);

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Mutual TLS end to end: a CA registered with CPM, client certs issued against it, roles, the three
-# path modes, per-path RBAC, and revocation. The modes differ by enforcement layer:
+# Mutual TLS end to end. The three path modes differ by enforcement layer:
 #   full-site  - the TLS policy runs require_and_verify, so a certless client never handshakes (000)
 #   whitelist  - TLS auth optional; only listed paths gated, certless requests get HTTP 403
 #   exclusion  - TLS auth optional; everything except the listed paths gated the same way
@@ -52,8 +51,7 @@ register_client_cert beta || { fail "the beta certificate can be registered" "$A
 beta_cert_id="$NEW_ID"
 pass "issued client certificates can be registered"
 
-# stranger is deliberately signed by the same CA but never registered, so it
-# exercises the leaf-pinning half of the trust model.
+# stranger is signed by the same CA but never registered, to exercise leaf pinning.
 
 # ── Roles ───────────────────────────────────────────────────────────────────
 
@@ -110,8 +108,7 @@ t_eq "an unregistered certificate from the same CA is refused" "000" \
 body=$(http_body "https://$full/deep/path" "${ALPHA[@]}")
 t_contains "an admitted request reaches the upstream" "origin-a" "$body"
 
-# The whole site is gated, so there must be no in-band 403: enforcement happens
-# during the handshake, not in a route.
+# Enforcement is in the handshake, so no path may get an in-band 403.
 t_eq "no path escapes full-site enforcement" "000" \
   "$(http_code "https://$full/anything/at/all")"
 
@@ -155,8 +152,7 @@ t_eq "everything else opens with a trusted certificate" "200" \
 
 # ── Per-path RBAC ───────────────────────────────────────────────────────────
 #
-# Both certificates are trusted at the TLS layer here, so the distinction has
-# to be made at the HTTP layer from the presented fingerprint.
+# Both certificates pass TLS here, so the HTTP layer must tell them apart by fingerprint.
 
 rbac=$(domain_for "mtls-rbac")
 create_host_or_fail "an mTLS host trusting two roles can be created" "$(jq -nc --arg d "$rbac" \

@@ -1,10 +1,6 @@
 /**
- * Proving that a request came from a paired agent.
- *
- * The mirror of what the agent used to do to the controller. Both sides sign the same canonical
- * string with the same symmetric secret, so this is the old `verifyRequest` with the roles swapped
- * - which is the whole security consequence of inverting the dial direction: the party that has to
- * prove itself changed, the primitive did not.
+ * Verifies a request came from a paired agent. Both sides sign the same canonical string with the
+ * same symmetric secret; inverting the dial direction changed who proves itself, not the primitive.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -23,12 +19,7 @@ export type VerifyResult =
   | { ok: true; agent: AgentCredentials }
   | { ok: false; status: number; error: string };
 
-/**
- * Every failure returns the same message and the same status.
- *
- * Telling a caller whether it got the agent id, the timestamp or the signature wrong turns this
- * into a probe for which of those it already has right.
- */
+/** One message and status for every failure, or this becomes a probe for which part is right. */
 const DENY: VerifyResult = {
   ok: false,
   status: 401,
@@ -53,11 +44,8 @@ async function sha256Hex(body: string): Promise<string> {
 // ─── Replay ──────────────────────────────────────────────────────────────────
 
 /**
- * Nonces already accepted, keyed by agent, with when each stops mattering.
- *
- * In memory like the registry it protects: a replayed subscription inside the skew window would
- * attach a second stream and displace the real agent's. Past `timestamp + skew` the timestamp check
- * refuses a replay on its own, so that is as long as an entry has to live.
+ * In memory like the registry it protects: a replayed subscription would displace the real agent's
+ * stream. Past `timestamp + skew` the timestamp check refuses a replay alone, bounding an entry.
  */
 const seen = new Map<string, number>();
 
@@ -99,10 +87,8 @@ export function resetReplayCache(): void {
 const verdicts = new WeakMap<Request, Promise<VerifyResult>>();
 
 /**
- * Verify a signed agent request.
- *
- * `body` is the raw text the agent signed - read it once at the route and pass it here, because
- * re-reading a consumed request body would hash the empty string and fail every POST.
+ * `body` is the raw text the agent signed, read once at the route: re-reading a consumed body would
+ * hash the empty string and fail every POST.
  */
 export function verifyAgentRequest(
   request: Request,

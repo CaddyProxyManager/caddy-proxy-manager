@@ -1,15 +1,9 @@
 name: Site
 
 on:
-  # Per release, not per push: the docs render the controller's own components live, so a site
-  # built on every merge would describe features no published image has yet. The Release workflow
-  # dispatches this on main right after it tags - a release created with GITHUB_TOKEN raises no
-  # `release` event, and the github-pages environment only deploys from main, so the tag itself is
-  # not a ref this can run at. Dispatch it by hand for a docs fix that should not wait for a version.
-  #
-  # A pull request that touches the site or the code it embeds is built and tested, never
-  # published, so a broken demo fails there rather than in the next release's deploy. The whole
-  # controller `src/` because a demo can reach any of it, and a narrower list would go stale.
+  # Per release, since the docs run the controller's components live. Release dispatches this on
+  # main (a GITHUB_TOKEN release raises no event, and Pages deploys only from main); dispatch by
+  # hand for an urgent docs fix. PRs build and test only. All of controller `src/`: demos reach it.
   pull_request:
     paths:
       - "apps/site/**"
@@ -18,8 +12,7 @@ on:
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
-# Least privilege: `contents: read` is all the build requires. The deploy job asks for the two
-# Pages needs itself, so a pull request's run never holds them.
+# The deploy job asks for Pages' permissions itself, so a PR's run never holds them.
 permissions:
   contents: read
 
@@ -36,21 +29,22 @@ jobs:
           # The oven/bun tag in docker/web and docker/agent, so CI tests what the images build with.
           bun-version: 1.4.2
 
-      # The whole workspace: apps/site is a workspace member, so its dependencies come from the
-      # root lockfile rather than one of its own.
+      # The whole workspace: apps/site has no lockfile of its own.
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Before the build: it is seconds, and a demo copying stale controller data fails here with
-      # the field named rather than as a wrong-looking form later.
+      # Before the build: stale demo data fails here with the field named.
       - name: Unit tests
         run: bun run --filter @cpm/site test
 
       - name: Build the site
         run: bun run --filter @cpm/site build
 
-      # From apps/site, the workspace that declares @playwright/test, so bunx resolves the pinned
-      # CLI rather than downloading the latest - see the same note in e2e.yml.
+      # ApexCharts, loaded only by the chart demos, is the largest chunk at ~265 KiB.
+      - name: Bundle size budget
+        run: bun scripts/check-bundle-budget.ts apps/site/dist/_astro --max-kib=300
+
+      # From apps/site so bunx resolves the pinned CLI, not the latest - see e2e.yml.
       - name: Resolve the Playwright version
         id: playwright
         working-directory: apps/site
@@ -92,8 +86,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    # One deployment at a time, and never cancel one in flight: a half-finished deploy would leave
-    # the published site inconsistent, and the next release will supersede it anyway.
+    # Never cancel a deploy in flight: a half-finished one leaves the site inconsistent.
     concurrency:
       group: pages
       cancel-in-progress: false

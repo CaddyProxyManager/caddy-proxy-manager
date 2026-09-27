@@ -1,10 +1,6 @@
 /**
- * E2E: the generic forward-auth provider in the UI.
- *
- * The behaviour against a real Caddy lives in functional/forward-auth-generic.spec.ts. What is
- * covered here is the path a person takes: the defaults section saves and prefills the host
- * dialog, and a host configured through that dialog stores what was typed - including the two
- * settings a form is easiest to lose, the API split and its bypass headers.
+ * E2E: the generic forward-auth provider in the UI (real-Caddy behaviour is in functional/). The
+ * defaults prefill the host dialog, and the dialog keeps the API split and its bypass headers.
  */
 import { test, expect } from '@playwright/test';
 import { goToSetting } from '../helpers/settings-nav';

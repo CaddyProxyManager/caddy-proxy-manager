@@ -1,15 +1,12 @@
 /**
- * How a failed server action decides what to show.
- *
- * The params case is here because it was missed once: extractErrorMessage translated the code but
- * dropped DomainError.params, so a message carrying placeholders would have rendered them raw. No
- * code took params at the time, which is exactly why nothing caught it.
+ * The params case guards a real miss: DomainError.params were dropped, which would render
+ * placeholders raw, and no code took params yet to catch it.
  */
 import { describe, expect, it } from 'bun:test';
 import { actionError, extractErrorMessage } from '@/src/lib/actions';
 import { DomainError, domainError } from '@/src/lib/domain-error';
 
-/** Stands in for next-intl's translator: resolves nothing, just proves what it was handed. */
+/** Resolves nothing; records what it was handed. */
 function translator(seen?: { key?: string; values?: Record<string, string | number> }) {
   const t = (key: string, values?: Record<string, string | number>) => {
     if (seen) {

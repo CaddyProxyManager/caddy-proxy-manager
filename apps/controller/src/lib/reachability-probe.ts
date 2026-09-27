@@ -1,29 +1,8 @@
 /**
- * Proving that a domain reaches *this* instance, without asking anybody else.
- *
- * The question the dashboard host's HTTPS toggle depends on is "does this name arrive here?", and
- * the honest way to answer it is to try. The controller is already serving - the operator is
- * reading a page it rendered - so a request to the domain that comes back here is proof the path
- * works end to end: DNS, the port, whatever NAT sits in between, and Caddy's route.
- *
- * Comparing a DNS record against a public IP looked up from a third-party echo service was the
- * alternative. It answers a narrower question (what the record says, not whether traffic arrives),
- * and it does it by telling someone else's server that this deployment exists.
- *
- * **The answer is signed, because reaching *a* server proves nothing.** The probe sends a nonce
- * and expects an HMAC of it under this instance's session secret. Any other server can echo a
- * nonce back; only this one can sign it. So a domain pointed at somebody else's machine reads as
- * "something answered, but it was not this instance" rather than as success.
- *
- * What it still cannot tell you, and why the UI says so:
- *
- * - **Split-horizon DNS.** A resolver inside the network that points the name here while public
- *   DNS points somewhere else passes this check and still fails an ACME order.
- * - **No NAT hairpin.** A network that will not let a request leave and come back by its public
- *   address fails this check while the outside world reaches the deployment perfectly well.
- *
- * Both are wrong in a recoverable direction: the toggle is a default the operator can override,
- * and the message says what was found rather than only whether it passed.
+ * Proves a domain reaches *this* instance by requesting it - no third-party IP echo - and
+ * checking an HMAC of the nonce, since any server can echo one. Split-horizon DNS can pass yet
+ * fail ACME, and a missing NAT hairpin can fail while the world gets through; the toggle is only
+ * a default.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -32,7 +11,6 @@ import { derivePurposeKey } from "./derived-key";
 /** Path the probe asks for. Public, and already exempt from authentication in `proxy.ts`. */
 export const PROBE_PATH = "/api/health";
 
-/** Query parameter carrying the nonce. */
 export const PROBE_PARAM = "probe";
 
 /**

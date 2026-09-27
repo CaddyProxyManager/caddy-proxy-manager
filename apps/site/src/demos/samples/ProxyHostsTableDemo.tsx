@@ -4,6 +4,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useFormatter, useTranslations } from "next-intl";
+import { HostNotesHint } from "@cpm/controller/src/components/proxy-hosts/HostNotesField";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
@@ -20,6 +21,7 @@ type Row = {
   /** Requests in the last 24h, or null when nothing was recorded for it. */
   requests: { total: number; blocked: number } | null;
   protections: string[];
+  notes: string | null;
   enabled: boolean;
 };
 
@@ -32,6 +34,7 @@ const HOSTS: Row[] = [
     agents: [],
     requests: { total: 18_412, blocked: 96 },
     protections: ["WAF", "LB"],
+    notes: null,
     enabled: true,
   },
   {
@@ -42,6 +45,7 @@ const HOSTS: Row[] = [
     agents: ["edge-fra"],
     requests: { total: 5_730, blocked: 0 },
     protections: ["Authentik"],
+    notes: null,
     enabled: true,
   },
   {
@@ -52,6 +56,7 @@ const HOSTS: Row[] = [
     agents: ["lab-nuc"],
     requests: null,
     protections: [],
+    notes: "Off until the next release candidate. Ask Priya before turning it back on.",
     enabled: false,
   },
   {
@@ -62,16 +67,14 @@ const HOSTS: Row[] = [
     agents: ["edge-fra", "edge-ams"],
     requests: { total: 812, blocked: 4 },
     protections: ["mTLS", "Tailnet"],
+    notes: null,
     enabled: true,
   },
 ];
 
 const AGENTS = { total: 3, connected: 2 };
 
-/**
- * The proxy host list: the real table and tiles, sorting and filtering for real off the query
- * string. In the app the server does both; here this component does, off the rows above.
- */
+/** The real table and tiles; the server sorts and filters in the app, this component does here. */
 function ProxyHostsTableDemoContent() {
   const t = useTranslations("proxyHosts");
   const router = useRouter();
@@ -120,14 +123,16 @@ function ProxyHostsTableDemoContent() {
       id: "domain",
       label: "Domain",
       sortKey: "domain",
-      // The docs column is narrower than the app's, so protections ride under the domain here
-      // rather than taking a column of their own - every value is still on the row.
+      // The docs column is narrower than the app's, so protections ride under the domain.
       render: (r) => (
         <VStack gap={1}>
           <VStack gap={0}>
-            <Text type="body" size="sm" weight="semibold">
-              {r.domain}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {r.domain}
+              </Text>
+              <HostNotesHint notes={r.notes} />
+            </HStack>
             <Text type="code" size="xsm" color="secondary">
               {r.upstreams}
             </Text>
@@ -263,10 +268,7 @@ function ProxyHostsTableDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Content goes inside DemoSurface, which provides the message catalog it translates from. */
 export default function ProxyHostsTableDemo() {
   return (
     <DemoSurface>

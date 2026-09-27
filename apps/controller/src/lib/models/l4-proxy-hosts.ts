@@ -8,17 +8,15 @@ import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { setHostAgents } from "./host-agents";
+import { normalizeHostDescription } from "../host-description";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
 export type L4ProxyProtocolVersion = "v1" | "v2";
 
 /**
- * What `layer4.proxy.selection_policies.*` actually registers in the shipped image.
- *
- * Deliberately shorter than the HTTP list: header, cookie, uri_hash, query and client_ip_hash all
- * need a request to read, and layer 4 has a connection. Confirmed against `caddy list-modules`
- * rather than assumed - caddy-l4 has no client_ip_hash even though reverse_proxy does.
+ * What `layer4.proxy.selection_policies.*` registers in the image, per `caddy list-modules`:
+ * the request-reading HTTP policies do not apply, and caddy-l4 has no client_ip_hash.
  */
 export type L4LoadBalancingPolicy =
   | "random"
@@ -149,6 +147,7 @@ const VALID_L4_UPSTREAM_DNS_FAMILIES: L4UpstreamDnsResolutionConfig["family"][] 
 export type L4ProxyHost = {
   id: number;
   name: string;
+  description: string | null;
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
@@ -170,13 +169,14 @@ export type L4ProxyHost = {
 
 export type L4ProxyHostInput = {
   name: string;
+  /** Free-text notes; blank clears them. */
+  description?: string | null;
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
   /**
-   * The `agents.id` rows that serve this host. Empty - and, on update, undefined - means every
-   * agent. Note that the port still has to be published with the usual apply: assigning a host to
-   * an agent tells it what to serve, not to recreate its Caddy container on the spot.
+   * Empty (or undefined on update) means every agent. Assigning a host does not recreate the
+   * agent's Caddy, so its port still needs the usual apply.
    */
   agentIds?: number[];
   matcherType?: L4MatcherType;
@@ -431,6 +431,7 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     protocol: row.protocol as L4Protocol,
     listenAddress: row.listenAddress,
     upstreams: safeJsonParse<string[]>(row.upstreams, []),
@@ -468,9 +469,8 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.listenAddress !== undefined) {
-    // splitHostPort rather than a trailing-colon match: `2001:db8::1` ends in `:1`, and reading
-    // that as a port is how an IPv6 address silently becomes a listener on port 1. An IPv6 literal
-    // has to be bracketed here, as it does everywhere else in this stack.
+    // splitHostPort, not a trailing-colon match: `2001:db8::1` ends in `:1` and would become a
+    // listener on port 1. IPv6 literals must be bracketed, as everywhere else in this stack.
     const parsed = splitHostPort(input.listenAddress);
     if (parsed === null) {
       throw domainError("l4ListenAddressInvalid", {}, { status: 400 });
@@ -521,11 +521,8 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
 }
 
 /**
- * The list filter shared by the paginated read and its count.
- *
- * `visibleIds` narrows the list to what the viewer may see - null means no restriction, which is
- * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
- * viewer may see nothing, and turning that into an unfiltered query would list every host.
+ * `visibleIds` null means unrestricted (admin). An empty array means the viewer sees nothing and
+ * must not be dropped, or the query would list every host.
  */
 function l4ListFilter(search?: string, visibleIds?: number[] | null, protocol?: L4Protocol) {
   const clauses = [];
@@ -536,6 +533,7 @@ function l4ListFilter(search?: string, visibleIds?: number[] | null, protocol?: 
     clauses.push(
       or(
         like(l4ProxyHosts.name, `%${search}%`),
+        like(l4ProxyHosts.description, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
         like(l4ProxyHosts.upstreams, `%${search}%`),
       ),
@@ -560,11 +558,7 @@ export async function countL4ProxyHosts(
   return row?.value ?? 0;
 }
 
-/**
- * Enabled hosts only - used to refuse switching caddy-l4 off while something still listens.
- * Disabled hosts emit no config, so they do not block the change.
- */
-/** The enabled hosts' ids, for callers that then narrow them to one agent's assignments. */
+/** Enabled only: disabled hosts emit no config, so they do not block switching caddy-l4 off. */
 export async function listEnabledL4ProxyHostIds(): Promise<number[]> {
   const rows = await db
     .select({ id: l4ProxyHosts.id })
@@ -573,7 +567,7 @@ export async function listEnabledL4ProxyHostIds(): Promise<number[]> {
   return rows.map((row) => row.id);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
+// biome-ignore lint/suspicious/noExplicitAny: heterogeneous drizzle columns have no useful union
 const L4_SORT_COLUMNS: Record<string, any> = {
   name: l4ProxyHosts.name,
   protocol: l4ProxyHosts.protocol,
@@ -625,6 +619,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     .insert(l4ProxyHosts)
     .values({
       name: input.name.trim(),
+      description: normalizeHostDescription(input.description) ?? null,
       protocol: input.protocol,
       listenAddress: input.listenAddress.trim(),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
@@ -693,7 +688,7 @@ export async function updateL4ProxyHost(
     throw domainError("l4ProxyHostNotFound");
   }
 
-  // For validation, merge with existing to check cross-field constraints
+  // Merged so cross-field constraints see the stored values.
   const merged = {
     protocol: input.protocol ?? existing.protocol,
     tlsTermination: input.tlsTermination ?? existing.tlsTermination,
@@ -721,6 +716,9 @@ export async function updateL4ProxyHost(
     .update(l4ProxyHosts)
     .set({
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.description !== undefined
+        ? { description: normalizeHostDescription(input.description) }
+        : {}),
       ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
       ...(input.listenAddress !== undefined ? { listenAddress: input.listenAddress.trim() } : {}),
       ...(input.upstreams !== undefined
@@ -748,7 +746,6 @@ export async function updateL4ProxyHost(
           input.geoblockMode !== undefined;
         if (!hasMetaChanges) return {};
 
-        // Start from existing meta
         const existingMeta: L4ProxyHostMeta = {
           ...(existing.loadBalancer
             ? { load_balancer: dehydrateL4LoadBalancer(existing.loadBalancer) }
@@ -767,11 +764,9 @@ export async function updateL4ProxyHost(
           ...(existing.geoblockMode !== "merge" ? { geoblock_mode: existing.geoblockMode } : {}),
         };
 
-        // Apply direct meta override if provided
         const meta: L4ProxyHostMeta =
           input.meta !== undefined ? { ...(input.meta ?? {}) } : { ...existingMeta };
 
-        // Apply structured field overrides
         if (input.loadBalancer !== undefined) {
           const lb = dehydrateL4LoadBalancer(input.loadBalancer);
           if (lb) {

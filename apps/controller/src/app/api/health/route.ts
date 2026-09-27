@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
+import { BOOT_ID } from "@/src/lib/boot-id";
 import { MAX_NONCE_LENGTH, PROBE_PARAM, signProbe } from "@/src/lib/reachability-probe";
 
 /**
- * Health check endpoint for Docker container health monitoring.
- *
- * It doubles as the answer to the reachability probe. `?probe=<nonce>` adds a signature of that
- * nonce under a key derived for the probe alone, which is what lets a request sent to the dashboard's
- * domain prove it arrived *here* rather than at some other server that happens to reply. See
- * `src/lib/reachability-probe.ts`.
- *
- * Public, like the rest of this route: the probe is made through Caddy from outside any session,
- * and the signature reveals nothing - it is an HMAC of a nonce the caller already chose, under a
- * key no other check in the app trusts.
+ * Docker health check, and the reachability probe: `?probe=<nonce>` signs the nonce with a
+ * probe-only key to prove the request arrived here (see reachability-probe.ts). Public, since an
+ * HMAC of the caller's own nonce under a key nothing else trusts reveals nothing.
  */
 export async function GET(request: Request) {
   const nonce = new URL(request.url).searchParams.get(PROBE_PARAM);
 
   // Bounded before it is signed, so this cannot be used to sign arbitrary content.
   if (nonce && nonce.length <= MAX_NONCE_LENGTH) {
-    return NextResponse.json({ status: "ok", probe: signProbe(nonce) }, { status: 200 });
+    return NextResponse.json(
+      { status: "ok", boot: BOOT_ID, probe: signProbe(nonce) },
+      { status: 200 },
+    );
   }
 
-  return NextResponse.json({ status: "ok" }, { status: 200 });
+  // `boot` lets a restart that happened between two polls still be seen (restart-wait.ts).
+  return NextResponse.json({ status: "ok", boot: BOOT_ID }, { status: 200 });
 }

@@ -1,8 +1,6 @@
 /**
- * Plants the Bun runtime check atop the standalone server entry. `vinext build` gives
- * dist/standalone/server.js a `node` shebang, and running it that way fails with
- * ERR_UNSUPPORTED_ESM_URL_SCHEME from `bun:sqlite` while the module graph is still linking - before
- * any application code, so runtime-guard.ts cannot catch it. Re-run each build.
+ * vinext gives dist/standalone/server.js a `node` shebang, which fails on `bun:sqlite` while
+ * linking, before runtime-guard.ts can run - so the check is planted atop it. Re-run each build.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -33,8 +31,7 @@ if (source.includes(MARKER)) {
   process.exit(0);
 }
 
-// The guard must precede every import, and the shebang must stay on line 1 -
-// so retarget the shebang at Bun and slot the check in directly beneath it.
+// Before every import, with the shebang (retargeted at Bun) kept on line 1.
 const lines = source.split("\n");
 const hasShebang = lines[0]?.startsWith("#!");
 if (!hasShebang) {

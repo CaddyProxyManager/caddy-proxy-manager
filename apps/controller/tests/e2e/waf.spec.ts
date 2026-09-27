@@ -17,8 +17,8 @@ test.describe('WAF', () => {
     const expectedTo = Math.floor(Date.parse('2026-05-02T13:30:00Z') / 1000);
 
     await page.goto('/waf');
-    // The first render is UTC until the browser records its zone and the page refreshes; wait for
-    // that, or the refresh can land mid-way through the filter clicks below.
+    // The first render is UTC until the browser records its zone and the page refreshes; a refresh
+    // mid-way through the filter clicks below would lose them.
     await expect
       .poll(async () => (await context.cookies()).find((c) => c.name === 'cpm-tz')?.value)
       .toBe('America/New_York');
@@ -38,9 +38,7 @@ test.describe('WAF', () => {
 
     await page.getByRole('radio', { name: 'Custom' }).click();
 
-    // DateTimeInput is no longer a native datetime-local control: it renders a
-    // date combobox (accepting unambiguous ISO input) plus a separate time
-    // field, each committing its pending text on blur.
+    // A date combobox (ISO input) plus a time field, each committing on blur.
     const fromDate = page.getByRole('combobox', { name: 'From', exact: true });
     const fromTime = page.getByLabel('From time', { exact: true });
     const toDate = page.getByRole('combobox', { name: 'To', exact: true });
@@ -64,9 +62,7 @@ test.describe('WAF', () => {
     await expect(page).toHaveURL(
       new RegExp(`range=custom.*from=${expectedFrom}.*to=${expectedTo}`),
     );
-    // The committed values are re-rendered in the field's own locale format, so
-    // assert the round-trip through the URL (above) and that the fields kept a
-    // value rather than pinning the display string.
+    // Re-rendered in the field's locale format, so assert the URL round-trip and a non-empty value.
     await expect(fromDate).not.toHaveValue('');
     await expect(toDate).not.toHaveValue('');
 
@@ -93,7 +89,6 @@ test.describe('WAF', () => {
   test('WAF page has Save WAF settings button', async ({ page }) => {
     await page.goto('/waf');
     await waitForHydration(page);
-    // Save button is on the Settings tab
     await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
@@ -111,30 +106,23 @@ test.describe('WAF', () => {
     await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
-    // These were addressed by hand-written DOM ids that the astryx controls do
-    // not emit; both expose a proper role and label, and their checked state is
-    // real ARIA state rather than a data- attribute.
     const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
     const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
-    // Turn WAF on if not already
     if (!(await wafSwitch.isChecked())) {
       await wafSwitch.click();
       await expect(wafSwitch).toBeChecked();
     }
 
-    // Turn OWASP CRS on if not already
     if (!(await owaspCheckbox.isChecked())) {
       await owaspCheckbox.click();
       await expect(owaspCheckbox).toBeChecked();
     }
 
-    // The button never disables while the action runs, so waiting for it to be
-    // enabled returned before the edit was staged and the reload read the old values.
+    // The button never disables while saving, so waiting on it returns before the edit is staged.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page);
 
-    // Navigate away and back to verify persistence
     await page.goto('/hosts');
     await expect(page).not.toHaveURL(/login/);
     await page.goto('/waf');

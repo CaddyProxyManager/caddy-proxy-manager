@@ -1,10 +1,6 @@
 /**
- * Serves the uploaded favicon, or 404 when the operator has not set one.
- *
- * Deliberately public - see the allowlist in src/proxy.ts. The login, portal and setup pages all
- * render before there is a session, and a favicon that redirected to /login would leave every
- * unauthenticated page without one. Nothing here is secret: a favicon is branding the browser
- * fetches for anyone who can reach the instance at all.
+ * Serves the uploaded favicon, or 404. Deliberately public (see the allowlist in src/proxy.ts):
+ * login, portal and setup render before there is a session, and a favicon is not secret.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -23,9 +19,8 @@ export async function GET(request: NextRequest) {
   const headers: Record<string, string> = {
     "content-type": favicon.type,
     etag,
-    // Revalidate every time rather than trusting a max-age: a favicon is fetched once in a while
-    // and a stale one is what an operator would report as "the upload did not work". The ETag
-    // makes the usual answer a 304 with no body.
+    // Revalidate every time: a stale favicon reads as "the upload did not work", and the ETag
+    // makes the usual answer a bodiless 304.
     "cache-control": "no-cache, must-revalidate",
     "x-content-type-options": "nosniff",
     // An SVG opened directly is a document, and a document can carry script. This makes the

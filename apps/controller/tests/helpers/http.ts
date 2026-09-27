@@ -5,7 +5,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 export interface HttpResponse {
   status: number;
@@ -13,7 +13,6 @@ export interface HttpResponse {
   body: string;
 }
 
-/** Make an HTTP request to Caddy (localhost:80) with a custom Host header. */
 export function httpGet(
   domain: string,
   path = '/',
@@ -69,10 +68,7 @@ export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<
   );
 }
 
-/**
- * Poll until the route returns a specific expected status code. Useful for forward auth routes,
- * where a 302 to the portal is what you expect.
- */
+/** Poll until the route returns `expectedStatus` - a 302 to the portal, for forward auth. */
 export async function waitForStatus(
   domain: string,
   expectedStatus: number,
@@ -130,7 +126,6 @@ export interface WsHandshakeResult {
   statusLine: string;
   /** Parsed numeric status code, or 0 if the response had no parseable HTTP status line. */
   statusCode: number;
-  /** Lower-cased response headers. */
   headers: Record<string, string>;
   /** Raw response head (everything before the body), latin1-decoded. */
   raw: string;
@@ -192,7 +187,6 @@ export function wsHandshake(
 
     socket.on('data', (chunk: Buffer) => {
       buf = Buffer.concat([buf, chunk]);
-      // Once the full response head has arrived, the handshake outcome is known.
       if (buf.indexOf('\r\n\r\n') !== -1) {
         clearTimeout(timer);
         finish();
@@ -210,6 +204,78 @@ export function wsHandshake(
       reject(err);
     });
   });
+}
+
+/**
+ * Opens a WebSocket, sends one text frame and returns the text of the first frame back - a 101
+ * alone doesn't prove the hijacked connection carries frames.
+ */
+export function wsEcho(domain: string, path: string, message: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(80, '127.0.0.1');
+    let buf = Buffer.alloc(0);
+    let upgraded = false;
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(
+        new Error(
+          `no echo from "${domain}${path}" (raw: ${JSON.stringify(buf.toString('latin1').slice(0, 200))})`,
+        ),
+      );
+    }, 10_000);
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      socket.destroy();
+      fn();
+    };
+
+    socket.on('connect', () => {
+      socket.write(
+        [
+          `GET ${path} HTTP/1.1`,
+          `Host: ${domain}`,
+          'Upgrade: websocket',
+          'Connection: Upgrade',
+          `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}`,
+          'Sec-WebSocket-Version: 13',
+          '',
+          '',
+        ].join('\r\n'),
+      );
+    });
+
+    socket.on('data', (chunk: Buffer) => {
+      buf = Buffer.concat([buf, chunk]);
+      if (!upgraded) {
+        const end = buf.indexOf('\r\n\r\n');
+        if (end === -1) return;
+        const statusLine = buf.subarray(0, buf.indexOf('\r\n')).toString('latin1');
+        if (!/^HTTP\/1\.1 101/.test(statusLine)) return done(() => reject(new Error(statusLine)));
+        upgraded = true;
+        buf = buf.subarray(end + 4);
+        // Client frames must be masked (RFC 6455 5.3); short text frames only.
+        const payload = Buffer.from(message);
+        const mask = crypto.randomBytes(4);
+        const masked = Buffer.from(payload.map((byte, i) => byte ^ mask[i % 4]));
+        socket.write(Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, masked]));
+      }
+      // Server frames are unmasked; the echo is short enough for a 7-bit length.
+      if (buf.length >= 2 && buf.length >= 2 + (buf[1] & 0x7f)) {
+        const text = buf.subarray(2, 2 + (buf[1] & 0x7f)).toString('utf8');
+        done(() => resolve(text));
+      }
+    });
+
+    socket.on('error', (err) => done(() => reject(err)));
+  });
+}
+
+/** Turns off Force HTTPS in the open host dialog, so the spec can talk plain HTTP to the host. */
+export async function turnOffForceHttps(page: Page): Promise<void> {
+  const toggle = page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' });
+  await toggle.scrollIntoViewIfNeeded();
+  if (await toggle.isChecked()) await toggle.click();
+  await expect(toggle).not.toBeChecked();
 }
 
 /** Inject hidden form fields into #create-host-form before submitting. */

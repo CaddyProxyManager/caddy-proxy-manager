@@ -1,11 +1,8 @@
 "use client";
 
 /**
- * Every applied revision, a comparison between any two, and the way back to an earlier one.
- *
- * Restoring stages rather than applies, so the page hands off to the header's Review & apply: the
- * operator sees what going back does to the Caddy config before it reaches Caddy, exactly as for an
- * edit made by hand.
+ * Restoring stages rather than applies, so the operator sees what going back does to the Caddy
+ * config through the header's Review & apply, as for a hand edit.
  */
 
 import { useState, useTransition } from "react";

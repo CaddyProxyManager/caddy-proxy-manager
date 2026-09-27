@@ -38,11 +38,13 @@ import {
   Monitor,
   Plus,
   Rows3,
+  ShieldCheck,
   Trash2,
   Unlink,
   User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { TwoFactorSection } from "./TwoFactorSection";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
@@ -70,12 +72,7 @@ type DeviceWords = {
   onOs: (browser: string, os: string) => string;
 };
 
-/**
- * Best-effort friendly device label from a User-Agent string.
- *
- * Module-level, so the three words that are prose rather than product names are passed in. The
- * browser and OS names are not: they are what those things are called in every language.
- */
+/** Only the prose words are passed in; browser and OS names are the same in every language. */
 function describeDevice(ua: string | null, words: DeviceWords): string {
   if (!ua) return words.unknown;
   const browser = /Edg\//.test(ua)
@@ -107,14 +104,16 @@ interface UserData {
   name: string | null;
   provider: string | null;
   subject: string | null;
-  passwordHash: string | null;
+  /** Never the hash itself - this crosses to the browser. */
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
   role: string;
   avatarUrl: string | null;
 }
 
 interface ProfileClientProps {
   user: UserData;
-  /** Linked OAuth identities, read from the authoritative accounts table (#261). */
+  /** From the authoritative accounts table (#261). */
   linkedProviders: Array<{ providerId: string; accountId: string }>;
   enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
   apiTokens: ApiToken[];
@@ -123,11 +122,10 @@ interface ProfileClientProps {
   localPasswordsEnabled?: boolean;
   /** The shared demo account, whose password every visitor signs in with. */
   passwordLocked?: boolean;
-  /** Icon sources resolved on the server, including the Gravatar fallback. */
+  /** Resolved on the server, including the Gravatar fallback. */
   avatar: ResolvedAvatar;
 }
 
-/** Card with an icon heading and a rule beneath it, used for every section. */
 function ProfileSection({
   icon,
   title,
@@ -156,10 +154,7 @@ function ProfileSection({
   );
 }
 
-/**
- * How tightly this user's tables are set. Applied at once through the provider, so the choice is
- * visible before the save comes back; a refused save puts the old one back and says why.
- */
+/** Table density, applied optimistically; a refused save restores the old one. */
 function DisplaySection({ onError }: { onError: (message: string) => void }) {
   const t = useTranslations("profile");
   const density = useTableDensity();
@@ -223,8 +218,7 @@ export default function ProfileClient({
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
-  // "Signed in 3 days ago" in the UI's language. `now` is passed explicitly: without it next-intl
-  // reports an environment fallback for every call.
+  // `now` is passed explicitly, or next-intl reports an environment fallback on every call.
   const format = useFormatter();
   const now = useNow();
   const deviceWords: DeviceWords = {
@@ -255,9 +249,8 @@ export default function ProfileClient({
     return provider;
   };
 
-  const hasPassword = !!user.passwordHash;
-  // Connection state comes from the accounts rows, not the users.provider projection, so a stale
-  // projection cannot make a linked account look unlinked or vice versa (#261).
+  const hasPassword = user.hasPassword;
+  // From accounts rows, not the stale-prone users.provider projection (#261).
   const linkedNames = linkedProviders.map(
     (link) =>
       enabledProviders.find((p) => p.id === link.providerId)?.name ??
@@ -346,7 +339,6 @@ export default function ProfileClient({
       setUnlinkCurrentPassword("");
       setLoading(false);
 
-      // Reload page to reflect changes
       setTimeout(() => window.location.reload(), 1500);
     } catch {
       setError(t("unlinkError"));
@@ -390,9 +382,7 @@ export default function ProfileClient({
     setLoading(true);
 
     try {
-      // linkSocial (not signIn.social) binds the identity to the session user
-      // and requires the provider email to match, so an unrelated IdP account
-      // cannot silently swap the browser onto a different CPM user.
+      // linkSocial, not signIn.social, so an unrelated IdP account cannot swap the session user.
       const { error: linkError } = await authClient.linkSocial({
         provider: providerId,
         callbackURL: "/profile",
@@ -413,7 +403,6 @@ export default function ProfileClient({
     const file = Array.isArray(selected) ? selected[0] : selected;
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setError(t("avatarMustBeImage"));
       return;
@@ -428,7 +417,6 @@ export default function ProfileClient({
     setLoading(true);
 
     try {
-      // Convert to base64
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
@@ -546,15 +534,12 @@ export default function ProfileClient({
               </Text>
               <HStack gap={4} vAlign="center">
                 <UserAvatar
-                  // avatarUrl is local state so an upload or removal shows
-                  // immediately; the Gravatar and initial come from the server.
+                  // Local state, so an upload or removal shows immediately.
                   avatar={{ ...avatar, imageUrl: avatarUrl }}
                   alt={user.name || user.email}
                   size="xl"
                 />
                 <HStack gap={2} vAlign="center">
-                  {/* FileInput replaces a <label>-wrapped hidden file input,
-                      and brings its own keyboard-reachable trigger. */}
                   <FileInput
                     label={t("uploadProfilePicture")}
                     isLabelHidden
@@ -634,6 +619,16 @@ export default function ProfileClient({
                 </HStack>
               </VStack>
             )}
+          </ProfileSection>
+        )}
+
+        {localPasswordsEnabled && (
+          <ProfileSection icon={ShieldCheck} title={t("twoFactor.title")}>
+            <TwoFactorSection
+              enabled={user.twoFactorEnabled}
+              hasPassword={hasPassword}
+              locked={passwordLocked}
+            />
           </ProfileSection>
         )}
 
@@ -787,8 +782,6 @@ export default function ProfileClient({
                 <Text type="body" size="sm" weight="semibold">
                   {t("tokenCopyWarning")}
                 </Text>
-                {/* CodeBlock owns the copy button, replacing the hand-built one
-                    and its two-second "Copied" flag. */}
                 <CodeBlock code={newToken} width="100%" />
               </VStack>
             )}
@@ -877,8 +870,7 @@ export default function ProfileClient({
                       value={tokenExpiresAt}
                       onChange={setTokenExpiresAt}
                     />
-                    {/* DateTimeInput has no htmlName, so the value reaches the
-                        server action through this hidden field. */}
+                    {/* DateTimeInput has no htmlName, hence the hidden field. */}
                     <input type="hidden" name="expires_at" value={tokenExpiresAt ?? ""} />
                   </VStack>
                 </Grid>
@@ -920,8 +912,7 @@ export default function ProfileClient({
             label={t("newPassword")}
             value={newPassword}
             onChange={setNewPassword}
-            // Fill the confirmation too: a generated value nobody typed cannot be retyped from
-            // memory, and leaving it blank only blocks the dialog.
+            // Fill the confirmation too: nobody can retype a generated value from memory.
             onGenerate={(generated) => {
               setNewPassword(generated);
               setConfirmPassword(generated);

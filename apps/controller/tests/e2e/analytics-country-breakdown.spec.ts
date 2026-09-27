@@ -1,10 +1,6 @@
 /**
- * Choosing a country opens its breakdown - hosts, response classes, user agents - under the map,
- * and the map can be recoloured by requests, blocked or unique IPs.
- *
- * Seeds a handful of requests from one country behind a host no other spec uses, then filters the
- * page to that host, so the country table holds exactly the seeded country whatever else is in
- * ClickHouse.
+ * Seeds one country behind a host no other spec uses and filters to it, so the country table
+ * holds exactly that country whatever else is in ClickHouse.
  */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
@@ -81,7 +77,6 @@ test.describe('Analytics country breakdown', () => {
       await page.goto('/analytics');
       await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
 
-      // Narrow the page to the seeded host, so the country table holds only the seeded country.
       await page.locator('button[aria-haspopup="listbox"]').click();
       await page.getByPlaceholder('Search hosts…').fill(tag);
       await page.getByRole('option', { name: host }).click();
@@ -91,8 +86,7 @@ test.describe('Analytics country breakdown', () => {
       await expect(open).toBeVisible({ timeout: 15_000 });
       await open.click();
 
-      // The breakdown names the country, and lists what the seed wrote. Scoped to the card: the
-      // map's selected-country popup carries the name too.
+      // Scoped to the card: the map's popup carries the name too.
       const breakdown = page.getByTestId('country-breakdown');
       const iceland = new Intl.DisplayNames(['en'], { type: 'region' }).of(COUNTRY) ?? COUNTRY;
       await expect(breakdown.getByText(iceland, { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -100,11 +94,9 @@ test.describe('Analytics country breakdown', () => {
       await expect(breakdown.getByText(host, { exact: true })).toBeVisible();
       await expect(breakdown.getByText('breakdown-test/1.0', { exact: true })).toBeVisible();
 
-      // The same button now closes it.
       await page.getByRole('button', { name: `Close the breakdown for ${COUNTRY}` }).click();
       await expect(breakdown).toBeHidden();
 
-      // The map metric is a radio group; switching it must stick.
       const blocked = page.getByRole('radio', { name: 'Blocked', exact: true });
       await blocked.click();
       await expect(blocked).toBeChecked();

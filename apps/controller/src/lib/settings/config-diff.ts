@@ -1,13 +1,6 @@
 /**
- * A line diff of the Caddy config document, for the review sheet.
- *
- * Caddy has no JSON-to-Caddyfile converter - its adapter runs one way only (see
- * ../caddy-caddyfile.ts) - so what an operator reviews is the JSON document that is actually
- * pushed, not a Caddyfile rendering of it.
- *
- * Keys are sorted before stringifying so that a diff shows what changed rather than what moved:
- * the builder assembles objects in whatever order its branches run, and an unsorted render turns
- * an unrelated edit into hundreds of reordered lines.
+ * Line diff of the pushed JSON (Caddy's adapter is one-way; ../caddy-caddyfile.ts). Keys are
+ * sorted, since the builder's key order varies and would bury an edit in reordered lines.
  */
 
 /** Property names whose values are replaced before the document is ever rendered. */
@@ -19,7 +12,7 @@ export type DiffLine = {
   /** Line number in the staged document; null for a removed line or a gap. */
   line: number | null;
   text: string;
-  /** For a gap, how many lines it stands for, so the review sheet can say so in its own words. */
+  /** For a gap, how many lines it stands for. */
   skipped?: number;
 };
 
@@ -31,14 +24,7 @@ export type ConfigDiff = {
   unchanged: boolean;
 };
 
-/**
- * Stable JSON with secrets masked.
- *
- * The document carries decrypted credentials - DNS provider tokens, Tailscale auth keys - because
- * that is what Caddy needs. None of them belong in a page rendered for review, so they are masked
- * here rather than at the seam that displays them: a mask applied at render time is one that a
- * later caller can forget.
- */
+/** Masks the decrypted credentials here, not at display, where a later caller could forget. */
 function render(value: unknown): string {
   return `${stringify(value, "", 0)}\n`;
 }
@@ -70,12 +56,7 @@ function stringify(value: unknown, key: string, depth: number): string {
   return `{\n${body.join(",\n")}\n${pad}}`;
 }
 
-/**
- * Diff two config documents into display lines.
- *
- * `contextLines` unchanged lines are kept around each change and the rest collapse into a gap
- * marker, so a three-field edit does not render three thousand identical lines.
- */
+/** Unchanged runs beyond `contextLines` collapse into a gap marker. */
 export function diffConfigDocuments(
   current: unknown,
   staged: unknown,
@@ -98,12 +79,7 @@ export function diffConfigDocuments(
 
 type Op = { kind: "context" | "added" | "removed"; line: number | null; text: string };
 
-/**
- * Longest-common-subsequence diff, with the shared head and tail trimmed first.
- *
- * The trim is what keeps this affordable: two renders of the same config differ in a handful of
- * lines out of thousands, and the quadratic table only ever sees the part that actually differs.
- */
+/** LCS diff; trimming the shared head and tail keeps the quadratic table small. */
 function diffLines(before: string[], after: string[]): Op[] {
   let head = 0;
   while (head < before.length && head < after.length && before[head] === after[head]) {
@@ -139,7 +115,6 @@ function lcsOps(before: string[], after: string[], offset: number): Op[] {
   const rows = before.length;
   const cols = after.length;
 
-  // Nothing to align: one side is empty, so every line on the other is a plain insert or delete.
   if (rows === 0 || cols === 0) {
     return [
       ...before.map((text) => ({ kind: "removed" as const, line: null, text })),
@@ -186,7 +161,6 @@ function lcsOps(before: string[], after: string[], offset: number): Op[] {
   return ops;
 }
 
-/** Keep `context` lines either side of each change; replace longer runs with a gap marker. */
 function collapse(ops: Op[], context: number): DiffLine[] {
   const keep = new Set<number>();
   ops.forEach((op, index) => {

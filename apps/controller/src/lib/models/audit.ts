@@ -12,7 +12,6 @@ export type AuditEvent = {
   createdAt: string;
 };
 
-// Escape LIKE metacharacters so user input is treated as literal text
 function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
 }
@@ -52,7 +51,6 @@ export async function countAuditEvents(filter?: string | AuditEventFilter): Prom
   return row?.value ?? 0;
 }
 
-/** Every entity type and action the log holds, for the filter menus. */
 export async function auditFilterOptions(): Promise<{ entityTypes: string[]; actions: string[] }> {
   const [entityTypes, actions] = await Promise.all([
     db
@@ -115,18 +113,14 @@ export async function createAuditEvent(data: {
 }
 
 export type AuditActivityBucket = {
-  /** Start of the hour, as an ISO string truncated to the hour (e.g. 2026-09-10T14). */
+  /** ISO truncated to the hour, e.g. 2026-09-10T14. */
   hour: string;
   count: number;
 };
 
 /**
- * Events per hour since `sinceIso`, for the activity strip above the list.
- *
- * Grouped in SQL on the ISO string's hour prefix rather than by parsing timestamps: createdAt is
- * stored as text, the prefix is fixed-width and already UTC, and this keeps a busy day's rows out
- * of the application entirely. Hours with no events are absent - the caller fills the gaps, since
- * only it knows how wide the strip is.
+ * Grouped in SQL on the stored text's fixed-width UTC hour prefix, keeping rows out of the app.
+ * Empty hours are absent; the caller knows the strip's width.
  */
 export async function auditActivityByHour(sinceIso: string): Promise<AuditActivityBucket[]> {
   const hour = sql<string>`substr(${auditEvents.createdAt}, 1, 13)`;
@@ -138,7 +132,7 @@ export async function auditActivityByHour(sinceIso: string): Promise<AuditActivi
   return rows.map((row) => ({ hour: row.hour, count: Number(row.count) }));
 }
 
-/** Distinct actors and entity types in the same window, for the tiles beside the strip. */
+/** Distinct actors and entity types in the same window. */
 export async function auditActivitySummary(
   sinceIso: string,
 ): Promise<{ events: number; actors: number; entityTypes: number }> {

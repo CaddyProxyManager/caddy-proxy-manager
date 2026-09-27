@@ -1,8 +1,6 @@
 /**
- * The GeoIP updater's failures, in the language of whoever reads the settings page.
- *
- * The updater runs on a timer with no reader, so it stores each failure's English and, when the
- * failure had one, its code (see `storedErrorMessage`). These put them back together for a page.
+ * The updater runs with no reader, so it stores English plus a code (see `storedErrorMessage`);
+ * these render them in the settings page reader's language.
  */
 
 import { storedErrorMessage } from "../actions";
@@ -11,8 +9,8 @@ import type { GeoipDownloadFailure, GeoipUpdateResult } from "./updater";
 type Translator = Parameters<typeof storedErrorMessage>[0];
 
 function editionFailureMessage(t: Translator, failure: GeoipDownloadFailure): string {
-  // Narrowed by hand: resolving one literal key against the whole root catalog is more than tsc
-  // will instantiate. `settings.geoipEditionDownloadFailed` is checked by the catalog test instead.
+  // Narrowed by hand: one literal key against the whole root catalog is more than tsc will
+  // instantiate. The catalog test checks `settings.geoipEditionDownloadFailed` instead.
   const translate = t as unknown as (key: string, values: Record<string, string>) => string;
   return translate("settings.geoipEditionDownloadFailed", {
     edition: failure.edition,
@@ -31,7 +29,6 @@ export function geoipDownloadErrorMessage(
   return failures.map((failure) => editionFailureMessage(t, failure)).join("; ");
 }
 
-/** Everything that went wrong in one run, the check's failure first, or null. */
 export function geoipUpdateErrorMessage(t: Translator, result: GeoipUpdateResult): string | null {
   if (!result.error) return null;
   const parts: string[] = [];

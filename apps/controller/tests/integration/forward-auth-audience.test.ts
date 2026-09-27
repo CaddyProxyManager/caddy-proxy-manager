@@ -1,9 +1,6 @@
 /**
- * Regression coverage for CPM-API-001.
- *
- * A code disclosed to another wildcard subdomain (or another scheme/port on
- * the same hostname) must not be redeemable there, and a token issued for one
- * exact origin must never become a global forward-auth bearer credential.
+ * CPM-API-001: a code disclosed to another subdomain, scheme or port must not be redeemable there,
+ * and a token for one origin must never become a global bearer credential.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -17,8 +14,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -36,10 +32,8 @@ vi.mock('../../src/lib/db', () => {
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-// Keep the real config builder so the proof-header wiring is covered, while
-// preventing any accidental live Caddy apply from this integration test.
-// The real config builder is kept; only the live apply is stubbed. bun has no importOriginal, so
-// the module is imported above the mock - the import runs before the mock replaces it.
+// The real builder keeps the proof-header wiring covered; only the apply is stubbed. bun has no
+// importOriginal, so the module is imported before the mock replaces it.
 const actualCaddy = await import('../../src/lib/caddy');
 
 vi.mock('../../src/lib/caddy', () => ({
@@ -310,9 +304,7 @@ describe('trusted Caddy callback boundary', () => {
       expect(set?.['X-Forwarded-Host']).toEqual(['{http.request.hostport}']);
     }
 
-    // Caddy's `host` placeholder intentionally omits the port. The audience
-    // and redirect handoff must use `hostport` so legitimate :8443 origins
-    // survive the generated configuration unchanged.
+    // Caddy's `host` omits the port; `hostport` keeps a :8443 origin intact.
     const serialized = JSON.stringify(document);
     expect(serialized).toContain('://{http.request.hostport}{http.request.uri}');
   });

@@ -1,22 +1,16 @@
 /**
- * Keeping Caddy's admin API on the address it was meant to bind, whoever sends the config.
- *
- * The controller writes one admin block for every Caddy, bound to every interface. On a Docker
- * network Caddy shares with the upstreams it proxies, that hands the admin API to each of them. The
- * agent pins it on the way through, and so does the controller when it loads a config directly.
+ * The controller's admin block binds every interface, which on a network shared with upstreams
+ * hands them the admin API. The agent, and the controller's direct transport, pin it.
  */
 
-/** Whether a request replaces Caddy's running config, and so carries an admin block of its own. */
+/** Such a request carries an admin block of its own. */
 export function loadsConfig(request: { method: string; path: string }): boolean {
   const path = request.path.split("?")[0];
   if (path === "/load") return true;
   return /^\/config\/?$/.test(path) && request.method.toUpperCase() !== "GET";
 }
 
-/**
- * Pin the admin listener of a config on its way to Caddy, or null for a body that is not a JSON
- * object - refused rather than forwarded unpinned.
- */
+/** Null for a non-object body, which is refused rather than forwarded unpinned. */
 export function pinAdminListen(body: string, listen: string): string | null {
   let config: unknown;
   try {

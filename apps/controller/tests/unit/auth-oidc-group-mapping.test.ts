@@ -11,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Outside the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -74,10 +73,7 @@ function provider(overrides: Partial<OAuthProvider> = {}): OAuthProvider {
   };
 }
 
-/**
- * better-auth's GenericOAuthUserInfo carries every standard OIDC field. These tests only need the
- * subject and the group claim, so the rest are filled in here rather than at each call site.
- */
+/** Fills the OIDC fields these tests do not care about. */
 function profile(claims: Record<string, unknown>) {
   return { emailVerified: false, ...claims } as Parameters<
     NonNullable<ReturnType<typeof mapOAuthProvider>['mapProfileToUser']>
@@ -92,8 +88,7 @@ describe('mapOAuthProvider - group mapping hooks', () => {
   it('attaches no claim hooks for a provider that does not use groups', async () => {
     const cfg = mapOAuthProvider(provider());
     expect(cfg.getUserInfo).toBeUndefined();
-    // mapProfileToUser is always present - it reports emailVerified for the auto-link gate - so
-    // what matters here is that it derives nothing from the group claim.
+    // Always present for the auto-link gate; what matters is it ignores the group claim.
     expect(await cfg.mapProfileToUser?.({ groups: ['CPM_Admin'] } as never)).toEqual({
       emailVerified: false,
     });
@@ -158,8 +153,7 @@ describe('mapOAuthProvider - group mapping hooks', () => {
 
     expect(mapped).not.toHaveProperty('role');
     expect(mapped).not.toHaveProperty('status');
-    // The auto-link gate is the one field it does report, so better-auth cannot fall back to the
-    // profile's own emailVerified.
+    // Reported so better-auth cannot fall back to the profile's own emailVerified.
     expect(mapped).toEqual({ emailVerified: false });
   });
 
@@ -225,11 +219,7 @@ describe('mapOAuthProvider - group mapping hooks', () => {
   });
 });
 
-/**
- * The returning user is the case the wiring exists for: better-auth calls `getUserInfo` - and so
- * `mapProfileToUser` - on every callback, new account or not, so a group change at the IdP takes
- * effect at the next sign-in rather than being frozen at the role the account was created with.
- */
+/** better-auth maps the profile on every callback, so an IdP group change lands at next sign-in. */
 describe('a repeat sign-in re-reads the group claim', () => {
   const now = '2026-01-01T00:00:00.000Z';
 

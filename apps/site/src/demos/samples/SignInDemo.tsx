@@ -2,13 +2,9 @@ import LoginClient from "@cpm/controller/src/components/auth/LoginClient";
 import { DemoSurface } from "../DemoSurface";
 
 /**
- * The sign-in screen itself, both steps of it.
- *
- * `LoginClient` runs unchanged. Its auth client is swapped for a shim that fails every attempt (see
- * shims/auth-client.ts), which is the honest outcome with no controller behind the page - and the
- * interesting one, because a failed password is where the kept username earns its place.
- *
- * Two providers, one of them primary, so the `tonal` button has something to be set against.
+ * `LoginClient` unchanged, its auth client a shim failing every attempt (shims/auth-client.ts):
+ * the honest outcome with no controller, and where the kept username earns its place. Two
+ * providers, one primary, so the `tonal` button has something to be set against.
  */
 export default function SignInDemo() {
   return (

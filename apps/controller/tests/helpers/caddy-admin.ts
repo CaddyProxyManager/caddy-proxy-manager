@@ -1,7 +1,6 @@
 /**
- * In-memory adapter for the Caddy admin seam. Accepts config loads, remembers the last document and
- * serves it back on GET /config/, so the whole build-and-apply path runs with nothing listening.
- * setup.bun.ts installs one globally; tests asserting on what was sent make their own.
+ * In-memory Caddy admin, so build-and-apply runs with nothing listening. setup.bun.ts installs one
+ * globally; tests asserting on what was sent make their own.
  */
 import type {
   CaddyAdminRequest,
@@ -18,19 +17,14 @@ export type RecordedRequest = {
 
 export type FakeCaddy = {
   transport: CaddyAdminTransport;
-  /** Every request the app made, oldest first. */
   requests: RecordedRequest[];
-  /** Requests that loaded a config document. */
   loads: RecordedRequest[];
-  /** The most recently loaded config, parsed. Null until something is loaded. */
   lastConfig: () => Record<string, unknown> | null;
   /** Make the next N responses (or all subsequent ones) fail with this status. */
   failWith: (status: number, text?: string) => void;
-  /** Make subsequent requests reject as if the socket could not be opened. */
   failWithNetworkError: (code: 'ECONNREFUSED' | 'ENOTFOUND') => void;
-  /** Serve the given ETag on GET /config/, so restart detection can be driven. */
+  /** Drives restart detection. */
   setConfigEtag: (etag: string | null) => void;
-  /** Drop the recorded history and return to healthy behaviour. */
   reset: () => void;
 };
 
@@ -53,8 +47,7 @@ function createFakeCaddy(): FakeCaddy {
     requests.push(record);
 
     if (networkError) {
-      // Shape mirrors what node:http surfaces, so the error-mapping branch in
-      // applyCaddyConfig sees what it would see in production.
+      // Shaped like node:http's, for applyCaddyConfig's error mapping.
       const error = new Error(`connect ${networkError}`) as Error & {
         cause?: NodeJS.ErrnoException;
       };
@@ -110,7 +103,6 @@ function createFakeCaddy(): FakeCaddy {
   };
 }
 
-/** Create a fake Caddy and install it at the seam. */
 export function installFakeCaddy(): FakeCaddy {
   const fake = createFakeCaddy();
   setCaddyAdminTransport(fake.transport);

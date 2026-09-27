@@ -25,6 +25,8 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { ReachabilityDialog } from "@/components/certificates/ReachabilityDialog";
+import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -67,7 +69,7 @@ type Props = {
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;
   forwardAuthDefaults: ForwardAuthSettings | null;
-  /** Prefilled into a new host's domains field. Empty means there is nothing to offer. */
+  /** Prefilled into a new host's domains; empty for none. */
   defaultDomain: string;
   tailscaleDefaults: TailscaleHostDefaults | null;
   pagination: { total: number; page: number; perPage: number };
@@ -79,20 +81,18 @@ type Props = {
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccessMap?: ForwardAuthAccessMap;
   agents?: AgentOption[];
-  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
-  /** Enabled/disabled totals across everything visible, so the tabs do not count only this page. */
+  /** Across everything visible, so the tabs do not count only this page. */
   counts: { total: number; enabled: number; disabled: number };
-  /** Host id → requests in the last 24h. A host with no entry took no traffic in the window. */
+  /** Last 24h; no entry means no traffic. */
   hostTraffic: Record<number, { total: number; blocked: number }>;
-  /** False when analytics is off or unreachable - then there are no numbers to show at all. */
+  /** False when analytics is off or unreachable. */
   trafficAvailable: boolean;
-  /** Which list tab the URL asked for. */
   activeState: "all" | "enabled" | "disabled";
-  /** False for an operator: a grant names a host that already exists, so creating one is an
-   * admin's job. The dialogs and the duplicate action go with the button. */
+  /** False for an operator: grants name existing hosts. Duplicating goes with it. */
   canCreate?: boolean;
-  /** The custom Caddyfile and raw JSON editors. Admin-only, enforced by the proxy host model. */
+  /** Custom Caddyfile and raw JSON; admin-only, enforced by the proxy host model. */
   canEditRawConfig?: boolean;
 };
 
@@ -112,7 +112,7 @@ type FeatureLabelKey =
   | "features.blocks"
   | "pathRewrites";
 
-/** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
+/** `variant` marks the two meaning "traffic is being restricted". */
 const FEATURES: ReadonlyArray<{
   key: string;
   labelKey: FeatureLabelKey;
@@ -142,8 +142,7 @@ const FEATURES: ReadonlyArray<{
   },
   {
     key: "tailscale",
-    // "Tailnet only" is the one worth seeing from the list: it means the host is not reachable
-    // from the public listener at all, which is otherwise invisible until you open it.
+    // Unreachable from the public listener, which is otherwise invisible from the list.
     labelKey: "features.tailnet",
     icon: <Network />,
     variant: "info",
@@ -205,16 +204,14 @@ function summarize(values: string[]) {
   return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
 }
 
-/**
- * The enable switch plus the row menu, shared by table and cards. At module scope - nesting it
- * would make a new component type each render, remounting the menu mid-use.
- */
+/** At module scope: nested, it would be a new type each render and remount the menu mid-use. */
 function HostActions({
   host,
   onToggle,
   onEdit,
   onDuplicate,
   onDelete,
+  onTestReachability,
   canCreate,
 }: {
   host: ProxyHost;
@@ -222,7 +219,8 @@ function HostActions({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
+  onTestReachability: () => void;
+  /** Duplicating makes a new host, so it follows Create, not Edit. */
   canCreate: boolean;
 }) {
   const t = useTranslations("proxyHosts");
@@ -241,6 +239,19 @@ function HostActions({
         items={[
           { label: t("edit"), onClick: onEdit },
           ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
+          // Admins only: access logs carry every client's address.
+          ...(canCreate
+            ? [
+                {
+                  label: t("viewLogs"),
+                  onClick: () =>
+                    window.location.assign(
+                      `/logs?source=access&host=${encodeURIComponent(host.domains[0] ?? "")}`,
+                    ),
+                },
+                { label: t("testReachability"), onClick: onTestReachability },
+              ]
+            : []),
           { type: "divider" },
           { label: t("delete"), variant: "destructive", onClick: onDelete },
         ]}
@@ -282,7 +293,8 @@ export default function ProxyHostsClient({
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
   const [deleteHost, setDeleteHost] = useState<ProxyHost | null>(null);
-  // Counter forces CreateHostDialog to remount on each open, resetting useFormState
+  const [checkingHost, setCheckingHost] = useState<ProxyHost | null>(null);
+  // Remounts CreateHostDialog on each open, resetting useFormState.
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
 
@@ -330,8 +342,7 @@ export default function ProxyHostsClient({
 
   const certificateNames = new Map(certificates.map((c) => [c.id, c.name]));
   const agentNames = new Map((agents ?? []).map((a) => [a.id, a.name]));
-  // Whether there is traffic data at all comes from the server, not from the map: with analytics on,
-  // an empty map is a quiet day, and hiding the column then would read as "analytics is off".
+  // From the server, not the map: an empty map is a quiet day, not "analytics is off".
   const trafficKnown = trafficAvailable;
   const trafficTotals = Object.values(hostTraffic).reduce(
     (sum, row) => ({ total: sum.total + row.total, blocked: sum.blocked + row.blocked }),
@@ -353,9 +364,12 @@ export default function ProxyHostsClient({
         <HStack gap={3} vAlign="center">
           <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
           <VStack gap={0} className="cpm-cell-lines">
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+              <HostNotesHint notes={host.description} />
+            </HStack>
             <Tooltip content={host.domains.join(", ")}>
               <Text type="code" size="xsm" color="secondary" maxLines={1}>
                 {summarize(host.domains)}
@@ -408,8 +422,7 @@ export default function ProxyHostsClient({
       width: 170,
       render: (host) => {
         const assigned = agentAssignments?.[host.id] ?? [];
-        // An empty assignment is not "none" - it is the default, which is every agent. Saying so
-        // in the list saves opening the host to find out.
+        // Empty means every agent, not none.
         if (assigned.length === 0) {
           return (
             <Text type="body" size="sm" color="secondary">
@@ -488,6 +501,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
@@ -505,6 +519,11 @@ export default function ProxyHostsClient({
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {summarize(host.domains)} &rarr; {host.upstreams[0]}
           </Text>
+          {host.description && (
+            <Text type="body" size="xsm" color="secondary" maxLines={2}>
+              {host.description}
+            </Text>
+          )}
           <HStack gap={2} vAlign="center">
             <StatusChip status={host.enabled ? "active" : "inactive"} />
             {host.certificateId && <Badge variant="info" label={t("tls")} />}
@@ -515,6 +534,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
@@ -660,6 +680,15 @@ export default function ProxyHostsClient({
           open={!!deleteHost}
           host={deleteHost}
           onClose={() => setDeleteHost(null)}
+        />
+      )}
+
+      {checkingHost && (
+        <ReachabilityDialog
+          open
+          hostId={checkingHost.id}
+          hostName={checkingHost.name}
+          onClose={() => setCheckingHost(null)}
         />
       )}
     </VStack>

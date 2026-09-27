@@ -1,9 +1,6 @@
 /**
- * E2E: the command palette is global - the shortcut and the rail button open it on any dashboard
- * page, and it reaches pages as well as settings. Runs as admin.
- *
- * The settings-specific behaviour (filtering, the empty state, Escape) is covered in
- * settings.spec.ts; this file is about the palette no longer belonging to Settings.
+ * The palette is global: the shortcut and the rail button open it on any dashboard page. Settings'
+ * own palette behaviour is in settings.spec.ts. Runs as admin.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';

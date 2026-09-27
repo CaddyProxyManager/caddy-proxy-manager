@@ -1,10 +1,6 @@
 /**
- * What buildCaddyDocument emits for a host that uses Tailscale.
- *
- * The interesting behaviour is not the handler shapes - tests/unit/caddy-tailscale.test.ts covers
- * those - but which *server* a host's routes land in, and what happens when the plugin is not
- * available: a host asked to live only on the tailnet must disappear rather than fall back to the
- * public listener, which is the one failure mode that would quietly publish a private service.
+ * Which server a Tailscale host lands in (handler shapes are in the unit test). A tailnet-only
+ * host must disappear without the plugin, never fall back to the public listener.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -59,7 +55,7 @@ function servers(document: CaddyDocument) {
   return document.apps.http?.servers ?? {};
 }
 
-/** The distinct `host` matcher values in a server's routes - one host contributes several routes. */
+/** Distinct, since one host contributes several routes. */
 function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
   const found = new Set<string>();
   const walk = (node: unknown) => {
@@ -74,23 +70,12 @@ function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
   return [...found];
 }
 
-/**
- * A TLS policy's subjects, if it has any.
- *
- * Narrowed rather than cast: `policies` is typed as bare records, so `policy.subjects` is
- * `unknown` and a cast tells the reader - and any analyser - nothing about what is really there.
- */
+/** Narrowed rather than cast: `policy.subjects` is `unknown`. */
 function subjectsOf(policy: Record<string, unknown>): string[] {
   return Array.isArray(policy.subjects) ? (policy.subjects as string[]) : [];
 }
 
-/**
- * The policy covering exactly this subject.
- *
- * `some(===)` rather than `subjects.includes(...)`: on a value an analyser cannot resolve to an
- * array, `includes` reads as a substring test over a hostname, which would match
- * "evil.example.com.attacker.net" as readily as the name meant. Equality says what is meant.
- */
+/** `some(===)`, not `includes`: an analyser reads that as a substring test over a hostname. */
 function policyForSubject(
   policies: Record<string, unknown>[],
   subject: string,
@@ -98,7 +83,6 @@ function policyForSubject(
   return policies.find((policy) => subjectsOf(policy).some((value) => value === subject));
 }
 
-/** Every handler name anywhere in the document. */
 function handlerNames(document: unknown): string[] {
   const found: string[] = [];
   const walk = (node: unknown) => {
@@ -240,8 +224,7 @@ describe('serving a host on the tailnet', () => {
 
 describe('when Tailscale is not usable', () => {
   it('drops a tailnet-only host rather than publishing it', async () => {
-    // The fail-closed case: falling back to the public listener would expose a service the
-    // operator deliberately kept private.
+    // Fail closed: the public listener would expose a deliberately private service.
     await enableTailscale();
     await createHost({ tailscale: { serve: true, tailnetOnly: true } });
     setAppliedModules(ALL_MODULE_PATHS.filter((path) => path !== TAILSCALE_PATH));
@@ -262,8 +245,7 @@ describe('when Tailscale is not usable', () => {
   });
 
   it('emits nothing tailscale-shaped while the setting itself is off', async () => {
-    // Configured first, then switched off - a host cannot be stored this way from cold, because
-    // the save-time gate refuses a tailnet host while no auth key exists.
+    // Configured first: the save-time gate refuses a tailnet host while no auth key exists.
     await enableTailscale();
     await createHost({ tailscale: { serve: true, tailnetOnly: false } });
     await enableTailscale({ enabled: false });
@@ -286,8 +268,7 @@ describe('identity authentication', () => {
   });
 
   it('strips client-supplied identity headers on every route, gated or not', async () => {
-    // An excluded path authenticates nothing, so without the strip a caller could set
-    // X-Tailscale-User itself and the upstream could not tell that from a header we set.
+    // An excluded path authenticates nothing, so a caller could forge X-Tailscale-User.
     await enableTailscale();
     await createHost({
       tailscale: {
@@ -300,8 +281,7 @@ describe('identity authentication', () => {
 
     const server = servers((await buildCaddyDocument()) as CaddyDocument).cpm_tailscale_caddy;
     const routes = server.routes as { handle: Record<string, unknown>[] }[];
-    // Every route that reaches the upstream, gated or not - the HTTPS redirect route proxies
-    // nothing, so it has no header for an upstream to believe.
+    // The HTTPS redirect route proxies nothing, so it has no header to strip.
     const proxying = routes.filter((route) =>
       JSON.stringify(route.handle).includes('"reverse_proxy"'),
     );
@@ -314,8 +294,7 @@ describe('identity authentication', () => {
   });
 
   it('does not authenticate when the host is not served on the tailnet', async () => {
-    // The authenticator finds its tsnet server through the listener the request arrived on. With
-    // no such listener it would fall back to a local tailscaled that this image does not run.
+    // Without the listener the authenticator falls back to a tailscaled this image does not run.
     await enableTailscale();
     await createHost({ tailscale: { serve: false, auth: true } });
 
@@ -347,9 +326,8 @@ describe('reaching an upstream over the tailnet', () => {
   });
 
   it('serves nothing on a node it only dials through', async () => {
-    // The node is registered - the transport needs the app block for its auth key - but nothing
-    // listens on it. It stays unstarted until a request goes through, which the plugin fork makes
-    // safe to release; see the note on the replace directive in docker/caddy/go.mod.
+    // Registered (the transport needs its auth key) but unlistened; the plugin fork makes that
+    // safe - see the replace directive in docker/caddy/go.mod.
     await enableTailscale();
     await createHost({ tailscale: { upstreamNode: 'edge' } });
 
@@ -362,8 +340,7 @@ describe('reaching an upstream over the tailnet', () => {
 
 describe('the stored host config', () => {
   it('drops the identity gate when the host is not served on the tailnet', async () => {
-    // Not cosmetic: the authenticator has no tsnet server to ask without a listener, so storing
-    // the combination at all would leave generation deciding what to do about it.
+    // Without a listener the authenticator has no tsnet server to ask.
     const host = await createHost({ tailscale: { serve: false, auth: true } });
     expect(host.tailscale).toBeNull();
   });
@@ -375,8 +352,7 @@ describe('the stored host config', () => {
   });
 
   it('keeps a dual-published host dual-published across a read', async () => {
-    // The stored blob is re-normalized on every read; re-applying the new-host default here would
-    // quietly pull the host off the public listener.
+    // Re-normalized on every read; the new-host default would pull it off the public listener.
     await enableTailscale();
     const host = await createHost({ tailscale: { serve: true, tailnetOnly: false } });
     expect(host.tailscale?.tailnetOnly).toBe(false);
@@ -385,9 +361,7 @@ describe('the stored host config', () => {
   });
 
   it('refuses to store a tailnet host while no auth key is configured', async () => {
-    // The failure this prevents is fleet-wide: a node that cannot register is a listener that never
-    // comes up, and Caddy rejects the whole document - so every host stops being updated, with an
-    // error naming Tailscale rather than whatever was being edited.
+    // Fleet-wide otherwise: a node that cannot register makes Caddy reject the whole document.
     await saveTailscaleSettings({
       ...TAILSCALE_SETTINGS,
       authKey: '',
@@ -408,7 +382,7 @@ describe('the stored host config', () => {
   });
 
   it('counts a Caddy placeholder as a stored key', async () => {
-    // Whether the environment actually defines it is only knowable inside the Caddy container.
+    // Only the Caddy container knows whether its environment defines it.
     await saveTailscaleSettings({
       ...TAILSCALE_SETTINGS,
       authKey: '{env.TS_AUTHKEY}',
@@ -481,8 +455,7 @@ describe('certificates for MagicDNS names', () => {
     const policies =
       ((await buildCaddyDocument()) as CaddyDocument).apps.tls?.automation?.policies ?? [];
     const acmePolicy = policyForSubject(policies, 'app.example.com');
-    // Never in one policy with the .ts.net name: Caddy skips ACME only when *every* subject is a
-    // MagicDNS name, so mixing them would send the tailnet name to a public CA.
+    // Caddy skips ACME only when *every* subject is MagicDNS; mixing leaks the name to a CA.
     expect(acmePolicy?.subjects).toEqual(['app.example.com']);
     expect(acmePolicy?.issuers).toBeDefined();
   });

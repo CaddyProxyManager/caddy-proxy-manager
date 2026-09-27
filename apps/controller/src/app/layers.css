@@ -1,7 +1,5 @@
 /**
- * Canonical cascade layer order. In its own file, imported first, because webpack hoists `@import`
- * above the inline CSS that follows. A later layer beats an earlier one regardless of specificity,
- * and unlayered styles beat every layer - so resets come before astryx-base/astryx-theme, and app
- * utilities after.
+ * Cascade layer order, in its own file imported first because webpack hoists `@import` above
+ * inline CSS. Later layers win regardless of specificity; unlayered styles beat all.
  */
 @layer reset, theme, base, astryx-base, astryx-theme, components, utilities;

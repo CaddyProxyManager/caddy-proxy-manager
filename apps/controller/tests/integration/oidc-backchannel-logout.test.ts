@@ -1,9 +1,6 @@
 /**
- * What a back-channel logout does to the database: which sessions it ends, and how a CPM session
- * comes to know which IdP session it belongs to in the first place.
- *
- * Token verification lives in tests/unit/oidc-logout-token.test.ts; by the time anything here runs
- * the token has already been proved genuine, so these are the consequences of believing it.
+ * What a back-channel logout does to the database, and how a session learns its IdP session.
+ * Token verification is tests/unit/oidc-logout-token.test.ts; here the token is already genuine.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -39,7 +36,6 @@ import {
 } from '../../src/lib/db/schema';
 import {
   bindSessionToIdpSession,
-  clearPendingSessionBindings,
   consumePendingSessionBinding,
   recordSessionBindingFromIdToken,
   revokeSessionsForLogoutToken,
@@ -126,7 +122,6 @@ async function sessionIdsFor(userId: number): Promise<number[]> {
 }
 
 beforeEach(async () => {
-  clearPendingSessionBindings();
   await ctx.db.delete(forwardAuthSessions);
   await ctx.db.delete(sessions);
   await ctx.db.delete(accounts);
@@ -138,9 +133,15 @@ describe('binding a CPM session to the IdP session it came from', () => {
   it('parks the sid an ID token carries and stamps it on the session', async () => {
     const userId = await createUser('sso@example.com');
     const sessionId = await createSession(userId);
+    const request = {};
 
-    recordSessionBindingFromIdToken(userId, PROVIDER, idTokenWith({ sub: 'u-1', sid: 'idp-1' }));
-    await bindSessionToIdpSession(userId, sessionId);
+    recordSessionBindingFromIdToken(
+      request,
+      userId,
+      PROVIDER,
+      idTokenWith({ sub: 'u-1', sid: 'idp-1' }),
+    );
+    await bindSessionToIdpSession(request, userId, sessionId);
 
     const [row] = await ctx.db.select().from(sessions).where(eq(sessions.id, sessionId));
     expect(row.oidcProviderId).toBe(PROVIDER);
@@ -148,33 +149,77 @@ describe('binding a CPM session to the IdP session it came from', () => {
   });
 
   it('parks nothing for a provider that issues no sid', async () => {
-    recordSessionBindingFromIdToken(1, PROVIDER, idTokenWith({ sub: 'u-1' }));
+    const request = {};
+    recordSessionBindingFromIdToken(request, 1, PROVIDER, idTokenWith({ sub: 'u-1' }));
 
-    expect(consumePendingSessionBinding(1)).toBeNull();
+    expect(consumePendingSessionBinding(request, 1)).toBeNull();
   });
 
   it('parks nothing when there is no ID token at all', async () => {
-    recordSessionBindingFromIdToken(1, PROVIDER, null);
+    const request = {};
+    recordSessionBindingFromIdToken(request, 1, PROVIDER, null);
 
-    expect(consumePendingSessionBinding(1)).toBeNull();
+    expect(consumePendingSessionBinding(request, 1)).toBeNull();
   });
 
   it('hands a parked binding back exactly once', () => {
-    recordSessionBindingFromIdToken(1, PROVIDER, idTokenWith({ sid: 'idp-1' }));
+    const request = {};
+    recordSessionBindingFromIdToken(request, 1, PROVIDER, idTokenWith({ sid: 'idp-1' }));
 
-    expect(consumePendingSessionBinding(1)?.sid).toBe('idp-1');
-    expect(consumePendingSessionBinding(1)).toBeNull();
+    expect(consumePendingSessionBinding(request, 1)?.sid).toBe('idp-1');
+    expect(consumePendingSessionBinding(request, 1)).toBeNull();
   });
 
-  it('leaves a session unbound when nothing was parked for that user', async () => {
+  it('parks nothing without a request to tie it to', () => {
+    recordSessionBindingFromIdToken(null, 1, PROVIDER, idTokenWith({ sid: 'idp-1' }));
+    expect(consumePendingSessionBinding({}, 1)).toBeNull();
+  });
+
+  it('leaves a session unbound when its request parked a sid for someone else', async () => {
     const userId = await createUser('local@example.com');
     const sessionId = await createSession(userId);
+    const request = {};
 
-    recordSessionBindingFromIdToken(userId + 1, PROVIDER, idTokenWith({ sid: 'idp-1' }));
-    await bindSessionToIdpSession(userId, sessionId);
+    recordSessionBindingFromIdToken(request, userId + 1, PROVIDER, idTokenWith({ sid: 'idp-1' }));
+    await bindSessionToIdpSession(request, userId, sessionId);
 
     const [row] = await ctx.db.select().from(sessions).where(eq(sessions.id, sessionId));
     expect(row.oidcSid).toBeNull();
+  });
+
+  it('keeps overlapping sign-ins for one user apart, whatever order their hooks finish', async () => {
+    const userId = await createUser('sso@example.com');
+    await linkAccount(userId, 'u-1');
+    const [first, second] = [{}, {}];
+    // Both account hooks run before either session hook, and the sessions arrive reversed.
+    recordSessionBindingFromIdToken(
+      first,
+      userId,
+      PROVIDER,
+      idTokenWith({ sub: 'u-1', sid: 'idp-A' }),
+    );
+    recordSessionBindingFromIdToken(
+      second,
+      userId,
+      PROVIDER,
+      idTokenWith({ sub: 'u-1', sid: 'idp-B' }),
+    );
+    const sessionB = await createSession(userId);
+    await bindSessionToIdpSession(second, userId, sessionB);
+    const sessionA = await createSession(userId);
+    await bindSessionToIdpSession(first, userId, sessionA);
+
+    const sidOf = async (id: number) =>
+      (await ctx.db.select().from(sessions).where(eq(sessions.id, id)))[0]?.oidcSid;
+    expect(await sidOf(sessionA)).toBe('idp-A');
+    expect(await sidOf(sessionB)).toBe('idp-B');
+
+    await revokeSessionsForLogoutToken({
+      providerId: PROVIDER,
+      subject: 'u-1',
+      sessionId: 'idp-A',
+    });
+    expect(await sessionIdsFor(userId)).toEqual([sessionB]);
   });
 });
 

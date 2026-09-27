@@ -4,7 +4,7 @@
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-redirects-adv.test';
@@ -13,7 +13,6 @@ const DOMAIN = 'func-redirects-adv.test';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract the Location header value from a response, normalised to a string. */
 function location(res: Awaited<ReturnType<typeof httpGet>>): string {
   const h = res.headers.location;
   return Array.isArray(h) ? h[0] : (h ?? '');
@@ -35,27 +34,22 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('echo-server:8080');
 
+      await turnOffForceHttps(page);
+
       await injectFormFields(page, {
-        sslForcedPresent: 'on',
         redirectsJson: JSON.stringify([
           // ── full absolute URL destinations ──────────────────────────────────
-          // Exact path → full URL on a completely different host (301)
           { from: '/old-page', to: 'https://new-site.example.com/page', status: 301 },
-          // Exact path → full URL with path on another domain (308 permanent)
           { from: '/docs', to: 'https://docs.example.com/v2/', status: 308 },
-          // Exact path → full URL using http:// scheme (302 temporary)
           { from: '/insecure-legacy', to: 'http://legacy.example.com/', status: 302 },
 
           // ── wildcard "from" → relative destination ──────────────────────────
-          // /.well-known/* → any well-known path redirected to /dav/ (301)
           { from: '/.well-known/*', to: '/dav/', status: 301 },
-          // /api/v1/* → all v1 endpoints redirected to /api/v2/ (302)
           { from: '/api/v1/*', to: '/api/v2/', status: 302 },
-          // /legacy* → bare prefix (no slash after) covers /legacy and /legacy/* (307)
+          // A bare prefix covers /legacy and /legacy/*.
           { from: '/legacy*', to: '/current/', status: 307 },
 
           // ── wildcard "from" → full URL destination ──────────────────────────
-          // /moved/* → absolute URL on another domain (308)
           { from: '/moved/*', to: 'https://archive.example.com/', status: 308 },
         ]),
       });

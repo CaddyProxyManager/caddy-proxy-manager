@@ -44,7 +44,6 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
 
   return (
     <VStack gap={4}>
-      {/* Create inline form */}
       {createOpen ? (
         <CreateRoleCard onClose={() => setCreateOpen(false)} />
       ) : (
@@ -230,7 +229,6 @@ function RoleCard({
   return (
     <Card variant={variant} padding={5}>
       <VStack gap={4}>
-        {/* Header */}
         <HStack justify="between" vAlign="center" gap={3}>
           <HStack gap={3} vAlign="center">
             <Icon icon={ShieldCheck} />
@@ -247,7 +245,6 @@ function RoleCard({
           <Badge label={assignedIds.size} />
         </HStack>
 
-        {/* Edit form */}
         {editing ? (
           <VStack gap={3}>
             <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
@@ -290,7 +287,6 @@ function RoleCard({
 
         <Divider />
 
-        {/* Certificates */}
         <VStack gap={2}>
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("certificates")}{" "}
@@ -318,8 +314,7 @@ function RoleCard({
         </VStack>
       </VStack>
 
-      {/* Replaces window.confirm, which was unstyled and not announced as a
-          dialog to assistive tech. */}
+      {/* Not window.confirm: unstyled, and not announced as a dialog to assistive tech. */}
       <AlertDialog
         isOpen={deleteOpen}
         onOpenChange={setDeleteOpen}

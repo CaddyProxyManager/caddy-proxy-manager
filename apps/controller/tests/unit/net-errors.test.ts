@@ -1,12 +1,8 @@
-/**
- * These helpers exist because Bun 1.4 changed what `fetch()` rejects with and how duplicate headers
- * read. The cases below are the shapes both runtimes actually produce, taken from live fetches.
- */
+/** Bun 1.4 changed fetch rejections and duplicate headers; these shapes come from live fetches. */
 import { describe, expect, it } from 'bun:test';
 import { isConnectionError } from '@/src/lib/net-errors';
 import { lastHeaderValue } from '@/src/lib/request-headers';
 
-/** Builds an error carrying a `code`, the way a runtime does. */
 const coded = (code: string, message = 'failed'): Error => {
   const error = new TypeError(message);
   Object.assign(error, { code });
@@ -69,8 +65,7 @@ describe('lastHeaderValue', () => {
   });
 
   it('takes the proxy-supplied value when duplicates were combined', () => {
-    // Bun 1.4 joins duplicate headers per the Fetch spec; the client's own
-    // value comes first and the proxy's is appended after it.
+    // Bun 1.4 joins duplicate headers per the Fetch spec, the client's value first.
     expect(lastHeaderValue('spoofed.example.com, app.example.com')).toBe('app.example.com');
   });
 

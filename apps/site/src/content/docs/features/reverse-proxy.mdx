@@ -12,13 +12,38 @@ import LoadBalancerDemo from "../../../demos/samples/LoadBalancerDemo";
 import LocationRulesDemo from "../../../demos/samples/LocationRulesDemo";
 import RedirectsDemo from "../../../demos/samples/RedirectsDemo";
 import UpstreamDnsDemo from "../../../demos/samples/UpstreamDnsDemo";
+import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
 mostly for, and most of the other features attach to it.
 
-<Demo title="The proxy host list" note="Sort by domain or status, or switch to the enabled or disabled hosts.">
+Every host, HTTP or L4, can carry **notes**: free text for whatever the next person needs to know,
+up to 2000 characters. They show as an icon beside the host's name in the list, with the text on
+hover, and the search box finds them. Anyone who can see the host can read them.
+
+<Demo title="The proxy host list" note="Sort by domain or status, switch to the enabled or disabled hosts, or hover the note on staging.">
   <ProxyHostsTableDemo client:visible />
 </Demo>
+
+## HTTPS and connection options
+
+Each host has switches at the top of its editor:
+
+- **Force HTTPS** answers plain HTTP with a 308 redirect to the same URL over HTTPS.
+- **HSTS** tells browsers to use only HTTPS for the host for two years, optionally including its
+  subdomains. It needs Force HTTPS, because a browser pinned to HTTPS never tries HTTP again.
+- **WebSocket support** lets upgrade requests through. The [WAF](../waf/) checks the handshake like
+  any other request, but not the messages after it. With it off, an upgrade is refused with a 403.
+- **Preserve Host header** sends the domain the client asked for rather than the upstream's
+  own address.
+
+<Demo title="Host options" note="Turn off Force HTTPS and HSTS follows.">
+  <HostTogglesDemo client:visible />
+</Demo>
+
+HTTP/2 and HTTP/3 are offered on every host. **Settings → Network → HTTP Versions** turns either
+off, for all hosts at once: Caddy decides this per listening port, and every host shares one.
+HTTP/1.1 always stays on.
 
 ## Upstreams and load balancing
 
@@ -49,21 +74,45 @@ Retries let a failed request try another upstream rather than surfacing the erro
 
 
 Path-based routing inside one host: send `/api/*` to one backend and `/ws/*` to another, each with
-its own upstreams, load balancing and health checks.
+its own upstreams, load balancing and health checks. A rule can also use an
+[access list](../access-control/#per-path-lists) of its own, or none, instead of the host's.
 
-<Demo title="Location rules" note="Expand a rule to give it its own load balancer.">
+<Demo title="Location rules" note="Expand a rule to give it its own load balancer, or change the access list it uses.">
   <LocationRulesDemo client:visible />
 </Demo>
 
 ## Redirects and rewrites
 
 Per-host redirect rules with a status of 301, 302, 307 or 308 - 307 and 308 preserve the request
-method, which matters for anything but a GET. A path prefix can be prepended before the request
+method, which matters for anything but a GET. **Keep path** carries the rest of the request
+along: **Full path** appends the whole path and query to the target, and **After prefix** drops
+the part of the pattern before its `*` first, so `/blog/*` sends `/blog/2024/post` to
+`https://blog.example.com/2024/post`. A path prefix can be prepended before the request
 reaches the upstream.
 
 <Demo title="Redirects and path rewrites">
   <RedirectsDemo client:visible />
 </Demo>
+
+## Cache assets
+
+**Cache assets** covers stylesheets, scripts, images and fonts, matched by file extension. Pages and
+API responses are never cached. The max age runs from a minute to a year, a day by default.
+
+- **Browser** sets `Cache-Control: max-age=<n>` on successful asset responses whose upstream sent
+  no `Cache-Control` of its own, so an application that already manages caching keeps its policy,
+  and a 404 or 500 during a deploy is not kept for a day.
+- **Caddy cache** also keeps a shared copy in Caddy, so repeat requests skip the upstream. It needs
+  the opt-in HTTP Cache module (see [Caddy build](/features/caddy-build/)); until that is compiled
+  in, the host falls back to browser caching. The cache lives in memory unless another
+  [storage](/features/caddy-build/#http-cache-storage) is chosen, such as Redis to share it between
+  Caddys. A request carrying a cookie or an `Authorization` header always goes to the upstream, so
+  an asset an application serves per user never reaches the next visitor.
+
+Either way, a response that sets a cookie gets `private` added to its `Cache-Control`, alongside
+anything stricter the upstream sent, and nothing marked `private` or `no-store` is stored. The
+cache sits after any forward auth or access check, just before the upstream, so an asset is never
+served to a caller who could not fetch it.
 
 ## DNS controls
 
@@ -80,6 +129,6 @@ because a single pinned address cannot carry more than one SNI name.
 
 ## Headers
 
-The host header is forwarded by default, which is what most applications behind a proxy expect.
-Other request and response headers are set through the host's advanced configuration fields, which
-take raw Caddy JSON and are admin-only.
+The host header is forwarded by default, which is what most applications behind a proxy expect;
+the **Preserve Host header** switch turns that off. Other request and response headers are set
+through the host's advanced configuration fields, which take raw Caddy JSON and are admin-only.

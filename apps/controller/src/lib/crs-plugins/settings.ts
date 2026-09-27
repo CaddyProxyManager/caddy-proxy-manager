@@ -1,9 +1,6 @@
 /**
- * Which CRS plugin registries are read, and how often.
- *
- * A JSON setting like the WAF's own rather than a settings-registry entry: that registry is for
- * values migrating out of `.env`, and none of these ever lived there. The token is encrypted at
- * rest and never leaves the server; readers get `hasGithubToken` instead.
+ * A JSON setting, not a registry entry: the registry is for values migrating out of `.env`. The
+ * token is encrypted at rest and never leaves the server; readers get `hasGithubToken`.
  */
 
 import { domainError } from "../domain-error";
@@ -38,7 +35,6 @@ type StoredSettings = {
   github_token: string;
 };
 
-/** What a page or the API may see. */
 export type CrsRegistrySettings = {
   registries: CrsRegistrySource[];
   /** 0 turns the scheduled refresh off; registries are then read on demand only. */

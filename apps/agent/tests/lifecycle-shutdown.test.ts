@@ -1,11 +1,7 @@
 /**
- * Caddy goes down with its agent, and comes back with it.
- *
- * Stopping the agent stops the Caddy it manages. That stop is an explicit one, which
- * `restart: unless-stopped` does not undo, so the agent records it and starts Caddy again the next
- * time it starts with a pairing - before the controller answers, so a host that rebooted while its
- * controller was unreachable still serves. The controller keeps the last word: if it has turned
- * Caddy off, the first desired state stops it again, and never races the restore.
+ * Stopping the agent stops Caddy explicitly, which `restart: unless-stopped` does not undo, so the
+ * agent records it and restarts Caddy on its next paired start, before the controller answers. If
+ * the controller has turned Caddy off, the first desired state stops it again without racing.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

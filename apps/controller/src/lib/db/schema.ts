@@ -1,14 +1,7 @@
 /**
- * The application's tables, for whichever backend DATABASE_URL names.
- *
- * Drizzle has no dialect-neutral table builder, and the dialect is a runtime value while types are
- * compile-time, so this exports the SQLite tables typed as their PostgreSQL twins when SQLite is
- * in use. The two declare identical column names and inferred types, which
- * tests/unit/db-schema-parity.test.ts asserts. ./connection.ts refuses to start if it and this
- * module ever disagree about the dialect.
- *
- * Decided here from the environment rather than imported from the connection, so a test can import
- * tables without opening a database.
+ * Drizzle has no dialect-neutral builder and the dialect is a runtime value, so SQLite tables are
+ * exported typed as their PostgreSQL twins (db-schema-parity.test.ts). Decided from the
+ * environment, not the connection, so tests can import tables without opening a database.
  */
 import { databaseDialect } from "./dialect";
 import * as pgSchema from "./schema.pg";
@@ -27,6 +20,8 @@ export const {
   sessions,
   accounts,
   verifications,
+  twoFactors,
+  accessListIpRules,
   oauthProviders,
   oauthStates,
   pendingOAuthLinks,

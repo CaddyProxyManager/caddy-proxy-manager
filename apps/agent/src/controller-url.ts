@@ -1,13 +1,8 @@
 /**
  * Turning what an operator types into an origin the agent can dial, and deciding whether to.
- *
- * Mirrors the controller's `normalizeAgentAddress`, and is deliberately just as strict: this value
- * arrives from a terminal, and an address carrying a path or a query is a sign someone pasted a
- * dashboard URL. Quietly trimming it would send a pairing code somewhere they did not mean.
- *
- * The link is not just control traffic: the pair response carries the shared secret, and desired
- * state can carry the ClickHouse password. So plain http is the default only
- * where it cannot leave the host or the compose network, and is refused towards a public address.
+ * As strict as the controller's `normalizeAgentAddress`: a path or query means a pasted dashboard
+ * URL, and trimming it would send a pairing code somewhere unintended. Plain http is refused
+ * towards public addresses, since the link carries the shared secret and the ClickHouse password.
  */
 
 /** Where the controller listens when the operator gave a host and no port. */
@@ -21,13 +16,9 @@ export class ControllerAddressError extends Error {
 }
 
 /**
- * The port the operator actually typed, which `new URL` will not tell you. Null when none was.
- *
- * The URL API normalises a scheme's default port away - `new URL("https://h:443").port` is the
- * empty string, indistinguishable from `https://h`. Both mean 443 here, but for http the two
- * differ: `http://h:80` asked for 80 and `http://h` did not ask for anything, and the second has
- * always meant the controller's own default. The digits matter too: a bare `h:80` is parsed as
- * http, loses its 80, and then becomes https, whose default is not what was typed.
+ * The port the operator actually typed, or null. `new URL` drops a scheme's default port, but
+ * `http://h:80` asked for 80 while `http://h` means the controller's default, and a bare `h:80`
+ * parses as http, loses its 80, then becomes https.
  */
 function typedAuthorityPort(input: string): string | null {
   const withoutScheme = input.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
@@ -121,15 +112,9 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
     url.port = String(port);
   }
 
-  // An explicit --port wins, then a port in the address, then the scheme's own default where the
-  // operator committed to one - and only then the controller's default.
-  //
-  // `https://` is the case that matters: the controller serves plain HTTP, so an https address
-  // means something is terminating TLS in front of it, and that thing listens on 443. This is how
-  // a Tailscale or Headscale deployment addresses its controller - `tailscale serve` publishes it
-  // at `https://<machine>.<tailnet>.ts.net` with no port to type - and defaulting that to 3000
-  // dialled a port nothing was listening on. `http://` keeps meaning 3000 without an explicit
-  // port, which is what every existing deployment relies on.
+  // --port, then the address's port, then the scheme's default where one was committed to, then
+  // the controller's. An https address means TLS terminates in front on 443 (`tailscale serve`
+  // has no port to type); bare `http://` keeps meaning 3000, which deployments rely on.
   const typedPort = typedAuthorityPort(trimmed);
   const resolved =
     url.port || typedPort || (url.protocol === "https:" ? "443" : String(DEFAULT_CONTROLLER_PORT));
@@ -137,12 +122,9 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
 }
 
 /**
- * Whether the agent may dial `url`: a warning to log when it may but plain http is involved, null
- * when there is nothing to say, and a ControllerAddressError when it may not.
- *
- * http to loopback or a single-label name is the bundled stack talking to itself and says nothing.
- * To a private address it warns. Anywhere else it is refused unless `allowInsecureHttp` - the
- * `CONTROLLER_ALLOW_INSECURE_HTTP` opt-in - says the operator accepts that.
+ * Whether the agent may dial `url`: null, a warning to log, or a ControllerAddressError. http is
+ * silent to loopback or a single-label name, warns to a private address, and is refused
+ * elsewhere unless `allowInsecureHttp` (`CONTROLLER_ALLOW_INSECURE_HTTP`).
  */
 export function checkControllerTransport(url: string, allowInsecureHttp: boolean): string | null {
   const parsed = new URL(url);

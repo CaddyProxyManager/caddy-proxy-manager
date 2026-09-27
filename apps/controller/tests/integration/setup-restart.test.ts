@@ -1,8 +1,4 @@
-/**
- * POST /api/setup/restart ends the process. It is reachable without signing in, so it has to stay
- * a single restart for the operator who ran the import or finished setup - not a way for anyone to
- * keep ending it.
- */
+/** POST /api/setup/restart needs no sign-in, so it must stay one restart, not a kill switch. */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { nextIntlServerMock } from '../helpers/next-intl';
@@ -13,8 +9,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -43,10 +38,7 @@ const mockAuth = vi.mocked(auth);
 const mockRestart = vi.mocked(scheduleProcessRestart);
 const now = '2026-01-01T00:00:00.000Z';
 
-/**
- * A same-origin POST, shaped by hand: a real Request drops the Host header, which checkSameOrigin
- * compares Origin against.
- */
+/** By hand: a real Request drops the Host header checkSameOrigin compares against. */
 function post(headers: Record<string, string> = {}) {
   const all: Record<string, string> = {
     origin: 'http://localhost:3000',
@@ -71,7 +63,7 @@ async function seedMigratedAccount() {
   });
 }
 
-/** Forget the last accepted restart, so a test can look at one guard at a time. */
+/** So a test can look at one guard at a time. */
 async function clearCooldown() {
   await ctx.db.delete(settings).where(eq(settings.key, 'setup:restart_requested_at'));
 }
@@ -146,8 +138,7 @@ describe('POST /api/setup/restart once the import brought a way to sign in', () 
 
 describe('POST /api/setup/restart in any state', () => {
   it('allows one restart a minute, so the process cannot be held in a loop', async () => {
-    // Nothing can sign in yet, so the request is unauthenticated by design; the cooldown is what
-    // bounds it. It lives in the database, because the restart it allows wipes process memory.
+    // Unauthenticated by design; the cooldown bounds it, in the database to survive the restart.
     const first = await post();
     expect(first.status).toBe(202);
 
@@ -215,10 +206,8 @@ describe('POST /api/setup/restart in any state', () => {
 });
 
 describe('POST /api/setup/restart as setup finishes', () => {
-  // The other half of the same reasoning: the process resolved its settings, its gates and its
-  // providers against a database that had none of them, so finishing setup restarts too.
-  // The migration source the outer setup records stays: what marks this branch is the completion
-  // flag, not the absence of an import.
+  // The process resolved its settings against an empty database, so finishing setup restarts
+  // too. This branch is marked by the completion flag, not the absence of an import.
   beforeEach(async () => {
     await markSetupCompleted();
   });
@@ -244,8 +233,7 @@ describe('POST /api/setup/restart as setup finishes', () => {
   });
 
   it('is not a standing restart endpoint for administrators', async () => {
-    // Deliberately narrower than the migration branch: an admin session alone would leave every
-    // completed deployment with a permanent way to stop the process.
+    // An admin session alone would give every deployment a permanent way to stop the process.
     await issueRestartToken();
     mockAuth.mockResolvedValue({
       user: { id: '1', email: 'admin@example.com', name: 'Admin', role: 'admin' },
@@ -258,8 +246,7 @@ describe('POST /api/setup/restart as setup finishes', () => {
   });
 
   it('needs no migration to have happened', async () => {
-    // A fresh install has nothing in `setup:migrated_from`, which is what the migration branch
-    // refuses on.
+    // The migration branch refuses on an empty `setup:migrated_from`.
     await ctx.db.delete(settings).where(eq(settings.key, 'setup:migrated_from'));
     const token = await issueRestartToken();
 

@@ -1,23 +1,14 @@
 /**
- * The single definition of how the end-to-end stack is addressed on the docker CLI.
- *
- * This lived as six copies - two global setups, two teardowns, container-health.spec.ts and
- * seed.ts - and they drifted the moment one of them changed: adding `--env-file` to four left the
- * other two still reading whatever .env the developer happened to have.
- *
- * `--env-file` REPLACES the repo-root .env rather than layering onto it, so the suite behaves the
- * same with or without one, and the same on CI, which has none. tests/e2e.env carries the two
- * variables docker-compose.yml refuses to interpolate without; the values services actually run
- * with come from tests/docker-compose.test.yml.
+ * The single definition of how the e2e stack is addressed on the docker CLI - six drifting copies
+ * left two reading the developer's .env. `--env-file` REPLACES the repo-root .env, so a run is
+ * the same with or without one; tests/e2e.env carries only what docker-compose.yml requires.
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Every docker command runs from here, not from process.cwd(). Compose resolves the relative paths
- * inside a compose file against the *project directory* - the directory of the first `-f` file -
- * so build contexts, bind mounts and `--env-file` all stay anchored to the repo root even though
- * the suite itself now lives under apps/controller.
+ * Every docker command runs from here, not process.cwd(): Compose anchors relative paths to the
+ * first `-f` file's directory, so build contexts and bind mounts stay on the repo root.
  */
 export const COMPOSE_CWD = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
@@ -32,21 +23,16 @@ const BASE_ARGS = [
 ];
 
 /**
- * One more `-f` when E2E_COMPOSE_EXTRA_FILE names it. CI points this at
- * tests/docker-compose.ci.yml to attach the GitHub Actions layer cache, which cannot simply live
- * in the test override: `type=gha` needs credentials only a runner has, so a developer running the
- * suite would fail on it. Unset everywhere else, which leaves the stack exactly as it was.
+ * One more `-f` when E2E_COMPOSE_EXTRA_FILE names it - CI's GitHub Actions layer cache, which
+ * cannot live in the test override because `type=gha` needs credentials only a runner has.
  */
 const EXTRA_FILE = process.env.E2E_COMPOSE_EXTRA_FILE;
 
 export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE_ARGS;
 
 /**
- * `COMPOSE_PROFILES` for teardown: every profile the stack defines, whether or not the run enabled
- * it. `down` only touches services in active profiles, and Caddy is started by the agent behind
- * the `caddy` profile that no setup activates - so a `down -v` that does not name it leaves the
- * Caddy container running and the volumes it holds ("agent-data-test", "caddy-*-test") in use. The
- * next run's agent then resumes the previous run's pairing against a fresh controller database,
- * gets refused, and stops Caddy for the rest of the run. A profile with no containers is a no-op.
+ * Every profile the stack defines: `down` only touches active profiles, so Caddy (profile
+ * `caddy`, started by the agent) would survive and hold its volumes, and the next run's agent
+ * would resume a stale pairing and stop Caddy. A profile with no containers is a no-op.
  */
 export const TEARDOWN_PROFILES = 'caddy,clickhouse,tools';

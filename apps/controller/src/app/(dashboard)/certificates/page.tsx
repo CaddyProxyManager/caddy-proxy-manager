@@ -145,7 +145,6 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
     usageMap.set(u.certId, hosts);
   }
 
-  // Build a map of cert ID -> its domain list (including wildcard entries)
   const certDomainMap = new Map<number, string[]>();
   for (const cert of certRows) {
     const domainNames = JSON.parse(cert.domainNames) as string[];
@@ -172,7 +171,6 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       }
     }
     if (coveredByCertId !== null) {
-      // Move this host to the cert's usedBy list
       const hosts = usageMap.get(coveredByCertId) ?? [];
       hosts.push({ id: host.id, name: host.name, domains: host.domains });
       usageMap.set(coveredByCertId, hosts);
@@ -194,7 +192,6 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       deduplicatedAcmeHosts.push(host);
       continue;
     }
-    // Check if all of this host's domains are covered by any wildcard ACME host
     const coveredByWildcard = wildcardDomainSets.some((wcDomains) =>
       host.domains.every((d) => isDomainCoveredByCert(d, wcDomains)),
     );
@@ -203,7 +200,6 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
     }
   }
 
-  // Paginate the deduplicated ACME hosts
   const adjustedAcmeTotal = deduplicatedAcmeHosts.length;
   const healthyAcmeTotal = countHealthyAcmeHosts(deduplicatedAcmeHosts);
   const paginatedAcmeHosts = deduplicatedAcmeHosts.slice(offset, offset + PER_PAGE);

@@ -8,13 +8,11 @@ import { MORE_DRAWER_SLOTS, moreDestinations } from "@/src/lib/nav/destinations"
 
 export type SaveDrawerResult = { ok: true } | { ok: false; error: string };
 
-/** Save which pages the signed-in user keeps in their More drawer, in the order given. */
 export async function saveMoreDrawerPinsAction(ids: string[]): Promise<SaveDrawerResult> {
   const session = await requireUser();
   const t = await getTranslations("nav.more");
 
-  // Checked against what this user may open, not just against the list of pages that exist: a
-  // client that posts "settings" for an operator must not get a pin for a page that refuses them.
+  // What this user may open, not just what exists: a posted "settings" must not pin a refused page.
   const allowed = new Set(moreDestinations(session.user.role).map((d) => d.id));
   const chosen = [...new Set(ids)].filter((id) => allowed.has(id as never));
 
@@ -29,7 +27,7 @@ export async function saveMoreDrawerPinsAction(ids: string[]): Promise<SaveDrawe
     Number(session.user.id),
     chosen as Parameters<typeof setMoreDrawerPins>[1],
   );
-  // The drawer is rendered by the dashboard layout, so every page under it has a stale copy.
+  // The drawer is in the dashboard layout, so every page under it has a stale copy.
   revalidatePath("/", "layout");
   return { ok: true };
 }

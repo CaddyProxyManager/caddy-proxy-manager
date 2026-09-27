@@ -1,8 +1,6 @@
 /**
- * The readiness check in fixAccountsSchema decides whether a legacy `accounts` table is rebuilt.
- * It is the only thing standing between an upgraded deployment and a table with no unique index
- * on (providerId, accountId) - which is what stops two rows claiming one identity - so the cases
- * below pin both directions: a wrong shape is repaired, and a correct one is left alone.
+ * fixAccountsSchema's readiness check alone guarantees the unique (providerId, accountId) index
+ * that stops two rows claiming one identity. Pinned both ways: wrong is repaired, right untouched.
  */
 import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
@@ -68,8 +66,7 @@ function accountRows(db: Database) {
 
 describe('fixAccountsSchema readiness check', () => {
   it('leaves a fully correct table alone', () => {
-    // The table object itself must survive: a needless rebuild reassigns ids and drops any column
-    // this repair does not know about, so "correct" has to mean "not touched".
+    // A needless rebuild reassigns ids and drops unknown columns, so correct means untouched.
     const db = legacyDb(CORRECT_ACCOUNTS);
     seedAccount(db, 'sub-a', 'dex');
     const before = tableSql(db);
@@ -81,8 +78,7 @@ describe('fixAccountsSchema readiness check', () => {
   });
 
   it('repairs a table whose id is right but has no unique identity index', () => {
-    // The case the weaker check missed. Without this index nothing stops two rows sharing one
-    // (providerId, accountId), which is the collision the importer refuses to merge.
+    // Without this index two rows can share one (providerId, accountId).
     const db = legacyDb(CORRECT_ACCOUNTS, [USER_IDX]);
     seedAccount(db, 'sub-a', 'dex');
 
@@ -141,13 +137,12 @@ describe('fixAccountsSchema readiness check', () => {
     ).map((column) => column.name);
     expect(columns).toContain('password');
     expect(columns).toContain('scope');
-    // Absent columns arrive as NULL rather than failing the rebuild, so the row is still here.
+    // Absent columns arrive as NULL rather than failing the rebuild.
     expect(accountRows(db)).toEqual([{ accountId: 'sub-a', providerId: 'dex' }]);
   });
 
   it('still refuses to merge an identity collision while repairing', () => {
-    // Preserved from before the readiness check was widened: two rows may belong to different
-    // users, so picking either one would turn a migration into an account takeover.
+    // Two rows may belong to different users; picking one would be an account takeover.
     const db = legacyDb(CORRECT_ACCOUNTS, [USER_IDX]);
     seedAccount(db, 'sub-a', 'dex');
     seedAccount(db, 'sub-a', 'dex');

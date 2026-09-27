@@ -1,13 +1,7 @@
 /**
- * GET /api/agent/geoip/:edition - a MaxMind database, for a paired agent.
- *
- * The controller holds the subscription and the files; an agent reaches them through here rather
- * than each host needing a licence key of its own. An agent sharing the controller's volume has the
- * files mounted already and never asks.
- *
- * Authenticated by the agent signing with its pairing secret, which is symmetric. An unsigned or
- * unrecognised caller gets 404, not 401: nothing should be able to learn that this route exists,
- * or which agent ids are real, without already holding a secret.
+ * GET /api/agent/geoip/:edition - a MaxMind database for a paired agent, so no host needs its own
+ * licence key. Signed with the pairing secret; anything else gets 404, not 401, so neither the
+ * route nor real agent ids can be learned without a secret.
  */
 
 import { existsSync, statSync } from "node:fs";
@@ -23,8 +17,7 @@ export async function GET(
   { params }: { params: Promise<{ edition: string }> },
 ) {
   const { edition } = await params;
-  // Checked before authentication so an unknown edition cannot be used to probe which agent ids
-  // verify: every failure below this point looks identical from outside.
+  // Before authentication, so an unknown edition cannot probe which agent ids verify.
   if (!(GEOIP_EDITIONS as readonly string[]).includes(edition)) return notFound();
 
   // GET, so the signed body is the empty string - the same value the agent hashed.
@@ -36,8 +29,7 @@ export async function GET(
   if (!existsSync(path)) return notFound();
 
   const etag = geoipEtag(path);
-  // The single-host case shares this volume, and a remote agent re-checks daily; without this
-  // every check would move tens of megabytes to discover nothing had changed.
+  // A remote agent re-checks daily; otherwise each check moves tens of megabytes for nothing.
   if (request.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { ETag: etag } });
   }

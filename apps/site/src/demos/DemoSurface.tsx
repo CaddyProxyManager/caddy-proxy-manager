@@ -32,14 +32,9 @@ function useStarlightMode(): Mode {
 }
 
 /**
- * The bit of the controller's app shell a demo needs: Astryx's theme surface and the real message
- * catalog. Everything is scoped to the wrapper below, so several demos can sit on one page.
- *
- * Astryx's own `<Theme>` is deliberately not used. The first one in a tree declares itself the root
- * and syncs `data-theme` and `data-astryx-theme` onto `<html>` - which would both fight Starlight
- * for the page's colour mode and pull the theme's prose defaults (heading sizes, paragraph colour,
- * `hr`) over the whole documentation site. What `<Theme>` renders otherwise is this wrapper and
- * this context, so the demos render them directly and leave `<html>` alone.
+ * The slice of the app shell a demo needs: Astryx's theme surface and the real message catalog.
+ * Not Astryx's `<Theme>`: the first in a tree syncs its attributes onto `<html>`, fighting
+ * Starlight's colour mode and restyling the whole docs site.
  */
 export function DemoSurface({ children }: { children: ReactNode }) {
   const mode = useStarlightMode();

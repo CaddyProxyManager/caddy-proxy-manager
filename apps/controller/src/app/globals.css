@@ -21,10 +21,7 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @layer base {
-  /**
-   * Colour and radius come from Astryx's Tailwind bridge above - one set of light-dark() tokens
-   * resolved by `color-scheme`, no `.dark` block. See src/lib/theme-mode.ts.
-   */
+  /* light-dark() tokens resolved by `color-scheme`, no `.dark` block. See src/lib/theme-mode.ts. */
   * {
     @apply border-border;
   }
@@ -35,45 +32,26 @@
 
 @layer components {
   /**
-   * AppShell paints its content area with the card token. The page is the body colour at every
-   * width - black in dark mode, light grey in light - with cards lifted off it, so the content area
-   * asks for the body colour itself. Otherwise the whole panel turns card-coloured and only the
-   * sidebar reads as the page.
-   *
-   * Not inside a dialog or sheet: those lay out with the same LayoutContent, sit in the shell's DOM
-   * even though they render on top, and must keep their own surface rather than turn page black.
+   * AppShell paints content with the card token; the page wants the body colour with cards lifted
+   * off it. Dialogs and sheets reuse LayoutContent inside the shell and keep their own surface.
    */
   .astryx-app-shell
   .astryx-layout-content:not(:is(dialog, [role="dialog"], [role="alertdialog"]) *) {
     background-color: var(--color-background-body);
   }
 
-  /**
-   * The sidebar sits a step off the black page in dark mode, so the two read as separate surfaces
-   * without a card-bright panel. Light mode keeps the page colour it already has. Both elements:
-   * the panel and the nav inside it each paint their own background.
-   */
+  /* A step off the black page in dark mode. Both elements paint their own background. */
   .astryx-app-shell-sidenav,
   .astryx-app-shell-sidenav .astryx-side-nav {
     background-color: light-dark(var(--color-background-body), #111111);
   }
 
-  /**
-   * A page whose root is a full-page Layout (a list rail beside a detail pane, as on Access Lists)
-   * asks for `height="fill"`, which is a percentage of this wrapper. The wrapper is otherwise sized
-   * by its content, so the percentage resolved to nothing and both panes stopped where the rail's
-   * content did. Only those pages get a definite height: every other page keeps growing with its
-   * content and scrolling in the shell.
-   */
+  /* A full-page Layout's `height="fill"` is a percentage of this wrapper, so it needs a height. */
   .cpm-mobile-content:has(> .astryx-layout) {
     height: 100%;
   }
 
-  /**
-   * The draggable divider beside a Layout side panel (components/ui/PanelResizeHandle.tsx). The
-   * element is the 1px line; the ::before is a wider invisible grab area centred on it, so the line
-   * stays thin without being hard to hit.
-   */
+  /* PanelResizeHandle: a 1px line with a wider invisible ::before to grab. */
   .cpm-panel-resize-handle {
     position: relative;
     flex: none;
@@ -105,18 +83,13 @@
     box-shadow: 0 0 0 1px var(--color-border-pink);
   }
 
-  /**
-   * components/ui/CodeEditor.tsx stacks a transparent <textarea> over the highlighted <pre>, so the
-   * textarea takes `outline: none` - its own ring would draw under the glyphs the reader sees. The
-   * frame carries the focus indicator instead.
-   */
+  /* CodeEditor's textarea ring would draw under the highlighted glyphs, so the frame shows focus. */
   .cpm-code-editor:focus-within {
     border-color: var(--color-border-pink);
     box-shadow: 0 0 0 1px var(--color-border-pink);
   }
 
-  /* A flush editor has no border to colour, and the pane around it clips an outer ring. An
-     outline paints above the frame's children, so the scrollbar cannot cover it. */
+  /* Flush: no border, and the pane clips an outer ring. An outline paints above the scrollbar. */
   .cpm-code-editor[data-flush]:focus-within {
     box-shadow: none;
     outline: 1px solid var(--color-border-pink);
@@ -130,25 +103,13 @@
     bottom: var(--spacing-3);
   }
 
-  /**
-   * A field whose value has been typed but not saved yet.
-   *
-   * The settings page marks the label (see PageBlocks.tsx): the Save button used to turn the
-   * accent colour when its form was dirty, and with one bar for the whole page that cue had to
-   * move to the thing that changed. Pink is the app's accent, so this reads as the same signal.
-   * The colour is set on the label's descendants too, since the design system draws the text in
-   * its own element inside the <label>.
-   */
+  /* Unsaved fields (PageBlocks.tsx). Descendants too: Astryx draws label text in its own element. */
   label[data-unsaved="true"],
   label[data-unsaved="true"] * {
     color: var(--color-text-pink);
   }
 
-  /**
-   * And the control itself, so the change is visible from the field as well as from its name.
-   * The bordered element differs by control - an input draws its own box, a checkbox draws an
-   * indicator - so the field carries the mark and these reach whichever it turns out to be.
-   */
+  /* The bordered element differs by control, so the field carries the mark. */
   [data-unsaved-field="true"] input:not([type="hidden"]),
   [data-unsaved-field="true"] textarea,
   [data-unsaved-field="true"] select,
@@ -156,15 +117,10 @@
     border-color: var(--color-border-pink);
   }
 
-  /**
-   * Visual masking for a secret in a multi-line field: a private key needs a <textarea>, since
-   * <input type="password"> strips newlines on paste and corrupts PEM. Where -webkit-text-security
-   * is unsupported the field degrades to plain text.
-   */
+  /* A private key needs a textarea, since a password input strips PEM newlines on paste. */
   [data-masked-input="true"] textarea {
     -webkit-text-security: disc;
-    /* biome-ignore lint/correctness/noUnknownProperty: unprefixed counterpart to
-       -webkit-text-security above, for engines that ship it unprefixed. */
+    /* biome-ignore lint/correctness/noUnknownProperty: for engines that ship it unprefixed. */
     text-security: disc;
   }
 }

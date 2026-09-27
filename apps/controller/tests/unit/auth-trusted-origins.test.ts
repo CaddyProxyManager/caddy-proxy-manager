@@ -1,8 +1,4 @@
-/**
- * A fresh deployment reached at its IP was refused at the setup sign-in ("Invalid origin"): Better
- * Auth trusted BASE_URL alone, which Compose defaults to localhost, and the step that asks for the
- * real URL comes after signing in.
- */
+/** A fresh deployment reached at its IP got "Invalid origin": BASE_URL defaults to localhost. */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 
@@ -131,8 +127,7 @@ describe('extraTrustedOrigins', () => {
   });
 
   it('trusts the dashboard host, which is this app under a name of its own', async () => {
-    // Setup seeds the dashboard domain from BASE_URL's hostname, so it differs from the Public URL
-    // by port alone - and a sign-in at the domain the operator was just sent to would be refused.
+    // The dashboard domain differs from the Public URL by port alone.
     ctx.setupCompleted = true;
     ctx.dashboard = { enabled: true, domain: 'cpm.example.com', tls: false };
     expect(await extraTrustedOrigins()).toContain('http://cpm.example.com');
@@ -146,8 +141,7 @@ describe('extraTrustedOrigins', () => {
     ctx.dashboard = { enabled: false, domain: 'cpm.example.com', tls: false };
     expect(await extraTrustedOrigins()).not.toContain('http://cpm.example.com');
 
-    // Only a hostname, for the same reason the probe insists on one: anything else could carry a
-    // scheme, a port or a path into what is being trusted.
+    // Anything but a hostname could carry a scheme, port or path into what is trusted.
     ctx.dashboard = { enabled: true, domain: 'cpm.example.com/evil', tls: false };
     expect(await extraTrustedOrigins()).toHaveLength(1);
   });
@@ -159,8 +153,7 @@ describe('isPublicOrigin', () => {
     expect(await isPublicOrigin('https://proxy.example.com')).toBe(true);
     expect(await isPublicOrigin(new URL(config.baseUrl).origin)).toBe(true);
     expect(await isPublicOrigin('https://attacker.example')).toBe(false);
-    // The dashboard host is trusted for signing in, not for everything a public origin is: the
-    // forward-auth portal reads this list too.
+    // Trusted for signing in only: the forward-auth portal reads this list too.
     ctx.dashboard = { enabled: true, domain: 'cpm.example.com', tls: true };
     expect(await isPublicOrigin('https://cpm.example.com')).toBe(false);
     expect(await isPublicOrigin('https://proxy.example.com:8443')).toBe(false);

@@ -50,12 +50,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: tApi("userNotFound") }, { status: 404 });
     }
 
-    // Must have a password before unlinking OAuth
     if (!user.passwordHash) {
       return NextResponse.json({ error: t("unlinkPasswordRequired") }, { status: 400 });
     }
 
-    // Check if user has any OAuth account links
     const oauthAccounts = await db
       .select()
       .from(accounts)
@@ -78,7 +76,6 @@ export async function POST(request: NextRequest) {
 
     const previousProvider = oauthAccounts[0].providerId;
 
-    // Delete the OAuth account link(s)
     await db
       .delete(accounts)
       .where(and(eq(accounts.userId, userId), ne(accounts.providerId, "credential")));
@@ -88,7 +85,6 @@ export async function POST(request: NextRequest) {
     const { syncUserOAuthIdentity } = await import("@/src/lib/models/user");
     await syncUserOAuthIdentity(userId);
 
-    // Audit log
     await createAuditEvent({
       userId,
       action: "oauth_unlinked",

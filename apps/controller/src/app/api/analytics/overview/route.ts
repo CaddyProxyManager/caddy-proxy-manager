@@ -17,9 +17,7 @@ export async function GET(req: NextRequest) {
     const hostsParam = searchParams.get("hosts") ?? "";
     const hosts = hostsParam ? hostsParam.split(",").filter(Boolean) : [];
 
-    // An unknown filter falls back to "all" rather than erroring. The caller is the
-    // overview's own tile row, and a stale client asking for a filter this build has
-    // dropped should still get a log rather than a broken pane.
+    // A stale client asking for a dropped filter still gets a log, not a broken pane.
     const requested = searchParams.get("filter") ?? "all";
     const filter = FILTERS.includes(requested as TrafficEventFilter)
       ? (requested as TrafficEventFilter)

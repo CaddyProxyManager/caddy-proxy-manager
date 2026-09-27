@@ -1,6 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { APP_VERSION } from "@/src/lib/app-version";
+import { SETTINGS_GROUPS } from "@/src/lib/settings-api";
+import {
+  DEFAULT_CACHE_MAX_AGE,
+  HOST_CACHE_MODES,
+  MAX_CACHE_MAX_AGE,
+  MIN_CACHE_MAX_AGE,
+} from "@/src/lib/host-cache";
+import {
+  CACHE_STORAGES,
+  CDN_PROVIDERS,
+  CDN_STRATEGIES,
+  MAX_CACHE_ENDPOINTS,
+  MAX_OTTER_SIZE,
+  MAX_REDIS_DB,
+  MIN_OTTER_SIZE,
+} from "@/src/lib/http-cache-options";
 
 const spec = {
   openapi: "3.1.0",
@@ -830,6 +846,90 @@ const spec = {
         },
       },
     },
+    "/api/v1/backup": {
+      post: {
+        tags: ["Backup"],
+        summary: "Download a backup of the whole configuration",
+        description:
+          "Every secret the database holds is decrypted into the file, and the file is encrypted with the passphrase sent. Restoring is done from Settings > Backup, which asks for a recent sign-in.",
+        operationId: "createBackup",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  passphrase: { type: "string", minLength: 12 },
+                  auditLog: { type: "boolean", description: "Include the audit log" },
+                  settingsHistory: { type: "boolean", description: "Include the settings history" },
+                },
+                required: ["passphrase"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "The backup file",
+            content: {
+              "application/octet-stream": { schema: { type: "string", format: "binary" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/access-lists/{id}/ip-rules": {
+      get: {
+        tags: ["Access Lists"],
+        summary: "List an access list's IP rules, in the order they are checked",
+        operationId: "getAccessListIpRules",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "The rules",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Access Lists"],
+        summary: "Replace an access list's IP rules",
+        description:
+          "The array sent becomes the whole set, in its order. An empty array removes every rule.",
+        operationId: "setAccessListIpRules",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "The rules as stored",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/api/v1/access-lists/{id}/entries/{entryId}": {
       delete: {
         tags: ["Access Lists"],
@@ -866,23 +966,7 @@ const spec = {
             required: true,
             schema: {
               type: "string",
-              enum: [
-                "general",
-                "acme",
-                "cloudflare",
-                "dns-provider",
-                "authentik",
-                "forward-auth",
-                "metrics",
-                "logging",
-                "dns",
-                "upstream-dns",
-                "geoblock",
-                "waf",
-                "error-pages",
-                "default-response",
-                "tailscale",
-              ],
+              enum: [...SETTINGS_GROUPS],
             },
             description: "Settings group name",
           },
@@ -906,6 +990,7 @@ const spec = {
                     { $ref: "#/components/schemas/WafSettings" },
                     { $ref: "#/components/schemas/DefaultResponseSettings" },
                     { $ref: "#/components/schemas/TailscaleSettingsStatus" },
+                    { $ref: "#/components/schemas/HttpCacheSettingsStatus" },
                   ],
                 },
               },
@@ -925,23 +1010,7 @@ const spec = {
             required: true,
             schema: {
               type: "string",
-              enum: [
-                "general",
-                "acme",
-                "cloudflare",
-                "dns-provider",
-                "authentik",
-                "forward-auth",
-                "metrics",
-                "logging",
-                "dns",
-                "upstream-dns",
-                "geoblock",
-                "waf",
-                "error-pages",
-                "default-response",
-                "tailscale",
-              ],
+              enum: [...SETTINGS_GROUPS],
             },
             description: "Settings group name",
           },
@@ -964,6 +1033,7 @@ const spec = {
                   { $ref: "#/components/schemas/WafSettings" },
                   { $ref: "#/components/schemas/DefaultResponseSettings" },
                   { $ref: "#/components/schemas/TailscaleSettings" },
+                  { $ref: "#/components/schemas/HttpCacheSettings" },
                 ],
               },
             },
@@ -2580,6 +2650,61 @@ const spec = {
         },
         required: ["enabled"],
       },
+      HttpCacheSettings: {
+        type: "object",
+        description:
+          "Where the Caddy cache keeps entries, and which CDN it purges. A blank redis.password or cdn.apiKey keeps the stored one",
+        properties: {
+          storage: {
+            type: "string",
+            enum: [...CACHE_STORAGES],
+          },
+          otterSize: {
+            type: ["integer", "null"],
+            minimum: MIN_OTTER_SIZE,
+            maximum: MAX_OTTER_SIZE,
+          },
+          redis: {
+            type: "object",
+            properties: {
+              addresses: {
+                type: "array",
+                maxItems: MAX_CACHE_ENDPOINTS,
+                items: { type: "string", example: "redis:6379" },
+              },
+              username: { type: "string" },
+              password: { type: "string", writeOnly: true },
+              db: { type: "integer", minimum: 0, maximum: MAX_REDIS_DB },
+            },
+          },
+          etcd: {
+            type: "object",
+            properties: {
+              endpoints: {
+                type: "array",
+                maxItems: MAX_CACHE_ENDPOINTS,
+                items: { type: "string" },
+              },
+            },
+          },
+          cdn: {
+            type: "object",
+            properties: {
+              provider: { type: "string", enum: [...CDN_PROVIDERS] },
+              apiKey: { type: "string", writeOnly: true },
+              email: { type: "string" },
+              zoneId: { type: "string" },
+              serviceId: { type: "string" },
+              strategy: { type: "string", enum: [...CDN_STRATEGIES] },
+            },
+          },
+        },
+      },
+      HttpCacheSettingsStatus: {
+        description:
+          "HttpCacheSettings with redis.hasPassword and cdn.hasApiKey in place of the secrets",
+        allOf: [{ $ref: "#/components/schemas/HttpCacheSettings" }],
+      },
       TailscaleSettingsStatus: {
         type: "object",
         description: "Tailscale settings as returned by GET, with the auth key withheld",
@@ -2607,8 +2732,29 @@ const spec = {
           },
           to: { type: "string", example: "/remote.php/dav/", description: "Redirect destination" },
           status: { type: "integer", enum: [301, 302, 307, 308], example: 301 },
+          preservePath: {
+            type: "string",
+            enum: ["full", "suffix"],
+            description:
+              "Append the request's path and query to `to`: all of it, or only what follows the part of `from` before its first `*`. Omit to redirect to `to` as is.",
+          },
         },
         required: ["from", "to", "status"],
+      },
+      HostCacheConfig: {
+        type: "object",
+        description:
+          "Cache assets: static asset paths only. Caddy mode needs the opt-in cache-handler module and falls back to browser mode without it",
+        properties: {
+          mode: { type: "string", enum: [...HOST_CACHE_MODES] },
+          maxAge: {
+            type: "integer",
+            minimum: MIN_CACHE_MAX_AGE,
+            maximum: MAX_CACHE_MAX_AGE,
+            example: DEFAULT_CACHE_MAX_AGE,
+          },
+        },
+        required: ["mode", "maxAge"],
       },
       RewriteConfig: {
         type: "object",
@@ -2638,6 +2784,11 @@ const spec = {
             oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }],
             description:
               "Optional per-rule load balancing and health checks for this path's upstreams",
+          },
+          accessListId: {
+            type: ["integer", "null"],
+            description:
+              "This path's own access list instead of the host's. Omit to inherit the host's, or null for none.",
           },
         },
         required: ["path", "upstreams"],
@@ -2717,7 +2868,7 @@ const spec = {
                 name: { type: "string" },
                 modulePath: { type: "string" },
                 description: { type: "string" },
-                category: { type: "string", enum: ["proxy", "security", "dns"] },
+                category: { type: "string", enum: ["proxy", "cache", "security", "dns"] },
                 features: { type: "array", items: { type: "string" } },
               },
             },
@@ -2750,6 +2901,7 @@ const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
+          description: { type: ["string", "null"], description: "Free-text notes" },
           domains: {
             type: "array",
             items: { type: "string" },
@@ -2811,6 +2963,7 @@ const spec = {
           },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
+          cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -2839,6 +2992,11 @@ const spec = {
         type: "object",
         properties: {
           name: { type: "string", example: "My App" },
+          description: {
+            type: ["string", "null"],
+            maxLength: 2000,
+            description: "Free-text notes. Blank or null clears them.",
+          },
           domains: { type: "array", items: { type: "string" }, example: ["app.example.com"] },
           upstreams: { type: "array", items: { type: "string" }, example: ["localhost:3000"] },
           certificateId: { type: ["integer", "null"] },
@@ -2880,6 +3038,7 @@ const spec = {
           },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
+          cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -2909,6 +3068,7 @@ const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
+          description: { type: ["string", "null"], description: "Free-text notes" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {
             type: "string",
@@ -2961,6 +3121,11 @@ const spec = {
         type: "object",
         properties: {
           name: { type: "string", example: "PostgreSQL Proxy" },
+          description: {
+            type: ["string", "null"],
+            maxLength: 2000,
+            description: "Free-text notes. Blank or null clears them.",
+          },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {
             type: "string",
@@ -3129,16 +3294,77 @@ const spec = {
           name: { type: "string" },
           description: { type: ["string", "null"] },
           entries: { type: "array", items: { $ref: "#/components/schemas/AccessListEntry" } },
+          ipRules: {
+            type: "array",
+            description: "Checked in order; the first rule matching the client decides.",
+            items: { $ref: "#/components/schemas/AccessListIpRule" },
+          },
+          ipDefault: {
+            type: "string",
+            enum: ["allow", "deny"],
+            description:
+              "What a request matching none of the IP rules gets. Only used while there are rules.",
+          },
+          satisfy: {
+            type: "string",
+            enum: ["all", "any"],
+            description:
+              "all: pass the IP rules and the password. any: an allowed address skips the password, and everyone else is asked for it.",
+          },
+          passAuth: {
+            type: "boolean",
+            description: "Forward the basic-auth Authorization header to the upstream.",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "name", "entries", "createdAt", "updatedAt"],
+        required: [
+          "id",
+          "name",
+          "entries",
+          "ipRules",
+          "ipDefault",
+          "satisfy",
+          "passAuth",
+          "createdAt",
+          "updatedAt",
+        ],
+      },
+      AccessListIpRule: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["allow", "deny"] },
+          cidr: {
+            type: "string",
+            example: "192.168.1.0/24",
+            description:
+              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128.",
+          },
+          note: { type: ["string", "null"] },
+        },
+        required: ["action", "cidr"],
       },
       AccessListInput: {
         type: "object",
         properties: {
           name: { type: "string", example: "Internal Users" },
           description: { type: ["string", "null"] },
+          ipDefault: {
+            type: "string",
+            enum: ["allow", "deny"],
+            description:
+              "What a request matching none of the IP rules gets. Only used while there are rules.",
+          },
+          satisfy: {
+            type: "string",
+            enum: ["all", "any"],
+            description:
+              "all: pass the IP rules and the password. any: an allowed address skips the password, and everyone else is asked for it.",
+          },
+          passAuth: {
+            type: "boolean",
+            description: "Forward the basic-auth Authorization header to the upstream.",
+          },
           users: {
             type: "array",
             description: "Seed members (only used during creation)",

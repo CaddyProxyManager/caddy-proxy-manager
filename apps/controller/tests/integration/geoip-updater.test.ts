@@ -1,10 +1,4 @@
-/**
- * One update cycle end to end: settings in, MaxMind faked, files and stored state out.
- *
- * What is pinned is the decision of what to download - only what is missing or rebuilt, and nothing
- * blind when MaxMind cannot say - because each download counts against a daily limit on the
- * operator's MaxMind account.
- */
+/** Pins what gets downloaded: each download counts against the account's daily MaxMind limit. */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,8 +10,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, pushes: 0 }));
 
 const schemaModule = await import('@/src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// A Bun mock factory must be synchronous; an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('@/src/lib/db', () => ({
@@ -45,7 +38,6 @@ const { getGeoipDownloadState, updateGeoipDatabases } = await import('@/src/lib/
 const EDITIONS = ['GeoLite2-Country', 'GeoLite2-ASN', 'GeoLite2-City'] as const;
 
 let dir: string;
-/** Edition to the build date MaxMind's metadata reports. */
 let builds: Record<string, string>;
 let metadataStatus: number;
 let brokenEdition: string | null;
@@ -62,7 +54,7 @@ function mmdb(label: string): Uint8Array {
   );
 }
 
-/** MaxMind as the updater sees it: metadata, a redirecting download, and the storage behind it. */
+/** Metadata, a redirecting download, and the storage behind it. */
 const fakeMaxMind = (async (input: string) => {
   calls += 1;
   const url = new URL(input);
@@ -188,7 +180,6 @@ describe('updateGeoipDatabases', () => {
     expect(existsSync(join(dir, 'GeoLite2-ASN.mmdb'))).toBe(false);
     const state = await getGeoipDownloadState();
     expect(state.error).toContain('GeoLite2-ASN: the download is not a readable archive');
-    // Kept one by one with the code, so the settings page can say it in its reader's language.
     expect(state.failures).toEqual([
       {
         edition: 'GeoLite2-ASN',

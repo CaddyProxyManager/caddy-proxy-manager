@@ -11,11 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: { absolute: t("metaTitle") } };
 }
 
-/**
- * The account step. Public by necessity - there is nothing to authenticate against yet - so the
- * stage is re-checked here rather than trusted from the proxy, which lets this page through
- * unconditionally so an unconfigured instance can reach it.
- */
+/** Public by necessity, so the stage is re-checked here; the proxy lets it through always. */
 export default async function SetupPage() {
   const session = await auth();
   const { stage } = await getSetupState(!!session?.user);
@@ -24,13 +20,10 @@ export default async function SetupPage() {
     redirect(SETUP_PATHS[stage]);
   }
 
-  // A migration that left the old accounts behind lands here, and it looks exactly like a fresh
-  // install unless the page says otherwise - which reads as the migration having done nothing.
+  // Otherwise a migration that left old accounts behind looks like it did nothing.
   return (
     <SetupAccountClient
       migratedFrom={await getMigrationSource()}
-      // The migrate step is only part of this flow on a host that had a previous version's
-      // database, so the stepper has to be told rather than assume four steps.
       hasMigrateStep={hasLegacyDatabase()}
       sqliteWarning={sqliteNoticeApplies()}
     />

@@ -1,8 +1,6 @@
 /**
- * Email address syntax, deliberately loose: one `@`, no whitespace, no empty domain labels. Whether
- * a mailbox exists is the mail server's question; this only catches a typo before it is saved.
- *
- * Client-safe on purpose - the form fields and the server check share it, so they cannot disagree.
+ * Email syntax, deliberately loose: it only catches a typo before it is saved. Client-safe on
+ * purpose - the form fields and the server check share it, so they cannot disagree.
  */
 
 /** RFC 5321's limit on a whole path, which bounds the regex's input as well. */

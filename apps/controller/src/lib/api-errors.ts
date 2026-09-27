@@ -1,9 +1,6 @@
 /**
- * An error whose message is intentionally safe to return to an API client.
- *
- * Only use this type with application-authored messages. Unexpected errors,
- * upstream response bodies, database errors, and other runtime details must
- * remain ordinary Error instances so apiErrorResponse redacts them.
+ * An error whose message is safe to return to an API client, so only for messages the app wrote.
+ * Upstream bodies, database errors and the like stay plain Errors, which apiErrorResponse redacts.
  */
 export class ApiClientError extends Error {
   readonly status: number;

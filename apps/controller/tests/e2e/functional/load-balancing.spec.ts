@@ -14,8 +14,6 @@ test.describe
       await createProxyHost(page, {
         name: 'Functional LB Test',
         domain: DOMAIN,
-        // Two upstreams separated by newline - both will be round-robined by Caddy.
-        // echo-server returns "echo-ok", echo-server-2 returns "echo-server-2".
         upstream: 'echo-server:8080\necho-server-2:8080',
       });
       await waitForRoute(DOMAIN);
@@ -31,7 +29,6 @@ test.describe
     test('both upstreams are reached over multiple requests', async () => {
       const bodies = new Set<string>();
 
-      // Send enough requests that both backends should be hit via round-robin.
       for (let i = 0; i < 20; i++) {
         const res = await httpGet(DOMAIN, '/');
         if (res.body.includes('echo-ok') || res.body.includes('echo-server-2')) {
@@ -39,7 +36,6 @@ test.describe
         }
       }
 
-      // Both distinct responses must appear
       expect(bodies.size).toBeGreaterThanOrEqual(2);
       const arr = Array.from(bodies);
       expect(arr.some((b) => b.includes('echo-ok'))).toBe(true);

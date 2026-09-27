@@ -4,6 +4,7 @@ description: HTTP basic auth, mutual TLS with the built-in CA, and role-based pa
 ---
 
 import AccessListDemo from "../../../demos/samples/AccessListDemo";
+import AccessListNetworkDemo from "../../../demos/samples/AccessListNetworkDemo";
 
 import Demo from "../../../components/Demo.astro";
 import PasswordFieldDemo from "../../../demos/samples/PasswordFieldDemo";
@@ -21,10 +22,43 @@ version, see [forward auth](../forward-auth/).
 Multi-account HTTP basic auth, assignable per proxy host. Passwords are bcrypt-hashed. One list can
 protect several hosts, and adding an account to the list grants it everywhere the list is used.
 
-**An empty list fails closed.** A host whose list has no members refuses every request rather than
-serving it unauthenticated. The access lists page flags a list with no members, and warns when a
-host is still using one; the host editor marks empty lists in its picker and warns when one is
-chosen.
+**An empty list fails closed.** A host whose list has no users and no IP rules refuses every
+request rather than serving it unauthenticated. The access lists page flags an empty list, and warns
+when a host is still using one; the host editor marks empty lists in its picker and warns when one
+is chosen.
+
+### IP rules
+
+A list's **Network** tab holds allow and deny rules on client addresses - single IPs or CIDR ranges,
+IPv4 or IPv6 - checked from the top, where the first rule that matches decides. **When no rule
+matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
+The address is the one Caddy resolves after [trusted proxies](../geo-blocking/#trusted-proxies), so
+a CDN or load balancer in front is seen through rather than allowed or denied as a whole.
+
+<Demo title="An access list's Network tab" note="Reorder, add or remove rules and save; nothing leaves the page.">
+  <AccessListNetworkDemo client:visible />
+</Demo>
+
+A list can hold IP rules alone, users alone, or both. With both, **Satisfy** decides how they
+combine:
+
+- **All** (the default): the address has to be allowed *and* the password right.
+- **Any**: an allowed address gets straight in, and everyone else - a denied address included - is
+  asked for the password. The office network walks in; working from home means logging in.
+
+### Per-path lists
+
+A [location rule](../reverse-proxy/#location-rules) can use a list of its own instead of the host's,
+or none at all: keep `/admin/*` to a stricter list, or leave `/.well-known/*` open on an otherwise
+protected host. Deleting a list sets any path that used it to none, so an old id can never come to
+mean a newer list.
+
+### Passing the password on
+
+By default the upstream never sees the credentials a list checked: CPM removes the `Authorization`
+header before forwarding the request. Turn on **Pass auth to host** for an application that reads
+the username from it itself. Lists made before this setting existed have it on, which is how they
+always behaved.
 
 Simple, and appropriate for exactly the cases basic auth is appropriate for: an internal tool, a
 staging site, something you want off the open internet without standing up an identity provider.
@@ -39,7 +73,8 @@ mTLS asks the *client* for a certificate. A visitor without one does not get a c
 which is a stronger boundary than any password - there is nothing to phish and nothing to guess.
 
 CPM includes a CA for this. Issue client certificates from the Certificates page, hand them to the
-people or machines that need them, and enable mTLS on the hosts they should reach.
+people or machines that need them, and enable mTLS on the hosts they should reach. The CA's private
+key is encrypted at rest like every other secret; Caddy only ever gets the CA certificate.
 
 **Revocation is fail-closed.** Revoking a certificate rejects it immediately, and revoking every
 certificate rejects every connection rather than falling open to none-required.

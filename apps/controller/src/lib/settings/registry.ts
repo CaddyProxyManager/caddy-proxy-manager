@@ -1,24 +1,13 @@
 /**
- * Every setting that is moving out of `.env` and into the database, described once.
- *
- * One definition carries the storage key, the environment variable it is migrated from, how to
- * read that variable, how to validate a value arriving from the API or the setup form, its
- * default, and where it belongs on screen. The setup page (phase 3) and the migration flow
- * (phase 4) both render themselves from this list rather than repeating it.
+ * Every database-backed setting, described once; setup, Settings and migration all render from it.
  *
  * Deliberately not here:
- *
- * - `OAUTH_*`. Those already have a home - the `oauth_providers` table, which `runEnvProviderSync`
- *   writes them into at startup. Adding them would create a second source of truth for the same
- *   provider.
- * - `CERTS_DIRECTORY`, `ACME_CA_ROOT_DIR`, `L4_PORTS_DIR`. Container paths describing where Caddy's
- *   files live on a particular host. They belong to the agent, and phase 5 moves them there.
- * - `INSTANCE_*`. The sync feature they configure is removed in phase 5.
- * - `DEMO_MODE`. A safety switch: stored, anyone with Settings access could turn the demo real.
- * - Anything that has to be read before the database can be: the connection string and pool size,
- *   `SESSION_SECRET` (it encrypts the database's own secrets), `NODE_ENV`, `PORT`/`HOST`, the
- *   standalone-binary bootstrap paths, whatever Compose reads on the host, and the agent's own
- *   pre-database configuration.
+ * - `OAUTH_*`: `runEnvProviderSync` writes them to `oauth_providers`; a second source of truth.
+ * - `CERTS_DIRECTORY`, `ACME_CA_ROOT_DIR`, `L4_PORTS_DIR`: host paths that belong to the agent.
+ * - `DEMO_MODE`: stored, anyone with Settings access could turn the demo real.
+ * - Anything read before the database can be: connection string and pool size, `SESSION_SECRET`
+ *   (it encrypts the database's secrets), `NODE_ENV`, `PORT`/`HOST`, bootstrap paths, whatever
+ *   Compose reads on the host, and the agent's pre-database config.
  */
 
 import { hasForbiddenControlCharacter } from "../settings-validation";
@@ -43,31 +32,13 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   /** A secret this deployment chooses for itself, so the UI may offer to generate one. */
   generatable?: boolean;
   /**
-   * Docker Compose reads this variable too, to provision `clickhouse`.
-   *
-   * Storing one of these in the database does not free the variable on its own. Compose cannot
-   * read the database, so where there is no agent to hand it the saved values it is still the only
-   * thing that can start that container, and deleting the line leaves it unprovisionable. With
-   * an agent the line can go, but only together with the service's Compose profile. Either way it
-   * is not a change the migration flow can safely make for the operator, so it lists these
-   * separately instead of commenting them out with the rest.
+   * Compose reads this variable too, to provision `clickhouse`, and cannot read the database, so
+   * the migration flow lists these separately rather than commenting them out of `.env`.
    */
   composeReads?: boolean;
-  /**
-   * Marks the setting that switches its whole group on and off.
-   *
-   * A group with one of these has a shape the generic field list cannot express: the rest of it
-   * configures a thing that may not be running at all, so the setup form renders this as a switch
-   * and the remaining fields only once it is on. At most one per group.
-   */
+  /** Switches its whole group on and off; the rest render only once it is on. One per group. */
   gate?: boolean;
-  /**
-   * The bounds `parse` enforces, for a form that would rather refuse a value than post it.
-   *
-   * Set by whichever constructor made the definition - a number has a range, text a length - and
-   * absent on the kinds that have neither. They are the same numbers `parse` checks against, so a
-   * control built from them cannot disagree with the validation behind it.
-   */
+  /** The bounds `parse` enforces, so a control built from them cannot disagree with it. */
   min?: number;
   max?: number;
   maxLength?: number;
@@ -90,20 +61,14 @@ export type SettingValidationCode =
   | "unknown";
 
 /**
- * Carries a code rather than only a sentence, because a translated one cannot be built by pasting
- * the field's name in front of a predicate - see the note on `password-policy.ts`. `message` stays
- * English for logs and for the paths that validate before any request exists (environment parsing
- * at startup); a caller that has a locale renders `code` instead.
+ * A code, not a sentence: a translation cannot paste the label before a predicate. `message` stays
+ * English for logs and startup env parsing; a caller with a locale renders `code`.
  */
 export class SettingValidationError extends Error {
   constructor(
     readonly settingKey: string,
     readonly code: SettingValidationCode,
-    /**
-     * ICU arguments for the message, `label` included - that one is the English label, which is
-     * what builds the fallback `message` below. A renderer with a locale replaces it with the
-     * translated label before formatting; see `settingValidationMessage`.
-     */
+    /** ICU arguments; `label` is English, so a renderer swaps in the translated one first. */
     readonly params: Record<string, string | number>,
     message: string,
   ) {
@@ -121,7 +86,6 @@ type Common<T extends SettingValue> = {
   label: string;
   description: string;
   default: T;
-  /** See `SettingDefinition.composeReads`. Spread through by every constructor below. */
   composeReads?: boolean;
 };
 
@@ -176,8 +140,7 @@ export function stringSetting(
     if (trimmed.length > maxLength) {
       return reject(key, "tooLong", { label: spec.label, max: maxLength });
     }
-    // A control character reaches a Caddy config or an HTTP header intact, so it is refused here
-    // rather than wherever it lands.
+    // Would reach a Caddy config or an HTTP header intact.
     if (hasForbiddenControlCharacter(trimmed)) {
       return reject(key, "controlCharacter", { label: spec.label });
     }
@@ -189,16 +152,11 @@ export function stringSetting(
     }
     return trimmed;
   };
-  // maxLength resolved rather than as given: a field built from this gets the limit `parse` will
-  // actually hold it to, including the default one the spec left out.
+  // Resolved, so a field gets the limit `parse` holds it to, default included.
   return { ...spec, key, maxLength, parse, fromEnv: parse };
 }
 
-/**
- * `generatable` says the value is the deployment's to choose, so the UI may offer to generate one.
- * A secret that has to match something outside this app - a licence key, an OAuth client secret -
- * leaves it off, because there a generated value is simply wrong.
- */
+/** Leave `generatable` off for a secret that must match something external, like a licence key. */
 export function secretSetting(
   spec: Common<string> & { maxLength?: number; generatable?: boolean },
 ) {
@@ -226,13 +184,7 @@ export function numberSetting(
   return { ...spec, key, parse, fromEnv: parse };
 }
 
-/**
- * A tri-state toggle: true, false, or null meaning "no opinion, let the stored policy decide".
- *
- * Several `AUTH_*` variables work this way today - unset defers to a Settings toggle, and setting
- * them pins the policy and locks it. Migrating them into the database is what finally removes the
- * distinction, but until then the shape has to survive the move.
- */
+/** Tri-state: null means "no opinion", deferring to a Settings toggle as unset `AUTH_*` vars do. */
 export function optionalBooleanSetting(
   spec: Omit<Common<boolean | null>, "default"> & { gate?: boolean },
 ): SettingDefinition<boolean | null> {
@@ -365,8 +317,7 @@ export const updateImageRepository = stringSetting({
     "its tags. Point it at your own namespace if you run a fork, or it will report releases you " +
     "cannot pull.",
   default: "ghcr.io/silentspud/caddy-proxy-manager",
-  // A registry reference: host, optional port, then at least one path segment. Lowercase because
-  // that is what the registry API accepts, and no scheme because the check forces https.
+  // Lowercase because the registry API requires it; no scheme because the check forces https.
   pattern: /^[a-z0-9][a-z0-9.-]*(:\d{1,5})?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$/,
   patternHint: "must look like ghcr.io/owner/name, with no scheme and no image name",
   maxLength: 256,
@@ -504,13 +455,8 @@ export const loginBlockMs = numberSetting({
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 /**
- * Whether analytics run at all.
- *
- * Tri-state, and unset is the important state: before this existed the answer was "yes if a
- * ClickHouse password is configured", and every deployment upgrading into this release has no
- * stored value. Leaving it unset therefore has to keep meaning exactly that, or turning the app on
- * after an upgrade would silently switch analytics off. `analyticsEnabled()` in
- * ../clickhouse/client.ts is where the inference lives.
+ * Unset must keep meaning "on if a ClickHouse password is set", or an upgrade silently turns
+ * analytics off. The inference is `analyticsEnabled()` in ../clickhouse/client.ts.
  */
 export const analyticsEnabled = optionalBooleanSetting({
   name: "analytics_enabled",
@@ -550,8 +496,7 @@ export const clickhouseUser = stringSetting({
 export const clickhousePassword = secretSetting({
   name: "clickhouse_password",
   env: "CLICKHOUSE_PASSWORD",
-  // Nothing outside this deployment knows it: the container is handed the same value the app
-  // connects with, so any strong string will do.
+  // The container is handed the same value the app connects with, so any strong string will do.
   generatable: true,
   composeReads: true,
   group: "analytics",
@@ -570,8 +515,7 @@ export const clickhouseDb = stringSetting({
   label: "ClickHouse database",
   description: "The database traffic and WAF events are written to.",
   default: "analytics",
-  // Interpolated into DDL, which has no placeholder for an identifier. Constrained here so the
-  // check happens at the boundary rather than as a throw from whichever query runs first.
+  // Interpolated into DDL, which has no placeholder for an identifier.
   pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
   patternHint: "must start with a letter or underscore and contain only letters, digits and _",
   maxLength: 128,
@@ -592,12 +536,7 @@ export const clickhouseRetentionDays = numberSetting({
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
 
-/**
- * Whether GeoIP is in use.
- *
- * Tri-state for the same reason as `analyticsEnabled`: the answer used to be "yes if the databases
- * are on disk", and unset has to keep meaning that. See `geoipEnabled()` in ../agent/geoip.ts.
- */
+/** Unset keeps meaning "on if the databases are on disk"; see `geoipEnabled()` (agent/geoip.ts). */
 export const geoipEnabled = optionalBooleanSetting({
   name: "geoip_enabled",
   env: "GEOIP_ENABLED",
@@ -610,8 +549,7 @@ export const geoipEnabled = optionalBooleanSetting({
     "is on only when the databases are already present.",
 });
 
-// The names say geoipupdate, the container that once read these. Kept: they are storage keys, and
-// the variables are what an upgrading deployment's .env still sets.
+// "geoipupdate" names kept: they are storage keys, and what an upgrading `.env` still sets.
 export const geoipAccountId = stringSetting({
   name: "geoipupdate_account_id",
   env: "GEOIPUPDATE_ACCOUNT_ID",

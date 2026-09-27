@@ -19,10 +19,7 @@ interface GeneratedPasswordFieldProps {
   label: string;
   value: string;
   onChange: (next: string) => void;
-  /**
-   * Called with the generated password instead of `onChange` when set, for a field that has a
-   * confirmation partner: filling one and leaving the other empty just blocks the form.
-   */
+  /** Replaces `onChange` on generate, so a confirmation partner can be filled too. */
   onGenerate?: (password: string) => void;
   htmlName?: string;
   description?: string;
@@ -30,19 +27,15 @@ interface GeneratedPasswordFieldProps {
   isRequired?: boolean;
   isOptional?: boolean;
   isDisabled?: boolean;
-  /** Native constraint, where the field had one. Empty values are unaffected either way. */
+  /** Empty values are unaffected. */
   minLength?: number;
   width?: string;
   "data-testid"?: string;
 }
 
 /**
- * A password input with a generate button, for values the app chooses rather than values that have
- * to match something outside it - a ClickHouse password, not a Tailscale auth key.
- *
- * Reveal and copy come with it because they are what makes generating usable: a random string in a
- * masked field that nobody can read is only useful for a secret no human ever needs again, and most
- * of these are handed to someone. Both act on what is in the field, generated or typed.
+ * For values the app chooses (a ClickHouse password, not a Tailscale auth key). Reveal and copy
+ * come with it: a masked random string is useless to the person it is handed to.
  */
 export function GeneratedPasswordField({
   label,
@@ -62,15 +55,13 @@ export function GeneratedPasswordField({
   const t = useTranslations("ui.passwordField");
   const [isRevealed, setIsRevealed] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
-  // The clipboard API only exists in a secure context, so on plain http the copy button can never
-  // work - it explains that instead. Read after mount: the server render has no window to ask.
+  // No clipboard API on plain http, so the button explains instead. Read after mount.
   const [canCopy, setCanCopy] = useState(true);
   useEffect(() => setCanCopy(window.isSecureContext), []);
 
   const generate = () => {
     const password = generatePassword();
-    // Reveal on generate: the point of generating is that the value is unknown, so leaving it
-    // masked would mean the only way to see it is to reach for the toggle every time.
+    // A generated value is unknown, so masking it would force the toggle every time.
     setIsRevealed(true);
     (onGenerate ?? onChange)(password);
   };
@@ -85,12 +76,10 @@ export function GeneratedPasswordField({
     try {
       await navigator.clipboard.writeText(value);
       setHasCopied(true);
-      // Not a toast: this sits inside dialogs and long forms where a corner toast is easy to miss,
-      // and the tick is next to the thing it is about.
+      // Not a toast: easy to miss in dialogs; the tick sits next to what it is about.
       setTimeout(() => setHasCopied(false), 2_000);
     } catch {
-      // Clipboard access can still be denied in some embedded webviews. The value is revealed and
-      // selectable, so there is a way through without an error to explain.
+      // Some webviews deny it; the value is revealed and selectable anyway.
     }
   };
 

@@ -1,8 +1,4 @@
-/**
- * Model errors are raised as codes and rendered by the action layer, so nothing checks the key
- * against the catalog at build time. This does: a code without a message would otherwise reach an
- * operator as the literal string "errors.somethingWentWrong".
- */
+/** Nothing checks error codes against the catalog at build time, so this does. */
 import { describe, it, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

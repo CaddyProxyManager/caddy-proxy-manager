@@ -1,7 +1,4 @@
-/**
- * The WAF forms' quick templates. A template the allowlist refuses inserts a rule the save then
- * rejects, which is how "Disable WAF for path" and "Remove XSS rules" shipped broken.
- */
+/** Every WAF quick template must pass the allowlist, or it inserts a rule the save rejects. */
 import { describe, it, expect } from 'bun:test';
 import { filterCustomDirectives } from '../../src/lib/caddy-waf';
 import { WAF_QUICK_TEMPLATES } from '../../src/lib/waf-templates';

@@ -1,16 +1,7 @@
 /**
- * Keeping this host's MaxMind databases in step with the controller's.
- *
- * The controller holds the subscription and the files. An agent on another host fetches them
- * through it rather than needing a licence key of its own - and the agent, not just the parsers,
- * is what needs them: Caddy reads the same directory for geo-blocking.
- *
- * Pulled rather than pushed because these are tens of megabytes. It is the only request that runs
- * agent-to-controller, and it is signed with the same pairing secret in the other direction, so it
- * needs no second credential.
- *
- * Every agent fetches, the one beside the controller included: the files land on the agent's own
- * volume, which Caddy mounts read-only, rather than on the controller's.
+ * Fetches this host's MaxMind databases from the controller, which holds the licence, signed with
+ * the pairing secret. Pulled, not pushed, as they are tens of megabytes. Every agent fetches, the
+ * bundled one too: the files land on the volume Caddy mounts read-only for geo-blocking.
  */
 
 import { createHmac } from "node:crypto";
@@ -49,24 +40,15 @@ function etagKey(edition: string): string {
   return `geoip_etag:${edition}`;
 }
 
-/**
- * The ETag to send for an edition, or null to fetch unconditionally.
- *
- * A stored tag is only meaningful while the file it described is still there: an operator who
- * deleted the database, or a fresh volume, must produce a download rather than a 304 for a file
- * that is gone.
- */
+/** Null fetches unconditionally: a tag means nothing once its file is gone. */
 function conditionalEtag(store: AgentStore, edition: GeoipEdition): string | null {
   if (!existsSync(databasePath(edition))) return null;
   return store.parseState(etagKey(edition));
 }
 
 /**
- * Stream a response body to `target`, refusing more than `maxBytes`. Returns the bytes written.
- *
- * Written to a temporary name in the same directory and renamed into place, because Caddy has the
- * directory open: a partial file under the real name is one Caddy would try to load. Counted while
- * streaming, since Content-Length is the sender's claim and may be absent.
+ * Streams to a temporary name and renames into place, since Caddy has the directory open. Counted
+ * while streaming, as Content-Length is the sender's claim and may be absent.
  */
 export async function writeCappedDownload(
   response: Response,
@@ -169,12 +151,7 @@ async function syncEdition(
   return "updated";
 }
 
-/**
- * Bring every edition the controller offers up to date.
- *
- * Never throws: a controller this agent cannot reach, or a database it cannot write, must not stop
- * it recreating containers - which is the job it exists for.
- */
+/** Never throws: an unreachable controller must not stop the agent recreating containers. */
 export async function syncGeoipDatabases(
   store: AgentStore,
   controllerUrl: string,
@@ -198,13 +175,9 @@ export async function syncGeoipDatabases(
 }
 
 /**
- * The controller origin to fetch from: the one this agent is paired with, else the origin inside
- * the pushed URL.
- *
- * The paired address first, because the pushed one is the controller's public `BASE_URL`, and for
- * the agent in the controller's own stack that means going out through the Caddy it may not have
- * started yet. The pushed URL already ends in the route, which the fetch appends again - so it is
- * stripped, where it used to be doubled and every fetch through it 404'd.
+ * The paired origin first: the pushed one is the public `BASE_URL`, which for the bundled agent
+ * goes through a Caddy it may not have started. The pushed URL's route suffix is stripped, since
+ * the fetch appends it again.
  */
 export function geoipControllerUrl(paired: string | null, pushed: string): string {
   if (paired) return paired;

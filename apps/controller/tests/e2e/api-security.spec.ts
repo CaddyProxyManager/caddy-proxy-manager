@@ -15,13 +15,12 @@ type Endpoint = {
   path: string;
   /** 'admin'/'user' are bearer-accessible; 'session' requires interactive auth. */
   auth: 'admin' | 'user' | 'session';
-  /** Optional body for mutating requests (prevents 400 from missing body) */
+  /** Avoids a 400 for a missing body. */
   body?: Record<string, unknown>;
 };
 
-// Use real-ish IDs; 999 will return 404 after auth passes, which is fine - we only test auth.
+// 999 404s after auth passes, which is fine - only auth is tested.
 const ENDPOINTS: Endpoint[] = [
-  // proxy-hosts
   { method: 'GET', path: '/proxy-hosts', auth: 'admin' },
   {
     method: 'POST',
@@ -55,7 +54,6 @@ const ENDPOINTS: Endpoint[] = [
   },
   { method: 'DELETE', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin' },
 
-  // l4-proxy-hosts
   { method: 'GET', path: '/l4-proxy-hosts', auth: 'admin' },
   {
     method: 'POST',
@@ -67,7 +65,6 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'PUT', path: '/l4-proxy-hosts/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/l4-proxy-hosts/999', auth: 'admin' },
 
-  // certificates
   { method: 'GET', path: '/certificates', auth: 'admin' },
   {
     method: 'POST',
@@ -79,7 +76,6 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'PUT', path: '/certificates/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/certificates/999', auth: 'admin' },
 
-  // ca-certificates
   { method: 'GET', path: '/ca-certificates', auth: 'admin' },
   {
     method: 'POST',
@@ -91,7 +87,6 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'PUT', path: '/ca-certificates/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/ca-certificates/999', auth: 'admin' },
 
-  // client-certificates
   { method: 'GET', path: '/client-certificates', auth: 'admin' },
   {
     method: 'POST',
@@ -103,7 +98,6 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'DELETE', path: '/client-certificates/999', auth: 'admin' },
   { method: 'GET', path: '/client-certificates/999/roles', auth: 'admin' },
 
-  // access-lists
   { method: 'GET', path: '/access-lists', auth: 'admin' },
   { method: 'POST', path: '/access-lists', auth: 'admin', body: { name: 'x' } },
   { method: 'GET', path: '/access-lists/999', auth: 'admin' },
@@ -117,7 +111,6 @@ const ENDPOINTS: Endpoint[] = [
   },
   { method: 'DELETE', path: '/access-lists/999/entries/999', auth: 'admin' },
 
-  // mtls-roles
   { method: 'GET', path: '/mtls-roles', auth: 'admin' },
   { method: 'POST', path: '/mtls-roles', auth: 'admin', body: { name: 'x' } },
   { method: 'GET', path: '/mtls-roles/999', auth: 'admin' },
@@ -131,7 +124,6 @@ const ENDPOINTS: Endpoint[] = [
   },
   { method: 'DELETE', path: '/mtls-roles/999/certificates/999', auth: 'admin' },
 
-  // groups
   { method: 'GET', path: '/groups', auth: 'admin' },
   { method: 'POST', path: '/groups', auth: 'admin', body: { name: 'x' } },
   { method: 'GET', path: '/groups/999', auth: 'admin' },
@@ -140,22 +132,17 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'POST', path: '/groups/999/members', auth: 'admin', body: { userId: 999 } },
   { method: 'DELETE', path: '/groups/999/members/999', auth: 'admin' },
 
-  // settings
   { method: 'GET', path: '/settings/general', auth: 'admin' },
   { method: 'PUT', path: '/settings/general', auth: 'admin', body: {} },
 
-  // forward-auth-sessions
   { method: 'GET', path: '/forward-auth-sessions', auth: 'admin' },
   { method: 'DELETE', path: '/forward-auth-sessions', auth: 'admin' },
   { method: 'DELETE', path: '/forward-auth-sessions/999', auth: 'admin' },
 
-  // audit-log
   { method: 'GET', path: '/audit-log', auth: 'admin' },
 
-  // caddy
   { method: 'POST', path: '/caddy/apply', auth: 'admin' },
 
-  // oauth-providers
   { method: 'GET', path: '/oauth-providers', auth: 'admin' },
   {
     method: 'POST',
@@ -167,16 +154,15 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'PUT', path: '/oauth-providers/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/oauth-providers/999', auth: 'admin' },
 
-  // openapi.json
   { method: 'GET', path: '/openapi.json', auth: 'admin' },
 
-  // users (admin for list; single-user endpoints allow self-access only, so arbitrary ID → admin)
+  // Single-user endpoints allow self-access only, so an arbitrary id needs admin.
   { method: 'GET', path: '/users', auth: 'admin' },
   { method: 'GET', path: '/users/999', auth: 'admin' },
   { method: 'PUT', path: '/users/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/users/999', auth: 'admin' },
 
-  // tokens (user-level - any authenticated user can manage their own)
+  // Any authenticated user manages their own tokens.
   { method: 'GET', path: '/tokens', auth: 'user' },
   { method: 'POST', path: '/tokens', auth: 'session', body: { name: 'x' } },
   { method: 'DELETE', path: '/tokens/999', auth: 'user' },
@@ -227,7 +213,6 @@ async function apiRequest(
 
 // ── Setup ───────────────────────────────────────────────────────────────
 
-// Don't use global auth state - we manage our own sessions
 test.use({ storageState: { cookies: [], origins: [] } });
 
 let userToken: string;
@@ -235,7 +220,7 @@ let viewerToken: string;
 let adminToken: string;
 
 test.beforeAll(async () => {
-  // Retry user creation - Docker exec can transiently fail under load
+  // Docker exec can transiently fail under load.
   for (let i = 0; i < 3; i++) {
     try {
       seed.ensureTestUser('apisec-user', 'ApiSecUser2026!', 'user');
@@ -343,7 +328,6 @@ test.describe('Admin role API access', () => {
 
 test.describe('Cross-user isolation', () => {
   test("user cannot GET another user's profile", async ({ request }) => {
-    // apisec-user tries to read admin (user ID 1)
     const status = await apiRequest(
       request,
       { method: 'GET', path: '/users/1', auth: 'user' },
@@ -398,18 +382,15 @@ test.describe('Cross-user isolation', () => {
   });
 
   test('user can GET their own profile', async ({ request }) => {
-    // First find the user's own ID
     await request.get(`${ORIGIN}/api/auth/get-session`, {
       headers: { Authorization: `Bearer ${userToken}` },
     });
-    // Bearer tokens go through our api-auth, not Better Auth session - use a different approach
-    // Just verify they CAN'T access admin user, which we tested above.
-    // Self-access is covered by the user-scoped GET/DELETE token endpoints.
+    // Bearer tokens go through api-auth, not a Better Auth session; self-access is covered by the
+    // token endpoints.
   });
 
   test("admin CAN access other users' profiles", async ({ request }) => {
-    // Admin reads apisec-user's profile - should work
-    // We need apisec-user's ID. Use the /users list endpoint.
+    // The id comes from the /users list.
     const res = await request.get(`${BASE}/users`, {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
     });

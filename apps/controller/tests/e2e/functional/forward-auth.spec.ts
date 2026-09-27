@@ -31,7 +31,6 @@ test.describe
       const host = await res.json();
       proxyHostId = host.id;
 
-      // Grant testadmin (user ID 1) forward auth access
       const accessRes = await page.request.put(
         `${API}/proxy-hosts/${proxyHostId}/forward-auth-access`,
         {
@@ -41,7 +40,6 @@ test.describe
       );
       expect(accessRes.status()).toBe(200);
 
-      // Wait for Caddy to pick up the forward auth config (expect 302 redirect to portal)
       await waitForStatus(DOMAIN, 302, 20_000);
     });
 
@@ -71,7 +69,6 @@ test.describe
       try {
         const response = await p.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/`);
         expect(response?.status()).toBeLessThan(500);
-        // Wait for the page to fully render
         await p.waitForLoadState('networkidle');
         // Step one of identifier-first sign-in: the password is only asked for after Continue.
         await expect(p.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
@@ -103,7 +100,7 @@ test.describe
       const p = await ctx.newPage();
       try {
         await p.goto(`${BASE_URL}/portal?rd=http://not-a-real-domain.test/`);
-        // Non-forward-auth domain → form shows but no rid is created (generic "Sign in to continue")
+        // A non-forward-auth domain gets the generic form and no rid.
         await expect(p.getByText('Sign in to continue')).toBeVisible();
       } finally {
         await ctx.close();
@@ -146,7 +143,6 @@ test.describe
 
         await signInWithCredentials(freshPage, 'testadmin', 'TestPassword2026!');
 
-        // Wait for the intercepted response
         const deadline = Date.now() + 15_000;
         while (!capturedRedirect && Date.now() < deadline) {
           await freshPage.waitForTimeout(200);
@@ -157,15 +153,12 @@ test.describe
         expect(capturedRedirect).toContain('code=');
         const data = { redirectTo: capturedRedirect! };
 
-        // Complete the callback via httpGet (sends to 127.0.0.1:80 with Host header)
         const callbackUrl = new URL(data.redirectTo);
         const callbackRes = await httpGet(DOMAIN, callbackUrl.pathname + callbackUrl.search);
-        // Callback sets _cpm_fa cookie and redirects to the original URL
         expect(callbackRes.status).toBe(302);
         const setCookie = String(callbackRes.headers['set-cookie'] ?? '');
         expect(setCookie).toContain('_cpm_fa=');
 
-        // Extract the session cookie and verify it grants access to the upstream
         const match = setCookie.match(/_cpm_fa=([^;]+)/);
         expect(match).toBeTruthy();
         const sessionCookie = match![1];

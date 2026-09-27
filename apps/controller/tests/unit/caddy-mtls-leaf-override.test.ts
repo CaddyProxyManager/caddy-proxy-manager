@@ -122,10 +122,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
     );
 
     expect(result).not.toBeNull();
-    // The Set-based dedup in the function should handle this
-    // Actually looking at the code, it uses a Set for PEMs
     const leafCerts = result!.trusted_leaf_certs as string[];
-    // pemToBase64Der('SHARED_CERT') appears once since we used a Set
     expect(leafCerts.length).toBe(1);
   });
 
@@ -159,7 +156,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       new Map(),
     );
 
-    // No override → unmanaged CA logic
+    // No override, so the unmanaged-CA path
     expect(result).not.toBeNull();
     expect(result!.trusted_ca_certs).toEqual(['CA_A']);
     expect(result!.trusted_leaf_certs).toBeUndefined();

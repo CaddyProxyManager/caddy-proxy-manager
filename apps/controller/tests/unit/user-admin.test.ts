@@ -1,7 +1,4 @@
-/**
- * The account rules the Users page, `/api/v1/users` and GraphQL share. Each used to keep its own
- * copy, and the ones that kept none wrote whatever string arrived into the role column.
- */
+/** Account rules the Users page, `/api/v1/users` and GraphQL share, pinned once for all three. */
 import { describe, expect, it } from 'bun:test';
 import { DomainError } from '@/src/lib/domain-error';
 import {

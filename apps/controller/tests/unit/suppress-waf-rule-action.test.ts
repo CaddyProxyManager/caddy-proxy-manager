@@ -5,7 +5,6 @@ import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 // The action's messages come from the catalog, and getTranslations has no request scope here.
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
-// Mock all dependencies of the server action before importing it.
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
@@ -18,8 +17,7 @@ type UpdateProxyHostMock = (id: number, input: unknown, userId: number) => Promi
 
 const { listProxyHostsMock, updateProxyHostMock } = vi.hoisted(() => ({
   listProxyHostsMock: vi.fn(async () => [] as unknown[]),
-  // Type-only signature mirrors updateProxyHost(id, input, actorUserId) so mock.calls
-  // preserves the arg tuple without unused-parameter lint noise.
+  // Mirrors updateProxyHost's signature so mock.calls keeps the arg tuple.
   updateProxyHostMock: vi.fn<UpdateProxyHostMock>(async () => ({})),
 }));
 
@@ -28,7 +26,6 @@ vi.mock('@/src/lib/models/proxy-hosts', () => ({
   updateProxyHost: updateProxyHostMock,
 }));
 
-// Stub other transitive deps of actions.ts that we don't exercise.
 vi.mock('@/src/lib/settings', () => ({
   clearSetting: vi.fn(),
   getSetting: vi.fn(),
@@ -50,8 +47,7 @@ vi.mock('@/src/lib/models/waf-events', () => ({
 }));
 vi.mock('@/src/lib/dns-providers', () => ({
   getProviderDefinition: vi.fn(),
-  // The Caddy module registry derives its DNS entries from this list at module
-  // scope, so it has to exist even though this test never reaches DNS code.
+  // The module registry reads this at module scope, though this test never reaches DNS code.
   DNS_PROVIDERS: [],
 }));
 vi.mock('@/src/lib/dns-provider-credentials', () => ({
@@ -81,10 +77,8 @@ describe('suppressWafRuleForHostAction port normalization', () => {
   });
 
   it('matches a host when the hostname includes :443 (regression)', async () => {
-    // Caddy/Coraza records the Host header verbatim, which can include the port
-    // when clients send "Host: app.example.com:443" (HTTP/2 :authority, some HTTP/1.1
-    // clients). The action must strip the port before matching against
-    // host.domains, which stores bare domain names.
+    // Coraza records Host verbatim, port included ("app.example.com:443"), while host.domains holds
+    // bare names, so the action must strip the port.
     listProxyHostsMock.mockResolvedValueOnce([fakeHost]);
     const result = await suppressWafRuleForHostAction(941100, 'app.example.com:443');
     expect(result.success).toBe(true);

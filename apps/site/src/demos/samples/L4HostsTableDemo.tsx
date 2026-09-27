@@ -1,8 +1,9 @@
 import { Badge } from "@astryxdesign/core/Badge";
-import { VStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { HostNotesHint } from "@cpm/controller/src/components/proxy-hosts/HostNotesField";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
@@ -15,6 +16,7 @@ type Row = {
   listen: string;
   matcher: string;
   upstream: string;
+  notes: string | null;
   status: "active" | "inactive" | "warning";
 };
 
@@ -26,6 +28,7 @@ const HOSTS: Row[] = [
     listen: "5432/tcp",
     matcher: "-",
     upstream: "db:5432",
+    notes: "Primary and replica. Failover is manual; see the runbook.",
     status: "active",
   },
   {
@@ -34,6 +37,7 @@ const HOSTS: Row[] = [
     listen: "25565/tcp",
     matcher: "-",
     upstream: "mc:25565",
+    notes: null,
     status: "active",
   },
   {
@@ -42,6 +46,7 @@ const HOSTS: Row[] = [
     listen: "8883/tcp",
     matcher: "SNI mqtt.example.com",
     upstream: "mosquitto:8883",
+    notes: null,
     status: "active",
   },
   {
@@ -50,16 +55,14 @@ const HOSTS: Row[] = [
     listen: "51820/udp",
     matcher: "-",
     upstream: "wg:51820",
+    notes: null,
     status: "warning",
   },
 ];
 
 const protocolOf = (row: Row) => (row.listen.endsWith("/udp") ? "udp" : "tcp");
 
-/**
- * The L4 list: tiles, the TCP/UDP tabs and the real table. In the app the tabs filter the query;
- * here this component filters the rows above off the same `protocol` parameter.
- */
+/** The app's tabs filter the query; here the rows are filtered off the same `protocol` param. */
 function L4HostsTableDemoContent() {
   const t = useTranslations("l4ProxyHosts");
   const router = useRouter();
@@ -84,9 +87,12 @@ function L4HostsTableDemoContent() {
       id: "name",
       label: "Name",
       render: (r) => (
-        <Text type="body" size="sm" weight="semibold">
-          {r.name}
-        </Text>
+        <HStack gap={1} vAlign="center">
+          <Text type="body" size="sm" weight="semibold">
+            {r.name}
+          </Text>
+          <HostNotesHint notes={r.notes} />
+        </HStack>
       ),
     },
     { id: "listen", label: "Listening", render: (r) => <Badge label={r.listen} /> },
@@ -145,10 +151,7 @@ function L4HostsTableDemoContent() {
   );
 }
 
-/**
- * The content renders inside DemoSurface rather than around it: the surface is what provides the
- * message catalog, and the content reads from it with useTranslations.
- */
+/** Inside DemoSurface, which provides the catalog useTranslations reads. */
 export default function L4HostsTableDemo() {
   return (
     <DemoSurface>

@@ -9,11 +9,8 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 
 /**
- * The identifier carried into the second step of sign-in, with the way back out of it.
- *
- * Identifier-first only works if the name you entered stays on screen: without it the second step
- * asks for the password to an account you can no longer see, and a typo in step one is
- * indistinguishable from a wrong password.
+ * Identifier-first needs the entered name on screen: without it the password step is for an
+ * account you cannot see, and a typo in step one looks like a wrong password.
  */
 export function SignInIdentity({
   username,

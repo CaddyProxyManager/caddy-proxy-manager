@@ -1,55 +1,29 @@
 /**
- * The controller <-> agent contract.
- *
- * The agent dials the controller and holds one event stream open; the controller never dials the
- * agent. Every field either side puts on the wire is named here, because the two are built from
- * different source trees and a rename that reaches only one of them fails at runtime rather than
- * at compile time.
- *
- * Request authentication is HMAC-SHA256 over a canonical string, not a bearer token - see
- * `signatureBase`. The secret is minted by the controller at pairing and never travels with a
- * request.
+ * The controller <-> agent contract. Every field either side puts on the wire is named here: the
+ * two build from different trees, so a rename reaching only one fails at runtime, not compile time.
+ * Requests are HMAC-signed (`signatureBase`); the secret never travels with a request.
  */
 
 // ─── Authentication ──────────────────────────────────────────────────────────
 
-/** Header carrying the request's Unix-millisecond timestamp. Part of the signed material. */
 export const AGENT_TIMESTAMP_HEADER = "x-cpm-timestamp";
-/** Header carrying the lowercase hex HMAC-SHA256 of `signatureBase`. */
 export const AGENT_SIGNATURE_HEADER = "x-cpm-signature";
-/**
- * Header naming which paired agent is calling, so the controller can pick the right secret.
- *
- * The shared secret is symmetric, so the agent signs with the same primitive the controller once
- * used and the controller verifies against the row it stored at pairing.
- */
+/** Names the calling agent, so the controller can pick the right secret. */
 export const AGENT_ID_HEADER = "x-cpm-agent";
 
 /**
- * Header carrying a fresh random value per signed request. Signed, and the controller refuses one
- * it has already accepted, so a captured request cannot be replayed inside the clock-skew window -
- * where a replayed subscription would displace the real agent's stream.
+ * Signed, and refused if already seen, so a captured request cannot be replayed inside the skew
+ * window - where a replayed subscription would displace the real agent's stream.
  */
 export const AGENT_NONCE_HEADER = "x-cpm-nonce";
-/** 128 random bits, lowercase hex. */
 export const AGENT_NONCE_PATTERN = /^[0-9a-f]{32}$/;
 
-/**
- * How far a request's timestamp may be from the agent's clock. Wide enough to survive two
- * containers whose clocks were never synchronised, narrow enough that a captured request stops
- * being replayable in a minute rather than a day.
- */
+/** Survives unsynchronised container clocks; a captured request dies in a minute, not a day. */
 export const AGENT_CLOCK_SKEW_MS = 60_000;
 
 /**
- * The exact bytes both sides sign. Newline-separated with a fixed field count, so no combination
- * of path and body can be made to produce another request's base string.
- *
- * `bodyHash` is the hex SHA-256 of the raw body - of the empty string when there is none - which
- * keeps the signature over the body without making the signer buffer it twice.
- *
- * Without `nonce` this is the base agents before 3.0.0-rc.4 sign, which the controller still
- * verifies. The two shapes differ in line count, so neither can produce the other's string.
+ * Fixed field count, so no path/body combination can produce another request's base string.
+ * Without `nonce` it is the pre-3.0.0-rc.4 base, still verified; the line counts differ.
  */
 export function signatureBase(
   method: string,
@@ -64,10 +38,10 @@ export function signatureBase(
 
 // ─── Pairing ─────────────────────────────────────────────────────────────────
 
-/** Alphabet the pairing code is drawn from: capitals only, so it can be read aloud and typed. */
+/** Capitals only, so it can be read aloud and typed. */
 export const PAIRING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 export const PAIRING_CODE_LENGTH = 6;
-/** How long a pairing code stays valid. The agent prints a fresh one when this elapses. */
+/** The agent prints a fresh code when this elapses. */
 export const PAIRING_CODE_TTL_MS = 5 * 60_000;
 
 // ─── Status ──────────────────────────────────────────────────────────────────
@@ -76,7 +50,6 @@ export type L4PortsState = "idle" | "pending" | "applying" | "applied" | "failed
 export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
 export type ManagedServicesState = "idle" | "pending" | "applying" | "applied" | "failed";
 
-/** Shared shape of both operation statuses. `state` narrows per operation. */
 export type AgentOperationStatus<TState extends string> = {
   state: TState;
   message?: string;
@@ -87,26 +60,29 @@ export type AgentOperationStatus<TState extends string> = {
 
 export type L4PortsStatus = AgentOperationStatus<L4PortsState>;
 export type CaddyBuildStatus = AgentOperationStatus<CaddyBuildState>;
+
+/** `external`: the operator builds Caddy's image and the agent only loads it (CADDY_BUILD_MODE). */
+export const CADDY_BUILD_MODES = ["agent", "external"] as const;
+export type CaddyBuildMode = (typeof CADDY_BUILD_MODES)[number];
+
+/** What an operator building the image needs, reported by an agent that will not build it. */
+export type ExternalCaddyImage = {
+  /** The reference Caddy's container was created from; null before its first start. */
+  image: string | null;
+  /** The image bakes Caddy's user in, so these must match the host's; "" when unset. */
+  puid: string;
+  pgid: string;
+};
 export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
 
 /**
- * The optional compose services the agent may start and stop.
- *
- * Each sits behind a compose profile, which is why it needs an agent at all: a profile is decided
- * when the operator runs `docker compose up`, so nothing inside the stack can turn one on. The
- * agent runs the compose CLI, so it can - see `ManagedServicesRequest`. `geoipupdate` was one until
- * the controller began downloading the databases itself; an older agent reads its absence as off.
+ * Compose services behind a profile, which nothing inside the stack can enable - only the agent,
+ * which runs the compose CLI. An older agent reads a missing name (`geoipupdate`) as off.
  */
 export const MANAGED_SERVICES = ["clickhouse"] as const;
 export type ManagedServiceName = (typeof MANAGED_SERVICES)[number];
 
-/**
- * Variables the compose file interpolates for those services, which the agent writes to a generated
- * env file and passes as an extra `--env-file`.
- *
- * An allowlist rather than a free-form map: these become lines in a file the compose CLI parses, so
- * an unconstrained key is a route to setting any variable the project reads.
- */
+/** An allowlist: an unconstrained key would let the controller set any variable compose reads. */
 export const MANAGED_SERVICE_ENV_KEYS = [
   "CLICKHOUSE_USER",
   "CLICKHOUSE_PASSWORD",
@@ -118,87 +94,71 @@ export type AgentStatus = {
   agentId: string;
   version: string;
   mode: AgentMode;
-  /** Compose project the agent operates on, as detected from the Caddy container's labels. */
+  /** Detected from the Caddy container's labels. */
   composeProject: string;
   l4Ports: {
-    /** Ports currently published on the Caddy container, as `HOST:CONTAINER[/proto]`. */
+    /** As `HOST:CONTAINER[/proto]`. */
     applied: string[];
     status: L4PortsStatus;
   };
   caddyBuild: {
     /**
-     * xcaddy `--with` specs the running binary was actually built with, or null when this agent
-     * has never rebuilt it - which the controller reads as the shipped image's full catalog. An
-     * empty array is a different and much worse claim: "built with no plugins at all".
+     * Null when never rebuilt, read as the shipped image's full catalog. An empty array is a
+     * different, much worse claim: built with no plugins at all.
      */
     applied: string[] | null;
     status: CaddyBuildStatus;
+    /** Only from an agent in external mode; absent means it builds the image itself. */
+    external?: ExternalCaddyImage;
   };
   services: {
-    /**
-     * What this agent last brought up or took down, or null before it has been asked.
-     *
-     * Recorded rather than probed: `docker compose ps` is a subprocess per service, and this status
-     * is read on every render of several pages. The controller only needs to know whether its last
-     * request landed, which is what this answers.
-     */
+    /** Recorded, not probed: `docker compose ps` per service is too slow for every render. */
     applied: Record<ManagedServiceName, boolean> | null;
     status: ManagedServicesStatus;
   };
   analytics: {
-    /** Whether the controller has given this agent somewhere to write events. */
     enabled: boolean;
-    /**
-     * Whether Caddy's access log exists on this host.
-     *
-     * Reported by the agent because only the agent can see it. The controller shows "logging is
-     * off" from this: with the log on another host, checking its own filesystem would say the
-     * feature is disabled on every remote deployment that has it switched on.
-     */
+    /** Only the agent can see the log; the controller's own filesystem says nothing remotely. */
     accessLogPresent: boolean;
   };
-  /**
-   * Caddy log files this host cannot use as it should, and what the controller needs to say how to
-   * fix them. Undefined from an agent older than the field, or one that cannot read its own
-   * identity (anything but Linux).
-   */
+  /** Undefined from an older agent, or one that cannot read its own identity (non-Linux). */
   logAccess?: LogAccessReport;
   /**
-   * Command kinds this agent runs beyond `caddy-admin`. Undefined from an agent older than the
-   * field, which the controller must read as none: an older agent answers an unknown kind with
-   * nothing at all, and the caller would wait out the whole command timeout.
+   * Kinds beyond `caddy-admin`. Undefined means none: an older agent answers an unknown kind with
+   * silence, and the caller would wait out the whole command timeout.
    */
   capabilities?: AgentCapability[];
 };
 
-export const AGENT_CAPABILITIES = ["caddy-validate"] as const;
+export const AGENT_CAPABILITIES = [
+  "caddy-validate",
+  "log-read",
+  "certificates",
+  "caddy-image",
+] as const;
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
 /**
- * - `unreadable`: the agent cannot read a log it parses, so those events are silently skipped.
- * - `notTruncatable`: the agent can read the WAF audit log but not write it, so it cannot truncate
- *   it once ingested and the file grows until the disk fills.
- * - `cleanupBlocked`: Caddy can write the log directory but not list it, which keeps rotation
- *   working while gzip and pruning of rolled files silently stop.
+ * `unreadable`: events silently skipped. `notTruncatable`: the WAF audit log grows until the disk
+ * fills. `cleanupBlocked`: Caddy can write but not list the directory, so pruning silently stops.
  */
 export type LogAccessProblemKind = "unreadable" | "notTruncatable" | "cleanupBlocked";
 
 export type LogAccessProblem = {
   kind: LogAccessProblemKind;
-  /** Path inside the agent's container, which is the same path inside Caddy's. */
+  /** The same path inside Caddy's container. */
   path: string;
   uid: number;
   gid: number;
-  /** Permission bits, as `stat` reports them. */
   mode: number;
 };
 
 export type LogAccessReport = {
   /** Where a fix runs: `docker exec` into this container. */
   caddyContainer: string;
-  /** The agent's own groups, so a file in some other group reads as a CADDY_GID mismatch. */
+  /** So a file in some other group reads as a CADDY_GID mismatch. */
   agentGroups: number[];
-  /** Caddy's group, as read off the files it owns, or null when there are none yet. */
+  /** Read off the files Caddy owns; null when there are none yet. */
   caddyGid: number | null;
   problems: LogAccessProblem[];
 };
@@ -207,14 +167,7 @@ export type AgentMode = "standalone" | "managed";
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
-/**
- * Which optional services should be running, and what compose needs to interpolate to start them.
- *
- * `env` is sent because those services read credentials the controller now holds in its own
- * settings, while compose reads them from the host `.env` the agent cannot write. Rather than ask
- * the operator to keep the two in step, the agent writes what it is given to a generated env file
- * and hands compose an extra `--env-file`.
- */
+/** `env` carries credentials the controller holds in settings, which the host `.env` lacks. */
 export type ManagedServicesRequest = {
   services: Record<ManagedServiceName, boolean>;
   env: Partial<Record<ManagedServiceEnvKey, string>>;
@@ -223,14 +176,11 @@ export type ManagedServicesRequest = {
 // ─── Caddy admin proxy ───────────────────────────────────────────────────────
 
 /**
- * A request for the agent to make against its own Caddy.
- *
- * The agent is the only thing that knows where its Caddy is, so every admin call goes through it
- * rather than the controller dialling an address of its own. Without this a paired remote agent
- * would recreate the *remote* container while the controller kept configuring a *local* Caddy.
+ * Only the agent knows where its Caddy is; dialling one itself, the controller would configure a
+ * local Caddy while a remote agent recreated its own.
  */
 export type CaddyAdminProxyRequest = {
-  /** Path under the admin API root, e.g. "/load" or "/config/". Must be absolute. */
+  /** Must be absolute. */
   path: string;
   method: string;
   body?: string;
@@ -238,72 +188,73 @@ export type CaddyAdminProxyRequest = {
   contentType?: string;
 };
 
-/** Caddy's own answer, passed back unchanged. A non-2xx status is data here, not an error. */
+/** A non-2xx status is data here, not an error. */
 export type CaddyAdminProxyResponse = {
   status: number;
   text: string;
   headers: Record<string, string>;
 };
 
-/**
- * Largest Caddy config the proxy route accepts.
- *
- * A generated document grows with the number of proxy hosts, and a deployment with hundreds of
- * them produces megabytes. Well above anything realistic, and still bounded.
- */
+/** Hundreds of hosts produce megabytes; well above realistic, still bounded. */
 export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
 
 /**
- * A config for the agent to run `caddy validate` on, with its own Caddy's binary, without loading
- * it. Caddy's admin API has no dry run, and Coraza only compiles a WAF while provisioning - so this
- * is the one way to learn whether a directive loads before every host's config depends on it.
- *
- * The answer comes back as a `CaddyAdminProxyResponse`: status 200 when Caddy accepted it, 422
- * when it refused, and `text` the transcript `caddy validate` printed either way.
+ * Caddy has no dry run and Coraza compiles only while provisioning, so this is the one way to test
+ * a directive before loading it. Answered 200 or 422, `text` the `caddy validate` transcript.
  */
 export type CaddyValidateRequest = { config: string };
 
-/** Status `caddy-validate` answers with for a config Caddy refused. */
+export type LogReadRequest = {
+  source: "access" | "waf" | "caddy";
+  /** Absent for the newest lines. Opaque to the controller. */
+  cursor?: string | null;
+  limit?: number;
+};
+
+/** Never the key. */
+export type CaddyCertificate = {
+  /** The issuer's storage directory, e.g. `acme-v02.api.letsencrypt.org-directory`. */
+  issuerKey: string;
+  /** The storage name, usually the domain. */
+  name: string;
+  names: string[];
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  fingerprint: string;
+};
+
+export type CertificateFileRequest = { issuerKey: string; name: string; includeKey?: boolean };
+export type CertificateFiles = { certificatePem: string; keyPem?: string };
+
+export type LogReadResponse = {
+  lines: string[];
+  /** Null when there is nothing to continue from yet. */
+  cursor: string | null;
+  truncated?: boolean;
+  /** E.g. access logging is off. */
+  missing?: boolean;
+};
+
 export const CADDY_VALIDATE_REFUSED_STATUS = 422;
 
 // ─── Fleet configuration ─────────────────────────────────────────────────────
 
-/**
- * The MaxMind databases an agent may be given.
- *
- * Country is what the log parsers read; Caddy's geo-blocking uses Country and ASN. City is
- * included because a deployment that subscribes to it expects it present, not because anything
- * here requires it.
- */
+/** Parsers read Country, geo-blocking Country and ASN; City only because subscribers expect it. */
 export const GEOIP_EDITIONS = ["GeoLite2-Country", "GeoLite2-ASN", "GeoLite2-City"] as const;
 export type GeoipEdition = (typeof GEOIP_EDITIONS)[number];
 
 export type FleetConfig = {
-  /**
-   * Always null. Agents once got the controller's ClickHouse credentials here and inserted their
-   * own events; they relay them through `AGENT_OPERATIONS.analytics` now. Still sent, as null, so an
-   * older agent reads analytics as off rather than tripping over a field that went missing.
-   */
+  /** Always null, but still sent so an older agent reads analytics as off. */
   clickhouse: null;
 
-  /**
-   * Whether to parse this host's Caddy logs and relay the events to the controller.
-   *
-   * The agent parses because only it can read the log. The controller writes, so no agent holds a
-   * ClickHouse credential or needs ClickHouse reachable from its host.
-   */
+  /** Only the agent can read the log; the controller writes, so no agent holds a credential. */
   analytics: boolean;
 
   /**
-   * Where to fetch the MaxMind databases, or null when the controller has none.
-   *
-   * The controller holds the subscription and the files; agents reach them through it rather than
-   * each host holding a licence key of its own. Pulled rather than pushed because these are tens
-   * of megabytes, over a signed route of their own rather than GraphQL.
-   *
-   * `url` is the controller's public address. An agent prefers the address it is paired with,
-   * joined to `CONTROLLER_GEOIP_ROUTE`: an agent beside the controller would otherwise fetch through
-   * the Caddy it has not started yet. `url` remains for agents that predate that.
+   * Pulled, not pushed: tens of megabytes. Agents prefer their paired address joined to
+   * `CONTROLLER_GEOIP_ROUTE`, since one beside the controller would otherwise fetch through the
+   * Caddy it has not started; `url` (the public address) remains for older agents.
    */
   geoip: {
     url: string;
@@ -313,7 +264,6 @@ export type FleetConfig = {
 
 // ─── Analytics rows ──────────────────────────────────────────────────────────
 
-/** One line of Caddy's access log, as the analytics tables store it. */
 export type TrafficEventRow = {
   ts: number;
   client_ip: string;
@@ -328,7 +278,6 @@ export type TrafficEventRow = {
   is_blocked: boolean;
 };
 
-/** One Coraza audit-log entry, as the analytics tables store it. */
 export type WafEventRow = {
   ts: number;
   host: string;
@@ -356,51 +305,23 @@ export type AgentErrorCode =
 
 // ═══ Controller-side agent API ═══════════════════════════════════════════════
 //
-// The agent dials the controller, never the reverse: a host behind NAT needs no inbound port, and
-// the controller needs no address for it. Pairing is minted by the controller and carried to the
-// agent by an operator running `cpm-agent --pair`.
-//
-// Only one direction actually needed inventing. The agent can always dial out, so its status and
-// command results are plain POSTs; what the controller cannot do is call in, so everything it needs
-// to push - desired state, and the Caddy admin calls it blocks on - goes down one long-lived
-// Server-Sent Events stream the agent holds open. That keeps the whole surface inside ordinary
-// route handlers, which is why dev and the compiled server behave identically.
-//
-// `AGENT_ROUTES` above are the agent's own, and are now local control only - nothing on the
-// network calls them.
+// The agent dials out, so a host behind NAT needs no inbound port; whatever the controller must
+// push goes down one long-lived stream the agent holds open.
 
-/** Path prefix for everything an agent calls on its controller. */
 export const CONTROLLER_AGENT_API_PREFIX = "/api/agent/v1";
 
 export const CONTROLLER_AGENT_ROUTES = {
-  /**
-   * Unauthenticated, and deliberately not GraphQL.
-   *
-   * Pairing runs before there is a secret, and the secret is what every signed call - including
-   * every GraphQL one - depends on. A chicken-and-egg exchange does not belong behind the door it
-   * is producing the key for.
-   */
+  /** Unsigned and not GraphQL: pairing runs before the secret every signed call needs exists. */
   pair: `${CONTROLLER_AGENT_API_PREFIX}/pair`,
   /**
-   * Unauthenticated, like `pair`: who a code would pair with, without spending it.
-   *
-   * The agent asks this before pairing so the operator can confirm the controller by name - a
-   * typo'd address that happens to answer is otherwise indistinguishable from the right one until
-   * the code is gone. A wrong code counts against the same budget as a wrong pairing attempt.
+   * Unsigned, like `pair`: names the controller without spending the code, so a typo'd address
+   * that answers can be caught. A wrong code counts against the same budget as a wrong pairing.
    */
   pairPreview: `${CONTROLLER_AGENT_API_PREFIX}/pair/preview`,
-  /**
-   * Everything else: the event subscription, the status report and the command results.
-   *
-   * One endpoint, because that is how GraphQL works. The agent opens a `subscription` here and
-   * holds it open - delivered as SSE, read with `fetch` rather than `EventSource` because this is
-   * Bun and not a browser, so the request carries the same signature headers as every other call
-   * and needs no token in a query string. Its reports go to the same URL as mutations.
-   */
+  /** The subscription is read with `fetch`, not `EventSource`, so it carries the signed headers. */
   graphql: "/api/graphql",
 } as const;
 
-/** The documents the agent sends. Written out so both ends can be read against one definition. */
 export const AGENT_OPERATIONS = {
   events: "subscription AgentEvents { agentEvents }",
   status: "mutation AgentStatus($status: JSON!) { agentStatus(status: $status) }",
@@ -410,68 +331,45 @@ export const AGENT_OPERATIONS = {
     "mutation AgentAnalytics($kind: String!, $rows: [JSON!]!) { agentAnalytics(kind: $kind, rows: $rows) }",
 } as const;
 
-/** The two kinds of row `AGENT_OPERATIONS.analytics` carries. */
 export const AGENT_ANALYTICS_KINDS = ["traffic", "waf"] as const;
 export type AgentAnalyticsKind = (typeof AGENT_ANALYTICS_KINDS)[number];
 
-/** What the controller did with a relayed batch. A malformed row is dropped, not fatal. */
+/** A malformed row is dropped, not fatal. */
 export type AgentAnalyticsResult = { accepted: number; rejected: number };
 
-/**
- * Largest relayed analytics request. The agent splits a batch to fit: a refused batch is resent
- * every pass, so one that could never fit would stall that host's analytics for good.
- */
+/** The agent splits to fit: a refused batch is resent every pass and would stall analytics. */
 export const MAX_ANALYTICS_REQUEST_BYTES = 8 * 1024 * 1024;
 
-/**
- * Where an agent fetches the MaxMind databases, as `<route>/<edition>` under its controller.
- *
- * Outside `CONTROLLER_AGENT_ROUTES` because it predates the v1 prefix and keeps its path. The
- * controller also sends the full URL in `FleetConfig.geoip`, for agents that predate this.
- */
+/** `<route>/<edition>`. Outside the v1 prefix because it predates it and keeps its path. */
 export const CONTROLLER_GEOIP_ROUTE = "/api/agent/geoip";
 
-/**
- * How often the controller writes a comment frame to an idle stream.
- *
- * SSE has no ping of its own, and a stream that says nothing for minutes is indistinguishable from
- * one a proxy silently dropped. Comfortably inside the 60s idle timeout most proxies default to.
- */
+/** A silent stream looks like one a proxy dropped; inside the common 60s idle timeout. */
 export const AGENT_STREAM_KEEPALIVE_MS = 20_000;
 
-/** How long the agent waits before redialling a stream that closed. Backs off on repeated failure. */
+/** Backs off from min to max on repeated failure. */
 export const AGENT_RECONNECT_MIN_MS = 1_000;
 export const AGENT_RECONNECT_MAX_MS = 30_000;
 
-/** Longest the controller waits for a command's result before failing whoever is blocked on it. */
 export const AGENT_COMMAND_TIMEOUT_MS = 60_000;
 
-/** Slow heartbeat: the agent reposts status this often even when nothing changed. */
+/** The agent reposts status this often even when nothing changed. */
 export const AGENT_STATUS_HEARTBEAT_MS = 60_000;
 
 /**
- * Filename of the bootstrap token the controller leaves on a shared data volume.
- *
- * Named here because both sides open the same file under different mounts - the controller writes
- * it under its data directory, the agent reads it under `DATA_DIR` - and a rename that reached only
- * one of them would silently stop the bundled stack pairing itself, with no error anywhere.
- *
- * Only meaningful for an agent sharing the controller's volume, which means the same host. A remote
- * agent has no such file and pairs with a code an operator carries.
+ * Both sides open this under different mounts; a rename reaching only one silently stops the
+ * bundled stack pairing itself. Same-host only - a remote agent pairs with a code.
  */
 export const AGENT_BOOTSTRAP_FILE = "agent-bootstrap";
 
-/** Shape of that token, so either side can tell one from a typed six-letter code. */
+/** Tells the token apart from a typed six-letter code. */
 export const AGENT_BOOTSTRAP_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
 // ─── Pairing (controller-minted) ─────────────────────────────────────────────
 
 export type AgentPairRequest = {
-  /** The code the operator read off the controller's UI. */
   code: string;
-  /** Stable id this agent will identify itself by from now on. Generated once, then persisted. */
+  /** Generated once, then persisted. */
   agentId: string;
-  /** Shown in the controller's agent list so an operator can tell two hosts apart. */
   agentName?: string;
   agentVersion: string;
 };
@@ -485,82 +383,60 @@ export type AgentPairPreviewRequest = {
 export type AgentPairPreviewResponse = {
   controllerId: string;
   controllerName: string;
-  /** True when the code would replace an existing pairing rather than add a new agent. */
+  /** The code would replace an existing pairing rather than add an agent. */
   repair: boolean;
 };
 
 export type AgentPairResponse = {
-  /** Hex-encoded shared secret. Returned exactly once, at pairing time. */
+  /** Returned exactly once. */
   secret: string;
-  /** Stable id of the controller, echoed on every later request so a re-pair is detectable. */
+  /** Echoed on every later request so a re-pair is detectable. */
   controllerId: string;
   controllerName: string;
 };
 
 // ─── Desired state ───────────────────────────────────────────────────────────
 
-/**
- * What the agent should have, pushed whenever it changes and once when the stream opens.
- *
- * Absolute, never incremental - the agent diffs it against its own applied state and acts only on
- * a difference, which is what makes a dropped stream cost nothing but the reconnect.
- */
+/** Absolute, never incremental, so a dropped stream costs nothing but the reconnect. */
 export type AgentDesiredState = {
-  /** Ports Caddy should publish, as `HOST:CONTAINER[/proto]`. */
   l4Ports: string[];
-  /** xcaddy `--with` specs Caddy's image should be built with. */
   caddyModules: string[];
-  /** Which optional compose services should be running, and what compose must interpolate. */
   services: ManagedServicesRequest;
   fleetConfig: FleetConfig;
-  /**
-   * Whether the agent may run Caddy at all.
-   *
-   * False before the controller has anything to serve, which is what keeps ports 80 and 443 shut
-   * on a freshly installed host rather than answering with a default page.
-   */
+  /** False until there is something to serve, keeping 80 and 443 shut on a fresh host. */
   caddyEnabled: boolean;
 };
 
 // ─── Stream frames ───────────────────────────────────────────────────────────
 
-/**
- * Work the controller needs done on the agent's host, now, with an answer.
- *
- * Everything else the controller sends is desired state the agent reconciles at its own pace. This
- * is the exception: a Caddy admin call has a response the controller is waiting on, and inverting
- * the dial direction is what forced it onto the stream rather than a request.
- */
+/** The one exception to desired state: a call the controller blocks on for an answer. */
 export type AgentCommand = {
-  /** Correlates the result. Opaque to the agent. */
+  /** Opaque to the agent. */
   id: string;
 } & (
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
   /** Only sent to an agent listing it in `AgentStatus.capabilities`. */
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
+  /** Likewise. Answered as a 200 whose text is a `LogReadResponse`. */
+  | { kind: "log-read"; request: LogReadRequest }
+  /** Under the `certificates` capability: a 200 whose text is `CaddyCertificate[]`. */
+  | { kind: "certificate-list"; request: Record<string, never> }
+  /** Likewise: a 200 whose text is `CertificateFiles`, or a 404. */
+  | { kind: "certificate-read"; request: CertificateFileRequest }
+  /**
+   * Under `caddy-image`: start loading the operator's image. A 200 once started, as a recreate
+   * outlasts the command timeout; the outcome is reported in `caddyBuild.status`.
+   */
+  | { kind: "caddy-image-load"; request: Record<string, never> }
 );
 
-/** Everything the controller can push down the stream. */
 export type AgentServerEvent =
   | { type: "desired-state"; state: AgentDesiredState }
   | { type: "command"; command: AgentCommand }
-  /**
-   * Restart Caddy, then the agent process itself. No answer: the process that would receive one
-   * is exiting too. Sent when the controller restarts after migrating its database, so every part
-   * of the stack comes back reading the same configuration.
-   */
+  /** Restarts Caddy and the agent after a controller migration. No answer: the agent exits. */
   | { type: "restart"; reason: string }
-  /** Sent once when the stream opens, so the agent can log what it is attached to. */
   | { type: "hello"; controllerId: string; controllerName: string }
-  /**
-   * Nothing to say, said out loud.
-   *
-   * A stream that is silent for minutes is indistinguishable from one a proxy dropped without
-   * telling either end. This used to be an SSE comment frame, which only worked because the
-   * controller was writing the frames itself; as a GraphQL subscription the transport belongs to
-   * the server library, so the keepalive has to be part of the protocol rather than under it.
-   * The agent ignores it - receiving it is the entire point.
-   */
+  /** Keepalive in the protocol: the GraphQL library owns the transport, so no SSE comments. */
   | { type: "ping" };
 
 export type AgentCommandResult = { id: string } & (
@@ -571,23 +447,19 @@ export type AgentCommandResult = { id: string } & (
 // ─── Local control ───────────────────────────────────────────────────────────
 
 /**
- * `cpm-agent --pair` talks to the agent already running on the host, not to the controller: the
- * running process is the one holding the socket and the database, and a second process pairing on
- * its behalf would have to hand the result over anyway.
+ * `cpm-agent --pair` talks to the running agent, not the controller: that process holds the
+ * socket and the database, and a second one would have to hand the result over anyway.
  */
 export const AGENT_LOCAL_ROUTES = {
-  /** Unauthenticated liveness, for the container HEALTHCHECK. Answers in every state. */
+  /** Unauthenticated, for the container HEALTHCHECK. Answers in every state. */
   health: "/health",
-  /** What the agent is doing: idle, pairing, paired, and why. */
   state: "/local/state",
-  /** Hand a running agent its controller address and pairing code. */
   pair: "/local/pair",
-  /** Who a pairing would be with, so `cpm-agent --pair` can ask before it happens. */
   pairPreview: "/local/pair/preview",
 } as const;
 
 export type AgentLifecycle =
-  /** No controller configured. Caddy is held down and nothing is polled. */
+  /** Caddy is held down and nothing is polled. */
   | "idle"
   /** Has an address and a code, exchanging them for a secret. */
   | "pairing"
@@ -598,16 +470,14 @@ export type AgentLocalState = {
   lifecycle: AgentLifecycle;
   agentId: string;
   version: string;
-  /** Controller origin once known, else null. */
   controllerUrl: string | null;
-  /** Whether Caddy is running, and whether the agent is currently allowed to run it. */
   caddy: { running: boolean; allowed: boolean };
-  /** Why the agent is idle or last failed to pair. Operator-facing, English. */
+  /** Operator-facing, English. */
   message: string | null;
 };
 
 export type AgentLocalPairRequest = {
-  /** Controller host or origin, as typed. A bare host is assumed to be http://. */
+  /** A bare host is assumed to be http://. */
   host: string;
   port?: number;
   code: string;
@@ -616,22 +486,21 @@ export type AgentLocalPairRequest = {
 export type AgentLocalPairPreviewResponse =
   | {
       ok: true;
-      /** The address the pairing would dial, normalized the way pairing will use it. */
       controllerUrl: string;
-      /** Null when the controller predates the preview route and so cannot say. */
+      /** Null when the controller predates the preview route. */
       controllerName: string | null;
       controllerId: string | null;
       repair: boolean;
     }
   | {
       ok: false;
-      /** Already a sentence, and already English - this goes to a terminal. */
+      /** English - this goes to a terminal. */
       error: string;
     };
 
 export type AgentLocalPairResponse = {
   ok: boolean;
   state: AgentLocalState;
-  /** Set when `ok` is false. Already a sentence, and already English - this goes to a terminal. */
+  /** English - this goes to a terminal. */
   error?: string;
 };

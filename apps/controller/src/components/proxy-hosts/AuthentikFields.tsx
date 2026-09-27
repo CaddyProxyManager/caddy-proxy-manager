@@ -85,9 +85,7 @@ export function AuthentikFields({
       <input type="hidden" name="authentikPresent" value="1" />
       <input type="hidden" name="authentikEnabledPresent" value="1" />
       <input type="hidden" name="authentikEnabled" value={enabled ? "true" : "false"} />
-      {/* Rendered unconditionally, as before: the action reads this marker to
-          decide whether to write setOutpostHostHeader at all, and the previous
-          markup kept it in the DOM even while the section was collapsed. */}
+      {/* Unconditional: the action reads it to decide whether to write setOutpostHostHeader. */}
       <input type="hidden" name="authentikSetHostHeaderPresent" value="1" />
 
       <VStack gap={4}>
@@ -108,10 +106,8 @@ export function AuthentikFields({
           />
         </HStack>
 
-        {/* Unmounted when off. Previously these stayed mounted but `disabled`
-            inside a max-h-0 wrapper - disabled controls are omitted from
-            FormData, so the submitted payload is unchanged, and they are no
-            longer reachable by keyboard while hidden. */}
+        {/* Unmounted when off: disabled controls never reached FormData anyway, and hidden ones
+            must not be keyboard-reachable. */}
         {enabled && (
           <VStack gap={4}>
             <TextInput

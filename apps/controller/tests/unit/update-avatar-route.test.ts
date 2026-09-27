@@ -1,6 +1,6 @@
 /**
- * POST /api/user/update-avatar stores the image inline on the user row, which is sent with every
- * page that shows it. The cap is sized for an icon; it used to allow 3 MB.
+ * POST /api/user/update-avatar stores the image inline on the user row, sent with every page
+ * that shows it, so the cap is sized for an icon.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

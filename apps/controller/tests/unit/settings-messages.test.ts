@@ -1,8 +1,6 @@
 /**
- * The Settings and setup screens look their labels up by setting name, and validation errors by
- * code - both at runtime, so TypeScript cannot check those keys against the catalog the way it
- * checks a literal `t("...")`. These do it instead: a setting added to the registry without a
- * message here fails the build rather than rendering its raw key to an operator.
+ * Setting labels and validation codes are looked up at runtime, beyond TypeScript's key checking,
+ * so these fail a setting without a message rather than render its raw key.
  */
 import { describe, expect, it } from 'bun:test';
 import messages from '../../messages/en.json';
@@ -46,7 +44,7 @@ describe('settings.groups messages', () => {
 
 describe('settings.validation messages', () => {
   it('covers every code the registry can reject with', () => {
-    // Mirrors SettingValidationCode. Kept as a literal so adding a code without a message fails.
+    // A literal copy of SettingValidationCode, so a new code without a message fails.
     const codes = [
       'boolean',
       'tristate',

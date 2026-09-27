@@ -1,8 +1,6 @@
 /**
- * Integration: what happens when Caddy refuses a config because Coraza cannot build the WAF with
- * a CRS plugin that passed the static checks (src/lib/crs-plugins/recovery.ts). A fake load stands
- * in for Caddy: it builds the plugin rules the real builder would, and refuses them when they
- * contain a plugin marked bad.
+ * Caddy refusing a CRS plugin Coraza cannot build (src/lib/crs-plugins/recovery.ts). A fake load
+ * builds the real plugin rules and refuses those containing a plugin marked bad.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

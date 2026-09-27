@@ -17,17 +17,9 @@ import {
 } from "@/src/lib/setup";
 
 /**
- * POST /api/setup/migrate - copy the chosen groups out of a legacy database.
- *
- * A route handler rather than a server action, and that is the whole reason this file exists. A
- * server action re-renders the page it was called from, and this page redirects as soon as the
- * import has changed what `getSetupState` answers - so the operator was thrown to /login the
- * instant the import finished, with no chance to be told the app is about to restart. A fetch
- * leaves the page mounted, which is what lets the restart happen in front of them.
- *
- * Unauthenticated by necessity: nothing can sign in to a deployment that has not been set up. The
- * guard is the same one the account step uses - this reads an arbitrary file off the host into the
- * application database, so it must only work while the database is genuinely empty.
+ * POST /api/setup/migrate. A route handler, not a server action: an action re-renders its page,
+ * which redirects to /login the instant the import lands, before the restart can be explained.
+ * Unauthenticated by necessity, so it only works while the database is genuinely empty.
  */
 
 export type MigrateResponse =
@@ -58,10 +50,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   const path = typeof body.path === "string" ? body.path.trim() : "";
   if (!path) return json({ ok: false, error: t("migrateErrors.chooseDatabase") }, 400);
 
-  // Re-derived here rather than trusted: the checkboxes close over each group's dependencies as
-  // they are ticked, but this arrives as a list of strings and could have been sent without them.
-  // Doing it again is what stops a proxy host being imported apart from the access list that was
-  // protecting it.
+  // Re-derived, not trusted: the checkboxes close over dependencies but a posted list need not,
+  // and this stops a proxy host being imported without the access list protecting it.
   const groups = parseMigrationSelection(
     Array.isArray(body.groups) ? body.groups.filter((g): g is string => typeof g === "string") : [],
   );
@@ -69,28 +59,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     return json({ ok: false, error: t("migrateErrors.chooseGroups") }, 400);
   }
 
-  // Matched against the scan rather than used, and this is the whole guard.
-  //
-  // The posted value names a file to open on the host, and this endpoint is unauthenticated by
-  // necessity - nothing can sign in to a deployment that has not been set up yet. Inspecting the
-  // posted path, which is what this did before, proves the file is a database of ours; it does not
-  // prove it is one this host offered. Anything else on the filesystem was still reachable: an
-  // existence check, a size, an error message naming why a file would not open - and, for a real
-  // SQLite file with the right tables, an import of accounts an attacker had written themselves.
-  //
-  // So the browser chooses among what the scan enumerated, and the path that reaches the importer
-  // is the scan's, never the request's. The candidates come from LEGACY_SQLITE_PATH or from
-  // reading the known directories, and each was inspected on the way out.
+  // The whole guard: the importer gets the scan's path, never the request's. Merely inspecting a
+  // posted path left the filesystem open to existence checks and to importing a planted database.
   const chosen = scanForLegacyDatabases().candidates.find((candidate) => candidate.path === path);
   if (!chosen) {
     return json({ ok: false, error: t("migrateErrors.unknownDatabase") }, 400);
   }
 
-  // The old database's secrets, and whether this deployment's SESSION_SECRET reads them.
-  //
-  // Checked here rather than left to the importer to discover, so a missing or mistyped key is a
-  // 400 that names the problem before any row is written. The key itself is used and dropped: what
-  // is stored is the re-encrypted ciphertext, under this deployment's own key.
+  // Checked up front so a missing or mistyped key is a 400 before any row is written. The key is
+  // used and dropped; only re-encrypted ciphertext is stored.
   const legacyKey = typeof body.legacyKey === "string" ? body.legacyKey.trim() : "";
   const probe = probeLegacySecrets(chosen.path);
   if (probe.hasEncryptedValues && !probe.readableWithCurrentKey) {

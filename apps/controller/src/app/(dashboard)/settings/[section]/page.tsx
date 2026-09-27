@@ -1,4 +1,5 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { redactHttpCacheSettings } from "@/src/lib/http-cache";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
 import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
@@ -16,6 +17,10 @@ import {
   getGeoBlockSettings,
   getErrorPagesSettings,
   getTrustedProxiesSettings,
+  getHttpProtocolsSettings,
+  getGlobalCaddyConfigSettings,
+  getHttpCacheSettings,
+  getTwoFactorPolicySettings,
   getDefaultResponseSettings,
   getAvatarSettings,
   getPasswordPolicySettings,
@@ -61,10 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("settings") };
 }
 
-/**
- * One settings section. The client keeps its own active-section state for instant switching, so
- * this route only decides which section a fresh load or a deep link opens on.
- */
+/** The client switches sections itself; this only picks where a fresh load or deep link opens. */
 export default async function SettingsSectionPage({
   params,
 }: {
@@ -73,26 +75,21 @@ export default async function SettingsSectionPage({
   const session = await requireAdmin();
   const { section } = await params;
 
-  // `/settings/authentik` and the rest were pages of their own until these were merged. They are
-  // links in the docs and in whatever an operator bookmarked, so they land on the block itself
-  // rather than on the overview.
+  // Formerly separate pages, still linked and bookmarked, so they land on the block itself.
   const legacy = LEGACY_SECTION_PAGES.get(section);
   if (legacy) redirect(`/settings/${legacy.page}#${legacy.anchor}`);
 
   const userId = Number(session.user.id);
 
-  // Every read below resolves against this operator's staged set, so a form shows what they have
-  // pending rather than what is stored. Without it a staged edit looks like it was discarded the
-  // moment the page reloaded.
+  // Reads resolve against the staged set, or a reload makes a staged edit look discarded.
   const overlay = await stagedOverlay(userId);
-  // The root translator, for the stored update-check and GeoIP failures this page shows.
+  // For the stored update-check and GeoIP failures.
   const tRoot = await getTranslations();
   // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
   const registry = await registryFields(tRoot);
 
-  // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
-  // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the
-  // overlay. getAllAgentStatuses reports per agent and never throws.
+  // Not settings, so deliberately outside the staged scope; being AsyncLocalStorage, a sibling
+  // promise cannot see it. getAllAgentStatuses never throws.
   const [
     [
       general,
@@ -107,6 +104,10 @@ export default async function SettingsSectionPage({
       globalGeoBlock,
       globalErrorPages,
       trustedProxies,
+      httpProtocols,
+      globalCaddyConfig,
+      httpCache,
+      twoFactorPolicy,
       defaultResponse,
       oauthProviders,
       primaryProviderId,
@@ -143,6 +144,10 @@ export default async function SettingsSectionPage({
         getGeoBlockSettings(),
         getErrorPagesSettings(),
         getTrustedProxiesSettings(),
+        getHttpProtocolsSettings(),
+        getGlobalCaddyConfigSettings(),
+        getHttpCacheSettings(),
+        getTwoFactorPolicySettings(),
         getDefaultResponseSettings(),
         listOAuthProviders(),
         getPrimaryProviderId(),
@@ -169,8 +174,7 @@ export default async function SettingsSectionPage({
   ]);
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
 
-  // The dashboard host's proxy options need the pickers the host form does. Only loaded on that
-  // section: the section is route-derived, and every other section would pay for lists it never shows.
+  // Only on the dashboard section, so other sections don't pay for the host form's pickers.
   let dashboardOptions: DashboardHostOptionsData | null = null;
   if (section === "dashboard") {
     const [
@@ -227,6 +231,10 @@ export default async function SettingsSectionPage({
       dns={dns}
       upstreamDnsResolution={upstreamDnsResolution}
       trustedProxies={trustedProxies}
+      httpProtocols={httpProtocols}
+      globalCaddyConfig={globalCaddyConfig}
+      httpCache={redactHttpCacheSettings(httpCache)}
+      twoFactorPolicy={twoFactorPolicy}
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}
@@ -254,17 +262,14 @@ export default async function SettingsSectionPage({
         name: agent.name,
         connected: connectedAgentIds.has(agent.id),
       }))}
-      // A Map does not survive the server/client boundary as one; the client reads it by id.
+      // A Map does not survive the server/client boundary.
       agentBuildSelections={Object.fromEntries(agentBuildSelections)}
-      // The auth key never leaves the server: the page ships only whether one is stored, so
-      // the form can say "leave blank to keep the current key" without shipping it.
+      // Only whether a key is stored, so the form can say "leave blank to keep".
       tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}
-      // Never null downstream: an unset blob means the feature has not been decided, which the
-      // form and the route builder both read as off with a domain to fill in.
+      // Never null: unset reads as off, with a domain to fill in.
       dashboard={dashboardSettings}
       dashboardOptions={dashboardOptions}
-      // Only whether one exists: the image itself is served by its own route, so shipping it in
-      // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
+      // The image has its own route; inlining it would be hundreds of KB of base64.
       hasFavicon={favicon !== null}
       updates={{
         ...updates,
@@ -273,13 +278,12 @@ export default async function SettingsSectionPage({
       registry={registry}
       analytics={analytics}
       geoip={geoip}
-      // Starting or stopping the optional containers needs an agent to run compose. Without one the
-      // settings still save and still gate the features; only the container management is missing.
+      // Container management needs an agent to run compose; the settings still save without one.
       canManageServices={agentStatuses.some((result) => result.ok)}
       baseUrl={publicBaseUrl}
       agents={{
         paired: pairedAgents,
-        // A failure this side worded, such as an agent that has not reported yet, carries a code.
+        // A failure worded here (e.g. an agent not reported yet) carries a code.
         statuses: agentStatuses.map((result) =>
           result.ok || !result.code
             ? result

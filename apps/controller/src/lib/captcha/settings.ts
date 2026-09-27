@@ -25,7 +25,7 @@ export const DEFAULT_CAPTCHA_SETTINGS: CaptchaSettings = {
   capInstanceUrl: "",
 };
 
-/** What the settings form is sent: the secret replaced by whether one is stored. */
+/** For the form: the secret replaced by whether one is stored. */
 export type CaptchaSettingsView = Omit<CaptchaSettings, "secretKey"> & { hasSecretKey: boolean };
 
 function normalize(value: unknown): CaptchaSettings {
@@ -58,10 +58,7 @@ export function captchaSettingsView(settings: CaptchaSettings): CaptchaSettingsV
   return { ...rest, hasSecretKey: secretKey.length > 0 };
 }
 
-/**
- * Whether sign-in is gated, and on what. Null when off, and also when half configured: a provider
- * with no secret could never verify anything, and gating on it would lock every local account out.
- */
+/** Null when off or half configured: gating on a provider with no secret locks everyone out. */
 export function activeCaptcha(settings: CaptchaSettings): CaptchaWidgetConfig | null {
   if (settings.provider === "none" || !settings.siteKey || !settings.secretKey) return null;
   if (settings.provider === "cap") {

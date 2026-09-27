@@ -12,8 +12,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -38,7 +37,6 @@ import * as schema from '../../src/lib/db/schema';
 const CPM_HEADERS = ['X-CPM-User', 'X-CPM-Email', 'X-CPM-Groups', 'X-CPM-User-Id'];
 const UPSTREAM = '10.0.0.5:8080';
 
-/** Recursively collect every `handle` array anywhere in the config document. */
 function collectHandleArrays(node: unknown, out: unknown[][] = []): unknown[][] {
   if (Array.isArray(node)) {
     for (const item of node) collectHandleArrays(item, out);
@@ -62,10 +60,8 @@ function isCpmStrip(h: unknown): boolean {
   if (handler?.handler !== 'headers') return false;
   const del = (handler.request as { delete?: string[] } | undefined)?.delete;
   if (!Array.isArray(del)) return false;
-  // Compared case-insensitively on purpose. What matters is that these headers
-  // are deleted; Caddy's delete goes through Go's canonicalising Header.Del, so
-  // the spelling in the config is free to change (and did, so the copy-back
-  // placeholder would resolve - see caddy-forward-auth-copy-headers.test.ts).
+  // Case-insensitive: Caddy's delete canonicalises through Go's Header.Del, so the spelling may
+  // change (it did - see caddy-forward-auth-copy-headers.test.ts).
   const lowered = del.map((name) => name.toLowerCase());
   return CPM_HEADERS.every((name) => lowered.includes(name.toLowerCase()));
 }
@@ -125,8 +121,7 @@ describe('CPM forward-auth inbound X-CPM-* header stripping', () => {
     const doc = await buildCaddyDocument();
     const handleArrays = collectHandleArrays(doc);
 
-    // The excluded-path route proxies to the upstream WITHOUT a forward-auth
-    // subrequest. It must still carry the strip handler.
+    // No forward-auth subrequest here, yet it must still strip.
     const excludedRoute = handleArrays.find(
       (arr) =>
         arr.some(isUpstreamProxy) &&

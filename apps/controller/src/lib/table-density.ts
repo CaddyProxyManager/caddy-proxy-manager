@@ -1,10 +1,6 @@
 /**
- * How tightly tables are set - a per-user choice, made on Profile.
- *
- * Astryx's own three densities: they change a row's padding, never its text, so every density
- * keeps the 14px values astryx-variants.css sets. Balanced is Astryx's default and what a user who
- * never chose gets. Kept free of server imports: the Profile control and the provider read the list
- * too.
+ * Per-user table density, set on Profile. Astryx's densities change padding, never text, so each
+ * keeps astryx-variants.css's 14px. No server imports: the Profile control and provider read it.
  */
 export const TABLE_DENSITIES = ["compact", "balanced", "spacious"] as const;
 

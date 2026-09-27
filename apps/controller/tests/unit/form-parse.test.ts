@@ -1,7 +1,3 @@
-/**
- * Unit tests for src/lib/form-parse.ts
- * Tests all pure FormData parsing helpers.
- */
 import { describe, it, expect } from 'bun:test';
 import {
   parseCsv,
@@ -13,9 +9,7 @@ import {
   parseOptionalNumber,
 } from '@/src/lib/form-parse';
 
-// ---------------------------------------------------------------------------
 // parseCsv
-// ---------------------------------------------------------------------------
 
 describe('parseCsv', () => {
   it('splits by comma', () => {
@@ -51,9 +45,7 @@ describe('parseCsv', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseUpstreams
-// ---------------------------------------------------------------------------
 
 describe('parseUpstreams', () => {
   it('splits by newline', () => {
@@ -85,9 +77,7 @@ describe('parseUpstreams', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseCheckbox
-// ---------------------------------------------------------------------------
 
 describe('parseCheckbox', () => {
   it('"on" → true', () => {
@@ -127,9 +117,7 @@ describe('parseCheckbox', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseOptionalText
-// ---------------------------------------------------------------------------
 
 describe('parseOptionalText', () => {
   it('returns trimmed string for non-empty input', () => {
@@ -153,9 +141,7 @@ describe('parseOptionalText', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseCertificateId
-// ---------------------------------------------------------------------------
 
 describe('parseCertificateId', () => {
   it('parses a valid positive integer', () => {
@@ -211,9 +197,7 @@ describe('parseCertificateId', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseAccessListId - identical rules to parseCertificateId
-// ---------------------------------------------------------------------------
 
 describe('parseAccessListId', () => {
   it('parses a valid positive integer', () => {
@@ -237,9 +221,7 @@ describe('parseAccessListId', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // parseOptionalNumber
-// ---------------------------------------------------------------------------
 
 describe('parseOptionalNumber', () => {
   it('parses integer', () => {

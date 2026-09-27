@@ -1,14 +1,7 @@
 /**
- * The agent's side of the wire: everything it says to its controller, and the one stream it listens
- * on.
- *
- * The agent dials, always. That is the whole point of the inversion - a host behind NAT needs no
- * inbound port and the controller needs no address for it - and it is why this file exists at all,
- * where the same traffic used to arrive as inbound requests to `server.ts`.
- *
- * Requests are signed with the same HMAC primitive the controller used to sign its own, over the
- * same canonical string. The secret never travels with a request, so it cannot be lifted from a
- * proxy log between the agent and its controller.
+ * Everything the agent says to its controller, and the one stream it listens on. The agent always
+ * dials, so a host behind NAT needs no inbound port. Requests are HMAC-signed and the secret never
+ * travels, so it cannot be lifted from a proxy log.
  */
 
 import { createHmac, randomBytes } from "node:crypto";
@@ -31,21 +24,15 @@ import {
   type AgentPairPreviewResponse,
 } from "@cpm/shared";
 
-/** Pairing crosses a network an operator just typed an address for, so it fails fast on a typo. */
+/** Pairing targets an address an operator just typed, so fail fast on a typo. */
 const PAIR_TIMEOUT_MS = 15_000;
 
-/** Status and command results are small; neither should wait on a stalled connection for long. */
 const POST_TIMEOUT_MS = 15_000;
 
-/** A relayed batch can be megabytes, and the controller writes it to ClickHouse before answering. */
+/** A relayed batch can be megabytes, written to ClickHouse before the controller answers. */
 const ANALYTICS_TIMEOUT_MS = 60_000;
 
-/**
- * Hex SHA-256 of a request body - of the empty string when there is none.
- *
- * Part of the signature base, so the signature covers the body without the signer having to buffer
- * it twice. Lived in `auth.ts` until the agent stopped verifying anything and only signs.
- */
+/** Hex SHA-256 of a request body (of "" when there is none), for the signature base. */
 async function sha256Hex(body: string): Promise<string> {
   const hasher = new Bun.CryptoHasher("sha256");
   hasher.update(body);
@@ -60,11 +47,8 @@ export class ControllerUnreachable extends Error {
 }
 
 /**
- * The controller answered, and said no.
- *
- * Separate from `ControllerUnreachable` because the two mean opposite things to the caller: a
- * refused call with 401 invalidates the stored secret, while an unreachable controller is a network
- * blip the agent should keep retrying through without discarding anything.
+ * The controller answered no. Distinct from `ControllerUnreachable`: a 401 invalidates the stored
+ * secret, while an unreachable controller is a blip to retry through.
  */
 export class ControllerRejected extends Error {
   constructor(
@@ -81,13 +65,13 @@ function describe(cause: unknown): string {
   return String(cause);
 }
 
-/** The error body the controller sends, when it sends one. A plain 500 has no JSON at all. */
+/** A plain 500 has no JSON at all. */
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const body = (await response.json()) as { error?: unknown };
     if (typeof body.error === "string" && body.error.length > 0) return body.error;
   } catch {
-    // Not JSON. The status line is all there is to report.
+    // Not JSON; the status line is all there is.
   }
   return fallback;
 }
@@ -102,12 +86,7 @@ export class ControllerClient {
     return this.url;
   }
 
-  /**
-   * Who this code would pair with, without spending it. Unsigned, like `pair`.
-   *
-   * Null when the controller has no preview route - one older than this agent. The caller still
-   * asks the operator, just without a name to show.
-   */
+  /** Who a code would pair with, without spending it. Null if the controller predates the route. */
   async previewPair(request: AgentPairPreviewRequest): Promise<AgentPairPreviewResponse | null> {
     const response = await this.send(
       CONTROLLER_AGENT_ROUTES.pairPreview,
@@ -129,12 +108,7 @@ export class ControllerClient {
     return (await response.json()) as AgentPairPreviewResponse;
   }
 
-  /**
-   * Exchange a one-time code for the shared secret.
-   *
-   * Unsigned, and the only unsigned call the agent makes: there is nothing to sign with yet. The
-   * code is what stands in for the secret, which is why it is short-lived and burned on use.
-   */
+  /** Exchange a one-time code for the secret - unsigned, as there is nothing to sign with yet. */
   async pair(request: AgentPairRequest): Promise<AgentPairResponse> {
     const response = await this.send(
       CONTROLLER_AGENT_ROUTES.pair,
@@ -156,12 +130,8 @@ export class ControllerClient {
   }
 
   /**
-   * Run one GraphQL operation and return its data, or throw what the controller said.
-   *
-   * GraphQL answers 200 with an `errors` array where REST answered a status code, so a caller that
-   * only checked `response.ok` would treat "that agent is not connected" as success. The status is
-   * still checked first - an unauthenticated request never reaches the resolver - and then the
-   * body.
+   * GraphQL refuses with 200 and an `errors` array, so checking `response.ok` alone would treat
+   * "that agent is not connected" as success; the status is checked first, then the body.
    */
   private async operation<T>(
     secret: string,
@@ -192,10 +162,8 @@ export class ControllerClient {
 
     const failure = payload?.errors?.[0];
     if (failure) {
-      // GraphQL answers 200 with an errors array where REST answered a status code, and the
-      // lifecycle upstream keys on that code: only a 401 means the controller has forgotten this
-      // agent, which is what stops it retrying a secret that will never be accepted again.
-      // Flattening every refusal to one code would leave an unpaired agent looping forever.
+      // Only a 401 stops the lifecycle retrying a secret that will never be accepted again;
+      // flattening every refusal to one code would leave an unpaired agent looping forever.
       throw new ControllerRejected(statusForError(failure), failure.message ?? "Request refused.");
     }
     if (!payload?.data) {
@@ -204,24 +172,16 @@ export class ControllerClient {
     return payload.data;
   }
 
-  /** Report what this agent currently has applied. */
   async postStatus(secret: string, status: AgentStatus): Promise<void> {
     await this.operation(secret, AGENT_OPERATIONS.status, { status });
   }
 
-  /**
-   * Hand back the results of commands the subscription issued.
-   *
-   * Its own request rather than a message on the subscription, because a subscription only runs
-   * one way: SSE has no client-to-server channel, which is exactly the trade that keeps this side
-   * of the conversation in ordinary mutations.
-   */
+  /** A request of its own because SSE has no client-to-server channel. */
   async postResults(secret: string, results: AgentCommandResult[]): Promise<void> {
     if (results.length === 0) return;
     await this.operation(secret, AGENT_OPERATIONS.commandResults, { results });
   }
 
-  /** Hand parsed log rows to the controller to write. Throws on a refusal, like every mutation. */
   async postAnalytics(
     secret: string,
     kind: AgentAnalyticsKind,
@@ -237,11 +197,8 @@ export class ControllerClient {
   }
 
   /**
-   * Open the event subscription and yield events until it ends or `signal` aborts.
-   *
-   * No overall timeout: this request is meant to stay open for as long as the agent runs. Liveness
-   * is the protocol's `ping` event instead - a subscription that has said nothing at all is the one
-   * case a timeout could not tell apart from a healthy idle fleet.
+   * No overall timeout: the stream stays open as long as the agent runs, and the protocol's `ping`
+   * event is the liveness check a timeout could not tell apart from an idle fleet.
    */
   async *events(secret: string, signal: AbortSignal): AsyncGenerator<AgentServerEvent> {
     const response = await this.send(
@@ -272,8 +229,7 @@ export class ControllerClient {
         if (done) return;
         buffer += value;
 
-        // Frames are separated by a blank line. A partial frame stays in the buffer until the rest
-        // of it arrives, which for a config push large enough to span TCP segments is the norm.
+        // A config push large enough to span TCP segments routinely leaves a partial frame here.
         let split = buffer.indexOf("\n\n");
         while (split !== -1) {
           const frame = buffer.slice(0, split);
@@ -291,12 +247,8 @@ export class ControllerClient {
   }
 
   /**
-   * Sign and send. `secret` null means an unsigned call, which only pairing is.
-   *
-   * The signature covers method, path, timestamp, a nonce and a hash of the body - the same base
-   * string the controller verifies - so a captured request cannot be replayed against a different
-   * endpoint, the controller refuses its nonce a second time, and it goes stale within
-   * `AGENT_CLOCK_SKEW_MS` regardless.
+   * `secret` null means unsigned (pairing only). The signature covers method, path, timestamp,
+   * nonce and body hash, so a captured request cannot be replayed elsewhere, twice, or late.
    */
   private async send(
     path: string,
@@ -339,17 +291,8 @@ export class ControllerClient {
 type GraphQLErrorShape = { message?: string; extensions?: { code?: unknown } };
 
 /**
- * The status code a GraphQL error stands for.
- *
- * The controller tags its refusals with `extensions.code`, and this is where those become the
- * codes the rest of the agent already reasons about. 401 is the one that matters: the lifecycle
- * treats it as "the controller has forgotten this agent" and drops to idle, where every other code
- * means retry. Getting this wrong in either direction is bad - a mapped-down 401 loops forever
- * against a secret that will never work, and a mapped-up anything-else throws away a pairing over
- * a transient fault.
- *
- * An untagged error is a fault the controller did not anticipate, which is a retry rather than a
- * reason to unpair.
+ * Maps `extensions.code` to HTTP-ish codes. 401 drops the agent to idle and anything else retries,
+ * so a missed 401 loops forever and a false one discards a pairing. Untagged errors retry.
  */
 function statusForError(error: GraphQLErrorShape): number {
   switch (error.extensions?.code) {
@@ -364,12 +307,7 @@ function statusForError(error: GraphQLErrorShape): number {
   }
 }
 
-/**
- * One SSE frame to an event, or null for anything that carries no payload.
- *
- * Keepalives are comment lines (`:`), which is the whole reason they are cheap: they hold the
- * connection open through a proxy's idle timeout without the agent having to interpret them.
- */
+/** Null for frames with no payload, like the `:` keepalives that outlast proxy idle timeouts. */
 function parseFrame(frame: string): AgentServerEvent | null {
   const data = frame
     .split("\n")
@@ -382,20 +320,15 @@ function parseFrame(frame: string): AgentServerEvent | null {
   try {
     payload = JSON.parse(data);
   } catch {
-    // A frame the controller wrote badly must not take the subscription down; the next one may
-    // be fine.
+    // A badly written frame must not take the subscription down; the next one may be fine.
     return null;
   }
 
-  // A subscription delivers execution results, so each frame is `{"data":{"agentEvents":…}}`
-  // rather than the event itself. An `errors` frame is a resolver that failed mid-stream: nothing
-  // to act on, and the subscription carries on - the controller closes it if it is really over.
+  // An `errors` frame is a resolver failing mid-stream: nothing to act on, and the controller
+  // closes the subscription if it is really over.
   if (payload.errors?.length) {
     const failure = payload.errors[0] ?? {};
-    // A refusal can arrive inside a frame rather than as a status, and it means the same thing:
-    // if the controller has forgotten this agent, sitting in the read loop would retry a secret
-    // that will never be accepted. Thrown so the lifecycle sees it, exactly as it would from a
-    // mutation.
+    // Thrown so the lifecycle sees a forgotten agent here too, instead of retrying a dead secret.
     if (statusForError(failure) === 401) {
       throw new ControllerRejected(401, failure.message ?? "The controller refused the stream.");
     }

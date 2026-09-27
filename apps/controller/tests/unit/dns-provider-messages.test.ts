@@ -1,9 +1,6 @@
 /**
- * The DNS Providers screen renders provider descriptions and credential field text from the
- * catalog, keyed by provider name and field key at runtime - which TypeScript cannot check against
- * the catalog. These do it instead: a provider or field added to the registry without a message
- * fails here, and the English entries must render exactly what the registry says, because the
- * registry's copy is still what the API and the Caddy config are built from.
+ * Provider and field text is keyed at runtime, so TypeScript cannot check the catalog covers it.
+ * The English entries must match the registry exactly: its copy still feeds the API and Caddy.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';

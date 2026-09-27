@@ -1,12 +1,9 @@
 "use client";
 
-/**
- * The module picker. Save records the selection; Rebuild recompiles Caddy and restarts the proxy -
- * hence two separately-confirmed buttons.
- */
+/** Save only records; Rebuild restarts the proxy, hence two separately-confirmed buttons. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Hammer, Plus, Trash2 } from "lucide-react";
+import { Hammer, PackageCheck, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -33,6 +30,7 @@ import {
 } from "@/src/lib/caddy-modules";
 import { caddyModuleDescription, caddyModuleName } from "@/src/lib/caddy-module-messages";
 import { extractErrorMessage } from "@/src/lib/actions";
+import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy-image-build";
 
 type BuildStatus = {
   state: "idle" | "pending" | "building" | "applied" | "failed";
@@ -49,7 +47,16 @@ type BuildDiff = {
   needsRebuild: boolean;
 };
 
-type BuildResponse = { diff: BuildDiff; status: BuildStatus };
+/** An agent that loads an operator-built image; see `caddyBuildAgents`. */
+type ExternalAgent = { name: string; image: string | null; puid: string; pgid: string };
+
+type BuildResponse = {
+  diff: BuildDiff;
+  status: BuildStatus;
+  /** Targeted agents that build their own image. */
+  builders: number;
+  external: ExternalAgent[];
+};
 
 type CustomModuleRow = CaddyCustomModule & { uid: string };
 
@@ -58,14 +65,15 @@ const nextRowId = () => `custom-${++rowIdCounter}`;
 
 const CATEGORY_LABEL_KEYS: Record<
   CaddyModuleCategory,
-  "categoryProxy" | "categorySecurity" | "categoryDns"
+  "categoryProxy" | "categoryCache" | "categorySecurity" | "categoryDns"
 > = {
   proxy: "categoryProxy",
+  cache: "categoryCache",
   security: "categorySecurity",
   dns: "categoryDns",
 };
 
-const CATEGORY_ORDER: CaddyModuleCategory[] = ["proxy", "security", "dns"];
+const CATEGORY_ORDER: CaddyModuleCategory[] = ["proxy", "cache", "security", "dns"];
 
 function groupModules(): [CaddyModuleCategory, CaddyModuleDefinition[]][] {
   return CATEGORY_ORDER.map((category) => [
@@ -74,15 +82,14 @@ function groupModules(): [CaddyModuleCategory, CaddyModuleDefinition[]][] {
   ]);
 }
 
-/** The fleet default, as a target id. Zero is not a valid `agents.id`, so it cannot collide. */
+/** Zero is never an `agents.id`, so it cannot collide. */
 const FLEET = 0;
 
 function resolveModuleMap(overrides: Record<string, boolean>): Record<string, boolean> {
   const resolved: Record<string, boolean> = {};
   for (const module of CADDY_MODULES) {
-    // A module missing from the map counts as enabled, so one added to the catalog after the
-    // operator last saved appears on rather than silently off.
-    resolved[module.id] = overrides[module.id] !== false;
+    // Missing means its default: on, so a module added since the last save is on, unless opt-in.
+    resolved[module.id] = overrides[module.id] ?? module.defaultEnabled !== false;
   }
   return resolved;
 }
@@ -93,15 +100,10 @@ export function CaddyBuildFields({
   agents = [],
   agentSelections = {},
 }: {
-  /** Stored overrides. A module missing from the map counts as enabled. */
   initialModules: Record<string, boolean>;
   initialCustomModules: CaddyCustomModule[];
-  /** Every paired agent, so one can be configured separately from the fleet. */
   agents?: { id: number; name: string; connected: boolean }[];
-  /**
-   * Each agent's own selection, keyed by row id. An agent absent from here - or mapped to null -
-   * follows the fleet default, which is the state every agent starts in.
-   */
+  /** Keyed by row id; absent or null follows the fleet default. */
   agentSelections?: Record<
     number,
     { modules: Record<string, boolean>; customModules: CaddyCustomModule[] } | null
@@ -111,21 +113,17 @@ export function CaddyBuildFields({
   // Custom module problems are domain error codes, which live at the catalog root.
   const tRoot = useTranslations();
   const [target, setTarget] = useState<number>(FLEET);
-  // Whether the selected agent tracks the fleet rather than carrying a selection of its own.
-  // Saving with this on clears the agent's row instead of writing a frozen copy of today's fleet.
+  // Saving with this on clears the agent's row rather than freezing a copy of today's fleet.
   const [follows, setFollows] = useState(false);
   const [modules, setModules] = useState<Record<string, boolean>>(() =>
     resolveModuleMap(initialModules),
   );
-  // Rows carry a client-only id because they have no server identity until saved, and reordering
-  // or deleting by array index makes React recycle inputs into the wrong row mid-edit.
+  // A client-only key: by index, React recycles inputs into the wrong row after a delete.
   const [customModules, setCustomModules] = useState<CustomModuleRow[]>(() =>
     initialCustomModules.map((entry) => ({ ...entry, uid: nextRowId() })),
   );
 
-  // Switching target reloads the editor from that target's stored selection. An agent with none
-  // starts from the fleet's, which is what it is actually running - so turning the switch off
-  // gives an accurate starting point rather than an empty form.
+  // An agent with no selection starts from the fleet's, which is what it actually runs.
   const selectTarget = (next: number) => {
     setTarget(next);
     const own = next === FLEET ? null : (agentSelections[next] ?? null);
@@ -140,7 +138,7 @@ export function CaddyBuildFields({
   };
   const [build, setBuild] = useState<BuildResponse | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
-  // Errors from the trigger request itself, which never reach the status file.
+  // The trigger request's own errors, which never reach the status file.
   const [rebuildError, setRebuildError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -150,7 +148,7 @@ export function CaddyBuildFields({
       );
       if (res.ok) setBuild(await res.json());
     } catch {
-      // A failed poll is not worth interrupting the page for; the next tick retries.
+      // The next tick retries.
     }
   }, [target]);
 
@@ -158,8 +156,7 @@ export function CaddyBuildFields({
     void fetchStatus();
   }, [fetchStatus]);
 
-  // Poll only while the agent is working. A build takes minutes, so a slower interval than the
-  // L4 banner's keeps the request count sane.
+  // Slower than the L4 banner's poll: a build takes minutes.
   const inFlight = build?.status.state === "pending" || build?.status.state === "building";
   useEffect(() => {
     if (!inFlight) return;
@@ -173,8 +170,7 @@ export function CaddyBuildFields({
     [modules, customModules],
   );
 
-  // Previewed from the same field list the server builds from, so what is shown is what the
-  // rebuild will actually pass to xcaddy.
+  // The same list the server builds from, so this is what xcaddy will get.
   const previewSpecs = useMemo(() => {
     const builtIn = CADDY_MODULES.filter((m) => modules[m.id]).map((m) => m.modulePath);
     const custom = customModules
@@ -183,31 +179,31 @@ export function CaddyBuildFields({
     return Array.from(new Set([...builtIn, ...custom])).sort();
   }, [modules, customModules]);
 
-  const dockerfilePreview = useMemo(
+  // The first external agent's image and ids; a fleet of them usually shares one build.
+  const externalAgent = build?.external[0] ?? null;
+  const externalOnly = Boolean(externalAgent) && build?.builders === 0;
+  const buildCommand = useMemo(
     () =>
-      [
-        "# The build argument the rebuild passes to docker/caddy/Dockerfile.",
-        "# Copy this into your own build if you would rather not use the agent:",
-        '#   docker compose build --build-arg CADDY_MODULES="..." caddy',
-        "",
-        "xcaddy build controller \\",
-        ...previewSpecs.map((spec) => `  --with ${spec} \\`),
-        "  --output /usr/bin/caddy",
-      ].join("\n"),
-    [previewSpecs],
+      caddyImageBuildCommand({
+        modules: previewSpecs,
+        image: externalAgent?.image ?? null,
+        puid: externalAgent?.puid ?? "",
+        pgid: externalAgent?.pgid ?? "",
+      }),
+    [previewSpecs, externalAgent],
   );
 
+  // External mode's rebuild is loading the image the operator built; same errors, same poll.
   const handleRebuild = async () => {
     setRebuilding(true);
     setRebuildError(null);
+    const path = externalOnly ? "/api/caddy-build/image" : "/api/caddy-build";
     try {
-      const res = await fetch(
-        target === FLEET ? "/api/caddy-build" : `/api/caddy-build?agent=${target}`,
-        { method: "POST" },
-      );
+      const res = await fetch(target === FLEET ? path : `${path}?agent=${target}`, {
+        method: "POST",
+      });
       if (!res.ok) {
-        // Not left to the status poll: these failures abort before the agent writes any status,
-        // and the poll only runs while it says pending/building - the spinner would just stop.
+        // These abort before the agent writes a status, so the poll would never see them.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setRebuildError(body?.error ?? t("rebuildCouldNotStartHttp", { status: res.status }));
         return;
@@ -276,7 +272,18 @@ export function CaddyBuildFields({
         rebuilding={rebuilding}
         onRebuild={handleRebuild}
         inFlight={Boolean(inFlight)}
+        external={externalOnly}
       />
+
+      {build && build.external.length > 0 && build.builders > 0 && (
+        <Banner
+          status="info"
+          title={t("externalAgentsTitle")}
+          description={t("externalAgentsNote", {
+            names: build.external.map((agent) => agent.name).join(", "),
+          })}
+        />
+      )}
 
       <Banner
         status="info"
@@ -296,7 +303,7 @@ export function CaddyBuildFields({
               <ModuleToggle
                 key={module.id}
                 module={module}
-                value={modules[module.id] ?? true}
+                value={modules[module.id] ?? module.defaultEnabled !== false}
                 onChange={(next) => setModules((prev) => ({ ...prev, [module.id]: next }))}
               />
             ))}
@@ -372,15 +379,21 @@ export function CaddyBuildFields({
 
       <CodeEditor
         label={t("buildCommandPreview")}
-        language="dockerfile"
-        value={dockerfilePreview}
+        language="plaintext"
+        value={buildCommand}
         isReadOnly
         height="md"
-        description={t("modulesSelected", { count: enabledCount })}
+        description={
+          externalAgent
+            ? t("buildCommandHelpExternal", {
+                count: enabledCount,
+                image: caddyImageTag(externalAgent.image),
+              })
+            : t("buildCommandHelpAgent", { count: enabledCount })
+        }
       />
 
-      {/* Every control above is React state, so the values reach the server
-          action through these hidden inputs rather than through the DOM. */}
+      {/* The controls above are React state; these carry it to the server action. */}
       {CADDY_MODULES.map((module) => (
         <input
           key={module.id}
@@ -430,11 +443,14 @@ function RebuildBanner({
   rebuilding,
   onRebuild,
   inFlight,
+  external,
 }: {
   build: BuildResponse | null;
   rebuilding: boolean;
   onRebuild: () => void;
   inFlight: boolean;
+  /** Every targeted agent loads an operator-built image, so the action is a load. */
+  external: boolean;
 }) {
   const t = useTranslations("caddyModules");
   if (!build) return null;
@@ -458,10 +474,10 @@ function RebuildBanner({
       icon={inFlight ? <Spinner size="sm" /> : undefined}
       title={
         inFlight
-          ? (status.message ?? t("rebuildingCaddy"))
+          ? (status.message ?? t(external ? "loadingImage" : "rebuildingCaddy"))
           : status.state === "failed"
-            ? t("lastRebuildFailed")
-            : t("rebuildRequired")
+            ? t(external ? "lastLoadFailed" : "lastRebuildFailed")
+            : t(external ? "imageRequired" : "rebuildRequired")
       }
       description={
         <VStack gap={2}>
@@ -492,7 +508,7 @@ function RebuildBanner({
           )}
           {!inFlight && (
             <Text type="body" size="xsm" color="secondary">
-              {t("rebuildDescription")}
+              {t(external ? "externalRebuildDescription" : "rebuildDescription")}
             </Text>
           )}
         </VStack>
@@ -501,8 +517,8 @@ function RebuildBanner({
         <Button
           variant="secondary"
           size="sm"
-          icon={<Hammer />}
-          label={t("rebuildCaddy")}
+          icon={external ? <PackageCheck /> : <Hammer />}
+          label={t(external ? "loadImage" : "rebuildCaddy")}
           isLoading={rebuilding}
           isDisabled={rebuilding || inFlight}
           onClick={onRebuild}

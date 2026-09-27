@@ -1,8 +1,6 @@
 /**
- * The CAPTCHA services the sign-in screen can put in front of the password step.
- *
- * Client-safe: the login form, the CSP builder and the settings form all read this, so nothing
- * here may reach the database or a secret.
+ * CAPTCHA services for the sign-in screen. Client-safe: the login form, CSP builder and settings
+ * form read this, so nothing here may reach the database or a secret.
  */
 
 export const CAPTCHA_PROVIDERS = ["recaptcha", "hcaptcha", "turnstile", "cap"] as const;
@@ -21,18 +19,15 @@ export type CaptchaWidgetConfig = {
   capApiEndpoint?: string;
 };
 
-/**
- * Pinned rather than `@latest`: the widget runs on the sign-in page, and an unreviewed release of
- * it would too.
- */
+/** Pinned, not `@latest`: an unreviewed release would run on the sign-in page. */
 export const CAP_WIDGET_VERSION = "0.1.58";
 
-/** Cap Standalone serves each site key under its own path; the widget and siteverify both hang off it. */
+/** Cap Standalone serves each site key under its own path, widget and siteverify alike. */
 export function capSiteUrl(instanceUrl: string, siteKey: string): string {
   return `${instanceUrl.replace(/\/+$/, "")}/${encodeURIComponent(siteKey)}/`;
 }
 
-/** The script that defines the widget. Explicit rendering, so React decides when it mounts. */
+/** Explicit rendering, so React decides when the widget mounts. */
 export function captchaScriptUrl(provider: CaptchaProvider, locale?: string): string {
   const hl = locale ? `&hl=${encodeURIComponent(locale)}` : "";
   switch (provider) {
@@ -79,7 +74,7 @@ export function captchaCspSources(config: CaptchaWidgetConfig): CspSources {
         style: [],
       };
     case "cap": {
-      // The widget solves its proof of work in WebAssembly, fetched from jsDelivr like the widget.
+      // Its proof of work runs in WebAssembly, fetched from jsDelivr like the widget.
       const instance = originOf(config.capApiEndpoint);
       return {
         script: ["https://cdn.jsdelivr.net", "'wasm-unsafe-eval'"],

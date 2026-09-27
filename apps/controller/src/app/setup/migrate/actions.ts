@@ -6,12 +6,8 @@ import { domainError } from "@/src/lib/domain-error";
 import { withTranslatedErrors } from "@/src/lib/translated-action";
 
 /**
- * Declining the offer, which is the only half of this screen that is still a server action.
- *
- * Running the import is a route handler instead - see app/api/setup/migrate/route.ts. A server
- * action re-renders the page it was called from, and once the import has changed what
- * `getSetupState` answers this page redirects, which is precisely what the restart step needs not
- * to happen. Declining has no such problem: the redirect it performs is the point.
+ * The import is a route handler (app/api/setup/migrate/route.ts): an action's re-render would
+ * redirect away before the restart step. Declining wants that redirect.
  */
 async function skipMigrationUntranslated(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {

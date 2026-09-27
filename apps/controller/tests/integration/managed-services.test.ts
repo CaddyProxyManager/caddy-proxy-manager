@@ -1,9 +1,6 @@
 /**
- * Which agents are asked to run the controller's ClickHouse, and sent the password that starts it.
- *
- * ClickHouse lives with the controller and every agent relays its events there, so only the agent
- * in the controller's own stack has any use for the container. Every other agent used to start one
- * nothing read, holding the password to do it.
+ * Which agents are asked to run the controller's ClickHouse, and sent its password. Every agent
+ * relays events to the controller, so only the one in the controller's own stack needs it.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

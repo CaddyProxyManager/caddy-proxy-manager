@@ -1,9 +1,6 @@
 /**
- * Email self-registration through Better Auth, against a real PostgreSQL database.
- *
- * The e2e suite covers this at :3001 and was the only thing that did, so a failure took a full
- * stack build to see and produced nothing but a 422 - Better Auth reports an adapter error and the
- * underlying database message never reaches the response. Booting the same code here surfaces it.
+ * Email self-registration against a real database. In e2e a failure is a bare 422 - Better Auth
+ * hides the database message - so this boots the same code where it surfaces.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createTestDatabase } from '@/tests/helpers/db';
@@ -18,11 +15,7 @@ vi.mock('next-intl/server', () => nextIntlServerMock());
 
 const cleanups: Array<() => void | Promise<void>> = [];
 
-/**
- * The status as a string, or `status: body` when it is not 200. Bun's `expect` takes no message
- * argument, so carrying the body into the compared value is what puts Better Auth's reason in the
- * failure output instead of a bare number.
- */
+/** Carries the body into the compared value, since Bun's `expect` takes no message argument. */
 async function statusAndBody(response: Response): Promise<string> {
   if (response.status === 200) return '200';
   return `${response.status}: ${await response.text()}`;
@@ -45,26 +38,21 @@ afterEach(async () => {
 });
 
 /**
- * Boot the app against a fresh database with credential signup open, as :3001 runs in e2e.
- *
- * `seedAdmin` runs the bootstrap that instrumentation.ts performs at server startup. It is what
- * separates this from a bare empty schema, and the reason the e2e failure did not reproduce here
- * until it was added: the admin is inserted with an explicit id.
+ * As :3001 runs in e2e. `seedAdmin` runs instrumentation.ts's bootstrap, whose explicit-id admin
+ * insert is what the e2e failure needed to reproduce.
  */
 async function bootWithSelfRegistration({ seedAdmin = false } = {}) {
   const database = await createTestDatabase();
   cleanups.push(() => database.drop());
 
   process.env.DATABASE_URL = database.url;
-  // The admin bootstrap and the other startup migrations have to run: this asserts on what a real
-  // deployment does on its first request, not on an empty schema.
+  // The startup migrations must run: this asserts a real first request, not an empty schema.
   delete process.env.CPM_EPHEMERAL_DB;
   process.env.AUTH_ALLOW_SELF_REGISTRATION = 'true';
   process.env.AUTH_RATE_LIMIT_ENABLED = 'false';
   resetDbModuleState();
 
-  // config.ts snapshots the environment at module load, so it has to be re-evaluated after the
-  // variables above are set or auth-server reads a stale copy and signup stays disabled.
+  // config.ts snapshots env at load; a stale copy leaves signup disabled.
   const config = await import(`@/src/lib/config${fresh()}`);
   vi.mock('@/src/lib/config', () => ({ ...config }));
 
@@ -94,8 +82,7 @@ describe('email self-registration', () => {
       asResponse: true,
     });
 
-    // Read the body before asserting: it carries the adapter's complaint, and a bare status code
-    // is exactly what made the e2e failure opaque.
+    // The body carries the adapter's complaint.
     expect(await statusAndBody(response)).toBe('200');
 
     const users = await db.select().from(schema.users);
@@ -103,8 +90,7 @@ describe('email self-registration', () => {
     expect(created, 'signup should have created the user').toBeDefined();
     expect(created?.role).toBe('user');
     expect(created?.status).toBe('active');
-    // Better Auth writes this password itself, never through models/user, so the account hook is
-    // the only thing that can date it.
+    // Better Auth bypasses models/user here, so only the account hook can date it.
     expect(created?.passwordChangedAt).toBeTruthy();
 
     const accounts = await db.select().from(schema.accounts);
@@ -117,10 +103,8 @@ describe('email self-registration', () => {
   });
 
   it('creates a user alongside the bootstrap admin', async () => {
-    // The e2e case exactly: a deployment whose admin was seeded at startup, taking its first
-    // self-registration. PostgreSQL leaves the users sequence at 1 after that explicit-id insert,
-    // so without ensureAdminUser resyncing it this signup collides on the primary key and Better
-    // Auth answers 422.
+    // The explicit-id admin insert leaves the sequence at 1; without ensureAdminUser resyncing it
+    // this signup collides on the primary key and Better Auth answers 422.
     const { auth, db, schema } = await bootWithSelfRegistration({ seedAdmin: true });
     const email = `after-admin-${Date.now()}@test.invalid`;
 

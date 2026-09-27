@@ -3,10 +3,9 @@ import OverviewClient, {
 } from "@cpm/controller/src/app/(dashboard)/OverviewClient";
 import { DemoSurface } from "../DemoSurface";
 
-/** Twenty-four hours of buckets, shaped like a home server's day rather than a flat line. */
+/** Shaped like a home server's day rather than a flat line. */
 const TIMELINE: OverviewPayload["timeline"] = (() => {
   const start = Math.floor(Date.parse("2026-02-11T12:00:00.000Z") / 1000) - 24 * 3600;
-  // Requests per hour: quiet overnight, a morning ramp, a long evening plateau.
   const perHour = [
     980, 760, 610, 540, 520, 610, 1180, 2140, 3020, 3310, 3180, 3240, 3090, 2980, 3120, 3260, 3410,
     3980, 4620, 4910, 4780, 4210, 2960, 1740,
@@ -14,7 +13,7 @@ const TIMELINE: OverviewPayload["timeline"] = (() => {
   return perHour.map((total, hour) => ({
     ts: start + hour * 3600,
     total,
-    // The scanner sweep that shows up in the blocked tile lands in the small hours.
+    // The scanner sweep behind the blocked tile.
     blocked: hour >= 2 && hour <= 4 ? 140 - (hour - 2) * 30 : 4,
     clientErrors: Math.round(total * 0.021) + (hour >= 2 && hour <= 4 ? 90 : 0),
     serverErrors: hour === 18 || hour === 19 ? 140 : Math.round(total * 0.0008),
@@ -23,9 +22,8 @@ const TIMELINE: OverviewPayload["timeline"] = (() => {
 })();
 
 /**
- * Rows as `traffic_events` stores them - no upstream and no duration, because it holds
- * neither. The audit timestamps below are interleaved with these on purpose: the log
- * blends both, and a demo where every change sorted above every request would not show it.
+ * As `traffic_events` stores them (no upstream or duration). Audit timestamps interleave on
+ * purpose, to show the log blending both.
  */
 const EVENTS: OverviewPayload["events"] = [
   {
@@ -109,7 +107,7 @@ const PREVIEW: OverviewPayload = {
     blockedRequests: 412,
     blockedPercent: 0.6,
     bytesServed: 2_813_420_000,
-    // Both false, so the demo shows the working page rather than the "switch logging on" banner.
+    // Not the "switch logging on" banner.
     loggingDisabled: false,
     analyticsDisabled: false,
   },
@@ -119,14 +117,7 @@ const PREVIEW: OverviewPayload = {
   events: EVENTS,
 };
 
-/**
- * The dashboard's own landing page, which is what the product looks like on an ordinary morning.
- *
- * It takes every number as a prop - including the traffic window, which the real page fetches -
- * and imports no server action, so it runs here unchanged. The tiles, the chart and the log are
- * the components that ship: the chart overlays every series until a tile is picked, and picking
- * one re-plots it and re-filters the log exactly as it does in the product.
- */
+/** Demoable unchanged: it takes every number as a prop and imports no server action. */
 export default function OverviewDemo() {
   return (
     <DemoSurface>

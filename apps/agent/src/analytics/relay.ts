@@ -1,10 +1,6 @@
 /**
- * Handing parsed log rows to the controller, which writes them to ClickHouse.
- *
- * The agent used to insert them itself, with the controller's own ClickHouse account. Relayed
- * instead so no agent holds a ClickHouse credential, ClickHouse never has to be reachable from an
- * agent's host, and the controller can record which agent sent each row. The parsers batch every
- * 30 seconds, so this is a request per batch, not one per proxied request.
+ * Relayed through the controller so no agent holds a ClickHouse credential or needs to reach it,
+ * and each row records its agent. One request per 30-second parser batch.
  */
 
 import {
@@ -22,7 +18,7 @@ const ENVELOPE_BYTES = 4 * 1024;
 
 let sink: AnalyticsSink | null = null;
 
-/** Whether the controller has analytics on. Everything below is a no-op when it does not. */
+/** Everything below is a no-op when it is off. */
 export function analyticsEnabled(): boolean {
   return sink !== null;
 }
@@ -33,12 +29,7 @@ export function configureAnalytics(next: AnalyticsSink | null): void {
   sink = next;
 }
 
-/**
- * Split rows into requests the controller will accept, measured as the JSON they become.
- *
- * A row that could never fit is dropped and counted rather than sent: the controller would refuse
- * the request every pass, and the parser would never get past it.
- */
+/** A row that can never fit is dropped and counted, or the parser would never get past it. */
 export function chunkBySize<T>(
   rows: readonly T[],
   maxBytes: number,
@@ -48,7 +39,7 @@ export function chunkBySize<T>(
   let size = 0;
   let oversized = 0;
   for (const row of rows) {
-    // One more for the comma between rows.
+    // +1 for the comma.
     const bytes = Buffer.byteLength(JSON.stringify(row)) + 1;
     if (bytes > maxBytes) {
       oversized += 1;
@@ -66,10 +57,7 @@ export function chunkBySize<T>(
   return { chunks, oversized };
 }
 
-/**
- * Send rows, throwing on any refusal so the parser keeps its place in the log and they go again on
- * the next pass rather than being lost.
- */
+/** Throws on any refusal, so the parser keeps its place and resends next pass. */
 async function relay(kind: AgentAnalyticsKind, rows: readonly unknown[]): Promise<void> {
   const target = sink;
   if (!target || rows.length === 0) return;

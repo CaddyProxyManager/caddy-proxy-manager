@@ -28,7 +28,6 @@ test.describe('Users page', () => {
     await waitForHydration(page);
   });
 
-  /** The rail's row for an account, found by its email. */
   const railRow = (page: import('@playwright/test').Page, email: string) =>
     page
       .getByRole('navigation', { name: 'Users' })
@@ -129,8 +128,7 @@ test.describe('Users page', () => {
   });
 
   test('the generate button fills the password with a usable value', async ({ page }) => {
-    // Generating writes into a masked field, so it also reveals: a value nobody can read is no
-    // use for a credential an administrator has to pass on.
+    // Generating also reveals: an admin has to pass the credential on.
     await page.getByRole('button', { name: /create user/i }).click();
     const password = page.getByTestId('create-password');
     await expect(password).toHaveValue('');
@@ -146,7 +144,6 @@ test.describe('Users page', () => {
     expect(generated).toMatch(/[0-9]/);
     expect(generated).toMatch(/[^A-Za-z0-9]/);
 
-    // Twice running does not hand out the same password.
     await page.getByRole('button', { name: /generate a strong password/i }).click();
     expect(await password.inputValue()).not.toBe(generated);
   });
@@ -160,8 +157,7 @@ test.describe('Users page', () => {
 
     await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click();
 
-    // The real assertion: what the generator produces satisfies the policy the server applies,
-    // so the form does not bounce it.
+    // The real assertion: the server's policy accepts what the generator produced.
     await expect(page.getByTestId('create-email')).not.toBeVisible();
     await expect(railRow(page, email)).toBeVisible({ timeout: 5000 });
   });
@@ -229,7 +225,6 @@ test.describe('Users page', () => {
     await page.getByTestId('create-name').fill('Viewer User');
     await page.getByTestId('create-password').fill(password);
 
-    // Select Viewer role
     await page.getByTestId('create-role').click();
     await page.getByRole('option', { name: 'Viewer' }).click();
 
@@ -327,8 +322,7 @@ test.describe('Users API v1 - create user (POST)', () => {
     expect(created.accountProviderId).toBe('credential');
   });
 
-  // Refused rather than downgraded: a silent downgrade hides a typo in an automation script, and the
-  // dashboard, REST and GraphQL now share one role allowlist.
+  // Refused, not downgraded: a silent downgrade hides a typo in an automation script.
   test('API POST with invalid role is refused', async ({ page }) => {
     const origin = new URL(page.url()).origin;
     const email = `api-invalid-role-${Date.now()}@test.local`;

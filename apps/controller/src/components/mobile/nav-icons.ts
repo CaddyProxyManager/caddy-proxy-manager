@@ -6,7 +6,7 @@ import {
   History,
   KeyRound,
   LayoutDashboard,
-  type LucideIcon,
+  ScrollText,
   Server,
   Settings,
   ShieldCheck,
@@ -14,6 +14,7 @@ import {
   UserCog,
   UserRound,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import type { DestinationId } from "@/src/lib/nav/destinations";
 
@@ -30,6 +31,7 @@ export const DESTINATION_ICONS: Record<DestinationId, LucideIcon> = {
   certificates: ShieldCheck,
   waf: ShieldOff,
   "audit-log": History,
+  logs: ScrollText,
   "api-docs": FileJson2,
   settings: Settings,
   profile: UserRound,

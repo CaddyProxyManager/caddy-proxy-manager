@@ -1,24 +1,13 @@
 /**
- * Tailscale, as this app drives github.com/tailscale/caddy-tailscale.
- *
- * The plugin runs tsnet inside the Caddy process, which is what makes this worth having: a
- * `tailscale/<node>` listener puts a site on the tailnet with no tailscaled on the host and no TUN
- * device, so nothing in the Compose stack changes. Three of its modules are used - the listener
- * network, the `tailscale` authentication provider, and the reverse-proxy transport - and this
- * file is the JSON each of them wants, split from caddy.ts so the shapes stay unit-testable
- * without a database.
- *
- * Certificates are deliberately not the plugin's: Caddy itself ships `tls.get_certificate.tailscale`
- * and skips ACME for a policy whose subjects are all `.ts.net`, so a tailnet host keeps this app's
- * connection policies, HSTS and mTLS instead of being handed to the plugin's own TLS listener.
+ * JSON for github.com/tailscale/caddy-tailscale (tsnet in-process: no tailscaled, no TUN device).
+ * Split from caddy.ts so the shapes are unit-testable without a database. Certificates come from
+ * Caddy's own `tls.get_certificate.tailscale`, not the plugin's listener, so a tailnet host keeps
+ * this app's connection policies, HSTS and mTLS.
  */
 
 import { type DomainError, type DomainErrorCode, domainError } from "./domain-error";
 
-/**
- * Local rather than imported from settings-validation, which reaches back here to validate the
- * REST settings group - one direction only, as caddy-default-response.ts does.
- */
+/** Local, not from settings-validation: that module imports this one, and imports go one way. */
 function hasForbiddenControlCharacter(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
@@ -31,16 +20,14 @@ function hasForbiddenControlCharacter(value: string): boolean {
 export const TAILSCALE_DOMAIN_SUFFIX = ".ts.net";
 
 /**
- * Where each node's tsnet state lands, one subdirectory per node. `/data` is the `caddy-data`
- * volume the image already owns, so a node keeps its identity across a container recreate - without
- * this the node re-registers on every restart and the tailnet fills with duplicates.
+ * On the `caddy-data` volume so a node keeps its identity across a recreate - otherwise it
+ * re-registers on every restart and the tailnet fills with duplicates.
  */
 export const TAILSCALE_DEFAULT_STATE_DIR = "/data/tailscale";
 
-/** The node a host is served on when it names none. */
 export const TAILSCALE_DEFAULT_NODE = "caddy";
 
-/** A tailnet machine name is a DNS label: what the tailnet admin console will accept. */
+/** A DNS label: what the tailnet admin console will accept. */
 const NODE_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 /** Tailscale ACL tags, as the admin console writes them. */
@@ -52,16 +39,12 @@ export function isTailscaleDomain(domain: string): boolean {
   return domain.trim().toLowerCase().endsWith(TAILSCALE_DOMAIN_SUFFIX);
 }
 
-/**
- * A node name as the listener address will spell it. Lowercased rather than rejected on case: the
- * name is typed by hand into two places (here and the tailnet) and `Caddy` vs `caddy` would
- * otherwise register two nodes that look identical in the UI.
- */
+/** Lowercased, not rejected: `Caddy` vs `caddy` would register two nodes that look identical. */
 export function normalizeNodeName(raw: string | null | undefined): string {
   return (raw ?? "").trim().toLowerCase();
 }
 
-/** Which node name is being checked. Each has its own message, so no label is spliced into one. */
+/** Each field has its own message, so no label is spliced into one. */
 export type NodeNameField = "node" | "upstreamNode" | "defaultNode";
 
 const NODE_NAME_CODES = {
@@ -73,10 +56,7 @@ const NODE_NAME_CODES = {
   defaultNode: { required: "tailscaleDefaultNodeRequired", invalid: "tailscaleDefaultNodeInvalid" },
 } as const satisfies Record<NodeNameField, Record<"required" | "invalid", DomainErrorCode>>;
 
-/**
- * Why a node name is unusable, or null. A 400 for `/api/v1`, where a proxy host's node names are
- * checked too.
- */
+/** Why a node name is unusable, or null. */
 export function nodeNameProblem(name: string, field: NodeNameField = "node"): DomainError | null {
   const codes = NODE_NAME_CODES[field];
   if (!name) return domainError(codes.required, {}, { status: 400 });
@@ -84,20 +64,14 @@ export function nodeNameProblem(name: string, field: NodeNameField = "node"): Do
   return null;
 }
 
-/** The English for an unusable node name, or null. */
 export function validateNodeName(name: string, field: NodeNameField = "node"): string | null {
   return nodeNameProblem(name, field)?.message ?? null;
 }
 
 /**
- * The key id inside a Tailscale key, or null.
- *
- * Keys are `tskey-<type>-<id>-<secret>` - the documented example is
- * `tskey-api-abcDEF1CNTRL-091234567890ABCDEF` - and the id is what the API addresses a key by.
- * Null for anything that does not have that shape: an older `tskey-<secret>` key, a Caddy
- * placeholder like `{env.TS_AUTHKEY}`, or a Headscale key, none of which this can look up. Callers
- * must treat null as "cannot check", never as "invalid" - the format is not a documented contract
- * and guessing wrong would refuse a key that works.
+ * The `<id>` of a `tskey-<type>-<id>-<secret>` key, or null. Null means "cannot check", never
+ * "invalid": the format is not a documented contract, and old keys, placeholders and Headscale
+ * keys lack it.
  */
 export function tailscaleKeyId(key: string): string | null {
   const parts = key.trim().split("-");
@@ -106,50 +80,34 @@ export function tailscaleKeyId(key: string): string | null {
   return /^[A-Za-z0-9]+$/.test(id) ? id : null;
 }
 
-/** True for a value Caddy will expand at load time, which cannot be resolved or checked here. */
+/** Caddy expands it at load time, so it cannot be resolved or checked here. */
 export function isCaddyPlaceholder(value: string): boolean {
   return /\{[a-z][a-z0-9_.]*\}/i.test(value.trim());
 }
 
 // ─── Global settings ─────────────────────────────────────────────────────────
 
-/**
- * Tailscale node defaults for the whole deployment.
- *
- * These are the plugin's global `tailscale` options. Per-host settings pick a node name; everything
- * about *how* a node registers is here, because a tailnet has one set of credentials and one
- * coordination server no matter how many sites are served on it.
- */
+/** The plugin's global options: a tailnet has one set of credentials however many sites use it. */
 export type TailscaleSettings = {
   enabled: boolean;
-  /**
-   * Auth key used to register each node. Stored encrypted, and passed to Caddy verbatim - the
-   * plugin runs it through Caddy's replacer, so `{env.TS_AUTHKEY}` works and keeps the key out of
-   * the database entirely.
-   */
+  /** Encrypted at rest; passed verbatim, so `{env.TS_AUTHKEY}` keeps it out of the database. */
   authKey: string;
-  /** Coordination server, for Headscale and friends. Empty means Tailscale's own. */
+  /** For Headscale and friends. Empty means Tailscale's own. */
   controlUrl: string;
-  /** Register nodes as ephemeral, so they leave the tailnet when Caddy stops. */
   ephemeral: boolean;
-  /** Parent directory for per-node state. Empty falls back to the plugin's own default. */
+  /** Empty falls back to the plugin's own default. */
   stateDir: string;
-  /** ACL tags applied at registration. Required by most reusable auth keys. */
+  /** Required by most reusable auth keys. */
   tags: string[];
-  /** Node name for hosts that do not choose one. */
   defaultNode: string;
   /**
-   * Check the auth key against the Tailscale API before saving it.
-   *
-   * Off by default, because it is the only thing in this app that reaches Tailscale on its own and
-   * it needs a second credential to do it - an auth key cannot authenticate to the API, only an
-   * access token can. With it off there is no way to tell a revoked key from a good one until
-   * Caddy tries to register the node, and that failure rejects the whole configuration.
+   * Off by default: it needs a second credential (an auth key cannot call the API). With it off a
+   * revoked key surfaces only when Caddy rejects the whole configuration.
    */
   validateAuthKey: boolean;
-  /** API access token (`tskey-api-…`) used for that check. Encrypted at rest. */
+  /** For that check. Encrypted at rest. */
   apiAccessToken: string;
-  /** Tailnet the check addresses. "-" means the token's own, which is right for most tailnets. */
+  /** "-" means the token's own tailnet. */
   apiTailnet: string;
 };
 
@@ -166,7 +124,7 @@ export const DEFAULT_TAILSCALE_SETTINGS: TailscaleSettings = {
   apiTailnet: "-",
 };
 
-/** What the browser and the REST API are allowed to see: everything but the two secrets. */
+/** Everything but the two secrets. */
 export type TailscaleSettingsView = Omit<TailscaleSettings, "authKey" | "apiAccessToken"> & {
   hasAuthKey: boolean;
   hasApiAccessToken: boolean;
@@ -186,9 +144,8 @@ function asStringArray(value: unknown): string[] {
 }
 
 /**
- * Validate and fill in a stored or submitted settings blob. Throws rather than silently correcting:
- * a node name Caddy cannot parse becomes a listener address it rejects, and Caddy rejects the whole
- * document - every other host goes down with it.
+ * Throws rather than correcting: a bad node name makes Caddy reject the whole document, taking
+ * every other host down with it.
  */
 export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
   const input = (value ?? {}) as Partial<Record<keyof TailscaleSettings, unknown>>;
@@ -201,8 +158,7 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
   const nodeError = nodeNameProblem(defaultNode, "defaultNode");
   if (nodeError) throw nodeError;
 
-  // Generous, because this same function runs over the *stored* blob, where the key is a base64
-  // ciphertext several times the length of what was typed.
+  // Generous: this also runs over the stored blob, where the key is a much longer ciphertext.
   const authKey = typeof input.authKey === "string" ? input.authKey.trim() : "";
   if (authKey.length > 4096) throw domainError("tailscaleAuthKeyTooLong");
   if (/\s/.test(authKey) || hasForbiddenControlCharacter(authKey)) {
@@ -239,8 +195,7 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
     throw domainError("tailscaleApiTokenInvalidCharacters");
   }
 
-  // "-" is Tailscale's own shorthand for the token's tailnet. A named one is a DNS-ish string, so
-  // this only refuses what would corrupt the request path.
+  // Only refuses what would corrupt the request path.
   const apiTailnet =
     typeof input.apiTailnet === "string" && input.apiTailnet.trim() ? input.apiTailnet.trim() : "-";
   if (!/^[A-Za-z0-9._@-]+$/.test(apiTailnet)) {
@@ -278,12 +233,8 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
 // ─── Caddy JSON ──────────────────────────────────────────────────────────────
 
 /**
- * The `apps.tailscale` block. `nodes` is deliberately absent: with no per-node overrides the
- * plugin derives each node's hostname from the name in its listener address, so an entry here
- * would only be a second place for the same string to drift.
- *
- * `authKey` arrives decrypted - the caller owns that, since only it knows whether the value came
- * from the database or from a Caddy placeholder that must be passed through untouched.
+ * No `nodes`: the plugin derives each hostname from the listener address, and an entry would
+ * only drift. `authKey` arrives decrypted - only the caller knows whether it is a placeholder.
  */
 export function buildTailscaleApp(
   settings: TailscaleSettings,
@@ -298,27 +249,19 @@ export function buildTailscaleApp(
   };
 }
 
-/**
- * The listener addresses for one node. Both ports, always: :443 is what serves the site and :80 is
- * what Caddy's automatic HTTPS redirects from, and a tailnet client typing a bare MagicDNS name
- * lands on :80 first.
- */
+/** Both ports: a client typing a bare MagicDNS name lands on :80 and gets redirected. */
 export function tailscaleListenAddresses(node: string): string[] {
   return [`tailscale/${node}:80`, `tailscale/${node}:443`];
 }
 
-/** The `tailscale_auth` equivalent: Caddy's authentication handler with the plugin's provider. */
+/** The `tailscale_auth` equivalent. */
 export function buildTailscaleAuthHandler(): Record<string, unknown> {
   return { handler: "authentication", providers: { tailscale: {} } };
 }
 
 /**
- * Identity the plugin puts on the authenticated user, and the header each is forwarded as.
- *
- * The placeholder keys are Caddy's `http.auth.user.<metadata key>`, so they have to match the
- * plugin's Authenticate() exactly - a typo forwards an empty header rather than failing. Header
- * names are in Go's canonical MIME casing for the same reason the CPM forward-auth ones are:
- * Caddy looks them up literally.
+ * Keys must match the plugin's Authenticate() exactly - a typo forwards an empty header rather
+ * than failing. Headers are in Go's canonical casing because Caddy looks them up literally.
  */
 export const TAILSCALE_IDENTITY_HEADERS: Record<string, string> = {
   "X-Tailscale-User": "{http.auth.user.tailscale_user}",
@@ -328,16 +271,12 @@ export const TAILSCALE_IDENTITY_HEADERS: Record<string, string> = {
   "X-Tailscale-Profile-Picture": "{http.auth.user.tailscale_profile_picture}",
 };
 
-/**
- * Drop client-supplied identity headers before anything else runs. Without this a request could
- * arrive claiming to be someone, and the upstream would have no way to tell that apart from a
- * header this proxy set.
- */
+/** Runs first, or a client could send identity headers the upstream takes for this proxy's. */
 export function buildTailscaleIdentityStripHandler(): Record<string, unknown> {
   return { handler: "headers", request: { delete: Object.keys(TAILSCALE_IDENTITY_HEADERS) } };
 }
 
-/** Set the identity headers from the authenticated user. Only valid after the auth handler. */
+/** Only valid after the auth handler. */
 export function buildTailscaleIdentityHeadersHandler(): Record<string, unknown> {
   return {
     handler: "headers",
@@ -352,10 +291,7 @@ export function buildTailscaleIdentityHeadersHandler(): Record<string, unknown> 
   };
 }
 
-/**
- * Auth and the identity headers as one handler, so callers that place a single "auth handler" in a
- * route chain - the shared path-mode builder - get both or neither.
- */
+/** One handler, so callers that place a single "auth handler" get both or neither. */
 export function buildTailscaleAuthSubroute(forwardIdentity: boolean): Record<string, unknown> {
   const handle = forwardIdentity
     ? [buildTailscaleAuthHandler(), buildTailscaleIdentityHeadersHandler()]
@@ -364,13 +300,8 @@ export function buildTailscaleAuthSubroute(forwardIdentity: boolean): Record<str
 }
 
 /**
- * The reverse-proxy transport that dials through a node. `tls` is passed through rather than
- * derived: the plugin treats any non-nil TLS config as "use https" and reads nothing out of it, so
- * the caller's existing https/skip-verify decision carries over unchanged.
- *
- * A node named only here is never started until the first request goes through it. Releasing one in
- * that state used to crash Caddy from inside tsnet, which is why docker/caddy/go.mod pins the
- * plugin to a fork - see the note there before moving that pin.
+ * `tls` passes through: the plugin reads any non-nil TLS config as "use https". Releasing a node
+ * never started crashes tsnet upstream - see docker/caddy/go.mod before moving the fork pin.
  */
 export function buildTailscaleTransport(
   node: string,
@@ -379,13 +310,7 @@ export function buildTailscaleTransport(
   return { protocol: "tailscale", name: node, ...(tls ? { tls } : {}) };
 }
 
-/**
- * An automation policy that serves `.ts.net` names from Tailscale instead of ACME.
- *
- * Caddy provisions no issuers for a policy whose subjects are all `.ts.net` and whose managers
- * include this one, so there is deliberately no `issuers` key - adding one would put the policy
- * back on ACME for names no public CA can validate.
- */
+/** No `issuers` on purpose: one would put `.ts.net` names back on ACME, which cannot issue them. */
 export function buildTailscaleAutomationPolicy(subjects: string[]): Record<string, unknown> {
   return { subjects, get_certificate: [{ via: "tailscale" }] };
 }

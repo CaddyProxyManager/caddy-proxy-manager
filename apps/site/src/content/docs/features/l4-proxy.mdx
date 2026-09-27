@@ -8,9 +8,10 @@ import L4HostEditorDemo from "../../../demos/samples/L4HostEditorDemo";
 import L4HostsTableDemo from "../../../demos/samples/L4HostsTableDemo";
 
 Not everything is HTTP. L4 proxy hosts forward raw TCP and UDP streams: a database, a game server,
-an SSH endpoint, anything that speaks its own protocol.
+an SSH endpoint, anything that speaks its own protocol. Like HTTP hosts, each can carry
+[notes](../reverse-proxy/), shown as an icon beside its name.
 
-<Demo title="The L4 host list" note="Switch between TCP and UDP.">
+<Demo title="The L4 host list" note="Switch between TCP and UDP, or hover the note on postgres.">
   <L4HostsTableDemo client:visible />
 </Demo>
 

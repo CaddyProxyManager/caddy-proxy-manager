@@ -1,11 +1,8 @@
 "use server";
 
 /**
- * The first-run setup actions.
- *
- * Every one of these re-checks the stage before it writes. The pages guard too, but a page guard is
- * a redirect and these are the endpoints that actually create an administrator - an unauthenticated
- * POST to a setup action on a configured instance would otherwise be a way to mint one.
+ * Each action re-checks the stage before writing: a page guard is only a redirect, and these are
+ * what create an administrator, so an unauthenticated POST could otherwise mint one.
  */
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -13,21 +10,39 @@ import { createOAuthProvider } from "@/src/lib/models/oauth-providers";
 import { createUser, findUserByEmail } from "@/src/lib/models/user";
 import { hashPassword } from "@/src/lib/password";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
-import { hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
+import {
+  SETUP_ACCOUNT_CLAIM,
+  claimSetupStep,
+  hasAnySignIn,
+  isSetupCompleted,
+  releaseSetupStep,
+} from "@/src/lib/setup";
 
 export type SetupActionState = { error: string | null };
 
-/**
- * Refuse to run once anything can sign in.
- *
- * `hasAnySignIn`, not the completion flag: the account step is over the moment an account exists,
- * whether or not the operator has finished the settings step. Checking the flag instead would leave
- * this open for the whole of the rest of setup.
- */
+/** `hasAnySignIn`, not the completion flag, which would leave this open for the rest of setup. */
 async function assertAccountStepOpen(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
     const t = await getTranslations("setup.errors");
     throw new Error(t("alreadyCompleted"));
+  }
+}
+
+/**
+ * Runs `create` holding the account step's claim, re-checking the step under it, so two setup
+ * requests can't both see an empty instance. Returns an error message, or null once created.
+ */
+async function withAccountStep(create: () => Promise<string | null>): Promise<string | null> {
+  const t = await getTranslations("setup.errors");
+  const claim = await claimSetupStep(SETUP_ACCOUNT_CLAIM);
+  if (!claim) return t("alreadyCompleted");
+  try {
+    await assertAccountStepOpen();
+    return await create();
+  } catch (error) {
+    return error instanceof Error ? error.message : t("noLongerOpen");
+  } finally {
+    await releaseSetupStep(SETUP_ACCOUNT_CLAIM, claim);
   }
 }
 
@@ -48,29 +63,26 @@ export async function createFirstAdmin(
   const policyFailure = passwordPolicyMessage(t, password, t("passwordPolicy.subject.password"));
   if (policyFailure) return { error: policyFailure };
 
-  try {
-    await assertAccountStepOpen();
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : t("setup.errors.noLongerOpen") };
-  }
-
+  // Hashed before the claim, so the slow part doesn't hold it.
+  const passwordHash = await hashPassword(password);
   // The same synthetic address the environment-seeded admin has always used, so an operator who
   // later sets ADMIN_USERNAME to the same name updates this account rather than making a second.
   const email = `${username.toLowerCase()}@localhost`;
-  if (await findUserByEmail(email)) {
-    return { error: t("setup.errors.usernameTaken") };
-  }
-
-  await createUser({
-    email,
-    name: username,
-    role: "admin",
-    provider: "credentials",
-    subject: username,
-    username: username.toLowerCase(),
-    displayUsername: username,
-    passwordHash: await hashPassword(password),
+  const failure = await withAccountStep(async () => {
+    if (await findUserByEmail(email)) return t("setup.errors.usernameTaken");
+    await createUser({
+      email,
+      name: username,
+      role: "admin",
+      provider: "credentials",
+      subject: username,
+      username: username.toLowerCase(),
+      displayUsername: username,
+      passwordHash,
+    });
+    return null;
   });
+  if (failure) return { error: failure };
 
   // To the login page rather than onwards: the point of this step is to prove the credentials work
   // before any more configuration is entered.
@@ -95,28 +107,26 @@ export async function configureFirstOAuthProvider(
     return { error: t("issuerMustBeUrl") };
   }
 
-  try {
-    await assertAccountStepOpen();
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : t("noLongerOpen") };
-  }
-
-  try {
-    await createOAuthProvider({
-      name,
-      type: "oidc",
-      clientId,
-      clientSecret,
-      issuer,
-      scopes: "openid email profile",
-      autoLink: false,
-      enabled: true,
-      source: "ui",
-    });
-  } catch (error) {
-    console.error("Setup: failed to create the OAuth provider", error);
-    return { error: t("providerSaveFailed") };
-  }
+  const failure = await withAccountStep(async () => {
+    try {
+      await createOAuthProvider({
+        name,
+        type: "oidc",
+        clientId,
+        clientSecret,
+        issuer,
+        scopes: "openid email profile",
+        autoLink: false,
+        enabled: true,
+        source: "ui",
+      });
+      return null;
+    } catch (error) {
+      console.error("Setup: failed to create the OAuth provider", error);
+      return t("providerSaveFailed");
+    }
+  });
+  if (failure) return { error: failure };
 
   redirect("/login");
 }

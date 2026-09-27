@@ -1,9 +1,6 @@
 /**
- * A Caddy admin API that lives in memory, for demo mode.
- *
- * Answers the three calls the controller makes - load, read back, adapt - so the build-and-apply
- * path runs end to end and the monitor sees a healthy Caddy. Nothing listens and nothing is served,
- * so no certificate is ever ordered and no DNS provider is ever called.
+ * An in-memory Caddy admin API for demo mode: answers load, read back and adapt so apply runs end
+ * to end. Nothing is served, so no certificate is ordered and no DNS provider called.
  */
 import type { CaddyAdminProxyRequest, CaddyAdminProxyResponse } from "@cpm/shared";
 

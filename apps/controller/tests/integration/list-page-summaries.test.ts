@@ -1,10 +1,6 @@
 /**
- * The counts and rollups the list pages open with.
- *
- * These queries exist so a header can describe the whole visible set while the table below shows
- * one page of it. What matters is that the aggregate SQL is right against a real Postgres - the
- * sum-of-case counts, count(distinct) skipping null actors, the hour-prefix grouping on a text
- * column - and that an empty table reports zeroes rather than nulls.
+ * The aggregates list-page headers show for the whole set while the table shows one page. Run
+ * against a real database: sum-of-case counts, count(distinct), hour-prefix grouping on text.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,9 +8,7 @@ import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 
 let db: TestDb;
 
-// currentDb rather than a captured handle: each test gets a fresh database, and a mock factory is
-// evaluated once, so a plain reference would pin every model call to the first test's database
-// while the inserts went to the current one.
+// currentDb: the factory runs once, so a captured handle would pin every test to the first db.
 vi.mock('../../src/lib/db', () => ({
   default: currentDb(() => db),
   nowIso: () => new Date().toISOString(),
@@ -104,8 +98,7 @@ describe('proxy host state counts', () => {
   it('counts nothing for a viewer granted nothing', async () => {
     await insertProxyHost('a', true);
 
-    // An empty grant list is "sees nothing", not "no restriction" - the distinction the list query
-    // makes, and one a count that ignored it would quietly undo.
+    // An empty grant list is "sees nothing", not "no restriction".
     expect(await countProxyHostsByState(undefined, [])).toEqual({
       total: 0,
       enabled: 0,
@@ -162,8 +155,7 @@ describe('audit activity', () => {
 
     expect(byHour.get('2026-09-10T14')).toBe(2);
     expect(byHour.get('2026-09-10T16')).toBe(1);
-    // The hour between them is absent rather than zero; the page fills the gap, because only it
-    // knows how many bars the strip has.
+    // Absent, not zero: only the page knows how many bars the strip has.
     expect(byHour.has('2026-09-10T15')).toBe(false);
   });
 
@@ -204,7 +196,7 @@ describe('audit activity', () => {
 
     const summary = await auditActivitySummary(iso(-60 * 60 * 1000));
     expect(summary.events).toBe(3);
-    // count(distinct userId) skips the null actor, so a system event is not counted as a person.
+    // A system event (null actor) is not a person.
     expect(summary.actors).toBe(1);
     expect(summary.entityTypes).toBe(2);
   });
@@ -297,8 +289,7 @@ describe('last session per user', () => {
 
     const byUser = await lastSessionByUser();
     expect(byUser.get(user.id)).toBe(newer);
-    // Carol has never signed in, and an absent entry is what lets the page say "no active session"
-    // rather than inventing a date.
+    // Absent, so the page says "no active session" rather than inventing a date.
     expect(byUser.has(other.id)).toBe(false);
   });
 });

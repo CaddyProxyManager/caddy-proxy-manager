@@ -8,7 +8,8 @@ import {
   isValidBodyLimit,
   seclangErrorDetails,
 } from "./caddy-waf";
-import { domainErrorMessage } from "./domain-error";
+import { DomainError, domainErrorMessage } from "./domain-error";
+import { CACHE_STORAGES, CDN_PROVIDERS, normalizeHttpCacheSettings } from "./http-cache";
 import { seclangErrors } from "./seclang";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
 import { normalizeTailscaleSettings } from "./caddy-tailscale";
@@ -90,6 +91,12 @@ function integerValue(value: unknown, label: string, min: number, max: number): 
     invalid(`${label} must be an integer from ${min} to ${max}`);
   }
   return value;
+}
+
+function optionalOneOf(value: unknown, allowed: readonly string[], label: string): void {
+  if (value !== undefined && !allowed.includes(value as string)) {
+    invalid(`${label} must be one of: ${allowed.join(", ")}`);
+  }
 }
 
 function stringList(
@@ -240,27 +247,19 @@ function validateDashboard(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "domain", "tls", "options"], "dashboard settings");
   booleanValue(required(value, "enabled", "dashboard settings"), "dashboard.enabled");
   booleanValue(required(value, "tls", "dashboard settings"), "dashboard.tls");
-  // Required even when disabled: the domain is what the route is rebuilt from the moment it is
-  // switched back on, and a blank one there would silently produce no route at all.
+  // Required even when disabled: re-enabling with a blank one would silently build no route.
   const domain = stringValue(required(value, "domain", "dashboard settings"), "dashboard.domain", {
     min: 1,
     max: 253,
   });
-  // A hostname, not merely a non-empty string. This value is interpolated into a Caddy host matcher
-  // and into the URL the reachability check requests, so "any text up to 253 characters" was the
-  // wrong bar in both places - the check being the one CodeQL objected to. Refusing it here is
-  // what stops anything else being stored to begin with.
+  // Interpolated into a Caddy host matcher and the reachability check's URL (which CodeQL flagged).
   if (!isHostname(domain)) {
     invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
   }
   if (value.options !== undefined) validateDashboardOptions(value.options);
 }
 
-/**
- * The shape of the dashboard host's proxy options. The `meta` blob is only checked for being a JSON
- * object here: the Caddy builder reads it through the same parser it uses for `proxy_hosts.meta`,
- * and the settings form builds it through the proxy host model, which does the field-level checks.
- */
+/** `meta` is only checked for being a JSON object: the proxy host model does the field checks. */
 function validateDashboardOptions(input: unknown): void {
   const options = record(input, "dashboard.options");
   onlyKeys(
@@ -505,8 +504,7 @@ function validateWaf(value: Record<string, unknown>): void {
       `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
     );
   }
-  // A dropped line is a rule the user believes is running. Refuse the write and name each one,
-  // rather than accepting the settings and quietly emitting a WAF without them.
+  // A dropped line is a rule the user believes is running, so refuse and name each one.
   const { dropped } = filterCustomDirectives(directives);
   if (dropped.length > 0) {
     invalid(
@@ -530,11 +528,7 @@ function validateWaf(value: Record<string, unknown>): void {
   validateBodyLimits(value, "waf");
 }
 
-/**
- * Shared by the global WAF settings and the per-host WAF config. Values above
- * Coraza's 1 GiB ceiling make Caddy reject the whole config document, so they
- * are refused at the input layer rather than silently dropped later.
- */
+/** Global and per-host WAF. Past Coraza's 1 GiB ceiling Caddy rejects the whole config. */
 export function validateBodyLimits(value: Record<string, unknown>, prefix: string): void {
   for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
     const raw = value[key];
@@ -590,6 +584,36 @@ function validateDefaultResponse(value: Record<string, unknown>): void {
   normalizeDefaultResponseSettings(value);
 }
 
+/** The GET shape round-trips: `hasPassword` and `hasApiKey` are accepted and ignored. */
+function validateHttpCache(value: Record<string, unknown>): void {
+  const label = "HTTP cache settings";
+  onlyKeys(value, ["storage", "otterSize", "redis", "etcd", "cdn"], label);
+  if (value.redis !== undefined) {
+    onlyKeys(
+      record(value.redis, "redis"),
+      ["addresses", "username", "password", "db", "hasPassword"],
+      label,
+    );
+  }
+  if (value.etcd !== undefined) onlyKeys(record(value.etcd, "etcd"), ["endpoints"], label);
+  if (value.cdn !== undefined) {
+    const cdn = record(value.cdn, "cdn");
+    onlyKeys(
+      cdn,
+      ["provider", "apiKey", "email", "zoneId", "serviceId", "strategy", "hasApiKey"],
+      label,
+    );
+    optionalOneOf(cdn.provider, CDN_PROVIDERS, "cdn.provider");
+  }
+  optionalOneOf(value.storage, CACHE_STORAGES, "storage");
+  try {
+    normalizeHttpCacheSettings(value, { secretsPending: true });
+  } catch (error) {
+    if (error instanceof DomainError) invalid(error.message);
+    throw error;
+  }
+}
+
 function validateTailscale(value: Record<string, unknown>): void {
   onlyKeys(
     value,
@@ -609,9 +633,7 @@ function validateTailscale(value: Record<string, unknown>): void {
   );
   booleanValue(required(value, "enabled", "Tailscale settings"), "tailscale.enabled");
   try {
-    // The normalizer is the single source of truth for what a node name, a tag and a state
-    // directory may be - it also runs on every read, so duplicating the rules here would let the
-    // API accept something the next read would silently drop.
+    // The normalizer also runs on every read; duplicated rules could accept what a read then drops.
     normalizeTailscaleSettings(value);
   } catch (error) {
     invalid(error instanceof Error ? error.message : "Invalid Tailscale settings");
@@ -686,6 +708,25 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       break;
     case "tailscale":
       validateTailscale(value);
+      break;
+    case "http-protocols":
+      onlyKeys(value, ["http2", "http3"], "HTTP version settings");
+      booleanValue(required(value, "http2", "HTTP version settings"), "http2");
+      booleanValue(required(value, "http3", "HTTP version settings"), "http3");
+      break;
+    case "two-factor":
+      onlyKeys(value, ["requireForAdmins"], "two-factor settings");
+      booleanValue(required(value, "requireForAdmins", "two-factor settings"), "requireForAdmins");
+      break;
+    case "http-cache":
+      validateHttpCache(value);
+      break;
+    case "global-caddy-config":
+      // Length, characters and whether Caddy takes it are checked on save, against a real Caddy.
+      onlyKeys(value, ["caddyfile"], "global Caddyfile settings");
+      if (typeof required(value, "caddyfile", "global Caddyfile settings") !== "string") {
+        invalid("caddyfile must be a string");
+      }
       break;
     default:
       invalid("Unknown settings group");

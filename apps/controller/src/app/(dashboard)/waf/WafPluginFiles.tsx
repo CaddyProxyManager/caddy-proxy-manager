@@ -25,10 +25,7 @@ const KIND = /-(config|before|after)\.conf$/;
 /** The order CRS loads them in, which the builder follows. */
 const KIND_ORDER: readonly FileKind[] = ["config", "before", "after"];
 
-/**
- * The files to list. A plugin installed before file names were recorded lists one per kind it has,
- * named the way CRS names them; the rules themselves are stored by kind either way.
- */
+/** A plugin predating recorded file names lists one per kind, named as CRS names them. */
 function pluginFiles(plugin: WafPluginRow): { name: string; kind: FileKind }[] {
   const named = plugin.fileNames.flatMap((name) => {
     const kind = KIND.exec(name)?.[1] as FileKind | undefined;
@@ -51,7 +48,6 @@ function pluginFiles(plugin: WafPluginRow): { name: string; kind: FileKind }[] {
   }));
 }
 
-/** An installed plugin's expanded row: its actions, its files on the left, the one picked on the right. */
 export function WafPluginFiles({
   plugin,
   update,
@@ -131,13 +127,12 @@ export function WafPluginFiles({
   const configFile = files.find((entry) => entry.kind === "config");
 
   return (
-    // One Layout frames it all: a nested Layout outside one bleeds by its container's padding and
-    // would slide up under a divider drawn above it.
+    // One Layout: a nested one bleeds by its container's padding under the divider above.
     <Layout
       height="auto"
       padding={0}
       header={
-        // About the plugin, not the open file; up here so the editor starts level with the tree.
+        // Up here so the editor starts level with the tree.
         <LayoutHeader hasDivider label={plugin.name}>
           <VStack gap={0}>
             <HStack gap={3} justify="between" vAlign="center" wrap="wrap" padding={3}>

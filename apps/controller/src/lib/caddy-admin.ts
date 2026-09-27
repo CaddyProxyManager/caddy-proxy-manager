@@ -1,14 +1,7 @@
 /**
- * The seam between this app and the Caddy admin API: all traffic goes through one transport, so
- * production installs `agentCaddyAdminTransport` and tests an in-memory adapter, exercising the
- * whole build-and-apply path with nothing listening.
- *
- * Requests go through an agent, not to an address of this app's own. The agent is the only thing
- * that knows where its Caddy is, and a controller that dialled `CADDY_API_URL` itself would
- * configure a Caddy on *this* host while a paired remote agent recreated the container on
- * *another* - which is exactly the split brain the fan-out exists to prevent. `CADDY_API_URL` is
- * the agent's setting now; `httpCaddyAdminTransport` remains only for a deployment running Caddy
- * with no agent at all.
+ * The one seam to the Caddy admin API, so tests swap in an in-memory adapter. Requests go through
+ * an agent: dialling `CADDY_API_URL` directly could configure this host's Caddy while a remote agent
+ * runs the real one. The direct transport is only for a deployment with no agent.
  */
 import http from "node:http";
 import https from "node:https";
@@ -20,14 +13,13 @@ export type CaddyAdminRequest = {
   path: string;
   method: string;
   body?: string;
-  /** Abort the request after this many ms. Omitted means no client-side timeout. */
+  /** Omitted means no client-side timeout. */
   timeoutMs?: number;
-  /** Content-Type for the body. Defaults to application/json; /adapt needs text/caddyfile. */
+  /** Defaults to application/json; /adapt needs text/caddyfile. */
   contentType?: string;
   /**
-   * The agent whose Caddy must answer. Required for anything whose answer ends up in a config
-   * loaded onto that agent: an unpinned request goes to whichever agent is first, and one agent's
-   * answer must never shape another's config. Never falls back to a direct connection.
+   * Required when the answer shapes a config loaded onto that agent: one agent's answer must never
+   * shape another's. A pinned request never falls back to a direct connection.
    */
   agentId?: string;
 };
@@ -40,11 +32,7 @@ export type CaddyAdminResponse = {
 
 export type CaddyAdminTransport = (request: CaddyAdminRequest) => Promise<CaddyAdminResponse>;
 
-/**
- * Absolute URL for an admin path. The settings module is imported lazily for the same reason the
- * config module was: it reads process.env on first load, and a static import would freeze that
- * before a test's hoisted block could set it.
- */
+/** Settings imported lazily: they read process.env on load, before a test could set it. */
 async function caddyAdminUrl(path: string): Promise<string> {
   const [{ caddyApiUrl }, { getSetting }] = await Promise.all([
     import("./settings/registry"),
@@ -55,12 +43,8 @@ async function caddyAdminUrl(path: string): Promise<string> {
 }
 
 /**
- * The body a direct request sends: a config it loads gets `CADDY_ADMIN_LISTEN` pinned as its admin
- * bind, as the agent does for every config it forwards.
- *
- * `buildCaddyDocument` binds every interface, because it cannot know each agent's address. With no
- * agent in between, that document would rebind the admin API onto caddy-network, where every
- * upstream could reach it - in a stack with no agent, and whenever the bundled one is reconnecting.
+ * Pins `CADDY_ADMIN_LISTEN` as the agent does: the built document binds every interface, which
+ * would expose the admin API on caddy-network to every upstream.
  */
 export function directRequestBody(
   request: Pick<CaddyAdminRequest, "method" | "path" | "body">,
@@ -72,10 +56,7 @@ export function directRequestBody(
   return pinned;
 }
 
-/**
- * Real transport: a plain node:http request. Not `fetch` - that sends Sec-Fetch-* headers, which
- * trigger Caddy's CORS origin enforcement.
- */
+/** node:http, not `fetch`: Sec-Fetch-* headers trigger Caddy's CORS origin enforcement. */
 export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   path,
   method,
@@ -83,15 +64,12 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   timeoutMs,
   contentType,
 }) => {
-  // Demo mode installs an in-memory transport at startup; this is what keeps a module that grabbed
-  // the real one from reaching a Caddy anyway.
+  // Catches a module that grabbed the real transport before demo mode swapped it.
   if (isDemoMode()) {
     throw new Error("The real Caddy admin transport was used in demo mode.");
   }
 
-  // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps the real transport
-  // back in, fail loudly instead of quietly opening a socket to whatever is listening on the
-  // admin port. CPM_TEST is set by tests/helpers/env.ts - `bun test` sets no marker of its own.
+  // Backstop for tests/setup.bun.ts. CPM_TEST comes from tests/helpers/env.ts; bun sets no marker.
   if (process.env.CPM_TEST) {
     throw new Error(
       "The real Caddy admin transport was used inside a test. Tests must install an " +
@@ -139,13 +117,7 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   });
 };
 
-/**
- * Production transport: ask the primary agent to make the request against its own Caddy.
- *
- * Falls back to `direct` when no agent answers, so a development setup that runs Caddy without the
- * agent container keeps working. That fallback is the only remaining use of this app's own
- * `CADDY_API_URL`; demo mode passes an in-memory Caddy instead.
- */
+/** Falls back to `direct` when no agent answers, for a Caddy running without an agent. */
 export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): CaddyAdminTransport {
   return async (request) => {
     const { caddyAdminViaAgent, AgentUnavailableError } = await import("./agent/client");
@@ -161,8 +133,7 @@ export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): Caddy
       );
       return { status: response.status, text: response.text, headers: response.headers };
     } catch (error) {
-      // Never for a pinned request: what was meant for one agent must not land on this app's own
-      // CADDY_API_URL because that agent went away mid-apply.
+      // Never for a pinned request: an agent going away mid-apply must not redirect it here.
       if (error instanceof AgentUnavailableError && request.agentId === undefined) {
         return direct(request);
       }
@@ -175,14 +146,13 @@ export const agentCaddyAdminTransport = agentCaddyAdminTransportWith(httpCaddyAd
 
 let transport: CaddyAdminTransport = agentCaddyAdminTransport;
 
-/** Install an adapter at the seam. Returns the previous one so callers can restore it. */
+/** Returns the previous adapter so callers can restore it. */
 export function setCaddyAdminTransport(next: CaddyAdminTransport): CaddyAdminTransport {
   const previous = transport;
   transport = next;
   return previous;
 }
 
-/** Issue a request against whichever adapter is currently installed. */
 export function caddyAdminRequest(request: CaddyAdminRequest): Promise<CaddyAdminResponse> {
   return transport(request);
 }

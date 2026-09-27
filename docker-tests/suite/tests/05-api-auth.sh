@@ -16,10 +16,8 @@ t_eq "the proxy host listing is a JSON array" "array" "$(jqr 'type')"
 
 # ── Token validation ────────────────────────────────────────────────────────
 #
-# Minting a token needs an interactive session, so these go through the admin's
-# cookie jar rather than the suite's bearer token. That restriction is the point
-# of the first assertion: a stolen bearer token must not be able to mint a
-# replacement that survives the revocation of the one it came from.
+# Minting needs a session, so a stolen bearer token cannot mint a replacement
+# that survives its own revocation.
 
 api_expect "a bearer token cannot mint another token" 403 POST /api/v1/tokens \
   '{"name":"docker-test-escalation"}'
@@ -48,9 +46,7 @@ with_token "$throwaway_raw" api_expect "a revoked token no longer authenticates"
 
 # ── Role enforcement ────────────────────────────────────────────────────────
 #
-# A non-admin account gets its own session and token, then tries the admin-only
-# collections. Read and write are both checked: `requireApiAdmin` guards the
-# whole route, not just mutations.
+# Reads too: `requireApiAdmin` guards the whole route, not just mutations.
 
 viewer_email="viewer-$$@cpm.test"
 viewer_password='V13wer-T3st!Passw0rd'
@@ -91,8 +87,7 @@ fi
 
 # ── CSRF on session auth ────────────────────────────────────────────────────
 #
-# Bearer-token callers are exempt (they are not browsers and carry no ambient
-# credential); cookie-authenticated writes must carry a same-origin Origin.
+# Bearer callers are exempt: they carry no ambient credential.
 
 admin_jar="$STATE_DIR/cookies.txt"
 
@@ -107,15 +102,9 @@ cross_origin=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
   --data-binary '{"name":"csrf-probe"}' "$CPM_API/api/v1/tokens")
 t_eq "a session write from a foreign Origin is refused" "403" "$cross_origin"
 
-# A real write, not a token mint: creating a token is session-only regardless of
-# CSRF, so it can no longer tell the two guards apart.
-#
-# Through create_host rather than a bare curl. `api` sends no Origin header of
-# its own, so the assertion is the same one either way, and this keeps the host
-# on the teardown stack. That matters here specifically: CPM writes the row
-# before it pushes the Caddy config, so a push that fails leaves a live host
-# behind in a reply that carries no id - nothing a raw curl could have tracked,
-# and every later file's config push would then fail on it.
+# Not a token mint, which is session-only anyway. create_host keeps the host on
+# the teardown stack: a failed push leaves a row with no id in the reply, which
+# would break every later file's config push.
 create_host "$(jq -nc --arg d "$(domain_for "bearer-csrf")" '{
   name: "docker-test-bearer-csrf", domains: [$d], upstreams: ["origin-a:8080"]
 }')"

@@ -1,20 +1,9 @@
 "use client";
 
 /**
- * A form control whose label line also names the environment variable that sets it.
- *
- * The design system's inputs take a label as a plain string, so a badge cannot go inside one. The
- * setup flow already worked around that: hide the control's own label, draw the label beside the
- * tokens, and point it at the control. This is that, shared, so the settings screens and the setup
- * step keep saying the same thing the same way.
- *
- * The control keeps its label as its accessible name (hidden, not removed), and the visible label
- * learns the control's generated id after mount, so clicking the text still focuses it.
- *
- * A checkbox or switch sits beside its label rather than under it, which is where a reader looks
- * for the box, so those pass `layout="inline"`. The design system hides a field's description
- * along with its label, so a control that wants one visible hands it here instead of setting it
- * on itself.
+ * A control whose label line also names its environment variable. Design-system labels are plain
+ * strings, so the control's label is hidden (still its accessible name) and drawn here, pointed at
+ * the control's id once mounted. Checkboxes and switches pass `layout="inline"`.
  */
 
 import {
@@ -44,21 +33,13 @@ export function EnvLabelledField({
   badge,
   children,
 }: {
-  /** The control's label, drawn here instead of by the control. */
   label: string;
   /** The variables that set this one field. */
   env: readonly string[];
   /** Something to say about this field beside its name, such as where its value came from. */
   badge?: ReactNode;
-  /**
-   * The field's description, drawn here rather than by the control.
-   *
-   * Either layout: hiding a control's label hides its description with it, so a caller that wants
-   * one visible hands it over rather than passing it down. Omit it and the control keeps its own,
-   * which only a stacked one will show.
-   */
+  /** Hiding a control's label hides its description too, so a visible one is handed over here. */
   description?: string;
-  /** `stacked` puts the label above the control; `inline` puts the control first, on its left. */
   layout?: "stacked" | "inline";
   /** One design-system control. It is given `isLabelHidden` and a ref. */
   children: ReactElement<ControlProps>;
@@ -67,10 +48,9 @@ export function EnvLabelledField({
   const [controlId, setControlId] = useState<string>();
   const labelId = useId();
 
-  // After mount, because the control generates its own id and only then has one to point at.
+  // The control generates its id, so it only has one after mount.
   useEffect(() => setControlId(controlRef.current?.id), []);
 
-  // A real label element, so the text focuses the control the way the control's own would.
   const labelLine = (
     <HStack gap={2} vAlign="center" wrap="wrap">
       <label id={labelId} htmlFor={controlId} style={{ cursor: "pointer" }}>
@@ -83,9 +63,8 @@ export function EnvLabelledField({
   const control = cloneElement(children, { isLabelHidden: true, ref: controlRef });
 
   if (layout === "inline") {
-    // A grid rather than a row of two stacks: the description starts where the label does rather
-    // than under the box. The box spans both rows and centres itself across them, so it sits in
-    // the middle of the field however many lines the description runs to.
+    // A grid, so the description starts under the label, not the box, and the box centres across
+    // both rows however long the description runs.
     return (
       <div
         style={{

@@ -1,10 +1,6 @@
-/**
- * Functional: HTTP→HTTPS redirect with ssl_forced enabled - plain HTTP gets a 308.
- * Domain: func-ssl.test
- */
+/** ssl_forced: plain HTTP gets a 308. Domain: func-ssl.test */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForRoute } from '../../helpers/http';
-import { injectFormFields } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-ssl.test';
@@ -12,8 +8,7 @@ const DOMAIN = 'func-ssl.test';
 test.describe
   .serial('SSL Redirect (ssl_forced)', () => {
     test('setup: create proxy host with ssl_forced=true', async ({ page }) => {
-      // Navigate to proxy-hosts and open the create dialog manually so we can
-      // inject ssl_forced=true without the ssl_forced_present bypass.
+      // Opened by hand rather than through createProxyHost, which turns Force HTTPS off.
       await page.goto('/proxy-hosts');
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
@@ -23,11 +18,10 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').fill('echo-server:8080');
 
-      // Inject ssl_forced=true (default form behavior - no override)
-      await injectFormFields(page, {
-        sslForcedPresent: 'on',
-        sslForced: 'on', // checkbox checked → ssl_forced = true
-      });
+      // On by default; the spec checks the switch rather than setting it.
+      await expect(
+        page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' }),
+      ).toBeChecked();
 
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
@@ -42,7 +36,6 @@ test.describe
 
     test('HTTP request receives 308 redirect to HTTPS', async () => {
       const res = await httpGet(DOMAIN, '/');
-      // Caddy redirects HTTP→HTTPS when ssl_forced=true
       expect(res.status).toBe(308);
     });
 

@@ -422,7 +422,7 @@ describe('cross-table relationships', () => {
       createdAt: now,
     });
 
-    // Delete the CA - should cascade: CA → issued certs → cert_roles
+    // Cascades: CA -> issued certs -> cert_roles, but not the role itself.
     await db.delete(caCertificates).where(eq(caCertificates.id, ca.id));
 
     const remainingCerts = await db.select().from(issuedClientCertificates);
@@ -431,7 +431,6 @@ describe('cross-table relationships', () => {
     const remainingAssignments = await db.select().from(mtlsCertificateRoles);
     expect(remainingAssignments).toHaveLength(0);
 
-    // The role itself should still exist
     const remainingRoles = await db.select().from(mtlsRoles);
     expect(remainingRoles).toHaveLength(1);
   });
@@ -488,7 +487,6 @@ describe('cross-table relationships', () => {
     const role = await insertRole();
     const now = nowIso();
 
-    // Create an access rule that references this role
     await db.insert(mtlsAccessRules).values({
       proxyHostId: host.id,
       pathPattern: '/test',
@@ -497,12 +495,11 @@ describe('cross-table relationships', () => {
       updatedAt: now,
     });
 
-    // Delete the role - the access rule should still exist (JSON array, no FK)
+    // No FK: role ids sit in a JSON array, so the rule outlives the role, dangling id and all.
     await db.delete(mtlsRoles).where(eq(mtlsRoles.id, role.id));
 
     const rules = await db.select().from(mtlsAccessRules);
     expect(rules).toHaveLength(1);
-    // The role ID is still in the JSON, but the role no longer exists
     expect(JSON.parse(rules[0].allowedRoleIds)).toEqual([role.id]);
   });
 });

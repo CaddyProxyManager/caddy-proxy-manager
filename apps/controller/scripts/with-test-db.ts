@@ -1,14 +1,7 @@
 /**
- * Runs a command with TEST_POSTGRES_URL pointing at a PostgreSQL the suite may do anything to.
- *
- *   bun scripts/with-test-db.ts bun test tests/unit
- *
- * PostgreSQL needs a real server. Starting one here rather than asking for it keeps `bun run test`
- * working on a fresh clone - the same bargain the e2e suite already makes, and Docker is already
- * required for that. With TEST_DB=sqlite nothing is started and the command runs as-is.
- *
- * An externally supplied TEST_POSTGRES_URL wins and nothing is started: that is how CI runs, where
- * the server is a service container, and how a developer points the suite at their own.
+ * `bun scripts/with-test-db.ts bun test tests/unit`. Starts a throwaway PostgreSQL so a fresh
+ * clone can test; an existing TEST_POSTGRES_URL (CI's service container) or TEST_DB=sqlite
+ * starts none.
  */
 import { SQL } from "bun";
 import yargs from "yargs";
@@ -20,18 +13,15 @@ const PASSWORD = "cpm-test";
 const READY_TIMEOUT_MS = 60_000;
 
 /**
- * `halt-at-non-option` is what keeps this a wrapper rather than a parser: everything from the first
- * bare word on belongs to the child, so `bun test --parallel` reaches Bun with its flag intact
- * instead of yargs claiming `--parallel` for itself. Positional numbers stay strings for the same
- * reason - an argument like `007` must not arrive as `7`.
+ * `halt-at-non-option` leaves the child's flags (`bun test --parallel`) to it, and positional
+ * numbers stay strings so `007` does not arrive as `7`.
  */
 const command = yargs(hideBin(process.argv))
   .scriptName("with-test-db")
   .usage("Usage: $0 <command> [args...]")
   .parserConfiguration({ "halt-at-non-option": true, "parse-positional-numbers": false })
   .demandCommand(1, "a command to run is required")
-  // Exit 2 for a usage error, as before: yargs would exit 1, which is indistinguishable from the
-  // wrapped command having failed.
+  // Exit 2: yargs's 1 is indistinguishable from the wrapped command failing.
   .fail((message, error) => {
     if (error) throw error;
     console.error(message);
@@ -51,10 +41,7 @@ async function docker(args: string[]): Promise<{ code: number; stdout: string; s
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 
-/**
- * Port 0 lets the OS pick, so concurrent runs (a watch session beside a one-off) never collide.
- * Docker reports the real port back through `port`.
- */
+/** Port 0 lets the OS pick, so concurrent runs never collide. */
 async function startContainer(): Promise<string> {
   const run = await docker([
     "run",
@@ -70,18 +57,14 @@ async function startContainer(): Promise<string> {
     "POSTGRES_DB=cpm_test",
     "-p",
     "0:5432",
-    // The parent directory: 18+ images keep the cluster in a versioned subdirectory of it, and
-    // refuse to start with a separate mount at the old /var/lib/postgresql/data.
+    // The parent: 18+ refuses a separate mount at the old /var/lib/postgresql/data.
     "--tmpfs",
     "/var/lib/postgresql",
     IMAGE,
-    // Bun runs test files in parallel processes, and each one that imports src/lib/db opens a
-    // pool of its own on top of the per-test connections. The default of 100 is exhausted well
-    // before the suite finishes; this is a throwaway server, so the ceiling can be generous.
+    // Every parallel test process opens its own pool; the default 100 runs out.
     "-c",
     "max_connections=1000",
-    // Durability buys nothing for a database that is deleted when the run ends, and fsync is the
-    // single largest cost in schema setup and teardown.
+    // Throwaway, and fsync is the largest cost in schema setup and teardown.
     "-c",
     "fsync=off",
     "-c",
@@ -105,7 +88,7 @@ async function startContainer(): Promise<string> {
   return mapped;
 }
 
-/** Returns the server's max_connections, which is also proof the -c flags reached postgres. */
+/** Returns max_connections, proof the -c flags reached postgres. */
 async function waitUntilReady(url: string): Promise<string> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let lastError: unknown;
@@ -143,8 +126,7 @@ if (process.env.TEST_DB === "sqlite") {
   const port = await startContainer();
   started = true;
   url = `postgres://cpm:${PASSWORD}@127.0.0.1:${port}/cpm_test`;
-  // Ctrl-C during a watch session would otherwise leave the container running. `--rm` only covers
-  // the container exiting on its own.
+  // `--rm` only covers the container exiting on its own, not Ctrl-C here.
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
       void stopContainer().finally(() => process.exit(130));

@@ -1,7 +1,6 @@
 /**
- * The legacy Cloudflare API token is a credential like every other DNS one, and is stored encrypted.
- * It used to be written as typed, so rows from before that still hold plaintext and must keep
- * working until their next save encrypts them.
+ * The legacy Cloudflare token is stored encrypted, but rows written before that hold plaintext and
+ * must keep working until their next save encrypts them.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({

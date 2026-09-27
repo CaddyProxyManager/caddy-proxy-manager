@@ -5,13 +5,8 @@ import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 
 /**
- * The phone's floating action button: the one thing you do on a list that is not reading it, in the
- * corner a thumb reaches without leaving the list.
- *
- * Rendered at every width and shown only below the narrow edge by CSS, so the server and the client
- * agree on the markup and nothing flashes in after hydration. On a desktop the page's own button is
- * the action; display: none there also keeps this one out of the accessibility tree, so no width
- * ever offers the same action twice to a screen reader.
+ * Rendered at every width and hidden by CSS above the narrow edge, so SSR and client markup agree
+ * and display: none keeps it out of the accessibility tree beside the page's own button.
  */
 export function Fab({
   label,

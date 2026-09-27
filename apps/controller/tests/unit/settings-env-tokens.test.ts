@@ -3,24 +3,16 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 /**
- * The settings screens show environment variables as tokens - beside a block's heading when the
- * variable governs the block, and under a field when it sets that one field - and feed the same
- * strings to the search. A token is only worth showing if it names a variable that
- * exists: a typo or a variable that was renamed out from under it sends an operator looking for a
- * line that is not there, and the search silently stops matching what they type.
- *
- * `.env.example` is the list of variables this deployment documents, so it is what the tokens are
- * checked against. Nothing here asserts the reverse - most variables configure something with no
- * settings page at all.
+ * Env-var tokens on the settings screens (and in its search) must name a variable `.env.example`
+ * documents, or they send an operator hunting for a line that isn't there. Not the reverse: most
+ * variables have no settings page.
  */
 
-// The navigation catalogue, which the sidebar and the section pane both render from.
 const settingsClient = readFileSync(
   join(process.cwd(), 'src/app/(dashboard)/settings/sections.ts'),
   'utf8',
 );
 
-// The blocks themselves, where a variable that sets one field is named under that field.
 const settingsBlocks = readFileSync(
   join(process.cwd(), 'src/app/(dashboard)/settings/SettingsClient.tsx'),
   'utf8',
@@ -28,20 +20,15 @@ const settingsBlocks = readFileSync(
 
 const envExample = readFileSync(join(process.cwd(), '../../.env.example'), 'utf8');
 
-/** Every `NAME=` in `.env.example`, commented-out lines included - those are documentation too. */
+/** Commented-out lines included: those are documentation too. */
 const documented = new Set(
   Array.from(envExample.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm), (m) => m[1]),
 );
 
-/**
- * Variables that are real but are not CPM's own, so `.env.example` does not carry them.
- *
- * `TS_AUTHKEY` lives in Caddy's environment: the Tailscale section accepts `{env.TS_AUTHKEY}` as
- * an auth key and Caddy's replacer resolves it, which is what keeps the key out of the database.
- */
+/** Not CPM's own: Caddy resolves `{env.TS_AUTHKEY}`, keeping the key out of the database. */
 const FOREIGN = new Set(['TS_AUTHKEY']);
 
-/** Tokens naming a family rather than a variable. Their members are asserted separately. */
+/** A family rather than a variable; members are asserted separately. */
 const isWildcard = (name: string) => name.endsWith('_*');
 
 function tokensIn(field: 'env' | 'envSearch'): string[] {
@@ -54,7 +41,7 @@ function tokensIn(field: 'env' | 'envSearch'): string[] {
   return names;
 }
 
-/** The variables named on a field's own label line, as `<EnvLabelledField env={[...]}>`. */
+/** As `<EnvLabelledField env={[...]}>`. */
 function fieldTokens(): string[] {
   const names: string[] = [];
   for (const use of settingsBlocks.matchAll(/<EnvLabelledField[^>]*?env=\{\[([^\]]*)\]\}/g)) {
@@ -65,11 +52,10 @@ function fieldTokens(): string[] {
 
 describe('settings environment tokens', () => {
   it('finds tokens to check', () => {
-    // Guards the regexes above: a catalog refactor that renames the fields would otherwise leave
-    // this file asserting nothing at all, quietly.
+    // A refactor renaming the fields would otherwise leave this asserting nothing, quietly.
     expect([...tokensIn('env'), ...fieldTokens()].length).toBeGreaterThan(15);
     expect(tokensIn('envSearch').length).toBeGreaterThan(0);
-    // Both shapes are in use, so a refactor that drops one fails here rather than going quiet.
+    // Both shapes are in use; dropping one fails here rather than going quiet.
     expect(tokensIn('env').length).toBeGreaterThan(0);
     expect(fieldTokens().length).toBeGreaterThan(0);
   });
@@ -83,7 +69,7 @@ describe('settings environment tokens', () => {
   });
 
   it('names only documented variables on the setup step', () => {
-    // The identity-provider card is not generated from the registry, so its names are typed out.
+    // The identity-provider card is not registry-generated.
     const setupClient = readFileSync(
       join(process.cwd(), 'src/app/setup/settings/SetupSettingsClient.tsx'),
       'utf8',
@@ -95,8 +81,7 @@ describe('settings environment tokens', () => {
   });
 
   it('shows a variable in one place, not two', () => {
-    // A variable named under its field must not also sit beside the heading: the heading is for
-    // what governs the whole block, and saying it twice reads as two different settings.
+    // Named twice, it reads as two different settings.
     const heading = new Set(tokensIn('env'));
     expect(fieldTokens().filter((name) => heading.has(name))).toEqual([]);
   });
@@ -108,7 +93,7 @@ describe('settings environment tokens', () => {
       const prefix = wildcard.slice(0, -1);
       const members = [...searchable].filter((name) => name.startsWith(prefix));
 
-      // Shown as a prefix, so the search is the only way to reach it by a member's name.
+      // Shown as a prefix, so only the search reaches it by a member's name.
       expect(members.length).toBeGreaterThan(0);
     }
   });

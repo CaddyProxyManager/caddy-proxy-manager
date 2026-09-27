@@ -1,6 +1,5 @@
-// The application's tables, and the hand-edited source of truth for both backends. After editing,
-// regenerate the SQLite mirror with `bun scripts/generate-sqlite-schema.ts`, then the migrations with
-// `bun run db:generate` once per dialect (see drizzle.config.ts).
+// Source of truth for both backends. After editing, run `bun scripts/generate-sqlite-schema.ts`,
+// then `bun run db:generate` once per dialect (see drizzle.config.ts).
 import {
   boolean,
   index,
@@ -20,9 +19,8 @@ export const users = pgTable(
     email: text("email").notNull(),
     name: text("name"),
     passwordHash: text("passwordHash"),
-    // When the login password was last set. Null for a user without one, and for one whose password
-    // predates this column - the credential account's updatedAt cannot stand in for it, because the
-    // environment-seeded admin rewrites that row on every start.
+    // Null without a password or for one predating this column. Not the credential account's
+    // updatedAt: the env-seeded admin rewrites that row on every start.
     passwordChangedAt: isoTimestamp("passwordChangedAt"),
     role: text("role").notNull().default("user"),
     provider: text("provider"),
@@ -32,6 +30,8 @@ export const users = pgTable(
     username: text("username"),
     displayUsername: text("displayUsername"),
     emailVerified: boolean("emailVerified").notNull().default(false),
+    // Set by Better Auth's two-factor plugin once TOTP is verified; local accounts only.
+    twoFactorEnabled: boolean("twoFactorEnabled").notNull().default(false),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
@@ -52,12 +52,13 @@ export const sessions = pgTable(
     expiresAt: isoTimestamp("expiresAt").notNull(),
     ipAddress: text("ipAddress"),
     userAgent: text("userAgent"),
-    // Which IdP session this one came from, when it came from one at all. OIDC back-channel
-    // logout names the session to end by its `sid`, which is only unique within an issuer - so
-    // the provider is stored beside it rather than matching on `sid` alone. Both stay null for
-    // credential sign-ins and for providers that issue no `sid`.
+    // For OIDC back-channel logout. `sid` is unique only per issuer, hence the provider beside it.
     oidcProviderId: text("oidcProviderId"),
     oidcSid: text("oidcSid"),
+    // An admin's "view as" preview; narrows this session only. Groups are a JSON array of ids.
+    viewAsRole: text("viewAsRole"),
+    viewAsGroupIds: text("viewAsGroupIds"),
+    viewAsExpiresAt: isoTimestamp("viewAsExpiresAt"),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
@@ -104,6 +105,26 @@ export const verifications = pgTable("verifications", {
   createdAt: isoTimestamp("createdAt"),
   updatedAt: isoTimestamp("updatedAt"),
 });
+
+// Better Auth's `twoFactor` model. `secret` and `backupCodes` are encrypted by the plugin with the
+// auth secret; the lockout columns cap consecutive wrong codes per account.
+export const twoFactors = pgTable(
+  "two_factors",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backupCodes").notNull(),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failedVerificationCount").notNull().default(0),
+    lockedUntil: isoTimestamp("lockedUntil"),
+  },
+  (table) => ({
+    userUnique: uniqueIndex("two_factors_user_unique").on(table.userId),
+  }),
+);
 
 export const oauthProviders = pgTable(
   "oauth_providers",
@@ -173,7 +194,6 @@ export const pendingOAuthLinks = pgTable(
     expiresAt: text("expiresAt").notNull(),
   },
   (table) => ({
-    // Ensure only one pending link per user per provider (prevents race conditions)
     userProviderUnique: uniqueIndex("pending_oauth_user_provider_unique").on(
       table.userId,
       table.provider,
@@ -188,12 +208,8 @@ export const settings = pgTable("settings", {
 });
 
 /**
- * Settings edited but not yet applied, held per operator.
- *
- * Same `key` and serialized `value` as `settings`, so a staged row is a drop-in for the stored one
- * and the read path parses both identically. Scoped by user because two admins editing at once
- * must not see each other's half-finished work land in their own apply - the row moves into
- * `settings` only when its owner applies.
+ * Settings edited but not yet applied. Same shape as `settings`, so a staged row is a drop-in;
+ * per user so one admin's apply never lands another's half-finished edits.
  */
 export const settingsStaged = pgTable(
   "settings_staged",
@@ -211,14 +227,8 @@ export const settingsStaged = pgTable(
 );
 
 /**
- * One row per apply, so an operator can see what changed and when it reached Caddy.
- *
- * `id` is the revision number the UI shows. `summary` is the human-readable change list rendered
- * at apply time rather than derived later: the settings it describes have moved on by then, and a
- * history that re-reads current values would narrate the present, not what happened.
- *
- * `changes` is each committed key's serialized value before and after, as JSON. It is what makes
- * two revisions comparable and an old one restorable; null on rows written before it existed.
+ * One row per apply. `summary` is rendered at apply time, since re-reading current values later
+ * would narrate the present. `changes` (before/after JSON) is null on rows predating it.
  */
 export const settingsRevisions = pgTable("settings_revisions", {
   id: serial("id").primaryKey(),
@@ -233,33 +243,19 @@ export const settingsRevisions = pgTable("settings_revisions", {
 });
 
 /**
- * Agents this controller has paired with.
- *
- * No address, because the controller never dials one: agents connect inbound and hold an event
- * stream open, so whether an agent is reachable is a question about `lib/agent/registry.ts` and
- * this table cannot answer it. What lives here is the half that must outlive a restart - who the
- * agent is, and the secret it signs with.
- *
- * `agentId` is the identity the agent asserts on every request and the key pairing upserts on, so
- * an agent that re-pairs replaces its row rather than accumulating one per attempt.
+ * Paired agents. No address: agents dial in, so reachability lives in `lib/agent/registry.ts`.
+ * Pairing upserts on `agentId`, so a re-pair replaces the row.
  */
 export const agents = pgTable(
   "agents",
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    /** The agent's own stable id, minted once on its host and reported at pairing. */
     agentId: text("agentId").notNull(),
-    /** Shared secret, encrypted at rest. Never leaves the server. */
+    /** Encrypted at rest. */
     secret: text("secret").notNull(),
     enabled: boolean("enabled").notNull().default(true),
-    /**
-     * This agent's own Caddy build selection, as JSON, or null to follow the fleet default.
-     *
-     * Null rather than a copy of the default: an agent that has never been configured separately
-     * must keep tracking the fleet selection, so enabling a module for everyone does not silently
-     * skip the hosts nobody thought to open.
-     */
+    /** JSON, or null to keep tracking the fleet default rather than a stale copy of it. */
     buildSettings: text("buildSettings"),
     lastSeenAt: text("lastSeenAt"),
     lastError: text("lastError"),
@@ -275,6 +271,12 @@ export const accessLists = pgTable("access_lists", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  // What a request matching none of the IP rules gets; only consulted while there are rules.
+  ipDefault: text("ipDefault").notNull().default("deny"),
+  // "all": pass the IP rules and the password. "any": either will do.
+  satisfy: text("satisfy").notNull().default("all"),
+  // Forward the basic-auth Authorization header to the upstream.
+  passAuth: boolean("passAuth").notNull().default(false),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
@@ -294,6 +296,26 @@ export const accessListEntries = pgTable(
   },
   (table) => ({
     accessListIdIdx: index("access_list_entries_list_idx").on(table.accessListId),
+  }),
+);
+
+/** Ordered allow/deny rules on client IPs; the first that matches decides. */
+export const accessListIpRules = pgTable(
+  "access_list_ip_rules",
+  {
+    id: serial("id").primaryKey(),
+    accessListId: integer("accessListId")
+      .references(() => accessLists.id, { onDelete: "cascade" })
+      .notNull(),
+    action: text("action").notNull(),
+    cidr: text("cidr").notNull(),
+    note: text("note"),
+    sortOrder: integer("sortOrder").notNull(),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    accessListIdIdx: index("access_list_ip_rules_list_idx").on(table.accessListId),
   }),
 );
 
@@ -348,6 +370,7 @@ export const issuedClientCertificates = pgTable(
 export const proxyHosts = pgTable("proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  description: text("description"),
   domains: text("domains").notNull(),
   upstreams: text("upstreams").notNull(),
   certificateId: integer("certificateId").references(() => certificates.id, {
@@ -396,9 +419,8 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: text("createdAt").notNull(),
 });
 
-// traffic_events and waf_events live in ClickHouse - see src/lib/clickhouse/client.ts. The
-// parsers that fill them, and their read offsets, live in the agent: the Caddy log is a file on
-// the agent's host, which a controller elsewhere cannot read at all.
+// traffic_events and waf_events live in ClickHouse (src/lib/clickhouse/client.ts); their parsers
+// and offsets live in the agent, which is where the Caddy log file is.
 
 // ── mTLS RBAC ──────────────────────────────────────────────────────────
 
@@ -600,8 +622,7 @@ export const forwardAuthExchanges = pgTable(
       .notNull(),
     audienceOrigin: text("audienceOrigin").notNull(),
     codeHash: text("codeHash").notNull(),
-    // Legacy compatibility column. Only a fixed placeholder is stored; the
-    // replacement session token is generated at atomic redemption time.
+    // Legacy column holding a fixed placeholder; the real token is minted at redemption.
     sessionToken: text("sessionToken").notNull(),
     redirectUri: text("redirectUri").notNull(),
     expiresAt: text("expiresAt").notNull(),
@@ -638,6 +659,7 @@ export const forwardAuthRedirectIntents = pgTable(
 export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  description: text("description"),
   protocol: text("protocol").notNull(),
   listenAddress: text("listenAddress").notNull(),
   upstreams: text("upstreams").notNull(),
@@ -654,12 +676,8 @@ export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
 });
 
 /**
- * Which agents serve a host.
- *
- * No rows for a host means every agent serves it, which is what the whole fleet did before this
- * table existed - so an upgrade changes nothing and an operator opts in per host. Many-to-many
- * rather than a column, because two edge nodes serving one host is an ordinary HA arrangement and
- * a single-valued assignment would forbid what the fleet-wide broadcast already allowed.
+ * Which agents serve a host; no rows means every agent, so upgrades change nothing. Many-to-many
+ * because two edge nodes serving one host is ordinary HA.
  */
 export const proxyHostAgents = pgTable(
   "proxy_host_agents",
@@ -699,18 +717,9 @@ export const l4ProxyHostAgents = pgTable(
 );
 
 /**
- * IdP group names that resolve to a CPM group.
- *
- * The prefix convention on `oauth_providers` mirrors claimed groups by name, which works right up
- * until the IdP's name is not the one an operator wants to see - "AD-Infra-Proxy-Admins" against a
- * CPM group called "Networking". This table is that mapping written down: a CPM group can claim as
- * many external names as it likes, and the prefix convention keeps working for everything not
- * named here.
- *
- * `providerId` is nullable and means "any provider", for the deployment with one IdP that does not
- * want to restate it. Uniqueness is enforced in the model rather than by an index, because
- * PostgreSQL treats NULLs as distinct and a partial index per case would be two indexes saying one
- * thing.
+ * IdP group names mapped to a CPM group, for names the prefix convention cannot express. Null
+ * `providerId` means any provider; uniqueness lives in the model since PostgreSQL treats NULLs
+ * as distinct.
  */
 export const groupIdpMappings = pgTable(
   "group_idp_mappings",
@@ -733,15 +742,8 @@ export const groupIdpMappings = pgTable(
 );
 
 /**
- * What a group is allowed to manage.
- *
- * Additive, never subtractive: a grant widens what an `operator` can reach and does nothing at all
- * to an `admin`, a `user` or a `viewer`. That is what makes this safe to ship - no existing user's
- * access changes until someone is deliberately moved to the operator role.
- *
- * One nullable column per resource kind rather than a polymorphic (type, id) pair, matching
- * `forward_auth_access`: it buys real foreign keys, so deleting a host takes its grants with it
- * instead of leaving a row pointing at an id something else will later reuse.
+ * What a group may manage. Additive, and only for `operator`s. One nullable column per resource
+ * kind, not a polymorphic pair, so real foreign keys delete grants with their host.
  */
 export const groupGrants = pgTable(
   "group_grants",

@@ -1,8 +1,3 @@
-/**
- * Moved here with the parser it covers: the Caddy log is a file on the agent's host, so this
- * is where it is read. The mocks the controller's copy needed are gone - these are pure
- * functions, and the module's imports are real dependencies of this package now.
- */
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -33,10 +28,8 @@ describe("readLines (real filesystem)", () => {
     const content = "complete\nincomplete-tail";
     writeFileSync(file, content);
     const { lines, newOffset } = await readLines(0, file);
-    // Only the newline-terminated line is returned...
     expect(lines).toEqual(["complete"]);
-    // ...and the offset stops right after that newline, so the partial tail
-    // will be re-read whole next pass instead of being split and lost.
+    // So the partial tail is re-read whole next pass rather than split and lost.
     expect(newOffset).toBe(Buffer.byteLength("complete\n"));
   });
 
@@ -46,8 +39,7 @@ describe("readLines (real filesystem)", () => {
     const pass1 = await readLines(0, file);
     expect(pass1.lines).toEqual(['{"a":1}']);
 
-    // Pass 2: the rest of the line lands; reading from the carried offset must
-    // yield the FULL second line, not a corrupted fragment.
+    // Pass 2: the carried offset must yield the FULL second line, not a fragment.
     appendFileSync(file, ',"c":3}\n');
     const pass2 = await readLines(pass1.newOffset, file);
     expect(pass2.lines).toEqual(['{"b":2,"c":3}']);

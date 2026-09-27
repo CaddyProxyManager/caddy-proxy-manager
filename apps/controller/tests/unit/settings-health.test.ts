@@ -1,26 +1,17 @@
-/**
- * The settings home's tile statuses. These are the claims the "needs attention" band makes, so
- * each one is pinned to the condition that justifies it - a tile that cries wolf is worse than no
- * tile, and a silent one hides a misconfiguration that looks fine on every individual page.
- */
+/** Each "needs attention" tile is pinned to the condition that justifies it, both ways. */
 import { describe, it, expect } from 'bun:test';
 import { createTranslator } from 'next-intl';
 import messages from '../../messages/en.json';
 import { needsAttention, sectionHealth, type HealthInput } from '../../src/lib/settings/health';
 
-// The real catalog rather than a stub, so the wording assertions below still hold the English.
+// The real catalog, so wording assertions hold the English.
 const t = createTranslator({ locale: 'en', messages, namespace: 'settings' });
 
 function health(healthInput: HealthInput) {
   return sectionHealth(healthInput, t);
 }
 
-/**
- * A GeoipView, defaulted to a healthy deployment.
- *
- * One builder rather than a literal per case: the view grows fields (the update check added three),
- * and eight copies would mean eight edits every time - which is how fixtures drift from the type.
- */
+/** Defaults to healthy; one builder so fixtures cannot drift from the type as it grows. */
 function geoipView(overrides: Partial<HealthInput['geoip']> = {}): HealthInput['geoip'] {
   return {
     enabled: false,
@@ -134,8 +125,7 @@ describe('sectionHealth', () => {
   });
 
   it('does not cry stale on age alone, because MaxMind may simply not have published', () => {
-    // The whole reason the update check exists: an old file is only a fault if something newer
-    // was available and was not fetched.
+    // An old file is only a fault if something newer was available and not fetched.
     const sections = health(
       input({
         geoip: geoipView({

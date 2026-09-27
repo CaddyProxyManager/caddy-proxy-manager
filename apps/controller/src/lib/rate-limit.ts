@@ -12,12 +12,8 @@ type RateLimitOutcome = {
 const ATTEMPTS = new Map<string, RateLimitEntry>();
 
 /**
- * Read per call rather than at module load: the three values are settings now, so an operator can
- * change the throttle without a restart. The settings module caches, so this is a map lookup after
- * the first read.
- *
- * Imported lazily for the same reason the config module always was - a static import would read
- * process.env before a test's hoisted block could set it.
+ * Per call, so a settings change needs no restart (cached, so cheap). Imported lazily: a static
+ * import would read process.env before a test's hoisted block could set it.
  */
 async function limits(): Promise<{ maxAttempts: number; windowMs: number; blockMs: number }> {
   const [registry, { getSetting }] = await Promise.all([
@@ -38,13 +34,11 @@ function getEntry(key: string, now: number, windowMs: number): RateLimitEntry | 
     return undefined;
   }
 
-  // Unblock if the penalty period has elapsed.
   if (entry.blockedUntil && entry.blockedUntil <= now) {
     ATTEMPTS.delete(key);
     return undefined;
   }
 
-  // Reset the window once the observation window expires.
   if (!entry.blockedUntil && entry.firstAttemptTimestamp + windowMs <= now) {
     ATTEMPTS.delete(key);
     return undefined;
@@ -107,7 +101,7 @@ type AccountEntry = { failures: number; lockedUntil: number; lastFailureAt: numb
 
 const ACCOUNTS = new Map<string, AccountEntry>();
 
-/** Failures an account absorbs before any delay, so a few typos never slow a real person down. */
+/** So a few typos never slow a real person down. */
 const ACCOUNT_FREE_FAILURES = 5;
 const ACCOUNT_BASE_DELAY_MS = 1_000;
 /** Capped rather than a hard lock: an attacker can slow the owner's sign-in, never shut it off. */
@@ -122,7 +116,7 @@ export function accountKey(emailOrUsername: string): string {
   return normalized.includes("@") ? normalized : `${normalized}@localhost`;
 }
 
-/** Milliseconds until `account` may try again; 0 when it may now. */
+/** 0 when it may try now. */
 export function accountRetryAfterMs(account: string, now = Date.now()): number {
   const entry = ACCOUNTS.get(account);
   if (!entry) return 0;
@@ -133,7 +127,7 @@ export function accountRetryAfterMs(account: string, now = Date.now()): number {
   return Math.max(0, entry.lockedUntil - now);
 }
 
-/** Records a failed password for `account`; returns the delay now imposed on it. */
+/** Returns the delay now imposed. */
 export function registerAccountFailure(account: string, now = Date.now()): number {
   let entry = ACCOUNTS.get(account);
   if (!entry || now - entry.lastFailureAt > ACCOUNT_FORGET_MS) {
@@ -164,7 +158,7 @@ export function resetAccountFailures(account: string): void {
 const WINDOWS = new Map<string, { count: number; resetAt: number }>();
 const MAX_TRACKED_WINDOWS = 10_000;
 
-/** Counts one event against `limit` per `windowMs` for `key`; false once that window is spent. */
+/** False once that window is spent. */
 export function takeFromWindow(key: string, limit: number, windowMs: number, now = Date.now()) {
   let entry = WINDOWS.get(key);
   if (!entry || entry.resetAt <= now) {
@@ -182,7 +176,7 @@ export function takeFromWindow(key: string, limit: number, windowMs: number, now
   return true;
 }
 
-/** Whether `key` has already spent `limit` in its current window, without counting anything. */
+/** Without counting anything. */
 export function windowSpent(key: string, limit: number, now = Date.now()): boolean {
   const entry = WINDOWS.get(key);
   return entry !== undefined && entry.resetAt > now && entry.count >= limit;

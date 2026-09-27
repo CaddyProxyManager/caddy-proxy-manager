@@ -1,10 +1,6 @@
 /**
- * POST /api/user/change-password.
- *
- * Changing a password has to end whoever else signed in with the old one - dashboard sessions and
- * forward-auth sessions alike - or a leaked password stays useful after it is changed. And a first
- * password on an account that signs in through a provider is a new way in, so a session alone is not
- * enough to add one: it has to be a sign-in from moments ago.
+ * POST /api/user/change-password. Must end every other session, forward-auth included, and a first
+ * password on a provider account is a new way in, so it needs a fresh sign-in.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -20,8 +16,7 @@ const ctx = vi.hoisted(() => ({
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -35,8 +30,7 @@ vi.mock('../../src/lib/db', () => ({
 vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
-// The session and its age are what these tests vary. Everything else stays real, the freshness
-// rule included.
+// Only the session and its age vary; the freshness rule stays real.
 const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({
   ...actualAuth,
@@ -116,7 +110,7 @@ async function forwardAuthSessionsOf(userId: number) {
   return ctx.db.select().from(forwardAuthSessions).where(eq(forwardAuthSessions.userId, userId));
 }
 
-/** A same-origin POST, shaped by hand: a real Request drops the Host header checkSameOrigin reads. */
+/** By hand: a real Request drops the Host header checkSameOrigin reads. */
 function post(body: unknown) {
   return POST({
     method: 'POST',
@@ -139,7 +133,7 @@ describe('changing a password', () => {
     const current = await seedSession(user.id, 'current');
     await seedSession(user.id, 'other');
     await seedForwardAuthSession(user.id);
-    // Old is fine here: the current password is the re-authentication.
+    // The current password is the re-authentication.
     ctx.session = { id: current, createdAt: new Date(Date.now() - 3 * 24 * 60 * MINUTE) };
 
     const response = await post({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD });

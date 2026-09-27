@@ -38,12 +38,14 @@ import { PathBlocksFields } from "./PathBlocksFields";
 import { PathRewritesFields } from "./PathRewritesFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
 import { AdvancedConfigFields } from "./AdvancedConfigFields";
+import { CacheFields } from "./CacheFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
+import { HostNotesField } from "./HostNotesField";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -56,11 +58,7 @@ type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
 export const NONE_VALUE = "__none__";
 
-/**
- * Close the dialog a second after the action succeeds, once. Keyed on the status alone: `onClose`
- * is a new function on every parent render, and depending on it re-armed a fresh, never-cleared
- * timer each time the page revalidated while the status stayed "success".
- */
+/** Keyed on status alone: `onClose` is new each render and would re-arm an uncleared timer. */
 function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -73,7 +71,6 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   }, [state.status]);
 }
 
-/** The action result banner, shared by all three dialogs. */
 function ActionStatus({ status, message }: { status: string; message?: string }) {
   if (status === "idle" || !message) return null;
   return <Banner status={status === "error" ? "error" : "success"} title={message} />;
@@ -88,21 +85,25 @@ export function toOptions(items: { id: number; name: string }[], noneLabel: stri
 
 type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
 
-/** Access list options, naming the empty ones: picking one closes the host rather than guarding it. */
+/** A list with neither users nor IP rules admits nobody. */
+export function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">): boolean {
+  return list.entries.length === 0 && (list.ipRules?.length ?? 0) === 0;
+}
+
+/** Names the empty ones: picking one closes the host rather than guarding it. */
 export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
   return toOptions(
     accessLists.map((list) => ({
       id: list.id,
-      name: list.entries.length === 0 ? t("accessListNoMembers", { name: list.name }) : list.name,
+      name: accessListIsEmpty(list) ? t("accessListNoMembers", { name: list.name }) : list.name,
     })),
     t("none"),
   );
 }
 
-/** A warning on the picker while the chosen list has no members. */
 export function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
   const chosen = accessLists.find((list) => String(list.id) === accessListId);
-  return chosen && chosen.entries.length === 0
+  return chosen && accessListIsEmpty(chosen)
     ? { type: "warning" as const, message: t("accessListEmptyWarning") }
     : undefined;
 }
@@ -131,11 +132,7 @@ export function CreateHostDialog({
   authentikDefaults: AuthentikSettings | null;
   forwardAuthDefaults: ForwardAuthSettings | null;
   tailscaleDefaults?: TailscaleHostDefaults | null;
-  /**
-   * Settings → General's default domain, prefilled so the common case is editing a subdomain
-   * rather than typing the whole name. Only for a genuinely new host: duplicating one carries
-   * the original's domains, which is what the operator opened the dialog to change.
-   */
+  /** Prefilled for a new host only: a duplicate carries the domains the operator came to change. */
   defaultDomain?: string;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];
@@ -149,6 +146,7 @@ export function CreateHostDialog({
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
   const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
   const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? defaultDomain ?? "");
   const [certificateId, setCertificateId] = useState(
     String(initialData?.certificateId ?? NONE_VALUE),
@@ -172,7 +170,11 @@ export function CreateHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <SettingsToggles
+            sslForced={initialData?.sslForced}
+            hstsEnabled={initialData?.hstsEnabled}
             hstsSubdomains={initialData?.hstsSubdomains}
+            allowWebsocket={initialData?.allowWebsocket}
+            preserveHostHeader={initialData?.preserveHostHeader}
             skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
             enabled={true}
           />
@@ -184,6 +186,7 @@ export function CreateHostDialog({
             onChange={setName}
             isRequired
           />
+          <HostNotesField value={description} onChange={setDescription} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}
@@ -213,12 +216,13 @@ export function CreateHostDialog({
           />
           <AgentAssignmentFields agents={agents} selected={[]} />
           <RedirectsFields initialData={initialData?.redirects} />
-          <LocationRulesFields initialData={initialData?.locationRules} />
+          <LocationRulesFields initialData={initialData?.locationRules} accessLists={accessLists} />
           <RewriteFields initialData={initialData?.rewrite} />
           <PathAllowsFields initialData={initialData?.pathAllows} />
           <PathBlocksFields initialData={initialData?.pathBlocks} />
           <PathRewritesFields initialData={initialData?.pathRewrites} />
           <ErrorPagesFields initialData={initialData?.errorPages} />
+          <CacheFields cache={initialData?.cache} />
           <AdvancedConfigFields host={initialData} />
           <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
           <ForwardAuthFields
@@ -294,6 +298,7 @@ export function EditHostDialog({
   );
 
   const [name, setName] = useState(host.name);
+  const [description, setDescription] = useState(host.description ?? "");
   const [domains, setDomains] = useState(host.domains.join("\n"));
   const [certificateId, setCertificateId] = useState(String(host.certificateId ?? NONE_VALUE));
   const [accessListId, setAccessListId] = useState(String(host.accessListId ?? NONE_VALUE));
@@ -315,11 +320,16 @@ export function EditHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <SettingsToggles
+            sslForced={host.sslForced}
+            hstsEnabled={host.hstsEnabled}
             hstsSubdomains={host.hstsSubdomains}
+            allowWebsocket={host.allowWebsocket}
+            preserveHostHeader={host.preserveHostHeader}
             skipHttpsValidation={host.skipHttpsHostnameValidation}
             enabled={host.enabled}
           />
           <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
+          <HostNotesField value={description} onChange={setDescription} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}
@@ -347,12 +357,13 @@ export function EditHostDialog({
           />
           <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
           <RedirectsFields initialData={host.redirects} />
-          <LocationRulesFields initialData={host.locationRules} />
+          <LocationRulesFields initialData={host.locationRules} accessLists={accessLists} />
           <RewriteFields initialData={host.rewrite} />
           <PathAllowsFields initialData={host.pathAllows} />
           <PathBlocksFields initialData={host.pathBlocks} />
           <PathRewritesFields initialData={host.pathRewrites} />
           <ErrorPagesFields initialData={host.errorPages} />
+          <CacheFields cache={host.cache} />
           {canEditRawConfig && <AdvancedConfigFields host={host} />}
           <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
           <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />

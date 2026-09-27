@@ -1,10 +1,6 @@
 /**
- * Group grants, and the role they apply to.
- *
- * The property worth pinning hardest is the one that made this safe to ship: a grant is **additive
- * and reaches only an operator**. An admin ignores them, a user and a viewer gain nothing from
- * them, and an operator starts with nothing. Get any of those backwards and adding the first grant
- * silently changes what an existing account can do.
+ * A grant is **additive and reaches only an operator**: admins ignore them, users and viewers gain
+ * nothing, operators start with nothing. Otherwise a first grant changes existing accounts.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { eq } from 'drizzle-orm';
@@ -16,8 +12,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -163,8 +158,7 @@ describe('grants reach only the operator role', () => {
   });
 
   it('gives a user nothing, even in a granted group', async () => {
-    // The whole safety argument: user 2 is a member of the granted group, and shipping this
-    // must not have widened what they can do by one host.
+    // User 2 is in the granted group and must not gain a single host.
     const access = await resolveAccess(await session('user', 2));
     expect(canView(access, 'proxyHost', HOST_A)).toBe(false);
     expect(canManage(access, 'proxyHost', HOST_A)).toBe(false);
@@ -182,7 +176,7 @@ describe('grants reach only the operator role', () => {
     expect(canManage(access, 'proxyHost', HOST_A)).toBe(true);
     expect(canView(access, 'proxyHost', HOST_B)).toBe(false);
     expect(canManage(access, 'agent', AGENT_A)).toBe(false);
-    // Creating is not something a grant can say anything about: it names a host that exists.
+    // A grant names an existing host, so it says nothing about creating.
     expect(canCreate(access)).toBe(false);
     expect([...(visibleIdFilter(access, 'proxyHost') ?? [])]).toEqual([HOST_A]);
   });
@@ -234,8 +228,7 @@ describe('setGroupGrants', () => {
   });
 
   it('cascades away with the host it named', async () => {
-    // The reason the resource columns are real foreign keys: a grant left pointing at a deleted
-    // host would come back to life when the id was reused.
+    // Why these are foreign keys: a dangling grant would revive when the id was reused.
     await seedGroup(1, 'Networking', [1]);
     await setGroupGrants(1, [
       { resource: { kind: 'proxyHost', id: HOST_A }, capability: 'manage' },

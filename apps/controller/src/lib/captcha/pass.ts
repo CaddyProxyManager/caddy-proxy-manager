@@ -1,10 +1,6 @@
 /**
- * Proof that the sign-in CAPTCHA was solved, good for exactly one password attempt.
- *
- * Minted when a provider token checks out, and spent by the password endpoint whatever the
- * password turns out to be, so each guess costs a solve. Spent here, on the server: clearing the
- * cookie only stops a browser, and a script replays whatever it was given. It names the account it
- * was solved for, so one solve cannot be carried to another name either.
+ * A solved CAPTCHA, good for one password attempt on one account, right or wrong. Spent on the
+ * server: clearing the cookie stops only a browser, not a script replaying it.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -12,25 +8,18 @@ import { derivePurposeKey } from "../derived-key";
 import { accountKey } from "../rate-limit";
 
 export const CAPTCHA_PASS_COOKIE = "cpm-captcha-pass";
-/** Only how long a pass may sit unused; spending it is what ends it. */
+/** How long a pass may sit unused. */
 export const CAPTCHA_PASS_TTL_MS = 10 * 60_000;
-/** Both password endpoints read it: Better Auth's under /api/auth, the portal's under /api/forward-auth. */
+/** Covers both /api/auth and /api/forward-auth. */
 export const CAPTCHA_PASS_PATH = "/api";
-/** Sent with every attempt that spent one, so the browser does not offer it again. */
 export const CAPTCHA_PASS_CLEAR_COOKIE = `${CAPTCHA_PASS_COOKIE}=; Path=${CAPTCHA_PASS_PATH}; Max-Age=0; HttpOnly; SameSite=Strict`;
 
-/**
- * Spent nonces, until their pass would have expired anyway. In memory, like every other throttle
- * here: a pass is only ever redeemed by the controller that minted it.
- */
+/** In memory: a pass is only redeemed by the controller that minted it. */
 const SPENT = new Map<string, number>();
-/** Minting takes a real solve each, so this is a ceiling a caller never reaches by accident. */
+/** Each entry took a real solve, so this is never reached by accident. */
 const MAX_SPENT = 100_000;
 
-/**
- * Mixed into the key so a restart invalidates every pass minted before it: SPENT is in memory and
- * starts empty, and a pass that outlived it could otherwise be redeemed a second time.
- */
+/** A restart empties SPENT, so it must also invalidate every pass minted before it. */
 let bootSalt = randomBytes(32);
 
 function signature(account: string, expiresAt: number, nonce: string): string {
@@ -44,7 +33,7 @@ export function issueCaptchaPass(username: string, now = Date.now()): string {
   return `${expiresAt}.${nonce}.${signature(accountKey(username), expiresAt, nonce)}`;
 }
 
-/** The nonce and expiry of a pass signed for `username`, or null. Spends nothing. */
+/** Spends nothing. */
 function verify(
   pass: string | null | undefined,
   username: string,
@@ -55,7 +44,7 @@ function verify(
   const [expiry, nonce, sig, ...rest] = pass.split(".");
   if (rest.length > 0 || !expiry || !nonce || !sig || !/^\d{1,15}$/.test(expiry)) return null;
   const expiresAt = Number(expiry);
-  // Past the TTL from now as well as expired: a pass is never minted further out than that.
+  // A pass is never minted further out than the TTL.
   if (expiresAt <= now || expiresAt > now + CAPTCHA_PASS_TTL_MS) return null;
   const expected = Buffer.from(signature(accountKey(username), expiresAt, nonce));
   const given = Buffer.from(sig);
@@ -63,7 +52,7 @@ function verify(
   return { nonce, expiresAt };
 }
 
-/** Whether `pass` would admit an attempt for `username` right now, without spending it. */
+/** Without spending it. */
 export function isValidCaptchaPass(
   pass: string | null | undefined,
   username: string,
@@ -73,10 +62,7 @@ export function isValidCaptchaPass(
   return verified !== null && !SPENT.has(verified.nonce);
 }
 
-/**
- * Admit one password attempt: true, and the pass is spent, or false and nothing changed.
- * Synchronous from check to record, so two requests replaying one pass cannot both get through.
- */
+/** Synchronous from check to record, so two replays of one pass cannot both get through. */
 export function redeemCaptchaPass(
   pass: string | null | undefined,
   username: string,
@@ -86,7 +72,7 @@ export function redeemCaptchaPass(
   if (!verified || SPENT.has(verified.nonce)) return false;
   if (SPENT.size >= MAX_SPENT) {
     for (const [nonce, expiresAt] of SPENT) if (expiresAt <= now) SPENT.delete(nonce);
-    // Refused rather than evicting a live entry, which would let that pass be replayed.
+    // Evicting a live entry would let that pass be replayed.
     if (SPENT.size >= MAX_SPENT) return false;
   }
   SPENT.set(verified.nonce, verified.expiresAt);
@@ -99,7 +85,6 @@ export function restartCaptchaPasses(): void {
   SPENT.clear();
 }
 
-/** The pass from a Cookie header, for route handlers that hold a raw request. */
 export function captchaPassFromCookieHeader(header: string | null): string | null {
   if (!header) return null;
   for (const part of header.split(";")) {

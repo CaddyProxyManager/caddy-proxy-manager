@@ -20,12 +20,11 @@ describe('wall-clock values in a time zone', () => {
   const unix = (iso: string) => Math.floor(Date.parse(iso) / 1000);
 
   it('reads a picker value as local time in the named zone', () => {
-    // May is daylight saving time in New York, four hours behind UTC.
+    // New York is on DST in May, UTC-4.
     expect(fromZonedWallTime('2026-05-01T09:00', 'America/New_York')).toBe(
       unix('2026-05-01T13:00:00Z'),
     );
     expect(fromZonedWallTime('2026-05-01T09:00', 'UTC')).toBe(unix('2026-05-01T09:00:00Z'));
-    // A half-hour zone.
     expect(fromZonedWallTime('2026-01-15T12:30', 'Asia/Kolkata')).toBe(
       unix('2026-01-15T07:00:00Z'),
     );

@@ -3,10 +3,8 @@ import { config } from "./config";
 import { derivePurposeKey } from "./derived-key";
 
 /**
- * Internal proof header injected by generated Caddy routes before they proxy a
- * forward-auth callback/verification request to CPM.  Forwarded host/protocol
- * headers alone are not trustworthy because the Next.js origin may be reachable
- * directly and clients can forge them there.
+ * Injected by Caddy before proxying a forward-auth request to CPM: forwarded headers alone can be
+ * forged by a client reaching the origin directly.
  */
 export const FORWARD_AUTH_PROXY_PROOF_HEADER = "X-CPM-Forward-Auth-Proof";
 
@@ -14,11 +12,7 @@ export const FORWARD_AUTH_PROXY_PROOF_HEADER = "X-CPM-Forward-Auth-Proof";
 const PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v2";
 const LEGACY_PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v1";
 
-/**
- * Derive a purpose-specific key instead of placing SESSION_SECRET itself in the
- * generated Caddy configuration.  Administrators who can read Caddy's config
- * are already trusted with the forward-auth control plane.
- */
+/** Keeps SESSION_SECRET itself out of the Caddy config its readers can see. */
 export function getForwardAuthProxyProof(): string {
   return createHmac("sha256", derivePurposeKey("forward-auth-proxy-proof:v2"))
     .update(PROOF_CONTEXT)
@@ -54,11 +48,7 @@ function hasValidProxyProof(headers: Headers): boolean {
   return false;
 }
 
-/**
- * Return the exact, normalized external origin vouched for by Caddy.  Scheme,
- * hostname, and non-default port are all part of URL.origin.  No Host fallback
- * is allowed: a direct request must never be able to manufacture an audience.
- */
+/** No Host fallback: a direct request must never be able to manufacture an audience. */
 export function getTrustedForwardAuthOrigin(headers: Headers): string | null {
   if (!hasValidProxyProof(headers)) return null;
 

@@ -1,7 +1,4 @@
-/**
- * The review sheet's diff. Caddy adapts one way only, so what an operator reviews is the JSON
- * document that gets pushed - which makes key ordering and credential masking this file's problem.
- */
+/** Caddy adapts one way only, so the review is the pushed JSON: ordering and masking matter. */
 import { describe, it, expect } from 'bun:test';
 import { diffConfigDocuments } from '../../src/lib/settings/config-diff';
 
@@ -26,9 +23,7 @@ describe('diffConfigDocuments', () => {
     expect(diff.unchanged).toBe(false);
     const added = diff.lines.filter((line) => line.kind === 'added');
     expect(added.some((line) => line.text.includes('100.64.0.0/10'))).toBe(true);
-    // Appending to a JSON array also rewrites the previous last line, which gains a trailing
-    // comma, so the entry costs two added lines and one removed rather than one added. Same
-    // behaviour as any line diff over JSON; asserted so it reads as expected rather than as a bug.
+    // The previous last line gains a comma, as in any line diff over JSON - expected, not a bug.
     expect(diff.added).toBe(2);
     expect(diff.removed).toBe(1);
   });
@@ -46,8 +41,7 @@ describe('diffConfigDocuments', () => {
   });
 
   it('masks credentials in rendered lines while showing the change beside them', () => {
-    // The ttl edit is what keeps lines on screen. With only the token changing there is nothing
-    // to render at all, which the next test covers.
+    // The ttl edit keeps lines on screen; a token-only change renders nothing (next test).
     const before = { dns: { api_token: 'secret-one', zone: 'example.com', ttl: 60 } };
     const after = { dns: { api_token: 'secret-two', zone: 'example.com', ttl: 120 } };
 
@@ -61,8 +55,7 @@ describe('diffConfigDocuments', () => {
   });
 
   it('reports a rotated credential as no change, because both sides mask to the same text', () => {
-    // Worth stating outright: the diff cannot show that a token changed, only that something did.
-    // The settings-level change list beside it is what tells the operator a credential was replaced.
+    // The diff shows only that something changed; the settings change list names the credential.
     const diff = diffConfigDocuments({ auth_key: 'old' }, { auth_key: 'new' });
 
     expect(diff.unchanged).toBe(true);
@@ -76,7 +69,6 @@ describe('diffConfigDocuments', () => {
 
     const gaps = diff.lines.filter((line) => line.kind === 'gap');
     expect(gaps.length).toBeGreaterThan(0);
-    // The whole point of collapsing: far fewer rendered lines than the document has.
     expect(diff.lines.length).toBeLessThan(20);
   });
 

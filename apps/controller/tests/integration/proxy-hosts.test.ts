@@ -155,7 +155,7 @@ describe('proxy-hosts integration', () => {
     });
     const row = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     const meta = JSON.parse(row!.meta ?? '{}');
-    // Raw DB stores all entries as-is; sanitization happens at model layer (parseMeta)
+    // Stored as-is; parseMeta sanitizes on read.
     expect(meta.location_rules).toHaveLength(3);
     expect(meta.location_rules[0].path).toBe('/good/*');
   });
@@ -172,7 +172,7 @@ describe('proxy-hosts integration', () => {
       meta: JSON.stringify({ redirects }),
     });
     const row = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
-    // Simulate parseMeta sanitization: only valid rules have non-empty from/to and valid status
+    // Mirrors parseMeta: a valid rule has non-empty from/to and a valid status.
     const meta = JSON.parse(row!.meta ?? '{}');
     const valid = (meta.redirects as typeof redirects).filter(
       (r) => r.from.trim() && r.to.trim() && [301, 302, 307, 308].includes(r.status),

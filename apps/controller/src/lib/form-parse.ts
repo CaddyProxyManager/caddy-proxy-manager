@@ -9,7 +9,7 @@ export function parseCsv(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
-/** Parse upstreams by newline only (URLs may contain commas in query strings). */
+/** Newline only: a URL's query string may contain commas. */
 export function parseUpstreams(value: FormDataEntryValue | null): string[] {
   if (!value || typeof value !== "string") return [];
   return value

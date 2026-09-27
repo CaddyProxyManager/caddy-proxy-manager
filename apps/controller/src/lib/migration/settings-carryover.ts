@@ -1,13 +1,6 @@
 /**
- * Translating the JSON blobs an older release stored into registry settings.
- *
- * Two settings were configurable from both sides before the registry existed: a `settings` row
- * holding a JSON object that the Settings page wrote, and an environment variable that merely
- * pinned it. Phase 2 deliberately left their consumers alone, because reading only the registry
- * would have discarded whatever the operator had chosen in the UI.
- *
- * This is the other half. A migrating deployment's blob value is lifted into the registry key, so
- * the choice survives and the consumers can stop consulting two places.
+ * Lifts values an older release stored in JSON `settings` blobs into registry keys, so an
+ * operator's UI choice survives and consumers read one place.
  */
 import { eq } from "drizzle-orm";
 import db from "../db";
@@ -16,11 +9,8 @@ import { gravatarEnabled, requirePasswordChangeOnLegacyHash } from "../settings/
 import { saveSettings } from "../settings/resolve";
 
 type Carryover = {
-  /** The `settings` row the old release wrote. */
   blobKey: string;
-  /** The field inside that row's JSON object. */
   field: string;
-  /** The registry setting it becomes. */
   settingKey: string;
 };
 
@@ -35,12 +25,7 @@ const CARRYOVERS: Carryover[] = [
 
 export type CarryoverResult = { settingKey: string; value: boolean };
 
-/**
- * Lift every recognised blob field into its registry key.
- *
- * Only writes what it finds: a deployment that never touched the Settings toggle has no blob, and
- * inventing a stored value for it would pin a default that was previously free to change.
- */
+/** Only writes what it finds: inventing a value would pin a default that was free to change. */
 export async function carryOverBlobSettings(): Promise<CarryoverResult[]> {
   const applied: CarryoverResult[] = [];
 

@@ -1,12 +1,7 @@
 /**
- * Whether Caddy's logs are usable by the two processes that depend on them, and saying so.
- *
- * The agent runs as its own user, reaching the logs through Caddy's group. That only works while
- * the files carry the modes and group Caddy normally gives them, and every way it stops working is
- * silent: an unreadable log parses as an empty one, a failed truncation leaves the WAF audit log
- * growing, and a directory Caddy cannot list stops its roller pruning old files. So this checks,
- * logs a warning once per problem, and reports it to the controller, which shows the fix on the
- * Agents page. Nothing here changes a permission - the agent could not, and should not try.
+ * The agent reads Caddy's logs through Caddy's group, and every way that breaks is silent (an
+ * empty parse, a growing audit log, a roller that stops pruning). So this warns once per problem
+ * and reports it for the Agents page. It never changes a permission.
  */
 
 import { readFileSync, statSync } from "node:fs";
@@ -17,10 +12,7 @@ export type Identity = { uid: number; groups: number[] };
 export type FileInfo = { uid: number; gid: number; mode: number };
 export type Permissions = { read: boolean; write: boolean; execute: boolean };
 
-/**
- * The permission bits `who` gets on a file, the way the kernel picks them: the owner's if they own
- * it, else the group's if they are in its group, else everyone else's. Never a union of the three.
- */
+/** As the kernel picks: owner's, else group's, else other's bits. Never a union of the three. */
 export function permissionsFor(who: Identity, file: FileInfo): Permissions {
   if (who.uid === 0) return { read: true, write: true, execute: true };
   const shift = file.uid === who.uid ? 6 : who.groups.includes(file.gid) ? 3 : 0;
@@ -31,13 +23,8 @@ export function permissionsFor(who: Identity, file: FileInfo): Permissions {
 export type LogPaths = { dir: string; access: string; rules: string; audit: string };
 
 /**
- * Every problem visible from `stat` alone.
- *
- * `checkFiles` is whether the agent is parsing the logs at all: a file it never opens is not a
- * problem worth showing, while the directory is Caddy's and matters either way.
- *
- * Caddy's identity is read off the files it created rather than configured, because the one place
- * it is configured - a build argument - is invisible from here.
+ * `checkFiles`: whether the agent parses the logs at all; the directory matters either way.
+ * Caddy's identity comes off its files, as the build argument that sets it is invisible here.
  */
 export function findLogAccessProblems(
   agent: Identity,
@@ -79,12 +66,7 @@ export function findLogAccessProblems(
   return { problems, caddyGid: owned?.gid ?? null };
 }
 
-/**
- * This process's effective uid and every group it has, from `/proc/self/status`.
- *
- * Read from procfs because Bun has neither `process.getuid` nor `process.getgroups`. Null anywhere
- * procfs is not, which is anywhere the agent is not running in its container.
- */
+/** From procfs: Bun has neither `process.getuid` nor `process.getgroups`. Null off Linux. */
 export function parseIdentity(status: string): Identity | null {
   const field = (name: string) => status.match(new RegExp(`^${name}:\\s*(.*)$`, "m"))?.[1];
   const uid = field("Uid")?.split(/\s+/)[1];
@@ -111,7 +93,7 @@ function statFile(path: string): FileInfo | null {
   }
 }
 
-/** Problems already logged, so each is a single line rather than one every status heartbeat. */
+/** So each problem logs once, not every status heartbeat. */
 const warned = new Set<string>();
 
 function describe(problem: LogAccessProblem): string {
@@ -129,10 +111,7 @@ function describe(problem: LogAccessProblem): string {
   }
 }
 
-/**
- * Check, warn about anything new, and return what to report. Undefined when this process cannot
- * tell who it is, since every answer would be a guess.
- */
+/** Undefined when this process cannot tell who it is: every answer would be a guess. */
 export function checkLogAccess(
   caddyContainer: string,
   parsing: boolean,

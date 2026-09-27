@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Return 200 with user info headers that Caddy will copy to upstream
   return new NextResponse(null, {
     status: 200,
     headers: {

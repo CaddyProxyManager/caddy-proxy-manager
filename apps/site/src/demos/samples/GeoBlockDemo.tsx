@@ -2,15 +2,14 @@ import { GeoBlockFields } from "@cpm/controller/src/components/proxy-hosts/GeoBl
 import { DemoSurface } from "../DemoSurface";
 import { json, serveApi } from "../fake-api";
 
-// The status line under the rules asks the controller whether the GeoIP databases are loaded.
-// Registered at import, so it is in place before the fields fetch on mount.
+// Answers the GeoIP status fetch; at import, so it precedes the fields' fetch on mount.
 if (typeof window !== "undefined") {
   serveApi(async (url) =>
     url.pathname === "/api/geoip-status" ? json({ enabled: true, country: true, asn: true }) : null,
   );
 }
 
-/** The shape the prose describes: a continent blocked, and two exceptions allowed back through. */
+/** As the prose describes: a continent blocked, two exceptions let back through. */
 export default function GeoBlockDemo() {
   return (
     <DemoSurface>

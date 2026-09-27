@@ -28,10 +28,7 @@ function names(ids: number[], from: NamedResource[]): string {
     .join(", ");
 }
 
-/**
- * Groups → Access for one group. The dialog is the app's; saving hands the result back here instead
- * of to the two grant writes, and the card reads it back the way an operator in the group gets it.
- */
+/** The app's dialog; saving hands the result back here instead of to the grant writes. */
 export default function GroupAccessDemo() {
   const [open, setOpen] = useState(false);
   const [access, setAccess] = useState<GroupAccess>({

@@ -46,16 +46,14 @@ describe('hashBcrypt (access lists / Caddy)', () => {
   });
 
   it('produces hashes a standard bcrypt implementation accepts', async () => {
-    // Caddy's http_basic provider verifies these, so they must be real bcrypt
-    // and not merely bcrypt-shaped.
+    // Caddy's http_basic verifies these, so they must be real bcrypt, not bcrypt-shaped.
     const hash = await hashBcrypt(PASSWORD, 10);
     expect(bcrypt.compareSync(PASSWORD, hash)).toBe(true);
     expect(bcrypt.compareSync('wrong', hash)).toBe(false);
   });
 
   it('matches bcryptjs truncation past the 72-byte limit', async () => {
-    // Bun.password does not truncate; without the clamp these hashes would not
-    // be real bcrypt, and Caddy would reject the correct password.
+    // Bun.password does not truncate; unclamped, Caddy would reject the correct password.
     const long = 'a'.repeat(100);
     expect(bcrypt.compareSync(long, await hashBcrypt(long, 10))).toBe(true);
     expect(bcrypt.compareSync('a'.repeat(72), await hashBcrypt(long, 10))).toBe(true);
@@ -109,8 +107,7 @@ describe('isLegacyPasswordHash', () => {
   });
 
   it('treats a missing hash as not legacy, so federated users are never gated', async () => {
-    // OAuth/OIDC accounts have no password to change; flagging them would be an
-    // unsatisfiable lockout.
+    // OAuth accounts have no password to change; flagging them would be an unsatisfiable lockout.
     expect(isLegacyPasswordHash(null)).toBe(false);
     expect(isLegacyPasswordHash(undefined)).toBe(false);
     expect(isLegacyPasswordHash('')).toBe(false);

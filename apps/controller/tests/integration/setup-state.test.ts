@@ -1,9 +1,6 @@
 /**
- * The first-run setup state machine.
- *
- * The stage is derived from what exists rather than counted, so the cases worth pinning are the
- * ones where "what exists" is ambiguous: an operator halfway through, an upgrade from a release
- * that had no setup flow, and a restart in the middle of either.
+ * The first-run setup state machine. The stage is derived from what exists, so the cases pinned
+ * are the ambiguous ones: halfway through, an upgrade from before setup, a restart in either.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -36,6 +33,7 @@ vi.mock('@/src/lib/db', () => ({
 
 const {
   backfillSetupCompletion,
+  claimSetupStep,
   declineMigration,
   getSetupState,
   hasAnySignIn,
@@ -43,6 +41,7 @@ const {
   markSetupCompleted,
   promoteFirstSetupAdmin,
   recordMigrationSource,
+  releaseSetupStep,
 } = await import('@/src/lib/setup');
 
 const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'OAUTH_ENABLED', 'LEGACY_SQLITE_PATH'];
@@ -257,8 +256,7 @@ describe('the migration offer', () => {
   });
 
   it('sends a migration that left the accounts behind on to account creation', async () => {
-    // The old database is still sitting there and nothing can sign in yet, which is exactly the
-    // shape that used to mean "offer the migration". Recording the source is what separates
+    // The old database is still there and nothing can sign in yet. Recording the source separates
     // "not dealt with" from "dealt with, and it brought no users".
     const directory = pointAtLegacyDatabase();
     try {
@@ -276,11 +274,9 @@ describe('the migration offer', () => {
 });
 
 /**
- * The OAuth branch of the account step stores a provider and nothing else: the user row is created
- * later, by Better Auth's callback, which pins every federated sign-up to `role: "user"`. Without
- * this promotion an instance set up against an IdP could never finish setup - the settings step
- * demanded an admin session, and the only place group-to-role mapping can be configured is that
- * same step. `saveSetupSettings` calls this as it saves, so completing setup is what confers it.
+ * The OAuth account step stores only a provider; Better Auth's callback pins the user it creates
+ * to `role: "user"`, and only an admin can finish setup. `saveSetupSettings` promotes them as
+ * it saves.
  */
 describe('promoteFirstSetupAdmin', () => {
   async function addUserWithAccount(
@@ -331,6 +327,17 @@ describe('promoteFirstSetupAdmin', () => {
     expect(await roleOf(userId)).toBe('admin');
   });
 
+  it('promotes exactly one of two federated users signing in at once', async () => {
+    const first = await addFederatedUser('sso@example.com');
+    const second = await addFederatedUser('colleague@example.com');
+    const results = await Promise.all([
+      promoteFirstSetupAdmin(first),
+      promoteFirstSetupAdmin(second),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect([await roleOf(first), await roleOf(second)].sort()).toEqual(['admin', 'user']);
+  });
+
   it('refuses a second caller once the first was promoted', async () => {
     const first = await addFederatedUser('sso@example.com');
     await promoteFirstSetupAdmin(first);
@@ -369,5 +376,32 @@ describe('promoteFirstSetupAdmin', () => {
 
     expect(await promoteFirstSetupAdmin(userId)).toBe(true);
     expect(await roleOf(userId)).toBe('admin');
+  });
+});
+
+describe('setup step claims', () => {
+  it('lets exactly one of several concurrent claimers in', async () => {
+    const claims = await Promise.all([1, 2, 3].map(() => claimSetupStep('setup_account_claim')));
+    expect(claims.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('frees the step once released, and only by its holder', async () => {
+    const claim = await claimSetupStep('setup_account_claim');
+    expect(claim).not.toBeNull();
+    await releaseSetupStep('setup_account_claim', 'someone else');
+    expect(await claimSetupStep('setup_account_claim')).toBeNull();
+    await releaseSetupStep('setup_account_claim', claim as string);
+    expect(await claimSetupStep('setup_account_claim')).not.toBeNull();
+  });
+
+  it('takes over a claim a crash left behind, once, after the timeout', async () => {
+    const stale = Date.now() - 11 * 60_000;
+    expect(await claimSetupStep('setup_account_claim', stale)).not.toBeNull();
+    expect(await claimSetupStep('setup_account_claim', stale + 60_000)).toBeNull();
+    const takers = await Promise.all([
+      claimSetupStep('setup_account_claim'),
+      claimSetupStep('setup_account_claim'),
+    ]);
+    expect(takers.filter(Boolean)).toHaveLength(1);
   });
 });

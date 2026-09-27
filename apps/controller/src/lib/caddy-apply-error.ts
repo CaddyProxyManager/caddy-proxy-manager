@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 
 export type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
 
-/** What a rejection says about the WAF, read out of Caddy's body without repeating any of it. */
+/** Read out of Caddy's body without repeating any of it. */
 export type WafRejection = {
   /** Coraza could not build a WAF handler: a directive it will not compile. */
   wafFailed: boolean;
-  /** Rule ids the error quotes, which point at whatever defined them. */
+  /** Point at whatever defined them. */
   ruleIds: number[];
 };
 
@@ -45,14 +45,8 @@ export function safeSystemErrorCode(error: unknown): string | null {
 }
 
 /**
- * Caddy's /load error body quotes the config it choked on, so it is never
- * surfaced or logged verbatim. Matching it against known failure modes gives
- * back an application-authored explanation instead: enough to fix the config,
- * with nothing echoed out of it.
- *
- * Coraza builds its WAF during config load, so these validation errors reject
- * the entire document - without a reason the operator only sees every host
- * stop updating, with no hint as to which knob did it.
+ * The /load error body quotes the config, so it is never surfaced verbatim; these give an
+ * app-authored reason instead. A Coraza error rejects the whole document, so every host stops.
  */
 const KNOWN_CADDY_REJECTIONS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
   {
@@ -69,7 +63,6 @@ const KNOWN_CADDY_REJECTIONS: ReadonlyArray<{ pattern: RegExp; reason: string }>
   },
 ];
 
-/** Known, safe-to-report explanation for a Caddy config rejection, if any. */
 export function describeCaddyRejection(responseBody: string): string | null {
   return KNOWN_CADDY_REJECTIONS.find(({ pattern }) => pattern.test(responseBody))?.reason ?? null;
 }

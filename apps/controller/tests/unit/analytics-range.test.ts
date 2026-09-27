@@ -1,10 +1,4 @@
-/**
- * The window every analytics route resolves from its query string.
- *
- * `from`/`to` arrive as untrusted text. The failure this guards is quiet: parseInt("abc") is NaN,
- * and a NaN bound reaches ClickHouse as a query that matches nothing - which renders as "no
- * traffic" rather than as an error anyone would notice.
- */
+/** A NaN bound from untrusted `from`/`to` matches nothing: "no traffic", not an error. */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { resolveAnalyticsRange, INTERVAL_SECONDS } from '../../src/lib/analytics-db';
@@ -62,8 +56,7 @@ describe('resolveAnalyticsRange', () => {
   });
 
   it('does not treat inherited object keys as intervals', () => {
-    // `interval in INTERVAL_SECONDS` would be true for "toString" on a plain object; the fallback
-    // must still apply.
+    // `in` is true for "toString" on a plain object; the fallback must still apply.
     const result = resolveAnalyticsRange(params('interval=toString'));
     expect(result).toEqual({ from: NOW - INTERVAL_SECONDS['1h'], to: NOW });
   });

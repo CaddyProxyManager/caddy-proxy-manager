@@ -1,11 +1,7 @@
 /**
- * Writes a pre-3.0 SQLite database for the migration e2e spec, then exits.
- *
- * A standalone script rather than a function the spec imports: Playwright runs specs under Node,
- * which cannot load `bun:sqlite` or reach `Bun.password` at all. The spec spawns this with `bun`.
- *
- * The schema comes from `drizzle/legacy-sqlite` - the migrations every 3.0 deployment actually ran
- * - so the file the browser sees is one the application discovered, not one a test invented.
+ * Writes a pre-3.0 SQLite database for the migration e2e spec. A script the spec spawns with
+ * `bun`, because Playwright runs specs under Node, which has no `bun:sqlite` or `Bun.password`.
+ * The schema is the real 3.0 migrations in `drizzle/legacy-sqlite`, not one a test invented.
  *
  *   bun tests/helpers/build-legacy-db.ts <password>
  */
@@ -25,11 +21,8 @@ const LEGACY_MIGRATIONS = resolve(moduleDir, '../../drizzle/legacy-sqlite');
 const NOW = '2026-01-01T00:00:00.000Z';
 
 /**
- * A bare positional rather than a flag: this is spawned by `legacy-db.ts`, never typed by hand.
- * Read off `_` because @types/yargs widens a `.command()` positional to `unknown` at the top level,
- * and the alternative is moving the whole script into a command handler for one argument.
- * `strictOptions` rather than `strict`, which with no commands declared would reject the positional
- * itself; positional numbers stay strings so a password of `007` reaches the hash intact.
+ * Read off `_`: @types/yargs types a `.command()` positional as `unknown`. `strict` would reject
+ * the positional itself, and numbers stay strings so a password of `007` hashes intact.
  */
 const [password] = yargs(hideBin(process.argv))
   .scriptName('build-legacy-db')
@@ -41,13 +34,10 @@ const [password] = yargs(hideBin(process.argv))
   .parseSync()
   ._.map(String);
 
-// A real argon2id hash, produced exactly as the application produces one. A placeholder would make
-// the spec's sign-in step untestable, and signing in is the only thing that proves the credential
-// row survived the import intact.
+// A real hash: signing in is the only proof the credential row survived the import.
 const passwordHash = await Bun.password.hash(password, { algorithm: 'argon2id' });
 
-// The file only, never the directory: it is a bind-mount source, and removing it out from under a
-// running container leaves the mount pointing at nothing.
+// The file only: the directory is a bind-mount source, and removing it orphans a running mount.
 mkdirSync(LEGACY_DIR, { recursive: true });
 rmSync(LEGACY_FILE, { force: true });
 
@@ -62,8 +52,7 @@ raw.run(
   [passwordHash, LEGACY_FIXTURE.adminUsername, LEGACY_FIXTURE.adminUsername, NOW, NOW],
 );
 
-// The credential account row Better Auth reads. Without it the migrated user exists but cannot
-// sign in, which is the failure this whole flow exists to rule out.
+// Better Auth signs in from this row, not users.passwordHash.
 raw.run(
   `INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt)
    VALUES (1, '1', 'credential', 'local:credential', ?, ?, ?)`,

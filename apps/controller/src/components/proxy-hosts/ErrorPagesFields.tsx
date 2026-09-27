@@ -50,8 +50,7 @@ function toJson(rules: RuleState[]): string {
 
 type Props = {
   initialData?: ErrorPageRule[];
-  // The form field name to emit. Lets the same editor back the per-host form and
-  // the global settings form.
+  // Lets one editor back the per-host and global settings forms.
   name?: string;
 };
 
@@ -110,8 +109,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                     onClick={() => removeRule(rule.rowId)}
                   />
                 </HStack>
-                {/* Error bodies are usually a chunk of styled HTML, which is
-                    unreadable in a three-row textarea. */}
+                {/* Styled HTML is unreadable in a three-row textarea. */}
                 <CodeEditor
                   label={t("responseBody")}
                   language="html"

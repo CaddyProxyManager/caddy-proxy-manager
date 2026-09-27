@@ -1,14 +1,7 @@
 /**
- * Timestamps as the dashboard shows them: in the reader's own time zone, with the UTC instant a
- * tooltip away (`components/ui/Timestamp.tsx`).
- *
- * Local time used to be off the table. The server cannot know the reader's time zone, so a server
- * render and the browser's re-render disagreed and hydration failed (issue #233), and everything was
- * pinned to UTC instead. The zone now travels in a cookie the browser sets (`time-zone.ts`) and
- * next-intl formats with it on both sides, so the text matches.
- *
- * What stays here is what next-intl does not do: the UTC text a log search needs, and moving a
- * date picker's wall-clock value into and out of a named time zone.
+ * Timestamps in the reader's time zone, which travels in a cookie (`time-zone.ts`) so server and
+ * browser renders match (#233). What stays here is what next-intl does not do: UTC text for log
+ * searches, and moving a date picker's wall-clock value into and out of a named zone.
  */
 
 export function toDate(value: Date | number | string): Date {

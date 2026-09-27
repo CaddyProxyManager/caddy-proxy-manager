@@ -14,10 +14,6 @@ beforeEach(async () => {
   db = await createTestDb();
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function nowIso() {
   return new Date().toISOString();
 }
@@ -46,10 +42,6 @@ async function insertEntry(accessListId: number, username: string, rawPassword: 
     .returning();
   return entry;
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('access-lists password hashing', () => {
   it('stores a bcrypt hash, not the plain-text password', async () => {

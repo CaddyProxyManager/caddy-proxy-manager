@@ -1,7 +1,6 @@
 /**
- * Regression (H1): the public reachability probe signed any caller-chosen nonce with HMAC-SHA256
- * under SESSION_SECRET, and the forward-auth proxy proof was that same HMAC over a 31-character
- * constant. `GET /api/health?probe=cpm-forward-auth-proxy-proof:v1` answered with the proof.
+ * Regression (H1): the probe HMACed any nonce under SESSION_SECRET, and the forward-auth proxy
+ * proof was that HMAC over a constant, so `?probe=cpm-forward-auth-proxy-proof:v1` leaked it.
  */
 import { describe, expect, it } from 'bun:test';
 import { createHmac } from 'node:crypto';

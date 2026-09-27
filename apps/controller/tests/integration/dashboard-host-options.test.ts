@@ -1,8 +1,6 @@
 /**
- * The dashboard host's proxy options: read from the host form, and copied from a stored host.
- *
- * Integration rather than unit because both go through the proxy host model - the meta merge, the
- * certificate lookup and the agent assignments are all database reads.
+ * The dashboard host's proxy options, from the host form and copied from a stored host.
+ * Integration because the proxy host model's merge and lookups all read the database.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -109,7 +107,7 @@ describe('copying a stored host into the dashboard host', () => {
     expect(copied?.host.id).toBe(host.id);
     expect(copied?.settings.enabled).toBe(true);
     expect(copied?.settings.domain).toBe('cpm.example.com');
-    // A host that forced HTTPS has pinned browsers to it; the copy must not fall back to HTTP.
+    // Forced HTTPS has pinned browsers; the copy must not fall back to HTTP.
     expect(copied?.settings.tls).toBe(true);
     const options = copied?.settings.options as DashboardHostOptions;
     expect(options.hstsSubdomains).toBe(true);
@@ -138,7 +136,7 @@ describe('copying a stored host into the dashboard host', () => {
 });
 
 describe('reading the dashboard host options from the form', () => {
-  // A function: the agent row is created per test, after this block is declared.
+  // The agent row is created per test, after this is declared.
   const stored = (): DashboardHostOptions => ({
     certificateId: null,
     accessListId: null,
@@ -171,7 +169,6 @@ describe('reading the dashboard host options from the form', () => {
     const view = dashboardHostFormView(options);
 
     expect(view.pathBlocks.map((rule) => rule.path)).toEqual(['/private/*']);
-    // Not in the form, so untouched.
     expect(view.redirects).toEqual(redirects);
     expect(options.hstsSubdomains).toBe(true);
     expect(options.agentIds).toEqual(existing.agentIds);

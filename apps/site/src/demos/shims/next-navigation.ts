@@ -1,13 +1,7 @@
 /**
- * Stands in for `next/navigation` inside the demos (see the alias in astro.config.mjs).
- *
- * DataTable is what needs it. That table sorts and pages by pushing a new URL, because in the app
- * the server does the sorting - so for the demo to be more than a picture, the query string has to
- * be somewhere a component can both write and watch. It writes to the real one, and the demo that
- * owns the rows subscribes here and re-derives them, which is the same contract with the work
- * moved into the browser.
- *
- * `replaceState`, never `pushState`: a reader pressing Back should leave the page, not undo a sort.
+ * `next/navigation` for the demos (aliased in astro.config.mjs). DataTable sorts and pages by
+ * pushing a URL, so the query string is written for real and watched here by the demo owning the
+ * rows. `replaceState`, never `pushState`: Back should leave the page, not undo a sort.
  */
 import { useSyncExternalStore } from "react";
 import { currentSimulation } from "../setup-simulation";

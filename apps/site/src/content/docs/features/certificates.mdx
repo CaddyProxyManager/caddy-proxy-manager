@@ -5,6 +5,7 @@ description: Automatic ACME certificates, DNS-01 providers, manual imports, and 
 
 import Demo from "../../../components/Demo.astro";
 import CertificatesTableDemo from "../../../demos/samples/CertificatesTableDemo";
+import AcmeCertificatesDemo from "../../../demos/samples/AcmeCertificatesDemo";
 
 Caddy obtains and renews certificates on its own. CPM's job is to tell it what to obtain, to show
 you what exists, and to hold the credentials that DNS challenges need.
@@ -16,9 +17,31 @@ you what exists, and to hold the credentials that DNS challenges need.
 ## Automatic
 
 Every proxy host gets HTTPS by default through ACME - Let's Encrypt, or any directory you point
-it at. Caddy renews these on the agent, so the Certificates page lists which hosts use them
-rather than an expiry date the controller never sees; imported certificates, whose PEM it holds,
-show their expiry, and the page counts down to the next one to lapse.
+it at. Caddy obtains and renews these on the agent, and the Certificates page reads each agent's
+certificate storage to show when every host's certificate expires and who issued it. An agent
+older than this feature leaves the column empty rather than guessing.
+
+Each host's menu has three tools:
+
+- **Renew now.** Caddy has no renew button of its own, so CPM puts the host's names under a
+  renewal window wide enough to include their current certificates and reloads twice: once
+  without them, so Caddy forgets the certificates it has cached, and once with them, so it reads
+  them back and renews. HTTPS to those names fails for the moment between the two reloads; after
+  that Caddy serves the old certificate until the new one arrives, so a failed renewal doesn't
+  take the site down. The names go back to their normal schedule once the new certificates
+  appear, or after 15 minutes if none do.
+- **Test reachability.** Resolves each domain, lists its CAA records, and fetches a probe path over
+  plain HTTP to see whether the request lands on this Caddy - the same trip an HTTP-01 challenge
+  makes. It only ever fetches the host's own domains. From there you can also ask
+  [Let's Debug](https://letsdebug.net) to check from outside; that sends the domain name to a
+  third party, so it runs only when you click it.
+- **Download.** The certificate, or its private key. The key needs a sign-in from the last ten
+  minutes, and every key download is written to the [audit log](../audit-log/). Imported
+  certificates have the same two downloads.
+
+<Demo title="Certificates → ACME" note="Renew one, or test its reachability, from its menu. Downloads need a controller.">
+  <AcmeCertificatesDemo client:visible />
+</Demo>
 
 For an internal CA, set the ACME directory URL under **Settings → General → ACME Server** and supply its root
 so Caddy trusts it.

@@ -17,7 +17,7 @@ describe('secret', () => {
   it('same input produces different output each time (random IV)', () => {
     const a = encryptSecret('same-value');
     const b = encryptSecret('same-value');
-    // Different because IV is random
+    // The IV is random.
     expect(a).not.toBe(b);
   });
 
@@ -59,14 +59,11 @@ describe('secret', () => {
   it('already-encrypted value is not double-encrypted', () => {
     const encrypted = encryptSecret('value');
     const encrypted2 = encryptSecret(encrypted);
-    // Should return the same value (idempotent)
     expect(encrypted2).toBe(encrypted);
   });
 
   describe('failure diagnostics', () => {
-    // The real trigger is a changed SESSION_SECRET, but config memoises the secret on first
-    // access and Bun cannot evict it, so the equivalent failure is produced directly: a
-    // structurally valid enc:v1: payload whose ciphertext no key can authenticate.
+    // Stands in for a changed SESSION_SECRET, which config memoises and Bun cannot evict.
     function undecryptable(): string {
       const [prefix, version, iv, tag, data] = encryptSecret('token-value').split(':');
       const flipped = data[0] === 'A' ? 'B' : 'A';

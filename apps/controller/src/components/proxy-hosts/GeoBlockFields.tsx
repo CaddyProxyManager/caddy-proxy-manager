@@ -50,9 +50,7 @@ function GeoIpStatus() {
     return <Spinner size="sm" label={t("checkingGeoipDatabases")} />;
   }
 
-  // `enabled: false` is a deliberate choice rather than a missing file, so it gets its own label
-  // and points at the toggle. Sending someone to look for a database that is on disk and being
-  // ignored is the worst of the possible messages here.
+  // A deliberate off gets its own label pointing at the toggle, not a hunt for a missing database.
   const off = status?.enabled === false;
   const allLoaded = status?.country && status?.asn;
   const noneLoaded = !status?.country && !status?.asn;
@@ -93,20 +91,14 @@ const CONTINENTS = [
   { code: "SA", nameKey: "continentNames.southAmerica", emoji: "🌎" },
 ] as const;
 
-/**
- * Every country as a picker option, named and sorted in `locale`. The name is part of the label,
- * so the search matches what the reader sees; the code stays in it for anyone searching by code.
- */
+/** Named in the label so search matches what the reader sees; the code stays for code search. */
 function countryOptions(locale: string) {
   return COUNTRY_CODES.map((code) => ({ code, name: regionName(code, locale) }))
     .sort((a, b) => a.name.localeCompare(b.name, locale))
     .map(({ code, name }) => ({ value: code, label: `${flagEmoji(code)}  ${name} (${code})` }));
 }
 
-/**
- * MultiSelector replaces ~200 lines of hand-built chips. The hidden input keeps the submitted
- * comma-joined value byte-identical, so the server action is untouched.
- */
+/** The hidden input keeps the submitted comma-joined value byte-identical for the server action. */
 function CodeMultiSelect({
   name,
   label,
@@ -156,7 +148,6 @@ type TagInputProps = {
   uppercase?: boolean;
 };
 
-/** Free-text chips. Token owns its own remove control and focus handling. */
 function TagInput({
   name,
   label,
@@ -204,9 +195,8 @@ function TagInput({
           placeholder={placeholder}
           description={helperText}
           onEnter={() => commit(draft)}
-          // Enter here means "add this tag", not "submit the form". The design system fires onEnter
-          // without preventing the default, so without this the same keypress also saves the whole
-          // config and re-applies Caddy on every tag added.
+          // The design system fires onEnter without preventing default, so Enter would also submit
+          // the form and re-apply Caddy on every tag added.
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}
@@ -394,8 +384,7 @@ const BLOCK_ALL_CIDR = "0.0.0.0/0";
 export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBlockFieldsProps) {
   const t = useTranslations("proxyHosts");
   const rawInitial = initialValues?.geoblock ?? null;
-  // Geoblocking is entirely the caddy-blocker plugin. With it off the rules would be recorded and
-  // then never emitted, so the switch is locked rather than left to look functional.
+  // Rules without the caddy-blocker plugin would never be emitted, so the switch is locked.
   const moduleDisabledReason = useDisabledReason("geoblock");
   const [enabled, setEnabled] = useState(rawInitial?.enabled ?? false);
   const [mode, setMode] = useState<GeoBlockMode>(initialValues?.geoblock_mode ?? "merge");
@@ -410,10 +399,8 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
   const [redirectUrl, setRedirectUrl] = useState(rawInitial?.redirect_url ?? "");
   const [failClosed, setFailClosed] = useState(rawInitial?.fail_closed ?? false);
 
-  // Re-seed from fresh server props after a save. revalidatePath re-renders this component with
-  // new initialValues, but useState seeds are read once, so without this the form kept showing
-  // the pre-save values until a hard refresh (#241). Bumping resetKey remounts the tag inputs,
-  // which hold their own copies of the lists.
+  // useState seeds are read once, so fresh props after a save would not show without this (#241).
+  // Bumping resetKey remounts the tag inputs, which hold their own copies.
   useEffect(() => {
     setEnabled(rawInitial?.enabled ?? false);
     setMode(initialValues?.geoblock_mode ?? "merge");
@@ -472,8 +459,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </Text>
             </VStack>
           </HStack>
-          {/* A disabled control emits no pointer events of its own, so
-              ModuleGated wraps it in the tooltip that explains why. */}
+          {/* A disabled control emits no pointer events, so ModuleGated carries the tooltip. */}
           <ModuleGated feature="geoblock">
             <Switch
               label={t("enableGeoBlocking")}
@@ -492,11 +478,9 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
           </Text>
         )}
 
-        {/* Deliberately NOT gated on moduleDisabledReason. The hidden
-            `geoblockPresent` marker above always submits, and the parser treats
-            a missing rule input as an empty list - so unmounting these while the
-            module is off would silently erase every stored rule on the next
-            save of an unrelated field. The Switch above is what stays locked. */}
+        {/* Deliberately NOT gated on moduleDisabledReason: `geoblockPresent` always submits and a
+            missing rule input parses as empty, so unmounting these would erase every stored rule
+            on the next unrelated save. */}
         {enabled && (
           <VStack gap={4}>
             {showModeSelector && (
@@ -532,12 +516,8 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               <Tab value="allow" label={t("allowRules")} />
             </TabList>
 
-            {/* Both panels stay mounted and the inactive one is hidden, rather
-                than unmounted: each carries the hidden inputs for its side of
-                the rules, and dropping them would submit empty values and wipe
-                the other tab's configuration. This is what the old markup did
-                with forceMount + data-[state=inactive]:hidden. The `hidden`
-                attribute is a visibility toggle here, not layout. */}
+            {/* Hidden, not unmounted: each panel carries its side's hidden inputs, and dropping
+                them would submit empty values and wipe the other tab's configuration. */}
             <VStack gap={4}>
               <div hidden={activeTab !== "block"}>
                 <RulesPanel prefix="block" initial={initial} resetKey={resetKey} />

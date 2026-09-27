@@ -31,7 +31,7 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
 ```bash
-VERSION=v3.3.0   # the release you downloaded
+VERSION=v3.4.0   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
@@ -128,6 +128,16 @@ port and module overrides. Then check:
 - **An `acme-ca` volume from an earlier release** keeps its old `0777` mode. Tighten it with
   `docker run --rm -v <project>_acme-ca:/acme-ca alpine sh -c 'chown 10001:10001 /acme-ca && chmod 0755 /acme-ca'`,
   using web's `PUID`/`PGID` if you changed them.
+
+### Upgrading to WAF-checked WebSockets
+
+A WebSocket upgrade used to skip the WAF, so adding two headers to an ordinary request took an
+attack past it too. Upgrades now go through the WAF like any other request: the handshake is
+inspected, the messages after it are not. A handshake the CRS flags is now refused with 403; if
+that is a false positive, suppress the rule for that host from the event drawer.
+
+A host's **WebSocket Support** switch used to matter only with the WAF on. Off now refuses upgrades
+with 403 on every host. Hosts keep the value they had, which is on unless someone turned it off.
 
 ---
 
@@ -228,24 +238,30 @@ that mounts the same data volume. See `apps/controller/tests/helpers/seed.ts`.
 The container health check is `cpm-server --healthcheck`, which probes `/api/health`
 from inside the image - the runtime has no shell HTTP client to call instead.
 
+`cpm-server --reset-2fa <username>` turns off a user's two-factor sign-in on the running server -
+the way back in for an administrator who has lost both their authenticator and their backup codes.
+Run it inside the container: `docker compose exec web /app/cpm-server --reset-2fa admin`.
+
 ---
 
 ## Features
 
-- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (12 policies, including weighted and query/header/cookie hashing), active/passive health checks, retries, and enable/disable toggle
-- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, and per-host geo blocking. Automatic Docker Compose port management via agent
-- **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
-- **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
+- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (12 policies, including weighted and query/header/cookie hashing), active/passive health checks, retries, Force HTTPS, HSTS, WebSocket and Preserve Host Header switches, free-text notes, and enable/disable toggle
+- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, per-host geo blocking, and notes. Automatic Docker Compose port management via agent
+- **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another), each with its own access list or the host's
+- **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308), optionally keeping the request's path and query (whole, or after the rule's prefix), and path prefix rewriting
+- **Cache Assets** - Per-host asset caching: browser Cache-Control defaults, or a shared Caddy cache with the opt-in HTTP Cache module, kept in memory, on disk, in Redis or in etcd, with Cloudflare or Fastly purging
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
-- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, named rule presets, plugins from the CRS plugin registry, custom SecLang directives checked by the editor and by a real Caddy before they are saved, and a searchable event log with severity and blocked/detected classification
+- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, named rule presets, plugins from the CRS plugin registry, custom SecLang directives checked by the editor and by a real Caddy before they are saved, WebSocket handshakes inspected like any other request, and a searchable event log with severity and blocked/detected classification
 - **Analytics** - Live traffic charts, protocol breakdown, country map, top user agents, and blocked request log with configurable time ranges
 - **Geo Blocking** - Block or allow traffic by country, continent, ASN, CIDR range, or exact IP per proxy host. Allow rules override block rules. Fail-closed mode, custom response codes/bodies, and trusted proxy support
-- **Access Lists** - Multi-account HTTP basic auth protection (bcrypt-hashed) assignable per proxy host
-- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL), manual SSL/TLS import with expiry monitoring, and a built-in CA for issuing and revoking internal client certificates (mTLS)
+- **Access Lists** - Multi-account HTTP basic auth (bcrypt-hashed) and ordered IP allow/deny rules (IPv4 and IPv6), combined as "all" or "any", assignable per proxy host or per location rule. The upstream only sees the credentials when "Pass auth to host" is on - off for new lists, on for lists made before the switch existed
+- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, Renew now, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring, and a built-in CA for issuing and revoking internal client certificates (mTLS)
 - **mTLS** - Mutual TLS per proxy host using built-in CA certificates. Issue, track, and revoke client certificates. Fail-closed revocation (all certs revoked = all connections rejected)
 - **mTLS RBAC** - Role-based access control for mTLS client certificates. Define roles, assign certs to roles, and create path-based access rules per proxy host (e.g. `/admin/*` requires the "ops" role)
-- **User Roles** - Three-tier role system (Viewer, User, Admin) controlling dashboard access, API permissions, and feature visibility
-- **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; search and filter
+- **User Roles** - Four roles (Viewer, User, Operator, Admin) controlling dashboard access, API permissions, and feature visibility
+- **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; reset two-factor sign-in; search and filter. The last active admin cannot be demoted, disabled or deleted
+- **View as** - Preview the dashboard as an operator, user or viewer, or as an operator in chosen groups, from Users or a group. It only narrows your own session, ends after an hour, and is audited under your name
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
 - **Forward Auth (external)** - Point a host at any forward-auth server (Authelia preset, or custom). Optionally answer non-browser callers with 401 instead of the login redirect, and let a header such as `X-Api-Key` bypass auth so the upstream checks it itself. **Settings → Forward Auth → Forward Auth Defaults** sets what new hosts inherit
@@ -257,8 +273,12 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
-- **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
-- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
+- **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
+- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
+- **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. Optionally required for administrators; resettable by an admin or from the container console
+- **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`. Restores onto a new machine with a different `SESSION_SECRET`, and saves what it replaces first
+- **Global Caddyfile** - Raw Caddyfile, global options and site blocks on their own ports, added to every agent's config. Adapted by each agent's Caddy and checked with `caddy validate` on save; anything that would replace CPM's own config (admin API, storage, certificate automation, ports 80/443) is refused by name
+- **Log Viewer** - Tail access, WAF, Caddy and certificate logs from any agent, following new lines, with a Logs action on each proxy host. Admin only
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
 - **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported - accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. An apply that any host refuses fails and names it
@@ -405,7 +425,7 @@ it win even then.
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
-| `L4_PORTS_DIR` | Directory where the controller leaves the bootstrap token the agent in its own stack pairs with. For non-Docker deployments | `/app/data` | No |
+| `L4_PORTS_DIR` | Directory where the controller leaves the bootstrap token the agent in its own stack pairs with, and the copy of the configuration a restore replaces (under `backups/`). For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`. Only needed without an agent - with one, **Settings → Observability → Analytics** starts and stops ClickHouse regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
@@ -414,6 +434,7 @@ it win even then.
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
 | `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
 | `DEMO_MODE` | Run with no Caddy at all: admin calls go to an in-memory Caddy, a simulated agent reports builds, ports and services as done, and real agents are refused pairing and connection. No certificate is ordered and no DNS provider is called. Environment-only so a demo's visitors cannot turn it off | `false` | No |
+| `CADDY_IMAGE` | The image the `caddy` service runs. Set it to an image you built with the agent in external mode (`CADDY_BUILD_MODE`) - never the shipped name, or loading it would pull the registry's copy over yours. Forwarded to the agent, which runs Compose | `ghcr.io/silentspud/caddy-proxy-manager/caddy:latest` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 
 ### The agent's environment
@@ -435,6 +456,7 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `CADDY_ADMIN_LISTEN` | Pinned as `admin.listen` in every config the agent forwards to Caddy, replacing the controller's bind-every-interface default. `docker-compose.yml` sets `caddy-admin:2019` here and on the `caddy` service, whose Caddyfile binds the same address until the first config arrives - a name only the internal `caddy-admin` network resolves | Unset (forwarded as sent) |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
+| `CADDY_BUILD_MODE` | `agent` builds Caddy's image when the module selection changes. `external` never builds: you build the image and **Settings → Caddy Build** loads it, so the socket proxy's `GRPC` and `SESSION` can be `0`. See [Building the Caddy image yourself](#building-the-caddy-image-yourself). Startup fails on any other value | `agent` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
@@ -488,9 +510,12 @@ than the API. `apiTokens` is the exception: every signed-in role manages its own
 
 ### REST is still there
 
-`/api/v1/` is unchanged and still documented at `/api-docs`. It is deprecated rather than removed:
-nothing in the field breaks, and both APIs call the same model functions, so they cannot disagree
-about what a write does. New integrations should use GraphQL.
+`/api/v1/` keeps working and is still documented at `/api-docs`. It is deprecated rather than
+removed: nothing in the field breaks, and both APIs call the same model functions, so they cannot
+disagree about what a write does. New integrations should use GraphQL.
+
+Backup is the exception: `POST /api/v1/backup` takes a passphrase and returns the encrypted file,
+for scripts and cron, and has no GraphQL counterpart. Restoring stays in **Settings → Backup**.
 
 ---
 
@@ -629,7 +654,8 @@ an identity provider, and saying that your data arrived without its accounts.
 
 Certificate private keys, DNS provider credentials, OAuth client secrets, agent secrets and the
 Tailscale auth key are stored encrypted, with `SESSION_SECRET` as the root key. A new deployment
-generates its own, so the old database's secrets are usually unreadable by it.
+generates its own, so the old database's secrets are usually unreadable by it. The mTLS CA's
+private keys, which a pre-3.0 database holds in plain text, are encrypted as they are copied.
 
 The migration screen notices and asks for the old value. Enter it, and every encrypted value is
 decrypted with it and re-encrypted under the secret this deployment already uses, as the rows are
@@ -706,6 +732,28 @@ container.
 
 ---
 
+## Backup and Restore
+
+**Settings → Backup** downloads the whole configuration as one `.cpmbak` file: hosts, certificates
+and their keys, access lists, users, groups, API tokens and every setting, optionally with the audit
+log and settings history. Scripts get the same file from `POST /api/v1/backup` with an admin token.
+Sessions and sign-in state are never included, nor are the certificates Caddy obtained (they are
+issued again), analytics or the GeoIP databases.
+
+Every secret the database encrypts is decrypted into the file, and the file is encrypted with a
+passphrase of at least 12 characters (scrypt, AES-256-GCM). That is what lets it restore onto a
+machine with a different `SESSION_SECRET`, and why the passphrase is the only thing protecting it -
+a lost passphrase cannot be recovered.
+
+Restoring replaces every account, so it needs a sign-in from the last ten minutes. It reads and
+converts the whole file before writing anything, saves the current configuration first to
+`/app/data/backups/` on `caddy-manager-data` under the same passphrase, replaces the tables in one
+transaction, and signs everyone out. A backup from an older release restores onto a newer one; one
+from a newer release is refused. Turn off **Keep the agent pairings** when moving to a new machine:
+its agents then pair afresh.
+
+---
+
 ## Security
 
 - Production enforces strong passwords (12+ chars, mixed case, numbers, special characters)
@@ -713,7 +761,12 @@ container.
 - Two independent throttles on the auth endpoints: Better Auth's request limit (5 per 60 seconds)
   and the login lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
   fields
+- Optional two-factor sign-in (TOTP and backup codes) on the dashboard and the forward-auth portal,
+  which can be required for administrators
 - Audit trail for all configuration changes
+- A backup holds every secret the database encrypts, decrypted and sealed with the backup's own
+  passphrase instead. Treat the file and its passphrase like `SESSION_SECRET`
+- Private key downloads and restores need a sign-in from the last ten minutes
 - Caddy's admin API, PostgreSQL and ClickHouse sit on internal networks the containers you proxy to
   cannot reach. The agent is root-equivalent on its host; [SECURITY.md](SECURITY.md) says why and
   what bounds it
@@ -732,7 +785,8 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 **Limitations:**
 - In-memory rate limiting (not suitable for multi-instance deployments)
 - `SESSION_SECRET` encrypts every secret the database holds - DNS credentials, private keys, agent
-  secrets. Rotating it makes all of them unreadable
+  secrets, two-factor secrets. Rotating it makes all of them unreadable; a backup restores them
+  under a new one
 
 ---
 
@@ -749,7 +803,7 @@ CPM has four roles:
 | Create or delete hosts | No | No | No | Yes |
 | Manage certificates and access lists | No | No | No | Yes |
 | Manage users, groups, and settings | No | No | No | Yes |
-| View analytics, audit log, and API docs | No | No | No | Yes |
+| View analytics, logs, audit log, and API docs | No | No | No | Yes |
 | Create and manage own API tokens | Yes | Yes | Yes | Yes |
 | Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes | Yes |
 
@@ -768,6 +822,17 @@ existing bearer token cannot mint replacement credentials. Viewer and user
 tokens are restricted to the same user-scoped API capabilities as their owner.
 
 > **Forward Auth access** is separate from role - all roles must be explicitly granted access to each protected host via the forward auth access list.
+
+### Viewing as a role
+
+Permissions attach to roles and groups, not people, so an admin checks what someone would see by
+previewing a role rather than impersonating a user: **View as a role** on Users, or **View as an
+operator in this group** on a group. Pages, actions, REST and GraphQL all follow the preview, and a
+banner on every page leads back.
+
+It narrows the admin's own session and nothing else. Changes are still made and audited as the
+admin, a demotion cancels it, and it ends after an hour. While it is on, API tokens cannot be minted
+(a token carries the real role) and forward-auth sign-in waits.
 
 ---
 
@@ -825,7 +890,20 @@ Caddy automatically obtains Let's Encrypt certificates for all proxy hosts.
 
 **DNS-01 Challenge** (optional): Configure a DNS provider in **Settings → DNS → DNS Providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate.
 
-**Custom Certificates** (optional): Import your own certificates via the Certificates page. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads.
+**Custom Certificates** (optional): Import your own certificates via the Certificates page. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads. The built-in mTLS CA's private keys are encrypted the same way.
+
+**What Caddy holds.** The ACME tab reads each agent's certificate storage, so it shows the expiry
+and issuer of the certificate Caddy is actually serving. This needs a [current
+agent](#features-that-need-a-current-agent).
+
+- **Renew now** makes each agent's Caddy renew a host's certificate ahead of schedule. Caddy has no
+  renew call, so this is a temporary renewal window plus two reloads; it lapses after 15 minutes if
+  no newer certificate appears.
+- **Test reachability**, on the certificate and proxy host menus, checks DNS, CAA and an HTTP
+  request to the host's own domains, from the controller. **Check from outside with Let's Debug**
+  asks letsdebug.net to check it from the internet, which tells that service the domain name.
+- **Download certificate** works for ACME and imported certificates alike. **Download private key**
+  needs a sign-in from the last ten minutes, and every key downloaded is in the audit log.
 
 ---
 
@@ -919,6 +997,8 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 
 **OWASP CRS** covers SQLi, XSS, LFI, RCE, and more (enabled by default when WAF is on).
 
+**WebSockets** - an upgrade request is inspected like any other, so a handshake carrying an attack is refused. The messages after the handshake are not inspected. A host with **WebSocket Support** off refuses upgrades with 403, WAF or not.
+
 **Rule suppression** - suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
 
 **Rule presets** - an application that trips the CRS usually needs the same exclusions everywhere it runs. Write them once under a name in **WAF → Presets**, then select the preset globally in **WAF → Settings** or per host in its WAF card (added to the global ones in merge mode, replacing them in override mode). Editing a preset changes every host that selects it; one still selected cannot be deleted.
@@ -955,7 +1035,8 @@ Both families, everywhere, by default.
 
 Publishing a layer-4 port and changing Caddy's compiled-in plugins both need the Caddy *container*
 recreated, not just its config reloaded. The controller has no Docker access - deliberately - so a
-second container does that work and the two talk over a small REST API.
+second container does that work. It dials the controller and holds one GraphQL subscription open;
+the controller never dials it.
 
 Every request is signed with a shared secret using HMAC-SHA256 over the method, path, timestamp and
 body. The secret never travels with a request, and the signature covers the path, so a captured
@@ -991,6 +1072,13 @@ The agent runs as its own user and reaches Caddy's logs through Caddy's group. I
 unreadable, the WAF audit log cannot be truncated, or Caddy cannot list the log directory to prune
 rolled files, the agent logs a warning and the **Agents** page shows it on that agent's card with
 the command that fixes it. The agent never changes a permission itself.
+
+### Features that need a current agent
+
+The log viewer, the certificate details and downloads on the ACME tab, and **Load built image** are
+commands the controller sends an agent, and an agent lists the ones it understands. An older agent
+is never sent one it did not list: it keeps serving, and those features are unavailable on it until
+it is upgraded.
 
 ### One controller, many configurations
 
@@ -1173,8 +1261,10 @@ Caddy is a single static binary: a plugin either was compiled in with
 [xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime.
 **Settings → Caddy Build** makes that list editable.
 
-The default image ships with every supported module, so an existing install
-behaves exactly as it did before this page existed.
+The default image ships with every supported module except the opt-in ones -
+HTTP Cache and its storages - so an existing install behaves exactly as it did
+before this page existed. An opt-in module is compiled in only once you select
+it and rebuild.
 
 ### Choosing modules
 
@@ -1187,14 +1277,17 @@ Each supported plugin has a toggle. Turning one off has two effects:
   the module. Global geoblocking and per-host geoblock rules follow the Request
   Blocker module; the WAF page and per-host WAF settings follow Coraza; the L4
   Proxy Hosts page follows caddy-l4; the Tailscale settings and every per-host
-  tailnet option follow caddy-tailscale; and each DNS provider follows its own
+  tailnet option follow caddy-tailscale; the **Caddy cache** mode of a host's
+  Cache assets follows HTTP Cache; and each DNS provider follows its own
   `caddy-dns` module, so disabling Cloudflare leaves Route 53 alone.
 
 A module still in use cannot be switched off - the save is refused and names
 what is using it (for example "3 enabled L4 proxy hosts need the Layer 4 Proxy
 module"). That check covers global WAF and geoblocking, per-host WAF and
 geoblock rules, enabled L4 hosts, and every DNS provider with credentials on
-file. Turn the feature off first.
+file. Turn the feature off first. HTTP Cache is not checked, because nothing
+breaks without it: a host set to the Caddy cache falls back to browser caching,
+with a warning in its editor.
 
 Per-host **Custom Caddyfile** snippets cannot be checked the same way - they are
 free-form text, and only Caddy's adapter knows what a directive resolves to, for
@@ -1264,11 +1357,41 @@ reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
 
 Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
-default in `docker-compose.yml`), which BuildKit builds through. Set both to `0` to opt
-out: everything else keeps working,
-and you can run `docker compose build caddy` yourself. Note that a hand-run build
-does not tell the agent anything, so the app keeps assuming the shipped module set
-until a rebuild goes through the agent.
+default in `docker-compose.yml`), which BuildKit builds through. To keep build access
+away from the agent, build the image yourself instead.
+
+#### Building the Caddy image yourself
+
+Set `CADDY_BUILD_MODE=external` for the agent, and `GRPC: 0` and `SESSION: 0` on
+`docker-socket-proxy`. The agent then never builds. **Settings → Caddy Build** shows the
+`docker build` command for your selection in place of the Rebuild button. It builds from
+this release's tag on GitHub, so it needs no checkout and runs anywhere Docker can
+build:
+
+```bash
+docker build \
+  -f docker/caddy/Dockerfile \
+  --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
+  --build-arg PUID=10000 --build-arg PGID=10000 \
+  -t caddy-proxy-manager-caddy:custom \
+  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.4.0
+```
+
+Build it on the agent's host, or elsewhere and push it to a registry. The first time,
+set `CADDY_IMAGE` to that tag in `.env` and run `docker compose up -d agent` so the
+agent's Compose sees it. Then click **Load built image**: the agent pulls the tag if it
+is a registry image and reads the new image's module list before touching Caddy. If the
+image lacks a module Caddy has now, the agent first has the controller push a config
+without it, since Caddy resuming from a saved config that names a missing module would
+not start. Then it recreates Caddy if the tag names a different image, and waits for it
+to report healthy.
+
+The agent takes the applied module set from the image itself, from
+`/etc/caddy/caddy-modules.txt`, which the Dockerfile writes from `CADDY_MODULES`. It reads
+it again whenever it starts Caddy, so a swap made behind its back is picked up on its
+next restart. An image built some other way has no such file and is treated as having
+no plugins: the app then generates config any Caddy can load, and every feature that
+needs a module stays off until you load an image that lists it.
 
 Every image records what it was compiled with, so you can check a container
 directly rather than inferring it:
@@ -1287,7 +1410,8 @@ The same selection is available under `/api/v1/caddy/modules`:
   `409` and naming what is still using a module you tried to disable.
 
 Saving over the API does not rebuild - same as the UI. The rebuild trigger and
-its progress live at `POST` / `GET /api/caddy-build`, which take the same admin
+its progress live at `POST` / `GET /api/caddy-build`, and external mode's
+**Load built image** at `POST /api/caddy-build/image`. They take the same admin
 Bearer token but sit outside the versioned `/api/v1` contract: they back the
 Settings panel and may change without a version bump. Prefer the button.
 
@@ -1303,6 +1427,46 @@ naming the line. A snippet that stops adapting later - because it referenced a
 plugin you have since removed - is skipped with a warning in the web container's
 logs rather than failing the whole config, so one stale snippet cannot take the
 other hosts down with it.
+
+### Global Caddyfile
+
+**Settings → Caddy Build → Global Caddyfile** takes raw Caddyfile for the whole
+instance: a global options block, and site blocks on ports of their own. It is
+adapted by each agent's Caddy and added to that agent's config, never replacing
+what CPM generates - CPM rebuilds the whole document on every apply, so an
+override would only fight it.
+
+A save is adapted by every connected agent and checked with `caddy validate`.
+Anything that would replace CPM's own config is refused by name: the admin API,
+storage, certificate automation, `http_port`/`https_port`, a port a CPM server
+listens on, CPM's logs, and the `layer4` and `tailscale` apps. Like a per-host
+snippet, one that stops adapting later is skipped with a warning.
+
+---
+
+## Cache Assets
+
+**Proxy Host → Cache assets** caches stylesheets, scripts, images and fonts,
+matched by file extension. Pages and API responses are never cached: they are
+too often per-user.
+
+| Mode | What it does |
+| --- | --- |
+| Browser | Sets `Cache-Control: max-age` on a 2xx asset response the upstream sent without one |
+| Caddy cache | Also keeps a shared copy in Caddy ([Souin](https://github.com/darkweak/souin)), so repeat requests skip the upstream. Needs the opt-in HTTP Cache module; until an agent has it, the host falls back to browser mode there |
+
+Either way the cache sits after forward auth, access lists and the WAF, in
+front of the proxy. The Caddy cache skips any request carrying a cookie or an
+`Authorization` header, and a response that sets a cookie is marked `private`
+before any cache sees it, so one visitor's copy never reaches the next.
+
+**Settings → Caddy Build → HTTP Cache** decides where the Caddy cache keeps
+entries: in memory by default, or in Otter (memory, bounded by entry count),
+Badger or SimpleFS (on `caddy-data`, so it survives a restart), Redis/Valkey or
+etcd (shared by every Caddy pointed at it). Each storage but memory is an
+opt-in module of its own; an agent whose image lacks the chosen one caches in
+memory. It can also purge Cloudflare or Fastly. The Redis password and the CDN
+API key are encrypted at rest and never sent back to the browser or the API.
 
 ---
 
@@ -1466,6 +1630,25 @@ listener. Serving something privately-intended to the internet is the one failur
 outage; the reason is logged, and everything else keeps serving.
 
 L4 proxy hosts are not on the tailnet - only HTTP proxy hosts are.
+
+---
+
+## Two-factor Sign-in
+
+Any account with a password can turn it on from **Profile**: the password, a QR code for an
+authenticator app, one code, and then ten backup codes shown once. Sign-in then asks for a code
+after the password, on the dashboard and the forward-auth portal alike, and a backup code works in
+its place once. The dashboard can skip the code on a trusted device for 30 days; the portal always
+asks.
+
+**Settings → Authentication → Two-factor Sign-in** can require it for administrators with a
+password. Until one enrols, the dashboard sends them to enrolment and their session's REST and
+GraphQL calls answer 403. An account that signs in only through OAuth is left to its identity
+provider, and API tokens are credentials of their own that keep working.
+
+An admin resets another user's two-factor sign-in from **Users**, which also signs them out. With no
+other admin to ask, `cpm-server --reset-2fa` does it from inside the container - see
+[Runtime](#runtime).
 
 ---
 

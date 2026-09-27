@@ -17,7 +17,6 @@ import {
 } from "@/src/lib/models/group-grants";
 import { logAuditEvent } from "@/src/lib/audit";
 
-/** Returns the new group's id, so the page can select it. */
 export async function createGroupAction(formData: FormData): Promise<{ id: number }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
@@ -68,7 +67,6 @@ export async function addGroupMemberAction(groupId: number, memberId: number) {
   revalidatePath("/users");
 }
 
-/** Add several users at once - the member picker's multi-select - with one revalidation. */
 export async function addGroupMembersAction(groupId: number, memberIds: number[]) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
@@ -87,12 +85,7 @@ export async function removeGroupMemberAction(groupId: number, memberId: number)
   revalidatePath("/users");
 }
 
-/**
- * Replace the IdP group names that resolve to this group.
- *
- * Admin-only, like everything else on this page: a grant decides what an operator may reach, so
- * letting an operator edit one would let them widen their own access.
- */
+/** Admin-only: an operator editing a grant could widen their own access. */
 export async function setGroupMappingsAction(
   groupId: number,
   entries: { providerId: string | null; externalName: string }[],
@@ -110,7 +103,7 @@ export async function setGroupMappingsAction(
   revalidatePath("/groups");
 }
 
-/** Replace what this group is allowed to manage. Audited, because it is a privilege change. */
+/** Audited: a privilege change. */
 export async function setGroupGrantsAction(
   groupId: number,
   grants: { resource: GrantResource; capability: GrantCapability }[],

@@ -1,11 +1,6 @@
 /**
- * The two halves of OIDC back-channel logout that touch the database: remembering which IdP
- * session a CPM session came from, and ending sessions when the IdP says that one is over.
- *
- * Binding has the same shape as the group sync next door, and for the same reason: the `sid` is a
- * claim in the ID token, which is written with the account row, while the thing it has to be
- * stored on is the session row created moments later. So the account hook parks it and the session
- * hook consumes it.
+ * OIDC back-channel logout's database half. The `sid` arrives with the account row but belongs on
+ * the session row created moments later: the account hook parks it, the session hook takes it.
  */
 
 import { and, eq, inArray } from "drizzle-orm";
@@ -22,59 +17,49 @@ export type PendingSessionBinding = {
   sid: string;
 };
 
-/** A sign-in consumes its entry within milliseconds; this is only a leak guard. */
-const PENDING_TTL_MS = 5 * 60 * 1000;
-
-const pending = new Map<number, { entry: PendingSessionBinding; expiresAt: number }>();
-
-function prunePending(now: number): void {
-  for (const [key, value] of pending) {
-    if (value.expiresAt <= now) pending.delete(key);
-  }
-}
-
-export function recordPendingSessionBinding(entry: PendingSessionBinding): void {
-  const now = Date.now();
-  prunePending(now);
-  pending.set(entry.userId, { entry, expiresAt: now + PENDING_TTL_MS });
-}
-
-export function consumePendingSessionBinding(userId: number): PendingSessionBinding | null {
-  const found = pending.get(userId);
-  pending.delete(userId);
-  if (!found || found.expiresAt <= Date.now()) return null;
-  return found.entry;
-}
-
-/** Exposed for tests - the registry is process-wide state. */
-export function clearPendingSessionBindings(): void {
-  pending.clear();
-}
-
 /**
- * Park the `sid` from an ID token being written to an account row.
- *
- * Called from the account hooks, where the token is still in hand. Providers that issue no `sid`
- * park nothing, and their sessions stay unbound - a logout token from one of those can only be
- * honoured by subject, which is what the spec expects of it anyway.
+ * Keyed by the sign-in request's own endpoint context, which Better Auth hands both the account
+ * and the session hook: overlapping sign-ins for one user each keep their own `sid`, whatever order
+ * their hooks finish in. Weak, so an unconsumed entry goes with its request.
  */
+const pending = new WeakMap<object, PendingSessionBinding>();
+
+export function recordPendingSessionBinding(request: object, entry: PendingSessionBinding): void {
+  pending.set(request, entry);
+}
+
+export function consumePendingSessionBinding(
+  request: object,
+  userId: number,
+): PendingSessionBinding | null {
+  const entry = pending.get(request);
+  pending.delete(request);
+  return entry && entry.userId === userId ? entry : null;
+}
+
+/** No `sid`, no binding: that provider's logout tokens are honoured by subject, per the spec. */
 export function recordSessionBindingFromIdToken(
+  request: object | null | undefined,
   userId: number,
   providerId: string,
   idToken: string | null | undefined,
 ): void {
-  if (!Number.isFinite(userId) || !idToken) return;
+  // Without the request there is nothing safe to correlate by, so the session goes unbound.
+  if (!request || !Number.isFinite(userId) || !idToken) return;
   const raw = isEncryptedSecret(idToken) ? decryptSecret(idToken, "OIDC id_token") : idToken;
   const claims = decodeJwtPayload(raw);
   const sid = claims?.sid;
   if (typeof sid !== "string" || !sid) return;
-  recordPendingSessionBinding({ userId, providerId, sid });
+  recordPendingSessionBinding(request, { userId, providerId, sid });
 }
 
-/** Called after better-auth creates a session: stamp it with the IdP session it belongs to. */
-export async function bindSessionToIdpSession(userId: number, sessionId: number): Promise<void> {
-  if (pending.size === 0 || !Number.isFinite(userId) || !Number.isFinite(sessionId)) return;
-  const entry = consumePendingSessionBinding(userId);
+export async function bindSessionToIdpSession(
+  request: object | null | undefined,
+  userId: number,
+  sessionId: number,
+): Promise<void> {
+  if (!request || !Number.isFinite(userId) || !Number.isFinite(sessionId)) return;
+  const entry = consumePendingSessionBinding(request, userId);
   if (!entry) return;
 
   await db
@@ -85,31 +70,20 @@ export async function bindSessionToIdpSession(userId: number, sessionId: number)
 
 export type RevocationTarget = {
   providerId: string;
-  /** The IdP subject, when the logout token named one. */
   subject: string | null;
-  /** The IdP session id, when the logout token named one. */
   sessionId: string | null;
 };
 
 export type RevocationResult = {
-  /** CPM sessions deleted. Zero is a success: the user may simply not have been signed in. */
+  /** Zero is a success: the user may simply not have been signed in. */
   sessions: number;
-  /** Users whose sessions were ended, for the audit trail. */
   userIds: number[];
 };
 
 /**
- * End the sessions a logout token names.
- *
- * A `sid` ends exactly the session it names, which is the whole point of the claim - and it wins
- * over any `sub` alongside it, which most providers send too. Reading both as "end this session,
- * and also every other one" would make session-scoped logout impossible to ask for. Only a token
- * with no `sid` at all ends every session that subject has, because then there is nothing finer to
- * go on.
- *
- * Forward-auth sessions go either way. They are minted from a CPM session but outlive it, so a
- * proxied host would keep letting the user in after their SSO session ended - and unlike CPM's own
- * sessions they carry no `sid` to narrow by, so all of the user's are dropped.
+ * A `sid` wins over the `sub` most providers also send, or session-scoped logout could not be asked
+ * for; only a token without one ends every session. Forward-auth sessions outlive CPM's and carry
+ * no `sid`, so all of the user's go either way.
  */
 export async function revokeSessionsForLogoutToken(
   target: RevocationTarget,

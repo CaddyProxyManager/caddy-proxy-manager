@@ -87,7 +87,6 @@ function toCrsPlugin(row: PluginRow): CrsPlugin {
   };
 }
 
-/** What a host form's picker needs. */
 export function toCrsPluginOption(plugin: CrsPlugin): {
   id: number;
   name: string;
@@ -145,7 +144,7 @@ function pluginIdsInMeta(meta: string | null): number[] {
   }
 }
 
-/** Where each plugin is selected, keyed by plugin id. Plugins selected nowhere are absent. */
+/** Plugins selected nowhere are absent. */
 export async function getCrsPluginUsage(): Promise<Map<number, CrsPluginUsage>> {
   const [global, dashboard, hosts] = await Promise.all([
     getWafSettings(),
@@ -181,13 +180,11 @@ export async function assertCrsPluginIdsExist(ids: readonly number[] | undefined
   }
 }
 
-/** A registry plugin as the registry table shows it. */
 export type CrsRegistryListing = CrsListedPlugin & {
   registryName: string;
   installedId: number | null;
   /** Null until a check has reached a verdict, or when it found the plugin installable. */
   unsupported: CrsUnsupportedReason | null;
-  /** The release the verdict is for. */
   checkedVersion: string | null;
 };
 

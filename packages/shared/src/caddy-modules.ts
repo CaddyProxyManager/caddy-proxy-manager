@@ -1,9 +1,6 @@
 /**
- * The `--with` specs `docker/caddy/Dockerfile` compiles in when no build arg overrides it.
- *
- * Shared because both sides read an agent that has never rebuilt as carrying exactly this: the
- * controller when gating config, the agent when deciding whether a desired set needs a rebuild.
- * The controller's catalog and the Dockerfile's ARG default are both tested against this list.
+ * The `--with` specs `docker/caddy/Dockerfile` compiles in by default. Shared because both sides
+ * assume a never-rebuilt agent carries exactly these. The catalog and the ARG are tested against it.
  */
 export const SHIPPED_CADDY_MODULES: readonly string[] = [
   "github.com/caddy-dns/cloudflare",

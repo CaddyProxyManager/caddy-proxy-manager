@@ -1,11 +1,4 @@
-/**
- * An agent, as the controller now sees one: an entry in the connection registry holding a stream.
- *
- * This used to be a real HTTP server the controller dialled. It cannot be any more - the controller
- * does not dial - so the fake attaches itself the way a real agent does, reads the frames the
- * controller pushes, and answers commands. Which makes it a smaller lie than the old one: there is
- * no transport to simulate, only the protocol.
- */
+/** Attaches to the registry as a real agent does: no transport to simulate, only the protocol. */
 
 import { randomBytes } from 'node:crypto';
 import type {
@@ -22,7 +15,6 @@ const { attach, detach, recordStatus, settleResults, resetRegistry } = await imp
   '../../src/lib/agent/registry'
 );
 
-/** One thing the controller pushed to this agent. */
 export type AgentRequestLog = {
   kind: 'hello' | 'desired-state' | 'command' | 'restart';
   state?: AgentDesiredState;
@@ -33,9 +25,9 @@ export type AgentRequestLog = {
 export type FakeAgent = {
   agentId: string;
   name: string;
-  /** Everything the controller has pushed, oldest first. */
+  /** Oldest first. */
   requests: AgentRequestLog[];
-  /** The desired state most recently pushed, or null before the first frame. */
+  /** Null before the first frame. */
   desired: AgentDesiredState | null;
   state: {
     appliedPorts: string[];
@@ -48,11 +40,11 @@ export type FakeAgent = {
     appliedServices: Record<ManagedServiceName, boolean> | null;
     servicesStatus: ManagedServicesStatus;
   };
-  /** Re-report status from `state`. Call after mutating it, as the real agent does on change. */
+  /** Re-report status from `state`. */
   report: () => void;
-  /** Finish the port apply the controller last asked for, as the real agent does once Caddy is up. */
+  /** Finish the last port apply, as the real agent does once Caddy is up. */
   completeL4Ports: () => void;
-  /** Finish the rebuild the controller last asked for, once Caddy is healthy. */
+  /** Finish the last rebuild, as once Caddy is healthy. */
   completeBuild: () => void;
   stop: () => Promise<void>;
 };
@@ -71,13 +63,7 @@ function defaultState(overrides: Partial<FakeAgent['state']>): FakeAgent['state'
   };
 }
 
-/**
- * Attach a fake agent and start reading what the controller pushes it.
- *
- * The stream is drained in the background, exactly as the real agent's reader loop does. Frames are
- * logged, and a command is answered immediately from `state.caddyAdmin` - a real agent would take a
- * network round trip, but nothing here is testing latency.
- */
+/** Drains the stream in the background; commands are answered at once from `state.caddyAdmin`. */
 export async function startFakeAgent(
   overrides: Partial<FakeAgent['state']> = {},
 ): Promise<FakeAgent> {
@@ -86,11 +72,7 @@ export async function startFakeAgent(
   const raw = defaultState(overrides);
   const requests: AgentRequestLog[] = [];
 
-  /**
-   * Mutating `state` re-reports, so a test can write `agent.state.l4Status = …` and the controller
-   * sees it - which is how the old fake behaved when the controller polled it over HTTP. Status is
-   * pushed now, so without this every such assignment would land in an object nothing reads again.
-   */
+  /** Mutating `state` re-reports; status is pushed, so an assignment would otherwise go unread. */
   const state = new Proxy(raw, {
     set(target, key, value) {
       Reflect.set(target, key, value);
@@ -120,8 +102,7 @@ export async function startFakeAgent(
     },
   };
 
-  // Reads the raw object, never the proxy: buildStatus runs inside the proxy's own setter, and
-  // going back through it would be a needless second hop on every mutation.
+  // The raw object: this runs inside the proxy's own setter.
   function buildStatus(): AgentStatus {
     return {
       agentId,
@@ -150,9 +131,7 @@ export async function startFakeAgent(
     },
   });
 
-  // The registry hands back events now rather than SSE bytes - the framing belongs to the GraphQL
-  // server. So this helper consumes what the real agent consumes once its transport is unwrapped,
-  // and no longer reimplements a frame parser to do it.
+  // Events, not SSE bytes: the framing belongs to the GraphQL server.
   let reading = true;
   void (async () => {
     for await (const event of events) {
@@ -160,7 +139,7 @@ export async function startFakeAgent(
       handleEvent(event);
     }
   })().catch(() => {
-    // The registry closed the stream; the test is over or the agent was detached.
+    // The test is over or the agent was detached.
   });
 
   function handleEvent(
@@ -171,10 +150,9 @@ export async function startFakeAgent(
       | { type: 'command'; command: AgentCommand }
       | { type: 'restart'; reason: string },
   ): void {
-    // Keepalives are an event now rather than a comment frame, and carry nothing to act on.
     if (event.type === 'ping') return;
 
-    // Logged and nothing more: the real agent restarts Caddy and exits, and the fake has neither.
+    // Logged only: the fake has no Caddy to restart and no process to exit.
     if (event.type === 'restart') {
       requests.push({ kind: 'restart', reason: event.reason });
       return;
@@ -204,16 +182,15 @@ export async function startFakeAgent(
     ]);
   }
 
-  // Report once immediately: the controller treats a connected agent that has never reported as
-  // present-but-unusable, which is not the state most of these tests are about.
+  // A connected agent that never reported counts as present-but-unusable.
   agent.report();
 
-  // Let the initial hello and desired-state frames land before the test asserts on them.
+  // Let the hello and desired-state frames land before the test asserts on them.
   await Bun.sleep(5);
   return agent;
 }
 
-/** Drop every attached agent, so one suite's registry cannot leak into the next. */
+/** So one suite's registry cannot leak into the next. */
 export function clearAgentEnv(): void {
   resetRegistry();
 }

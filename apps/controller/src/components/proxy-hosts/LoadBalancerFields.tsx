@@ -13,10 +13,8 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
 /**
- * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
- *
- * A function rather than a module constant because the labels come from the message catalog, and
- * `useTranslations` is only available inside the component.
+ * Every selection policy the shipped Caddy build registers. A function because the labels come
+ * from `useTranslations`, which only works inside the component.
  */
 function loadBalancingPolicies(t: ReturnType<typeof useTranslations<"proxyHosts">>) {
   return [
@@ -52,8 +50,8 @@ function loadBalancingPolicies(t: ReturnType<typeof useTranslations<"proxyHosts"
 }
 
 /**
- * One state object because Astryx inputs are controlled where these were `defaultValue` fields.
- * `htmlName` keeps the submitted FormData keys byte-identical.
+ * One state object because Astryx inputs are controlled. `htmlName` keeps the submitted FormData
+ * keys byte-identical.
  */
 type TextFields = {
   policyHeaderField: string;

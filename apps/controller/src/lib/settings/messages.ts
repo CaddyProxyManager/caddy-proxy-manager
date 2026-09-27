@@ -1,10 +1,6 @@
 /**
- * Reads the `settings.*` catalog on behalf of the screens that render the registry.
- *
- * Every lookup here is keyed by something only known at runtime - which setting, which group,
- * which validation code - so none of them can be checked against the catalog the way a literal
- * `t("...")` is. `tests/unit/settings-messages.test.ts` covers that gap: it asserts the catalog
- * has an entry for every registry setting, every group and every code.
+ * `settings.*` lookups keyed at runtime, so tsc cannot check them;
+ * tests/unit/settings-messages.test.ts asserts the catalog covers every setting, group and code.
  */
 
 import type { useTranslations } from "next-intl";
@@ -19,10 +15,7 @@ function dynamic(t: Translator): DynamicTranslate {
   return t as unknown as DynamicTranslate;
 }
 
-/**
- * The registry key without its `config:` prefix, which is how `settings.registry.*` is keyed -
- * a colon would read as nesting to next-intl.
- */
+/** Without the `config:` prefix: next-intl would read the colon as nesting. */
 export function settingMessageName(settingKey: string): string {
   return settingKey.replace(/^config:/, "");
 }
@@ -40,7 +33,7 @@ export function settingGroupTitle(t: Translator, group: SettingGroup): string {
 }
 
 export function settingValidationMessage(t: Translator, error: SettingValidationError): string {
-  // An unknown key has no label to look up - the key itself is the only thing to name it by.
+  // An unknown key has no label; the key itself is all there is.
   const label =
     error.code === "unknown" ? String(error.params.label) : settingLabel(t, error.settingKey);
 

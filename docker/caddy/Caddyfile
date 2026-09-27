@@ -1,22 +1,15 @@
 {
-	# docker-compose.yml sets CADDY_ADMIN_LISTEN to a name only the internal caddy-admin network
-	# resolves, so the admin API is not on caddy-network, where every upstream could reach it. The
-	# agent pins the same address into each config it loads. Unset, this keeps the old open bind,
-	# where only leaving port 2019 unpublished bounds reach.
-	#
-	# `origins` rejects a request whose Origin header is not listed, which stops a page in the
-	# operator's browser reconfiguring the proxy. On an open bind Caddy also skips Host checking
-	# ("admin endpoint on open interface; host checking disabled"); on a named one it enforces this
-	# list against Host.
+	# Compose points CADDY_ADMIN_LISTEN at the internal caddy-admin network, off caddy-network where
+	# every upstream could reach it; unset, only an unpublished 2019 bounds the open bind.
+	# `origins` stops a page in the operator's browser reconfiguring the proxy; on a named bind it is
+	# also enforced against Host, which Caddy skips on an open interface.
 	admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019} {
 		origins caddy-admin:2019 caddy:2019 localhost:2019 localhost
 	}
 }
 
-# Placeholder site, HTTP only so a fresh install cannot fail a certificate order before anyone has
-# configured anything. It answers until CPM applies its own configuration, which replaces this file
-# wholesale - and from then on the dashboard domain is served by the managed host in
-# Settings -> Dashboard Host, not by this block.
+# Placeholder until CPM's first apply replaces this wholesale; HTTP only, so a fresh install cannot
+# fail a certificate order before anything is configured.
 http://{$DASHBOARD_DOMAIN:caddyproxymanager.com}, http://localhost {
 	respond "Caddy Proxy Manager is running - configure proxy hosts via the web interface" 200
 }

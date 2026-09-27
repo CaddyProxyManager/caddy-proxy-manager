@@ -11,12 +11,8 @@ export interface TcpResponse {
 }
 
 /**
- * Open a TCP connection to host:port, send a payload, and collect whatever comes back within the
- * timeout window.
- *
- * The default window is generous: the stack's echo backends are linux/amd64 images, and under
- * emulation on an arm64 host they can miss a tighter deadline while the rest of the suite runs -
- * which surfaces as a "connected but empty echo" failure rather than as slowness.
+ * The default window is generous: the echo backends are amd64 images, and under emulation on arm64
+ * they can miss a tighter deadline, surfacing as a "connected but empty echo" failure.
  */
 export function tcpSend(
   host: string,
@@ -89,9 +85,8 @@ export async function waitForTcpEcho(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      // tcpSend rejects (rather than resolving) when the socket errors before it ever connects -
-      // ECONNREFUSED while the caddy container is being recreated, for one. That is exactly the
-      // window this helper exists to wait through, so treat it as "not ready yet" and keep polling.
+      // tcpSend rejects when the socket errors before connecting (ECONNREFUSED while caddy is
+      // recreated) - exactly the window this waits through, so keep polling.
       const res = await tcpSend(host, port, `${probe}\n`, 2_000);
       if (res.data.includes(probe)) return;
     } catch {

@@ -37,7 +37,12 @@ type RuleState = {
   path: string;
   upstreams: WithRowId<UpstreamEntry>[];
   loadBalancer: LoadBalancerConfig | null;
+  accessListId?: number | null;
 };
+
+// Selector values for the rule's own access list; a list is its id.
+const INHERIT = "inherit";
+const NO_LIST = "none";
 
 function blankUpstream(): WithRowId<UpstreamEntry> {
   return withRowId({ protocol: "http://", address: "" });
@@ -50,6 +55,7 @@ function toState(rules: LocationRule[]): WithRowId<RuleState>[] {
       upstreams:
         r.upstreams.length > 0 ? withRowIds(r.upstreams.map(parseUpstream)) : [blankUpstream()],
       loadBalancer: r.loadBalancer ?? null,
+      ...(r.accessListId !== undefined && { accessListId: r.accessListId }),
     })),
   );
 }
@@ -62,14 +68,19 @@ function toJson(rules: RuleState[]): string {
         path: r.path.trim(),
         upstreams: r.upstreams.filter((u) => u.address.trim()).map(serializeUpstream),
         loadBalancer: r.loadBalancer?.enabled ? r.loadBalancer : null,
+        ...(r.accessListId !== undefined && { accessListId: r.accessListId }),
       }))
       .filter((r) => r.upstreams.length > 0),
   );
 }
 
-type Props = { initialData?: LocationRule[] };
+type Props = {
+  initialData?: LocationRule[];
+  /** Offered as each rule's own list. Without them the choice isn't shown and rules inherit. */
+  accessLists?: { id: number; name: string }[];
+};
 
-export function LocationRulesFields({ initialData = [] }: Props) {
+export function LocationRulesFields({ initialData = [], accessLists }: Props) {
   const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
@@ -92,6 +103,19 @@ export function LocationRulesFields({ initialData = [] }: Props) {
 
   const updateLoadBalancer = (ruleId: string, value: LoadBalancerConfig | null) =>
     patchRule(ruleId, (rule) => ({ ...rule, loadBalancer: value }));
+
+  const updateAccessList = (ruleId: string, value: string) =>
+    patchRule(ruleId, (rule) => {
+      const { accessListId: _, ...rest } = rule;
+      if (value === INHERIT) return rest;
+      return { ...rest, accessListId: value === NO_LIST ? null : Number(value) };
+    });
+
+  const accessListChoices = accessLists && [
+    { value: INHERIT, label: t("locationAccessListInherit") },
+    { value: NO_LIST, label: t("locationAccessListNone") },
+    ...accessLists.map((list) => ({ value: String(list.id), label: list.name })),
+  ];
 
   const addUpstream = (ruleId: string) =>
     patchRule(ruleId, (rule) => ({ ...rule, upstreams: [...rule.upstreams, blankUpstream()] }));
@@ -202,6 +226,22 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                     />
                   </HStack>
                 </VStack>
+
+                {accessListChoices && (
+                  <Selector
+                    label={t("locationAccessList")}
+                    size="sm"
+                    options={accessListChoices}
+                    value={
+                      rule.accessListId === undefined
+                        ? INHERIT
+                        : rule.accessListId === null
+                          ? NO_LIST
+                          : String(rule.accessListId)
+                    }
+                    onChange={(next) => updateAccessList(rule.rowId, next as string)}
+                  />
+                )}
 
                 <LocationLoadBalancerFields
                   value={rule.loadBalancer}

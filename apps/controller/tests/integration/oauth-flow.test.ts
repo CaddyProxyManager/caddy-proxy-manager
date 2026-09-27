@@ -1,28 +1,8 @@
 /**
- * A complete OAuth sign-in against a real OIDC provider, in the fast suite.
- *
- * This exists because of a regression that reached main. `advanced.database.joins` was enabled to
- * let Better Auth fetch a session and its user in one query instead of two. It worked - getSession
- * dropped to a single statement, and a test proved it. But Better Auth builds a *different* join
- * during the OAuth callback, and that one failed:
- *
- *     db.query.accounts.findFirst with: [users]     <- fine
- *     db.query.users.findFirst    with: [accountss] <- TypeError: undefined is not an object
- *                                                      (evaluating 'relation.referencedTable')
- *
- * The drizzle adapter derives the many-side join key by appending "s" to the model name. This
- * app's model names are already plural (`accounts`, configured in auth-server.ts), so it asked for
- * `accountss` and drizzle had no such relation. `usePlural: true` is not the fix - it pluralizes
- * every model name, so `verifications` becomes `verificationss` and startup fails outright. The
- * only working spelling was to name the relations `accountss`/`sessionss`, which depends on an
- * adapter quirk rather than anything documented, so joins stay off.
- *
- * Nothing in the fast suites could see it. The unit auth tests stub `betterAuth` and assert the
- * options object, so no adapter code runs; the other integration tests drive the adapter directly
- * and never build the queries a callback builds. Only the end-to-end suite caught it - after the
- * push, 14 minutes later. This closes that gap: it exercises the real callback in about a second.
- *
- * Needs the mock IdP running (see tests/helpers/mock-idp.ts); skips with a note when it is not.
+ * A complete OAuth sign-in against a real OIDC provider, in the fast suite. Only e2e caught
+ * `advanced.database.joins` breaking the callback: the drizzle adapter appends "s" to our
+ * already-plural model names and asks for `accountss`, so joins stay off.
+ * Needs the mock IdP (tests/helpers/mock-idp.ts); skips with a note when it is not running.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createTestDatabase } from '@/tests/helpers/db';
@@ -130,8 +110,7 @@ describe.if(IDP_AVAILABLE)('OAuth sign-in against a real IdP', () => {
 
   it('ignores a role claim from the IdP', async () => {
     // The mock returns role:"admin". Better Auth's generic-OAuth signup spreads raw claims into
-    // the new user and ignores `input: false`, so enforceSafeUserDefaults has to override it. The
-    // end-to-end suite covers this too; having it here means a broken hook is caught in seconds.
+    // the new user and ignores `input: false`, so enforceSafeUserDefaults has to override it.
     const { auth, db, schema } = await bootWithMockProvider();
     await completeOAuthSignIn(auth, { providerId: PROVIDER_ID });
 

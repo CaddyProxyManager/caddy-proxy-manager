@@ -1,7 +1,6 @@
 /**
- * Functional: WAF directives are checked before they are saved - by the linter as they are typed,
- * and by the real Caddy on save, which the agent runs `caddy validate` in a throwaway container
- * for. The second is the only thing here that exercises that path end to end, socket proxy and all.
+ * WAF directives are linted as typed and validated by a real Caddy on save; the only end-to-end
+ * test of the agent's `caddy validate`, socket proxy and all.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { waitForHydration } from '../../helpers/hydration';

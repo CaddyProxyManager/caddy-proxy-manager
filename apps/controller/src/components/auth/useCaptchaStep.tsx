@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { CaptchaWidget, type CaptchaWidgetHandle } from "@/src/components/auth/CaptchaWidget";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 
-/** What the check answers with, by the code the route refuses with. */
+/** Keyed by the code the route refuses with. */
 const CAPTCHA_ERRORS = {
   CAPTCHA_FAILED: "failed",
   CAPTCHA_UNAVAILABLE: "unavailable",
@@ -13,11 +13,8 @@ const CAPTCHA_ERRORS = {
 } as const;
 
 /**
- * The sign-in CAPTCHA, shared by `/login` and the forward-auth portal.
- *
- * The server spends a pass on every password attempt, so a solve is needed before the first one
- * and again after each that fails. `widget` is non-null exactly while one is needed - the form
- * draws it on whichever step it is on - and `pass` succeeds at once when none is.
+ * Shared by `/login` and the portal. Every password attempt spends a pass, so each needs a solve;
+ * `widget` is non-null exactly while one is needed, and `pass` succeeds at once otherwise.
  */
 export function useCaptchaStep({
   config,
@@ -26,12 +23,11 @@ export function useCaptchaStep({
 }: {
   config: CaptchaWidgetConfig | null;
   nonce?: string;
-  /** A sentence to show in the form's own error banner. */
   onError: (message: string) => void;
 }): {
   widget: ReactNode;
   pending: boolean;
-  /** Trade the solved token for a pass, if one is needed. True once it is held. */
+  /** True once a pass is held. */
   pass: (username: string) => Promise<boolean>;
   /** The pass was spent, lapsed or belongs to another name: the next attempt needs a new solve. */
   spent: (message?: "expired") => void;
@@ -71,13 +67,13 @@ export function useCaptchaStep({
     } finally {
       setPending(false);
     }
-    // Whatever went wrong, the token is spent or suspect.
+    // Spent or suspect, whatever went wrong.
     ref.current?.reset();
     return false;
   };
 
   const spent = (message?: "expired") => {
-    // Unmounting the old widget and mounting a new one is what gives a fresh challenge.
+    // Only a remount gives a fresh challenge.
     setNeeded(true);
     setToken(null);
     if (message) onError(t(message));

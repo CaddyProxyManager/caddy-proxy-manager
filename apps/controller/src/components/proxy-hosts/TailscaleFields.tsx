@@ -14,21 +14,16 @@ import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/Modul
 import { useTranslations } from "next-intl";
 
 export type TailscaleHostDefaults = {
-  /** Whether Tailscale is switched on in Settings at all. */
   enabled: boolean;
-  /** Whether an auth key is stored. Without one the node cannot register, and the apply fails. */
+  /** Without one the node cannot register, and the apply fails. */
   hasAuthKey: boolean;
-  /** The node a host inherits when it names none. */
+  /** Inherited by a host that names none. */
   defaultNode: string;
 };
 
 /**
- * One proxy host's Tailscale options.
- *
- * `serve` is the switch the identity options hang off, because neither works without it: the gate
- * needs a tsnet listener to ask who is calling, and "tailnet only" has nothing to be exclusive of.
- * Dialling an upstream over the tailnet is genuinely independent - a host published on the public
- * internet can still proxy to a machine that only exists on the tailnet - so it sits outside.
+ * The identity options hang off `serve`, needing its tsnet listener. Dialling an upstream over
+ * the tailnet is independent - a public host can still proxy to a tailnet machine.
  */
 export function TailscaleFields({
   tailscale,

@@ -8,7 +8,7 @@ const SITEVERIFY: Record<Exclude<CaptchaWidgetConfig["provider"], "cap">, string
 
 const TIMEOUT_MS = 10_000;
 
-/** "unavailable" is the service not answering, which the form words differently from a failed solve. */
+/** "unavailable" is the service not answering, worded differently from a failed solve. */
 export type CaptchaVerdict = "passed" | "failed" | "unavailable";
 
 export type CaptchaCheck = {
@@ -19,7 +19,7 @@ export type CaptchaCheck = {
   capInstanceUrl?: string;
 };
 
-/** Ask the provider whether `token` is a solve for this site. Tokens are single-use there too. */
+/** Tokens are single-use at the provider too. */
 export async function verifyCaptchaToken(
   check: CaptchaCheck,
   token: string,
@@ -58,7 +58,7 @@ export async function verifyCaptchaToken(
     }
     const body = (await response.json()) as { success?: unknown; "error-codes"?: unknown };
     if (body.success === true) return "passed";
-    // A wrong secret is the operator's to fix, and looks like every visitor failing the puzzle.
+    // A wrong secret looks like every visitor failing the puzzle, so it is the operator's to fix.
     const codes = Array.isArray(body["error-codes"]) ? body["error-codes"].map(String) : [];
     if (codes.some((code) => /secret/i.test(code))) {
       console.warn(`[captcha] ${check.provider} rejected the secret key: ${codes.join(", ")}`);

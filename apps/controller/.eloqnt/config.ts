@@ -9,10 +9,8 @@ export default defineConfig({
     format: "json",
   },
   lint: {
-    // These families are looked up by a key built at runtime - `settings.registry.${name}.label`,
-    // `errors.${error.code}` - so no static analysis can see the reference. Scoped rather than
-    // switched off globally: orphan-message is what caught three keys that really were dead.
-    // Coverage for these is `settings-messages.test.ts` and `domain-error.test.ts` instead.
+    // Keys built at runtime, which static analysis cannot see; settings-messages.test.ts and
+    // domain-error.test.ts cover them. Scoped, since orphan-message has caught real dead keys.
     overrides: [
       {
         keys: "settings.registry.*",

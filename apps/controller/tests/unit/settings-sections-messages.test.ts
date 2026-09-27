@@ -1,9 +1,6 @@
 /**
- * The settings rail, header and search render each section's name and description, and each
- * group's label, from the catalog by id - at runtime, so TypeScript cannot check those keys the way
- * it checks a literal `t("...")`. These do it instead: a section added to `sections.ts` without a
- * message fails the build rather than rendering its raw key, and the English entries must read
- * exactly as the module does, since e2e finds the rail's links by that text.
+ * Section and group keys are composed at runtime, so tsc cannot check them. The English must also
+ * match `sections.ts` exactly, since e2e finds the rail's links by that text.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';

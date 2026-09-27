@@ -1,10 +1,6 @@
 /**
- * Staging: a settings write goes into the operator's change set, not the settings table, and
- * reaches Caddy only when applied.
- *
- * The mechanism is an AsyncLocalStorage scope read by `getSetting` and `setSetting`, so these
- * tests exercise the real seam rather than the wrappers around it - if the scope stops being
- * consulted, an edit silently becomes a live write, which is the failure worth catching.
+ * The real AsyncLocalStorage seam, not its wrappers: if the scope stops being consulted, an edit
+ * silently becomes a live write.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -15,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// createTestDb is async and a Bun mock factory must be synchronous, so the db is built here and
-// the factory just hands it over. An async factory never resolves and hangs the file.
+// A Bun mock factory must be synchronous; an async one never resolves and hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -68,7 +63,6 @@ describe('capture scope', () => {
     });
 
     expect(writes.get('general')).toBe(JSON.stringify({ defaultDomain: 'staged.example.com' }));
-    // The table is untouched: that is the whole contract.
     expect(await ctx.db.select().from(settings)).toHaveLength(0);
   });
 
@@ -80,8 +74,7 @@ describe('capture scope', () => {
   });
 
   it('lets an action read back what it wrote a moment earlier', async () => {
-    // Actions read-modify-write a blob. Without the capture being visible to reads, the second
-    // write in one action would be based on the stored value and discard the first.
+    // Actions read-modify-write a blob; a second write must see the first.
     const { writes } = await withCapturedWrites(new Map(), async () => {
       await setSetting('general', { defaultDomain: 'first.example.com', acmeEmail: 'a@b.c' });
     });
@@ -151,8 +144,7 @@ describe('stageWrites', () => {
       new Map([['general', JSON.stringify({ defaultDomain: 'same.example.com' })]]),
     );
 
-    // Editing a field and putting it back must leave nothing pending, or the review sheet shows a
-    // change from a value to itself.
+    // Or the review sheet shows a change from a value to itself.
     expect(await listStagedSettings(userId)).toHaveLength(0);
   });
 

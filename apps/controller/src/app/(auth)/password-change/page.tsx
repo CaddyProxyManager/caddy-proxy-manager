@@ -14,8 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PasswordChangePage() {
   const session = await requireUser();
 
-  // Reached directly by someone who does not need it - including right after a
-  // successful change, when the hash is argon2id and the gate no longer matches.
+  // Including right after a change, when the hash is argon2id and the gate no longer matches.
   if (!(await requiresLegacyPasswordChange(Number(session.user.id)))) {
     redirect("/");
   }

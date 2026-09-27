@@ -5,8 +5,7 @@ import forge from 'node-forge';
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-// The action reports the password rule to the operator, so it asks for a translator; a unit test
-// has no request for one to resolve against.
+// The action translates the password rule, and a unit test has no request to resolve one from.
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
 vi.mock('@/src/lib/auth', () => ({
@@ -87,10 +86,8 @@ describe('client certificate .p12 export', () => {
   });
 
   it('stretches the export password with PBKDF2-SHA256, not SHA-1', async () => {
-    // forge honours `prfAlgorithm` by forwarding its options to
-    // pki.encryptPrivateKeyInfo, but does not declare it in @types/node-forge.
-    // If a forge upgrade drops that pass-through the PRF silently reverts to
-    // SHA-1, which this assertion is here to catch.
+    // `prfAlgorithm` is an undeclared pass-through in forge; if an upgrade drops it the PRF
+    // silently reverts to SHA-1.
     const der = (await issue()).toString('hex');
     expect(der).toContain(HMAC_WITH_SHA256);
     expect(der).not.toContain(HMAC_WITH_SHA1);
@@ -119,8 +116,7 @@ describe('client certificate .p12 export', () => {
   });
 
   it('refuses an export password weaker than a login password', async () => {
-    // The .p12 leaves the deployment as a file, so this password is the only
-    // thing protecting the client private key.
+    // Once the .p12 leaves as a file, this password is all that protects the private key.
     for (const weak of ['short', 'alllowercaseletters1!', 'NoDigitsInHere!!', 'NoSpecialChar123']) {
       await expect(issue(weak)).rejects.toThrow(/Export password must/);
     }
@@ -131,8 +127,7 @@ describe('client certificate .p12 export', () => {
   });
 
   it('does no key generation when the password is rejected', async () => {
-    // The check has to come before the 2048-bit keygen and the database write,
-    // or a rejected request still costs both.
+    // Otherwise a rejected request still costs the 2048-bit keygen and the database write.
     await expect(issue('short')).rejects.toThrow();
     expect(createIssuedClientCertificate).not.toHaveBeenCalled();
   });

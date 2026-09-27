@@ -1,7 +1,4 @@
-/**
- * What a GraphQL client is told when a resolver fails. The endpoint used to return every error
- * raw, so a database or upstream failure reached the caller verbatim; REST has always redacted.
- */
+/** Resolver failures are redacted, as REST's always were. */
 import { describe, expect, it } from 'bun:test';
 import { GraphQLError } from 'graphql';
 import { ApiAuthError } from '@/src/lib/api-auth';
@@ -9,7 +6,7 @@ import { ApiValidationError } from '@/src/lib/api-errors';
 import { domainError } from '@/src/lib/domain-error';
 import { maskGraphQLError } from '@/src/lib/graphql/errors';
 
-/** An error as graphql-js hands it over: located at a field, the thrown one kept as the original. */
+/** As graphql-js hands it over. */
 function located(original: Error): GraphQLError {
   return new GraphQLError(original.message, { originalError: original, path: ['field'] });
 }

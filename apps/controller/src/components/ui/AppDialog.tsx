@@ -21,7 +21,6 @@ type AppDialogProps = {
   isSubmitDisabled?: boolean;
 };
 
-/** Token-backed widths, replacing the max-w-* utility classes. */
 const DIALOG_WIDTH: Record<NonNullable<AppDialogProps["maxWidth"]>, number> = {
   xs: 320,
   sm: 420,
@@ -62,8 +61,7 @@ export function AppDialog({
                   <Button variant="secondary" label={t("cancel")} onClick={onClose} />
                   {onSubmit && (
                     <Button
-                      // Explicit: Astryx's default is secondary, which left the one action a
-                      // dialog exists for the same grey as Cancel beside it.
+                      // Astryx defaults to secondary, the same grey as Cancel beside it.
                       variant="primary"
                       label={submitLabel ?? t("save")}
                       onClick={onSubmit}

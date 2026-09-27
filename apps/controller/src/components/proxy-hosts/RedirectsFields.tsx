@@ -15,15 +15,24 @@ import { useTranslations } from "next-intl";
 type Props = { initialData?: RedirectRule[] };
 
 const STATUS_OPTIONS = [301, 302, 307, 308].map((s) => ({ value: String(s), label: String(s) }));
+const KEEP_NONE = "none";
 
 export function RedirectsFields({ initialData = [] }: Props) {
   const t = useTranslations("proxyHosts");
+  const pathOptions = [
+    { value: KEEP_NONE, label: t("preservePathNone") },
+    { value: "full", label: t("preservePathFull") },
+    { value: "suffix", label: t("preservePathSuffix") },
+  ];
   const [rules, setRules] = useState<WithRowId<RedirectRule>[]>(() => withRowIds(initialData));
 
   const addRule = () => setRules((r) => [...r, withRowId({ from: "", to: "", status: 301 })]);
   const removeRule = (rowId: string) => setRules((r) => r.filter((rule) => rule.rowId !== rowId));
-  const updateRule = (rowId: string, key: keyof RedirectRule, value: string | number) =>
-    setRules((r) => r.map((rule) => (rule.rowId === rowId ? { ...rule, [key]: value } : rule)));
+  const updateRule = (
+    rowId: string,
+    key: keyof RedirectRule,
+    value: string | number | RedirectRule["preservePath"],
+  ) => setRules((r) => r.map((rule) => (rule.rowId === rowId ? { ...rule, [key]: value } : rule)));
 
   return (
     <VStack gap={2}>
@@ -34,7 +43,14 @@ export function RedirectsFields({ initialData = [] }: Props) {
         type="hidden"
         name="redirectsJson"
         value={JSON.stringify(
-          rules.map(({ from, to, status }): RedirectRule => ({ from, to, status })),
+          rules.map(
+            ({ from, to, status, preservePath }): RedirectRule => ({
+              from,
+              to,
+              status,
+              ...(preservePath && { preservePath }),
+            }),
+          ),
         )}
       />
 
@@ -66,6 +82,21 @@ export function RedirectsFields({ initialData = [] }: Props) {
                 options={STATUS_OPTIONS}
                 value={String(rule.status)}
                 onChange={(next) => updateRule(rule.rowId, "status", Number(next))}
+              />
+              <Selector
+                label={t("preservePath")}
+                isLabelHidden={i > 0}
+                size="sm"
+                width={150}
+                options={pathOptions}
+                value={rule.preservePath ?? KEEP_NONE}
+                onChange={(next) =>
+                  updateRule(
+                    rule.rowId,
+                    "preservePath",
+                    next === KEEP_NONE ? undefined : (next as RedirectRule["preservePath"]),
+                  )
+                }
               />
               <IconButton
                 variant="ghost"

@@ -1,7 +1,5 @@
-# Full-stack integration test rig. One *internal* bridge network: containers reach each other and
-# nothing else, no host ports published, certificates from an in-network Pebble rather than Let's
-# Encrypt. Static IPs because dnsmasq must answer *.cpm.test with Caddy's address, and Pebble is
-# pointed at dnsmasq so HTTP-01 validation resolves test domains the same way the client does.
+# Full-stack rig on one *internal* network, certificates from an in-network Pebble. Static IPs
+# because dnsmasq answers *.cpm.test with Caddy's address, and Pebble validates through dnsmasq.
 name: cpm-docker-tests
 
 networks:
@@ -13,23 +11,26 @@ networks:
       config:
         - subnet: 172.28.0.0/24
           gateway: 172.28.0.1
+  # The agent phase's Docker API, which nothing else can reach.
+  cpm-test-docker:
+    name: cpm-test-docker
+    driver: bridge
+    internal: true
 
 volumes:
   postgres-data: # postgres: the controller's database
   cpm-data:      # web: certificates and shared state
   caddy-data:    # caddy: certificate storage
   caddy-config:  # caddy: autosave.json
-  caddy-logs:    # shared: access log + coraza audit log. Nothing here reads them - that moved to
-                 # the agent, which this rig does not run. Mounted so the paths the controller
-                 # writes into Caddy's config exist.
+  caddy-logs:    # shared: unread here (no agent), but the log paths in Caddy's config must exist
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
+  agent-data:    # agent phase: the agent's state
 
 services:
   # ── Test PKI ────────────────────────────────────────────────────────────
-  # One-shot. Mints the CA that signs Pebble's own HTTPS endpoint (Caddy has to
-  # trust it to talk ACME) and a deliberately-mismatched cert for the HTTPS
-  # origin, so upstream hostname verification has something to fail on.
+  # One-shot: the CA for Pebble's HTTPS endpoint, and a deliberately mismatched cert for the
+  # HTTPS origin so upstream hostname verification has something to fail on.
   certgen:
     build:
       context: ./images/runner
@@ -44,8 +45,7 @@ services:
         ipv4_address: 172.28.0.4
 
   # ── DNS ─────────────────────────────────────────────────────────────────
-  # *.cpm.test resolves to Caddy. Everything else is forwarded to Docker's
-  # embedded resolver so container names still work.
+  # *.cpm.test resolves to Caddy; the rest forwards to Docker's resolver for container names.
   dns:
     build:
       context: ./images/dns
@@ -57,16 +57,14 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.5
     healthcheck:
-      # A-only: dnsmasq has no AAAA to give for these names, and busybox
-      # nslookup waits out the full timeout on the empty answer.
+      # A-only: busybox nslookup waits out the full timeout on the empty AAAA answer.
       test: ["CMD", "nslookup", "-type=a", "probe.cpm.test", "127.0.0.1"]
       interval: 3s
       timeout: 5s
       retries: 10
 
   # ── ACME certificate authority ──────────────────────────────────────────
-  # Validates HTTP-01/TLS-ALPN-01 against Caddy on the standard ports, which is
-  # why httpPort/tlsPort are overridden from Pebble's defaults.
+  # httpPort/tlsPort are overridden so validation hits Caddy on the standard ports.
   pebble:
     image: ghcr.io/letsencrypt/pebble:latest
     container_name: cpm-test-pebble
@@ -76,8 +74,7 @@ services:
       - -dnsserver
       - 172.28.0.5:53
     environment:
-      # Pebble's defaults exist to shake out non-compliant ACME clients. They
-      # make a test suite flaky, so: no validation delay, never reject a nonce.
+      # Pebble's client-hardening defaults make a suite flaky: no delay, no nonce rejection.
       PEBBLE_VA_NOSLEEP: "1"
       PEBBLE_WFE_NONCEREJECT: "0"
     volumes:
@@ -116,7 +113,8 @@ services:
     build:
       context: ..
       dockerfile: docker/caddy/Dockerfile
-    image: cpm-test/caddy:latest
+    # The agent phase's agent sets this to the image it loads; everything else runs the rig's own.
+    image: ${CADDY_IMAGE:-cpm-test/caddy:latest}
     container_name: cpm-test-caddy
     environment:
       DASHBOARD_DOMAIN: cpm.test
@@ -145,10 +143,8 @@ services:
       NODE_ENV: production
       SESSION_SECRET: test-session-secret-not-for-production-use-0123456789
       CADDY_API_URL: http://caddy:2019
-      # The dotted alias below, not the bare service name: curl 8.22 (Alpine 3.24's) stores a
-      # cookie set by a single-label host like `web` but never sends it back, so the runner's
-      # signed-in session would vanish between sign-in and its first API call. The origin the
-      # suite sends has to match this one, so CPM_API on the runner moves with it.
+      # Dotted alias, not `web`: curl 8.22 never sends back a cookie set by a single-label host,
+      # losing the runner's session. CPM_API on the runner must match.
       BASE_URL: http://web.cpm.internal:3000
       NEXTAUTH_URL: http://web.cpm.internal:3000
       DATABASE_URL: postgres://cpm:docker-tests@postgres:5432/cpm
@@ -177,8 +173,7 @@ services:
         aliases:
           - web.cpm.internal
     healthcheck:
-      # The image's own probe. It cannot be a shell one-liner: the runtime stage is Debian with the
-      # compiled binary and nothing else - no Bun CLI, no curl, no wget.
+      # The runtime stage has only the compiled binary - no Bun CLI, curl or wget.
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
@@ -186,8 +181,7 @@ services:
       start_period: 10s
 
   # ── Simulated proxy destinations ────────────────────────────────────────
-  # L7 (HTTP) origins. origin-a and origin-b are identical apart from the id
-  # they report, which is how load-balancing tests tell them apart.
+  # origin-a and origin-b differ only in the id they report, for load-balancing tests.
   origin-a:
     build:
       context: ./images/backend
@@ -223,8 +217,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # HTTPS origin whose certificate deliberately does NOT match its hostname,
-  # so `skipHttpsHostnameValidation` has a real failure to suppress.
+  # Certificate deliberately mismatches, so `skipHttpsHostnameValidation` has work to do.
   origin-tls:
     image: cpm-test/backend:latest
     container_name: cpm-test-origin-tls
@@ -242,7 +235,7 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.22
 
-  # L4 destinations: raw TCP and UDP endpoints with no HTTP awareness at all.
+  # L4 destinations: raw TCP and UDP.
   origin-tcp:
     image: cpm-test/backend:latest
     container_name: cpm-test-origin-tcp
@@ -270,8 +263,82 @@ services:
         ipv4_address: 172.28.0.24
 
   # ── Simulated client ────────────────────────────────────────────────────
-  # The only container that drives the tests. It resolves test domains through
-  # dnsmasq exactly as a browser would, and reaches Caddy over TLS by name.
+  # Drives the tests, resolving through dnsmasq as a browser would.
+  # ── Agent phase (run.sh, after the main suite) ─────────────────────────
+  # An agent in external build mode, behind a socket proxy with BuildKit denied: it must load an
+  # image built elsewhere, never build one. Last, because pairing moves every admin call onto it.
+
+  # Built, never run: the image an operator would build for it. One DNS module and nothing else,
+  # so the rig's own image and this one differ in the module list the agent must read.
+  caddy-external:
+    profiles: ["agent-build"]
+    build:
+      context: ..
+      dockerfile: docker/caddy/Dockerfile
+      args:
+        CADDY_MODULES: github.com/caddy-dns/cloudflare
+    image: cpm-test/caddy:external
+
+  docker-socket-proxy:
+    profiles: ["agent"]
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    container_name: cpm-test-docker-proxy
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      IMAGES: 1
+      # The point of the phase: no BuildKit, so a build could not run even if the agent tried.
+      GRPC: 0
+      SESSION: 0
+      BUILD: 0
+      EVENTS: 0
+      EXEC: 0
+      SWARM: 0
+      AUTH: 0
+      SECRETS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../docker/socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    networks:
+      - cpm-test-docker
+
+  agent:
+    profiles: ["agent"]
+    build:
+      context: ..
+      dockerfile: docker/agent/Dockerfile
+    image: cpm-test/agent:latest
+    container_name: cpm-test-agent
+    environment:
+      DATA_DIR: /data
+      # Pairs itself with the bootstrap token web leaves there, as the bundled agent does.
+      CONTROLLER_DATA_DIR: /controller-data
+      CONTROLLER_URL: http://web:3000
+      COMPOSE_DIR: /compose
+      CADDY_API_URL: http://caddy:2019
+      CADDY_CONTAINER_NAME: cpm-test-caddy
+      CADDY_BUILD_MODE: external
+      CADDY_IMAGE: cpm-test/caddy:external
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    group_add:
+      # web's, for the bootstrap token.
+      - "10001"
+    volumes:
+      - agent-data:/data
+      - cpm-data:/controller-data:ro
+      # This directory, so the agent's compose manages the rig's own caddy service.
+      - .:/compose:ro
+      - caddy-logs:/logs
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.12
+      cpm-test-docker: {}
+
   runner:
     build:
       context: ./images/runner

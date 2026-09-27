@@ -1,26 +1,9 @@
 "use client";
 
 /**
- * What happens between a setup step finishing and the operator being handed on.
- *
- * Both flows that end in a restart use it. A migration replaces the database underneath a process
- * that read the old one at boot; finishing setup stores configuration a process that started
- * against an empty database has already resolved - settings are cached, the enabled OAuth
- * providers were listed at boot, the environment backfill has decided what this deployment looks
- * like. Going straight on means using a process still running on the old answers, and what an
- * operator sees then is their data with none of their settings and no reason to suspect a restart
- * would fix it. Coming back is also what applies the Caddy configuration, which is how a dashboard
- * host created seconds ago starts answering.
- *
- * So the restart is part of the flow rather than a line in the release notes, and this is the only
- * screen that can say so - a page cannot explain itself while its own server is down. Every word
- * is the caller's: the two flows restart for different reasons and are owed different sentences.
- *
- * The wait is deliberately in two halves. Waiting only for the app to answer would be satisfied by
- * the process that is still about to exit, so this waits for it to go away first and only then for
- * it to come back. A deployment with no supervisor never comes back, which is a real way to run
- * this app and not an error: after the budget runs out it says so and offers the way forward by
- * hand.
+ * Migration and setup both leave a process running on answers resolved at boot (settings, OAuth
+ * providers, the env backfill), and only a restart applies the new Caddy config. The wait is in
+ * restart-wait.ts. No supervisor is valid: it says so.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -35,78 +18,59 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { loadPage } from "@/src/lib/browser-navigation";
+import { type Health, waitForRestart } from "@/src/lib/restart-wait";
 
-/** How often to ask whether the app is there. Frequent enough to feel immediate, not a flood. */
 const POLL_INTERVAL_MS = 1000;
-/** How long to wait for the process to go away before assuming nothing is going to stop it. */
 const SHUTDOWN_BUDGET_MS = 20_000;
-/** How long to wait for it to come back. Generous: a cold start pulls in the whole app. */
+/** Generous: a cold start pulls in the whole app. */
 const STARTUP_BUDGET_MS = 120_000;
-/**
- * How long to keep asking whether the dashboard host answers. Short: the app is already back, so
- * this is only the gap between it starting and Caddy having the route - and every second of it is
- * spent on a page that is finished.
- */
+/** Short: only the gap until Caddy has the route, spent on a finished page. */
 const DASHBOARD_BUDGET_MS = 15_000;
-/**
- * How long to respect a cooldown before giving up on it. The route allows one restart a minute, and
- * a deployment that migrated and then finished setup inside that minute is refused for a reason
- * that passes on its own - so it is waited out rather than reported.
- */
+/** The route allows one restart a minute; migrate-then-setup inside it is waited out. */
 const COOLDOWN_BUDGET_MS = 90_000;
 
-/** The words this restart is owed. The two flows share the machinery, not the sentences. */
+/** The two flows share the machinery, not the sentences. */
 export type RestartCopy = {
-  /** The page heading behind the dialog. */
   heading: string;
-  /** The line under it. */
   lead: string;
-  /** The dialog's own title and body. */
   title: string;
   description: string;
-  /** The footnote: what the operator should expect on the other side. */
   note: string;
-  /** What to do when nothing restarted the app, with and without a reason to give. */
+  /** For when nothing restarted the app. */
   manually: string;
   manuallyWithDetail: (detail: string) => string;
 };
 
 type Phase =
-  /** The last restart was too recent to ask for another; waiting out its cooldown. */
+  /** Waiting out the last restart's cooldown. */
   | "queued"
-  /** The restart has been asked for and the old process is still answering. */
+  /** The old process is still answering. */
   | "stopping"
-  /** It has gone. Waiting for the supervisor to bring it back. */
   | "starting"
-  /** It answered again; the operator is on their way to the next step. */
   | "ready"
-  /** Nothing restarted it, or it never came back. The operator finishes by hand. */
+  /** The operator finishes by hand. */
   | "stalled";
 
-/** Why the wait ended without the app, kept as data so the words are chosen at render. */
+/** Data, so the words are chosen at render. */
 type Detail =
-  /** The restart route's own explanation, already translated on the server. */
+  /** Already translated on the server. */
   | { message: string }
   | { code: "refused"; status: number }
   | { code: "stillRunning" }
   | { code: "notBack" };
 
-/** True when the app answered. A failure to connect is the expected reply while it is down. */
-async function isUp(): Promise<boolean> {
+async function health(): Promise<Health> {
   try {
     const response = await fetch("/api/health", { cache: "no-store" });
-    return response.ok;
+    if (!response.ok) return { up: false, boot: null };
+    const body = (await response.json().catch(() => null)) as { boot?: unknown } | null;
+    return { up: true, boot: typeof body?.boot === "string" ? body.boot : null };
   } catch {
-    return false;
+    return { up: false, boot: null };
   }
 }
 
-/**
- * Whether the dashboard host is answering yet, asked of the app rather than of the browser.
- *
- * A cross-origin fetch from here could not read its own answer, and an opaque one cannot tell this
- * instance from whatever else holds the name. The server signs a nonce and checks it, which can.
- */
+/** Asked of the server, which checks a signed nonce: an opaque cross-origin fetch cannot tell. */
 async function dashboardAnswers(): Promise<boolean> {
   try {
     const response = await fetch("/api/setup/dashboard-reachable", { cache: "no-store" });
@@ -128,31 +92,23 @@ export default function RestartDialog({
   copy,
   preferredOrigin = null,
 }: {
-  /** Where to send the operator once the app is back, as a path. */
   next: string;
-  /** Single-use proof that this browser ran the step, which the restart asks for. */
+  /** Single-use proof that this browser ran the step. */
   restartToken: string;
   copy: RestartCopy;
-  /**
-   * An origin to prefer over this one - the dashboard host's, once setup has claimed it. Used only
-   * if it actually answers: sending an operator to a domain whose DNS does not arrive here, or
-   * whose Caddy is not running because no agent has paired, would end setup on a browser error.
-   */
+  /** The dashboard host's origin, used only if it answers, lest setup end on a browser error. */
   preferredOrigin?: string | null;
 }) {
   const t = useTranslations("setup");
   const [phase, setPhase] = useState<Phase>("stopping");
-  // What went wrong, put into words at render rather than here: translating inside the effect
-  // would make `t` one of its dependencies, and re-running it would cancel the restart in flight.
+  // Translated at render: `t` in the effect's deps would re-run it and cancel the restart.
   const [detail, setDetail] = useState<Detail | null>(null);
-  // Strict Mode mounts effects twice in development, and asking a process to exit twice is not
-  // something to leave to chance.
+  // Strict Mode runs effects twice in development; never ask a process to exit twice.
   const started = useRef(false);
 
   const goOn = useCallback(
     (origin?: string) => {
-      // A full load rather than a router push: the process serving this page is not the one that
-      // will serve the next, and nothing client-side should be carried across.
+      // A full load: nothing client-side should carry across to the new process.
       loadPage(origin ? `${origin}${next}` : next);
     },
     [next],
@@ -165,6 +121,8 @@ export default function RestartDialog({
     let cancelled = false;
 
     void (async () => {
+      // Read before asking, so a restart finished between two polls is still recognised.
+      const before = (await health()).boot;
       const deadline = Date.now() + COOLDOWN_BUDGET_MS;
       // Loops only for a cooldown; every other answer leaves it on the first pass.
       for (;;) {
@@ -195,60 +153,43 @@ export default function RestartDialog({
             return;
           }
         } catch {
-          // The connection dropping as the process exits is a normal outcome here, not a failure:
-          // the request did its job on the way out. The polling below is what decides.
+          // The connection dropping as the process exits is normal; the polling below decides.
         }
         break;
       }
 
-      // Down first. Accepting the first successful poll would accept the process that is still on
-      // its way out, and send the operator to a page about to be served by nobody.
-      const shutdownBy = Date.now() + SHUTDOWN_BUDGET_MS;
-      while (!cancelled && Date.now() < shutdownBy) {
-        if (!(await isUp())) break;
-        await sleep(POLL_INTERVAL_MS);
-      }
-      if (cancelled) return;
-
-      if (await isUp()) {
-        setDetail({ code: "stillRunning" });
+      const outcome = await waitForRestart(before, {
+        health,
+        sleep,
+        now: Date.now,
+        pollMs: POLL_INTERVAL_MS,
+        shutdownBudgetMs: SHUTDOWN_BUDGET_MS,
+        startupBudgetMs: STARTUP_BUDGET_MS,
+        cancelled: () => cancelled,
+        onDown: () => setPhase("starting"),
+      });
+      if (outcome === null || cancelled) return;
+      if (outcome !== "restarted") {
+        setDetail({ code: outcome });
         setPhase("stalled");
         return;
       }
 
-      setPhase("starting");
-
-      const startupBy = Date.now() + STARTUP_BUDGET_MS;
-      while (!cancelled && Date.now() < startupBy) {
-        if (await isUp()) {
-          if (cancelled) return;
-          setPhase("ready");
-
-          // The app is back, so the operator is leaving either way; the only question left is by
-          // which name. Caddy is configured as the app starts, so the route can be a moment behind
-          // it - hence a short wait rather than a single ask.
-          if (preferredOrigin) {
-            const dashboardBy = Date.now() + DASHBOARD_BUDGET_MS;
-            while (!cancelled && Date.now() < dashboardBy) {
-              if (await dashboardAnswers()) {
-                if (cancelled) return;
-                goOn(preferredOrigin);
-                return;
-              }
-              await sleep(POLL_INTERVAL_MS);
-            }
+      setPhase("ready");
+      // Caddy is configured as the app starts, so the route can lag it by a moment.
+      if (preferredOrigin) {
+        const dashboardBy = Date.now() + DASHBOARD_BUDGET_MS;
+        while (!cancelled && Date.now() < dashboardBy) {
+          if (await dashboardAnswers()) {
             if (cancelled) return;
+            goOn(preferredOrigin);
+            return;
           }
-
-          goOn();
-          return;
+          await sleep(POLL_INTERVAL_MS);
         }
-        await sleep(POLL_INTERVAL_MS);
+        if (cancelled) return;
       }
-      if (cancelled) return;
-
-      setDetail({ code: "notBack" });
-      setPhase("stalled");
+      goOn();
     })();
 
     return () => {

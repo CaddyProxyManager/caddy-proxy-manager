@@ -20,18 +20,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const PER_PAGE = 20;
 
-/** A non-negative integer from the query string, or null for anything else. */
 function readId(raw: string | string[] | undefined): number | null {
   if (typeof raw !== "string" || !/^\d+$/.test(raw)) return null;
   return Number(raw);
 }
 
 /**
- * The applied revisions, and a comparison between two of them.
- *
- * The selection lives in the query string so a comparison is a link an operator can send someone,
- * and the diff is rendered here rather than fetched: it needs the config builder, which only runs
- * on the server anyway.
+ * The selection is in the query string so a comparison is a shareable link; the diff renders here
+ * because it needs the config builder, which only runs on the server.
  */
 export default async function SettingsHistoryPage({
   searchParams,
@@ -53,8 +49,7 @@ export default async function SettingsHistoryPage({
   const revisions = await recentRevisions(PER_PAGE, (page - 1) * PER_PAGE);
 
   const latest = ids[0] ?? 0;
-  // By default the latest revision against the one before it: "what did the last apply do". Checked
-  // against the table rather than `ids`, which is capped and would lose an older revision's link.
+  // Checked against the table, not `ids`, which is capped and would lose an older revision's link.
   const to = readId(params.to) ?? latest;
   const from = readId(params.from) ?? (await previousRevisionId(to));
   const [toExists, fromExists] = await Promise.all([

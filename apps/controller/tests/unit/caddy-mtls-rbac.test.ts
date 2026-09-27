@@ -1,7 +1,3 @@
-/**
- * The mTLS RBAC functions: resolveAllowedFingerprints, buildFingerprintCelExpression,
- * buildMtlsRbacSubroutes and normalizeFingerprint.
- */
 import { describe, it, expect } from 'bun:test';
 import {
   resolveAllowedFingerprints,
@@ -135,24 +131,21 @@ describe('buildMtlsRbacSubroutes', () => {
     const result = buildMtlsRbacSubroutes(rules, roleFpMap, new Map(), baseHandlers, reverseProxy);
 
     expect(result).not.toBeNull();
-    // Should have 3 routes: allow /admin/*, deny /admin/*, catch-all
+    // allow /admin/*, deny /admin/*, catch-all
     expect(result!.length).toBe(3);
 
-    // Allow route has expression matcher
     const allowRoute = result![0] as Record<string, unknown>;
     const match = (allowRoute.match as Record<string, unknown>[])[0];
     expect(match.path).toEqual(['/admin/*']);
     expect(match.expression).toContain('fp_admin');
     expect(allowRoute.terminal).toBe(true);
 
-    // Deny route returns 403
     const denyRoute = result![1] as Record<string, unknown>;
     const denyMatch = (denyRoute.match as Record<string, unknown>[])[0];
     expect(denyMatch.path).toEqual(['/admin/*']);
     const denyHandler = (denyRoute.handle as Record<string, unknown>[])[0];
     expect(denyHandler.status_code).toBe('403');
 
-    // Catch-all has no match
     const catchAll = result![2] as Record<string, unknown>;
     expect(catchAll.match).toBeUndefined();
     expect(catchAll.terminal).toBe(true);
@@ -274,11 +267,9 @@ describe('buildMtlsRbacSubroutes', () => {
     // /secret/* deny + /api/* allow + /api/* deny + catch-all = 4
     expect(result!.length).toBe(4);
 
-    // First route: deny /secret/*
     expect((result![0] as any).match[0].path).toEqual(['/secret/*']);
     expect((result![0] as any).handle[0].status_code).toBe('403');
 
-    // Second route: allow /api/*
     expect((result![1] as any).match[0].path).toEqual(['/api/*']);
     expect((result![1] as any).match[0].expression).toContain('fp');
   });
@@ -341,7 +332,6 @@ describe('buildFingerprintCelExpression edge cases', () => {
     const expr = buildFingerprintCelExpression(fps);
     expect(expr).toContain('fp_000');
     expect(expr).toContain('fp_049');
-    // Verify sorted order
     const idx0 = expr.indexOf('fp_000');
     const idx49 = expr.indexOf('fp_049');
     expect(idx0).toBeLessThan(idx49);

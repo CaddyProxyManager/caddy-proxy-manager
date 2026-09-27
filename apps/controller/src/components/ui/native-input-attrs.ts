@@ -17,10 +17,7 @@ export const AUTOFILL_OFF = autofill("off");
 /** Restores the browser's empty-field gate. Pair with `isRequired` for the visible indicator. */
 export const NATIVE_REQUIRED: NativeAttrs = { required: true };
 
-/**
- * For a field holding an address, an identifier or a code rather than prose. The browser otherwise
- * underlines every one of them as a misspelling, and offers a correction that would break the value.
- */
+/** For addresses, identifiers and codes, whose "corrections" would break the value. */
 export const NO_SPELLCHECK: NativeAttrs = {
   spellCheck: false,
   autoCapitalize: "off",

@@ -14,10 +14,6 @@ import {
   resolveLegacyCaFingerprints,
 } from '../../src/lib/caddy-mtls';
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
 function makeCaPem(label: string): string {
   return `-----BEGIN CERTIFICATE-----\n${label}\n-----END CERTIFICATE-----`;
 }
@@ -25,10 +21,6 @@ function makeCaPem(label: string): string {
 function makeCaCertMap(...entries: [number, string][]) {
   return new Map(entries.map(([id, label]) => [id, { id, certificatePem: makeCaPem(label) }]));
 }
-
-// ---------------------------------------------------------------------------
-// pemToBase64Der
-// ---------------------------------------------------------------------------
 
 describe('pemToBase64Der', () => {
   it('strips PEM header and footer', () => {
@@ -54,10 +46,6 @@ describe('pemToBase64Der', () => {
     expect(result).not.toContain('END');
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildClientAuthentication
-// ---------------------------------------------------------------------------
 
 describe('buildClientAuthentication', () => {
   it('returns null when no domains have mTLS config', () => {
@@ -307,10 +295,6 @@ describe('buildValidClientCertCelExpression', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// groupMtlsDomainsByCaSet
-// ---------------------------------------------------------------------------
-
 describe('groupMtlsDomainsByCaSet', () => {
   it('returns empty map for empty input', () => {
     expect(groupMtlsDomainsByCaSet([], new Map()).size).toBe(0);
@@ -338,8 +322,7 @@ describe('groupMtlsDomainsByCaSet', () => {
   });
 
   it('separates domains with different CA sets - the cross-CA isolation test', () => {
-    // This is the core bug scenario: two hosts with different CAs must each get
-    // their own TLS policy so CA_B certs cannot authenticate against the CA_A host.
+    // The core bug: CA_B certs must not authenticate against the CA_A host.
     const mTlsDomainMap = new Map([
       ['app.example.com', [1]], // trusts CA_A only
       ['api.example.com', [2]], // trusts CA_B only
@@ -421,10 +404,6 @@ describe('groupMtlsDomainsByCaSet', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Cross-CA isolation integration: groupMtlsDomainsByCaSet + buildClientAuthentication
-// ---------------------------------------------------------------------------
-
 describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => {
   const caCertMap = makeCaCertMap([1, 'CA_A'], [2, 'CA_B']);
 
@@ -473,14 +452,13 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
 
     expect(policies).toHaveLength(2);
 
-    const appPolicy = policies.find((p) => p.sni.includes('app.example.com'))!;
-    const apiPolicy = policies.find((p) => p.sni.includes('api.example.com'))!;
+    // Membership in the SNI list, not a substring: each policy names its own domains.
+    const appPolicy = policies.find((p) => new Set(p.sni).has('app.example.com'))!;
+    const apiPolicy = policies.find((p) => new Set(p.sni).has('api.example.com'))!;
 
-    // app.example.com policy must ONLY trust CA_A
     expect(appPolicy.trusted_ca_certs).toContain('CA_A');
     expect(appPolicy.trusted_ca_certs).not.toContain('CA_B');
 
-    // api.example.com policy must ONLY trust CA_B
     expect(apiPolicy.trusted_ca_certs).toContain('CA_B');
     expect(apiPolicy.trusted_ca_certs).not.toContain('CA_A');
   });
@@ -540,7 +518,6 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
 
     expect(auth).not.toBeNull();
     expect(auth!.trusted_ca_certs).toEqual(['CA_A']);
-    // Both domains in the same policy
     expect(domainGroup).toContain('app.example.com');
     expect(domainGroup).toContain('app2.example.com');
   });

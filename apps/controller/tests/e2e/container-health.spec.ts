@@ -9,10 +9,8 @@ import { COMPOSE_ARGS, COMPOSE_CWD } from '../helpers/compose';
 type ContainerInfo = {
   name: string;
   /**
-   * The compose service, which is how every lookup below identifies a container. Matching on the
-   * name cannot work: the project is called caddy-proxy-manager, so `name.includes('caddy')` is
-   * true of every container in the stack, and which one `find` returned depended on the
-   * alphabetical position of the other services.
+   * The compose service. Not the name: the project is caddy-proxy-manager, so
+   * `name.includes('caddy')` matches every container in the stack.
    */
   service: string;
   state: string;

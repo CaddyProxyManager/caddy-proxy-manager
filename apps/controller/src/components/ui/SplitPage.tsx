@@ -1,12 +1,6 @@
 "use client";
 
-/**
- * A list-detail page: a searchable rail of records on the left, the selected record on the right.
- *
- * The shape Access Lists introduced, shared so Users and Groups read the same way: the rail is
- * resizable with its width remembered per page, and on a phone there is room for only one of the
- * two, so the rail shows until a record is picked and the detail then offers the way back.
- */
+/** List-detail. On a phone only one fits: the rail until a record is picked, then the detail. */
 import { type ReactNode, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
@@ -28,23 +22,17 @@ export function SplitPage({
 }: {
   /** Names the remembered rail width; unique per page. */
   storageKey: string;
-  /** The rail's landmark name. */
   railLabel: string;
-  /** The divider's accessible name. */
   resizeLabel: string;
-  /** The phone's way back from a record to the list. */
   backLabel: string;
-  /**
-   * The rail. `open` is what a row calls after selecting its record: on a phone it swaps the rail
-   * for the detail, on a desktop both are already showing and it does nothing.
-   */
+  /** A row calls `open` after selecting; it swaps to the detail on a phone, no-op on desktop. */
   rail: (open: () => void) => ReactNode;
   detail: ReactNode;
-  /** Whether a record is selected - on a phone, the detail only shows while one is. */
+  /** On a phone, the detail only shows while one is. */
   hasSelection: boolean;
-  /** Shown with the phone's rail only, such as a floating create button. */
+  /** Phone rail only, such as a floating create button. */
   phoneExtras?: ReactNode;
-  /** Rendered in every layout: dialogs and other overlays. */
+  /** Dialogs and other overlays, rendered in every layout. */
   children?: ReactNode;
 }) {
   // Both hooks before any branch, so the hook order never changes with the width.

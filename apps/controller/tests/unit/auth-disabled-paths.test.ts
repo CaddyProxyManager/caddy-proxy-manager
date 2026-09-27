@@ -1,14 +1,12 @@
 /**
- * Better Auth serves every endpoint it has unless told otherwise, and several of them change a
- * credential behind the app's back: its change-password updates `accounts` but not the
- * `users.passwordHash` sign-in verifies, with only its own 8-character minimum. The username probe
- * enumerates accounts for anyone. Driven through a real instance, so the paths are proven to match
- * the way Better Auth normalizes them rather than merely listed.
+ * Several Better Auth endpoints bypass the app: its change-password skips `users.passwordHash` and
+ * the policy, and the username probe enumerates accounts. A real instance proves the disabled
+ * paths match how it normalizes them.
  */
 import { describe, expect, it } from 'bun:test';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
-import { username } from 'better-auth/plugins';
+import { twoFactor, username } from 'better-auth/plugins';
 import { DISABLED_AUTH_PATHS } from '@/src/lib/auth-disabled-paths';
 
 const ORIGIN = 'http://localhost:3000';
@@ -20,7 +18,7 @@ const auth = betterAuth({
   basePath: '/api/auth',
   emailAndPassword: { enabled: true },
   disabledPaths: DISABLED_AUTH_PATHS,
-  plugins: [username()],
+  plugins: [username(), twoFactor()],
 });
 
 function call(path: string, method: 'GET' | 'POST' = 'POST') {
@@ -53,6 +51,13 @@ describe('Better Auth endpoints the app replaces', () => {
       '/is-username-available',
     ]) {
       expect(DISABLED_AUTH_PATHS).toContain(path);
+    }
+  });
+
+  it('leaves the TOTP and backup-code checks reachable', async () => {
+    // No 2FA cookie, so refused - but by the plugin, not as a missing route.
+    for (const path of ['/two-factor/verify-totp', '/two-factor/verify-backup-code']) {
+      expect((await call(path)).status, path).not.toBe(404);
     }
   });
 

@@ -1,10 +1,6 @@
 /**
- * Integration: port computation, and the round trip through the agent that publishes them.
- *
- * The agent here is a real HTTP server speaking the real protocol, not a mock of the client - see
- * tests/helpers/fake-agent.ts. Every assertion about what the controller sent is
- * therefore also an assertion that it signed the request correctly, which is the half of this seam
- * that fails silently.
+ * L4 port computation and the round trip through the agent. The agent speaks the real protocol
+ * (tests/helpers/fake-agent.ts), so every assertion also checks the signing, which fails silently.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -19,8 +15,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -212,7 +207,7 @@ describe('getAppliedL4Ports', () => {
   it('is empty when no agent is reachable at all', async () => {
     await agent.stop();
     clearAgentEnv();
-    // Not an error: a deployment whose agent container is not running still serves every page.
+    // Not an error: pages must still render with the agent down.
     expect(await getAppliedL4Ports()).toEqual([]);
   });
 });
@@ -253,8 +248,7 @@ describe('getL4PortsDiff', () => {
     await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
     await agent.stop();
     clearAgentEnv();
-    // Nothing can be published without an agent, so claiming the ports are already up would be
-    // the one answer an operator cannot act on.
+    // "Already up" would be the one answer an operator cannot act on.
     expect((await getL4PortsDiff()).needsApply).toBe(true);
   });
 });
@@ -272,9 +266,7 @@ describe('applyL4Ports', () => {
 
   it('returns the in-progress status the agent answers with', async () => {
     await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
-    // Accepted, not finished: a recreate takes seconds, so the agent answers immediately and the
-    // controller polls. Reporting "applied" here would tell the operator the ports are up before
-    // the container has come back.
+    // A recreate takes seconds, so the agent answers at once and the controller polls.
     expect((await applyL4Ports()).state).toBe('pending');
 
     agent.completeL4Ports();
@@ -301,8 +293,7 @@ describe('applyL4Ports', () => {
   it('fails loudly when there is no agent to send to', async () => {
     await agent.stop();
     clearAgentEnv();
-    // Unlike the read paths, this one must not degrade quietly: the operator clicked a button and
-    // has to be told nothing happened.
+    // Unlike the reads, a clicked button must be told nothing happened.
     expect(applyL4Ports()).rejects.toThrow(/agent/i);
   });
 });
@@ -352,8 +343,7 @@ describe('isAgentAvailable', () => {
 
   it('is false once the agent disconnects', async () => {
     await agent.stop();
-    // "Configured but unreachable" is no longer a state: an agent that is not holding a stream open
-    // cannot be reached by any means, so a dropped connection is the whole of unavailability.
+    // Without an open stream an agent cannot be reached at all.
     expect(await isAgentAvailable()).toBe(false);
     clearAgentEnv();
   });

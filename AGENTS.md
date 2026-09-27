@@ -52,8 +52,9 @@ them. Three things make that work, and all three live in `apps/site/astro.config
 
 A component that imports a server action or the database cannot be demoed - the import would pull
 the db into the browser bundle, unless `astro.config.mjs` points that action module at a shim, as it
-does for the setup screens and the host editors. That rules out the page clients under `(dashboard)` that import
-`./actions`; `AuditLogClient` is demoed because it does not.
+does for the setup screens, the host editors and the access lists' Network tab. That rules out the
+page clients under `(dashboard)` that import `./actions`; `AuditLogClient` is demoed because it
+does not.
 
 The site has two test suites, both run by `site.yml`. `bun run --filter @cpm/site test` holds the
 data a demo copies from the controller to the original; `test:e2e` (from `apps/site`, after a
@@ -86,9 +87,21 @@ consequences worth knowing before touching either side:
   for that agent (the Re-pair action), never the shared code.
 - **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
-  `caddy-validate` is the one listed today: the agent runs `caddy validate` in a throwaway,
+  Four are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
-  Coraza (`lib/waf-dry-run.ts`) without loading anything.
+  Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
+  Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
+  `certificates`: `certificate-list` and `certificate-read` look into Caddy's storage from a
+  throwaway container mounting its volumes read-only (`apps/agent/src/certificates.ts`).
+  `caddy-image`: `caddy-image-load` starts loading an operator-built image and answers at once,
+  since a recreate outlasts the timeout; only an agent reporting `caddyBuild.external` gets it.
+- **With `CADDY_BUILD_MODE=external` the agent never builds Caddy's image.** A module diff is
+  not acted on; the applied set is read from `/etc/caddy/caddy-modules.txt` in the image Caddy
+  runs, on every start and on each load. An image without that file counts as no plugins. A load
+  that drops modules narrows the applied set and waits for the controller's next config before
+  recreating: `caddy run --resume` exits on an autosave naming a module the binary lacks.
+- **A changed applied set is re-applied at once** (`lib/agent/module-change.ts`, from the status
+  mutation), since what config may emit follows it. The narrowing above depends on this.
 - **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
@@ -160,6 +173,21 @@ Keep in mind when touching it:
   two `:?` variables, so a variable the `caddy` or `clickhouse` definitions
   interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
   default.
+
+### Adding a DNS provider
+
+Only on request - each module grows the Caddy image. It must build against libdns v1 (Caddy
+2.10+), which many `caddy-dns/*` repositories still don't; check that before anything else. Then,
+in one commit:
+
+- the entry in `apps/controller/src/lib/dns-providers.ts` (`password` fields are encrypted at rest)
+  and its `settings.dnsProviders.<name>` labels in `en.json`;
+- the module path in `SHIPPED_CADDY_MODULES` (`packages/shared/src/caddy-modules.ts`), the
+  `CADDY_MODULES` ARG in `docker/caddy/Dockerfile`, and the import in `docker/caddy/tools.go`, with
+  its pin in `docker/caddy/go.mod` from `go get`;
+- a test in `tests/unit/dns-providers.test.ts` for the challenge JSON it emits;
+- its name in the provider list, and the count, in `apps/site/src/content/docs/features/certificates.mdx`
+  and `index.mdx`.
 
 ## User-facing text
 

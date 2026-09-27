@@ -8,6 +8,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -39,7 +40,7 @@ type Props = {
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
-  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
   canCreate?: boolean;
@@ -65,7 +66,6 @@ function ProtocolBadge({ protocol }: { protocol: string }) {
   return <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />;
 }
 
-/** "10.0.0.1:443 +2" - the primary upstream plus a count of the rest. */
 function summarizeUpstreams(upstreams: string[]) {
   return upstreams.length > 1 ? `${upstreams[0]} +${upstreams.length - 1}` : upstreams[0];
 }
@@ -87,7 +87,7 @@ function HostActions({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
+  /** Duplicating makes a new host, so it follows Create, not Edit. */
   canCreate: boolean;
 }) {
   const t = useTranslations("l4ProxyHosts");
@@ -135,8 +135,6 @@ export default function L4ProxyHostsClient({
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [bannerRefresh, setBannerRefresh] = useState(0);
-  // The whole layer4 app comes from caddy-l4; with it off, nothing on this page
-  // reaches the running proxy.
   const l4DisabledReason = useDisabledReason("l4");
 
   const router = useRouter();
@@ -210,9 +208,12 @@ export default function L4ProxyHostsClient({
         <HStack gap={3} vAlign="center">
           <Icon icon={Network} size="sm" color={host.protocol === "tcp" ? "accent" : "warning"} />
           <VStack gap={0} className="cpm-cell-lines">
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+              <HostNotesHint notes={host.description} />
+            </HStack>
             <Tooltip content={formatMatcher(host, t)}>
               <Text type="body" size="xsm" color="secondary" maxLines={1}>
                 {formatMatcher(host, t)}
@@ -282,6 +283,11 @@ export default function L4ProxyHostsClient({
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
           </Text>
+          {host.description && (
+            <Text type="body" size="xsm" color="secondary" maxLines={2}>
+              {host.description}
+            </Text>
+          )}
           <StatusChip status={host.enabled ? "active" : "inactive"} />
         </VStack>
         {actionsFor(host)}
@@ -291,9 +297,7 @@ export default function L4ProxyHostsClient({
 
   return (
     <VStack gap={6}>
-      {/* Existing hosts stay listed and editable while the module is off - they
-          are simply not emitted into the config. Hiding them would make hosts
-          that still exist look deleted. */}
+      {/* Hosts stay listed while the module is off: hiding them would make them look deleted. */}
       {l4DisabledReason && (
         <Banner
           status="warning"

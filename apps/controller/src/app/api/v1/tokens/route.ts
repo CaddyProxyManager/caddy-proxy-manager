@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
+import { domainErrorMessage } from "@/src/lib/domain-error";
 import { createApiToken, listApiTokens, listAllApiTokens } from "@/src/lib/models/api-tokens";
 
 export async function GET(request: NextRequest) {
@@ -14,16 +15,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, authMethod } = await requireApiUser(request);
+    const { userId, authMethod, viewAsGroupIds } = await requireApiUser(request);
 
-    // Credential creation requires an interactive, cookie-authenticated session.
-    // Otherwise a stolen (possibly short-lived) bearer token could mint a new,
-    // non-expiring token and survive revocation or expiry of the original.
+    // A stolen bearer token must not mint a successor that outlives its revocation or expiry.
     if (authMethod !== "session") {
       return NextResponse.json(
         { error: "API tokens can only be created from an authenticated session" },
         { status: 403 },
       );
+    }
+    // A token carries the account's real role, not the one being previewed.
+    if (viewAsGroupIds !== undefined) {
+      return NextResponse.json({ error: domainErrorMessage("viewAsForbidden") }, { status: 403 });
     }
 
     const body = await request.json();
@@ -32,7 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    // Validate expires_at before passing to createApiToken
     if (
       body.expires_at !== undefined &&
       body.expires_at !== null &&

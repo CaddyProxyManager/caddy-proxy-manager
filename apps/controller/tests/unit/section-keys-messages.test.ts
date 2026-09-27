@@ -1,8 +1,6 @@
 /**
- * The review sheet labels a staged change from the catalog by section id - at runtime, so
- * TypeScript cannot check the key the way it checks a literal `t("...")`. These do it instead: a
- * section added to `section-keys.ts` without a message fails here rather than rendering its raw key,
- * and the English must read exactly as the module's own label.
+ * Section labels are looked up by runtime id, which tsc cannot check: a section without a message
+ * fails here, and the English must match the module's own label.
  */
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';

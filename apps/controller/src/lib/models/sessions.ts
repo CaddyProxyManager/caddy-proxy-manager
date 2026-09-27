@@ -3,10 +3,7 @@ import db from "../db";
 import { sessions } from "../db/schema";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 
-/**
- * Active management-UI session for a user, as shown in the profile. (Forward-auth `_cpm_fa`
- * sessions are tracked separately.)
- */
+/** A management-UI session; forward-auth `_cpm_fa` sessions are tracked separately. */
 export interface UserSession {
   id: number;
   createdAt: string;
@@ -16,7 +13,7 @@ export interface UserSession {
   userAgent: string | null;
 }
 
-/** List a user's non-expired sessions, newest first. */
+/** Non-expired, newest first. */
 export async function listUserSessions(userId: number): Promise<UserSession[]> {
   const now = Date.now();
   const rows = await db
@@ -39,7 +36,7 @@ export async function listUserSessions(userId: number): Promise<UserSession[]> {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-/** Revoke one session, only if it belongs to the user. False when none, so callers can 404. */
+/** Only if it belongs to the user; false when none, so callers can 404. */
 export async function revokeUserSession(userId: number, sessionId: number): Promise<boolean> {
   const [existing] = await db
     .select({ id: sessions.id })
@@ -50,7 +47,7 @@ export async function revokeUserSession(userId: number, sessionId: number): Prom
   return true;
 }
 
-/** Revoke all a user's sessions except `exceptSessionId`. Returns the number revoked. */
+/** Returns the number revoked. */
 export async function revokeOtherUserSessions(
   userId: number,
   exceptSessionId: number | null,
@@ -68,11 +65,7 @@ export async function revokeOtherUserSessions(
   return toRevoke.length;
 }
 
-/**
- * End every session a password change should cut off: the user's other dashboard sessions and all
- * their forward-auth sessions. `keepSessionId` is the session that made the change, or null when
- * none should survive.
- */
+/** Other dashboard sessions and every forward-auth one; `keepSessionId` null keeps none. */
 export async function revokeSessionsAfterPasswordChange(
   userId: number,
   keepSessionId: number | null,

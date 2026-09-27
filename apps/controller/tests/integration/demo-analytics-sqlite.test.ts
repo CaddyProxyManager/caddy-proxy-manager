@@ -1,10 +1,6 @@
 /**
- * A demo with no ClickHouse keeps analytics in SQLite, running ClickHouse's queries translated.
- *
- * Every query the analytics pages make runs here against generated traffic, and each answer is
- * checked against a count taken straight from the rows - so a function the translator does not know,
- * or one it translates into something that parses but means something else, fails here rather than
- * on the demo's analytics page.
+ * The demo's SQLite analytics runs ClickHouse's queries translated. Each is checked against a
+ * count from the rows, so an unknown or mistranslated function fails here, not on the demo.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

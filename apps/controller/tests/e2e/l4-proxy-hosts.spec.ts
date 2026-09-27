@@ -5,10 +5,7 @@ import { waitForHydration } from '../helpers/hydration';
 const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
 const ORIGIN = 'http://localhost:3000';
 
-/**
- * The sortable column headers only exist once the table has rows. These tests used to rely on
- * hosts left by the functional L4 specs, making them order-dependent - own the fixture instead.
- */
+/** Sortable headers need rows; owning the fixture keeps these tests order-independent. */
 async function createFixtureHost(page: Page, name: string, listenAddress: string) {
   const res = await page.request.post(API_L4_HOSTS, {
     headers: { Origin: ORIGIN },
@@ -46,7 +43,6 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByRole('button', { name: /create l4 host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Verify key form fields exist
     await expect(page.getByLabel('Name')).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Protocol' }).first()).toBeVisible();
     await expect(page.getByLabel('Listen Address')).toBeVisible();
@@ -79,7 +75,6 @@ test.describe('L4 Proxy Hosts page', () => {
       await expect(page).toHaveURL(/sortBy=name/);
       await expect(page).toHaveURL(/sortDir=asc/);
 
-      // Click again to toggle direction
       await sortBtn.click();
       await expect(page).toHaveURL(/sortDir=desc/);
     });
@@ -115,7 +110,6 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByRole('button', { name: /^create$/i }).click();
 
-    // Dialog should close and host should appear in table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
     await expect(page.getByRole('table').getByText(':19999', { exact: true })).toBeVisible();
@@ -153,27 +147,19 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.goto('/l4-proxy-hosts');
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
 
-    // Open the dropdown menu for that row and click Delete
     const row = page.locator('tr', { hasText: 'E2E Test Host' });
     await row.getByRole('button').first().click();
     await page.getByRole('menuitem', { name: /delete/i }).click();
 
-    // Confirm deletion
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText(/are you sure/i)).toBeVisible();
     await page.getByRole('button', { name: /delete/i }).click();
 
-    // Host should be removed
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('E2E Test Host')).not.toBeVisible({ timeout: 5_000 });
   });
 
-  /**
-   * Regression (#241): creating multiple L4 hosts back-to-back left the table
-   * stale until a manual browser refresh - the create dialog's form state
-   * survived between opens and revalidation raced the close. Each save must
-   * be reflected in the table with no reload, even on rapid successive saves.
-   */
+  /** #241: back-to-back creates left the table stale until a reload. */
   test('rapid successive creates are all reflected in the table without reload', async ({
     page,
   }) => {
@@ -181,8 +167,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await waitForHydration(page);
 
     for (let i = 1; i <= 3; i++) {
-      // Re-open the dialog each iteration - this is what exercised the stale
-      // useActionState bug (dialog remount now resets form state).
+      // Re-opening each time is what exercised the stale useActionState bug.
       await page.getByRole('button', { name: /create l4 host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByLabel('Name').fill(`E2E Rapid Host ${i}`);
@@ -191,7 +176,6 @@ test.describe('L4 Proxy Hosts page', () => {
 
       await page.getByRole('button', { name: /^create$/i }).click();
 
-      // Dialog closes on success, host appears in table - no page.reload()
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
       // exact: the row's switch is labelled `Enable <name>`, which contains the name.
       await expect(
@@ -200,10 +184,7 @@ test.describe('L4 Proxy Hosts page', () => {
     }
   });
 
-  /**
-   * Regression (#241): toggling a host's enabled switch updated the DB but
-   * the row kept showing the old status until a browser refresh.
-   */
+  /** #241: the row kept its old status until a reload. */
   test('toggling enabled updates the row status without reload', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
@@ -218,16 +199,13 @@ test.describe('L4 Proxy Hosts page', () => {
     const rowSwitch = row.getByRole('switch').first();
     await expect(row).toBeVisible();
 
-    // Toggle off - the row must show the new status without a reload
     await expect(rowSwitch).toBeChecked();
     await rowSwitch.click();
     await expect(rowSwitch).not.toBeChecked({ timeout: 10_000 });
 
-    // Toggle back on
     await rowSwitch.click();
     await expect(rowSwitch).toBeChecked({ timeout: 10_000 });
 
-    // Cleanup
     await row.getByRole('button').first().click();
     await page.getByRole('menuitem', { name: /delete/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -238,11 +216,7 @@ test.describe('L4 Proxy Hosts page', () => {
     });
   });
 
-  /**
-   * Swept through the API rather than the UI, and unconditionally: the tests above create their
-   * hosts through the dialog, and a failure part-way would otherwise leave hosts - and their
-   * listen ports - behind for every later test in the suite.
-   */
+  /** Unconditional, via the API: a mid-test failure would leak hosts and their listen ports. */
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     try {

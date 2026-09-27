@@ -1,25 +1,18 @@
 /**
- * SecLang read the way Coraza v3.7 reads it, for checks that run before Caddy ever sees a rule.
- *
- * Pure and dependency-free, because the editors lint as the user types and the validators lint the
- * same text on save. Every error here is one Coraza's parser raises for that input
- * (internal/seclang/rule_parser.go, internal/actions, internal/operators) - a false positive
- * blocks a save Caddy would have accepted, so anything less certain is a warning. What this cannot
- * know, like a rule id the CRS already uses, is left to the dry run against the real Caddy.
+ * SecLang read the way Coraza v3.7 reads it, pure so editors and validators lint the same text.
+ * Errors are only what Coraza's parser raises - a false positive blocks a save Caddy would accept -
+ * so anything less certain is a warning, and what this cannot know is left to the dry run.
  */
 
 /**
- * One directive as Coraza reads it: `text` is what its parser evaluates, `lines` the source lines
- * it came from, emitted verbatim, and `start` the 0-based index of the first. `text` is empty for a
- * blank or comment line, and null for a continuation or backtick block the input never closed.
+ * `text` is what Coraza evaluates, `lines` the source it came from, `start` the first's 0-based
+ * index; `text` is "" for blank/comment lines and null for an unclosed continuation or block.
  */
 export type SeclangDirective = { text: string | null; lines: string[]; start: number };
 
 /**
- * Groups lines exactly as Coraza's parser does (internal/seclang/parser.go, v3.7): a trailing `\`
- * continues, a line ending in a backtick opens a block that a line starting with one closes, and a
- * comment line is skipped even mid-rule. The allowlist must judge what Coraza evaluates, or a rule
- * split across lines is checked in pieces.
+ * Groups lines as Coraza's parser.go does (`\` continues, backtick blocks, comments skipped even
+ * mid-rule), so the allowlist judges what Coraza evaluates, not a split rule in pieces.
  */
 export function seclangDirectives(raw: string): SeclangDirective[] {
   const out: SeclangDirective[] = [];
@@ -80,7 +73,6 @@ const OPERATORS = new Set(
 );
 
 type ActionKind = "disruptive" | "metadata" | "flow" | "data" | "nondisruptive";
-/** How an action treats its argument: refuses one, requires one, or takes either. */
 type ActionArgument = "none" | "required" | "optional";
 
 /** Lower-cased, as actions.Register stores them. */
@@ -144,10 +136,7 @@ const CRS_ID_RANGE = { start: 900_000, end: 999_999 };
 // Issues
 // ---------------------------------------------------------------------------
 
-/**
- * Why a directive will not load (an error) or may not behave as written (a warning). A code rather
- * than a sentence: the catalog holds the wording, under `errors`, beside the allowlist's reasons.
- */
+/** Error (will not load) or warning (may not behave as written); a code, worded in the catalog. */
 export type SeclangIssueCode =
   | "seclangEmptyDirective"
   | "seclangRuleFormat"
@@ -305,10 +294,8 @@ function parseVariables(vars: string): { name: string; selected: boolean }[] {
 }
 
 /**
- * The first PCRE-only construct in a pattern, or null. Coraza compiles @rx with Go's RE2, which
- * refuses lookaround, backreferences, atomic groups and possessive quantifiers - and a pattern
- * pasted from ModSecurity is where they come from. Character classes are skipped, since a `(?=`
- * inside one is literal.
+ * First PCRE-only construct, or null: @rx compiles with RE2, which refuses lookaround,
+ * backreferences, atomic groups and possessive quantifiers common in pasted ModSecurity rules.
  */
 export function findUnsupportedRegex(pattern: string): string | null {
   let inClass = false;
@@ -357,7 +344,6 @@ type RuleContext = {
 
 const INTEGER = /^[+-]?\d+$/;
 
-/** Checks one action list; returns what the caller needs to know about the rule it belongs to. */
 function checkActions(
   raw: string,
   ctx: RuleContext,
@@ -446,17 +432,14 @@ function checkActions(
   return { id, chain, disruptive, parsed: actions };
 }
 
-/**
- * Every problem Coraza would have with this text, in line order. Only the SecLang rule directives
- * are read - which directives may appear at all is the allowlist's call, made separately.
- */
+/** Every problem Coraza would have with this text; which directives may appear is not its call. */
 export function lintSeclang(raw: string, options: SeclangLintOptions = {}): SeclangIssue[] {
   const issues: SeclangIssue[] = [];
   const ids = new Map<number, number>();
   const defaultPhases = new Set<string>();
   /**
-   * SecDefaultAction is only stored when read; Coraza parses it for each rule after it, so what is
-   * wrong with one fails the next rule and nothing at all without one. Held until a rule shows up.
+   * Coraza parses SecDefaultAction into each later rule, so its errors fail the next rule, or
+   * nothing without one. Held until a rule shows up.
    */
   let deferred: SeclangIssue[] = [];
   /** Line of the rule whose `chain` the next rule would join, or null. */
@@ -502,8 +485,8 @@ export function lintSeclang(raw: string, options: SeclangLintOptions = {}): Secl
         if (defaultPhases.has(normalized)) {
           defer("error", "seclangDefaultActionDuplicatePhase", { phase: normalized });
         } else if (options.crsLoaded && (normalized === "1" || normalized === "2")) {
-          // crs-setup.conf.example defines both. Whether a rule follows is up to where the text
-          // lands relative to the CRS, which this cannot see; the dry run can.
+          // crs-setup.conf.example defines both; whether a rule follows depends on where the text
+          // lands relative to the CRS, which only the dry run sees.
           report("warning", "seclangDefaultActionDuplicatePhase", { phase: normalized });
         }
         defaultPhases.add(normalized);
@@ -601,7 +584,6 @@ export function lintSeclang(raw: string, options: SeclangLintOptions = {}): Secl
   return issues.sort((a, b) => a.line - b.line);
 }
 
-/** Only the issues that stop Coraza loading the text. */
 export function seclangErrors(raw: string, options?: SeclangLintOptions): SeclangIssue[] {
   return lintSeclang(raw, options).filter((issue) => issue.severity === "error");
 }

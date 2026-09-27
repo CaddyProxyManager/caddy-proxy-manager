@@ -1,10 +1,7 @@
 /**
- * Reads the `setup.migrationGroups.*` catalog on behalf of the migration screen.
- *
- * selection.ts keeps the English as the source - it is a plain module the importer and the API
- * route share, with no translator to hand - and the screen renders through these instead. The
- * lookup is keyed by the group's id at runtime, so TypeScript cannot check it against the catalog;
- * `tests/unit/migration-messages.test.ts` asserts every group has both messages.
+ * The migration screen's `setup.migrationGroups.*` lookups. selection.ts keeps the English, as the
+ * importer and API share it with no translator; keys are runtime ids, so
+ * tests/unit/migration-messages.test.ts checks coverage.
  */
 
 import type { useTranslations } from "next-intl";

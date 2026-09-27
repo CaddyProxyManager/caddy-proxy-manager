@@ -5,6 +5,7 @@ import { and, count, desc, eq, max, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 import { isDemoAdmin } from "../demo-mode";
 import { domainError } from "../domain-error";
+import { withRowLock } from "../db-claim";
 
 /** See isDemoAdmin: the shared demo account keeps its password, its role and its access. */
 function assertNotDemoAdmin(userId: number): void {
@@ -23,6 +24,7 @@ export type User = {
   subject: string | null;
   avatarUrl: string | null;
   status: string;
+  twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +43,7 @@ function parseDbUser(user: DbUser): User {
     subject: user.subject,
     avatarUrl: user.avatarUrl,
     status: user.status,
+    twoFactorEnabled: user.twoFactorEnabled,
     createdAt: toIso(user.createdAt)!,
     updatedAt: toIso(user.updatedAt)!,
   };
@@ -132,9 +135,8 @@ export async function updateUserProfile(
     .set({
       email: data.email ?? current.email,
       name: data.name ?? current.name,
-      // Distinguish "not supplied" from "cleared": an explicit null removes the
-      // icon so the user falls back to their Gravatar or initial. Collapsing
-      // both with `??` made "remove profile picture" a silent no-op.
+      // An explicit null removes the icon (falling back to Gravatar or the initial); `??` would
+      // make "remove profile picture" a silent no-op.
       avatarUrl: data.avatarUrl === undefined ? current.avatarUrl : data.avatarUrl,
       updatedAt: now,
     })
@@ -198,13 +200,8 @@ export async function removeUserPassword(userId: number): Promise<void> {
 }
 
 /**
- * The OAuth identities linked to a user, read from the authoritative
- * `accounts` table (Better Auth writes federated identities there).
- *
- * The informational `users.provider` / `users.subject` columns are a cached
- * projection of this table and are re-derived via {@link syncUserOAuthIdentity};
- * the Profile page must read connection state from here so a stale projection
- * can never make a linked account look unlinked (or vice versa). (#261)
+ * The OAuth identities linked to a user, from `accounts`. `users.provider`/`subject` are a cached
+ * projection, so the Profile page reads here and a stale one cannot misreport it (#261).
  */
 export async function listUserOAuthProviders(
   userId: number,
@@ -217,15 +214,8 @@ export async function listUserOAuthProviders(
 }
 
 /**
- * Re-derive `users.provider` / `users.subject` from the authoritative
- * `accounts` table.
- *
- * Better Auth only writes to `accounts` when an OAuth identity is linked
- * (auto-link, profile link, federated sign-up), so without this sync the two
- * representations drift apart and the Profile UI reports the wrong connection
- * state in both directions (#261). The most recently created OAuth account
- * wins; with no OAuth identity left the user falls back to their credential
- * account ("credentials"), or to null when they have neither.
+ * Re-derive `users.provider` / `users.subject` from `accounts`, which Better Auth writes alone
+ * (#261). The newest OAuth account wins; otherwise "credentials", or null with neither.
  */
 export async function syncUserOAuthIdentity(userId: number): Promise<void> {
   const [oauthAccount] = await db
@@ -275,27 +265,57 @@ export async function listUsers(): Promise<User[]> {
   return rows.map(parseDbUser);
 }
 
+const ADMIN_INVARIANT_LOCK = "admin_invariant_lock";
+
+/**
+ * Whether `userId` is an active admin with no other active admin beside them. Only meaningful
+ * under the admin lock: two unlocked callers removing each other would both see the other.
+ */
+export async function isLastActiveAdmin(userId: number): Promise<boolean> {
+  const admins = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
+  return admins.some((row) => row.id === userId) && admins.length === 1;
+}
+
+/**
+ * Serialises every change that can remove an active admin - role, status, delete, OIDC sync -
+ * so the "at least one" check and the write can't interleave with another such change.
+ */
+export function withAdminLock<T>(work: () => Promise<T>): Promise<T> {
+  return withRowLock(ADMIN_INVARIANT_LOCK, work);
+}
+
+async function assertKeepsAnAdmin(userId: number): Promise<void> {
+  if (await isLastActiveAdmin(userId)) throw domainError("lastActiveAdmin", {}, { status: 409 });
+}
+
 export async function updateUserRole(userId: number, role: User["role"]): Promise<User | null> {
   if (role !== "admin") assertNotDemoAdmin(userId);
-  const now = nowIso();
-  const [updated] = await db
-    .update(users)
-    .set({ role, updatedAt: now })
-    .where(eq(users.id, userId))
-    .returning();
-  return updated ? parseDbUser(updated) : null;
+  return withAdminLock(async () => {
+    if (role !== "admin") await assertKeepsAnAdmin(userId);
+    const [updated] = await db
+      .update(users)
+      .set({ role, updatedAt: nowIso() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated ? parseDbUser(updated) : null;
+  });
 }
 
 export async function updateUserStatus(userId: number, status: string): Promise<User | null> {
   if (status !== "active") assertNotDemoAdmin(userId);
-  const now = nowIso();
-  const [updated] = await db
-    .update(users)
-    .set({ status, updatedAt: now })
-    .where(eq(users.id, userId))
-    .returning();
+  const updated = await withAdminLock(async () => {
+    if (status !== "active") await assertKeepsAnAdmin(userId);
+    const [row] = await db
+      .update(users)
+      .set({ status, updatedAt: nowIso() })
+      .where(eq(users.id, userId))
+      .returning();
+    return row;
+  });
 
-  // Revoke all forward auth sessions when user is deactivated
   if (status !== "active") {
     await deleteUserForwardAuthSessions(userId);
   }
@@ -305,15 +325,15 @@ export async function updateUserStatus(userId: number, status: string): Promise<
 
 export async function deleteUser(userId: number): Promise<void> {
   assertNotDemoAdmin(userId);
-  await db.delete(users).where(eq(users.id, userId));
+  await withAdminLock(async () => {
+    await assertKeepsAnAdmin(userId);
+    await db.delete(users).where(eq(users.id, userId));
+  });
 }
 
 /**
- * The most recent session start per user, as a stand-in for "last signed in".
- *
- * Sessions are deleted when they expire and on sign-out, so a user who has not been back since
- * their last session lapsed reports nothing rather than a date in the past. That is why the list
- * says "no active session" rather than "never": the table cannot tell the two apart.
+ * The most recent session start per user, standing in for "last signed in". Expired sessions are
+ * deleted, so the list says "no active session" rather than "never".
  */
 export async function lastSessionByUser(): Promise<Map<number, string>> {
   const rows = await db

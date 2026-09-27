@@ -1,9 +1,6 @@
 /**
- * The agent signature check, and the replay protection on top of it.
- *
- * A signed request is good once. Inside the clock-skew window a captured subscription POST could
- * otherwise be replayed to attach a second stream, which replaces the real agent's in the registry.
- * The nonce is pinned here, and so is the fallback that still covers agents signing without one.
+ * A signed request is good once: inside the clock-skew window a replayed subscription POST would
+ * attach a second stream and replace the real agent's in the registry.
  */
 import { createHmac, randomBytes } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'bun:test';
@@ -23,8 +20,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Out of the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -67,7 +63,7 @@ function signedHeaders(
   return headers;
 }
 
-/** A fresh request object carrying these bytes: what a replay looks like on arrival. */
+/** A fresh request object with these bytes, as a replay arrives. */
 function arriving(headers: Record<string, string>): Request {
   return new Request(`http://controller.test${PATH}`, { method: 'POST', headers, body: BODY });
 }
@@ -127,8 +123,7 @@ describe('replay protection', () => {
   });
 
   it('gives one request the same verdict however often it is checked', async () => {
-    // A GraphQL document naming two agent fields verifies its one request twice. That is not a
-    // replay, and reading it as one would refuse every such request.
+    // A GraphQL document naming two agent fields verifies its one request twice.
     const request = arriving(signedHeaders());
     expect((await verifyAgentRequest(request, BODY)).ok).toBe(true);
     expect((await verifyAgentRequest(request, BODY)).ok).toBe(true);

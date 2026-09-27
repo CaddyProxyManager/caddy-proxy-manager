@@ -11,11 +11,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LoadBalancerConfig, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { useTranslations } from "next-intl";
 
-/**
- * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
- *
- * See LoadBalancerFields for why this is a function: the labels live in the message catalog.
- */
+/** A function because the labels live in the message catalog. */
 function loadBalancingPolicies(
   t: ReturnType<typeof useTranslations<"proxyHosts">>,
 ): { value: LoadBalancingPolicy; label: string }[] {
@@ -75,7 +71,7 @@ const EMPTY_PASSIVE = {
   unhealthyRequestCount: null,
 };
 
-/** Weights are typed as a comma-separated list, positional against the upstream list. */
+/** Positional against the upstream list. */
 function parseWeightList(value: string): number[] | null {
   const parts = value
     .split(",")
@@ -96,10 +92,7 @@ type Props = {
   onChange: (value: LoadBalancerConfig | null) => void;
 };
 
-/**
- * Controlled per-location-rule load balancer editor. Mirrors LoadBalancerFields but drives one
- * object via onChange, for serializing into the location-rules JSON.
- */
+/** LoadBalancerFields for one location rule, driven through onChange. */
 export function LocationLoadBalancerFields({ value, onChange }: Props) {
   const t = useTranslations("proxyHosts");
   const lb = value;

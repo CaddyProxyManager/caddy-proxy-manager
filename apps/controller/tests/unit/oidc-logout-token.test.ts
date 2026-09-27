@@ -1,10 +1,6 @@
 /**
- * Verification of an OIDC back-channel logout token.
- *
- * Every case here is a check standing between an unauthenticated POST and other people's sessions
- * being deleted, so the tokens are really signed and really verified against a JWKS rather than
- * stubbed at the module boundary - a mock of `jwtVerify` would pass whatever the implementation
- * asked it to.
+ * Each check stands between an unauthenticated POST and deleted sessions, so tokens are really
+ * signed and verified against a JWKS; a mocked `jwtVerify` would pass anything.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
@@ -133,8 +129,7 @@ describe('verifyLogoutToken', () => {
   });
 
   it('rejects an ID token replayed as a logout token', async () => {
-    // The nonce is what gives it away: it binds an ID token to an authentication request, so a
-    // logout token carrying one was not minted as a logout token.
+    // A nonce binds an ID token to an auth request, so this was not minted as a logout token.
     const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', nonce: 'n-1' });
     const result = await verifyLogoutToken(token, provider);
 
@@ -191,9 +186,7 @@ describe('verifyLogoutToken', () => {
     if (!result.ok) expect(result.reason).toContain('jwks_uri');
   });
 
-  // Authentik and friends issue an `iss` ending in a slash. Trimming it before handing it to
-  // jwtVerify made an exact-match comparison fail against itself, and every token they sent was
-  // refused - so the issuer goes through exactly as the operator configured it.
+  // Authentik issues `iss` with a trailing slash; trimming it made jwtVerify refuse every token.
   it('accepts a token from an issuer whose identifier ends in a slash', async () => {
     const slashed = `${ISSUER}/`;
     const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', iss: slashed });
@@ -205,8 +198,7 @@ describe('verifyLogoutToken', () => {
   });
 
   it('still refuses a token whose issuer differs from the configured one', async () => {
-    // The two spellings identify the same server to a human and different ones to the spec, so a
-    // provider configured with one and issuing the other is a misconfiguration worth reporting.
+    // Different issuers to the spec, so the mismatch is a misconfiguration worth reporting.
     const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', iss: ISSUER });
 
     expect((await verifyLogoutToken(token, { issuer: `${ISSUER}/`, clientId: CLIENT_ID })).ok).toBe(

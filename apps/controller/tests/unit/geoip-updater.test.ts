@@ -1,10 +1,4 @@
-/**
- * The controller's own GeoLite2 downloader.
- *
- * MaxMind is a third party, so what is pinned here is the handling of its answers: the credential
- * must not follow the redirect to storage, a failure is named, and an archive that does not hold
- * the database is refused before it can replace a working one.
- */
+/** Pins the handling of a third party's answers. */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

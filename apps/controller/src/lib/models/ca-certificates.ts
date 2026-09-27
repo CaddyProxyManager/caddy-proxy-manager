@@ -9,6 +9,7 @@ import {
 } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -47,6 +48,31 @@ function parseCaCertificate(row: CaCertificateRow): CaCertificate {
   };
 }
 
+function sealKey(pem: string | undefined): string | null {
+  const trimmed = pem?.trim();
+  return trimmed ? encryptSecret(trimmed) : null;
+}
+
+/**
+ * Encrypts private keys older releases stored in plain text. Idempotent and unflagged, like
+ * `migrateLegacyCertificateStorage`, so a restored old backup is repaired on the next start.
+ */
+export async function migrateLegacyCaCertificateStorage(): Promise<number> {
+  const rows = await db
+    .select({ id: caCertificates.id, privateKeyPem: caCertificates.privateKeyPem })
+    .from(caCertificates);
+  let migrated = 0;
+  for (const row of rows) {
+    if (!row.privateKeyPem || isEncryptedSecret(row.privateKeyPem)) continue;
+    await db
+      .update(caCertificates)
+      .set({ privateKeyPem: encryptSecret(row.privateKeyPem) })
+      .where(eq(caCertificates.id, row.id));
+    migrated += 1;
+  }
+  return migrated;
+}
+
 export async function listCaCertificates(): Promise<CaCertificate[]> {
   const rows = await db.select().from(caCertificates).orderBy(desc(caCertificates.createdAt));
   return rows.map(parseCaCertificate);
@@ -56,7 +82,9 @@ export async function getCaCertificatePrivateKey(id: number): Promise<string | n
   const cert = await db.query.caCertificates.findFirst({
     where: (table, { eq }) => eq(table.id, id),
   });
-  return cert?.privateKeyPem ?? null;
+  if (!cert?.privateKeyPem) return null;
+  // Plain text until the startup pass has sealed it; decryptSecret passes that through.
+  return decryptSecret(cert.privateKeyPem, `CA certificate ${id} private key`);
 }
 
 export async function getCaCertificate(id: number): Promise<CaCertificate | null> {
@@ -76,7 +104,7 @@ export async function createCaCertificate(
     .values({
       name: input.name.trim(),
       certificatePem: input.certificatePem.trim(),
-      privateKeyPem: input.privateKeyPem?.trim() ?? null,
+      privateKeyPem: sealKey(input.privateKeyPem),
       createdBy: actorUserId,
       createdAt: now,
       updatedAt: now,
@@ -114,9 +142,7 @@ export async function updateCaCertificate(
     .set({
       name: input.name?.trim() ?? existing.name,
       certificatePem: input.certificatePem?.trim() ?? existing.certificatePem,
-      ...(input.privateKeyPem !== undefined
-        ? { privateKeyPem: input.privateKeyPem?.trim() ?? null }
-        : {}),
+      ...(input.privateKeyPem !== undefined ? { privateKeyPem: sealKey(input.privateKeyPem) } : {}),
       updatedAt: now,
     })
     .where(eq(caCertificates.id, id));
@@ -138,8 +164,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw domainError("caCertificateNotFound");
   }
 
-  // Issued client certificates belonging to this CA, plus any mTLS roles that include them - used
-  // both to detect references below and to cascade-delete afterwards.
+  // For the reference check below and the cascade after it.
   const issuedCerts = await db
     .select({ id: issuedClientCertificates.id })
     .from(issuedClientCertificates)
@@ -156,9 +181,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     for (const row of roleRows) affectedRoleIds.add(row.roleId);
   }
 
-  // A host is "in use" if it trusts one of the CA's issued certs (trusted_client_cert_ids), a role
-  // containing one (trusted_role_ids), or the deprecated whole-CA list (ca_certificate_ids). The
-  // old guard checked only the deprecated field.
+  // Through an issued cert, a role holding one, or the deprecated whole-CA list.
   const allHosts = await db
     .select({ meta: proxyHosts.meta, name: proxyHosts.name })
     .from(proxyHosts);
@@ -180,7 +203,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
   });
 
   if (referencing.length > 0) {
-    // Still a 409 over REST. The names go as a list, so the delete dialog formats them for its reader.
+    // A 409 over REST; the names go as a list for the dialog to format.
     throw domainError(
       "caCertificateInUse",
       { names: referencing.map((h) => h.name) },
@@ -188,8 +211,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     );
   }
 
-  // Cascade-delete the CA's issued certs and role mappings by hand: the schema declares
-  // onDelete: "cascade", but bun:sqlite leaves PRAGMA foreign_keys OFF, so it never fires.
+  // By hand: bun:sqlite leaves PRAGMA foreign_keys OFF, so the schema's cascade never fires.
   if (issuedCertIds.length > 0) {
     await db
       .delete(mtlsCertificateRoles)

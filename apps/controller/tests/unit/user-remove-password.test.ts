@@ -1,7 +1,6 @@
 /**
- * POST /api/user/remove-password leaves a signed-in user with only their linked providers. It is
- * the inverse of unlink-oauth and guarded from the other side: never without a linked provider,
- * never without the current password, and nothing changes when either check fails.
+ * The inverse of unlink-oauth: never without a linked provider or the current password, and
+ * nothing changes when either check fails.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -15,8 +14,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -69,10 +67,7 @@ async function seedUser(options: { linkProvider: boolean }) {
   return user;
 }
 
-/**
- * A same-origin POST. Shaped by hand like the unlink-oauth test's: a real Request drops the Host
- * header, which checkSameOrigin compares Origin against, so every call would be refused as 403.
- */
+/** By hand: a real Request drops the Host header checkSameOrigin compares Origin against. */
 function post(body: unknown) {
   return POST({
     method: 'POST',

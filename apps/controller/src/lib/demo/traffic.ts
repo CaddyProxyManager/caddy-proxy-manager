@@ -1,17 +1,12 @@
 /**
- * Invented traffic for a demo's analytics: the seed writes a month of it, and a running demo keeps
- * adding more, so every range on the analytics pages has something in it however long ago the demo
- * was seeded.
- *
- * Shaped rather than uniform - busy evenings, quiet nights and weekends, a few countries doing most
- * of the talking, a visitor pool with regulars, and scanners the WAF keeps catching - because a flat
- * chart teaches nobody what the dashboard is for.
+ * Invented demo traffic: a seeded month, then live minutes, so every range has data. Shaped, not
+ * uniform, because a flat chart teaches nobody what the dashboard is for.
  */
 import type { TrafficEventRow, WafEventRow } from "../clickhouse/client";
 
 export type TrafficShare = { domain: string; share: number };
 
-/** Relative traffic for the hosts the seed creates. A host someone adds in the demo gets the default. */
+/** A host added in the demo gets the default. */
 export const DEMO_HOST_SHARES: Record<string, number> = {
   "jellyfin.example.com": 30,
   "photos.example.com": 18,
@@ -25,7 +20,7 @@ export const DEMO_HOST_SHARES: Record<string, number> = {
 };
 const DEFAULT_SHARE = 4;
 
-/** Requests an hour at the busiest time of day; the shape below scales everything off it. */
+/** Requests an hour at the peak; everything scales off it. */
 export const PEAK_PER_HOUR = 900;
 
 const COUNTRIES = [
@@ -72,7 +67,6 @@ const PATHS = [
   "/health",
 ];
 
-/** What a scanner asks for, which is what the WAF is there to catch. */
 const PROBE_PATHS = [
   "/wp-login.php",
   "/.env",
@@ -107,7 +101,6 @@ function weighted<T>(entries: readonly (readonly [T, number])[]): T {
   return entries[0]![0];
 }
 
-/** Busy in the evening, quiet at 04:00, and quieter at the weekend. */
 function busyness(date: Date): number {
   const hour = date.getUTCHours() + date.getUTCMinutes() / 60;
   const daily = 0.15 + 0.85 * Math.max(0, Math.sin(((hour - 5) / 24) * Math.PI * 2) * 0.5 + 0.5);
@@ -120,13 +113,10 @@ function randomIp(): string {
   return `${Math.floor(Math.random() * 180) + 20}.${octet()}.${octet()}.${octet()}`;
 }
 
-/**
- * A fixed set of visitors, drawn from rather than invented per request: one address per request
- * makes "unique visitors" equal the request count, and a handful makes every chart one person.
- */
+/** A fixed pool: one address per request would make unique visitors equal requests. */
 const VISITOR_IPS = Array.from({ length: 3000 }, randomIp);
 const REGULARS = 20;
-/** The ones the WAF keeps catching: a scanner comes back, it does not arrive once and leave. */
+/** A scanner comes back rather than arriving once. */
 const ATTACKER_IPS = Array.from({ length: 60 }, randomIp);
 
 function visitorIp(): string {
@@ -146,10 +136,7 @@ export function trafficShares(domains: string[]): TrafficShare[] {
   return domains.map((domain) => ({ domain, share: DEMO_HOST_SHARES[domain] ?? DEFAULT_SHARE }));
 }
 
-/**
- * Events for `[from, to)`, spread over it at the rate the time of day calls for. A fractional
- * count rounds by chance, so a minute that should hold 0.4 requests holds one 40% of the time.
- */
+/** A fractional count rounds by chance: 0.4 requests is one request 40% of the time. */
 export function generateTraffic(
   from: number,
   to: number,
@@ -187,7 +174,7 @@ export function generateTraffic(
       });
     }
 
-    // Scanners are steady rather than following the daily shape: they do not sleep.
+    // Scanners do not sleep.
     const expectedProbes = (span / 3600) * (6 + Math.random() * 10);
     const probes = Math.floor(expectedProbes) + (Math.random() < expectedProbes % 1 ? 1 : 0);
     for (let i = 0; i < probes; i++) {
@@ -230,7 +217,7 @@ export function generateTraffic(
   return { traffic, waf };
 }
 
-/** Write events for `[from, to)`, an hour at a time so a month never sits in memory at once. */
+/** An hour at a time, so a month never sits in memory. */
 export async function writeDemoTraffic(
   from: number,
   to: number,
@@ -248,7 +235,6 @@ export async function writeDemoTraffic(
   return written;
 }
 
-/** The enabled proxy hosts' domains, which is where invented traffic should arrive. */
 async function servedDomains(): Promise<string[]> {
   const { listProxyHosts } = await import("../models/proxy-hosts");
   const hosts = await listProxyHosts();
@@ -261,11 +247,7 @@ const MAX_BACKFILL_S = 30 * 86400;
 
 type Global = typeof globalThis & { __CPM_DEMO_TRAFFIC__?: ReturnType<typeof setInterval> };
 
-/**
- * Keep the demo's analytics current: fill whatever gap the demo was down for, then add each minute
- * as it passes. Only with the SQLite store - a demo pointed at a real ClickHouse is someone's
- * deliberate setup, and it is not ours to fill.
- */
+/** Backfills downtime, then adds each minute. SQLite store only: a real ClickHouse is not ours. */
 export async function startLiveDemoTraffic(): Promise<void> {
   const global = globalThis as Global;
   if (global.__CPM_DEMO_TRAFFIC__) return;
@@ -275,7 +257,7 @@ export async function startLiveDemoTraffic(): Promise<void> {
 
   let last = Math.floor(Date.now() / 1000);
   const latest = latestEventTs();
-  // Empty is a demo seeded before it had analytics, or with --no-seed: it gets the full window.
+  // Empty: seeded before analytics existed, or with --no-seed.
   if (latest === null || latest < last) {
     const from =
       latest === null ? last - MAX_BACKFILL_S : Math.max(latest + 1, last - MAX_BACKFILL_S);

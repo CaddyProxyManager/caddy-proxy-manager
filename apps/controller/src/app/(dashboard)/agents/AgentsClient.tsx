@@ -1,13 +1,6 @@
 "use client";
 
-/**
- * The agents this viewer may see, and the two things they may do to one.
- *
- * An admin sees every paired agent; an operator sees the ones their groups were granted. The row
- * says which hosts are pinned to the agent, but not how many it actually serves - every unassigned
- * host lands on all of them, and a number that quietly folded those in would look wrong the moment
- * someone counted.
- */
+/** Rows show pinned hosts, not served ones: every unassigned host lands on all agents. */
 
 import { useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -47,14 +40,11 @@ export type AgentRow = {
   assignedHttpHosts: number;
   assignedL4Hosts: number;
   canManage: boolean;
-  /** Log permission problems the agent reported, each with the command that fixes it. */
+  /** Each with the command that fixes it. */
   logAccessFixes: LogAccessFix[];
 };
 
-/**
- * Relative where that is the useful reading - an agent seen four hours ago is the thing worth
- * noticing - and absolute once it is old enough that "14 days ago" stops meaning anything.
- */
+/** Relative while recent, absolute once "14 days ago" stops meaning anything. */
 const LAST_SEEN_RELATIVE_MS = 48 * 60 * 60 * 1000;
 
 export default function AgentsClient({
@@ -90,8 +80,7 @@ export default function AgentsClient({
 
   const connectedCount = agents.filter((agent) => agent.connected).length;
   const ownBuildCount = agents.filter((agent) => agent.hasOwnBuildSettings).length;
-  // Pinned, not served: an unassigned host runs on every agent, and folding those in would give a
-  // number nobody could reconcile against the host list.
+  // Pinned, not served: counting unassigned hosts would not reconcile with the host list.
   const pinnedHosts = agents.reduce(
     (sum, agent) => sum + agent.assignedHttpHosts + agent.assignedL4Hosts,
     0,
@@ -126,9 +115,7 @@ export default function AgentsClient({
 
   return (
     <VStack gap={6}>
-      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way there.
-          As the header's action it is a button on a desktop and the floating button on a phone -
-          before, the desktop had no way there from this page at all. */}
+      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way. */}
       <PageHeader
         title={t("title")}
         action={isAdmin ? { label: t("pairAgent"), href: "/settings/agent" } : undefined}

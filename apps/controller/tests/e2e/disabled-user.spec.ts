@@ -37,8 +37,7 @@ async function loginAs(
   const page = await context.newPage();
 
   await page.goto(`${BASE}/login`);
-  // The form submits natively until React attaches its onSubmit, so a fill or click landing first
-  // is dropped or turned into a GET to /login with the credentials in the query string.
+  // Before hydration the form submits natively, as a GET to /login with credentials in the query.
   await waitForHydration(page);
   await signInWithCredentials(page, username, password);
 
@@ -65,7 +64,6 @@ test.describe('Disabled user enforcement', () => {
   });
 
   test.afterAll(async () => {
-    // Re-enable user so it doesn't affect other tests
     try {
       setUserStatus('active');
     } catch {
@@ -74,19 +72,15 @@ test.describe('Disabled user enforcement', () => {
   });
 
   test('disabled user UI session is rejected', async ({ browser }) => {
-    // Log in while active
     const context = await loginAs(browser, TEST_USERNAME, TEST_PASSWORD);
 
-    // Verify session works
     const page = await context.newPage();
     await page.goto(BASE);
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
     await page.close();
 
-    // Disable user
     setUserStatus('disabled');
 
-    // Existing session should now be rejected - page should redirect to /login
     const page2 = await context.newPage();
     await page2.goto(BASE);
     await expect(page2).toHaveURL(/\/login/, { timeout: 15_000 });
@@ -94,21 +88,17 @@ test.describe('Disabled user enforcement', () => {
 
     await context.close();
 
-    // Re-enable for subsequent tests
     setUserStatus('active');
   });
 
   test('disabled user cannot log in', async ({ page }) => {
-    // Disable first
     setUserStatus('disabled');
 
     await page.goto(`${BASE}/login`);
-    // Not just flake insurance: this test passes if the URL stays on /login, and a pre-hydration
-    // native submit does exactly that - it would go green without ever attempting a login.
+    // Not flake insurance: a pre-hydration native submit stays on /login and would pass untested.
     await waitForHydration(page);
     await signInWithCredentials(page, TEST_USERNAME, TEST_PASSWORD);
 
-    // Should stay on login page or show an error
     await expect(async () => {
       const url = page.url();
       const hasError = await page
@@ -118,14 +108,12 @@ test.describe('Disabled user enforcement', () => {
       expect(url.includes('/login') || hasError).toBe(true);
     }).toPass({ timeout: 15_000 });
 
-    // Re-enable for subsequent tests
     setUserStatus('active');
   });
 
   test('disabled user API token returns 401', async ({ request }) => {
     const token = createApiToken();
 
-    // Token should work while active
     const res1 = await request.get(`${API_BASE}/tokens`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -134,10 +122,8 @@ test.describe('Disabled user enforcement', () => {
     });
     expect(res1.status()).toBe(200);
 
-    // Disable user
     setUserStatus('disabled');
 
-    // Token should now be rejected
     const res2 = await request.get(`${API_BASE}/tokens`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -146,14 +132,12 @@ test.describe('Disabled user enforcement', () => {
     });
     expect(res2.status()).toBe(401);
 
-    // Re-enable for subsequent tests
     setUserStatus('active');
   });
 
   test('re-enabling user restores API access', async ({ request }) => {
     const token = createApiToken();
 
-    // Disable
     setUserStatus('disabled');
     const res1 = await request.get(`${API_BASE}/tokens`, {
       headers: {
@@ -163,7 +147,6 @@ test.describe('Disabled user enforcement', () => {
     });
     expect(res1.status()).toBe(401);
 
-    // Re-enable
     setUserStatus('active');
     const res2 = await request.get(`${API_BASE}/tokens`, {
       headers: {
@@ -175,11 +158,9 @@ test.describe('Disabled user enforcement', () => {
   });
 
   test('re-enabling user restores UI login', async ({ browser }) => {
-    // Disable then re-enable
     setUserStatus('disabled');
     setUserStatus('active');
 
-    // Should be able to log in again
     const context = await loginAs(browser, TEST_USERNAME, TEST_PASSWORD);
     const page = await context.newPage();
     await page.goto(BASE);

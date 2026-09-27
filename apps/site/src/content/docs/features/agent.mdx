@@ -14,10 +14,22 @@ and some things need the Caddy *container* recreated rather than its configurati
 Two things are fixed when a container is created and cannot be changed by reloading config:
 
 - **Published ports**, which [L4 hosts](../l4-proxy/) need.
-- **Compiled-in plugins**, which [Caddy Build](../caddy-build/) changes.
+- **Compiled-in plugins**, which [Caddy Build](../caddy-build/) changes - by building the image,
+  or with `CADDY_BUILD_MODE=external` only loading one you built.
 
 The agent also starts and stops the optional ClickHouse container for [analytics](../analytics/),
 so it becomes a toggle in Settings rather than a compose profile you edit by hand.
+
+It is also how the controller sees what only the Caddy host has:
+
+- the access, WAF and Caddy logs for the [log viewer](../analytics/#logs);
+- Caddy's certificate storage, for each host's expiry and the downloads on the
+  [Certificates](../certificates/) page, read from a throwaway container mounting it read-only;
+- `caddy validate` against the real binary, in a throwaway container with no network, which checks
+  a WAF save or a [global Caddyfile](../caddy-build/#global-caddyfile) without loading anything.
+
+An agent tells the controller which of these it supports, and an older one is simply not asked.
+Update it to get them.
 
 ## The agent dials out
 

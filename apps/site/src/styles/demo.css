@@ -1,9 +1,6 @@
 /*
- * The frame a live demo sits in, and the surface behind it. Both are drawn in Starlight's own
- * tokens, because they belong to the page rather than to the product - what goes inside the frame
- * is styled by Astryx, out of src/demos/demo.css, which only pages with a demo on them load.
- *
- * Unlayered: these selectors reach nothing but the elements Demo.astro and DemoSurface write.
+ * A demo's frame and surface, in Starlight tokens because they belong to the page; the inside is
+ * Astryx's, via src/demos/demo.css. Unlayered: nothing but Demo.astro and DemoSurface is matched.
  */
 .cpm-demo-frame {
   border: 1px solid var(--sl-color-gray-5);
@@ -30,7 +27,6 @@
   font-weight: 600;
 }
 
-/* Says the thing is real rather than a picture - the one claim the frame has to make. */
 .cpm-demo-badge {
   background: var(--sl-color-accent-low);
   border-radius: 999px;
@@ -49,15 +45,10 @@
   outline-offset: 2px;
 }
 
-/*
- * The caveat, on hover or focus. CSS rather than a component: the frame is plain Astro markup with
- * no island of its own, and one line of text does not justify shipping React to every page that
- * has a demo on it.
- */
+/* CSS, not a component: a one-line tooltip does not justify shipping React to every demo page. */
 .cpm-demo-hint {
   background: var(--sl-color-gray-5);
-  /* The tooltip sits on the demo surface, which is close to it in both themes; the border is what
-     separates the two. */
+  /* The demo surface is close to this colour in both themes; the border separates them. */
   border: 1px solid var(--sl-color-gray-4);
   border-radius: 0.375rem;
   color: var(--sl-color-white);
@@ -73,8 +64,7 @@
   z-index: 1;
 }
 
-/* `:focus`, not `:focus-visible`: the ring below is a visual affordance and belongs to keyboard
-   focus alone, but the caveat itself should show however the badge came to be focused. */
+/* `:focus`, not `:focus-visible`: the ring is for keyboard focus, the caveat for any focus. */
 .cpm-demo-badge:hover + .cpm-demo-hint,
 .cpm-demo-badge:focus + .cpm-demo-hint {
   opacity: 1;
@@ -86,11 +76,7 @@
   }
 }
 
-/*
- * The surface a demo's card sits on. Astryx's Card is near-black in dark mode and white in light,
- * so one colour cannot sit behind both - the light override is what keeps a white card from
- * vanishing into a white page.
- */
+/* Astryx's Card is white in light mode, so the light override keeps it off a white page. */
 .cpm-demo {
   background: var(--sl-color-black);
   padding: 1.25rem;

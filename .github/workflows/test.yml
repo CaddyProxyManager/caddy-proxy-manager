@@ -1,12 +1,8 @@
 name: Tests
 
 on:
-  # Work lands on branches that come and go - one per change set, or one bundling a release's
-  # worth of them - so this cannot name them; it names the one branch that is not work. Every
-  # commit reaching main does so through a pull request whose checks ran against the merge result
-  # - the same tree that lands. Running them again on the push to main would re-prove a green
-  # commit at full cost, so main is excluded here. Direct pushes to main are not a hole this
-  # leaves open: they are not permitted.
+  # Not main: everything reaches it through a PR whose checks ran on the merge result, and direct
+  # pushes to main are not permitted.
   push:
     branches-ignore:
       - main
@@ -17,21 +13,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Zero out GITHUB_TOKEN permissions - tests need no credentials. No secrets:
-    # references in this workflow either, so no repo secrets are injected into the
-    # environment. The postgres service below is a throwaway container on the
-    # runner, reachable only from this job.
+    # Tests need no credentials, and nothing here references secrets.
     permissions: {}
 
-    # No postgres service container: the suite starts its own through
-    # apps/controller/scripts/with-test-db.ts, which needs to pass `-c max_connections=1000` and a
-    # tmpfs data directory. A service container takes neither, and running the same code path here
-    # as locally is worth more than reusing the runner's.
+    # No postgres service: with-test-db.ts needs `-c max_connections=1000` and a tmpfs data dir,
+    # which a service container cannot take.
     services:
-      # A real OIDC provider for tests/integration/oauth-flow.test.ts. OAuth is the one auth path
-      # the fast suite cannot otherwise reach - the unit tests stub betterAuth outright - and a
-      # broken callback previously only surfaced in the end-to-end suite, after the push.
-      # interactiveLogin:false makes /authorize issue a code directly, so no browser is involved.
+      # A real OIDC provider for oauth-flow.test.ts; unit tests stub betterAuth outright.
       # Keep JSON_CONFIG in step with MOCK_IDP_JSON_CONFIG in tests/helpers/mock-idp.ts.
       mock-oidc:
         image: ghcr.io/navikt/mock-oauth2-server:2.1.10
@@ -53,21 +41,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Biome covers both linting and formatting, so an unformatted file fails
-      # here rather than drifting until someone notices. `biome check` exits
-      # non-zero only on errors, so the remaining warnings stay advisory.
+      # Fails only on errors, so Biome's warnings stay advisory.
       - name: Lint and format check
         run: bun run lint
 
       - name: Type-check clean dependency graph
         run: bun run typecheck
 
-      # Coverage is collected here rather than in a separate job so the
-      # thresholds in scripts/coverage-ratchet.ts actually gate a pull request:
-      # the step fails if coverage drops below the ratchet.
-      # The IdP has no health check of its own, and the OAuth test skips when it cannot reach one.
-      # Wait for it explicitly so a container that failed to start fails the job instead of quietly
-      # dropping that coverage.
+      # The OAuth test skips when the IdP is unreachable, so a dead container must fail the job.
       - name: Wait for the mock OIDC provider
         run: |
           for i in $(seq 1 60); do
@@ -89,8 +70,7 @@ jobs:
         run: bun run --filter @cpm/controller test:sqlite
 
       - name: Upload coverage report
-        # Always: a threshold failure is exactly when the per-file breakdown in
-        # coverage/lcov.info is worth reading.
+        # Always: a threshold failure is when the per-file breakdown matters.
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -106,3 +86,7 @@ jobs:
           SESSION_SECRET: ci-build-session-secret-at-least-32-chars
           ADMIN_PASSWORD: ci-build-admin-password
         run: bun run build
+
+      # Swagger UI is the largest chunk at ~360 KiB; a new one past this fails instead of warning.
+      - name: Bundle size budget
+        run: bun scripts/check-bundle-budget.ts apps/controller/dist/client --max-kib=400

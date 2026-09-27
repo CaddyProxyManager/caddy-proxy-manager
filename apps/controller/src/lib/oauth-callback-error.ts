@@ -1,14 +1,7 @@
 /**
- * Turns the `?error=` Better Auth appends when an OAuth sign-in fails into a sentence for the
- * sign-in page.
- *
- * Only `account_not_linked` gets its own wording: it is the one an operator can act on, and it
- * replaces the old /link-account page. A provider without "Link to an existing account with the
- * same email" is refused when the email already belongs to someone, and the way forward is to sign
- * in some other way and link the provider from Profile.
- *
- * The code is echoed only when it looks like one of Better Auth's codes, so a crafted link cannot
- * put arbitrary text on the sign-in page.
+ * Better Auth's OAuth `?error=` as a sign-in page sentence. Only `account_not_linked`, the one an
+ * operator can act on (sign in another way, link from Profile), gets its own wording. A code is
+ * echoed only when it looks like Better Auth's, so a crafted link cannot put text on the page.
  */
 
 type Translate = (

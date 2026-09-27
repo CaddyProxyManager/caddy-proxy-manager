@@ -1,11 +1,6 @@
 /**
- * The two optional features, as the Settings page reads and writes them.
- *
- * Analytics and GeoIP are the only settings whose value decides whether a whole service runs, so
- * they need more than the registry's read/write: saving one has to drop the ClickHouse client's
- * cached configuration, re-push the fleet credentials, ask the agents to start or stop ClickHouse,
- * and set the GeoIP downloader going. That sequence is here rather than in the server action so the
- * ordering is stated once.
+ * Analytics and GeoIP decide whether a whole service runs, so saving one drops cached ClickHouse
+ * config, re-pushes fleet credentials, starts or stops containers and kicks the GeoIP download.
  */
 
 import { geoipDatabaseAgeDays, geoipEnabled, installedGeoipDatabases } from "../agent/geoip";
@@ -21,13 +16,13 @@ export type AnalyticsView = {
   enabled: boolean;
   /** True while nothing is stored, so `enabled` was inferred from whether a password is set. */
   inferred: boolean;
-  /** Where the toggle's value came from, so the page can say a variable is still overriding it. */
+  /** So the page can say a variable is still overriding it. */
   source: SettingSource;
   url: string;
   user: string;
   database: string;
   retentionDays: number;
-  /** Whether a password exists. The value itself never reaches the browser. */
+  /** The value itself never reaches the browser. */
   hasPassword: boolean;
 };
 
@@ -37,29 +32,14 @@ export type GeoipView = {
   source: SettingSource;
   accountId: string;
   hasLicenseKey: boolean;
-  /** Which MaxMind databases are on disk right now. Empty before the first download. */
   installedEditions: string[];
-  /**
-   * Whole days since a database was last written, or null when none are installed.
-   *
-   * The number that says whether the updater is still running: MaxMind publishes GeoLite2 twice a
-   * week, so a working deployment never gets far past a few days.
-   */
+  /** MaxMind publishes twice a week, so a working updater never gets far past a few days. */
   databaseAgeDays: number | null;
-  /** When MaxMind was last asked whether anything newer exists, or null if never. */
   lastCheckedAt: string | null;
-  /** Why the last check failed, when it did. */
   checkError: string | null;
-  /**
-   * Editions MaxMind has rebuilt since our copy was written.
-   *
-   * The signal the file's age cannot give on its own: it separates "MaxMind has published nothing"
-   * from "the updater has stopped fetching what MaxMind published".
-   */
+  /** Tells "MaxMind published nothing" from "the updater stopped fetching", which age cannot. */
   editionsBehind: string[];
-  /** Why the updater's last download failed, when one did. */
   downloadError: string | null;
-  /** Hours between the updater's checks. */
   updateIntervalHours: number;
 };
 
@@ -86,10 +66,7 @@ export async function analyticsView(): Promise<AnalyticsView> {
   };
 }
 
-/**
- * `t` is the root translator: the stored check and download failures are said in the reader's
- * language here, so the page and its health summary both get sentences.
- */
+/** `t` is the root translator, so stored failures reach the page already translated. */
 export async function geoipView(t: Parameters<typeof storedErrorMessage>[0]): Promise<GeoipView> {
   const installed = installedGeoipDatabases();
   const interval = await resolveSetting(registry.geoipUpdateIntervalHours);
@@ -123,12 +100,8 @@ export async function geoipView(t: Parameters<typeof storedErrorMessage>[0]): Pr
 }
 
 /**
- * The effective on/off for every gated feature, keyed by setting.
- *
- * A form showing a switch needs a boolean, and the stored value for these is tri-state - unset
- * meaning "infer it". Resolving that here is what makes the setup form open with analytics already
- * on for a deployment that arrived with a ClickHouse password in its `.env`, rather than presenting
- * a switch that is off and inviting the operator to turn off something already running.
+ * Resolves the tri-state stored value (unset means "infer") to a boolean, so a deployment with a
+ * ClickHouse password in `.env` opens setup with analytics on, not off while running.
  */
 export async function gateDefaults(): Promise<Record<string, boolean>> {
   const [analytics, geoip] = await Promise.all([isAnalyticsEnabled(), geoipEnabled()]);
@@ -139,16 +112,8 @@ export async function gateDefaults(): Promise<Record<string, boolean>> {
 }
 
 /**
- * Push the new configuration everywhere it is cached or acted on.
- *
- * Order matters and is the reason this is one function: the ClickHouse client has to forget the old
- * credentials before anything reads them back, the agents have to be told where to write before
- * they are told to start writing, and the container has to come up last because the two steps
- * before it are what make it useful.
- *
- * Exported because the setup flow writes the same settings through `saveSettings` directly, and
- * without this it would finish with the containers still stopped and the client still holding the
- * configuration it resolved before the operator filled the form in.
+ * Order matters: the client forgets old credentials, agents learn where to write, and the
+ * container starts last. Exported for setup, which writes through `saveSettings` directly.
  */
 export async function propagateOptionalFeatureSettings(): Promise<void> {
   const [{ invalidateClickHouseConfig }, { pushFleetConfig }, { applyManagedServices }] =
@@ -167,13 +132,7 @@ export async function propagateOptionalFeatureSettings(): Promise<void> {
   void updateGeoipDatabases();
 }
 
-/**
- * Save the analytics settings.
- *
- * An empty password means "leave the stored one alone", because the form never receives the current
- * value to send back - the alternative is a page that wipes the credential every time someone
- * changes the retention.
- */
+/** An empty password keeps the stored one: the form never receives it to send back. */
 export async function saveAnalyticsSettings(input: {
   enabled: boolean;
   url: string;
@@ -183,8 +142,7 @@ export async function saveAnalyticsSettings(input: {
   retentionDays: number;
 }): Promise<void> {
   const values: Record<string, unknown> = {
-    // Written as an explicit boolean, never back to null: the tri-state exists for a deployment
-    // that has never been through this page, and this is that page.
+    // Never back to null: the tri-state is for deployments that never saw this page.
     [registry.analyticsEnabled.key]: input.enabled,
     [registry.clickhouseUrl.key]: input.url,
     [registry.clickhouseUser.key]: input.user,

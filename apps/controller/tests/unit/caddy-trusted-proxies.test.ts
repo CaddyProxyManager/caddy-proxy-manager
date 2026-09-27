@@ -221,7 +221,6 @@ function findBlocker(node: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-// Sanity: buildBlockerHandler / resolveEffectiveGeoBlock still imported & usable
 describe('geoblock helpers remain reachable', () => {
   it('buildBlockerHandler emits trusted_proxies from a resolved config', () => {
     const resolved = resolveEffectiveGeoBlock(

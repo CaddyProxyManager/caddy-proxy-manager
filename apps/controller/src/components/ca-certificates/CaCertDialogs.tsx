@@ -76,8 +76,7 @@ export function IssueClientCertDialog({
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
   const router = useRouter();
-  // One dialog per CA row, and a closed native <dialog> stays in the DOM, so a shared form id would
-  // resolve `form={id}` to the first (empty) form and block submission. useId per instance.
+  // Closed <dialog>s stay in the DOM, so a shared form id would resolve to the first (empty) form.
   const issueFormId = useId();
   const [isPending, startTransition] = useTransition();
   const [issued, setIssued] = useState<{
@@ -91,8 +90,7 @@ export function IssueClientCertDialog({
   const [exportPassword, setExportPassword] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Controlled fields, so a reopened dialog starts clean rather than showing
-  // the previous issuance's export password.
+  // So a reopened dialog does not show the previous export password.
   useEffect(() => {
     if (!open) return;
     setCommonName("");
@@ -111,8 +109,7 @@ export function IssueClientCertDialog({
     const formData = new FormData(formRef.current!);
     setError(null);
 
-    // The server enforces this too; checking here just avoids a round trip and
-    // a 4096-bit keygen for a password that was never going to be accepted.
+    // Also server-side; this saves a 4096-bit keygen for a password that would be refused.
     const policyError = passwordPolicyMessage(
       tRoot,
       exportPassword,

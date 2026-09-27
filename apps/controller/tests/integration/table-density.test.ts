@@ -1,7 +1,4 @@
-/**
- * The per-user table density: a settings row per user, read by the dashboard layout on every
- * navigation - so an unreadable one has to fall back rather than throw.
- */
+/** Read on every navigation, so an unreadable row must fall back rather than throw. */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { nextIntlServerMock } from '../helpers/next-intl';
@@ -15,8 +12,7 @@ const ctx = vi.hoisted(() => ({
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// A Bun mock factory must be synchronous; an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({

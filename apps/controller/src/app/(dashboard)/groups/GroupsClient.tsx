@@ -1,16 +1,13 @@
 "use client";
 
 /**
- * Groups as a list-detail page: groups in a searchable rail, the selected group on the right.
- *
- * The group pages on Mobbin (Calendly, Miro, PlanetScale, Pinterest Business) share one shape: the
- * group's name and description lead, "Add members" is the primary action beside the edit and
- * delete ones, and the body is a searchable member list with a remove action per row, next to
- * what the group grants. Access here is that second part - IdP names and managed resources - so it
- * gets a tab of its own instead of hiding behind a dialog with nothing on the page to say so.
+ * Groups as a list-detail page. Access (IdP names and managed resources) gets its own tab rather
+ * than hiding behind a dialog with nothing on the page to say so.
  */
 import { useEffect, useMemo, useState } from "react";
+import { startViewAsAction } from "../view-as/actions";
 import {
+  Eye,
   Globe,
   Network,
   Pencil,
@@ -329,6 +326,7 @@ function GroupDetail({
   const [addOpen, setAddOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [viewAsError, setViewAsError] = useState<string | null>(null);
   const counts = grantCounts(access);
   const isIdp = group.source === "oidc";
 
@@ -388,6 +386,21 @@ function GroupDetail({
           <IconButton
             variant="ghost"
             size="sm"
+            label={t("viewAsGroupNamed", { name: group.name })}
+            tooltip={t("viewAsGroup")}
+            icon={<Eye />}
+            onClick={async () => {
+              const result = await startViewAsAction("operator", [group.id]);
+              if (result.status === "error") {
+                setViewAsError(result.message ?? null);
+                return;
+              }
+              window.location.assign("/");
+            }}
+          />
+          <IconButton
+            variant="ghost"
+            size="sm"
             label={t("deleteGroupNamed", { name: group.name })}
             tooltip={t("deleteGroup")}
             icon={<Trash2 />}
@@ -395,6 +408,8 @@ function GroupDetail({
           />
         </HStack>
       </HStack>
+
+      {viewAsError && <Banner status="error" title={t("viewAsGroup")} description={viewAsError} />}
 
       {isIdp && (
         <Banner status="info" title={t("idpManaged")} description={t("idpMembershipHelp")} />
@@ -458,7 +473,7 @@ function GroupDetail({
         }}
       />
 
-      {/* Replaces window.confirm, which was unstyled and not announced as a dialog. */}
+      {/* Not window.confirm: unstyled, and not announced as a dialog. */}
       <AlertDialog
         isOpen={confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(false)}
@@ -488,9 +503,8 @@ function GroupDetail({
           onClose={() => setAccessOpen(false)}
           onSave={async (next) => {
             setAccessOpen(false);
-            // Two writes, because they are two tables. The mapping is the harmless one, so it goes
-            // first: if the grants write fails the group is renamed in the IdP's terms but has
-            // gained nothing, which is the safe half to land alone.
+            // Two tables, two writes. The mapping goes first: if the grants write then fails, the
+            // group has gained nothing, the safe half to land alone.
             await setGroupMappingsAction(group.id, next.mappings);
             await setGroupGrantsAction(group.id, [
               ...next.proxyHostIds.map((id) => ({

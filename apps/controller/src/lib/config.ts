@@ -17,33 +17,25 @@ const DEFAULT_APP_NAME = "Caddy Proxy Manager";
  */
 const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
-/**
- * Gravatar fallback for users with no icon. `null` leaves the choice to the Settings toggle;
- * AVATAR_GRAVATAR pins it and locks the toggle, so an air-gapped deployment can guarantee no
- * browser reaches gravatar.com.
- */
 function resolveLegacyPasswordChangeEnv(): boolean | null {
   const raw = process.env.AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH?.trim().toLowerCase();
   if (raw === undefined || raw === "") return null;
   return raw !== "false" && raw !== "0" && raw !== "no";
 }
 
+/** AVATAR_GRAVATAR pins it and locks the toggle, so air-gapped browsers never hit gravatar.com. */
 function resolveGravatarEnv(): boolean | null {
   const raw = process.env.AVATAR_GRAVATAR?.trim().toLowerCase();
   if (raw === undefined || raw === "") return null;
   return raw !== "false" && raw !== "0" && raw !== "no";
 }
 
-/**
- * OIDC-only mode: no local accounts at all. No bootstrap admin, no credential sign-in; every
- * identity comes from an OAuth/OIDC provider.
- */
+/** OIDC-only mode: no local accounts, no bootstrap admin, no credential sign-in. */
 const LOCAL_USERS_DISABLED = process.env.AUTH_DISABLE_LOCAL_USERS === "true";
 
 const isProduction = process.env.NODE_ENV === "production";
 const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
 const isDevelopment = process.env.NODE_ENV === "development";
-// Only enforce strict validation in actual production runtime, not during build
 const isBuildPhase =
   process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
 const isRuntimeProduction = isProduction && isNodeRuntime && !isBuildPhase;
@@ -52,12 +44,10 @@ function resolveSessionSecret(): string {
   const rawSecret = process.env.SESSION_SECRET ?? null;
   const secret = rawSecret?.trim();
 
-  // In development, allow missing secret
   if (isDevelopment && !secret) {
     return DEV_SECRET;
   }
 
-  // In production build phase, allow temporary value
   if (isProduction && !isNodeRuntime && !secret) {
     return DEV_SECRET;
   }
@@ -71,10 +61,8 @@ function resolveSessionSecret(): string {
     );
   }
 
-  // Use provided secret or dev secret (only reachable in development)
   const finalSecret = secret || DEV_SECRET;
 
-  // Strict validation in production runtime
   if (isRuntimeProduction) {
     if (!secret) {
       throw new Error(
@@ -100,19 +88,11 @@ function resolveSessionSecret(): string {
 }
 
 /**
- * The bootstrap admin, when the environment still names one.
- *
- * Absent credentials are no longer a startup failure. They mean the deployment has not been
- * configured yet, and the app answers that by running first-run setup (./setup.ts) rather than
- * refusing to start - which is the whole reason for having a setup flow. There is no development
- * default either: admin/admin was a way to get a usable instance without configuring one, and
- * setup is now the better answer to that in every environment.
- *
- * Credentials that *are* present still have to be good ones. A weak ADMIN_PASSWORD is a worse
- * outcome than no seed at all, since it silently produces a reachable account.
+ * Absent credentials mean an unconfigured deployment, which runs first-run setup (./setup.ts)
+ * rather than failing. Present ones must still be good: a weak ADMIN_PASSWORD silently produces a
+ * reachable account, which is worse than no seed.
  */
 function resolveAdminCredentials(): { username: string | null; password: string | null } {
-  // With local users disabled there is no bootstrap admin to seed at all.
   if (LOCAL_USERS_DISABLED) {
     return { username: null, password: null };
   }
@@ -120,7 +100,6 @@ function resolveAdminCredentials(): { username: string | null; password: string 
   const username = process.env.ADMIN_USERNAME?.trim() || null;
   const password = process.env.ADMIN_PASSWORD?.trim() || null;
 
-  // Neither set: nothing to seed, and setup asks for an account instead.
   if (!username && !password) {
     return { username: null, password: null };
   }
@@ -130,8 +109,7 @@ function resolveAdminCredentials(): { username: string | null; password: string 
   if (!password) {
     errors.push("ADMIN_PASSWORD must be set alongside ADMIN_USERNAME");
   } else if (isRuntimeProduction && process.env.DEMO_MODE?.trim().toLowerCase() !== "true") {
-    // Runtime only: the production build imports this module with whatever the image carries, and
-    // a placeholder there must not fail the build.
+    // Runtime only: the production build imports this with whatever the image carries.
     if (password === DEFAULT_ADMIN_PASSWORD) {
       errors.push("ADMIN_PASSWORD must not be 'admin'");
     } else {
@@ -152,7 +130,6 @@ function resolveAdminCredentials(): { username: string | null; password: string 
   return { username, password };
 }
 
-// Lazy initialization to avoid executing during build time
 let _adminCredentials: { username: string | null; password: string | null } | null = null;
 let _sessionSecret: string | null = null;
 
@@ -178,12 +155,8 @@ export const config = {
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   appName: APP_NAME,
   /**
-   * Domain the dashboard is served on, when the operator pinned one.
-   *
-   * Null rather than a default: this seeds the managed dashboard host once, at the end of setup,
-   * and "unset" has to stay distinguishable from a real choice so the fallback to BASE_URL's
-   * hostname can happen. The bundled Caddyfile has its own default for the placeholder site it
-   * serves until then. After setup the stored setting is what the route is built from.
+   * Null rather than a default: it seeds the dashboard host once at setup, and "unset" must stay
+   * distinguishable so BASE_URL's hostname can be the fallback.
    */
   dashboardDomain: process.env.DASHBOARD_DOMAIN?.trim() || null,
   avatars: {
@@ -197,22 +170,17 @@ export const config = {
     return getAdminCredentials().password;
   },
   auth: {
-    // OIDC-only mode. Disables credential sign-in, local account creation, password management,
-    // and the bootstrap admin seed.
     disableLocalUsers: LOCAL_USERS_DISABLED,
     allowSelfRegistration:
       !LOCAL_USERS_DISABLED && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
-    // Separate from credential self-registration: gates whether an OAuth sign-in may implicitly
-    // create a brand-new account. Defaults closed - except in OIDC-only mode, where the IdP is
-    // the only way an account can exist, so it defaults open unless explicitly refused.
+    // Separate from credential self-registration. Closed by default, except in OIDC-only mode,
+    // where the IdP is the only way an account can exist.
     allowOauthRegistration: LOCAL_USERS_DISABLED
       ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
       : process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
-    // When true, an OAuth IdP's profile claims may set a new user's role/status. Defaults to
-    // false, forcing safe defaults regardless of claims. Enable only if you control the IdP.
+    // Lets IdP claims set a new user's role/status; enable only if you control the IdP.
     allowOauthRoleFromClaims: process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS === "true",
-    // Force a password reset for anyone still on a pre-argon2id bcrypt hash. true/false when
-    // AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH pins it, null when the stored setting decides.
+    // For pre-argon2id bcrypt hashes; null when the stored setting decides.
     requirePasswordChangeOnLegacyHashFromEnv: resolveLegacyPasswordChangeEnv(),
   },
   oauth: {
@@ -225,8 +193,7 @@ export const config = {
     tokenUrl: process.env.OAUTH_TOKEN_URL ?? null,
     userinfoUrl: process.env.OAUTH_USERINFO_URL ?? null,
     allowAutoLinking: process.env.OAUTH_ALLOW_AUTO_LINKING === "true",
-    // Scopes for the env-configured provider. Group claims usually need an extra scope (e.g.
-    // "openid email profile groups").
+    // Group claims usually need an extra scope, e.g. "openid email profile groups".
     scopes: process.env.OAUTH_SCOPES?.trim() || null,
     // ── Group-based roles (env-configured provider) ─────────────────────────
     groupsClaim: process.env.OAUTH_GROUPS_CLAIM?.trim() || null,
@@ -245,10 +212,9 @@ export const config = {
 /** Validates config at production startup, throwing on insecure defaults. Safe during build. */
 export function validateProductionConfig() {
   if (isRuntimeProduction) {
-    // Access the config values to force validation; throws if defaults are used in production
+    // Reading them forces validation, which throws on production defaults.
     void config.sessionSecret;
-    // Admin credentials are validated only when local users exist at all -
-    // resolveAdminCredentials() short-circuits in OIDC-only mode.
+    // Short-circuits in OIDC-only mode.
     void config.adminUsername;
     void config.adminPassword;
   }

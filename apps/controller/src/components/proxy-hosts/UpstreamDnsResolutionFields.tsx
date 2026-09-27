@@ -10,8 +10,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { useTranslations } from "next-intl";
 
-// Labels are looked up at render: these lists are module constants, and `useTranslations` only
-// exists inside the component.
+// Labels resolve at render: `useTranslations` only exists inside the component.
 type ResolutionMode = "inherit" | "enabled" | "disabled";
 type FamilyMode = "inherit" | "ipv6" | "ipv4" | "both";
 
@@ -61,8 +60,6 @@ export function UpstreamDnsResolutionFields({
     <Card>
       <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
 
-      {/* Collapsible owns the disclosure, replacing a hand-rotated chevron and a
-          max-height/opacity transition that left hidden fields focusable. */}
       <Collapsible
         defaultIsOpen={mode !== "inherit" || family !== "inherit"}
         trigger={

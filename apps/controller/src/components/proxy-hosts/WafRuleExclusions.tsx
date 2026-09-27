@@ -40,8 +40,6 @@ export function WafRuleExclusions({ value }: Props) {
       {ids.length > 0 && (
         <HStack gap={2} wrap="wrap">
           {ids.map((id) => (
-            // Token owns its own remove control, replacing the button nested
-            // inside a Badge with a hand-rolled hover background.
             <Token
               key={id}
               size="sm"
@@ -63,9 +61,7 @@ export function WafRuleExclusions({ value }: Props) {
           min={1}
           width={160}
           onEnter={addId}
-          // Enter adds the ID; it must not also submit the surrounding host
-          // form. The design system fires onEnter without preventing the
-          // default, which would otherwise save the host mid-edit.
+          // onEnter does not prevent the default, which would submit the host form mid-edit.
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}

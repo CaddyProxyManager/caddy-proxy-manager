@@ -187,7 +187,9 @@ describe('buildCaddyDocument default response', () => {
 
     const server = cpmServer(await buildCaddyDocument());
     expect(server?.listen).toEqual([':80']);
-    expect(server?.routes).toEqual([
+    // After the reachability probe, which every server answers first.
+    expect(JSON.stringify(server?.routes?.[0])).toContain('cpm-reachability');
+    expect(server?.routes?.slice(1)).toEqual([
       {
         handle: [
           {
@@ -289,7 +291,7 @@ describe('normalizeDefaultResponseSettings refusals', () => {
         'Duplicate default response header name: x-a',
       ],
       [
-        { mode: 'respond', headers: { 'X-A': 'bad ' } },
+        { mode: 'respond', headers: { 'X-A': 'bad\0' } },
         'defaultResponseHeaderValueInvalid',
         'Invalid value for default response header: X-A',
       ],

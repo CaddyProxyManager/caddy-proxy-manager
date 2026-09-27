@@ -1,7 +1,6 @@
 /**
- * What buildCaddyDocument emits once a module is switched off. Caddy validates a posted config as
- * one document, so a handler naming an absent module takes every host offline - the handler must
- * not appear at all. The Caddyfile escape hatch is covered too: an unadaptable snippet is skipped.
+ * Caddy validates a posted config as one document, so a handler naming an absent module takes every
+ * host offline and must not appear at all. An unadaptable Caddyfile snippet is skipped.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -12,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -37,6 +35,7 @@ import { CADDY_MODULES } from '../../src/lib/caddy-modules';
 import {
   saveCaddyBuildSettings,
   saveGeoBlockSettings,
+  saveHttpCacheSettings,
   saveWafSettings,
   type GeoBlockSettings,
 } from '../../src/lib/settings';
@@ -70,15 +69,11 @@ const GEOBLOCK: GeoBlockSettings = {
   redirect_url: '',
 };
 
-/**
- * Pretend a rebuild already completed with exactly these module paths - the agent's *applied* set,
- * which it reports only after a build has succeeded, not the selection that requested it.
- */
+/** The agent's *applied* set, reported only after a build succeeds - not the selection. */
 function setAppliedModules(specs: string[]) {
   agent.state.appliedModules = specs;
 }
 
-/** Select every catalog module except the named ids. */
 async function selectAllModulesExcept(...disabledIds: string[]) {
   await saveCaddyBuildSettings({
     modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, !disabledIds.includes(m.id)])),
@@ -128,7 +123,6 @@ function installAdapter(options: { failAdapt?: boolean } = {}) {
   });
 }
 
-/** Every handler name appearing anywhere in the document. */
 function handlerNames(document: unknown): string[] {
   const found: string[] = [];
   const walk = (node: unknown) => {
@@ -199,8 +193,7 @@ describe('geoblock gating', () => {
   });
 
   it('omits the blocker handler when it is selected but not yet compiled in', async () => {
-    // Enabling a module does not put it in the running binary - only a rebuild
-    // does. Emitting the handler in between would fail the whole config.
+    // Only a rebuild puts a module in the binary; emitting it before would fail the whole config.
     setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('caddy-blocker-plugin')));
     await selectAllModulesExcept();
     await saveGeoBlockSettings(GEOBLOCK);
@@ -247,6 +240,91 @@ describe('WAF gating', () => {
   });
 });
 
+describe('cache gating', () => {
+  const CACHE = { cache: { mode: 'caddy', maxAge: 3600 } };
+
+  it('emits the cache handler when cache-handler is selected and built', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    await createHost(CACHE);
+
+    expect(handlerNames(await buildCaddyDocument())).toContain('cache');
+  });
+
+  it('falls back to browser caching while the opt-in module is not compiled in', async () => {
+    // Selected but not rebuilt: the shipped image lacks it.
+    setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('cache-handler')));
+    await selectAllModulesExcept();
+    await createHost(CACHE);
+
+    const document = await buildCaddyDocument();
+    expect(handlerNames(document)).not.toContain('cache');
+    expect(JSON.stringify(document)).toContain('max-age=3600');
+  });
+});
+
+describe('cache storage gating', () => {
+  const REDIS = {
+    storage: 'redis',
+    redis: { addresses: ['redis:6379'], password: 'hunter2' },
+  };
+  const cacheApp = async () =>
+    ((await buildCaddyDocument()) as { apps: Record<string, unknown> }).apps.cache as
+      | Record<string, unknown>
+      | undefined;
+
+  it('points the cache at Redis once both modules are built, with the password decrypted', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    await saveHttpCacheSettings(REDIS);
+
+    const stored = await ctx.db.select().from(schema.settings);
+    const row = JSON.stringify(stored.find((r) => r.key === 'http_cache'));
+    expect(row).not.toContain('hunter2');
+    expect(row).toContain('enc:v1:');
+
+    const app = await cacheApp();
+    expect(app?.redis).toMatchObject({
+      found: true,
+      configuration: { InitAddress: ['redis:6379'], Password: 'hunter2' },
+    });
+  });
+
+  it('keeps the stored key when the form sends it blank, and refuses a CDN without one', async () => {
+    const cdn = { provider: 'fastly', serviceId: 'svc' };
+    await expect(saveHttpCacheSettings({ cdn })).rejects.toThrow(
+      /Fastly purging needs an API token/,
+    );
+    await saveHttpCacheSettings({ cdn: { ...cdn, apiKey: 'fastly-key' } });
+    await saveHttpCacheSettings({ cdn: { ...cdn, strategy: 'hard' } });
+
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    expect((await cacheApp())?.cdn).toEqual({
+      provider: 'fastly',
+      api_key: 'fastly-key',
+      service_id: 'svc',
+      strategy: 'hard',
+    });
+  });
+
+  it('leaves the storage out until its own module is compiled in', async () => {
+    setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('storages/redis')));
+    await selectAllModulesExcept();
+    await saveHttpCacheSettings(REDIS);
+
+    expect(await cacheApp()).toBeUndefined();
+  });
+
+  it('emits no cache app without HTTP Cache itself', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept('cache-handler');
+    await saveHttpCacheSettings(REDIS);
+
+    expect(await cacheApp()).toBeUndefined();
+  });
+});
+
 describe('layer 4 gating', () => {
   beforeEach(async () => {
     await createL4ProxyHost(
@@ -271,8 +349,7 @@ describe('layer 4 gating', () => {
   });
 
   it('omits the whole layer4 app once caddy-l4 is deselected', async () => {
-    // There is no partial version of this: without the plugin there is no
-    // `layer4` key for Caddy to unmarshal, so the key must be absent entirely.
+    // Without the plugin there is no `layer4` to unmarshal, so the key must be absent entirely.
     setAppliedModules(ALL_MODULE_PATHS);
     await selectAllModulesExcept('caddy-l4');
 
@@ -288,12 +365,10 @@ describe('per-host Caddyfile', () => {
     await createHost({ customCaddyfile: 'handle /status* {\n  respond "ok" 200\n}' });
 
     const document = await buildCaddyDocument();
-    // A subroute, not flattened handlers - the adapted route carries its own
-    // path matcher and flattening would apply it to every request.
+    // Flattening would apply the adapted route's path matcher to every request.
     expect(handlerNames(document)).toContain('subroute');
     expect(handlerNames(document)).toContain('reverse_proxy');
-    // Matched on the adapted body rather than the handler name: static_response
-    // also shows up for the unrelated HTTP-to-HTTPS redirect route.
+    // static_response also appears in the HTTP-to-HTTPS redirect route.
     expect(JSON.stringify(document)).toContain('"body":"ok"');
   });
 
@@ -306,8 +381,7 @@ describe('per-host Caddyfile', () => {
     installAdapter({ failAdapt: true });
     const document = await buildCaddyDocument();
 
-    // One host's stale escape hatch must not take the other hosts down, and
-    // must not block the very edit needed to fix it.
+    // Nor may it block the very edit needed to fix it.
     expect(handlerNames(document)).toContain('reverse_proxy');
     expect(JSON.stringify(document)).not.toContain('"body":"ok"');
   });

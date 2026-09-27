@@ -1,11 +1,6 @@
 /**
- * The exact commands the agent runs, and what each operation does with their outcome.
- *
- * These invariants were previously pinned by grepping the shell script this replaced; they are
- * pinned properly now, against the argv actually built and the state actually written. Each one
- * corresponds to a way the proxy can be taken down by a recreate that does slightly too much:
- * pulling an image, cascading to dependencies, dropping an override, or recording a build that
- * never finished.
+ * The exact argv the agent runs and the state each operation writes. Each invariant is a way a
+ * recreate that does slightly too much takes the proxy down.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,17 +13,10 @@ import { Operations } from "../src/operations";
 
 let dir: string;
 let config: AgentConfig;
-/** Every argv the agent spawned, in order. */
 let spawned: string[][];
-/** Queue of results for the next spawns; anything unqueued succeeds with empty output. */
+/** Anything unqueued succeeds with empty output. */
 let results: Array<{ exitCode: number; stdout?: string }>;
-/**
- * What `docker inspect` reports for the working_dir label.
- *
- * Answered outside the queue above, unlike the project-name inspect: it is a second question the
- * agent asks before every compose invocation, and threading it through a positional queue would
- * make every test's result list depend on how many labels the implementation happens to read.
- */
+/** The working_dir label, outside the queue so tests don't depend on how many labels are read. */
 let hostDirLabel: string;
 
 const realSpawn = Bun.spawn;
@@ -47,8 +35,7 @@ beforeEach(() => {
   spawned = [];
   results = [];
   hostDirLabel = "";
-  // Intercepting the spawn rather than the DockerHost is the point: what matters is the argv that
-  // would reach Docker, and a stubbed DockerHost would assert only that the test agrees with itself.
+  // The spawn, not DockerHost: a stubbed DockerHost would only assert the test agrees with itself.
   (Bun as { spawn: unknown }).spawn = ((argv: string[]) => {
     spawned.push(argv);
     if (argv.some((a) => a.includes("com.docker.compose.project.working_dir"))) {
@@ -77,17 +64,70 @@ afterEach(() => {
   }
 });
 
-/** The argv of the last `docker compose` invocation. */
 function lastCompose(): string[] {
   const found = [...spawned].reverse().find((a) => a[0] === "docker" && a[1] === "compose");
   if (!found) throw new Error("no compose invocation was made");
   return found;
 }
 
+describe("external build mode", () => {
+  afterEach(() => {
+    delete process.env.CADDY_BUILD_MODE;
+  });
+
+  it("never lets compose fall through to a build, which the socket proxy may not allow", async () => {
+    process.env.CADDY_BUILD_MODE = "external";
+    const host = new DockerHost(loadConfig());
+    await host.startCaddy();
+    expect(lastCompose()).toContain("--no-build");
+    await host.recreateCaddy();
+    expect(lastCompose()).toContain("--no-build");
+  });
+
+  it("builds on a missing image as before in agent mode", async () => {
+    const host = new DockerHost(config);
+    await host.startCaddy();
+    expect(lastCompose()).not.toContain("--no-build");
+  });
+
+  it("pulls a registry tag without failing on a local one, and recreates without building", async () => {
+    const host = new DockerHost(config);
+    await host.pullCaddyImage();
+    expect(lastCompose()).toContain("--ignore-pull-failures");
+    await host.upCaddyImage();
+    expect(lastCompose()).toContain("--no-build");
+    expect(lastCompose()).not.toContain("--force-recreate");
+  });
+
+  it("asks compose which image it would create Caddy from", async () => {
+    results.push({ exitCode: 0, stdout: "proj" });
+    results.push({ exitCode: 0, stdout: "caddy-proxy-manager-caddy:custom\n" });
+    expect(await new DockerHost(config).composeCaddyImage()).toBe(
+      "caddy-proxy-manager-caddy:custom",
+    );
+    expect(lastCompose().slice(-3)).toEqual(["config", "--images", "caddy"]);
+  });
+
+  it("reads an image's list from a container it never starts, and removes it", async () => {
+    await new DockerHost(config).readImageModuleList("caddy-proxy-manager-caddy:custom");
+    const verbs = spawned.filter((a) => a[0] === "docker").map((a) => a[1]);
+    expect(verbs).toEqual(["create", "cp", "rm"]);
+  });
+
+  it("tells a missing module list from a daemon that cannot be read", async () => {
+    results.push({
+      exitCode: 1,
+      stdout: "Error: Could not find the file /etc/caddy/caddy-modules.txt",
+    });
+    expect(await new DockerHost(config).readCaddyModuleList()).toEqual({ state: "missing" });
+    results.push({ exitCode: 1, stdout: "Cannot connect to the Docker daemon" });
+    expect((await new DockerHost(config).readCaddyModuleList()).state).toBe("unreadable");
+  });
+});
+
 describe("compose invocation", () => {
   it("recreates only the caddy service", async () => {
-    // A bare `up -d` would recreate the controller and this agent along with it, killing the
-    // process partway through its own operation.
+    // A bare `up -d` would recreate this agent partway through its own operation.
     results.push({ exitCode: 0, stdout: "caddy-proxy-manager" });
     await new DockerHost(config).recreateCaddy();
     expect(lastCompose().at(-1)).toBe("caddy");
@@ -100,8 +140,7 @@ describe("compose invocation", () => {
   });
 
   it("passes --force-recreate, without which a port change is a no-op", async () => {
-    // Published ports are fixed at create time. Compose sees no config change and would leave the
-    // existing container running with the old bindings.
+    // Ports are fixed at create time, and compose sees no config change.
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
     expect(lastCompose()).toContain("--force-recreate");
@@ -115,8 +154,7 @@ describe("compose invocation", () => {
   });
 
   it("detects the compose project from the caddy container's labels", async () => {
-    // The project name comes from whatever directory the operator ran compose in, so assuming one
-    // would make the agent manage a project that does not exist on most deployments.
+    // It comes from the directory the operator ran compose in, so it cannot be assumed.
     results.push({ exitCode: 0, stdout: "someone-elses-project\n" });
     await new DockerHost(config).recreateCaddy();
     const argv = lastCompose();
@@ -137,14 +175,12 @@ describe("compose invocation", () => {
     await host.recreateCaddy();
     const argv = lastCompose();
     expect(argv[argv.indexOf("-p") + 1]).toBe("pinned");
-    // With both pinned it never asks Docker at all, so a stopped Caddy container does not stop a
-    // recreate. Neither lookup is load-bearing on its own - see the two tests below.
+    // Never asks Docker, so a stopped Caddy container does not stop a recreate.
     expect(spawned.some((a) => a[1] === "inspect")).toBe(false);
   });
 
   it("carries both overrides on every invocation", async () => {
-    // A rebuild must not drop the published L4 ports, and a port change must not rebuild Caddy
-    // without the module selection. Omitting either is how one operation silently undoes the other.
+    // Omitting either is how a rebuild or a port change silently undoes the other.
     writeFileSync(join(dir, "docker-compose.l4-ports.yml"), renderL4PortsOverride(["25:25"]));
     writeFileSync(
       join(dir, "docker-compose.caddy-build.yml"),
@@ -159,9 +195,8 @@ describe("compose invocation", () => {
   });
 
   it("detects --project-directory from the host path the operator's compose recorded", async () => {
-    // The daemon resolves a relative bind mount against this. Without it, a service mounting
-    // ./docker/... gets an empty directory Docker silently created at a path that does not exist
-    // on the host - a container that comes up wrong rather than a command that fails.
+    // The daemon resolves relative binds against it; without it ./docker/... silently mounts an
+    // empty directory Docker created.
     hostDirLabel = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -170,10 +205,8 @@ describe("compose invocation", () => {
   });
 
   it("translates a Windows project directory into the path the daemon can resolve", async () => {
-    // Docker Desktop for Windows records the label as a drive path, which means nothing to the
-    // daemon. It mounts each shared drive in its VM at /run/desktop/mnt/host/<letter>, and a bind
-    // resolved through that prefix reaches the real file - where the untranslated form gets an
-    // empty directory Docker created at a path the host does not have.
+    // Docker Desktop records a drive path, meaningless to the daemon, whose VM mounts each drive
+    // at /run/desktop/mnt/host/<letter>.
     hostDirLabel = "C:\\deploy\\cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -194,8 +227,6 @@ describe("compose invocation", () => {
   });
 
   it("leaves a POSIX label alone", async () => {
-    // A Linux host already records a path the daemon resolves; touching it would break the case
-    // that has always worked.
     hostDirLabel = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -204,9 +235,7 @@ describe("compose invocation", () => {
   });
 
   it("omits --project-directory for a path it cannot translate", async () => {
-    // A UNC path has no drive for Docker Desktop to have mounted, so there is nothing to convert
-    // it to. Passing a guess would be worse than the pre-existing behaviour; COMPOSE_HOST_DIR is
-    // the way out, and the agent logs that it needs setting.
+    // A UNC path has no mounted drive; the agent logs that COMPOSE_HOST_DIR is needed.
     hostDirLabel = "\\\\server\\share\\cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -214,8 +243,7 @@ describe("compose invocation", () => {
   });
 
   it("omits --project-directory when the label cannot be read", async () => {
-    // Unconditionally passing something breaks named-volume deployments, where the agent's
-    // /compose mount is the correct project directory; a guess would be worse than nothing.
+    // A guess breaks named-volume deployments, where /compose is the right project directory.
     hostDirLabel = "";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -232,16 +260,14 @@ describe("compose invocation", () => {
   });
 
   it("builds without --project-directory, even a detected one", async () => {
-    // The build context is read by the CLI in this container, not the daemon, so the host path
-    // fails with "unable to prepare context". Seen on Docker Desktop for Windows; Linux too, unless
-    // the host directory happens to be /compose.
+    // The CLI in this container reads the build context, so a host path fails with "unable to
+    // prepare context".
     hostDirLabel = "C:\\deploy\\cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).buildCaddy();
     const argv = lastCompose();
     expect(argv).not.toContain("--project-directory");
     expect(argv.slice(-2)).toEqual(["build", "caddy"]);
-    // Nothing to ask the daemon for, either.
     expect(spawned.some((a) => a.some((s) => s.includes("working_dir")))).toBe(false);
   });
 
@@ -251,15 +277,13 @@ describe("compose invocation", () => {
     await new DockerHost(loadConfig()).buildCaddy();
     const argv = lastCompose();
     expect(argv).not.toContain("--project-directory");
-    // The rest of the shared arguments still apply, so the build resolves the same project.
     expect(argv[argv.indexOf("-p") + 1]).toBe("proj");
     expect(argv[argv.indexOf("--env-file") + 1]).toBe("/dev/null");
     expect(argv[argv.indexOf("-f") + 1]).toBe(join(dir, "docker-compose.yml"));
   });
 
   it("never hands compose the project's .env, even when one is mounted", async () => {
-    // It holds SESSION_SECRET and POSTGRES_PASSWORD. An explicit empty env file is also what stops
-    // compose picking the project's .env up on its own.
+    // It holds the secrets; an explicit empty env file also stops compose reading it implicitly.
     writeFileSync(join(dir, ".env"), "SESSION_SECRET=real\n");
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -292,10 +316,8 @@ describe("compose invocation", () => {
   });
 
   it("bounds the build with a timeout so a hung compile cannot wedge the agent", async () => {
-    // Without it a wedged xcaddy holds the operation lock forever, and every later port change and
-    // rebuild is refused as BUSY until someone restarts the container.
-    // Pinned so composeArgs asks Docker nothing: the stub below never exits, and this test is about
-    // the build's timeout, not the label lookup's. A build never reads the host directory.
+    // A wedged xcaddy would hold the operation lock, refusing everything else as BUSY.
+    // Pinned so no label lookup reaches the stub below, which never exits.
     process.env.COMPOSE_PROJECT_NAME = "proj";
     const host = new DockerHost({ ...loadConfig(), buildTimeoutSeconds: 1 });
     (Bun as { spawn: unknown }).spawn = ((argv: string[], options: { signal?: AbortSignal }) => {
@@ -303,7 +325,6 @@ describe("compose invocation", () => {
       return {
         stdout: new Response("").body,
         stderr: new Response("").body,
-        // Never exits on its own. Only the abort ends it.
         exited: new Promise((_, reject) => {
           options.signal?.addEventListener("abort", () => reject(new Error("aborted")));
         }),
@@ -349,8 +370,7 @@ describe("operations", () => {
   });
 
   it("records the applied module set only once Caddy is healthy again", async () => {
-    // Recording it earlier tells the controller a module is available while the old image is still
-    // serving, and it will then emit a handler the running binary rejects the whole config over.
+    // Earlier, the controller would emit a handler the still-running old binary rejects.
     const impatient = { ...config, healthTimeoutSeconds: 1 };
     operations = new Operations(impatient, store, new DockerHost(impatient));
 
@@ -367,8 +387,7 @@ describe("operations", () => {
   });
 
   it("leaves the running container alone when the build fails", async () => {
-    // A failed xcaddy compile is routine, and the old image keeps serving. The status has to say so
-    // - the operator's first question is whether the proxy just went down.
+    // The status must say the old image keeps serving: the operator's first question.
     results.push({ exitCode: 0, stdout: "proj" });
     results.push({ exitCode: 1, stdout: "go: module not found" });
 
@@ -381,8 +400,7 @@ describe("operations", () => {
   });
 
   it("builds from the mounted project but recreates against the host one", async () => {
-    // The build reads its context in this container; the recreate needs the daemon to resolve
-    // relative binds. Each gets the directory its reader can see.
+    // Each gets the directory its reader (this container's CLI, the daemon) can see.
     hostDirLabel = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" }); // inspect (project)
     results.push({ exitCode: 0 }); // build
@@ -408,8 +426,7 @@ describe("operations", () => {
   });
 
   it("clears a status left mid-flight by a killed agent", async () => {
-    // The UI would otherwise spin forever on an operation that provably is not running - this
-    // process has just started - with its button disabled and no way back.
+    // Otherwise the UI spins forever, its button disabled, on an operation that cannot be running.
     store.setCaddyBuildStatus({ state: "building", message: "compiling" });
     store.setL4PortsStatus({ state: "applying", message: "recreating" });
 
@@ -426,9 +443,7 @@ describe("operations", () => {
   });
 
   it("republishes at startup when Caddy came up without the port override", async () => {
-    // The operator's `docker compose up` starts Caddy from the base files, which carry no
-    // generated override, so a rebooted host comes up with every L4 port unpublished. This is the
-    // only thing that notices.
+    // A plain `docker compose up` has no generated override, so a reboot unpublishes L4 ports.
     store.setAppliedL4Ports(["15432:15432"]);
     results.push({ exitCode: 0, stdout: JSON.stringify({ "80/tcp": [{ HostPort: "80" }] }) });
 
@@ -447,13 +462,12 @@ describe("operations", () => {
 
     await operations.restorePublishedPorts();
     await Bun.sleep(50);
-    // A recreate on every agent restart would drop every live connection for nothing.
+    // A recreate drops every live connection.
     expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
   });
 
   it("adopts what Docker publishes when it has never applied anything", async () => {
-    // First run, or a stack whose ports an operator manages by hand. Re-applying an empty list
-    // over either would unpublish ports this agent never published.
+    // Re-applying an empty list would unpublish ports this agent never published.
     results.push({ exitCode: 0, stdout: JSON.stringify({ "443/tcp": [{ HostPort: "443" }] }) });
 
     await operations.restorePublishedPorts();
@@ -477,7 +491,7 @@ describe("optional services", () => {
     store.close();
   });
 
-  /** Wait for the operation, which returns as soon as the work is accepted. */
+  /** The operation returns as soon as the work is accepted. */
   async function settle(): Promise<void> {
     for (let i = 0; i < 100 && store.managedServicesStatus().state === "applying"; i++) {
       await Bun.sleep(10);
@@ -485,20 +499,18 @@ describe("optional services", () => {
   }
 
   it("enables the profile explicitly rather than relying on compose to infer it", async () => {
-    // These services sit behind a profile, so without this compose reports "no such service" -
-    // and on the versions that do infer it, the behaviour arrived partway through v2.
+    // Otherwise "no such service"; only some v2 releases infer it.
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).startService("clickhouse");
 
     const argv = lastCompose();
     expect(argv[argv.indexOf("--profile") + 1]).toBe("clickhouse");
-    // Top-level flag: it has to precede the subcommand or compose rejects it.
+    // Top-level flag: compose rejects it after the subcommand.
     expect(argv.indexOf("--profile")).toBeLessThan(argv.indexOf("up"));
     expect(argv.at(-1)).toBe("clickhouse");
   });
 
   it("stops rather than removes, so the data volume outlives the toggle", async () => {
-    // Turning analytics off must not be how someone discovers their event history is gone.
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).stopService("clickhouse");
 
@@ -509,10 +521,8 @@ describe("optional services", () => {
   });
 
   it("passes the credentials through the child's environment, not a file on disk", async () => {
-    // Compose reads the process environment at a higher precedence than any env file, so this
-    // overrides a stale value in the project's own .env - which the agent mounts read-only and
-    // cannot rewrite. It also keeps the password off the agent's data volume, and sidesteps the
-    // quoting rules an env file would need.
+    // The environment outranks any env file, so it beats a stale read-only .env, keeps the
+    // password off the data volume and needs no quoting.
     writeFileSync(join(dir, ".env"), "CLICKHOUSE_PASSWORD=stale\n");
     let seen: Record<string, string> | undefined;
     (Bun as { spawn: unknown }).spawn = ((

@@ -25,12 +25,12 @@ import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
+import { HostNotesField } from "@/components/proxy-hosts/HostNotesField";
 import { useTranslations } from "next-intl";
 
 /**
- * Schedule onClose after a successful action exactly once. Without the ref guard the effect
- * re-arms on every parent render - onClose is a new function identity each time - while status
- * stays "success", so a stray onClose closes a dialog the user has just reopened (#241).
+ * Once only: onClose's identity changes every render while status stays "success", so the effect
+ * would re-arm and close a dialog the user just reopened (#241).
  */
 function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   const scheduledRef = useRef(false);
@@ -43,7 +43,6 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   }, [state.status, onClose]);
 }
 
-/** The namespace's translator, so the option builders below can be hoisted out of the form. */
 type Translator = ReturnType<typeof useTranslations<"l4ProxyHosts">>;
 
 const PROTOCOL_OPTIONS = [
@@ -70,13 +69,8 @@ function proxyProtocolOptions(t: Translator) {
 }
 
 /**
- * What `layer4.proxy.selection_policies.*` registers - a strict subset of the HTTP list.
- *
- * No header, cookie, uri_hash, query or client_ip_hash: each needs a request to read, and layer 4
- * has a connection. Checked against the shipped binary, not assumed from the HTTP side.
- *
- * A function because the labels come from the message catalog, which is only reachable from
- * inside the component.
+ * What `layer4.proxy.selection_policies.*` registers, checked against the shipped binary: no
+ * request-reading policies, since layer 4 has only a connection.
  */
 function lbPolicyOptions(t: ReturnType<typeof useTranslations<"l4ProxyHosts">>) {
   return [
@@ -114,7 +108,6 @@ function upstreamDnsFamilyOptions(t: Translator) {
   ];
 }
 
-/** Collapsible section with an icon in its trigger, replacing the accordions. */
 function Section({
   icon,
   title,
@@ -145,9 +138,10 @@ function Section({
   );
 }
 
-/** Every free-text field in the form, keyed by its form field name. */
+/** Keyed by form field name. */
 type TextFields = {
   name: string;
+  description: string;
   listenAddress: string;
   upstreams: string;
   matcherValue: string;
@@ -178,6 +172,7 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
   const geo = initialData?.geoblock;
   return {
     name: initialData?.name ?? "",
+    description: initialData?.description ?? "",
     listenAddress: initialData?.listenAddress ?? "",
     upstreams: initialData?.upstreams.join("\n") ?? "",
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
@@ -226,9 +221,7 @@ function L4HostForm({
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
 
-  // Astryx inputs are controlled, so every field that used defaultValue now
-  // needs seeded state. They are grouped rather than declared one useState at
-  // a time, since there are twenty-six of them.
+  // Astryx inputs are controlled; one object rather than dozens of useStates.
   const [text, setText] = useState<TextFields>(() => initialText(initialData));
   const set =
     <K extends keyof TextFields>(key: K) =>
@@ -272,8 +265,7 @@ function L4HostForm({
         )}
 
         <input type="hidden" name="enabledPresent" value="1" />
-        {/* Empty (not "off") when disabled, matching the original: the parser
-            treats anything that is not on/true/1 as false. */}
+        {/* Empty, not "off": the parser reads anything but on/true/1 as false. */}
         <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
 
         <Card variant={enabled ? "muted" : "default"} padding={4}>
@@ -304,6 +296,8 @@ function L4HostForm({
           onChange={set("name")}
           isRequired
         />
+
+        <HostNotesField value={text.description} onChange={set("description")} />
 
         <Selector
           label={t("protocol")}

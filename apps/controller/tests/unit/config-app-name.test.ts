@@ -35,8 +35,7 @@ describe('APP_NAME', () => {
 });
 
 describe('the page title template', () => {
-  // Mirrors app/layout.tsx. Next fills %s with the page's own title, and skips
-  // the template entirely for a title given as { absolute: ... }.
+  // Mirrors app/layout.tsx; { absolute: ... } skips the template.
   const render = (appName: string, pageTitle: string) => `%s · ${appName}`.replace('%s', pageTitle);
 
   it('suffixes the page title with the app name', async () => {

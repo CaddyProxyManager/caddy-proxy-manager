@@ -1,18 +1,7 @@
 /**
- * Who may sign in and sign up, and how hard the door is to knock on.
- *
- * The same answers `config.auth` and the `AUTH_*` variables used to give, resolved through the
- * settings registry so a value saved in Settings decides them. `config` reads `process.env` once
- * when the module loads, which is fine for a variable and useless for a setting: nothing saved
- * would reach a reader until the container restarted.
- *
- * The derivations that were written into `config` are kept here, because they are policy rather
- * than plumbing: OIDC-only mode has no local accounts to register, and it leaves OAuth
- * registration open unless the operator has said otherwise, since the IdP is then the only way an
- * account can come to exist.
- *
- * The settings modules are imported lazily, as public-url.ts does, and their values are cached for
- * the process, so this is a map lookup after the first call rather than a query.
+ * Sign-in and sign-up policy through the settings registry, not `config`, which reads
+ * `process.env` once at load so a saved value would need a restart. Settings modules are imported
+ * lazily, as public-url.ts does, and cached for the process.
  */
 import { config } from "./config";
 
@@ -26,7 +15,7 @@ export type AuthPolicy = {
   rateLimit: { enabled: boolean; window: number; max: number };
 };
 
-/** What `config` alone can say, for the paths that run before a database is reachable. */
+/** For paths that run before a database is reachable. */
 function fromEnvironment(): AuthPolicy {
   return {
     disableLocalUsers: config.auth.disableLocalUsers,
@@ -71,10 +60,9 @@ export async function authPolicy(): Promise<AuthPolicy> {
 
     return {
       disableLocalUsers: disabled.value,
-      // Nothing to self-register into without local accounts, whatever the setting says.
       allowSelfRegistration: !disabled.value && selfRegistration.value,
-      // Open by default in OIDC-only mode, where the IdP is the only way in - but only while
-      // nobody has answered the question, so an explicit "no" is still honoured.
+      // Open by default in OIDC-only mode, where the IdP is the only way in; an explicit "no"
+      // is still honoured.
       allowOauthRegistration:
         disabled.value && oauthRegistration.source === "default" ? true : oauthRegistration.value,
       allowOauthRoleFromClaims: roleFromClaims.value,
@@ -90,7 +78,6 @@ export async function authPolicy(): Promise<AuthPolicy> {
   }
 }
 
-/** The one question most callers ask, on its own. */
 export async function localUsersDisabled(): Promise<boolean> {
   return (await authPolicy()).disableLocalUsers;
 }

@@ -21,11 +21,8 @@ const CHECKS: Record<Answer, DashboardDnsCheck> = {
 };
 
 /**
- * Settings → Dashboard Host, with the save and the reachability check answered in the browser.
- *
- * The check really runs against the saved domain rather than the field - the section enforces that
- * itself - so what the reader picks above is what the world would say about that saved name. The
- * proxy options are left out: they are the proxy host editor's fields, demoed on its own page.
+ * The check runs against the saved domain, not the field, so the pick above is what the world
+ * would say about that name. The proxy options are demoed on the host editor's page.
  */
 export default function DashboardHostDemo() {
   const [answer, setAnswer] = useState<Answer>("reached");

@@ -19,8 +19,7 @@ afterAll(async () => {
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Outside the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -44,10 +43,7 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
-// The flag above is read through the config module, and config snapshots
-// process.env when it is first evaluated - which has already happened by the
-// time this file's body runs. Evaluate a second copy now that the env is set
-// and point the plain specifier at it, so auth-server reads the right value.
+// config snapshots process.env on first evaluation, already past; a fresh copy sees the flag.
 const freshConfig = await import(`../../src/lib/config${fresh()}`);
 vi.mock('../../src/lib/config', () => ({ ...freshConfig }));
 

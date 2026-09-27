@@ -81,11 +81,7 @@ const EVENTS = [
   },
 ];
 
-/**
- * The activity strip and tiles the page opens with, derived from the rows above the way the server
- * derives them from the table: the 24 hours ending at the newest event, bucketed by hour, with the
- * gaps filled so every hour has a bar.
- */
+/** Derived as the server does: the 24 hours ending at the newest event, gaps filled. */
 const NEWEST = Math.max(...EVENTS.map((event) => new Date(event.createdAt).getTime()));
 const WINDOW_START = NEWEST - 23 * 60 * 60 * 1000;
 const IN_WINDOW = EVENTS.filter((event) => new Date(event.createdAt).getTime() >= WINDOW_START);
@@ -109,12 +105,7 @@ const FILTER_OPTIONS = {
   actions: distinct(EVENTS.map((event) => event.action)),
 };
 
-/**
- * The audit log page itself, filtering and paging for real.
- *
- * In the app the server answers each new query string; here this component does, off the rows
- * above. Nothing else changes - the filter bar, the table and the pager are the ones shipped.
- */
+/** This component answers each query string off the rows above, where the app's server would. */
 export default function AuditLogDemo() {
   const params = useSearchParams();
   const search = params.get("search") ?? "";

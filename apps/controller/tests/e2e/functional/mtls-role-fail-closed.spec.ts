@@ -10,9 +10,8 @@ import {
 } from '../../helpers/https';
 
 /**
- * SECURITY-AUDIT H2: role-based mTLS must FAIL CLOSED when the trusted role resolves to no active
- * certificate. The bug dropped such a host from the trust map, so Caddy served a plain TLS policy
- * and the backend was reachable with no client certificate. Drives the real REST API over TLS.
+ * SECURITY-AUDIT H2: role-based mTLS must FAIL CLOSED when the role has no active certificate;
+ * the bug served plain TLS instead.
  */
 
 const API_CA = 'http://localhost:3000/api/v1/ca-certificates';
@@ -46,7 +45,7 @@ function makeCa(commonName: string) {
   };
 }
 
-/** Client cert signed by the CA. Returns the key too, so it can be used as a TLS identity. */
+/** Returns the key too, for use as a TLS identity. */
 function makeClientCert(ca: ReturnType<typeof makeCa>, commonName: string) {
   const keys = forge.pki.rsa.generateKeyPair(2048);
   const cert = forge.pki.createCertificate();
@@ -166,10 +165,7 @@ test.describe('mTLS - role-based trust fails closed on revocation', () => {
       const revokeResp = await del(`${API_CLIENT_CERTS}/${ids.certId}`);
       expect(revokeResp.ok(), 'revoke client cert').toBeTruthy();
 
-      // Wait for the new config to go live: the now-revoked cert must stop being
-      // accepted. (With the H2 bug the host would fall open to plain TLS and the
-      // revoked cert - and no cert - would keep returning 200, so this poll would
-      // never flip and the test fails.)
+      // The new config is live once the revoked cert is refused; under H2 it never flips.
       await expect
         .poll(async () => (await httpsGetOutcome(domain, '/', clientIdentity)).response?.status, {
           timeout: 45_000,

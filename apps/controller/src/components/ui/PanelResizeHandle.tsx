@@ -1,16 +1,8 @@
 "use client";
 
 /**
- * A draggable divider for a Layout side panel, whose width is remembered in this browser.
- *
- * Our own rather than Astryx's: `ResizeHandle` is not a public export of @astryxdesign/core 0.6,
- * only something SideNav uses internally. The width is a per-browser convenience, so it lives in
- * localStorage - read after mount, so the server render and the first client render agree, and
- * every access is guarded because storage can be missing or refuse (private windows, blocked
- * site data). Without it the panel simply opens at its default width.
- *
- * Usage: render the handle straight after the LayoutPanel in the `start` slot, give the panel
- * `width={width}` and no `hasDivider` - the handle draws the line.
+ * Our own: Astryx's `ResizeHandle` is not exported. Width lives in localStorage, read after mount
+ * so SSR agrees. Render it right after the LayoutPanel, which takes `width` and no `hasDivider`.
  */
 import {
   type KeyboardEvent,
@@ -30,7 +22,6 @@ function clamp(value: number, { minWidth, maxWidth }: WidthBounds): number {
   return Math.round(Math.min(maxWidth, Math.max(minWidth, value)));
 }
 
-/** A panel width that survives reloads in this browser. */
 export function usePersistedPanelWidth(storageKey: string, bounds: WidthBounds) {
   const { defaultWidth, minWidth, maxWidth } = bounds;
   const [width, setWidthState] = useState(defaultWidth);
@@ -94,8 +85,7 @@ export function PanelResizeHandle({
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const state = drag.current;
     if (!state) return;
-    // The panel is on the inline-start side, so dragging towards the end widens it - in a
-    // right-to-left page that is leftwards.
+    // Dragging towards inline-end widens it, which is leftwards in RTL.
     const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
     const delta = (event.clientX - state.startX) * (rtl ? -1 : 1);
     state.latest = clamp(state.startWidth + delta, panel);
@@ -131,7 +121,7 @@ export function PanelResizeHandle({
   };
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: an <hr> cannot take focus or pointer events; a focusable separator is the ARIA pattern for a splitter.
+    // biome-ignore lint/a11y/useSemanticElements: an <hr> cannot take focus (ARIA splitter)
     <div
       role="separator"
       aria-orientation="vertical"

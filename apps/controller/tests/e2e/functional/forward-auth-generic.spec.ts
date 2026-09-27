@@ -1,11 +1,6 @@
 /**
- * Functional: the generic forward-auth provider against a real Caddy and a stand-in auth server
- * (tests/mock-forward-auth/server.js, reachable as mock-forward-auth:9091).
- *
- * The upstream is traefik/whoami, which echoes the request it received - that is what makes it
- * possible to assert on the identity headers, both the ones the auth server supplied and the ones
- * a caller tried to forge.
- *
+ * Generic forward auth against tests/mock-forward-auth/server.js (mock-forward-auth:9091). whoami
+ * echoes the request, so supplied and forged identity headers are both assertable.
  * Domains: func-fa-generic.test, func-fa-generic-split.test, func-fa-generic-bypass.test
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
@@ -50,8 +45,7 @@ test.describe
     test('setup: three hosts, one per behaviour', async ({ page }) => {
       await createHost(page.request, 'FA generic', PLAIN, {});
       await createHost(page.request, 'FA generic split', SPLIT, {
-        // The endpoint that redirects whoever asks: without the split the caller gets that redirect,
-        // with it a non-browser caller gets 401. Nothing else in the test can tell the two apart.
+        // Redirects everyone, so only the split can turn a non-browser caller's answer into 401.
         provider: 'custom',
         authEndpoint: '/api/always-redirect',
         apiSplit: true,
@@ -61,7 +55,7 @@ test.describe
         apiBypassHeaders: ['X-Api-Key'],
       });
 
-      // An API-shaped request, which the Authelia-style endpoint answers with 401.
+      // The Authelia-style endpoint answers an API-shaped request with 401.
       await waitForStatus(PLAIN, 401, 20_000);
       await waitForStatus(SPLIT, 401, 20_000);
       await waitForStatus(BYPASS, 401, 20_000);
@@ -81,12 +75,11 @@ test.describe
     });
 
     test('strips an identity header the caller forged', async () => {
-      // No session: the request never reaches the upstream at all, so the forgery cannot land.
+      // No session: never reaches the upstream.
       const blocked = await httpGet(PLAIN, '/', { 'Remote-User': 'root' });
       expect(blocked.status).toBe(401);
 
-      // With a session it does reach the upstream, and must arrive as alice rather than as root:
-      // the copy step only overwrites when the auth server answered with a value.
+      // Must arrive as alice: the copy only overwrites when the auth server sent a value.
       const allowed = await httpGet(PLAIN, '/', { Cookie: VALID_COOKIE, 'Remote-User': 'root' });
       expect(allowed.status).toBe(200);
       expect(allowed.body).toContain('Remote-User: alice');
@@ -98,11 +91,11 @@ test.describe
       expect(browser.status).toBe(302);
       expect(String(browser.headers.location)).toContain('auth-portal.test');
 
-      // The same endpoint answers this one with a 302 as well; the 401 is CPM's doing.
+      // The endpoint answers 302 here too; the 401 is CPM's.
       const api = await httpGet(SPLIT, '/api/things');
       expect(api.status).toBe(401);
 
-      // An in-page XHR asked for HTML too, and still must not be handed a login page.
+      // An XHR accepting HTML still must not get a login page.
       const xhr = await httpGet(SPLIT, '/api/things', {
         ...BROWSER_HEADERS,
         'X-Requested-With': 'XMLHttpRequest',
@@ -114,10 +107,10 @@ test.describe
       const bypassed = await httpGet(BYPASS, '/printer/objects', { 'X-Api-Key': 'whatever' });
       expect(bypassed.status).toBe(200);
       expect(bypassed.body).toContain('GET /printer/objects');
-      // Nothing authenticated this request, so no identity may be asserted to the upstream either.
+      // Unauthenticated, so no identity may reach the upstream.
       expect(bypassed.body).not.toContain('Remote-User');
 
-      // The header is what bypasses; without it the same path is still gated.
+      // Without the header the same path is still gated.
       const gated = await httpGet(BYPASS, '/printer/objects');
       expect(gated.status).toBe(401);
     });

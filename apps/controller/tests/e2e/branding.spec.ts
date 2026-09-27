@@ -1,17 +1,13 @@
 /**
- * The custom favicon: upload, serve, remove.
- *
- * The interesting half is the route rather than the form. It is deliberately public - every
- * unauthenticated page declares the icon - and it hands back a Content-Type derived from the bytes
- * rather than from what the browser claimed on upload, which is what stops a file being stored as
- * an image and served as a document.
+ * The custom favicon. The route is public on purpose, and its Content-Type comes from the bytes,
+ * not the upload's claim, so nothing stored as an image is served as a document.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { goToSetting } from '../helpers/settings-nav';
 
 const FAVICON_URL = '/api/branding/favicon';
 
-/** The smallest valid PNG: a 1×1 transparent pixel. */
+/** A 1x1 transparent PNG. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
@@ -32,14 +28,13 @@ async function removeIfPresent(page: Page) {
 
 test.describe('Branding - custom favicon', () => {
   test.afterEach(async ({ page }) => {
-    // Shared stack: leave no icon behind for the specs that assert on unauthenticated pages.
+    // Shared stack: other specs assert on unauthenticated pages.
     await goToBranding(page);
     await removeIfPresent(page);
   });
 
   test('serves 404 until one is uploaded, without redirecting to login', async ({ page }) => {
-    // Public on purpose: the login, portal and setup pages all declare the icon before there is a
-    // session, so a redirect here would leave every unauthenticated page without one.
+    // Public: login, portal and setup declare the icon before there is a session.
     const response = await page.request.get(FAVICON_URL);
     expect(response.status()).toBe(404);
   });
@@ -63,7 +58,7 @@ test.describe('Branding - custom favicon', () => {
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toBe('image/png');
     expect(Buffer.from(await response.body())).toEqual(PNG);
-    // An ETag is what lets the browser revalidate rather than re-download on every page.
+    // Lets the browser revalidate rather than re-download.
     expect(response.headers().etag).toMatch(/^"[0-9a-f]{32}"$/);
   });
 
@@ -84,9 +79,7 @@ test.describe('Branding - custom favicon', () => {
   });
 
   test('a file that only claims to be an image is refused', async ({ page }) => {
-    // The property the sniffing exists for. The browser's mimeType is attacker-controlled, and the
-    // stored type is what the route later serves - so believing this claim would let someone put a
-    // document behind an image URL on the app's own origin.
+    // The upload's mimeType is attacker-controlled; trusted, it puts a document on our origin.
     await goToBranding(page);
     await page.locator('input[type="file"]').setInputFiles({
       name: 'evil.png',

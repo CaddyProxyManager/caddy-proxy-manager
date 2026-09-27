@@ -1,10 +1,6 @@
 /**
- * The driver, and the schema migrations that run against it.
- *
- * PostgreSQL through Bun.SQL, or SQLite through bun:sqlite, chosen by ./dialect.ts. `db` is typed
- * as the PostgreSQL database either way: pg-core has no `.get()`/`.all()`/`.run()`, so a
- * SQLite-only call in app code fails typecheck rather than at a PostgreSQL deployment's first
- * request. Everything else in this file exists because it is the one place allowed to know which.
+ * The driver and its migrations; the one place allowed to know the dialect. `db` is typed as
+ * PostgreSQL either way, so a SQLite-only call fails typecheck rather than in production.
  */
 import { Database } from "bun:sqlite";
 import { SQL } from "bun";
@@ -31,19 +27,14 @@ const globalForDrizzle = globalThis as GlobalForDrizzle;
 export const target = resolveDatabaseTarget(process.env);
 export const dialect: DatabaseDialect = target.kind === "sqlite" ? "sqlite" : "postgres";
 
-// ./schema.ts chose its tables from the same environment. A PostgreSQL driver handed SQLite tables
-// fails far from the cause ("column is of type boolean but expression is of type integer").
+// A PostgreSQL driver handed SQLite tables fails far from the cause ("column is of type boolean").
 if (schemaDialect !== dialect) {
   throw new Error(`The ${schemaDialect} schema was loaded for a ${dialect} connection.`);
 }
 
 /**
- * Connections the pool may open. Bun.SQL defaults to 10 and says so nowhere; measured, 30
- * concurrent queries against a default client run in three batches. SQLite is in-process and
- * ignores it.
- *
- * Stays an environment variable rather than a stored setting: the pool has to exist before
- * anything can be read from the database.
+ * Bun.SQL's undocumented default; 30 concurrent queries run in three batches. An env var, not a
+ * setting: the pool must exist before the database can be read. SQLite ignores it.
  */
 const DEFAULT_POOL_MAX = 10;
 const poolMax = Number(process.env.DATABASE_POOL_MAX) || DEFAULT_POOL_MAX;
@@ -53,19 +44,15 @@ function openSqlite(path: string): Database {
   const database = new Database(path, { create: true });
   // Off by default in SQLite, and every ON DELETE in the schema depends on it.
   database.run("PRAGMA foreign_keys = ON");
-  // Readers stop blocking the writer, and a second writer waits rather than failing at once.
+  // Readers stop blocking the writer; a second writer waits rather than failing at once.
   database.run("PRAGMA journal_mode = WAL");
   database.run("PRAGMA busy_timeout = 5000");
   return database;
 }
 
 /**
- * The raw driver handle: `SQL` under PostgreSQL, `Database` under SQLite. Only the migration path
- * should need it.
- *
- * The PostgreSQL options are spread from the target rather than assembled here: when the
- * environment gave discrete fields they reach the driver as fields, so a password containing `/`
- * or `@` is a password rather than a URL delimiter. See ./dialect.ts.
+ * Only the migration path should need the raw handle. Options are spread as fields, so a password
+ * with `/` or `@` is not read as a URL delimiter (./dialect.ts).
  */
 export const client: SQL | Database =
   globalForDrizzle.__DB_CLIENT__ ??
@@ -92,9 +79,8 @@ function isAlreadyExistsError(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("message" in error)) return false;
   const message = (error as { message: unknown }).message;
   const code = "code" in error ? (error as { code: unknown }).code : undefined;
-  // Matched on the driver's error code, never on message text alone: a bare "already exists"
-  // substring would also swallow genuine migration failures that happen to mention it.
-  // 42P07 is PostgreSQL's duplicate_table, 42P06 duplicate_schema.
+  // By code, not message text, which real migration failures can share. 42P07 duplicate_table,
+  // 42P06 duplicate_schema.
   return (
     code === "42P07" ||
     code === "42P06" ||
@@ -103,12 +89,8 @@ function isAlreadyExistsError(error: unknown): boolean {
 }
 
 /**
- * Refuse a SQLite file from before 3.0, which an unmodified old .env still names.
- *
- * Today's SQLite history starts over at drizzle/sqlite/0000, so the migrator would try to create
- * tables that already exist - and the build-race handler below would swallow exactly that, leaving
- * the app running on a schema it does not know. Ours is recognisable by its own baseline in
- * __drizzle_migrations; a file with tables and no such row is someone else's history.
+ * Refuse a pre-3.0 SQLite file: history restarts at 0000, and the build-race handler would
+ * swallow its "already exists". Ours has its baseline row in __drizzle_migrations.
  */
 function assertNotLegacySqlite(database: Database): void {
   const hasTables = database
@@ -126,7 +108,7 @@ function assertNotLegacySqlite(database: Database): void {
       .query("SELECT 1 FROM __drizzle_migrations WHERE created_at = ?")
       .get(baseline ?? -1);
   } catch {
-    // No migrations table at all: not ours either.
+    // No migrations table: not ours either.
   }
   if (!ours) {
     throw new Error(
@@ -154,8 +136,7 @@ export async function runSchemaMigrations(): Promise<void> {
     }
     globalForDrizzle.__MIGRATIONS_RAN__ = true;
   } catch (error: unknown) {
-    // Pages may be pre-rendered in parallel during the build, racing the migrations. If the
-    // tables already exist, continue.
+    // Parallel prerendering during the build races the migrations.
     if (isAlreadyExistsError(error)) {
       console.log("Database tables already exist, skipping migrations");
       globalForDrizzle.__MIGRATIONS_RAN__ = true;
@@ -165,25 +146,18 @@ export async function runSchemaMigrations(): Promise<void> {
   }
 }
 
-/**
- * True when the connection points at a throwaway database that carries no deployment history, so
- * the one-time data migrations in ../db.ts have nothing to migrate and are skipped: SQLite's
- * `:memory:`, or an explicit opt-in that only the test harness sets.
- */
+/** `:memory:` or the test harness's opt-in: nothing for ../db.ts's data migrations to do. */
 export const isEphemeral =
   process.env.CPM_EPHEMERAL_DB === "true" ||
   (target.kind === "sqlite" && target.path === ":memory:");
 
-/** A statement produced inside a transaction: awaited under PostgreSQL, `.run()` under SQLite. */
-// biome-ignore lint/suspicious/noExplicitAny: a drizzle query builder's type is per-dialect and per-table; the only contract this needs is "executable"
+/** Awaited under PostgreSQL, `.run()` under SQLite. */
+// biome-ignore lint/suspicious/noExplicitAny: builder types are per-dialect and per-table
 type Executable = PromiseLike<any> & { run?: () => unknown };
 
 /**
- * Run a batch of statements in one transaction.
- *
- * The callback returns statements rather than executing them because the drivers disagree on how
- * a transaction body may be written: Bun.SQL takes an async callback, while bun:sqlite commits the
- * moment its synchronous callback returns - an async body would commit before its first `await`.
+ * The callback returns statements, not runs them: bun:sqlite commits when its synchronous
+ * callback returns, so an async body would commit before its first `await`.
  */
 export async function runInTransaction(
   // biome-ignore lint/suspicious/noExplicitAny: `tx` is the per-dialect transaction handle

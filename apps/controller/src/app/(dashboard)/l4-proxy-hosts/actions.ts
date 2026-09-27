@@ -49,11 +49,8 @@ const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
 const VALID_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 /**
- * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
- *
- * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
- * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
- * to say why.
+ * Weights for `weighted_round_robin`, comma-separated in upstream order. All or nothing: a weight
+ * silently dropped to 0 takes a backend out of rotation with nothing on screen to say why.
  */
 function parseWeights(value: FormDataEntryValue | null): number[] | null {
   if (typeof value !== "string" || value.trim().length === 0) return null;
@@ -81,13 +78,9 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   const result: Partial<L4LoadBalancerConfig> = {};
   if (enabled !== undefined) result.enabled = enabled;
   if (policy) result.policy = policy;
-  // Presence, not value - see parseLoadBalancerConfig in the proxy-hosts actions: gating on the
-  // value made an emptied box indistinguishable from a field the form never rendered, so nothing
-  // here could be cleared once set.
-  //
-  // The three caddy-l4 does not define keep their lines because a host saved before they were
-  // withdrawn still has them in `meta`; the form no longer renders them, so these never fire, and
-  // the generator already refuses to emit them.
+  // Presence, not value (see parseLoadBalancerConfig in the proxy-hosts actions), or an emptied
+  // box could never be cleared. The three caddy-l4 lacks stay for hosts saved before their
+  // withdrawal; the form no longer renders them and the generator refuses to emit them.
   if (formData.has("lbTryDuration")) {
     result.tryDuration = parseOptionalText(formData.get("lbTryDuration"));
   }
@@ -104,7 +97,6 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
     result.policyWeights = parseWeights(formData.get("lbPolicyWeights"));
   }
 
-  // Active health check
   if (formData.has("lbActiveHealthEnabledPresent")) {
     result.activeHealthCheck = {
       enabled: parseCheckbox(formData.get("lbActiveHealthEnabled")),
@@ -114,7 +106,6 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
     };
   }
 
-  // Passive health check
   if (formData.has("lbPassiveHealthEnabledPresent")) {
     result.passiveHealthCheck = {
       enabled: parseCheckbox(formData.get("lbPassiveHealthEnabled")),
@@ -256,6 +247,7 @@ export async function createL4ProxyHostAction(
 
     const input: L4ProxyHostInput = {
       name: String(formData.get("name") ?? "Untitled"),
+      description: formData.has("description") ? String(formData.get("description")) : undefined,
       protocol: parseProtocol(formData),
       listenAddress: String(formData.get("listenAddress") ?? "").trim(),
       upstreams: parseUpstreams(formData.get("upstreams")),
@@ -304,6 +296,7 @@ export async function updateL4ProxyHostAction(
 
     const input: Partial<L4ProxyHostInput> = {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
+      description: formData.has("description") ? String(formData.get("description")) : undefined,
       protocol: parseProtocol(formData),
       listenAddress: formData.get("listenAddress")
         ? String(formData.get("listenAddress")).trim()

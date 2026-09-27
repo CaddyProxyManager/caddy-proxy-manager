@@ -1,20 +1,8 @@
 /**
- * Starting and stopping the optional ClickHouse container from the Settings page.
- *
- * ClickHouse sits behind a Compose profile, so whether it exists at all is decided by
- * `COMPOSE_PROFILES` on the host - outside the stack, before anything in it runs. Nothing the
- * controller can reach changes that, but the agent runs the Compose CLI, and `--profile` on one
- * invocation enables a profile for that invocation. That is the whole trick: the agent turns a
- * stored setting into `docker compose --profile clickhouse up -d clickhouse`.
- *
- * The credentials travel with the request because Compose interpolates them from the host `.env`,
- * which the agent mounts read-only and the controller has no access to at all. Sending them lets an
- * operator configure ClickHouse in one place - the Settings page - instead of keeping the database
- * and a file on the host in step by hand.
- *
- * Only the agent in the controller's own stack is asked. ClickHouse lives with the controller, and
- * every other agent relays its events there, so an agent elsewhere has no use for the container or
- * for the password that starts it.
+ * Starting and stopping the optional ClickHouse container from the Settings page, through the
+ * agent's `docker compose --profile clickhouse`. Credentials travel with the request so they
+ * live in the database, not a host `.env` the controller cannot read. Only the bundled agent is
+ * asked: every other agent relays its events to the controller's ClickHouse.
  */
 
 import type { ManagedServicesRequest } from "@cpm/shared";
@@ -24,10 +12,8 @@ import { bundledAgentId } from "./bootstrap";
 import { pushDesiredState } from "./desired-state";
 
 /**
- * Whether this agent is the one that runs the controller's services.
- *
- * With no record of which agent is bundled - paired before that was recorded, or that agent since
- * unpaired - every agent is asked, as before, rather than a deployment losing its ClickHouse.
+ * Whether this agent runs the controller's services. With no bundled agent recorded, every agent
+ * is asked rather than a deployment losing its ClickHouse.
  */
 async function runsControllerServices(agentRowId: number): Promise<boolean> {
   const bundled = await bundledAgentId();
@@ -36,9 +22,8 @@ async function runsControllerServices(agentRowId: number): Promise<boolean> {
 }
 
 /**
- * What the optional services should currently be, from the settings alone.
- *
- * `agentRowId` scopes it to one agent; omitted gives the answer for the agent that runs them.
+ * What the optional services should be, from the settings alone. `agentRowId` scopes it to one
+ * agent; omitted, it answers for the agent that runs them.
  */
 export async function desiredManagedServices(agentRowId?: number): Promise<ManagedServicesRequest> {
   if (agentRowId !== undefined && !(await runsControllerServices(agentRowId))) {
@@ -68,15 +53,8 @@ export async function desiredManagedServices(agentRowId?: number): Promise<Manag
 }
 
 /**
- * Ask every agent to reconcile its optional services with the current settings.
- *
- * Desired state now, like everything else the controller wants: the services travel in the same
- * frame as the ports and the modules, and the agent reconciles at its own pace. Kept as its own
- * function because the callers name what changed, not how it is delivered.
- *
- * Never throws. An agent that is not attached gets the whole state the moment it reconnects, which
- * is also the answer for a deployment whose agent has not started - the operator manages the
- * container themselves there, which is what COMPOSE_PROFILES is still for.
+ * Ask every agent to reconcile its optional services; they travel as desired state with the
+ * ports and modules. Never throws: an unattached agent gets the whole state when it reconnects.
  */
 export async function applyManagedServices(): Promise<void> {
   await pushDesiredState();

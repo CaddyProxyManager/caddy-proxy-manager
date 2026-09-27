@@ -1,17 +1,7 @@
 /**
- * The GraphQL API, executed against a real database.
- *
- * Two things are worth proving here and nowhere else.
- *
- * **Parity.** A GraphQL mutation and the `/api/v1/` route it stands beside call the same model
- * function, so they must produce the same row. The tests below write through GraphQL and read back
- * through the model the REST route uses - if a resolver ever starts doing its own validation or
- * shaping, that is where it shows up.
- *
- * **The gate.** Management is admin-only, including for an operator, because a group grant
- * delegates the dashboard and not the API. That rule is one line in each resolver and exactly the
- * kind of line that gets forgotten on the next one added, so it is asserted per operation rather
- * than once.
+ * Parity: a mutation and its `/api/v1/` route call the same model function, so writes go through
+ * GraphQL and are read back through the model. The gate: management is admin-only, operators too,
+ * and that one line per resolver is easy to forget, so it is asserted per operation.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -48,12 +38,7 @@ import { getUserById } from '../../src/lib/models/user';
 import { getSetting, saveCloudflareSettings } from '../../src/lib/settings';
 import * as dbSchema from '../../src/lib/db/schema';
 
-/**
- * A context with the viewer already decided.
- *
- * The real one authenticates a Bearer token or a session; that path belongs to api-auth and is
- * tested there. What these tests need is the answer, so they can vary the role.
- */
+/** The viewer decided up front; token and session auth belong to api-auth's tests. */
 function contextFor(
   role: string | null,
   authMethod: 'bearer' | 'session' = 'bearer',

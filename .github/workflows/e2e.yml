@@ -1,21 +1,10 @@
 name: End-to-end tests
 
 on:
-  # Opt-in, not automatic. This suite builds the whole Compose stack and runs single-worker against
-  # a live Caddy, so it is the expensive check by a wide margin, and it is no longer a required
-  # check on main - most pull requests do not need 20 minutes of it to be reviewable. Two ways in:
-  #
-  #   - run it by hand from the Actions tab, against any branch or tag;
-  #   - label a pull request `e2e`, and it runs on the merge result and on every push after that.
-  #
-  # `synchronize` without the label check would run it for every push to every pull request, so the
-  # job itself is guarded below - a workflow-level filter cannot read the label list.
-  #
-  # A manual run takes no `ref` input, and so tests the head of whatever ref was picked. An input
-  # that fed `actions/checkout` would be a cache-poisoning hole (CodeQL
-  # actions/cache-poisoning/poisonable-step): a run dispatched from main writes into main's cache
-  # scope, so checking out an arbitrary commit there lets that commit's code seed the cache every
-  # later run on main restores. To test one commit, push it to a branch or tag and dispatch that.
+  # Opt-in: the whole Compose stack against a live Caddy is the expensive check, and not required
+  # on main. Run it from the Actions tab, or label a PR `e2e` to run it on every push after that.
+  # No `ref` input: one feeding `actions/checkout` would let any commit seed main's cache (CodeQL
+  # actions/cache-poisoning). To test a commit, push it to a branch or tag and dispatch that.
   workflow_dispatch:
   pull_request:
     branches:
@@ -34,14 +23,11 @@ concurrency:
 
 jobs:
   e2e:
-    # A pull request runs this only while it carries the `e2e` label; a manual run always does.
-    # Removing the label stops later pushes from starting a run, and the guard is a job-level `if`
-    # rather than a workflow-level filter because only the job can see `labels`.
+    # PRs run only while labelled `e2e`; a job-level `if`, as a workflow filter cannot see labels.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
-    # tests/global-setup.ts allows 180s for the stack to come up and the suite
-    # itself runs single-worker against a live Caddy, so this is slow by nature.
-    # Healthy runs land around 15-20 minutes; past 45 something is wedged.
+    # global-setup allows 180s for the stack and the suite runs single-worker: healthy runs take
+    # 15-20 minutes, so past 45 something is wedged.
     timeout-minutes: 45
     # The suite builds images and drives a local stack. No package pushes, no
     # repo writes, and no secrets: references, so nothing is injected here.
@@ -49,13 +35,8 @@ jobs:
       contents: read
 
     env:
-      # Single source of truth for the browser set: the install step and the cache
-      # key both read it, so adding a browser here misses the cache and downloads
-      # it rather than restoring a bundle that is missing it.
-      #
-      # chromium for the desktop project, webkit for mobile-iphone: devices
-      # ['iPhone 15'] carries defaultBrowserType "webkit", so omitting it fails
-      # only the mobile project, and only once it reaches a test.
+      # One source for the install step and the cache key, so a new browser misses the cache.
+      # webkit is for mobile-iphone: omitting it fails only that project, once it reaches a test.
       PLAYWRIGHT_BROWSERS: chromium webkit
 
     steps:
@@ -71,17 +52,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Browser builds are pinned to the Playwright release, so the version is the
-      # whole cache key beyond the browser set. No restore-keys prefix: a partial
-      # hit would leave browsers from another release in place and the install step
-      # below would skip over them.
-      #
-      # Every playwright step below runs from apps/controller, which is the workspace
-      # that declares @playwright/test, so bunx resolves the pinned CLI. From the repo
-      # root it resolves nothing locally and downloads the latest from npm instead -
-      # which installed 1.63.0's browsers for a suite running 1.62.1, leaving the
-      # tests looking for a revision that was never downloaded. Do not "simplify"
-      # these back to the root.
+      # Browsers are pinned per Playwright release, so the version is the key; a restore-keys hit
+      # would leave another release's browsers. Run from apps/controller: from the root, bunx
+      # fetches the latest CLI, whose browsers were never installed.
       - name: Resolve the Playwright browser cache key
         id: playwright
         working-directory: apps/controller
@@ -101,9 +74,7 @@ jobs:
         working-directory: apps/controller
         run: bunx playwright install $PLAYWRIGHT_BROWSERS
 
-      # The shared libraries --with-deps pulls in are apt packages outside
-      # ~/.cache/ms-playwright, so the cache cannot carry them and this runs on a
-      # hit too. It is a no-op once they are present.
+      # apt packages outside the cache, so this runs on a hit too; a no-op once present.
       - name: Install Playwright system dependencies
         working-directory: apps/controller
         run: bunx playwright install-deps $PLAYWRIGHT_BROWSERS
@@ -113,10 +84,7 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # tests/global-setup.ts drives `docker compose up -d --build` over
-      # docker-compose.yml + tests/docker-compose.test.yml, seeds fixtures, logs
-      # in, and saves the storage state the projects reuse. Teardown removes the
-      # stack, so there is nothing to clean up after this step.
+      # global-setup builds and seeds the stack and teardown removes it: nothing to clean up here.
       - name: Run Playwright end-to-end suite
         run: bun run test:e2e
         env:
@@ -127,9 +95,7 @@ jobs:
           COMPOSE_BAKE: "true"
 
       - name: Upload failure artifacts
-        # Only on failure: traces and the per-test error-context.md snapshots are
-        # what make a red run diagnosable without reproducing it locally, and a
-        # green run's copies are noise.
+        # Traces and error-context snapshots make a red run diagnosable; a green run's are noise.
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

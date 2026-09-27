@@ -9,6 +9,8 @@ import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { downloadText } from "@/src/lib/download-text";
+import { toast } from "sonner";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -58,6 +60,23 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  async function download(includeKey: boolean) {
+    const response = await fetch(
+      `/api/certificates/${cert.id}/download${includeKey ? "?key=1" : ""}`,
+    );
+    const body = (await response.json()) as {
+      certificatePem?: string;
+      keyPem?: string;
+      error?: string;
+    };
+    if (!response.ok) {
+      toast.error(body.error ?? t("downloadFailed"));
+      return;
+    }
+    if (includeKey && body.keyPem) downloadText(`${cert.name}.key`, `${body.keyPem}\n`);
+    else if (body.certificatePem) downloadText(`${cert.name}.crt`, `${body.certificatePem}\n`);
+  }
+
   function handleDelete() {
     setError(null);
     startTransition(async () => {
@@ -78,6 +97,9 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         alignment="end"
         items={[
           { label: t("edit"), onClick: onEdit },
+          { label: t("downloadCertificate"), onClick: () => download(false) },
+          { label: t("downloadKey"), onClick: () => download(true) },
+          { type: "divider" },
           {
             label: t("delete"),
             variant: "destructive",

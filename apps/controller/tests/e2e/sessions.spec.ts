@@ -39,10 +39,8 @@ test.describe('Active session management', () => {
     page,
     browser,
   }) => {
-    // `page` carries the admin storageState (session #1). Create a second,
-    // independent session in a CLEAN context. The empty storageState is
-    // required - browser.newContext() otherwise inherits the project's admin
-    // storageState, so /login would redirect to "/" instead of showing the form.
+    // `page` is session #1. The empty storageState is required: newContext() otherwise inherits
+    // the admin's, and /login would redirect to "/" instead of showing the form.
     const ctx2 = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     await loginViaUi(ctx2);
 
@@ -59,7 +57,6 @@ test.describe('Active session management', () => {
       expect(list1.filter((s) => s.current).length).toBe(1);
       expect(list1.find((s) => s.current)!.id).not.toBe(session2Id);
 
-      // Revoke session #2 from session #1.
       const del = await page.request.delete(`${API}/sessions/${session2Id}`, {
         headers: { Origin: BASE_URL },
       });

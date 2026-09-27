@@ -1,18 +1,22 @@
 /**
- * Stands in for the controller's `src/lib/auth-client` inside the demos (see the alias in
- * astro.config.mjs).
- *
- * The real one is Better Auth's client, which posts to `/api/auth/*` on whatever origin loaded it -
- * here the documentation site, which has no such route and would answer with a 404 page. This one
- * never makes a request. Every attempt fails the way a wrong password or an unreachable provider
- * does, after a pause long enough to see the pending state, so what a reader gets to try is the
- * form's own handling of that: the name kept on screen, the error in the product's words.
- *
- * The exception is the setup demo, which has accounts of its own to check against.
+ * The docs site has no `/api/auth/*`, so this never makes a request: every sign-in fails as a wrong
+ * password does, except in the setup demo, which has accounts of its own. Two-factor setup takes
+ * any password and any six digits, since there is no account or authenticator to check them on.
  */
 import { currentSimulation } from "../setup-simulation";
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, 700));
+
+/** A made-up key; scanning it adds a harmless entry to an authenticator app. */
+const TOTP_URI =
+  "otpauth://totp/Caddy%20Proxy%20Manager:avery?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Caddy%20Proxy%20Manager";
+
+function backupCodes(): string[] {
+  return Array.from({ length: 10 }, () => {
+    const digits = Math.random().toString(36).slice(2, 12).padEnd(10, "0");
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  });
+}
 
 export const authClient = {
   signIn: {
@@ -20,7 +24,7 @@ export const authClient = {
       const simulation = currentSimulation();
       if (simulation) return simulation.signInUsername(input.username, input.password);
       await pause();
-      // No message, so the form falls back to its own wording for a rejected password.
+      // No message, so the form uses its own wording.
       return { error: { status: 401 } };
     },
     async social(input: { provider: string; callbackURL?: string; errorCallbackURL?: string }) {
@@ -28,6 +32,30 @@ export const authClient = {
       if (simulation) return simulation.signInSocial(input.callbackURL);
       await pause();
       throw new Error("There is no identity provider behind the documentation site");
+    },
+  },
+  twoFactor: {
+    async enable(_input: { password: string }) {
+      await pause();
+      return { data: { totpURI: TOTP_URI, backupCodes: backupCodes() }, error: null };
+    },
+    async verifyTotp(input: { code: string }) {
+      await pause();
+      return /^\d{6}$/.test(input.code)
+        ? { data: {}, error: null }
+        : { data: null, error: { status: 401, code: "INVALID_CODE" } };
+    },
+    async verifyBackupCode(_input: { code: string }) {
+      await pause();
+      return { data: null, error: { status: 401, code: "INVALID_BACKUP_CODE" } };
+    },
+    async generateBackupCodes(_input: { password: string }) {
+      await pause();
+      return { data: { backupCodes: backupCodes() }, error: null };
+    },
+    async disable(_input: { password: string }) {
+      await pause();
+      return { data: {}, error: null };
     },
   },
 };

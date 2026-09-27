@@ -44,10 +44,8 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
-// The flag above is read through the config module, and config snapshots
-// process.env when it is first evaluated - which has already happened by the
-// time this file's body runs. Evaluate a second copy now that the env is set
-// and point the plain specifier at it, so auth-server reads the right value.
+// config snapshots process.env on first evaluation, which has already happened, so a fresh copy
+// is evaluated now and the plain specifier points at it for auth-server.
 const freshConfig = await import(`../../src/lib/config${fresh()}`);
 vi.mock('../../src/lib/config', () => ({ ...freshConfig }));
 

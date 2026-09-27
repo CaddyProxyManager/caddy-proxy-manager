@@ -45,7 +45,6 @@ async function loadStats(): Promise<StatCard[]> {
     db.select({ value: count() }).from(accessLists),
   ]);
 
-  // Build cert domain map for wildcard coverage checks
   const certDomainMap = new Map<number, string[]>();
   for (const cert of certRows) {
     certDomainMap.set(cert.id, JSON.parse(cert.domainNames) as string[]);
@@ -59,7 +58,6 @@ async function loadStats(): Promise<StatCard[]> {
 
   let acmeCount = 0;
   for (const domains of acmeHostDomains) {
-    // Check if covered by an existing certificate's wildcard
     let covered = false;
     for (const [, certDomains] of certDomainMap) {
       if (domains.every((d: string) => isDomainCoveredByCert(d, certDomains))) {
@@ -67,7 +65,6 @@ async function loadStats(): Promise<StatCard[]> {
         break;
       }
     }
-    // Check if this non-wildcard host is covered by a wildcard ACME host
     if (!covered && !domains.some((d: string) => d.startsWith("*."))) {
       covered = wildcardAcmeDomainSets.some((wcDomains) =>
         domains.every((d: string) => isDomainCoveredByCert(d, wcDomains)),
@@ -137,9 +134,8 @@ export default async function OverviewPage() {
       Math.floor(Date.now() / 1000),
       [],
     ).catch(() => null),
-    // The server-event log. Rendered on the server because it is the one band that does
-    // not follow the range control - and the one with something to show on an install
-    // where access logging was never switched on.
+    // Rendered on the server: the one band that ignores the range control, and the one with
+    // something to show where access logging was never switched on.
     db
       .select({
         id: auditEvents.id,
@@ -186,11 +182,8 @@ export default async function OverviewPage() {
 }
 
 /**
- * Names for the audit rows' actors, in one query.
- *
- * `audit_events.userId` is nullable and set null on user deletion, so a row can name
- * an account that no longer exists; those fall back to the system actor in the UI
- * rather than showing a bare id.
+ * `audit_events.userId` is set null on user deletion, so a missing name falls back to the system
+ * actor in the UI rather than a bare id.
  */
 async function loadActorNames(userIds: (number | null)[]): Promise<Map<number, string>> {
   const ids = [...new Set(userIds.filter((id): id is number => id !== null))];

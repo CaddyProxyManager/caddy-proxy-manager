@@ -1,31 +1,21 @@
 /**
- * A real OIDC provider for tests, without a browser and without the compose stack.
- *
- * `mock-oauth2-server` with `interactiveLogin: false` issues an authorization code straight from
- * /authorize instead of rendering a login form, so a complete sign-in is three fetches. That
- * matters because OAuth is the part of auth the fast suites cannot otherwise reach: the unit tests
- * stub `betterAuth` entirely, and everything else drives the adapter directly, which misses the
- * queries Better Auth only builds during a callback. Before this existed, an OAuth regression was
- * invisible until the end-to-end suite ran - after a push, and 14 minutes later.
- *
- * Start it with:
+ * A real OIDC provider, so the fast suites reach the queries Better Auth builds only in a callback.
+ * `interactiveLogin: false` makes a sign-in three fetches. Start it with:
  *
  *   docker run -d --name cpm-idp -p 5599:8080 \
  *     -e JSON_CONFIG='<the JSON printed by `bun tests/helpers/mock-idp.ts`>' \
  *     ghcr.io/navikt/mock-oauth2-server:2.1.10
  *
- * Pass the config through JSON_CONFIG rather than mounting tests/mock-oidc/config.json: the bind
- * mount silently fails on Windows and the server falls back to interactive login, which then hangs
- * the flow on an HTML form instead of failing usefully.
+ * JSON_CONFIG, not a bind mount: that silently fails on Windows and the login hangs on a form.
  */
 
-/** Where the IdP is reachable. TEST_OIDC_URL lets CI point at a service container. */
+/** TEST_OIDC_URL lets CI point at a service container. */
 export const MOCK_IDP_URL = (process.env.TEST_OIDC_URL ?? 'http://localhost:5599').replace(
   /\/$/,
   '',
 );
 
-/** The issuer for the "default" realm, which is what the app is configured with. */
+/** The "default" realm, which the app is configured with. */
 export const MOCK_IDP_ISSUER = `${MOCK_IDP_URL}/default`;
 
 /** Claims the IdP returns. `role: "admin"` is deliberate - see oauth-flow.test.ts. */
@@ -37,10 +27,7 @@ export const MOCK_IDP_CLAIMS = {
   role: 'admin',
 } as const;
 
-/**
- * The JSON_CONFIG value the container needs. Exported so the docs above, CI and any local run all
- * use one definition rather than three that drift.
- */
+/** One definition for the docs above, CI and local runs. */
 export const MOCK_IDP_JSON_CONFIG = JSON.stringify({
   interactiveLogin: false,
   httpServer: 'NettyWrapper',
@@ -54,7 +41,7 @@ export const MOCK_IDP_JSON_CONFIG = JSON.stringify({
   ],
 });
 
-/** Whether the IdP is up, so a suite can skip rather than fail when nobody started it. */
+/** So a suite can skip rather than fail when nobody started it. */
 export async function isMockIdpReachable(): Promise<boolean> {
   try {
     const response = await fetch(`${MOCK_IDP_ISSUER}/.well-known/openid-configuration`, {
@@ -70,16 +57,11 @@ export type OAuthSignInResult = {
   /** Where the app redirected after the callback. Contains "error" when sign-in failed. */
   location: string;
   ok: boolean;
-  /** Session cookies the callback set, ready to replay on a later request. */
+  /** Ready to replay on a later request. */
   cookie: string;
 };
 
-/**
- * Run a full OAuth sign-in against the mock IdP and return where the app landed.
- *
- * `auth.handler` is called directly rather than over HTTP - nothing has to be listening on
- * BASE_URL, only the redirect_uri has to match what the provider was registered with.
- */
+/** Calls `auth.handler` directly: nothing need listen on BASE_URL, only redirect_uri must match. */
 export async function completeOAuthSignIn(
   auth: any,
   options: { providerId: string; baseUrl?: string },
@@ -96,8 +78,7 @@ export async function completeOAuthSignIn(
   };
   const cookieHeader = () => [...cookies].map(([k, v]) => `${k}=${v}`).join('; ');
 
-  // Since Better Auth 1.7 the generic-OAuth plugin registers each provider as a first-class social
-  // provider, so this is /sign-in/social - /sign-in/oauth2 does not exist and returns 404.
+  // Better Auth 1.7+ registers generic-OAuth providers as social; /sign-in/oauth2 404s.
   const startResponse = await auth.handler(
     new Request(`${base}/api/auth/sign-in/social`, {
       method: 'POST',
@@ -132,8 +113,7 @@ export async function completeOAuthSignIn(
   return { location, ok: location !== '' && !location.includes('error'), cookie: cookieHeader() };
 }
 
-// `bun tests/helpers/mock-idp.ts` prints the config, so the docker command above can be pasted
-// together without hand-copying JSON.
+// Prints the config for the docker command above.
 if (import.meta.main) {
   console.log(MOCK_IDP_JSON_CONFIG);
 }

@@ -11,7 +11,7 @@ import { signInWithCredentials } from '../helpers/sign-in';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-// Pages that require admin role (via requireAdmin in their own page.tsx)
+// Via requireAdmin in their own page.tsx.
 const ADMIN_ONLY_PAGES = [
   '/proxy-hosts',
   '/l4-proxy-hosts',
@@ -26,15 +26,10 @@ const ADMIN_ONLY_PAGES = [
   '/api-docs',
 ];
 
-// Pages accessible to any authenticated user
 const USER_ACCESSIBLE_PAGES = ['/', '/profile'];
 
-// All dashboard pages (union of both sets)
 const ALL_DASHBOARD_PAGES = [...USER_ACCESSIBLE_PAGES, ...ADMIN_ONLY_PAGES];
 
-/**
- * Log in as the given user and return an authenticated browser context.
- */
 async function loginAs(
   browser: import('@playwright/test').Browser,
   username: string,
@@ -44,12 +39,10 @@ async function loginAs(
   const page = await context.newPage();
 
   await page.goto('http://localhost:3000/login');
-  // The form submits natively until React attaches its onSubmit, so a fill or click landing first
-  // is dropped or turned into a GET to /login with the credentials in the query string.
+  // Before hydration the form submits natively - a GET with the credentials in the query.
   await waitForHydration(page);
   await signInWithCredentials(page, username, password);
 
-  // The login client does router.replace('/') on success - wait for that
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 });
   await page.close();
   return context;
@@ -77,11 +70,9 @@ test.describe('Role-based access control', () => {
   let viewerContext: BrowserContext;
 
   test.beforeAll(async ({ browser }) => {
-    // Create test users with non-admin roles
     ensureTestUser('testuser', 'TestUserPass2026!', 'user');
     ensureTestUser('testviewer', 'TestViewerPass2026!', 'viewer');
 
-    // Log in as each role
     userContext = await loginAs(browser, 'testuser', 'TestUserPass2026!');
     viewerContext = await loginAs(browser, 'testviewer', 'TestViewerPass2026!');
   });
@@ -109,7 +100,6 @@ test.describe('Role-based access control', () => {
     try {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
-      // Non-admin gets empty stats - no Proxy Hosts / Certificates / Access Lists cards
       await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({
         timeout: 3_000,
       });
@@ -123,9 +113,7 @@ test.describe('Role-based access control', () => {
     try {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
-      // Overview should be in the nav
       await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible();
-      // Admin-only nav items should not be visible
       await expect(page.getByRole('link', { name: 'Proxy Hosts' })).not.toBeVisible();
       await expect(page.getByRole('link', { name: 'Settings' })).not.toBeVisible();
       await expect(page.getByRole('link', { name: 'Users' })).not.toBeVisible();
@@ -202,8 +190,7 @@ test.describe('Role-based access control', () => {
       const page = await userContext.newPage();
       try {
         const response = await page.goto(path);
-        // requireAdmin() throws "Administrator privileges required".
-        // Next.js renders the error boundary or returns 500.
+        // requireAdmin() throws, so the error boundary renders or it 500s.
         const status = response?.status() ?? 0;
         const url = page.url();
 
@@ -251,7 +238,6 @@ test.describe('Role-based access control', () => {
 
   test('admin role: all dashboard pages are accessible', async ({ browser }, testInfo) => {
     testInfo.setTimeout(90_000);
-    // Use the pre-authenticated admin state from global-setup
     const adminContext = await browser.newContext({
       storageState: resolve(moduleDir, '../.auth/admin.json'),
     });

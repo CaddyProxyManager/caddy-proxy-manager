@@ -1,11 +1,7 @@
 # syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
-# Bun is the only supported runtime (src/lib/runtime-guard.ts); the runtime stage needs no toolchain
-# because what ships is one compiled binary. Pinned to $BUILDPLATFORM so `deps` and `builder` run
-# natively: emulated, the Rolldown-backed `vinext build` deadlocks in its first transform pass and
-# wedges the job until the runner's 6-hour cap. The runtime stage still builds per-target, and the
-# only arch-specific artifact it gets is the binary, cross-compiled a few lines down. Digest-pinned
-# like every base here; keep the tag in step with bun-version in the workflows and db-seed.
+# $BUILDPLATFORM: emulated, `vinext build` deadlocks until the runner's 6-hour cap, so the binary
+# is cross-compiled instead. Keep the tag in step with bun-version in the workflows and db-seed.
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS base
 WORKDIR /app
 
@@ -14,43 +10,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-# Every workspace manifest, not just the root one: `bun install` resolves the whole workspace graph
-# up front and fails on a member it cannot read. bunfig.toml comes along because it pins the
-# isolated linker, which decides the node_modules layout the builder stage copies below.
+# Every workspace manifest, or `bun install` fails; bunfig.toml pins the linker whose layout the
+# builder copies.
 COPY package.json bun.lock bunfig.toml ./
-# patchedDependencies in package.json: a frozen install refuses to run without the files it names.
+# A frozen install refuses to run without the patchedDependencies files.
 COPY patches ./patches
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
 COPY apps/site/package.json ./apps/site/
 COPY packages/shared/package.json ./packages/shared/
-# --ignore-scripts skips native addon build steps; nothing here needs one, since the PostgreSQL
-# driver is Bun's built-in Bun.SQL rather than a compiled addon.
+# Nothing needs a native addon build: the PostgreSQL driver is Bun.SQL.
 RUN bun install --frozen-lockfile --ignore-scripts
 
 FROM base AS builder
 ARG TARGETARCH
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Never connected to: the bundler does not execute the app's startup path, and src/lib/db/dialect.ts
-# rejects anything that is not a PostgreSQL URL at import. This satisfies that check and nothing else.
+# Never connected to; only satisfies dialect.ts's import-time URL check.
 ENV DATABASE_URL=postgres://build:build@127.0.0.1:5/unused
-# Application version baked into the UI and the OpenAPI spec at build time.
-# Set by CI to the git tag (without the leading v) for release builds; when
-# unset, vite.config.ts falls back to the package.json version.
+# The git tag without its v; unset, vite.config.ts uses package.json's version.
 ARG APP_VERSION
-# Both trees, because the isolated linker splits them: root node_modules holds the package store
-# (.bun/) plus the root's own devDependencies, and each workspace member gets a node_modules of
-# relative symlinks into that store. Copying only the root leaves the controller with nothing.
-# packages/shared has no node_modules of its own (it declares no dependencies), and the
-# @cpm/shared symlink resolves into the source tree that `COPY . .` lands on the next line.
+# Both trees: the isolated linker puts the store at the root and symlinks into it per member.
+# packages/shared has no dependencies, so no node_modules.
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/controller/node_modules ./apps/controller/node_modules
 COPY . .
-# `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
-# production server into dist/standalone/cpm-server. This stage runs on the host arch, so the binary
-# is cross-compiled for the target - Bun names targets by libc and arch, and the glibc variants
-# match the debian:trixie-slim runtime. BUN_COMPILE_TARGET feeds the package.json script.
+# Cross-compiled for the target; the glibc variants match the trixie runtime.
 RUN case "$TARGETARCH" in \
       amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
       arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
@@ -59,12 +44,8 @@ RUN case "$TARGETARCH" in \
     bun run build && bun run build:binary
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager
-# and Bun CLI would be dead weight. Trixie matches oven/bun's slim base, so the glibc matches -
-# check `docker run --rm oven/bun:1.4.2-slim cat /etc/debian_version` when either moves, since the
-# standalone node_modules copied below were installed there and may carry native binaries.
-# The only runtime stage - the e2e suite runs this same image, seeding through the `db-seed`
-# container rather than executing code here.
+# The binary carries its own Bun. Must match oven/bun's Debian release (its node_modules may hold
+# native binaries): check `docker run --rm oven/bun:1.4.2-slim cat /etc/debian_version`.
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
 ARG PUID=10001
 ARG PGID=10001
@@ -73,9 +54,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 WORKDIR /app
 
-# ca-certificates is not optional: ACME, OAuth/OIDC, ClickHouse and the Caddy
-# admin API are all reached over TLS, and an image without a trust store fails
-# every one of them at runtime rather than at build time.
+# Without a trust store every TLS call (ACME, OIDC, ClickHouse) fails at runtime, not build time.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -85,29 +64,22 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     groupadd -g ${PGID} cpm && \
     useradd -r -u ${PUID} -g cpm cpm
 
-# The whole standalone directory, copied verbatim so the layout is preserved: the binary
-# (cpm-server), the app bundle and client assets (dist/), the runtime deps the bundle still imports
-# (node_modules/), and the package.json whose "type": "module" says how to load dist/*.js. The
-# bundle stays on disk because vinext loads it with a runtime import() of a real path, which Bun's
-# embedded-asset filesystem does not support.
+# Verbatim, package.json included ("type": "module"). The bundle stays on disk: vinext import()s a
+# real path, which Bun's embedded-asset filesystem does not support.
 COPY --from=builder --chown=cpm:cpm /app/apps/controller/dist/standalone ./
 
-# Migrations are read at startup and live outside the bundle.
 COPY --from=builder --chown=cpm:cpm /app/apps/controller/drizzle ./drizzle
 
 RUN mkdir -p /app/data && chown -R cpm:cpm /app/data
 
-# Shared volume for the custom ACME CA root PEM (issue #192), which decides the CA Caddy trusts for
-# ACME, so only web may write it. A new named volume takes this directory's owner and mode on first
-# mount; Caddy's image has no /acme-ca to compete, and Caddy mounts it read-only.
+# The ACME CA root Caddy trusts (#192), so only web may write it. A new named volume takes this
+# directory's owner and mode on first mount.
 RUN mkdir -p /acme-ca && chown cpm:cpm /acme-ca && chmod 0755 /acme-ca
 
 COPY --chown=cpm:cpm docker/web/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Image identity, so a pulled image describes itself without the compose file beside it. Static
-# facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
-# .github/workflows/docker-build-trusted.yml, whose --label flags override anything set here.
+# Static facts only: docker-build-trusted.yml's metadata-action supplies version and revision.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
       org.opencontainers.image.description="Web UI and API for managing Caddy reverse proxies, certificates and routes." \
       org.opencontainers.image.vendor="SilentSpud" \

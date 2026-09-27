@@ -1,25 +1,7 @@
 /**
- * Serving CPM's own dashboard through the Caddy it manages.
- *
- * The quickest way to understand what this product does is to watch it proxy something, and the
- * one upstream every deployment already has is the dashboard the operator is reading. So setup
- * turns this on and the dashboard is reachable by name immediately, with no host to create first.
- *
- * It is a *managed* host, not a row in `proxy_hosts`. Those two facts follow from that:
- *
- * - It is synthesised into the Caddy document on every apply, from these settings. Nothing can
- *   delete it out from under the operator, and changing the domain here is the only way to change
- *   it - there is no second copy in the hosts table to drift from this one.
- * - It is put ahead of the stored hosts before routes are built. Routes are then sorted by host
- *   specificity, which decides every case where two hosts could match the same request except one:
- *   two rows claiming the *same* exact domain, where the sort falls back to original order. Being
- *   first is what wins that tie, so a host somebody creates for the dashboard's domain cannot
- *   shadow the route the dashboard is reached through - the page that would fix the mistake is the
- *   one that would have stopped answering.
- *
- * The escape hatch is the reason all of this is safe: the controller publishes its own port
- * (`3000:3000` in the bundled compose file), so a broken dashboard host never locks anybody out -
- * `http://<host>:3000` still serves the settings page that turns it off.
+ * CPM's own dashboard served through its Caddy: a managed host synthesised on every apply, not a
+ * `proxy_hosts` row. It goes ahead of stored hosts so it wins a same-domain tie in the route sort.
+ * Safe because the controller's published port 3000 still serves the page that turns it off.
  */
 
 import { Resolver } from "node:dns/promises";
@@ -30,47 +12,28 @@ import {
   createProbeNonce,
   probeSignatureMatches,
 } from "./reachability-probe";
-// Type-only: erased at compile time, so this does not import caddy.ts at runtime and cannot
-// close a cycle with the module that consumes buildDashboardHostRow.
+// Type-only, so it cannot close a runtime cycle with caddy.ts.
 import type { ProxyHostRow } from "./caddy";
 
 /** How CPM serves its own dashboard. Stored as the `dashboard` settings blob. */
 export type DashboardHostSettings = {
-  /** Whether the managed route exists at all. Off means the dashboard is reached by port only. */
   enabled: boolean;
-  /** The domain it answers on. */
   domain: string;
-  /**
-   * Whether to force HTTPS, which is also what asks Caddy to obtain a certificate.
-   *
-   * Set from a reachability check rather than defaulted to true: a fresh install whose domain does
-   * not arrive here yet would otherwise start failing ACME the moment setup finished, and the
-   * operator's first experience of the product would be a certificate error.
-   */
+  /** Forces HTTPS, which also asks Caddy for a certificate - so set from a reachability check. */
   tls: boolean;
-  /**
-   * Everything else a proxy host can be configured with. Absent on settings saved before the
-   * dashboard host had options, which reads as a host with none.
-   */
+  /** Absent on settings saved before the dashboard host had options. */
   options?: DashboardHostOptions;
 };
 
-/**
- * A proxy host's options, minus what the managed host decides for itself.
- *
- * The upstream is the controller, and websocket upgrades and the preserved Host header are what the
- * dashboard needs to work at all, so none of those are offered. HTTPS and HSTS follow `tls`.
- * Everything that lives in a host's `meta` blob is carried as that blob, so the Caddy builder reads
- * it exactly as it reads a stored host's.
- */
+/** A proxy host's options minus upstream, websockets and Host header, which the dashboard needs. */
 export type DashboardHostOptions = {
   certificateId: number | null;
   accessListId: number | null;
   hstsSubdomains: boolean;
   skipHttpsHostnameValidation: boolean;
-  /** The agents that serve it. Empty means every agent, as it does for a stored host. */
+  /** Empty means every agent. */
   agentIds: number[];
-  /** A proxy host `meta` blob, as `proxy_hosts.meta` stores it. */
+  /** Same shape as `proxy_hosts.meta`, so the Caddy builder reads it unchanged. */
   meta: string | null;
 };
 
@@ -84,28 +47,16 @@ export const EMPTY_DASHBOARD_HOST_OPTIONS: DashboardHostOptions = {
 };
 
 /**
- * The id the synthetic row carries.
- *
- * Negative so it cannot collide with a `proxy_hosts` serial, and so anything that does look this
- * up by id finds nothing rather than somebody else's host. That is also why the two host features
- * stored in tables keyed by host - mTLS access rules and CPM forward-auth grants - are not offered
- * for it: its certificate, access list and agents travel in `options` instead.
+ * Negative so it never collides with a `proxy_hosts` serial - which is also why features keyed by
+ * host id (mTLS rules, forward-auth grants) are not offered for it.
  */
 export const DASHBOARD_HOST_ID = -1;
 
-/** Shown as the host's name wherever the generated config is inspected. */
 export const DASHBOARD_HOST_NAME = "CPM Dashboard (managed)";
 
-/**
- * Names that describe how to reach a machine from itself, and so cannot be proxied usefully.
- *
- * A deployment reached at `http://localhost:3000` during setup has told us nothing about the name
- * it will be reached at afterwards, and claiming `localhost` in Caddy would take the port-based
- * escape hatch away from the very deployment least likely to have a domain yet.
- */
+/** Claiming `localhost` in Caddy would take the port escape hatch from installs with no domain. */
 const NOT_A_PUBLIC_NAME = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", ""]);
 
-/** The hostname in BASE_URL, when it is one this could serve. */
 function domainFromBaseUrl(): string {
   try {
     const hostname = new URL(config.baseUrl).hostname.toLowerCase();
@@ -115,14 +66,7 @@ function domainFromBaseUrl(): string {
   }
 }
 
-/**
- * The domain to serve the dashboard on before anybody has chosen one.
- *
- * DASHBOARD_DOMAIN first, because setting it is an explicit answer. Otherwise the hostname in
- * BASE_URL - the deployment is already being reached there, so it is the name the operator has in
- * hand, and proxying it is exactly what they came to do. Empty when neither says anything usable,
- * which leaves the feature off rather than claiming a domain nobody asked for.
- */
+/** DASHBOARD_DOMAIN, else BASE_URL's hostname; empty leaves the feature off. */
 export function seedDashboardDomain(): string {
   return config.dashboardDomain ?? domainFromBaseUrl();
 }
@@ -132,20 +76,8 @@ export function defaultDashboardSettings(): DashboardHostSettings {
 }
 
 /**
- * Turn the dashboard host on as setup finishes.
- *
- * Over HTTP, always. The check that decides HTTPS works by asking the domain for a signature only
- * this instance can produce, and at this moment there is nothing on that domain to ask: the route
- * is being created by this very call, no configuration has been applied yet, and on the bundled
- * stack Caddy may not even be running - it starts once an agent is paired. Probing here would
- * answer "unreachable" for reasons that say nothing about the operator's DNS.
- *
- * So the host comes up on HTTP and Settings -> Dashboard Host offers the check, which is
- * meaningful the moment the route is live. That is also the safe order: HTTP works immediately,
- * and HTTPS is turned on once something has confirmed it will succeed.
- *
- * The domain is the one the operator confirmed on the setup form, which opens with
- * `seedDashboardDomain()` - so a deployment that never touches that card gets what it always did.
+ * Always HTTP at setup: the route does not exist yet and Caddy may not be running, so a probe here
+ * would say nothing about DNS. Settings -> Dashboard Host offers the HTTPS check once it is live.
  */
 export function activateDashboardHost(domain: string): DashboardHostSettings {
   const name = domain.trim().toLowerCase();
@@ -153,13 +85,7 @@ export function activateDashboardHost(domain: string): DashboardHostSettings {
   return { enabled: true, domain: name, tls: false };
 }
 
-/**
- * The origin the dashboard host answers on, or null when it serves nothing.
- *
- * The scheme follows `tls`, which is what the managed route is actually configured with - a host
- * forcing HTTPS redirects the plain request away, and one that is not has no certificate to offer.
- * Built from a validated hostname, so it is safe to put in a Location or a fetch.
- */
+/** Null when it serves nothing. Built from a validated hostname, so safe in a Location or fetch. */
 export function dashboardHostOrigin(settings: DashboardHostSettings | null): string | null {
   if (!settings?.enabled) return null;
   const domain = settings.domain.trim().toLowerCase();
@@ -167,13 +93,7 @@ export function dashboardHostOrigin(settings: DashboardHostSettings | null): str
   return `${settings.tls ? "https" : "http"}://${domain}`;
 }
 
-/**
- * The synthetic host, or null when there is nothing to serve.
- *
- * Returns a `ProxyHostRow` rather than a Caddy route so it travels the same path every other host
- * does - TLS automation, websocket upgrades, host-header handling, error pages. A hand-built route
- * would have to re-implement each of those and would drift from them at the first change.
- */
+/** A `ProxyHostRow`, not a route, so it takes the same TLS/header/error-page path as any host. */
 export function buildDashboardHostRow(
   settings: DashboardHostSettings | null,
   upstream: string | null,
@@ -183,8 +103,7 @@ export function buildDashboardHostRow(
   const domain = settings.domain.trim().toLowerCase();
   if (!domain) return null;
 
-  // No upstream means the controller could not work out how Caddy reaches it. Serving the domain
-  // anyway would answer with a proxy error, which is worse than not claiming the domain at all.
+  // Claiming the domain with no upstream would only answer proxy errors.
   if (!upstream) return null;
 
   const options = settings.options ?? EMPTY_DASHBOARD_HOST_OPTIONS;
@@ -193,14 +112,12 @@ export function buildDashboardHostRow(
     id: DASHBOARD_HOST_ID,
     name: DASHBOARD_HOST_NAME,
     domains: JSON.stringify([domain]),
-    // Plain strings, the shape parseUpstreamTarget reads. http:// because Caddy reaches the
-    // controller inside the network the two share, not across the internet.
+    // http:// because Caddy reaches the controller on their shared network.
     upstreams: JSON.stringify([`http://${upstream}`]),
     certificateId: options.certificateId,
     accessListId: options.accessListId,
     sslForced: settings.tls ? 1 : 0,
-    // Tied to TLS: an HSTS header sent over a domain that is not yet on HTTPS pins the browser to
-    // a scheme this host is not serving, and the operator cannot clear it from here.
+    // HSTS without HTTPS pins browsers to a scheme this host does not serve.
     hstsEnabled: settings.tls ? 1 : 0,
     hstsSubdomains: settings.tls && options.hstsSubdomains ? 1 : 0,
     // The dashboard streams: agent status and the log views are server-sent events.
@@ -214,12 +131,8 @@ export function buildDashboardHostRow(
 }
 
 /**
- * A DNS hostname, and nothing that could be mistaken for one.
- *
- * Labels of letters, digits and hyphens, separated by dots, up to the 253 characters DNS allows.
- * That excludes everything an attacker-shaped value would need: `//`, `@`, `:`, `?`, `#`, a path,
- * whitespace, or a bracketed IPv6 literal. A bare IPv4 literal passes, which is intended - an
- * operator may reasonably serve the dashboard on an address rather than a name.
+ * Rejects anything that could smuggle a scheme, credentials, port, path or query into a URL.
+ * A bare IPv4 literal passes on purpose.
  */
 export function isHostname(value: string): boolean {
   const name = value.trim();
@@ -227,12 +140,10 @@ export function isHostname(value: string): boolean {
   return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/i.test(name);
 }
 
-/** What the reachability check found. `ok` is what the TLS toggle is set from. */
+/** `ok` is what the TLS toggle is set from. */
 export type DashboardDnsCheck = {
   ok: boolean;
-  /** Addresses the domain resolves to, empty when it resolves to nothing. */
   resolved: string[];
-  /** Why the check answered the way it did. */
   reason: "reached" | "otherServer" | "unreachable" | "unresolved" | "noDomain";
 };
 
@@ -251,7 +162,6 @@ async function withTimeout<T>(work: (signal: AbortSignal) => Promise<T>): Promis
   }
 }
 
-/** Every address the name resolves to, over both families. Empty when it resolves to nothing. */
 async function resolveAddresses(name: string): Promise<string[]> {
   const resolver = new Resolver({ timeout: CHECK_TIMEOUT_MS, tries: 1 });
   const [v4, v6] = await Promise.all([
@@ -262,35 +172,19 @@ async function resolveAddresses(name: string): Promise<string[]> {
 }
 
 /**
- * Ask the domain for a signature only this instance can produce.
- *
- * Answers true only when the response carries the right signature: a server that is not this one
- * can return 200, can return `{"status":"ok"}`, and can echo the nonce, but cannot sign it.
- *
- * The scheme is the caller's: `checkDashboardDns` asks over HTTP, because it runs before HTTPS has
- * been turned on and proving the name arrives here is the precondition for asking Caddy for a
- * certificate. A host already serving HTTPS is asked over HTTPS instead - it redirects the plain
- * request away, which `redirect: "manual"` reads as "not this instance".
+ * True only for a correctly signed nonce: another server can return 200 or echo it, not sign it.
+ * A host already on HTTPS must be probed over HTTPS - it redirects plain requests away.
  */
 async function probeSelf(domain: string, scheme: "http" | "https" = "http"): Promise<boolean> {
-  // Interpolating the stored setting straight into a URL is what CodeQL flagged, and it was right
-  // to. `isHostname` is the narrow gate: letters, digits, dots and hyphens only, so nothing can
-  // carry a scheme, credentials, a port, a path or a query into the request. An unusable value
-  // means the check simply fails rather than dialling somewhere unintended.
-  //
-  // Note what is deliberately *not* blocked: an address in private or loopback space. This is a
-  // deployment probing its own domain, and plenty of legitimate installs answer on a private
-  // address - a LAN-only instance, or one reached through NAT hairpin. Refusing those would break
-  // the feature for the deployments most likely to use it, to prevent an administrator from
-  // pointing a boolean-valued probe at their own network.
+  // The CodeQL URL-injection gate. Private and loopback addresses are deliberately allowed: LAN
+  // and NAT-hairpin installs probe their own domain there.
   if (!isHostname(domain)) return false;
 
   const nonce = createProbeNonce();
   const url = `${scheme}://${domain}${PROBE_PATH}?${PROBE_PARAM}=${encodeURIComponent(nonce)}`;
 
   const answered = await withTimeout(async (signal) => {
-    // `redirect: "manual"` rather than following: a redirect to somewhere else is not this
-    // instance answering, and chasing it could send the nonce to a third party.
+    // Following a redirect could hand the nonce to a third party.
     const response = await fetch(url, { signal, redirect: "manual", cache: "no-store" });
     if (!response.ok) return null;
     const body = (await response.json()) as { probe?: unknown };
@@ -301,19 +195,12 @@ async function probeSelf(domain: string, scheme: "http" | "https" = "http"): Pro
 }
 
 /**
- * Whether the domain reaches this instance.
- *
- * Never throws: every failure is an answer of `ok: false` with a reason, because the caller is
- * rendering a warning rather than handling an exception, and a resolver being slow is not a reason
- * to fail their request.
- *
- * DNS resolution is kept alongside the probe purely to tell two failures apart - a name nothing
- * answers for needs a record created, a name that resolves but does not arrive here needs the
- * record or the network fixed. Both are local lookups; nothing is asked of a third party.
+ * Never throws: the caller renders a warning. DNS is resolved only to tell "no record" from
+ * "resolves but does not arrive here".
  */
 export async function checkDashboardDns(
   domain: string,
-  // Injected by tests, the way tailscale-api takes its fetchImpl. Real callers pass nothing.
+  // Test seam; real callers pass nothing.
   deps: {
     resolveAddresses?: (name: string) => Promise<string[]>;
     probe?: (name: string) => Promise<boolean>;
@@ -333,20 +220,11 @@ export async function checkDashboardDns(
   if (reachedSelf) return { ok: true, resolved: addresses, reason: "reached" };
   if (addresses.length === 0) return { ok: false, resolved: [], reason: "unresolved" };
 
-  // It resolves and something is there, or nothing is. The probe cannot tell a wrong server from a
-  // closed port without reporting more than it can be sure of, so both read as "did not reach
-  // here" and the message covers the ways that happens.
+  // A wrong server and a closed port look alike to the probe, so both report otherServer.
   return { ok: false, resolved: addresses, reason: "otherServer" };
 }
 
-/**
- * Whether the dashboard host is answering, on the scheme it is configured for.
- *
- * The narrower half of `checkDashboardDns`: no DNS lookup and no reason, because the only caller
- * is deciding whether to send a browser there. A false is not a diagnosis - Caddy may not be
- * running yet, the record may not exist - which is why it only ever costs the operator the
- * redirect, never the page they are on.
- */
+/** Only decides whether to redirect a browser there; a false is not a diagnosis. */
 export async function dashboardHostAnswers(
   settings: DashboardHostSettings | null,
 ): Promise<boolean> {

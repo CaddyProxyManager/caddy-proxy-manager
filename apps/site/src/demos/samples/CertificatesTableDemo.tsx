@@ -17,9 +17,8 @@ type Row = {
 };
 
 /**
- * One healthy, one close to expiry, one that has failed - what the page is watched for. Only the
- * imported ones carry a date: ACME certificates are renewed by Caddy on the agent, and their expiry
- * never reaches the controller.
+ * One healthy, one close to expiry, one that has failed - what the page is watched for. The ACME
+ * date is read from the agent's certificate storage; the others from the PEM the controller holds.
  */
 const CERTS: Row[] = [
   {
@@ -27,7 +26,7 @@ const CERTS: Row[] = [
     domain: "app.example.com",
     issuer: "Let's Encrypt",
     challenge: "HTTP-01",
-    expires: "Renewed by Caddy",
+    expires: "in 61 days",
     status: "active",
   },
   {
@@ -50,8 +49,6 @@ const CERTS: Row[] = [
 
 function CertificatesTableDemoContent() {
   const t = useTranslations("certificates");
-  // ACME certificates are renewed by Caddy on the agent, so only the imported ones have an expiry
-  // the controller can count - which is why the tiles split them the way the page does.
   const acme = CERTS.filter((c) => c.issuer === "Let's Encrypt").length;
   const imported = CERTS.length - acme;
   const expired = CERTS.filter((c) => c.status === "error").length;

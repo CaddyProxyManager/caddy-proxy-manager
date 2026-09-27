@@ -5,12 +5,8 @@ import * as sqliteStore from "./sqlite-store";
 // ── Configuration ───────────────────────────────────────────────────────────
 
 /**
- * Where analytics are written, resolved from the settings registry rather than the environment.
- *
- * Read per call rather than captured at module load, which is what makes the Settings toggle mean
- * anything: these values used to be `process.env` constants frozen the first time anything imported
- * this file, so a saved change could not take effect before a restart. The registry's own
- * stored → environment → default order keeps an unmigrated deployment behaving exactly as it did.
+ * Where analytics are written, from the settings registry. Read per call rather than at module
+ * load, or a saved Settings change would wait for a restart.
  */
 type ClickHouseConfig = {
   url: string;
@@ -25,10 +21,8 @@ type ClickHouseConfig = {
 };
 
 /**
- * Cached for the process, and dropped by `invalidateClickHouseConfig` when settings are saved.
- *
- * The promise is cached rather than the value, so the several queries a single analytics page fires
- * share one settings read instead of racing to do the same work.
+ * Dropped by `invalidateClickHouseConfig` on save. The promise is cached, not the value, so the
+ * queries one analytics page fires share a single settings read.
  */
 let configPromise: Promise<ClickHouseConfig> | null = null;
 
@@ -60,8 +54,8 @@ async function resolveConfig(): Promise<ClickHouseConfig> {
       "Analytics are switched on but no ClickHouse password is set - nothing will be recorded.",
     );
   }
-  // An unset toggle means "decide from the configuration", which is the rule this file applied
-  // before the toggle existed. Upgrading must not turn a working deployment's analytics off.
+  // An unset toggle decides from the configuration, so upgrading keeps a working deployment's
+  // analytics on.
   const enabled = sqlite ? toggle !== false : (toggle ?? configured) && configured;
 
   // Interpolated into DDL, which has no placeholder for an identifier. The registry rejects a bad
@@ -79,20 +73,15 @@ function chConfig(): Promise<ClickHouseConfig> {
 }
 
 /**
- * Forget the resolved configuration, and drop a client built from the old one.
- *
- * Called when the analytics settings are saved. Without the close, a changed URL or password would
- * be ignored until the process restarted - the singleton below would keep answering with a
- * connection opened under the previous credentials.
+ * Called on settings save. Without the close, the singleton would keep a connection opened under
+ * the old URL or password until a restart.
  */
 export async function invalidateClickHouseConfig(): Promise<void> {
   configPromise = null;
   try {
     await closeClickHouse();
   } catch (error) {
-    // Best-effort. The settings are already saved by the time this runs, so a socket that will not
-    // close cleanly must not turn a successful save into a reported failure - and the next
-    // getClient rebuilds from the new configuration either way.
+    // Best-effort: the settings are already saved, and the next getClient rebuilds either way.
     console.warn("Could not close the previous ClickHouse client:", error);
     client = null;
     clientKey = null;
@@ -270,15 +259,11 @@ const DISABLED_SYSTEM_LOGS = [
   "histogram_metric_log",
 ] as const;
 
-// Matches a disabled log table and its numbered upgrade leftovers: a ClickHouse upgrade renames the
-// old table to `<name>_<N>` and never cleans it up, so an exact-name drop misses it. Anchored to
-// names built from the trusted constant list above - no user input reaches this regex.
+// Also matches numbered upgrade leftovers: an upgrade renames the old table to `<name>_<N>` and
+// never cleans it up. Built from the constant list above, so no user input reaches it.
 const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join("|")})(_[0-9]+)?$`;
 
-/**
- * Drop the diagnostic system-log tables we disable via config, including numbered `_<N>` leftovers.
- * Best-effort - the analytics user often lacks DROP on `system`.
- */
+/** Best-effort: the analytics user often lacks DROP on `system`. */
 async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
   let names: string[];
   try {
@@ -395,7 +380,6 @@ export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = "")
     return;
   }
   const ch = await getClient();
-  // Convert unix timestamp to ClickHouse DateTime string
   const values = rows.map((r) => ({
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
@@ -532,7 +516,7 @@ async function queryRow<T>(query: string, query_params?: QueryParams): Promise<T
   return rows[0] ?? null;
 }
 
-// ── Analytics queries (same signatures as old analytics-db.ts) ──────────────
+// ── Analytics queries ───────────────────────────────────────────────────────
 
 export interface AnalyticsSummary {
   totalRequests: number;
@@ -597,7 +581,7 @@ export interface TimelineBucket {
   ts: number;
   total: number;
   blocked: number;
-  /** Added for the overview, whose chart follows whichever tile is selected. */
+  /** For the overview, whose chart follows whichever tile is selected. */
   clientErrors: number;
   serverErrors: number;
   bytes: number;
@@ -711,12 +695,8 @@ export interface CountryBreakdown {
 const COUNTRY_BREAKDOWN_LIMIT = 5;
 
 /**
- * One country's slice of the access log: where it went, how it was answered, and what sent it.
- *
- * "XX" is the code queryCountries gives rows GeoIP could not place, so it selects the NULLs here
- * rather than matching a literal - otherwise the unplaced row in the table would open an empty
- * breakdown. Three small grouped queries rather than one: each is a different GROUP BY, and
- * ClickHouse runs them in parallel from here.
+ * "XX" is what queryCountries gives unplaced rows, so it selects the NULLs rather than a literal.
+ * Three small queries, not one: each is a different GROUP BY, and they run in parallel.
  */
 export async function queryCountryBreakdown(
   from: number,
@@ -956,11 +936,8 @@ export interface StatusClassCounts {
 }
 
 /**
- * Counts by status class, for the overview's error tiles.
- *
- * `querySummary` deliberately does not carry these - it is shared with the analytics
- * page, which has no use for them, and widening it would make every caller pay for
- * three more aggregates.
+ * Not in `querySummary`: the analytics page shares it and has no use for these, so widening it
+ * would make every caller pay for three more aggregates.
  */
 export async function queryStatusClasses(
   from: number,
@@ -995,9 +972,8 @@ export async function queryStatusClasses(
 }
 
 /**
- * Which slice of the access log the overview is asking for. Each one is a status
- * class the tiles already count, so the log below a tile is the same population
- * the tile's number came from.
+ * Each is a status class a tile already counts, so the log below a tile is the same population as
+ * its number.
  */
 export type TrafficEventFilter = "all" | "server-errors" | "client-errors" | "largest" | "blocked";
 
@@ -1023,11 +999,8 @@ const TRAFFIC_EVENT_CONDITIONS: Record<TrafficEventFilter, string> = {
 };
 
 /**
- * Recent access-log rows, newest first - or largest first for the bandwidth tile,
- * where "what used the traffic" is the question and recency is not.
- *
- * Every selected column is one the parser actually writes: there is no upstream
- * address and no request duration in `traffic_events`, so neither is offered here.
+ * Newest first, or largest first for the bandwidth tile. `traffic_events` has no upstream address
+ * or request duration, so neither is offered.
  */
 export async function queryTrafficEvents(
   from: number,
@@ -1091,11 +1064,7 @@ export interface HostTotals {
   blocked: number;
 }
 
-/**
- * Per-host request counts for the proxy host list. Grouped in one query rather than one per row:
- * a page of twenty-five hosts would otherwise be twenty-five round trips to ClickHouse, and the
- * list renders whether or not any of them answer.
- */
+/** Per-host request counts in one grouped query, not a round trip per row of the host list. */
 export async function queryHostTotals(from: number, to: number): Promise<HostTotals[]> {
   const rows = await queryRows<{ host: string; total: string; blocked: string }>(
     `

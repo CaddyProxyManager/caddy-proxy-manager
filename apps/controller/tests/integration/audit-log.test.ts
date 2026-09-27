@@ -95,7 +95,6 @@ describe('audit-log integration', () => {
   });
 
   it('event with userId stores reference correctly', async () => {
-    // Insert a user first (needed for FK)
     const now = nowIso();
     const [user] = await db
       .insert(users)

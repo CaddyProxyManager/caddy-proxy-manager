@@ -7,9 +7,8 @@ banner "TLS certificates"
 
 # ── ACME issuance ───────────────────────────────────────────────────────────
 #
-# The rig has no route to the internet, so a valid certificate here can only
-# have come from Pebble, obtained over a real ACME order with a real HTTP-01
-# challenge served by Caddy on port 80.
+# The rig has no internet route, so a valid certificate can only have come from
+# Pebble over a real HTTP-01 order.
 
 acme_domain=$(domain_for "acme")
 create_host_or_fail "an auto-managed host can be created" "$(jq -nc --arg d "$acme_domain" \
@@ -33,6 +32,35 @@ t_ok "the chain verifies against the ACME root alone" tls_handshake_ok "$acme_do
 
 fetch "https://$acme_domain/"
 t_eq "traffic flows over the ACME certificate" "200" "$FETCH_CODE"
+
+# ── Renew now ───────────────────────────────────────────────────────────────
+#
+# Caddy has no renew endpoint; CPM widens the name's renewal window and reloads.
+# A fresh certificate is the only proof that worked.
+
+# The rig runs no agent to read Caddy's storage, so the request names the certificate's dates:
+# Pebble's last five years, and this one is a minute old, which no fixed window would reach.
+tls_cert "$acme_domain" >"$STATE_DIR/acme-before.pem"
+first_serial=$(cert_serial "$STATE_DIR/acme-before.pem")
+api_session POST /api/certificates/renew "$(jq -nc --arg n "$acme_domain" \
+  --arg b "$(cert_date_iso "$STATE_DIR/acme-before.pem" -startdate)" \
+  --arg a "$(cert_date_iso "$STATE_DIR/acme-before.pem" -enddate)" \
+  '{name:$n, notBefore:$b, notAfter:$a}')"
+t_eq "Renew now is accepted for a managed name" "200" "$API_STATUS"
+
+renewed() {
+  local serial
+  serial=$(tls_cert "$acme_domain" | openssl x509 -noout -serial 2>/dev/null | sed 's/.*=//')
+  [ -n "$serial" ] && [ "$serial" != "$first_serial" ]
+}
+if wait_for "a new certificate for $acme_domain" 120 renewed; then
+  pass "Renew now makes Caddy obtain a new certificate"
+else
+  fail "Renew now makes Caddy obtain a new certificate" "still serving $first_serial"
+fi
+
+api_session POST /api/certificates/renew '{"name":"10.0.0.1"}'
+t_eq "Renew now refuses something that is not a hostname" "400" "$API_STATUS"
 
 # ── Several domains on one host ─────────────────────────────────────────────
 
@@ -104,9 +132,8 @@ t_ne "an imported certificate with no PEM is rejected" "201" "$API_STATUS"
 
 # ── Wildcards ───────────────────────────────────────────────────────────────
 #
-# A wildcard cannot be issued over HTTP-01, so CPM refuses an auto-managed
-# wildcard host unless a DNS provider is configured. With an explicit
-# certificate attached the restriction does not apply.
+# HTTP-01 cannot issue a wildcard, so an auto-managed one needs a DNS provider;
+# an explicit certificate lifts that.
 
 api POST /api/v1/proxy-hosts \
   '{"name":"auto wildcard","domains":["*.auto-wild.cpm.test"],"upstreams":["origin-a:8080"]}'

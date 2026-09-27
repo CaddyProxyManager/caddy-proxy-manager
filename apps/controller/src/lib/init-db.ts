@@ -6,12 +6,11 @@ import { isDemoMode, SEEDED_ADMIN_ID } from "./demo-mode";
 import { accounts, schemaDialect, users } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
 
-/** Ensures the env-configured admin user exists, hashing the password. Called at startup. */
+/** Ensures the env-configured admin user exists. Called at startup. */
 
 //Todo: this could probably be handled better, especially for the adminid.
 export async function ensureAdminUser(): Promise<void> {
-  // OIDC-only mode: no local accounts, so no bootstrap admin to seed and no admin credentials to
-  // require. Roles come from the IdP's groups.
+  // OIDC-only: no local accounts, so no admin to seed; roles come from the IdP's groups.
   if (await localUsersDisabled()) {
     console.log("Local user management is disabled - skipping admin user seed");
     return;
@@ -28,24 +27,18 @@ export async function ensureAdminUser(): Promise<void> {
   const adminEmail = `${adminUsername}@localhost`;
   const provider = "credentials";
   const subject = adminUsername;
-  // A demo's visitors all see this account, so it gets a name that says what it is. Outside a demo
-  // the name is the operator's to change, so it is only set when the row is created.
+  // Every demo visitor sees this name; outside a demo it is only set when the row is created.
   const demoName = isDemoMode() ? "Demo Admin" : null;
 
-  // Hash the admin password for secure storage
   const passwordHash = await hashPassword(adminPassword);
 
-  // Check if admin user already exists
   const existingUser = await db.query.users.findFirst({
     where: (table, { eq }) => eq(table.id, adminId),
   });
 
   if (existingUser) {
-    // Admin user exists - always update the password hash so env-var changes take effect, and keep
-    // the role at "admin".
     const now = nowIso();
-    // Rehashed on every start, so a new hash says nothing: only an ADMIN_PASSWORD that no longer
-    // matches the stored one is a change worth dating.
+    // Rehashed every start, so only an ADMIN_PASSWORD no longer matching is worth dating.
     const passwordChanged =
       !existingUser.passwordHash ||
       !(await verifyPassword(adminPassword, existingUser.passwordHash));
@@ -63,13 +56,11 @@ export async function ensureAdminUser(): Promise<void> {
         updatedAt: now,
       })
       .where(eq(users.id, adminId));
-    // Ensure credential account row exists for Better Auth
     await ensureCredentialAccount(adminId, passwordHash);
     console.log(`Updated admin user: ${adminUsername}`);
     return;
   }
 
-  // Create admin user with hashed password
   const now = nowIso();
   await db.insert(users).values({
     id: adminId,
@@ -92,17 +83,12 @@ export async function ensureAdminUser(): Promise<void> {
 
   console.log(`Created admin user: ${adminUsername}`);
 
-  // Ensure credential account row exists for Better Auth
   await ensureCredentialAccount(adminId, passwordHash);
 }
 
 /**
- * Move the `users.id` sequence past the row above.
- *
- * The admin is inserted with an explicit id because auth.ts hard-codes 1, and PostgreSQL does not
- * advance a `serial`'s sequence for an explicit value - so the next insert is handed 1 as well and
- * fails on the primary key. Better Auth reports that as a bare 422, which is what the first
- * self-registration on a fresh deployment used to get.
+ * The admin's explicit id 1 does not advance PostgreSQL's `serial`, so the next insert would get 1
+ * too and fail the primary key - a bare 422 on a fresh deployment's first self-registration.
  */
 async function syncUserIdSequence(): Promise<void> {
   // SQLite's AUTOINCREMENT already counts explicit ids.
@@ -115,7 +101,7 @@ async function syncUserIdSequence(): Promise<void> {
   );
 }
 
-/** Ensures the `credential` account row Better Auth needs, with the password hash. */
+/** Better Auth needs the `credential` account row. */
 async function ensureCredentialAccount(userId: number, passwordHash: string): Promise<void> {
   const now = nowIso();
   const [existing] = await db
@@ -125,7 +111,6 @@ async function ensureCredentialAccount(userId: number, passwordHash: string): Pr
     .limit(1);
 
   if (existing) {
-    // Update password hash if changed
     await db
       .update(accounts)
       .set({

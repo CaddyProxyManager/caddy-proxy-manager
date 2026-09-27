@@ -1,7 +1,3 @@
-/**
- * Integration: src/lib/models/mtls-roles.ts CRUD plus the fingerprint/cert-id map builders, against
- * a real in-memory SQLite database.
- */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
@@ -9,7 +5,6 @@ import { issuedClientCertificates, caCertificates, users } from '../../src/lib/d
 
 let db: TestDb;
 
-// Mock the modules that mtls-roles.ts imports
 vi.mock('../../src/lib/db', () => {
   // This gets re-evaluated per test via beforeEach
   return {
@@ -25,7 +20,7 @@ let userId: number;
 beforeEach(async () => {
   db = await createTestDb();
   vi.clearAllMocks();
-  // Seed a user to satisfy FK constraints on createdBy
+  // Satisfies the createdBy foreign key.
   const now = new Date().toISOString();
   const [user] = await db
     .insert(users)
@@ -108,7 +103,6 @@ async function seedCaAndCerts() {
   return { ca, cert1, cert2, revokedCert };
 }
 
-// Dynamically import after mocks are set up
 const {
   listMtlsRoles,
   getMtlsRole,
@@ -304,7 +298,7 @@ describe('buildRoleFingerprintMap', () => {
     expect(map.has(role.id)).toBe(true);
     const fps = map.get(role.id)!;
     expect(fps.size).toBe(2);
-    // Fingerprints are normalized: colons stripped, lowercased
+    // Normalized: colons stripped, lowercased.
     expect(fps.has('aabbccdd')).toBe(true);
     expect(fps.has('eeff0011')).toBe(true);
   });
@@ -315,7 +309,6 @@ describe('buildRoleFingerprintMap', () => {
     await assignRoleToCertificate(role.id, revokedCert.id, 1);
 
     const map = await buildRoleFingerprintMap();
-    // Role exists but has no active certs
     expect(map.has(role.id)).toBe(false);
   });
 

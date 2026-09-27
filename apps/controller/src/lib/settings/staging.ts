@@ -1,9 +1,6 @@
 /**
- * The staged change set: what an operator has edited but not yet applied.
- *
- * Nothing here pushes to Caddy. Staging collects writes, `applyStagedSettings` in ./apply.ts moves
- * them into the `settings` table and reloads once. Keys and values match the `settings` table
- * exactly, so a staged row substitutes for a stored one with no translation.
+ * Edited-but-unapplied settings. Nothing here pushes to Caddy; ./apply.ts moves rows into
+ * `settings` and reloads once. Same keys and values as `settings`, so rows substitute directly.
  */
 
 import db, { nowIso } from "../db";
@@ -19,7 +16,7 @@ export type StagedEntry = {
   stagedAt: string;
 };
 
-/** Every key this operator has staged, oldest first. */
+/** Oldest first. */
 export async function listStagedSettings(userId: number): Promise<StagedEntry[]> {
   const rows = await db
     .select({
@@ -33,7 +30,6 @@ export async function listStagedSettings(userId: number): Promise<StagedEntry[]>
   return rows.sort((a, b) => a.stagedAt.localeCompare(b.stagedAt));
 }
 
-/** The staged set as the overlay shape the read path consults. */
 export async function stagedOverlay(userId: number): Promise<Map<string, string>> {
   const entries = await listStagedSettings(userId);
   return new Map(entries.map((entry) => [entry.key, entry.value]));
@@ -43,13 +39,7 @@ export async function countStagedSettings(userId: number): Promise<number> {
   return (await listStagedSettings(userId)).length;
 }
 
-/**
- * Record captured writes as this operator's staged set.
- *
- * A write whose value matches what is already stored is *unstaged* rather than recorded: editing a
- * field and putting it back should leave nothing pending, and without this a no-op save would show
- * up in the review sheet as a change from a value to itself.
- */
+/** A write matching the stored value is *unstaged*, so an edit put back leaves nothing pending. */
 export async function stageWrites(userId: number, writes: Map<string, string>): Promise<void> {
   if (writes.size === 0) return;
   const now = nowIso();
@@ -81,13 +71,7 @@ export async function discardAllStaged(userId: number): Promise<void> {
   await db.delete(settingsStaged).where(eq(settingsStaged.userId, userId));
 }
 
-/**
- * The stored serialization of each key; an unset key is absent.
- *
- * Deliberately reads the raw rows rather than going through `getSetting`, which parses - comparing
- * serialized forms is what tells us whether a write is a no-op, and re-serializing a parsed value
- * could differ from what is stored by key order alone.
- */
+/** Raw rows, not `getSetting`: a parse and re-serialize could differ by key order alone. */
 export async function storedValues(keys: string[]): Promise<Map<string, string>> {
   const rows = await db
     .select({ key: settings.key, value: settings.value })
@@ -96,7 +80,7 @@ export async function storedValues(keys: string[]): Promise<Map<string, string>>
   return new Map(rows.map((row) => [row.key, row.value]));
 }
 
-/** Read a setting as it would be after applying this operator's staged set. */
+/** As it would be after applying this operator's staged set. */
 export async function getStagedSetting<T>(userId: number, key: string): Promise<T | null> {
   const overlay = await stagedOverlay(userId);
   return withStagedReads(overlay, () => getSetting<T>(key));

@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # GitHub Actions updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,7 +13,6 @@ updates:
       prefix: "ci"
       include: "scope"
 
-  # Bun dependencies updates
   - package-ecosystem: "bun"
     directory: "/"
     schedule:
@@ -27,7 +25,6 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
-    # Group non-security updates
     groups:
       development-dependencies:
         dependency-type: "development"
@@ -66,7 +63,6 @@ updates:
           - "github.com/corazawaf/coraza-caddy/v2"
           - "github.com/google/cel-go"
 
-  # Docker base images updates
   - package-ecosystem: "docker"
     directory: "/docker/web"
     schedule:

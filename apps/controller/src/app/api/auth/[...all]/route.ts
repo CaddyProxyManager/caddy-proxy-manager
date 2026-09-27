@@ -14,12 +14,45 @@ import {
   registerAccountFailure,
   resetAccountFailures,
 } from "@/src/lib/rate-limit";
+import {
+  CREDENTIAL_SIGN_IN_PATHS,
+  TWO_FACTOR_MANAGE_PATHS,
+  hasTwoFactorChallengeCookie,
+} from "@/src/lib/auth-sign-in-paths";
+import { isDemoAdmin, isDemoMode } from "@/src/lib/demo-mode";
+import { createAuditEvent } from "@/src/lib/models/audit";
 
 export const dynamic = "force-dynamic";
 
-const PASSWORD_SIGN_IN_PATHS = new Set(["/api/auth/sign-in/username", "/api/auth/sign-in/email"]);
+const PASSWORD_SIGN_IN_PATHS = new Set(CREDENTIAL_SIGN_IN_PATHS.map((path) => `/api/auth${path}`));
+const TWO_FACTOR_MANAGE = new Set(TWO_FACTOR_MANAGE_PATHS.map((path) => `/api/auth${path}`));
 
-/** better-auth keys its rate limiter on CLIENT_IP_HEADER alone, so a client-sent copy is replaced. */
+/** Confirming a new authenticator hits verify-totp with no sign-in challenge cookie. */
+function twoFactorManageAudit(
+  pathname: string,
+  cookies: string | null,
+): { action: string; summary: string } | null {
+  switch (pathname) {
+    case "/api/auth/two-factor/verify-totp":
+      return hasTwoFactorChallengeCookie(cookies)
+        ? null
+        : { action: "two_factor_enabled", summary: "User turned on two-factor sign-in" };
+    case "/api/auth/two-factor/disable":
+      return { action: "two_factor_disabled", summary: "User turned off two-factor sign-in" };
+    case "/api/auth/two-factor/generate-backup-codes":
+      return { action: "two_factor_backup_codes", summary: "User replaced their backup codes" };
+  }
+  return null;
+}
+
+/** Every demo visitor shares one account, and a second factor on it would lock the next one out. */
+async function isDemoAdminRequest(request: Request): Promise<boolean> {
+  if (!isDemoMode()) return false;
+  const session = await (await getAuth()).api.getSession({ headers: request.headers });
+  return session?.user ? isDemoAdmin(Number(session.user.id)) : false;
+}
+
+/** better-auth rate-limits on CLIENT_IP_HEADER alone, so a client-sent copy is replaced. */
 async function withClientIp(request: Request): Promise<Request> {
   const headers = new Headers(request.headers);
   headers.delete(CLIENT_IP_HEADER);
@@ -36,7 +69,6 @@ async function withClientIp(request: Request): Promise<Request> {
   } as RequestInit);
 }
 
-/** The name a password sign-in is for, as sent. */
 async function signInName(request: Request): Promise<string | null> {
   try {
     const body = (await request.json()) as { username?: unknown; email?: unknown };
@@ -53,7 +85,30 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const forwarded = await withClientIp(request);
-  if (!PASSWORD_SIGN_IN_PATHS.has(new URL(request.url).pathname)) {
+  const pathname = new URL(request.url).pathname;
+  if (TWO_FACTOR_MANAGE.has(pathname) && (await isDemoAdminRequest(request))) {
+    const t = await getTranslations("errors");
+    return Response.json(
+      { code: "DEMO_LOCKED", message: t("demoAdminProtected") },
+      { status: 403 },
+    );
+  }
+  const managedAudit = twoFactorManageAudit(pathname, request.headers.get("cookie"));
+  if (managedAudit) {
+    const session = await (await getAuth()).api.getSession({ headers: request.headers });
+    const response = await toNextJsHandler(await getAuth()).POST(forwarded);
+    if (response.ok && session?.user) {
+      await createAuditEvent({
+        userId: Number(session.user.id),
+        action: managedAudit.action,
+        entityType: "user",
+        entityId: Number(session.user.id),
+        summary: managedAudit.summary,
+      }).catch(() => {});
+    }
+    return response;
+  }
+  if (!PASSWORD_SIGN_IN_PATHS.has(pathname)) {
     return toNextJsHandler(await getAuth()).POST(forwarded);
   }
 
@@ -70,8 +125,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Enforced here, not only by the form: the endpoint is reachable without it. After the throttle,
-  // so a request refused for that does not spend the solve.
+  // The endpoint is reachable without the form. After the throttle, so a refusal keeps the solve.
   const captcha = await getActiveCaptcha();
   // No name, no pass: an empty one would be the account key of the username "@localhost".
   if (
@@ -91,5 +145,27 @@ export async function POST(request: Request) {
     else if (response.ok) resetAccountFailures(account);
   }
   if (captcha) response.headers.append("Set-Cookie", CAPTCHA_PASS_CLEAR_COOKIE);
+  if (response.ok) await auditCompletedSignIn(response);
   return response;
+}
+
+/** The session hook skips password sign-ins, as the 2FA plugin may yet delete that session. */
+async function auditCompletedSignIn(response: Response): Promise<void> {
+  try {
+    const body = (await response.clone().json()) as {
+      twoFactorRedirect?: boolean;
+      user?: { id?: string | number };
+    };
+    const userId = Number(body.user?.id);
+    if (body.twoFactorRedirect || !Number.isInteger(userId)) return;
+    await createAuditEvent({
+      userId,
+      action: "login_success",
+      entityType: "session",
+      entityId: null,
+      summary: "User signed in",
+    });
+  } catch {
+    // Never fail a sign-in over its audit entry.
+  }
 }

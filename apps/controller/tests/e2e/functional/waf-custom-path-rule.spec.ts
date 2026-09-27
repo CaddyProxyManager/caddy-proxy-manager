@@ -23,8 +23,7 @@ test.describe
       await page.getByRole('button', { name: /settings/i }).click();
       await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
-      // Hand-written ids the astryx controls never emit; both expose a role and
-      // an accessible name instead.
+      // Astryx controls emit no ids; by role and name instead.
       const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
       const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
@@ -37,8 +36,7 @@ test.describe
         await expect(owaspCheckbox).toBeChecked();
       }
 
-      // Wait for the staged banner: the button never disables, so it being
-      // enabled says nothing about whether the save has landed.
+      // The button never disables, so wait for the staged banner.
       await page.getByRole('button', { name: 'Save', exact: true }).click();
       await expectStaged(page);
 

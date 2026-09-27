@@ -1,13 +1,6 @@
 /**
- * Migrating a real pre-3.0 SQLite database into PostgreSQL.
- *
- * The fixture is built by running the SQLite migrations every 3.0 deployment ran, then seeding it
- * the way that release would have - so this exercises the actual shapes an upgrade meets rather
- * than a hand-written approximation of them.
- *
- * This is also where two tests deleted in the PostgreSQL move get their successors. They used to
- * assert that legacy `accounts` rows stayed readable by booting the app on the old database, which
- * is no longer a thing that can happen; the same guarantees now belong to the import.
+ * Migrating a real pre-3.0 SQLite database into PostgreSQL. The fixture runs the SQLite
+ * migrations every 3.0 deployment ran, so this exercises the shapes an upgrade actually meets.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -69,8 +62,7 @@ function buildLegacyDatabase(): string {
     [NOW, NOW, NOW, NOW],
   );
 
-  // The credential account row Better Auth reads. This is the shape the deleted compatibility
-  // tests were guarding.
+  // The credential account row Better Auth reads.
   raw.run(
     `INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt)
      VALUES (1, '1', 'credential', 'local:credential', '$argon2id$hash', ?, ?)`,
@@ -119,6 +111,7 @@ beforeEach(async () => {
   invalidateSettingsCache();
   directory = mkdtempSync(join(tmpdir(), 'cpm-legacy-'));
   for (const table of [
+    schemaModule.caCertificates,
     schemaModule.accounts,
     schemaModule.apiTokens,
     schemaModule.proxyHosts,
@@ -132,9 +125,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.LEGACY_SQLITE_PATH;
-  // Every handle above and in the importer is closed with `close(true)`, so the file is released
-  // here rather than whenever the collector gets to it. Without that this line fails on Windows,
-  // intermittently, with EBUSY.
+  // Every handle is closed with `close(true)`, or this fails intermittently on Windows with EBUSY.
   rmSync(directory, { recursive: true, force: true });
 });
 
@@ -206,9 +197,8 @@ describe('import', () => {
   });
 
   it('carries the credential account across, so the migrated admin can still sign in', async () => {
-    // The successor to the deleted auth-adapter-compat and db-compat-accounts tests: what those
-    // guarded was that Better Auth could read an account row written by the old release. It can
-    // only reach one now by way of this import.
+    // Better Auth must read an account row written by the old release, and can only reach one
+    // through this import.
     await importLegacyDatabase(buildLegacyDatabase());
 
     const accounts = await ctx.db
@@ -226,7 +216,7 @@ describe('import', () => {
 
   it('leaves the id sequences past the copied rows', async () => {
     // Without this, the first proxy host created after an upgrade is handed id 1 and dies on the
-    // primary key - the same failure the bootstrap admin caused before its sequence was resynced.
+    // primary key.
     await importLegacyDatabase(buildLegacyDatabase());
 
     const [created] = await ctx.db
@@ -272,9 +262,26 @@ describe('import', () => {
     expect(users).toHaveLength(2);
 
     expect(first.totalRows).toBeGreaterThan(0);
-    // Reporting the batch size rather than the rows actually written would claim a second run had
-    // migrated everything again.
+    // The batch size would claim a second run had migrated everything again.
     expect(second.totalRows).toBe(0);
+  });
+
+  it('encrypts a CA private key the old release kept in plain text', async () => {
+    const path = buildLegacyDatabase();
+    const raw = new Database(path);
+    raw.run(
+      `INSERT INTO ca_certificates (id, name, certificatePem, privateKeyPem, createdBy, createdAt,
+                                    updatedAt)
+       VALUES (1, 'root', 'CERT', 'PLAIN CA KEY', 1, ?, ?)`,
+      [NOW, NOW],
+    );
+    raw.close(true);
+
+    await importLegacyDatabase(path);
+    const [ca] = await ctx.db.select().from(schemaModule.caCertificates);
+    expect(ca.privateKeyPem?.startsWith('enc:v1:')).toBe(true);
+    expect(decryptSecret(ca.privateKeyPem!)).toBe('PLAIN CA KEY');
+    expect(ca.certificatePem).toBe('CERT');
   });
 
   it('inserts users before the accounts that reference them', async () => {
@@ -343,7 +350,6 @@ describe('choosing what to migrate', () => {
   });
 
   it('copies everything when no selection is given', async () => {
-    // The default is the behaviour every caller had before there was anything to choose.
     const report = await importLegacyDatabase(buildLegacyDatabase());
 
     expect(report.excludedBySelection).toEqual([]);
@@ -354,8 +360,7 @@ describe('choosing what to migrate', () => {
 
 describe('carrying the old JSON settings into the registry', () => {
   it('lifts the gravatar toggle out of its blob, so an upgrade does not reset it', async () => {
-    // The fixture has avatars.gravatarEnabled = false. Phase 2 deliberately left this consumer
-    // reading the blob, because migrating it needed this step to exist first.
+    // The fixture has avatars.gravatarEnabled = false.
     await importLegacyDatabase(buildLegacyDatabase());
     invalidateSettingsCache();
 
@@ -397,10 +402,7 @@ describe('carrying the old JSON settings into the registry', () => {
 
 /**
  * A database whose secrets were encrypted under a SESSION_SECRET this deployment does not have.
- *
- * Before the importer took a key, the only way through was to change SESSION_SECRET to match the
- * old installation's and keep it forever. Now the old value is asked for once and used to
- * re-encrypt everything under the key this deployment already has.
+ * The old value is asked for once and used to re-encrypt under this deployment's key.
  */
 describe('a database encrypted with a different SESSION_SECRET', () => {
   const OLD_SECRET = 'the-old-installations-session-secret-4321';
@@ -445,7 +447,6 @@ describe('a database encrypted with a different SESSION_SECRET', () => {
       .from(schemaModule.certificates)
       .where(eq(schemaModule.certificates.id, 1));
 
-    // Readable with the running deployment's own key, which is what nothing could do before.
     expect(decryptSecret(row.privateKeyPem as string)).toBe('-----BEGIN PRIVATE KEY-----');
     // Re-encrypted rather than copied: the old secret is not needed again after this.
     expect(row.privateKeyPem).not.toBe(encryptWithOldSecret('-----BEGIN PRIVATE KEY-----'));

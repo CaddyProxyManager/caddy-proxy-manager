@@ -1,10 +1,6 @@
 import type { OAuthGroupMapping, OAuthProvider } from "./models/oauth-providers";
 
-/**
- * OAuth provider data that is safe to serialize to React clients and ordinary
- * API responses. Use an explicit allowlist so future server-side fields do not
- * cross the browser boundary automatically.
- */
+/** An explicit allowlist, so a new server-side field never reaches the browser by default. */
 export type OAuthProviderView = OAuthGroupMapping & {
   id: string;
   name: string;
@@ -59,21 +55,12 @@ export function oauthCallbackUrl(baseUrl: string, providerId: string): string {
   return `${normalizedBaseUrl}/api/auth/callback/${encodeURIComponent(providerId)}`;
 }
 
-/**
- * Where an identity provider sends OIDC back-channel logout notifications.
- *
- * One URL for every provider, unlike the callback: a logout token names its own issuer, and that
- * is what selects the provider it is verified against.
- */
+/** One URL for every provider: a logout token's issuer selects the provider. */
 export function oidcBackchannelLogoutUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/api/auth/oidc/backchannel-logout`;
 }
 
-/**
- * Preserve the stored secret unless the administrator explicitly supplies a
- * replacement. Omitting the property is important: an empty string would
- * otherwise rotate the provider to an unusable credential.
- */
+/** Omits the property unless replaced: an empty string would rotate to an unusable credential. */
 export function withOAuthClientSecretRotation<T extends object>(
   update: T,
   replacement: string | undefined,

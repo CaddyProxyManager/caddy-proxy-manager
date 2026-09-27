@@ -1,7 +1,4 @@
-/**
- * Integration tests for src/lib/models/mtls-access-rules.ts
- * Tests all CRUD operations and the bulk query function.
- */
+/** Integration: src/lib/models/mtls-access-rules.ts, CRUD and the bulk query. */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
@@ -306,7 +303,6 @@ describe('JSON parsing edge cases in access rules', () => {
   it('handles malformed allowedRoleIds JSON gracefully', async () => {
     const host = await insertHost();
     const now = nowIso();
-    // Insert directly with bad JSON
     await db.insert(mtlsAccessRules).values({
       proxyHostId: host.id,
       pathPattern: '/test',

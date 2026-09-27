@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { mustEnrollTwoFactor } from "./two-factor-policy";
 import { auth, checkSameOrigin } from "./auth";
 import { validateToken } from "./models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./api-errors";
-import { DomainError } from "./domain-error";
+import { DomainError, domainErrorMessage } from "./domain-error";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -25,10 +26,11 @@ export type ApiAuthResult = {
   userId: number;
   role: string;
   authMethod: "bearer" | "session";
+  /** A session viewing as some groups; a token never is. */
+  viewAsGroupIds?: number[];
 };
 
 export async function authenticateApiRequest(request: NextRequest): Promise<ApiAuthResult> {
-  // Try Bearer token first
   const authHeader = request.headers.get("authorization") ?? "";
   if (authHeader.startsWith("Bearer ")) {
     const rawToken = authHeader.slice(7);
@@ -48,29 +50,34 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
     };
   }
 
-  // Fall back to session auth
   const session = await auth();
   if (!session?.user?.id) {
     throw new ApiAuthError("Unauthorized", 401);
   }
 
-  // Deny access when role is missing rather than defaulting to "user"
+  // Deny rather than default to "user".
   const role = session.user.role;
   if (!role) {
     throw new ApiAuthError("Session missing role claim", 401);
+  }
+
+  // /api/v1 and /api/graphql skip the proxy's gate, so the two-factor policy is enforced here too.
+  if (await mustEnrollTwoFactor(session)) {
+    throw new ApiAuthError(domainErrorMessage("twoFactorRequired"), 403);
   }
 
   return {
     userId: Number(session.user.id),
     role,
     authMethod: "session",
+    viewAsGroupIds: session.viewAs?.groupIds,
   };
 }
 
 export async function requireApiUser(request: NextRequest): Promise<ApiAuthResult> {
   const result = await authenticateApiRequest(request);
 
-  // CSRF check for session-authenticated mutating requests
+  // A bearer token cannot be ridden cross-site; a session cookie can.
   if (result.authMethod === "session") {
     const method = request.method.toUpperCase();
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
@@ -92,9 +99,6 @@ export async function requireApiAdmin(request: NextRequest): Promise<ApiAuthResu
   return result;
 }
 
-/**
- * Helper to build an error response from an ApiAuthError or generic error.
- */
 export function apiErrorResponse(error: unknown): NextResponse {
   if (error instanceof ApiAuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -102,16 +106,14 @@ export function apiErrorResponse(error: unknown): NextResponse {
   if (error instanceof ApiClientError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
-  // A model error that names its 4xx - one that used to be an ApiClientError - is just as safe.
+  // A model error that names its 4xx is as safe to echo as an ApiClientError.
   if (error instanceof DomainError && error.status !== undefined) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   if (error instanceof NotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
-  // Several model functions predate NotFoundError and use a fixed
-  // "<resource> not found" message. Preserve their 404 contract without
-  // reflecting the unexpected message (or any resource/internal detail).
+  // Older models throw a plain "<resource> not found": keep the 404 without echoing the message.
   if (error instanceof Error && error.message.trim().toLowerCase().endsWith("not found")) {
     return NextResponse.json({ error: "Resource not found" }, { status: 404 });
   }
@@ -119,10 +121,7 @@ export function apiErrorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: "Internal server error", errorId }, { status: 500 });
 }
 
-/**
- * Log enough metadata to correlate unexpected failures without copying raw
- * exception messages, response bodies, URLs, or stacks into centralized logs.
- */
+/** Correlatable metadata only - never raw messages, bodies, URLs or stacks into shared logs. */
 export function logUnexpectedApiError(context: string, error: unknown): string {
   const errorId = randomUUID();
   const rawType = error instanceof Error ? error.name : typeof error;

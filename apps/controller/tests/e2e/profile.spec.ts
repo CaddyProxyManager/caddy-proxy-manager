@@ -10,7 +10,7 @@ test.describe('Profile', () => {
 
   test('profile page shows username or email', async ({ page }) => {
     await page.goto('/profile');
-    // Use first() since username appears in sidebar + profile body
+    // The username is in the sidebar too.
     await expect(page.locator('text=/testadmin|testadmin@/i').first()).toBeVisible({
       timeout: 5000,
     });
@@ -37,7 +37,6 @@ test.describe('Profile', () => {
       .last()
       .click();
 
-    // Should show an error alert
     await expect(page.locator('[role="alert"]').filter({ hasText: /\S/ }).first()).toBeVisible({
       timeout: 10000,
     });
@@ -58,8 +57,7 @@ test.describe('Profile', () => {
       .last()
       .click();
 
-    // Scoped to the error banner (role="alert"): the field's own hint states the
-    // same rule, so an unscoped text match now finds both and fails on strict mode.
+    // Scoped to the alert: the field's hint states the same rule and trips strict mode.
     await expect(
       page.getByRole('alert').filter({ hasText: /at least 12 characters/i }),
     ).toBeVisible({ timeout: 5000 });

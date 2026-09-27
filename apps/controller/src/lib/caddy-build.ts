@@ -1,15 +1,7 @@
 /**
- * Caddy image build management.
- *
- * Plugins are compiled in, so changing the module list means rebuilding the image and recreating
- * the container - which the controller cannot do itself, having no Docker socket. It sends the
- * selection to the agent and reads back what the agent actually built.
- *
- * *desired* is the admin's selection, which drives the UI; *applied* is what the running binary was
- * built with, which the agent reports and only after a build has succeeded and Caddy is healthy
- * again. Generation must never emit a handler outside *applied*, since Caddy rejects a config
- * naming an unknown module in full - so the two are kept apart, and generation uses the
- * intersection.
+ * Caddy image builds, which the agent runs. *desired* is the admin's selection and drives the UI;
+ * *applied* is what the running binary was built with. Caddy rejects a whole config naming an
+ * unknown module, so generation uses only the intersection of the two.
  */
 
 import crypto from "node:crypto";
@@ -30,9 +22,11 @@ import { domainError } from "./domain-error";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
 import {
+  caddyBuildAgents,
   getAgentStatusFor,
   getAllAgentStatuses,
   requestCaddyBuild,
+  requestCaddyImageLoad,
   tryGetAgentStatus,
 } from "./agent/client";
 import { getAgentBuildSettings } from "./models/agents";
@@ -53,13 +47,12 @@ export type CaddyBuildDiff = {
 
 // ─── Selection ───────────────────────────────────────────────────────────────
 
-/**
- * Resolve stored settings into a complete selection. A missing module id counts as enabled, so a
- * module added to the catalog after the operator last saved appears on.
- */
+/** A missing module id counts as enabled, so one added to the catalog since the last save is on. */
 export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): string[] {
   const overrides = settings?.modules ?? {};
-  return CADDY_MODULES.filter((m) => overrides[m.id] !== false).map((m) => m.id);
+  return CADDY_MODULES.filter((m) => overrides[m.id] ?? m.defaultEnabled !== false).map(
+    (m) => m.id,
+  );
 }
 
 export function resolveCustomModules(settings: CaddyBuildSettings | null): CaddyCustomModule[] {
@@ -85,26 +78,12 @@ export function defaultModuleSpecs(): string[] {
 // ─── Applied state ───────────────────────────────────────────────────────────
 
 /**
- * The module specs compiled into every running binary - the intersection across the fleet.
- *
- * From what each agent reports having built, which it records only after a build has succeeded and
- * Caddy is healthy again - never from the selection. Using the selection would make applied equal
- * desired the instant a rebuild was requested, so any config apply during the build would emit
- * handlers the running binary lacks, and a failed build would reject every apply after it.
- *
- * The intersection, not the union, because one document goes to every host: a handler only one
- * agent's binary has makes Caddy reject the whole config on all the others. Null from an agent
- * means it has never rebuilt, so it is still the shipped image and carries the full catalog.
- *
- * An unreachable agent contributes nothing rather than emptying the set. It cannot be configured
- * either - the apply fails on it and says so - and stripping every plugin-backed handler from the
- * hosts that *are* reachable would turn one unreachable agent into a fleet-wide outage.
+ * What agents report having built, never the selection, or a pending or failed build would emit
+ * handlers the binary lacks. Fleet-wide it is the intersection, since one document goes everywhere;
+ * an unreachable agent is skipped, so it cannot strip plugins from the reachable ones.
  */
 export async function getAppliedModuleSpecs(agentRowId?: number): Promise<string[]> {
-  // Asked about one agent, the intersection is beside the point: that agent's document is built
-  // for it alone, so what its own binary carries is the whole answer. An agent that is not
-  // connected reads as the shipped image, the same assumption the fleet path makes for one that
-  // has never rebuilt.
+  // One agent's document is built for it alone. Null or disconnected means the shipped image.
   if (agentRowId !== undefined) {
     const status = await getAgentStatusFor(agentRowId);
     const applied = status?.caddyBuild.applied;
@@ -140,12 +119,7 @@ export function parseModuleSpecList(value: string): string[] {
     .sort();
 }
 
-/**
- * The module selection that applies to an agent: its own if it has one, else the fleet default.
- *
- * Called with no agent for the fleet-wide answer, which is what the Settings page shows and what a
- * deployment that has never configured an agent separately gets everywhere.
- */
+/** An agent's own module selection if it has one, else the fleet default. */
 export async function resolveBuildSettingsFor(
   agentRowId?: number,
 ): Promise<CaddyBuildSettings | null> {
@@ -212,8 +186,7 @@ export async function getCaddyModuleAvailability(
       Boolean(p),
     ),
   );
-  // Custom modules are opaque - no feature mapping, but they belong in appliedPaths so a
-  // caller checking a specific path can find one an operator added by hand.
+  // Custom modules map to no feature, but a caller checking a path must still find them.
   const appliedPaths = new Set(appliedSpecs.map((spec) => stripVersion(spec)));
   return {
     desired: featuresForPaths(desiredPaths),
@@ -234,6 +207,16 @@ export function isFeatureUsable(
   feature: CaddyFeatureId,
 ): boolean {
   return availability.desired.has(feature) && availability.applied.has(feature);
+}
+
+/** Whether an HTTP cache storage is selected and compiled in; HTTP Cache itself is checked apart. */
+export function isCacheStorageUsable(
+  availability: CaddyModuleAvailability,
+  storage: string,
+): boolean {
+  const module = CADDY_MODULES.find((m) => m.cacheStorage === storage);
+  if (!module) return false;
+  return availability.desiredIds.has(module.id) && availability.appliedPaths.has(module.modulePath);
 }
 
 /**
@@ -262,10 +245,7 @@ export function featureModuleNames(
 
 // ─── Build ───────────────────────────────────────────────────────────────────
 
-/**
- * Send the selection to the agent to build with. Validated here as well as in the UI, since the
- * REST API reaches this too and a bad module path would otherwise fail opaquely inside the build.
- */
+/** Validated here too: the REST API reaches this, and a bad path fails opaquely in the build. */
 export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildStatus> {
   const settings = await resolveBuildSettingsFor(agentRowId);
 
@@ -275,13 +255,41 @@ export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildSt
     if (problem) throw problem;
   }
 
-  // Re-apply the config before the rebuild. Caddy runs with `--resume`, so a recreated container
-  // reloads the last autosaved config; if that names a module the new binary lacks, the proxy stays
-  // down with no admin API to correct it. Imported lazily - caddy.ts imports this for gating.
+  // Re-apply first: under `--resume` a recreated Caddy reloads its autosave, and one naming a
+  // module the new binary lacks leaves it down. Lazy because caddy.ts imports this module.
   const { applyCaddyConfig } = await import("./caddy");
   await applyCaddyConfig();
 
   return requestCaddyBuild(resolveModuleSpecs(settings));
+}
+
+/** `?agent=<row id>` on the build routes; absent or malformed is the fleet. */
+export function parseAgentRowId(raw: string | null): number | undefined {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * External mode's rebuild: the operator built the image, and each targeted agent loads it. The
+ * config is re-applied first for the same reason a rebuild does it.
+ */
+export async function loadCaddyImage(agentRowId?: number): Promise<CaddyBuildStatus> {
+  if (caddyBuildAgents(agentRowId).external.length === 0) {
+    throw domainError("caddyImageNoExternalAgent", {}, { status: 409 });
+  }
+  const { applyCaddyConfig } = await import("./caddy");
+  await applyCaddyConfig();
+
+  const results = await requestCaddyImageLoad(agentRowId);
+  const failed = results.filter((result) => !result.ok);
+  if (failed.length === results.length && failed[0] && !failed[0].ok) {
+    throw domainError(
+      "caddyImageLoadFailed",
+      { agent: failed[0].agent, error: failed[0].error },
+      { status: 502 },
+    );
+  }
+  return { state: "pending", triggeredAt: new Date().toISOString() };
 }
 
 /** The agent's last word on the rebuild - one named agent's, or the primary's. */
@@ -309,8 +317,7 @@ export function sanitizeCaddyBuildSettings(input: {
     if (!modulePath) continue;
     const problem = customModuleProblem({ ...entry, modulePath });
     if (problem) throw problem;
-    // A duplicate path fails the build with a confusing "module already required" error,
-    // long after the admin left the page.
+    // Otherwise the build fails later with a confusing "module already required".
     if (seen.has(modulePath)) {
       throw domainError("customModuleDuplicate", { path: modulePath }, { status: 400 });
     }
@@ -327,12 +334,9 @@ export function sanitizeCaddyBuildSettings(input: {
 
 // ─── UI gate ─────────────────────────────────────────────────────────────────
 
-const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01"];
+const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01", "cache"];
 
-/**
- * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not
- * applied - a control following applied would stay greyed out right after being switched on.
- */
+/** Gates on *desired*: following applied, a control stays greyed out right after it is enabled. */
 export async function getModuleGateState(
   nameOf?: (module: CaddyModuleDefinition) => string,
 ): Promise<{
@@ -356,8 +360,7 @@ export async function getModuleGateState(
   return {
     features,
     moduleNames,
-    // Per-module rather than per-feature: DNS-01 is only meaningful one provider at a time,
-    // and having Cloudflare compiled in says nothing about whether Route 53 is.
+    // Per-module: Cloudflare compiled in says nothing about Route 53.
     enabledModuleIds: Array.from(availability.desiredIds),
     pendingRebuild: diff.needsRebuild,
   };

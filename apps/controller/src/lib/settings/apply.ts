@@ -1,10 +1,4 @@
-/**
- * Moving a staged change set into the settings table and reloading Caddy once.
- *
- * The whole point of staging is that this is the only place a settings edit reaches Caddy, so the
- * cost of a batch is one reload rather than one per form, and the operator sees what will happen
- * before it does.
- */
+/** The only place a settings edit reaches Caddy: one reload per batch, reviewed beforehand. */
 
 import db, { nowIso } from "../db";
 import { settings, settingsRevisions } from "../db/schema";
@@ -18,18 +12,18 @@ import { domainError } from "../domain-error";
 export type RevisionRow = {
   id: number;
   appliedByName: string | null;
-  /** The stored change list. Kept as written, since the migration copies it; the UI renders `keys`. */
+  /** Kept as written, since the migration copies it; the UI renders `keys`. */
   summary: string;
-  /** The storage keys the apply committed, for the review sheet to name in the reader's language. */
+  /** So the review sheet can name them in the reader's language. */
   keys: string[];
   outcome: "applied" | "failed";
   error: string | null;
   appliedAt: string;
-  /** Whether the row holds its values. One written before they were recorded can be neither compared nor restored. */
+  /** Older rows lack their values, so they can be neither compared nor restored. */
   recorded: boolean;
 };
 
-/** A key's serialized value either side of an apply; `before` is null for a key that had no row. */
+/** `before` is null for a key that had no row. */
 export type RevisionChange = { before: string | null; after: string };
 
 /** `error` is what the revision stores; `cause` is what the action renders, in the reader's language. */
@@ -37,12 +31,7 @@ export type ApplyOutcome =
   | { ok: true; revision: number }
   | { ok: false; error: string; cause: Error; revision: number };
 
-/**
- * Render the config Caddy would receive if this operator applied now.
- *
- * Cheap because of the read overlay: the builder is called unmodified and every settings read
- * inside it resolves against the staged set instead of the table.
- */
+/** The unmodified builder, with settings reads overlaid by the staged set. */
 export async function renderStagedDocument(userId: number): Promise<unknown> {
   const overlay = await stagedOverlay(userId);
   return withStagedReads(overlay, () => buildCaddyDocument());
@@ -57,12 +46,8 @@ export async function renderConfigComparison(
 }
 
 /**
- * Commit the staged set and push it.
- *
- * Under the same lock every settings write takes, so a concurrent apply by another operator cannot
- * interleave with this one's writes. The staged rows are dropped only after the write succeeds -
- * a failed push leaves the settings table updated but records the failure, because the values are
- * what the operator asked for and re-applying is a retry rather than a re-entry.
+ * Under the settings lock. A failed push still commits the values and records the failure, so
+ * re-applying is a retry rather than a re-entry.
  */
 export async function applyStagedSettings(
   userId: number,
@@ -92,11 +77,10 @@ export async function applyStagedSettings(
     try {
       await applyCaddyConfig();
     } catch (cause) {
-      // Something that is not an Error, or caddy.ts's CaddyApplyError carrying this very sentence:
-      // either way the code stands in, so the action can say it translated. The English is the same.
+      // A non-Error, or caddy.ts's error with this very sentence: use the code so it translates.
       failure = cause instanceof Error && cause.message !== fallback.message ? cause : fallback;
     }
-    // Stored in English as before: the revision row is history, not a message for one reader.
+    // English: the revision row is history, not a message for one reader.
     const error = failure?.message ?? null;
 
     const [row] = await db
@@ -127,7 +111,7 @@ export async function applyStagedSettings(
   });
 }
 
-/** The most recent applies, newest first. Drives the header pill, the review sheet and the history page. */
+/** Newest first. */
 export async function recentRevisions(limit = 3, offset = 0): Promise<RevisionRow[]> {
   const rows = await db
     .select({

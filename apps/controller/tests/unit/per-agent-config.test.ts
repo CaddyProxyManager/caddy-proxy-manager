@@ -1,10 +1,6 @@
 /**
- * Hosts pinned to agents, and each agent's own Caddy build.
- *
- * The rule the whole feature rests on is that **no assignment means every agent**. Get that
- * backwards and shipping the feature takes every existing site down at once, so it is pinned from
- * both directions here: an unassigned host reaches an agent, and a host assigned elsewhere does
- * not.
+ * **No assignment means every agent** - backwards, it takes every existing site down at once - so
+ * it is pinned from both directions.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -15,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -103,8 +98,7 @@ describe('the unassigned rule', () => {
   });
 
   it('treats an empty assignment list the same as none at all', () => {
-    // A host can end up with an empty bucket in a caller's map; reading that as "nowhere" would
-    // take the host offline rather than leaving it where it was.
+    // Reading an empty bucket as "nowhere" would take the host offline.
     expect(servedByAgent(new Map([[7, []]]), 7, AGENT_A)).toBe(true);
   });
 
@@ -115,8 +109,7 @@ describe('the unassigned rule', () => {
   });
 
   it('includes everything when there is no agent in hand at all', () => {
-    // The fleet-wide document - a single-agent deployment, and every test that builds config
-    // without an agent - must not start filtering because a host was pinned somewhere.
+    // The fleet-wide document must not filter because a host was pinned somewhere.
     expect(servedByAgent(new Map([[7, [AGENT_A]]]), 7, null)).toBe(true);
   });
 });
@@ -247,8 +240,7 @@ describe('required L4 ports scoped to an agent', () => {
     );
 
     expect(await getRequiredL4Ports(AGENT_A)).toEqual(['5432:5432', '9000:9000']);
-    // Recreating a container to publish a port it will never answer on is the cost of getting
-    // this wrong, which is why the filter is here and not only in the config document.
+    // Otherwise a container is recreated to publish a port it never answers on.
     expect(await getRequiredL4Ports(AGENT_B)).toEqual(['9000:9000']);
     expect(await getRequiredL4Ports()).toEqual(['5432:5432', '9000:9000']);
   });
@@ -257,7 +249,6 @@ describe('required L4 ports scoped to an agent', () => {
 describe('per-agent build settings', () => {
   it('starts null, so a fresh agent follows the fleet default', async () => {
     expect(await getAgentBuildSettings(AGENT_A)).toBeNull();
-    // Nothing stored fleet-wide either, so both answers are the same "no overrides" null.
     expect(await resolveBuildSettingsFor(AGENT_A)).toBeNull();
   });
 
@@ -269,8 +260,7 @@ describe('per-agent build settings', () => {
   });
 
   it('goes back to following the fleet when the selection is cleared', async () => {
-    // Cleared rather than overwritten with a copy: a copy would freeze the agent on whatever the
-    // fleet happened to have that day, and never pick up a later change.
+    // Cleared, not copied: a copy would freeze the agent on that day's fleet settings.
     await setAgentBuildSettings(AGENT_A, { modules: { 'caddy-l4': false }, customModules: [] });
     await setAgentBuildSettings(AGENT_A, null);
     expect(await getAgentBuildSettings(AGENT_A)).toBeNull();

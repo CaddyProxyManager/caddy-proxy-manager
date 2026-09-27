@@ -48,12 +48,11 @@ import { useTableDensity } from "@/components/ui/TableDensity";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
-// `ssr: false` is deliberate. ApexCharts v7 renders on the server only through
-// `react-apexcharts/server`, an async Server Component this client file cannot reach - and there
-// is nothing to render anyway, since every dataset arrives from /api/analytics/* in an effect.
+// ApexCharts v7 server-renders only via an async Server Component this client file cannot reach,
+// and every dataset arrives in an effect anyway.
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-/** Its own component because `loading` is called at module scope, where no hook can run. */
+/** `loading` is called at module scope, where no hook can run. */
 function MapLoading() {
   const t = useTranslations("analytics");
   return (
@@ -140,7 +139,7 @@ interface BlockedPage {
   pages: number;
 }
 
-/** Table-facing shapes: Astryx's Table requires an index signature on rows. */
+/** Astryx's Table requires an index signature on rows. */
 type CountryRow = {
   countryCode: string;
   total: number;
@@ -174,7 +173,7 @@ function countryFlag(code: string): string {
   );
 }
 
-/** `unknown` is the label for an empty agent string, passed in because it comes from the catalog. */
+/** `unknown` is passed in because it comes from the catalog. */
 function parseUA(ua: string, unknown: string): string {
   if (!ua) return unknown;
   if (/Googlebot/i.test(ua)) return "Googlebot";
@@ -203,7 +202,6 @@ function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): st
   return `${fixed(bytes / 1024 / 1024 / 1024, 2)} GB`;
 }
 
-/** An axis label at the resolution the range implies, on the reader's clock. */
 function formatTs(
   format: ReturnType<typeof useFormatter>,
   ts: number,
@@ -219,7 +217,6 @@ function formatTs(
 
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
 
-/** A date and a time in one control. Converts between DateTimeInput's ISO string and Dayjs. */
 function DateTimePicker({
   value,
   onChange,
@@ -246,8 +243,6 @@ function DateTimePicker({
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
-/** Raw hex: these cards share the chart palette, and the chart library is not token-aware. */
-/** `tone` names the meaning; the value resolves from an Astryx token at paint time. */
 type StatTone = "error" | "warning";
 
 const STAT_TONE_VAR: Record<StatTone, string> = {
@@ -289,7 +284,6 @@ function StatCard({
 
 const INCLUDE_UNCONFIGURED_KEY = "analytics:includeUnconfiguredHosts";
 
-/** Host filter. MultiSelector supplies search, select-all and badges; this adds the toggle. */
 function HostsCombobox({
   allHosts,
   selectedHosts,
@@ -302,7 +296,6 @@ function HostsCombobox({
   const t = useTranslations("analytics");
   const [includeUnconfigured, setIncludeUnconfigured] = useState(false);
 
-  // Restore the persisted "include unconfigured hosts" preference
   useEffect(() => {
     try {
       setIncludeUnconfigured(localStorage.getItem(INCLUDE_UNCONFIGURED_KEY) === "1");
@@ -355,7 +348,7 @@ function HostsCombobox({
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-/** A non-2xx the server gave no reason for. Carries the parts so the page can word it from the catalog. */
+/** Carries the parts so the page can word it from the catalog. */
 class UnexplainedStatusError extends Error {
   path: string;
   status: number;
@@ -367,11 +360,7 @@ class UnexplainedStatusError extends Error {
   }
 }
 
-/**
- * Fetch JSON, treating a non-2xx as a failure. The analytics endpoints answer errors with
- * `{ error: "…" }`, which parsed without checking `response.ok` lands an object in array-typed
- * state - the first `.map()` then throws during render and blanks the page.
- */
+/** An unchecked `{ error }` body lands in array state, and the first `.map()` blanks the page. */
 async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url);
   const body = await response.json().catch(() => null);
@@ -380,8 +369,7 @@ async function fetchJson(url: string): Promise<unknown> {
       body && typeof body === "object" && "error" in body
         ? String((body as { error: unknown }).error).trim()
         : "";
-    // Errors thrown by the ClickHouse client often carry an empty message, so always fall back to
-    // something renderable - an empty string is falsy and would leave the banner invisible.
+    // ClickHouse errors often carry an empty message, which would leave the banner invisible.
     throw reported
       ? new Error(reported)
       : new UnexplainedStatusError(url.split("?")[0], response.status);
@@ -389,7 +377,7 @@ async function fetchJson(url: string): Promise<unknown> {
   return body;
 }
 
-/** Defensive cast for list payloads: renders empty rather than throwing on an odd 200. */
+/** Renders empty rather than throwing on an odd 200. */
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
@@ -405,7 +393,6 @@ export default function AnalyticsClient() {
   const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
   const [allHosts, setAllHosts] = useState<AnalyticsHost[]>([]);
 
-  // Custom range as Dayjs objects
   const [customFrom, setCustomFrom] = useState<Dayjs | null>(null);
   const [customTo, setCustomTo] = useState<Dayjs | null>(null);
 
@@ -420,12 +407,10 @@ export default function AnalyticsClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [mapMetric, setMapMetric] = useState<MapMetric>("total");
-  // Phone-only chrome: the interval and map-metric choices open as sheets instead of segments.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const [intervalSheetOpen, setIntervalSheetOpen] = useState(false);
   const [metricSheetOpen, setMetricSheetOpen] = useState(false);
 
-  /** How many seconds the current selection spans - used for chart axis labels */
   const rangeSeconds = useMemo(() => {
     if (interval === "custom" && customFrom && customTo) {
       const diff = customTo.unix() - customFrom.unix();
@@ -434,7 +419,6 @@ export default function AnalyticsClient() {
     return INTERVAL_SECONDS_CLIENT[interval as Interval] ?? 3600;
   }, [interval, customFrom, customTo]);
 
-  /** Build the query string for all analytics endpoints */
   const buildParams = useCallback(
     (extra = "") => {
       const h =
@@ -448,14 +432,12 @@ export default function AnalyticsClient() {
     [interval, selectedHosts, customFrom, customTo],
   );
 
-  // Fetch all configured+active hosts once
   useEffect(() => {
     fetchJson("/api/analytics/hosts")
       .then((h) => setAllHosts(asArray<AnalyticsHost>(h)))
       .catch(() => setAllHosts([]));
   }, []);
 
-  // Fetch all analytics data when range/host selection changes
   useEffect(() => {
     if (interval === "custom") {
       if (!customFrom || !customTo || customFrom.unix() >= customTo.unix()) return;
@@ -515,9 +497,8 @@ export default function AnalyticsClient() {
 
   const chartTheme = useChartTheme();
 
-  // Every chart config is memoized on its data: react-apexcharts deep-compares options and series
-  // on each render, so a fresh object per render had it walking the whole timeline whenever any
-  // state on the page changed - a sheet opening, a country being picked.
+  // Memoized: react-apexcharts deep-compares options and series, so a fresh object walked the
+  // whole timeline on every unrelated state change.
   const timelineOptions = useMemo<ApexOptions>(
     () => ({
       ...chartTheme.base,
@@ -628,8 +609,6 @@ export default function AnalyticsClient() {
   ];
 
   // ── Table shapes ──────────────────────────────────────────────────────────
-  // Astryx's Table wants rows carrying an index signature, so each dataset is widened at this one
-  // boundary rather than on the domain types themselves.
 
   const countryRows: CountryRow[] = countries.slice(0, 10).map((c) => ({
     countryCode: c.countryCode,
@@ -639,8 +618,7 @@ export default function AnalyticsClient() {
     waf: wafByCountry.get(c.countryCode) ?? 0,
   }));
 
-  // Replaces a hand-tinted row background, which signalled selection by colour alone and was
-  // invisible to assistive tech.
+  // Not a tinted background: colour alone is invisible to assistive tech.
   const countryStatus = useTableRowStatus<CountryRow>({
     getStatus: (row) =>
       row.countryCode === selectedCountry ? { color: "accent", label: t("selected") } : null,
@@ -651,8 +629,7 @@ export default function AnalyticsClient() {
       key: "countryCode",
       header: t("country"),
       width: proportional(1),
-      // The whole row used to be the click target for filtering the map, which no keyboard user
-      // could reach. The country itself is the control now.
+      // A button, not a clickable row, so keyboard users can reach it.
       renderCell: (row) => (
         <Button
           variant="ghost"
@@ -896,7 +873,6 @@ export default function AnalyticsClient() {
 
   return (
     <VStack gap={8}>
-      {/* Header */}
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={0}>
           <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
@@ -905,8 +881,6 @@ export default function AnalyticsClient() {
           <Heading level={1}>{t("analytics")}</Heading>
         </VStack>
         <HStack gap={3} vAlign="center" wrap="wrap">
-          {/* Was six buttons whose selected state read only as a filled
-              variant; SegmentedControl exposes the choice as a radio group. */}
           <div className="cpm-desktop-only">
             <SegmentedControl
               label={t("timeInterval")}
@@ -954,15 +928,12 @@ export default function AnalyticsClient() {
         </HStack>
       </HStack>
 
-      {/* Load failure alert - e.g. ClickHouse unreachable or a failing query.
-          Rendered instead of crashing the page, so the rest of the UI stays usable. */}
       {loadError && (
         <div data-testid="analytics-load-error">
           <Banner status="error" title={t("loadErrorTitle")} description={loadError} />
         </div>
       )}
 
-      {/* Analytics disabled alert */}
       {summary?.analyticsDisabled && (
         <Banner
           status="info"
@@ -971,7 +942,6 @@ export default function AnalyticsClient() {
         />
       )}
 
-      {/* Logging disabled alert */}
       {summary?.loggingDisabled && !summary?.analyticsDisabled && (
         <Banner
           status="warning"
@@ -988,7 +958,6 @@ export default function AnalyticsClient() {
         />
       )}
 
-      {/* Loading overlay */}
       {loading && (
         <HStack justify="center" padding={10}>
           <Spinner size="lg" label={t("loadingAnalytics")} />
@@ -997,7 +966,7 @@ export default function AnalyticsClient() {
 
       {!loading && summary && (
         <>
-          {/* Stats row, folded into one card on a phone where five tiles are a screen of their own */}
+          {/* One card on a phone, where five tiles are a screen of their own. */}
           <div className="cpm-mobile-only">
             <Card padding={4}>
               <VStack gap={3}>
@@ -1073,7 +1042,6 @@ export default function AnalyticsClient() {
             />
           </Grid>
 
-          {/* Timeline */}
           <Card padding={5}>
             <VStack gap={4}>
               <Text type="body" size="sm" weight="semibold">
@@ -1094,18 +1062,15 @@ export default function AnalyticsClient() {
             </VStack>
           </Card>
 
-          {/* World map + Countries */}
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
             <Card padding={5}>
-              {/* Full height, so the map grows to match the country table beside it instead of
-                  leaving the bottom of its card empty. */}
+              {/* Full height, so the map grows to match the country table beside it. */}
               <VStack gap={2} minHeight={280} height="100%">
                 <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
                   <Text type="body" size="sm" weight="semibold">
                     {t("trafficByCountry")}
                   </Text>
-                  {/* One map, recoloured: the ramp is normalised against the chosen metric, so
-                      Blocked lights up the countries that block most rather than the busiest. */}
+                  {/* The ramp normalises per metric, so Blocked lights up the most-blocked. */}
                   <div className="cpm-desktop-only">
                     <SegmentedControl
                       label={t("mapMetric")}
@@ -1161,8 +1126,7 @@ export default function AnalyticsClient() {
                   <Table
                     density={density}
                     data={countryRows}
-                    // A phone keeps the country and the two counts that answer "is it hostile";
-                    // five fixed columns are wider than the card.
+                    // Five fixed columns are wider than the card on a phone.
                     columns={
                       isNarrow
                         ? countryColumns.filter((c) => c.key !== "uniqueIps" && c.key !== "waf")
@@ -1186,7 +1150,6 @@ export default function AnalyticsClient() {
             />
           )}
 
-          {/* Protocols + User Agents */}
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
             <Card padding={5}>
               <VStack gap={4}>
@@ -1236,7 +1199,6 @@ export default function AnalyticsClient() {
             </Card>
           </Grid>
 
-          {/* Recent Blocked Requests */}
           <Card padding={5}>
             <VStack gap={4}>
               <Text type="body" size="sm" weight="semibold">
@@ -1255,7 +1217,6 @@ export default function AnalyticsClient() {
                       hasHover
                     />
                   </div>
-                  {/* Seven columns become rows on a phone: who, what they hit, and from where. */}
                   <div className="cpm-mobile-only">
                     <List>
                       {blockedRows.map((row) => (
@@ -1285,7 +1246,6 @@ export default function AnalyticsClient() {
             </VStack>
           </Card>
 
-          {/* WAF Top Rules */}
           {wafStats && wafStats.total > 0 && (
             <Card padding={5}>
               <VStack gap={4}>

@@ -9,12 +9,8 @@ import { type SeclangIssue, seclangDirectives, seclangErrors } from "./seclang";
 // ---------------------------------------------------------------------------
 
 /**
- * Coraza refuses to build a WAF whose request body limit exceeds 1 GiB
- * (internal/corazawaf/waf.go - "request body limit should be at most 1GiB").
- * coraza-caddy constructs its WAF while Caddy is loading the config, so a
- * single out-of-range value makes Caddy reject the ENTIRE config document -
- * every host goes unapplied, not just the offending one. Never emit a value
- * above this.
+ * Coraza refuses a request body limit above 1 GiB, and one out-of-range value makes Caddy reject
+ * the ENTIRE config document, not just the offending host.
  */
 export const CORAZA_MAX_BODY_LIMIT = 1_073_741_824; // 1 GiB
 
@@ -25,15 +21,12 @@ export const CORAZA_MIN_BODY_LIMIT = 1_024;
 export const CORAZA_DEFAULT_BODY_LIMIT = 134_217_728; // 128 MiB
 
 /**
- * SecRequestBodyLimit / SecRequestBodyInMemoryLimit set by
- * `@coraza.conf-recommended`, which we Include when load_owasp_crs is on.
- * The 12.5 MiB limit is why large uploads (Nextcloud/Immich chunks) fail with
- * the CRS enabled while the same host works with it off.
+ * The limits `@coraza.conf-recommended` sets when the CRS is on. The 12.5 MiB is why large uploads
+ * (Nextcloud/Immich chunks) fail with the CRS enabled and work with it off.
  */
 export const CRS_BODY_LIMIT = 13_107_200; // 12.5 MiB
 export const CRS_IN_MEMORY_BODY_LIMIT = 131_072; // 128 KiB
 
-/** True when `value` is a byte count Coraza will accept for a body limit. */
 export function isValidBodyLimit(value: unknown): value is number {
   return (
     typeof value === "number" &&
@@ -47,11 +40,7 @@ export function bodyLimitRangeMessage(label: string): string {
   return `${label} must be an integer between ${CORAZA_MIN_BODY_LIMIT} and ${CORAZA_MAX_BODY_LIMIT} bytes (1 GiB is Coraza's hard maximum)`;
 }
 
-/**
- * The settings are stored in bytes (what SecLang takes), but the forms ask for
- * MiB - nobody sizes an upload limit in bytes. Anything finer stays reachable
- * through the custom directives.
- */
+/** Stored in bytes (what SecLang takes), asked for in MiB; finer values go in custom directives. */
 export const BYTES_PER_MIB = 1_048_576;
 export const MIN_BODY_LIMIT_MIB = 1;
 export const MAX_BODY_LIMIT_MIB = CORAZA_MAX_BODY_LIMIT / BYTES_PER_MIB; // 1024
@@ -60,10 +49,7 @@ export function bytesToMib(bytes: number | undefined): string {
   return typeof bytes === "number" && bytes > 0 ? String(Math.round(bytes / BYTES_PER_MIB)) : "";
 }
 
-/**
- * Which field a body limit came from. Each is its own message rather than a label spliced into one,
- * because not every language puts the field name first.
- */
+/** One message per field rather than a spliced label: not every language puts the field first. */
 export type BodyLimitErrorCode = Extract<
   DomainErrorCode,
   | "wafRequestBodyLimitInvalid"
@@ -86,16 +72,13 @@ export function parseBodyLimitMib(raw: unknown, errorCode: BodyLimitErrorCode): 
   return mib * BYTES_PER_MIB;
 }
 
-/** SecRequestBody*Limit directives that carry a byte count. */
 const BODY_LIMIT_DIRECTIVE =
   /^(SecRequestBodyLimit|SecRequestBodyNoFilesLimit|SecRequestBodyInMemoryLimit)\s+(\d+)\s*$/i;
 const BODY_LIMIT_ACTION_DIRECTIVE = /^SecRequestBodyLimitAction\s+(?:Reject|ProcessPartial)\s*$/i;
 
 /**
- * Returns the first custom directive whose byte count Coraza would reject, or
- * null when every body-limit line is in range. Input layers call this so the
- * user gets a precise error at save time instead of a silent drop here plus an
- * opaque "Caddy rejected configuration" later.
+ * First custom directive whose byte count Coraza would reject, so the user gets a precise error at
+ * save time instead of an opaque "Caddy rejected configuration" later.
  */
 export function findInvalidBodyLimitDirective(
   directives: string | null | undefined,
@@ -109,10 +92,7 @@ export function findInvalidBodyLimitDirective(
   return null;
 }
 
-/**
- * Why a custom SecLang line never reaches Caddy. A code rather than a sentence: the wording lives
- * in the catalog, next to every other sentence a person reads.
- */
+/** Why a custom SecLang line never reaches Caddy - a code, so the wording lives in the catalog. */
 export type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedInclude"
   | "wafDirectiveDroppedRuleMutation"
@@ -121,7 +101,6 @@ export type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedNotAllowed"
   | "wafDirectiveDroppedUnterminated";
 
-/** A custom SecLang line CPM will not send to Caddy, and why. */
 export type DroppedWafDirective = { line: string; reason: DroppedWafDirectiveReason };
 
 /** Allowed on their own; anything else is dropped. */
@@ -143,12 +122,8 @@ const BLOCKED_SEC_RULE_PREFIXES = [
 ];
 
 /**
- * Splits the user's custom directives into the lines that will be emitted and the ones this drops.
- *
- * The allowlist is the security boundary and stays exactly as strict as it was; what changed is
- * that a dropped line is now something to say out loud. A silently discarded
- * `SecRuleUpdateActionById` reads as "the WAF ignores my rule" rather than "CPM refused that
- * directive", so both validators fail the write and name each line (upstream discussion #146).
+ * Splits custom directives into kept and dropped lines. The allowlist is the security boundary; a
+ * silently dropped line reads as "the WAF ignores my rule", so validators name each one (#146).
  */
 export function filterCustomDirectives(raw: string | null | undefined): {
   kept: string[];
@@ -159,7 +134,6 @@ export function filterCustomDirectives(raw: string | null | undefined): {
   if (!raw?.trim()) return { kept, dropped };
 
   for (const { text, lines } of seclangDirectives(raw.trim())) {
-    // Blank lines and comments carry nothing to reject.
     if (text === "") {
       kept.push(...lines);
       continue;
@@ -174,10 +148,8 @@ export function filterCustomDirectives(raw: string | null | undefined): {
       dropped.push({ line: text, reason: "wafDirectiveDroppedInclude" });
       continue;
     }
-    // Body limits are allowed, but only inside the range Coraza accepts - an out-of-range value
-    // would make Caddy reject the whole config document. Input validation reports these; dropping
-    // here is the net. (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
-    // corazawaf/coraza#896. Kept accepted so existing configs keep loading.)
+    // Out-of-range limits would make Caddy reject the whole config; validation reports them, this
+    // is the net. SecRequestBodyNoFilesLimit parses but is not enforced (corazawaf/coraza#896).
     const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(text);
     if (bodyLimit) {
       if (isValidBodyLimit(Number(bodyLimit[2]))) kept.push(...lines);
@@ -208,21 +180,14 @@ export function filterCustomDirectives(raw: string | null | undefined): {
   return { kept, dropped };
 }
 
-/**
- * The "line -> why" list both validators put in their error. Echoing the line back is safe: only
- * lines CPM is about to drop are named, so nothing new is repeated to the caller.
- */
+/** "line -> why" for the validators' error; echoing only lines CPM drops repeats nothing new. */
 export function droppedWafDirectiveDetails(dropped: readonly DroppedWafDirective[]): string[] {
-  // The bounds go as strings, or the catalog would format 1073741824 with separators. Only the
-  // body-limit reason reads them; the others ignore the extra params.
+  // As strings, or the catalog formats 1073741824 with separators; other reasons ignore them.
   const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
   return dropped.map((entry) => `"${entry.line}" - ${domainErrorMessage(entry.reason, bounds)}`);
 }
 
-/**
- * The "line N: why" list the validators put in their error for what the linter found. At most
- * `limit`, since one typo early in a rule list can make every later line look wrong.
- */
+/** "line N: why" per linter issue, capped: one early typo can make every later line look wrong. */
 export function seclangErrorDetails(issues: readonly SeclangIssue[], limit = 5): string[] {
   return issues.slice(0, limit).map((issue) =>
     domainErrorMessage("seclangIssueAt", {
@@ -247,13 +212,9 @@ export const normalizeWafPluginIds = normalizeWafPresetIds;
 // CRS plugins
 // ---------------------------------------------------------------------------
 
-/** An installed CRS plugin's three files, as the builder emits them. */
 export type CrsPluginRules = { config: string; before: string; after: string };
 
-/**
- * Why a CRS plugin file cannot be loaded. A code for the same reason the custom-directive ones are:
- * the sentence lives in the catalog.
- */
+/** Why a CRS plugin file cannot be loaded - a code, so the sentence lives in the catalog. */
 export type CrsPluginRejectionReason =
   | "crsPluginDirectiveNotAllowed"
   | "crsPluginNeedsFile"
@@ -272,9 +233,8 @@ export type CrsPluginRejection = {
 };
 
 /**
- * What a plugin may contain. Wider than the custom-directive allowlist, because rewriting CRS
- * rules' targets from an -after file is what an exclusion plugin is for; every registered plugin
- * uses only SecRule, SecAction, SecMarker and SecRuleUpdateTargetById.
+ * Wider than the custom-directive allowlist: rewriting CRS rule targets from an -after file is what
+ * an exclusion plugin is for.
  */
 const PLUGIN_DIRECTIVE_PREFIXES = [
   /^SecRule\s/,
@@ -287,10 +247,7 @@ const PLUGIN_DIRECTIVE_PREFIXES = [
 /** Operators that read a file next to the rule, which an inlined plugin does not have. */
 const FILE_OPERATOR = /@(?:inspectFile|pmFromFile|pmf|ipMatchFromFile|ipMatchF|geoLookup)\b/i;
 
-/**
- * ModSecurity's persistent collections - read as a variable, written by setvar, or opened by
- * initcol. Coraza refuses to compile the rule, as dos-protection-modsecurity shows.
- */
+/** ModSecurity persistent collections; Coraza refuses to compile a rule that uses one. */
 const PERSISTENT_COLLECTION =
   /^SecRule\s+(?:\S*\|)?[!&]*(?:IP|SESSION|USER|GLOBAL|RESOURCE)(?::|\s)|setvar\s*:\s*'?(?:ip|session|user|global|resource)\.|\binitcol\s*:/i;
 
@@ -303,9 +260,8 @@ function hasUnbalancedQuotes(text: string): boolean {
 const RULE_ID = /(?:^|[\s"',])id\s*:\s*'?(\d+)/g;
 
 /**
- * Checks one plugin file before it is stored and again before it is emitted. Coraza compiles every
- * host's rules as Caddy loads the config, so a plugin it cannot compile takes the whole config down
- * - which is also why the registry's range is enforced: a duplicate rule id is such a failure.
+ * Checked on store and again on emit: a plugin Coraza cannot compile, or a duplicate rule id
+ * outside the registry range, takes the whole config down as Caddy loads it.
  */
 export function findCrsPluginRejections(
   raw: string,
@@ -313,7 +269,7 @@ export function findCrsPluginRejections(
 ): CrsPluginRejection[] {
   const rejections: CrsPluginRejection[] = [];
   const normalized = raw.replace(/\r\n?/g, "\n");
-  /** Where the checks below refused a directive, so the linter does not name it a second time. */
+  /** So the linter does not name an already-refused directive a second time. */
   const rejectedStarts = new Set<number>();
   for (const { text, lines, start } of seclangDirectives(normalized)) {
     if (text === "") continue;
@@ -366,7 +322,6 @@ export function resolveEffectiveWaf(
 
   if (!hostEnabled && !globalEnabled) return null;
 
-  // Override mode: use host config entirely
   if (host && host.waf_mode === "override") {
     if (!hostEnabled) return null;
     return {
@@ -383,8 +338,7 @@ export function resolveEffectiveWaf(
     };
   }
 
-  // Merge mode: start with global, overlay host fields.
-  // host.enabled === false is an explicit opt-out - respect it even when global is on.
+  // host.enabled === false is an explicit opt-out, even when global is on.
   if (host && global) {
     if (host.enabled === false) return null;
     return {
@@ -397,8 +351,6 @@ export function resolveEffectiveWaf(
       excluded_rule_ids: [...(global.excluded_rule_ids ?? []), ...(host.excluded_rule_ids ?? [])],
       preset_ids: [...new Set([...(global.preset_ids ?? []), ...(host.preset_ids ?? [])])],
       plugin_ids: [...new Set([...(global.plugin_ids ?? []), ...(host.plugin_ids ?? [])])],
-      // Body limits are scalars, not lists: the host value wins when set,
-      // otherwise the global one applies.
       request_body_limit: host.request_body_limit ?? global.request_body_limit,
       request_body_in_memory_limit:
         host.request_body_in_memory_limit ?? global.request_body_in_memory_limit,
@@ -424,13 +376,11 @@ export function resolveEffectiveWaf(
   return null;
 }
 
-/** Caddy matcher for a WebSocket upgrade, mirroring the built-in `@websockets`. */
-export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
-  header: {
-    Connection: ["*Upgrade*"],
-    Upgrade: ["websocket"],
-  },
-};
+/** The token is case-insensitive, and HTTP/2's extended CONNECT carries no Upgrade header. */
+export const WEBSOCKET_ATTEMPT_MATCHERS: Record<string, unknown>[] = [
+  { header_regexp: { Upgrade: { pattern: "(?i)websocket" } } },
+  { method: ["CONNECT"] },
+];
 
 /**
  * Builds the Caddy `waf` handler. @-prefixed SecLang paths resolve from the embedded
@@ -444,20 +394,16 @@ export function buildWafHandler(
 ): Record<string, unknown> {
   const parts: string[] = [];
 
-  // `mode` is interpolated straight into the directive block and settings are stored unvalidated,
-  // so anything but a known engine mode would smuggle in SecLang past the allowlist. Clamp to
-  // Coraza's three real values.
+  // Settings are stored unvalidated and `mode` is interpolated into SecLang, so clamp it to
+  // Coraza's three values or it smuggles directives past the allowlist.
   const engineMode = waf.mode === "Off" || waf.mode === "DetectionOnly" ? waf.mode : "On";
 
   if (waf.load_owasp_crs) {
-    // @-prefixed paths resolve from the embedded coraza-coreruleset filesystem,
-    // which is only mounted when load_owasp_crs is true.
     parts.push("Include @coraza.conf-recommended", "Include @crs-setup.conf.example");
   }
 
-  // CRS 4's plugin order: every -config, then every -before, the rules, then every -after. Plugins
-  // tune and exclude CRS rules, so without the CRS they are left out. An unknown id is a plugin
-  // uninstalled under a stale selection, and emits nothing.
+  // CRS 4 order: every -config, every -before, the rules, every -after. Plugins only tune the CRS,
+  // so without it they are left out; an unknown id is a stale selection and emits nothing.
   const selectedPlugins = waf.load_owasp_crs
     ? [...new Set(waf.plugin_ids ?? [])].flatMap((id) => plugins.get(id) ?? [])
     : [];
@@ -467,9 +413,8 @@ export function buildWafHandler(
   pluginPart("config");
   pluginPart("before");
 
-  // Presets sit with the plugins' -before files: after crs-setup, ahead of the rules. A runtime
-  // exclusion (ctl:ruleRemove*) only works on rules that have not run yet. An unknown id is a
-  // preset deleted under a stale selection, and emits nothing.
+  // Ahead of the rules, since ctl:ruleRemove* only affects rules that have not run yet. An unknown
+  // id is a stale selection and emits nothing.
   for (const id of new Set(waf.preset_ids ?? [])) {
     const { kept } = filterCustomDirectives(presets.get(id));
     if (kept.length > 0) parts.push(kept.join("\n"));
@@ -478,7 +423,6 @@ export function buildWafHandler(
   if (waf.load_owasp_crs) parts.push("Include @owasp_crs/*.conf");
   pluginPart("after");
 
-  // Runtime-validate excluded_rule_ids are positive integers
   if (waf.excluded_rule_ids?.length) {
     const validIds = waf.excluded_rule_ids.filter(
       (id): id is number =>
@@ -491,25 +435,18 @@ export function buildWafHandler(
 
   parts.push(
     `SecRuleEngine ${engineMode}`,
-    // RelevantOnly logs transactions where a rule fired with the auditlog action (which all
-    // OWASP CRS rules set via SecDefaultAction), covering blocked and DetectionOnly hits. Clean
-    // requests with no matches are skipped, avoiding massive log growth.
+    // Logs only transactions where a rule fired (CRS sets auditlog on all), avoiding huge logs.
     "SecAuditEngine RelevantOnly",
     "SecAuditLog /logs/waf-audit.log",
     "SecAuditLogFormat JSON",
-    // The caddy image ships the audit log pre-created as caddy-owned 0660, which a new volume copies
-    // in, and Coraza opens an existing file without touching its mode - so the agent can truncate
-    // it through caddy's group. No SecAuditLogFileMode: the container's 0022 umask would strip the
-    // group-write bit from it anyway. A file Coraza creates itself is 0644, and the agent reports
-    // that on the Agents page. Part H carries the matched rules; bodies (I, J, E) and headers (D)
-    // are omitted to avoid huge writes.
+    // The image pre-creates the log caddy-owned 0660 and Coraza keeps an existing file's mode, so
+    // the agent can truncate it via caddy's group; SecAuditLogFileMode would lose group-write.
+    // Bodies (I, J, E) and headers (D) are omitted to avoid huge writes.
     "SecAuditLogParts ABFHZ",
     "SecResponseBodyAccess Off",
   );
 
-  // Body limits from the dedicated settings fields. Emitted after the CRS
-  // include (so they override @coraza.conf-recommended's 12.5 MiB) but before
-  // custom_directives, which stay the escape hatch that wins over the UI.
+  // After the CRS include, to override its 12.5 MiB, and before custom_directives, which win.
   if (isValidBodyLimit(waf.request_body_limit)) {
     parts.push(`SecRequestBodyLimit ${waf.request_body_limit}`);
   }
@@ -523,9 +460,7 @@ export function buildWafHandler(
     parts.push(`SecRequestBodyLimitAction ${waf.request_body_limit_action}`);
   }
 
-  // Allowlist approach: only known-safe directive prefixes reach the handler. The validators
-  // refuse a write that would drop a line, so by here `dropped` is normally empty - this stays the
-  // net for rows written before that check existed.
+  // Validators refuse writes that would drop a line; this is the net for older rows.
   const { kept } = filterCustomDirectives(waf.custom_directives);
   if (kept.length > 0) {
     parts.push(kept.join("\n"));
@@ -540,16 +475,8 @@ export function buildWafHandler(
 }
 
 /**
- * Coraza also validates `SecRequestBodyInMemoryLimit <= SecRequestBodyLimit`
- * and fails config load when it doesn't hold. That pairing is easy to break by
- * accident: lowering only the request limit leaves the CRS's 128 KiB in-memory
- * value above it, and the resulting rejection takes down every host's config,
- * not just this handler's.
- *
- * Coraza validates the FINAL parsed values, so only the last directive of each
- * kind matters. When they conflict, append a corrective in-memory line - the
- * last one wins, so the config stays loadable with the user's request limit
- * intact.
+ * Coraza fails config load unless InMemoryLimit <= RequestBodyLimit, checking the last of each.
+ * Lowering just the request limit leaves the CRS's 128 KiB above it, so append a corrective line.
  */
 function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): string {
   let requestLimit = crsLoaded ? CRS_BODY_LIMIT : CORAZA_DEFAULT_BODY_LIMIT;
@@ -566,50 +493,4 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
 
   if (inMemoryLimit === null || inMemoryLimit <= requestLimit) return directives;
   return `${directives}\nSecRequestBodyInMemoryLimit ${requestLimit}`;
-}
-
-/**
- * The handler-chain entry applying the WAF for a proxy route.
- *
- * When allowWebsocket is true the WAF handler is wrapped in a non-terminal
- * subroute that only runs for NON-WebSocket requests.  WebSocket upgrades must
- * bypass the coraza handler ENTIRELY - not merely have the rule engine turned
- * off via `ctl:ruleEngine=off` (issue #195):
- *
- *   The coraza-caddy middleware wraps the response writer to inspect the
- *   upstream response (SecLang phase 3/4 rules).  That wrapper does not pass
- *   through the connection hijack that a `101 Switching Protocols` upgrade
- *   performs, so the raw WebSocket bytes leak out without the HTTP status line.
- *   The client sees a corrupt "HTTP/0.9" response and the handshake fails.
- *   Disabling only the rule engine leaves the response wrapper in place, so the
- *   connection is still mangled - routing around the handler is the only fix.
- *
- * Because a Caddy `subroute` compiles its inner routes with the OUTER `next`
- * handler as their continuation, the WAF handler still wraps the downstream
- * `reverse_proxy` for ordinary requests (response inspection preserved); only
- * the matched-out WebSocket upgrade skips it and falls straight through to the
- * next handler in the chain.
- *
- * With allowWebsocket the handler sits in a non-terminal subroute that skips upgrades. They must
- * bypass coraza entirely, not just disable the rule engine (#195): coraza-caddy wraps the response
- * writer, breaking the `101 Switching Protocols` hijack - raw bytes leak out with no status line.
- * A `subroute` compiles inner routes with the OUTER `next`, so ordinary requests still get the WAF.
- */
-export function buildWafHandlerEntry(
-  waf: WafSettings,
-  allowWebsocket = false,
-  presets: ReadonlyMap<number, string> = new Map(),
-  plugins: ReadonlyMap<number, CrsPluginRules> = new Map(),
-): Record<string, unknown> {
-  const wafHandler = buildWafHandler(waf, presets, plugins);
-  if (!allowWebsocket) return wafHandler;
-  return {
-    handler: "subroute",
-    routes: [
-      {
-        match: [{ not: [WEBSOCKET_UPGRADE_MATCHER] }],
-        handle: [wafHandler],
-      },
-    ],
-  };
 }

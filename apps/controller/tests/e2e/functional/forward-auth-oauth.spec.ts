@@ -1,7 +1,6 @@
 /**
- * Functional: Forward Auth with OAuth (Dex OIDC) - host creation, Dex login, allowed vs disallowed
- * users, group-based access, session lifecycle. Test domains are not DNS-resolvable, so browser
- * navigation uses localhost:3000 and the callback goes through httpGet. Domain: func-fwd-oauth.test
+ * Forward auth with Dex OIDC. Test domains do not resolve, so the browser stays on localhost:3000
+ * and the callback goes through httpGet. Domain: func-fwd-oauth.test
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
@@ -12,17 +11,15 @@ const ECHO_BODY = 'echo-ok';
 const BASE_URL = 'http://localhost:3000';
 const API = `${BASE_URL}/api/v1`;
 
-// Dex test users (must match tests/dex/config.yml)
+// Must match tests/dex/config.yml.
 const ALICE = { email: 'alice@test.local', username: 'alice', password: 'password' };
 const BOB = { email: 'bob@test.local', username: 'bob', password: 'password' };
 
-// State shared across serial tests
 let proxyHostId: number;
 let aliceUserId: number;
 let bobUserId: number;
 let testGroupId: number;
 
-/** Make an authenticated API request using the admin session cookies from page context. */
 async function apiPost(page: Page, path: string, body: unknown) {
   return page.request.post(`${API}${path}`, {
     data: body,
@@ -41,36 +38,28 @@ async function apiGet(page: Page, path: string) {
   return page.request.get(`${API}${path}`);
 }
 
-/** Log into Dex with email/password. Handles the Dex login form.
- * If Dex has an existing session and auto-redirects, this is a no-op. */
+/** A no-op when an existing Dex session auto-redirects. */
 async function dexLogin(page: Page, email: string, password: string) {
-  // Wait for either Dex login form OR auto-redirect back to our app.
-  // Dex may auto-redirect if it has an active session from a prior login.
   try {
     await page.waitForURL((url) => url.toString().includes('localhost:5556'), { timeout: 15_000 });
   } catch {
-    // Already redirected back - no Dex login needed (Dex has existing session)
     return;
   }
 
-  // Dex shows a "Log in to dex" page with a link to the local (password) connector
-  // or goes straight to the login form
+  // Dex may show a connector chooser first, or go straight to the form.
   const loginLink = page.getByRole('link', { name: /log in with email/i });
   if (await loginLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await loginLink.click();
   }
 
-  // If Dex auto-redirected during the wait above, skip the form
   if (!page.url().includes('localhost:5556')) return;
 
-  // Wait for the Dex login form to appear
   await expect(page.getByRole('button', { name: /login/i })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('textbox', { name: /email/i }).fill(email);
   await page.getByRole('textbox', { name: /password/i }).fill(password);
   await page.getByRole('button', { name: /login/i }).click();
 }
 
-/** Create a fresh browser context with no auth state for OAuth flows. */
 async function freshContext(page: Page): Promise<BrowserContext> {
   return page
     .context()
@@ -78,10 +67,7 @@ async function freshContext(page: Page): Promise<BrowserContext> {
     .newContext({ storageState: { cookies: [], origins: [] } });
 }
 
-/**
- * OAuth login through /login, verifying the user was created. Fresh browser context per user, and
- * one retry - Better Auth OAuth state can race between rapid logins.
- */
+/** One retry: Better Auth OAuth state can race between rapid logins. */
 async function doOAuthLogin(page: Page, user: { email: string; password: string }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctx = await freshContext(page);
@@ -91,7 +77,7 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
       const oauthButton = p.getByRole('button', { name: /continue with dex/i });
       await expect(oauthButton).toBeVisible({ timeout: 10_000 });
       await oauthButton.click();
-      // Better Auth does fetch then window.location.href - wait for Dex or error redirect
+      // Better Auth fetches, then sets window.location.href.
       try {
         await p.waitForURL(
           (url) => {
@@ -105,7 +91,6 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
         throw new Error(`OAuth redirect failed for ${user.email}: stuck on ${p.url()}`);
       }
       await dexLogin(p, user.email, user.password);
-      // Wait for redirect back to the app
       await p.waitForURL(
         (url) => {
           try {
@@ -118,7 +103,6 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
         { timeout: 30_000 },
       );
 
-      // Verify the URL doesn't indicate an error
       const finalUrl = p.url();
       if (finalUrl.includes('error=') || finalUrl.includes('/login')) {
         if (attempt === 0) continue; // retry
@@ -131,16 +115,12 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
   }
 }
 
-/**
- * OAuth login on the portal, returning the callback URL. Does not navigate there (test domains are
- * not resolvable); intercepts the session-login response for the redirect instead.
- */
+/** The callback URL, from the intercepted session-login response: test domains don't resolve. */
 async function oauthPortalLogin(
   page: Page,
   domain: string,
   user: { email: string; password: string },
 ): Promise<{ redirectTo: string | null; error: string | null }> {
-  // Intercept the session-login API to capture the response before the page navigates away
   let capturedResponse: { redirectTo: string | null; error: string | null } | null = null;
   await page.route('**/api/forward-auth/session-login', async (route) => {
     const response = await route.fetch();
@@ -158,8 +138,7 @@ async function oauthPortalLogin(
   await oauthButton.click();
   await dexLogin(page, user.email, user.password);
 
-  // After Dex login, the browser returns to the portal with ?rid=...
-  // The portal auto-submits to session-login. Wait for the intercepted response.
+  // Back on the portal with ?rid=..., which auto-submits to session-login.
   const deadline = Date.now() + 25_000;
   while (!capturedResponse && Date.now() < deadline) {
     await page.waitForTimeout(500);
@@ -168,10 +147,7 @@ async function oauthPortalLogin(
   return capturedResponse ?? { redirectTo: null, error: 'timeout' };
 }
 
-/**
- * Complete the forward auth callback via httpGet and return the session cookie.
- * Used when browser can't resolve the test domain.
- */
+/** Via httpGet, since the browser can't resolve the test domain. */
 async function completeCallback(domain: string, callbackUrl: string): Promise<string> {
   const url = new URL(callbackUrl);
   const res = await httpGet(domain, url.pathname + url.search);
@@ -280,7 +256,6 @@ test.describe
         expect(result.redirectTo).toBeTruthy();
         expect(result.redirectTo).toContain('/.cpm-auth/callback');
 
-        // Complete callback and verify upstream access
         const sessionCookie = await completeCallback(DOMAIN, result.redirectTo!);
         const upstreamRes = await httpGet(DOMAIN, '/', { Cookie: `_cpm_fa=${sessionCookie}` });
         expect(upstreamRes.status).toBe(200);
@@ -389,7 +364,6 @@ test.describe
         await p.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/`);
         await expect(p.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
 
-        // Intercept the login API response before the page navigates away
         let capturedRedirect: string | null = null;
         await p.route('**/api/forward-auth/login', async (route) => {
           const response = await route.fetch();
@@ -400,7 +374,6 @@ test.describe
 
         await signInWithCredentials(p, 'testadmin', 'TestPassword2026!');
 
-        // Wait for the intercepted response
         const deadline = Date.now() + 15_000;
         while (!capturedRedirect && Date.now() < deadline) {
           await p.waitForTimeout(200);
@@ -409,7 +382,6 @@ test.describe
         expect(capturedRedirect).toBeTruthy();
         expect(capturedRedirect).toContain('/.cpm-auth/callback');
 
-        // Complete via httpGet
         const sessionCookie = await completeCallback(DOMAIN, capturedRedirect!);
         const upstreamRes = await httpGet(DOMAIN, '/', { Cookie: `_cpm_fa=${sessionCookie}` });
         expect(upstreamRes.status).toBe(200);

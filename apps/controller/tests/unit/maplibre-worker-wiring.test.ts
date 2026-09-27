@@ -5,9 +5,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * WorldMapInner imports maplibre-gl's tile worker with `?worker&url` and hands the chunk to
- * setWorkerUrl(), since the worker's own `import.meta.url` lookup does not survive bundling. These
- * fail loudly if an upgrade renames the entry - otherwise a blank map.
+ * The worker goes through `?worker&url` and setWorkerUrl(), since its own `import.meta.url` lookup
+ * does not survive bundling. A renamed entry would otherwise be a silent blank map.
  */
 
 const require = createRequire(import.meta.url);
@@ -27,13 +26,11 @@ describe('maplibre worker wiring', () => {
   });
 
   it('imports that worker through Vite so its sibling chunks get bundled in', () => {
-    // The worker is not self-contained - it imports ./maplibre-gl-shared.mjs,
-    // which a bare `?url` copy of the entry alone would 404 on.
+    // It imports ./maplibre-gl-shared.mjs, which a bare `?url` copy would 404 on.
     expect(readFileSync(require.resolve(WORKER_SPECIFIER), 'utf8')).toContain(
       './maplibre-gl-shared.mjs',
     );
-    // Quote-agnostic on purpose: the assertion is about which module the client
-    // hands maplibre, not about how the formatter happens to quote it.
+    // Quote-agnostic: the formatter's quoting is not the point.
     expect(worldMapInner.replace(/'/g, '"')).toContain(`"${WORKER_SPECIFIER}?worker&url"`);
   });
 
@@ -43,9 +40,7 @@ describe('maplibre worker wiring', () => {
   });
 
   it('builds workers as ES modules, which maplibre requires', () => {
-    // maplibre spawns the worker itself, as a module worker. Vite's build
-    // default is iife, which that spawn would reject, so the config has to
-    // override it - if maplibre ever drops `type: "module"` this test says so.
+    // maplibre spawns a module worker, which Vite's iife default would break.
     const maplibre = readFileSync(require.resolve('maplibre-gl/dist/maplibre-gl.mjs'), 'utf8');
     expect(maplibre.replace(/`/g, '"')).toContain('new Worker(e,{type:"module"})');
 
@@ -54,7 +49,6 @@ describe('maplibre worker wiring', () => {
   });
 
   it("CSP allows loading the worker from 'self'", () => {
-    // The policy moved out of proxy.ts into its own module when upstream extracted buildCsp().
     const csp = readFileSync(join(projectRoot, 'src', 'lib', 'csp.ts'), 'utf8');
     const workerSrc = csp.match(/"worker-src ([^"]+)"/);
     expect(workerSrc?.[1]).toContain("'self'");

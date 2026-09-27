@@ -1,6 +1,6 @@
 /**
- * OAuth redirect URIs were built from BASE_URL alone, so a Public URL saved in setup or Settings
- * never reached Better Auth - while Settings told operators to register a callback built from it.
+ * OAuth redirect URIs follow the Public URL saved in setup or Settings, not BASE_URL alone:
+ * Settings tells operators to register a callback built from it.
  */
 import { describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -1,7 +1,7 @@
 import { TailscaleFields } from "@cpm/controller/src/components/proxy-hosts/TailscaleFields";
 import { DemoSurface } from "../DemoSurface";
 
-/** Served on the tailnet and nowhere else, which is the reason most people turn this on. */
+/** Tailnet only, the reason most people turn this on. */
 export default function TailscaleDemo() {
   return (
     <DemoSurface>

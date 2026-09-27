@@ -1,13 +1,6 @@
 "use client";
 
-/**
- * The settings landing page: what this instance is doing, and what is wrong with it.
- *
- * The section list it replaced could only say what each page was for. Every tile here reports a
- * value the deployment actually holds, and anything `sectionHealth` could show is broken is lifted
- * out of the grid into a band at the top - the question people open Settings with is "is anything
- * wrong", and answering it should not require visiting two dozen pages.
- */
+/** Anything `sectionHealth` shows broken is lifted to the top: "is anything wrong" comes first. */
 
 import Link from "next/link";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -30,11 +23,7 @@ type Props = {
 
 const GROUP_ORDER: SectionHealth["group"][] = ["traffic", "access", "runtime"];
 
-/**
- * Colour alone would carry the status, so each dot also gets a label for assistive technology -
- * a red and a green circle are the same circle to a screen reader. The labels are catalog keys,
- * since that label is the only way a screen reader user learns the status at all.
- */
+/** Colour alone is invisible to a screen reader, so each dot gets a catalog label. */
 type StatusLabelKey =
   | "homeStatusHealthy"
   | "homeStatusAttention"

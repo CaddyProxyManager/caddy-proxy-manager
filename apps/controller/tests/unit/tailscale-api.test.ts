@@ -1,8 +1,4 @@
-/**
- * The auth-key check. Every branch maps to a different thing the operator has to go and fix, so
- * the point of these is that the reasons stay distinguishable - a single "validation failed" would
- * send someone to the Tailscale console when the problem is their API token, or vice versa.
- */
+/** Each branch is a different fix for the operator, so the reasons must stay distinguishable. */
 import { describe, it, expect } from 'bun:test';
 
 import { checkTailscaleAuthKey } from '@/src/lib/tailscale-api';
@@ -43,8 +39,7 @@ describe('tailscaleKeyId', () => {
   });
 
   it('returns null for anything without that shape', () => {
-    // Null means "cannot check", never "invalid" - the format is not a documented contract, and
-    // an older key or a Headscale one is perfectly usable without an id.
+    // Null is "cannot check", not "invalid": older and Headscale keys work without an id.
     expect(tailscaleKeyId('tskey-abcdef1432341818')).toBeNull();
     expect(tailscaleKeyId('{env.TS_AUTHKEY}')).toBeNull();
     expect(tailscaleKeyId('')).toBeNull();
@@ -118,8 +113,7 @@ describe('checkTailscaleAuthKey', () => {
   });
 
   it('refuses rather than guessing when the API cannot be reached', async () => {
-    // Deliberately not "ok": letting an unreachable API through would quietly defeat the whole
-    // point of turning the check on. The message names the way out.
+    // Not "ok": passing an unreachable API would defeat the check. The message names the way out.
     const { impl } = fakeFetch({ status: 0, throws: new Error('getaddrinfo ENOTFOUND') });
     const result = await check({ fetchImpl: impl });
     expect(result.status).toBe('rejected');

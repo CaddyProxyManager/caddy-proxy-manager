@@ -4,15 +4,13 @@ set -eu
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 cd "$script_dir"
 
-# caddy-blocker-plugin may request a newer cel-go API than the reviewed stable
-# Caddy release supports. Derive the compatibility replacement from the exact
-# pinned Caddy module instead of hand-maintaining a second version number.
+# caddy-blocker-plugin may want a newer cel-go than pinned Caddy supports; derive
+# the replacement from Caddy's own pin rather than a second hand-kept version.
 caddy_version="$(go list -m -f '{{.Version}}' github.com/caddyserver/caddy/v2)"
 go mod download "github.com/caddyserver/caddy/v2@${caddy_version}"
 caddy_mod_file="$(go env GOMODCACHE)/cache/download/github.com/caddyserver/caddy/v2/@v/${caddy_version}.mod"
-# cel-go's import path became cel.dev/cel-go at v0.32.0 - the GitHub repo moved to
-# cel-expr/cel-go, but the module renamed to the vanity domain rather than the new repo. Match
-# either spelling on both sides so the pin survives Caddy and the plugins migrating separately.
+# cel-go became cel.dev/cel-go at v0.32.0. Match either path on both sides, since Caddy and the
+# plugins migrate separately.
 cel_paths="github.com/google/cel-go cel.dev/cel-go"
 
 caddy_cel_path=""
@@ -30,8 +28,7 @@ if [ -z "$cel_go_version" ]; then
   exit 1
 fi
 
-# Replaced under whichever path our own graph requires, which is not necessarily Caddy's during a
-# migration; a replace may cross paths, so pointing the old one at the new module is valid.
+# Under whichever path our graph requires; a replace may cross paths.
 replaced=""
 for path in $cel_paths; do
   if go list -m "$path" >/dev/null 2>&1; then
@@ -46,8 +43,6 @@ else
   echo "Pinned${replaced} to ${caddy_cel_path}@${cel_go_version}"
 fi
 
-# tidy, not `go mod download all`: with tools.go pinning the graph, download all records
-# checksums for the whole transitive closure -- 1282 go.sum lines against tidy's 725 -- so the
-# scheduled run reported a diff every week and opened a PR of pure churn. `download all` was
-# only ever here because tidy used to empty this module; tools.go is what makes tidy correct.
+# tidy, not `go mod download all`, which records the whole transitive closure in go.sum and made
+# the scheduled run open a PR of pure churn every week.
 go mod tidy

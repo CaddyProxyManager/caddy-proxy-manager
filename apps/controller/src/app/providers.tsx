@@ -28,28 +28,18 @@ export default function Providers({
   timeZone: string;
 }) {
   return (
-    /* `locale` and `messages` are passed explicitly rather than inherited from the request config.
-       vinext renders RSC and SSR in separate environments, and next-intl's server context does not
-       cross that boundary - left to infer them, the provider throws during the SSR pass and the
-       page 500s with the RSC payload already rendered correctly. The time zone likewise: without
-       it the SSR pass logs ENVIRONMENT_FALLBACK, and a different one here than on the server
-       would render every timestamp twice, differently. */
+    /* Explicit, because vinext's SSR environment does not see next-intl's request config: left to
+       infer, the SSR pass throws and the page 500s. A mismatched time zone would render every
+       timestamp twice, differently. */
     <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
       <TimeZoneSync timeZone={timeZone} />
-      {/* Holds the language preference and hands the locale to Astryx, whose own components carry
-          strings this app never writes. */}
+      {/* Hands the locale to Astryx, whose components carry strings this app never writes. */}
       <LocaleProvider locale={locale} preference={localePreference}>
-        {/* Astryx owns light/dark end to end: ThemeModeProvider holds the
-            preference and passes it to Astryx's <Theme>, which sets color-scheme
-            and syncs `data-theme` to <html>. The theme's tokens are light-dark()
-            pairs, so the browser resolves them - including "system". */}
+        {/* Astryx owns light/dark: tokens are light-dark() pairs, so the browser resolves
+            "system" itself. */}
         <ThemeModeProvider initialMode={initialThemeMode}>
-          {/* Every Astryx component that renders a link (Button, Link, Tab,
-              ClickableCard, ...) routes through this, so an href stays a
-              client-side navigation instead of a full page load. */}
+          {/* So every Astryx link stays a client-side navigation, not a full page load. */}
           <LinkProvider component={NextLink}>
-            {/* Astryx's Tooltip manages its own layer, so no tooltip provider is
-                needed here any more. */}
             {children}
             <Toaster richColors position="bottom-right" />
           </LinkProvider>

@@ -1,14 +1,6 @@
 /**
- * What the agent makes of a GraphQL answer.
- *
- * GraphQL replies 200 with an `errors` array where REST replied with a status code, and the rest
- * of the agent still reasons in status codes - the lifecycle drops to idle on a 401 and retries on
- * anything else. So the translation between the two is load-bearing, and wrong in either direction
- * is bad: a 401 flattened to 400 loops forever against a secret that will never be accepted, and
- * anything else raised to 401 throws away a working pairing over a transient fault.
- *
- * These drive the client against a stub controller rather than a live one. What is being pinned is
- * the meaning the agent takes from a reply, which does not need a socket to exercise.
+ * GraphQL `errors` to the status codes the lifecycle reasons in: a 401 flattened loops forever
+ * on a dead secret, and anything else raised to 401 throws away a working pairing.
  */
 import { createHmac } from "node:crypto";
 import { describe, it, expect, afterEach } from "bun:test";
@@ -28,7 +20,6 @@ afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
 });
 
-/** Answer every request with one GraphQL payload. */
 function respondWith(payload: unknown, status = 200) {
   globalThis.fetch = (async () =>
     new Response(JSON.stringify(payload), {
@@ -54,7 +45,7 @@ const STATUS = {
 
 describe("a GraphQL refusal keeps the meaning the lifecycle acts on", () => {
   it("surfaces an unknown agent as 401, so the lifecycle can stop retrying", async () => {
-    // The one code that ends the loop. Everything else is a reason to try again later.
+    // The one code that ends the loop.
     respondWith({
       errors: [{ message: "Unknown agent", extensions: { code: "AGENT_UNAUTHORIZED" } }],
     });
@@ -69,8 +60,7 @@ describe("a GraphQL refusal keeps the meaning the lifecycle acts on", () => {
   });
 
   it("keeps a not-connected refusal retryable", async () => {
-    // The controller restarted and has no subscription for this agent yet. Reconnecting fixes it;
-    // unpairing would be a catastrophic overreaction.
+    // A restarted controller has no subscription yet: reconnect, never unpair.
     respondWith({
       errors: [
         { message: "That agent is not connected.", extensions: { code: "AGENT_NOT_CONNECTED" } },
@@ -104,9 +94,7 @@ describe("a GraphQL refusal keeps the meaning the lifecycle acts on", () => {
 
 describe("command results are not capped at a status-sized body", () => {
   it("sends a result far larger than a status without complaint", async () => {
-    // A Caddy config readback is measured in megabytes. The controller used to cap this endpoint
-    // separately from the status one; folding them into a single GraphQL endpoint is what made it
-    // possible to lose that, so the size the agent will send is pinned here.
+    // A config readback runs to megabytes, and one GraphQL endpoint shares one cap.
     let sentBytes = 0;
     globalThis.fetch = (async (_url: string, init?: RequestInit) => {
       sentBytes = String(init?.body ?? "").length;
@@ -159,8 +147,7 @@ describe("signing", () => {
     expect(nonce).toMatch(AGENT_NONCE_PATTERN);
     expect(second.headers.get(AGENT_NONCE_HEADER)).not.toBe(nonce);
 
-    // The nonce is under the signature, or stripping it would turn a request back into a
-    // replayable one.
+    // Signed, or stripping the nonce would make the request replayable.
     const timestamp = Number(first.headers.get(AGENT_TIMESTAMP_HEADER));
     const bodyHash = new Bun.CryptoHasher("sha256").update(first.body).digest("hex");
     const expected = createHmac("sha256", "secret")

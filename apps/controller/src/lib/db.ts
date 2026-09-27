@@ -1,11 +1,6 @@
 /**
- * The application's database handle, plus the one-time data migrations that run on startup.
- *
- * PostgreSQL only, reached through Bun.SQL and drizzle; the connection itself lives in
- * ./db/connection.ts.
- *
- * This module top-level-awaits its startup work, so the import graph waits for the migrations and
- * no route handler can observe a half-migrated database.
+ * The database handle (connection in ./db/connection.ts) plus one-time data migrations,
+ * top-level-awaited so no route handler can observe a half-migrated database.
  */
 import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./db/schema";
@@ -19,9 +14,7 @@ try {
   await runSchemaMigrations();
 } catch (error) {
   console.error("Failed to run database migrations:", error);
-  // Next's production build can import this module from parallel workers that share the temporary
-  // build database. Runtime, development, and tests must fail closed on migration errors so
-  // identity collisions are never ignored.
+  // Parallel build workers share the build database; everywhere else fails closed on errors.
   if (process.env.NEXT_PHASE === "phase-production-build") {
     console.warn("Continuing despite migration error during build phase");
   } else {
@@ -29,10 +22,7 @@ try {
   }
 }
 
-/**
- * One-time migration: populate `accounts` from users' provider/subject fields, add credential
- * accounts for password users, sync env OAuth providers. Idempotent via a settings flag.
- */
+/** Populates `accounts` from users' provider/subject. Idempotent via a settings flag. */
 async function runBetterAuthDataMigration() {
   if (isEphemeral) return;
 
@@ -46,7 +36,6 @@ async function runBetterAuthDataMigration() {
   if (flag) return;
 
   const now = new Date().toISOString();
-  // Migrate OAuth users: create account rows from users.provider/subject
   const oauthUsers = await db.select().from(users).where(ne(users.provider, "credentials"));
   for (const user of oauthUsers) {
     if (!user.provider || !user.subject) continue;
@@ -72,7 +61,6 @@ async function runBetterAuthDataMigration() {
     }
   }
 
-  // Migrate credentials users: create credential account rows
   const credentialUsers = await db.select().from(users).where(eq(users.provider, "credentials"));
   for (const user of credentialUsers) {
     const [existing] = await db
@@ -92,7 +80,7 @@ async function runBetterAuthDataMigration() {
     }
   }
 
-  // Populate username field for all users (derived from email prefix)
+  // Derived from the email prefix.
   const usersWithoutUsername = await db.select().from(users).where(isNull(users.username));
   for (const user of usersWithoutUsername) {
     const usernameFromEmail = user.email.toLowerCase();
@@ -110,11 +98,11 @@ async function runBetterAuthDataMigration() {
   console.log("Better Auth data migration complete: populated accounts table");
 }
 
-/** Sync OAUTH_* env vars into oauthProviders. Raw Drizzle - this runs at module load. */
+/** Raw Drizzle: this runs at module load. */
 async function runEnvProviderSync() {
   if (isEphemeral) return;
 
-  // Lazy import to avoid circular dependency at module load
+  // Lazy, to avoid a circular import at module load.
   let config: {
     oauth: {
       enabled: boolean;
@@ -139,7 +127,7 @@ async function runEnvProviderSync() {
     };
   };
   try {
-    config = require("./config").config;
+    ({ config } = await import("./config"));
   } catch {
     return;
   }
@@ -149,7 +137,7 @@ async function runEnvProviderSync() {
   const { oauthProviders } = schema;
   let encryptSecret: (v: string) => string;
   try {
-    encryptSecret = require("./secret").encryptSecret;
+    ({ encryptSecret } = await import("./secret"));
   } catch (e) {
     console.error(
       "CRITICAL: Failed to load encryption module, refusing to store plaintext secrets:",
@@ -159,7 +147,7 @@ async function runEnvProviderSync() {
   }
 
   const name = config.oauth.providerName;
-  // Use a slug-based ID so the OAuth callback URL is predictable
+  // A slug, so the OAuth callback URL is predictable.
   const providerId =
     name
       .toLowerCase()
@@ -234,7 +222,6 @@ async function runCloudflareToProviderMigration() {
 
   const { settings: settingsTable } = schema;
 
-  // Skip if migration already ran
   const [flag] = await db
     .select()
     .from(settingsTable)
@@ -242,7 +229,7 @@ async function runCloudflareToProviderMigration() {
     .limit(1);
   if (flag) return;
 
-  // Skip if new dns_provider setting already exists (user already configured it)
+  // The user already configured the new format.
   const [existing] = await db
     .select()
     .from(settingsTable)
@@ -256,7 +243,6 @@ async function runCloudflareToProviderMigration() {
     return;
   }
 
-  // Check for legacy cloudflare setting
   const [cfRow] = await db
     .select()
     .from(settingsTable)
@@ -300,11 +286,8 @@ async function runCloudflareToProviderMigration() {
 }
 
 /**
- * One-time repair (#261): re-derive `users.provider` / `users.subject` from the authoritative
- * `accounts` table. Deployments that linked or unlinked OAuth identities before the sync hook in
- * auth-server existed carry stale values, which made the Profile page report the wrong connection
- * state. The logic mirrors syncUserOAuthIdentity() in models/user, spelled out here because that
- * module imports this one.
+ * One-time repair (#261): re-derive `users.provider`/`subject` from `accounts`. Mirrors
+ * syncUserOAuthIdentity() in models/user, which imports this module.
  */
 async function runOAuthIdentityRepair() {
   if (isEphemeral) return;

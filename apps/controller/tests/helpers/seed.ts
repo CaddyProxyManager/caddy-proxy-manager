@@ -1,28 +1,20 @@
 /**
- * Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI -
- * deliberately, so the suite runs the image that ships - so seeding happens in the throwaway
- * `db-seed` container, which reaches the same PostgreSQL server the web container does.
- *
- * The scripts below are source text sent to that container, not code this file runs. They use
- * Bun.SQL directly rather than drizzle: db-seed has no application bundle, and the point is to
- * write rows the application did not write.
+ * The web image is a compiled binary with no Bun CLI, so seeding runs in the throwaway `db-seed`
+ * container. The scripts below are source text sent there, using Bun.SQL rather than drizzle:
+ * db-seed has no app bundle, and the point is rows the app did not write.
  */
 import { execFileSync } from 'node:child_process';
 import { COMPOSE_ARGS, COMPOSE_CWD } from './compose';
 
-/** How db-seed reaches the database. The password matches tests/e2e.env. */
+/** Matches tests/e2e.env. */
 const DB = 'postgres://cpm:e2e-postgres-password@postgres:5432/cpm';
 
-/** Prologue every script shares: open the connection under the name the scripts use. */
 const PRELUDE = `
     import { SQL } from "bun";
     const sql = new SQL({ url: ${JSON.stringify(DB)}, max: 1 });
 `;
 
-/**
- * Run a Bun script against the application database and return its stdout. `--rm` so containers
- * don't accumulate, `--no-deps` so seeding never starts the stack, `-T` because there is no TTY.
- */
+/** `--no-deps` so seeding never starts the stack, `-T` because there is no TTY. */
 export function runSeedScript(script: string): string {
   return execFileSync(
     'docker',
@@ -31,10 +23,7 @@ export function runSeedScript(script: string): string {
   );
 }
 
-/**
- * Create the user, or reset one to a known role, password and active state. Writes both a `users`
- * row and a `credential` account row - Better Auth reads the account, the dashboard the user.
- */
+/** Writes both rows: Better Auth reads the `credential` account, the dashboard the `users` row. */
 export function ensureTestUser(username: string, password: string, role: string): void {
   runSeedScript(`
     const email = ${JSON.stringify(`${username}@localhost`)};
@@ -65,7 +54,6 @@ export function ensureTestUser(username: string, password: string, role: string)
   `);
 }
 
-/** Flip a user between active and disabled. */
 export function setUserStatus(email: string, status: 'active' | 'disabled'): void {
   runSeedScript(`
     await sql\`UPDATE users SET status = \${${JSON.stringify(status)}},
@@ -74,10 +62,7 @@ export function setUserStatus(email: string, status: 'active' | 'disabled'): voi
   `);
 }
 
-/**
- * Issue a Bearer API token for a user and return the raw value. Only the SHA-256 hash is stored,
- * matching what the application does, so the caller gets the one and only copy of the plaintext.
- */
+/** Stores only the SHA-256 hash, like the app, so the return value is the only plaintext copy. */
 export function createApiToken(email: string, name: string, token: string): string {
   runSeedScript(`
     const { createHash } = await import("node:crypto");
@@ -130,16 +115,12 @@ export function getUserRecord(email: string): SeededUserRecord {
     await sql.close();
   `).trim();
 
-  // `docker compose run` can interleave its own progress lines with the
-  // container's stdout, so take the JSON object rather than the whole stream.
+  // `docker compose run` interleaves its progress lines with the container's stdout.
   const json = output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1);
   return JSON.parse(json) as SeededUserRecord;
 }
 
-/**
- * Rewrite a user's password hash to bcrypt. Legacy-gate fixtures cannot be made through the UI, so
- * the old state is planted in both the `users` row and the `credential` account row.
- */
+/** Legacy-gate fixtures cannot be made through the UI, so both rows are planted with bcrypt. */
 export function downgradeUserToBcrypt(email: string, password: string): void {
   runSeedScript(`
     const hash = await Bun.password.hash(${JSON.stringify(password)}, { algorithm: "bcrypt", cost: 10 });
@@ -163,8 +144,7 @@ export function getUserHashAlgorithm(email: string): string {
     console.log("HASH:" + (user?.passwordHash ?? "").split("$").slice(0, 2).join("$"));
     await sql.close();
   `);
-  // Prefixed and picked out of the stream for the same reason getUserRecord slices its JSON:
-  // `docker compose run` interleaves its own lines with the container's stdout.
+  // Prefixed for the same reason getUserRecord slices its JSON.
   const line = output.split('\n').find((l) => l.includes('HASH:')) ?? '';
   return line.slice(line.indexOf('HASH:') + 'HASH:'.length).trim();
 }
@@ -180,10 +160,21 @@ export function setSettingRow(key: string, value: unknown): void {
   `);
 }
 
-/** Remove a settings row, restoring the built-in default. */
 export function clearSettingRow(key: string): void {
   runSeedScript(`
     await sql\`DELETE FROM settings WHERE key = \${${JSON.stringify(key)}}\`;
+    await sql.close();
+  `);
+}
+
+/** Turn off a user's 2FA, so a spec that enrols one can run again. */
+export function resetTwoFactor(email: string): void {
+  runSeedScript(`
+    const [user] = await sql\`SELECT id FROM users WHERE email = \${${JSON.stringify(email)}}\`;
+    if (user) {
+      await sql\`DELETE FROM two_factors WHERE "userId" = \${user.id}\`;
+      await sql\`UPDATE users SET "twoFactorEnabled" = false WHERE id = \${user.id}\`;
+    }
     await sql.close();
   `);
 }

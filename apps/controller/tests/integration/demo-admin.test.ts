@@ -96,6 +96,13 @@ describe('the demo administrator', () => {
   });
 
   it('is an ordinary account outside demo mode', async () => {
+    // Another admin first: the last active one can't be disabled, demo or not.
+    await createUser({
+      email: 'second-admin@localhost',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'second-admin',
+    });
     await expect(updateUserStatus(1, 'disabled')).resolves.toMatchObject({ status: 'disabled' });
   });
 });

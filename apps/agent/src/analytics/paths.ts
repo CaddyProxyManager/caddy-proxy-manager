@@ -1,9 +1,6 @@
 /**
- * Where the agent finds Caddy's logs and keeps its MaxMind databases.
- *
- * Its own module, with nothing but `node:path`, so the parsers can share it without importing the
- * GeoIP fetcher - and so a test that mocks `node:fs` does not have to mock every export that
- * fetcher uses.
+ * Only `node:path`, so the parsers need not import the GeoIP fetcher and a `node:fs` mock need
+ * not cover its exports.
  */
 
 import { dirname, join } from "node:path";
@@ -20,22 +17,15 @@ export function wafRulesLogPath(): string {
   return process.env.WAF_RULES_LOG || "/logs/waf-rules.log";
 }
 
-/** The directory Caddy rolls its logs in. */
 export function logsDir(): string {
   return dirname(accessLogPath());
 }
 
-/**
- * The agent's copy of the databases, on its own volume.
- *
- * The agent does not run as root, so its own volume is the one place it can write them. Caddy mounts
- * this directory read-only, so the agent owning it is the whole permission story.
- */
+/** The agent is not root, so its own volume is where it can write; Caddy mounts it read-only. */
 export function geoipDir(): string {
   return process.env.GEOIP_DIR || join(process.env.DATA_DIR || "/data", "geoip");
 }
 
-/** The database the parsers look countries up in. */
 export function geoipCountryDb(): string {
   return process.env.GEOIP_DB || join(geoipDir(), "GeoLite2-Country.mmdb");
 }

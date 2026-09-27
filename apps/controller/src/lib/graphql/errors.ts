@@ -1,9 +1,6 @@
 /**
- * What a GraphQL client is told when something fails, and who may read the schema.
- *
- * Masking follows `apiErrorResponse`: an error written for the reader goes out as written, and
- * anything else - a database error, an upstream body, a stack - is logged under an id and replaced.
- * Returning every error raw, as this endpoint used to, handed internals to any caller.
+ * Masks like `apiErrorResponse`: reader-facing errors go out as written, anything else is logged
+ * under an id and replaced, so internals never reach a caller.
  */
 
 import { type DocumentNode, GraphQLError, visit } from "graphql";
@@ -17,7 +14,6 @@ import { SettingsApplyError } from "../settings-api";
 import { SettingsValidationError } from "../settings-validation";
 import type { GraphQLContext } from "./context";
 
-/** Errors whose message was written for the person reading it. */
 const SAFE_ERRORS = [
   ApiAuthError,
   ApiClientError,
@@ -79,10 +75,7 @@ function withoutSuggestion(error: unknown): unknown {
   });
 }
 
-/**
- * Introspection for authenticated callers only. The schema describes every mutation on the box,
- * and the one caller without a user credential - the agent - never asks for it.
- */
+/** Authenticated callers only; the agent, the one caller without a user, never asks. */
 export function authenticatedIntrospectionPlugin(): Plugin {
   return {
     async onExecute({ args, setResultAndStopExecution }) {

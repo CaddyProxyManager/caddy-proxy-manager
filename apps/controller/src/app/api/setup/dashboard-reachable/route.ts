@@ -4,16 +4,8 @@ import { dashboardHostAnswers } from "@/src/lib/dashboard-host";
 import { getDashboardSettings } from "@/src/lib/settings";
 
 /**
- * GET /api/setup/dashboard-reachable - whether the dashboard host is answering yet.
- *
- * Asked by the restart dialog, once, to decide whether to hand the operator over to the domain
- * setup just claimed or leave them on the address they are already using. It is a question only
- * the server can answer: the browser cannot read a cross-origin response, and an opaque one cannot
- * tell this instance from whatever else holds the name.
- *
- * Admin-gated, because it makes this deployment fetch a URL - the same reason the Settings page's
- * check is. The domain is the stored one, which has been through the settings validator; nothing
- * the caller sends reaches the request.
+ * Server-side because a browser cannot read a cross-origin response. Admin-gated since it fetches
+ * a URL, and only the stored, validated domain - nothing the caller sends.
  */
 export async function GET(request: NextRequest): Promise<Response> {
   if ((await auth(request))?.user.role !== "admin") {

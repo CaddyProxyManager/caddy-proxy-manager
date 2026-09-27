@@ -1,20 +1,11 @@
-/**
- * The executable schema: type definitions plus resolvers, assembled once.
- *
- * Built at module load rather than per request. Parsing SDL and building the type map is not free,
- * and the schema cannot change while the process is running.
- */
+/** Built once at module load: parsing SDL is not free and the schema never changes at runtime. */
 
 import { createSchema } from "graphql-yoga";
 import { agentResolvers } from "./agent";
 import { resolvers } from "./resolvers";
 import { typeDefs } from "./typedefs";
 
-/**
- * Merged by hand rather than with a merge helper: there are exactly two sources and the only
- * overlap is `Mutation`, so a dependency to express that would cost more than the three lines it
- * saves - and it would hide the fact that the agent contributes mutations at all.
- */
+/** By hand: two sources overlapping only on `Mutation`, and it shows the agent adds mutations. */
 export const schema = createSchema({
   typeDefs,
   resolvers: {

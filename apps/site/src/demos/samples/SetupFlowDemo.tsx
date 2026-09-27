@@ -29,13 +29,8 @@ import {
 const SETTING_GROUPS = ["application", "authentication", "analytics", "geoip"] as const;
 
 /**
- * First-run setup from end to end, on the real screens.
- *
- * Each page is the component the app's page renders, given what that page would load. Everything
- * server-side - the stage, the redirects, the actions, the migration, the save, the restart - is
- * setup-simulation.ts, so the path through it is the app's: an imported account skips account
- * creation, a dashboard domain moves the address and asks for sign-in again, and only a migrated
- * install ends on the cleanup page.
+ * First-run setup on the real screens, each given what its page would load. Everything server-side
+ * is setup-simulation.ts, so the path through it is the app's.
  */
 export default function SetupFlowDemo() {
   const [simulation] = useState(() => new Simulation(true));

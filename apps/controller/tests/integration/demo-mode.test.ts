@@ -1,8 +1,6 @@
 /**
- * Demo mode: the app behaves as if it had an agent and a Caddy, and nothing real is ever reached.
- *
- * Worth pinning from both sides - the simulated agent must look finished to the pages that read its
- * status, and every door a real agent or a real Caddy could come through must stay shut.
+ * Both sides: the simulated agent must look finished to the pages, and every door a real agent or
+ * Caddy could come through must stay shut.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { AgentDesiredState } from '@cpm/shared';

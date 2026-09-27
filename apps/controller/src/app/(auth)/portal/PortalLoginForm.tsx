@@ -15,6 +15,8 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
+import { twoFactorError } from "@/src/lib/two-factor-error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
@@ -25,18 +27,16 @@ interface PortalLoginFormProps {
   hasRedirect: boolean;
   targetDomain: string;
   enabledProviders?: SignInProvider[];
-  /** False in OIDC-only mode: there are no local accounts to sign in with. */
+  /** False in OIDC-only mode. */
   localLoginEnabled?: boolean;
   existingSession?: { userId: string; name: string | null; email: string | null } | null;
-  /** A refused single sign-on attempt, already put into words by the page. */
   initialError?: string | null;
-  /** Null when none is configured, or the host this sign-in is for has turned it off. */
+  /** Null when none is configured, or this host turned it off. */
   captcha?: CaptchaWidgetConfig | null;
-  /** The page's CSP nonce, which Cap needs for the scripts it injects. */
+  /** Cap needs it for the scripts it injects. */
   cspNonce?: string;
 }
 
-/** The portal is always one centred card; only its contents vary. */
 function PortalCard({
   title,
   description,
@@ -84,21 +84,21 @@ export default function PortalLoginForm({
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  // The same two steps as /login, for the same reason: the password is only asked for once there
-  // is a name to attach it to.
+  // Two steps as on /login: the password is only asked for once there is a name to attach it to.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
+  // Issued by the password step for an account with 2FA; the code step sends it back.
+  const [challenge, setChallenge] = useState<string | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setError });
 
-  // See LoginClient: focusing from the handler races React's commit, so the field is focused from
-  // the effect that follows the step change.
+  // Focusing from the handler races React's commit (see LoginClient).
   useEffect(() => {
     if (onPasswordStep) {
       passwordRef.current?.focus();
     }
   }, [onPasswordStep]);
 
-  // If user already has a NextAuth session (e.g. from OAuth), auto-create forward auth session
+  // An existing session (e.g. from OAuth) gets a forward auth session without a form.
   useEffect(() => {
     if (existingSession && rid) {
       setPending(true);
@@ -121,7 +121,7 @@ export default function PortalLoginForm({
           setPending(false);
         });
     }
-    // `t` is stable for a given locale, so it does not re-run this on every render.
+    // `t` is stable per locale, so this does not re-run every render.
   }, [existingSession, rid, t]);
 
   const submitCredentials = async (trimmedUsername: string) => {
@@ -143,18 +143,24 @@ export default function PortalLoginForm({
       }
 
       if (!response.ok) {
-        // The attempt spent the pass; the next one needs a new solve.
         captchaStep.spent();
         setError(data.error ?? t("login.failed"));
         setPending(false);
-        // Stay on the password step so the name that failed is still readable.
+        // So the name that failed is still readable.
         setOnPasswordStep(true);
+        return;
+      }
+
+      if (data.needsSecondFactor) {
+        setChallenge(data.challenge);
+        setPassword("");
+        setPending(false);
         return;
       }
 
       window.location.href = data.redirectTo;
     } catch {
-      // Whether the attempt reached the server is unknown, so assume the pass went with it.
+      // Whether it reached the server is unknown, so assume the pass went with it.
       captchaStep.spent();
       setError(t("unexpectedErrorTryAgain"));
       setPending(false);
@@ -162,12 +168,41 @@ export default function PortalLoginForm({
     }
   };
 
+  const startOver = () => {
+    setChallenge(null);
+    setOnPasswordStep(false);
+    setPassword("");
+    captchaStep.spent();
+  };
+
+  const submitCode = async ({ method, code }: TwoFactorSubmission) => {
+    setError(null);
+    setPending(true);
+    try {
+      const response = await fetch("/api/forward-auth/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenge, rid, code, method }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? t("login.failed"));
+        setPending(false);
+        if (twoFactorError({ status: response.status, code: data.code }).restart) startOver();
+        return;
+      }
+      window.location.href = data.redirectTo;
+    } catch {
+      setError(t("unexpectedErrorTryAgain"));
+      setPending(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
-    // Read from state, not FormData: Astryx withholds an input's `name` while it is disabled, and
-    // these fields disable themselves once a sign-in is pending.
+    // Not FormData: Astryx withholds a disabled input's `name`, and these disable while pending.
     const trimmedUsername = username.trim();
 
     if (!trimmedUsername) {
@@ -196,8 +231,7 @@ export default function PortalLoginForm({
   const handleOAuthSignIn = (providerId: string) => {
     setError(null);
     setOauthPending(providerId);
-    // Redirect back to this portal page after OAuth, with the rid param preserved.
-    // The rid is an opaque server-side ID - the actual redirect URI is never in the URL.
+    // rid is an opaque server-side id; the real redirect URI is never in the URL.
     const callbackUrl = `/portal?rid=${encodeURIComponent(rid)}`;
     // A refused sign-in comes back to the same portal page, rid intact, so it can say why.
     authClient.signIn.social({
@@ -220,7 +254,6 @@ export default function PortalLoginForm({
     );
   }
 
-  // If we have a session and are auto-redirecting, show a loading state
   if (existingSession && pending && !error) {
     return (
       <PortalCard
@@ -265,7 +298,16 @@ export default function PortalLoginForm({
 
       {!localLoginEnabled && hasProviders && providerList}
 
-      {localLoginEnabled && (
+      {localLoginEnabled && challenge && (
+        <TwoFactorStep
+          pending={pending}
+          allowTrustDevice={false}
+          onSubmit={submitCode}
+          onCancel={startOver}
+        />
+      )}
+
+      {localLoginEnabled && !challenge && (
         <>
           {/* One form across both steps - see LoginClient for why the password field stays
               mounted while it is hidden. */}

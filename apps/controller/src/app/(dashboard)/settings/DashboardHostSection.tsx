@@ -26,13 +26,8 @@ import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboa
 import { SKIP_PAGE_SAVE } from "./PageBlocks";
 
 /**
- * How this dashboard is served through the Caddy it manages.
- *
- * Two things make this section different from the rest of the page. Turning it off can remove the
- * route the reader is using right now, so it asks first when it can tell that is the case - the
- * page is being served on the very domain about to stop being claimed. And TLS is a question about
- * the world rather than a preference, so the DNS check is offered inline: forcing HTTPS on a name
- * that does not resolve here yet buys nothing but a failing certificate order.
+ * Asks first when a change would remove the route the reader is on. The DNS check is inline
+ * because forcing HTTPS on a name that does not arrive here only buys a failing ACME order.
  */
 export function DashboardHostSection({
   dashboard,
@@ -45,7 +40,7 @@ export function DashboardHostSection({
   options: DashboardHostOptionsData | null;
   dashboardState: { success: boolean; message?: string } | null;
   dashboardFormAction: (payload: FormData) => void;
-  /** `checkDashboardDnsAction`, passed in so the docs site can render this without the actions. */
+  /** Passed in so the docs site can render this without the actions. */
   checkDns: () => Promise<DashboardDnsCheck>;
 }) {
   const t = useTranslations("settings");
@@ -56,14 +51,8 @@ export function DashboardHostSection({
   const [checking, setChecking] = useState(false);
   const [confirmDisable, setConfirmDisable] = useState(false);
 
-  // Whether this page arrived through the route in question. Read after mount rather than during
-  // render: the server has no window to ask, so deciding it inline would render one button on the
-  // server and a different one in the browser, which is a hydration mismatch. Until it resolves
-  // the form behaves normally, which is the safe way round - the worst case is the dialog not
-  // appearing for the first instant, not a warning that never appears.
-  //
-  // Compared against what is stored rather than what is typed: the saved domain is what Caddy is
-  // serving right now, and a half-typed replacement says nothing about how the reader got here.
+  // After mount, or server and browser render different buttons. Compared with the saved domain,
+  // since that is what Caddy serves now.
   const [servedThroughProxy, setServedThroughProxy] = useState(false);
   useEffect(() => {
     setServedThroughProxy(
@@ -74,9 +63,7 @@ export function DashboardHostSection({
 
   const losingOwnAccess = servedThroughProxy && !enabled;
 
-  // The check runs against the saved domain, not the field: a request whose host came from the
-  // form would be an administrator's keystrokes deciding where the server connects. So a field
-  // that has been edited has to be saved before the answer would mean anything.
+  // Against the saved domain, so keystrokes never decide where the server connects.
   const domainIsSaved = domain.trim().toLowerCase() === dashboard.domain.trim().toLowerCase();
 
   async function runCheck() {
@@ -84,8 +71,7 @@ export function DashboardHostSection({
     try {
       const result = await checkDns();
       setCheck(result);
-      // The check is the whole reason to trust the answer, so let it set the toggle rather than
-      // leaving the operator to read a warning and reproduce its conclusion by hand.
+      // The check sets the toggle rather than leaving the operator to act on a warning.
       setTls(result.ok);
     } finally {
       setChecking(false);
@@ -99,9 +85,7 @@ export function DashboardHostSection({
   return (
     <>
       <FormCard title={t("dashboardHostTitle")}>
-        {/* Kept off the page bar: when the change would cut the reader's own way in, the
-            button opens a confirmation and the dialog submits. A bar that submitted the form
-            directly would step over that question. */}
+        {/* Off the page bar, which would submit past the confirmation. */}
         <form id="dashboard-host-form" action={dashboardFormAction} {...SKIP_PAGE_SAVE}>
           <VStack gap={3}>
             {dashboardState?.message && (
@@ -165,10 +149,7 @@ export function DashboardHostSection({
                 </VStack>
               </Collapsible>
             )}
-            {/*
-              A plain SaveButton would submit before anything could be said about it, so when the
-              reader is about to cut their own route the button asks first and the dialog submits.
-            */}
+            {/* When cutting the reader's own route, the button asks and the dialog submits. */}
             {losingOwnAccess ? (
               <HStack>
                 <Button
@@ -210,7 +191,7 @@ export function DashboardHostSection({
   );
 }
 
-/** What the reachability check found, in the terms the toggle above it is decided by. */
+/** The reachability result, in the terms the toggle is decided by. */
 function DnsCheckResult({ check }: { check: DashboardDnsCheck }) {
   const t = useTranslations("settings");
 

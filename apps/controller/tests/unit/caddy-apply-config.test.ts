@@ -11,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -68,8 +67,6 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
     expect(caddy.loads).toHaveLength(1);
     expect(caddy.loads[0]).toMatchObject({ path: '/load', method: 'POST' });
 
-    // The payload is the real document, not a stub: the host we just created
-    // must be routable in it.
     const config = caddy.lastConfig() as never as {
       apps: { http: { servers: { cpm: { routes: { match?: { host?: string[] }[] }[] } } } };
     };
@@ -82,8 +79,7 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
   it('throws when Caddy rejects the config', async () => {
     caddy.failWith(400, 'invalid handler');
 
-    // The response body quotes the config Caddy choked on, so it is never echoed back -
-    // only an application-authored message and a code reach the caller.
+    // The body quotes the config Caddy choked on, so it is never echoed back.
     await expect(applyCaddyConfig()).rejects.toMatchObject({
       name: 'CaddyApplyError',
       code: 'CADDY_REJECTED',

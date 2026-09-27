@@ -24,9 +24,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 async function signIn(page: import('@playwright/test').Page, password: string) {
   await page.goto('/login');
-  // The sign-in form submits natively until React attaches its onSubmit, so a fill or a click that
-  // lands first is either dropped or turned into a GET to /login?username=...&password=... - the
-  // shape CI caught this helper failing in, on the second sign-in below.
+  // Before hydration the form submits natively - a GET with the credentials in the query.
   await waitForHydration(page);
   await signInWithCredentials(page, USERNAME, password);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
@@ -44,8 +42,7 @@ test.describe('Legacy password gate', () => {
   });
 
   test('the fixture really is a bcrypt hash', () => {
-    // Guards the test itself: if seeding silently wrote argon2id, every
-    // assertion below would pass for the wrong reason.
+    // If seeding silently wrote argon2id, everything below would pass for the wrong reason.
     expect(getUserHashAlgorithm(EMAIL)).toBe('$2b');
   });
 
@@ -74,7 +71,6 @@ test.describe('Legacy password gate', () => {
     await page.getByRole('textbox', { name: /^Confirm New Password/ }).fill(NEW_PASSWORD);
     await page.getByRole('button', { name: /update password/i }).click();
 
-    // Lands back on the dashboard rather than bouncing at the gate again.
     await expect(page).not.toHaveURL(/\/password-change/, { timeout: 15_000 });
     expect(getUserHashAlgorithm(EMAIL)).toBe('$argon2id');
 

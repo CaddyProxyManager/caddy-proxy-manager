@@ -1,10 +1,4 @@
-/**
- * What this agent reports about itself.
- *
- * Its own module because two callers need it and neither should own it: the lifecycle pushes it to
- * the controller, and the local control routes serve it to `cpm-agent` on the host. It used to be
- * a closure inside the request handler, back when the controller asked for it.
- */
+/** Pushed to the controller by the lifecycle and served to `cpm-agent` by the local routes. */
 
 import {
   AGENT_CAPABILITIES,
@@ -20,11 +14,7 @@ import type { AgentStore } from "./db";
 import type { DockerHost } from "./docker";
 import pkg from "../package.json";
 
-/**
- * Reported to the controller and printed by `--version`. Read from the workspace manifest so there
- * is one version to bump: this used to be a literal, and had drifted a minor release ahead of
- * anything that was ever published.
- */
+/** From the manifest, so there is one version to bump. */
 export const AGENT_VERSION: string = pkg.version;
 
 export type StatusDeps = {
@@ -32,6 +22,12 @@ export type StatusDeps = {
   store: AgentStore;
   docker: DockerHost;
 };
+
+/** Only a plausible id: anything else would fail the controller's decoder and the whole report. */
+function numericId(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  return /^\d{1,10}$/.test(trimmed) ? trimmed : "";
+}
 
 export async function buildStatus({ config, store, docker }: StatusDeps): Promise<AgentStatus> {
   return {
@@ -46,6 +42,15 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
     caddyBuild: {
       applied: store.appliedCaddyModules(),
       status: store.caddyBuildStatus(),
+      ...(config.caddyBuildMode === "external"
+        ? {
+            external: {
+              image: store.caddyImage(),
+              puid: numericId(process.env.PUID),
+              pgid: numericId(process.env.PGID),
+            },
+          }
+        : {}),
     },
     services: {
       applied: store.appliedManagedServices() as Record<ManagedServiceName, boolean> | null,
@@ -55,7 +60,7 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
       enabled: analyticsEnabled(),
       accessLogPresent: accessLogPresent(),
     },
-    // The files only matter while the agent is parsing them; the directory is Caddy's either way.
+    // The files matter only while parsed; the directory is Caddy's either way.
     logAccess: checkLogAccess(config.caddyContainerName, analyticsEnabled()),
     capabilities: [...AGENT_CAPABILITIES],
   };

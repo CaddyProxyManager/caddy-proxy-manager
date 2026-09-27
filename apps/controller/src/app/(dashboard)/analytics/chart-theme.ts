@@ -12,11 +12,9 @@ import type { ApexOptions } from "apexcharts";
 export interface ChartTheme {
   /** Resolved mode - ApexCharts has its own light/dark defaults keyed off this. */
   mode: "light" | "dark";
-  /** Shared chart chrome: background, grid, tooltip, axis label styling. */
   base: ApexOptions;
-  /** Axis and legend label colour, ready to drop into a `style.colors`. */
   labelColor: string;
-  /** Categorical colours. Identical in light and dark on purpose, so a series keeps identity. */
+  /** Identical in light and dark on purpose, so a series keeps identity. */
   series: {
     blue: string;
     red: string;
@@ -29,8 +27,7 @@ export interface ChartTheme {
 }
 
 export function useChartTheme(): ChartTheme {
-  // `tokens` rather than `token()`: the map is memoized on theme + mode, while the lookup function
-  // is rebuilt every render and would defeat the useMemo.
+  // `tokens`, not `token()`, which is rebuilt every render and would defeat the useMemo.
   const { mode, tokens } = useTheme();
 
   return useMemo(() => {
@@ -57,8 +54,7 @@ export function useChartTheme(): ChartTheme {
         cyan: token("--color-data-categorical-cyan"),
         orange: token("--color-data-categorical-orange"),
       },
-      // The categorical colours are saturated mid-tones, so the "on dark" foreground stays legible
-      // on every one of them in both modes.
+      // Saturated mid-tones, so "on dark" stays legible on each in both modes.
       onSeries: token("--color-on-dark"),
     };
   }, [mode, tokens]);

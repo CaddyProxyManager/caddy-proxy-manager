@@ -13,8 +13,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -53,19 +52,10 @@ import * as schema from '../../src/lib/db/schema';
 type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
 let agent: FakeAgent;
 
-/**
- * Desired-state frames seen at the start of the test, so `rebuildRequested` measures what the test
- * did rather than the frame every agent gets when it attaches.
- */
+/** Frames at test start, so the one every agent gets on attach is not counted as a rebuild. */
 let pushBaseline = 0;
 
-/**
- * Whether the controller pushed new desired state during this test.
- *
- * Asking for a rebuild is a push now, not a POST to a rebuild endpoint. Saving the build settings
- * does not push - only applying does - so a frame appearing after the baseline is the rebuild
- * request, and its absence is the controller declining to ask for one.
- */
+/** Saving the build settings does not push, only applying does, so a new frame is the request. */
 function rebuildRequested(): boolean {
   return agent.requests.filter((r) => r.kind === 'desired-state').length > pushBaseline;
 }
@@ -75,10 +65,7 @@ const CORAZA = 'github.com/corazawaf/coraza-caddy/v2';
 const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
-/**
- * Pretend a rebuild already completed with these modules - the agent's *applied* set, which it
- * reports only after a build has succeeded and Caddy is healthy again. Never the selection.
- */
+/** The agent's *applied* set, reported only after a build succeeds and Caddy is healthy. */
 function setAppliedModules(specs: string[]) {
   agent.state.appliedModules = specs;
 }
@@ -94,11 +81,13 @@ afterEach(async () => {
 });
 
 describe('selection resolution', () => {
-  it('treats an unknown module id as enabled', async () => {
-    // A module added to the catalog after an operator last saved must appear
-    // on, matching the image they are already running.
+  it('treats an unknown module id as enabled, unless it is opt-in', async () => {
+    // A module added to the catalog after the last save is on, matching the running image.
     const ids = resolveEnabledModuleIds({ modules: { 'caddy-l4': true }, customModules: [] });
-    expect(ids).toEqual(CADDY_MODULES.map((m) => m.id));
+    expect(ids).toEqual(CADDY_MODULES.filter((m) => m.defaultEnabled !== false).map((m) => m.id));
+    expect(
+      resolveEnabledModuleIds({ modules: { 'cache-handler': true }, customModules: [] }),
+    ).toContain('cache-handler');
   });
 
   it('drops only the modules explicitly set to false', () => {
@@ -120,8 +109,7 @@ describe('selection resolution', () => {
   });
 
   it('silently skips a stored custom module that no longer validates', () => {
-    // Validation happens on save, but a hand-edited settings row or an older
-    // release's data must not be able to inject a shell fragment into the build.
+    // A hand-edited row or an older release's data must not inject a shell fragment.
     const specs = resolveModuleSpecs({
       modules: {},
       customModules: [{ modulePath: 'github.com/o/r; rm -rf /', enabled: true }],
@@ -144,9 +132,8 @@ describe('selection resolution', () => {
 
 describe('applied module specs', () => {
   it('reports the full catalog when no rebuild has happened', async () => {
-    // The agent reports null until it has built something, meaning the container is still the
-    // shipped image - which carries everything. Returning an empty list here would make config
-    // generation drop every plugin-backed handler on a perfectly healthy install.
+    // Null means the shipped image, which carries everything; an empty list would drop every
+    // plugin-backed handler on a healthy install.
     expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
@@ -162,8 +149,7 @@ describe('applied module specs', () => {
 
   it('falls back to the full catalog when no agent answers at all', async () => {
     await agent.stop();
-    // A missing agent is not evidence that the binary has no plugins. Claiming an empty set would
-    // silently strip every gated feature from a config that was working a moment ago.
+    // A missing agent is no evidence the binary lacks plugins.
     expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
@@ -205,11 +191,9 @@ describe('feature gating', () => {
     });
 
     const availability = await getCaddyModuleAvailability();
-    // Selected and built: usable.
     expect(isFeatureUsable(availability, 'l4')).toBe(true);
-    // Selected but not built yet - emitting it would fail the whole config.
+    // Not built yet - emitting it would fail the whole config.
     expect(isFeatureUsable(availability, 'waf')).toBe(false);
-    // Built but deselected - the admin is on their way to removing it.
     expect(isFeatureUsable(availability, 'geoblock')).toBe(false);
   });
 
@@ -237,8 +221,8 @@ describe('feature gating', () => {
 
 describe('module gate state for the UI', () => {
   it('gates on the selection, not on the built image', async () => {
-    // Following the applied set would leave a freshly enabled feature greyed out after being
-    // switched on, which reads as broken. pendingRebuild is what says "saved, not live yet".
+    // Following the applied set would grey out a feature just switched on; pendingRebuild says
+    // "saved, not live yet".
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
 
@@ -276,8 +260,7 @@ describe('sanitizeCaddyBuildSettings', () => {
   });
 
   it('rejects an invalid custom module rather than dropping it', () => {
-    // Dropping it silently would let a typo look like a successful save and
-    // leave the operator waiting for a plugin that was never requested.
+    // Dropping it silently would make a typo look like a successful save.
     expect(() =>
       sanitizeCaddyBuildSettings({ customModules: [{ modulePath: 'nope', enabled: true }] }),
     ).toThrow(/host and a path/);
@@ -297,23 +280,19 @@ describe('sanitizeCaddyBuildSettings', () => {
 
 describe('applyCaddyBuild', () => {
   it('regenerates the config before signalling the rebuild', async () => {
-    // Caddy runs with --resume, so the recreated container reloads the last autosaved config. If
-    // that still names a module the new binary does not have, Caddy refuses to load it and the
-    // proxy stays down - with no way in, because the admin API never comes up either. The apply
-    // has to happen before the trigger is written, not after.
+    // Caddy runs with --resume: a saved config naming a module the new binary lacks keeps the proxy
+    // and admin API down. So the apply comes before the trigger.
     const caddy: FakeCaddy = installFakeCaddy();
     await saveCaddyBuildSettings({ modules: { 'coraza-waf': false }, customModules: [] });
 
     await applyCaddyBuild();
 
     expect(caddy.loads.length).toBeGreaterThan(0);
-    // And the rebuild is only requested once that apply has happened.
     expect(rebuildRequested()).toBe(true);
   });
 
   it('does not ask for a rebuild when the config apply fails', async () => {
-    // Asking anyway would hand the agent a rebuild whose new binary is guaranteed not to match
-    // the config Caddy will resume from.
+    // The new binary would be guaranteed not to match the config Caddy resumes from.
     const caddy: FakeCaddy = installFakeCaddy();
     caddy.failWith(500, 'nope');
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
@@ -327,8 +306,7 @@ describe('applyCaddyBuild', () => {
     await saveCaddyBuildSettings({ modules: { 'caddy-l4': false }, customModules: [] });
 
     const status = await applyCaddyBuild();
-    // Pending, not finished: the controller pushes the module list and the agent reconciles, and
-    // xcaddy compiles from source for minutes after that.
+    // xcaddy compiles from source for minutes after the agent reconciles.
     expect(status.state).toBe('pending');
 
     const modules = agent.desired?.caddyModules ?? [];
@@ -337,9 +315,8 @@ describe('applyCaddyBuild', () => {
   });
 
   it('does not claim the new modules are applied until the build succeeds', async () => {
-    // Requesting a rebuild changes nothing about the binary that is running. Treating the request
-    // as already landed is how the applied set gets poisoned: config generation would emit handlers
-    // for a module the live binary lacks, and Caddy rejects such a document wholesale.
+    // Treating a request as landed poisons the applied set: config would name modules the live
+    // binary lacks, and Caddy rejects the document wholesale.
     setAppliedModules([L4, CORAZA]);
     await saveCaddyBuildSettings({
       modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
@@ -348,15 +325,13 @@ describe('applyCaddyBuild', () => {
 
     await applyCaddyBuild();
 
-    // Still the old binary's module set, and the diff still says a rebuild is
-    // outstanding - it only settles once the agent reports success.
+    // It only settles once the agent reports success.
     expect(await getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(true);
   });
 
   it('leaves the applied set untouched when a build never completes', async () => {
-    // A failed xcaddy compile is routine, and the request that started it is not evidence of
-    // anything. Treating "asked for" as "built" would persist the wrong answer across restarts.
+    // Failed compiles are routine; "asked for" as "built" would persist the wrong answer.
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({
       modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
@@ -375,7 +350,7 @@ describe('applyCaddyBuild', () => {
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
     await applyCaddyBuild();
 
-    // What the agent does after build + up + healthy, and only then.
+    // Only after build + up + healthy.
     agent.completeBuild();
 
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(false);

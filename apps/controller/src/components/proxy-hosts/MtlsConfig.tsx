@@ -60,9 +60,7 @@ export function MtlsFields({
   const [editRule, setEditRule] = useState<MtlsAccessRule | null>(null);
 
   const isEditMode = !!proxyHostId;
-  // Only consider certs that are not revoked AND whose issuing CA still exists.
-  // Deleting a CA should remove its issued certs, but legacy/orphaned rows must
-  // never resurface as selectable here.
+  // Revoked certs and those whose CA is gone are excluded, so orphaned rows never resurface here.
   const knownCaIds = new Set(caCertificates.map((c) => c.id));
   const activeCerts = issuedClientCerts.filter(
     (c) => !c.revokedAt && knownCaIds.has(c.caCertificateId),
@@ -221,8 +219,6 @@ export function MtlsFields({
                           <HStack justify="between" vAlign="center" gap={2}>
                             <CheckboxInput
                               label={caName}
-                              // Indeterminate communicates a partial CA selection,
-                              // which the old markup faked with opacity.
                               value={allSelected ? true : someSelected ? "indeterminate" : false}
                               onChange={() => toggleAllFromCA(caId)}
                             />
@@ -344,8 +340,7 @@ export function MtlsFields({
                                 )}
                             </HStack>
                           )}
-                          {/* Always visible: the old controls only appeared on
-                              hover, so keyboard users could not reach them. */}
+                          {/* Always visible, not on hover, so keyboard users can reach them. */}
                           <HStack gap={1}>
                             <IconButton
                               variant="ghost"
@@ -505,8 +500,7 @@ function RuleDialog({
 
         <Switch label={t("mtlsDenyPathLabel")} value={denyAll} onChange={setDenyAll} />
 
-        {/* Unmounted rather than dimmed to 30% opacity, so these are not
-            reachable while the rule denies everything. */}
+        {/* Unmounted, not dimmed, so these are unreachable while the rule denies everything. */}
         {!denyAll && (
           <VStack gap={4}>
             {roles.length === 0 ? (

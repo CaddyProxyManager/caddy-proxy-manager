@@ -1,11 +1,6 @@
 /**
- * The controller's API routes, answered in the browser for whichever demo needs them.
- *
- * The components call the global `fetch` for `/api/...` paths the documentation site does not
- * have, so without this each such call is a 404 in the reader's console. `fetch` is wrapped once,
- * at import rather than in an effect: a child's effect runs before its parent's, so a component
- * fetching on mount would otherwise go out before the demo around it had installed anything. Only
- * same-origin requests a handler claims are answered; everything else reaches the network.
+ * Answers the controller's `/api/...` routes in the browser. `fetch` is wrapped at import, not in
+ * an effect: a child's effect runs before its parent's, so a mount fetch would go out first.
  */
 
 /** Answers a request, or returns null to leave it to the next handler and then the network. */
@@ -27,7 +22,7 @@ if (typeof window !== "undefined") {
   }) as typeof fetch;
 }
 
-/** Answer requests with `handler` until the returned function is called. */
+/** Until the returned function is called. */
 export function serveApi(handler: ApiHandler): () => void {
   handlers.add(handler);
   return () => {
@@ -35,7 +30,6 @@ export function serveApi(handler: ApiHandler): () => void {
   };
 }
 
-/** A JSON response, as the route handlers send one. */
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

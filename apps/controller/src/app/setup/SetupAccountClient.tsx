@@ -1,15 +1,9 @@
 "use client";
 
 /**
- * The first two decisions of setup: what this instance is, and how anyone signs in to it.
- *
- * The role question comes first and is not persisted anywhere - an agent has no database of its
- * own to record it in, and answering "agent" ends the flow with a pointer to its own instructions
- * rather than continuing. Only a controller has anything further to configure here.
- *
- * `migratedFrom` is set when a migration has just run and chose not to bring the old accounts. The
- * page is otherwise identical to a fresh install's, which would leave the operator reading "nothing
- * can sign in to this instance yet" and concluding their migration had failed.
+ * The role is not persisted: an agent has no database to record it in, and "agent" ends the flow.
+ * `migratedFrom` explains "nothing can sign in yet" after a migration that left accounts behind,
+ * which would otherwise read as a failed migration.
  */
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -50,8 +44,7 @@ export default function SetupAccountClient({
   const [role, setRole] = useState<Role>("controller");
   const [method, setMethod] = useState<Method>("local");
 
-  // Astryx text inputs are controlled, so the form's values live here and reach the server action
-  // through each field's htmlName.
+  // Astryx text inputs are controlled; values reach the action through each field's htmlName.
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -145,8 +138,7 @@ export default function SetupAccountClient({
                       description={passwordPolicyHint(t)}
                       value={password}
                       onChange={setPassword}
-                      // Fill the confirmation too: a generated value nobody typed cannot be
-                      // retyped from memory, and leaving it blank only blocks the form.
+                      // Nobody can retype a generated value from memory.
                       onGenerate={(generated) => {
                         setPassword(generated);
                         setPasswordConfirmation(generated);

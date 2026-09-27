@@ -1,13 +1,6 @@
 /**
- * Pairing, and the standing grant it creates - now minted here rather than by the agent.
- *
- * A row in `agents` lets whoever holds its secret run Caddy admin calls on another host, so the
- * properties worth pinning are about what the exchange refuses and what it never lets out: the
- * secret must not be stored in the clear, a credential must work exactly once, guessing must be
- * bounded, and no credential anyone could hold may displace an agent that is already paired.
- *
- * The route is exercised directly. There is no agent to stand up any more - the agent's side of
- * pairing is one unsigned POST.
+ * An agent's secret runs Caddy admin calls on another host, so this pins what pairing refuses:
+ * no cleartext secret, single-use credentials, bounded guessing, and no displacing a paired agent.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -18,8 +11,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
-// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous - an async one never resolves and the file hangs.
+// Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -283,8 +275,7 @@ describe('an agent that is already paired', () => {
 });
 
 describe('guessing from one address', () => {
-  // The address comes from X-Forwarded-For here: the test server stamps no peer address, and
-  // X-Real-IP is never trusted.
+  // X-Forwarded-For: the test server stamps no peer address, and X-Real-IP is never trusted.
   const from = { 'x-forwarded-for': '203.0.113.9' };
 
   it('stops a client after five wrong codes, even when its sixth is right', async () => {
@@ -299,8 +290,7 @@ describe('guessing from one address', () => {
 });
 
 describe('bootstrap token', () => {
-  // Its own directory per test: the token is a file, and a leaked one between tests would let a
-  // stale value pair when the test believed there was none.
+  // A directory per test, so a leaked token file cannot pair a later test.
   let dir: string;
 
   beforeEach(async () => {
@@ -361,8 +351,7 @@ describe('bootstrap token', () => {
   });
 
   it('does not let a bootstrap token stand in for a typed code when none was written', async () => {
-    // A controller with no shared volume must refuse this outright rather than falling through to
-    // the six-letter path and comparing against a live code.
+    // Must not fall through to comparing against the live six-letter code.
     ensurePairingCode();
     expect((await pair('e'.repeat(64))).status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
@@ -443,7 +432,7 @@ describe('bootstrap token', () => {
     expect(agentId).toBe(AGENT_ID);
     await bootstrap.forgetBootstrapAgent(AGENT_ID);
 
-    // A restart is exactly when the old behaviour wrote a fresh token and the agent paired back.
+    // A restart is when a fresh token would let the agent pair back.
     bootstrap.resetBootstrapState();
     expect(await bootstrap.ensureBootstrapToken()).toBe(false);
     expect(await tokenOnDisk()).toBe(false);
@@ -476,7 +465,7 @@ describe('POST /api/agent/v1/pair/preview', () => {
   }
 
   it('names the controller for a right code without spending it', async () => {
-    // The Application name - what the sidebar calls this instance - not a separate branding value.
+    // The Application name, not a separate branding value.
     await saveSettings({ [appName.key]: 'Edge Controller' });
     const { code } = ensurePairingCode();
 

@@ -1,10 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/**
- * Security headers on public pages. The login and portal forms shipped with none - headers were set
- * only on the authenticated branch - and later with framing protection but no script policy. Both
- * now carry the dashboard's nonce CSP and the same referrer and permissions policies.
- */
+/** Login and portal carry the dashboard's nonce CSP, referrer and permissions policies. */
 
 const BASE_URL = 'http://localhost:3000';
 

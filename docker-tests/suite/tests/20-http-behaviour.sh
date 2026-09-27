@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Per-host HTTP behaviour: scheme forcing, HSTS, host header handling,
-# WebSocket upgrades, and HTTPS upstreams with a mismatched certificate.
+# Per-host HTTP behaviour: scheme forcing, HSTS, host headers, WebSockets, and HTTPS upstreams with
+# a mismatched certificate.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "HTTP behaviour"
@@ -51,8 +51,7 @@ sts=$(header_value strict-transport-security)
 t_contains "the HSTS header is set" "max-age=63072000" "$sts"
 t_contains "subdomains are included when asked for" "includeSubDomains" "$sts"
 
-# hstsSubdomains defaults off, so a host that only enables HSTS must not claim
-# authority over names it does not serve.
+# hstsSubdomains defaults off: HSTS alone must not claim names the host does not serve.
 plain_hsts=$(domain_for "hsts-no-subdomains")
 create_host_or_fail "a host with HSTS but not subdomains can be created" "$(jq -nc --arg d "$plain_hsts" '{
   name: "docker-test hsts no subdomains", domains: [$d], upstreams: ["origin-a:8080"],
@@ -65,8 +64,7 @@ sts=$(header_value strict-transport-security)
 t_contains "HSTS is still set" "max-age=63072000" "$sts"
 t_not_contains "subdomains are not claimed unless asked for" "includeSubDomains" "$sts"
 
-# Turning HSTS off must remove the header entirely - a stale max-age would keep
-# browsers pinned to HTTPS long after the operator changed their mind.
+# A stale max-age would keep browsers pinned to HTTPS long after the operator changed their mind.
 no_hsts=$(domain_for "hsts-off")
 create_host_or_fail "a host with HSTS switched off can be created" "$(jq -nc --arg d "$no_hsts" '{
   name: "docker-test hsts off", domains: [$d], upstreams: ["origin-a:8080"],
@@ -79,8 +77,7 @@ t_eq "no HSTS header is sent when the host disables it" "" "$(header_value stric
 
 # ── Host header handling ────────────────────────────────────────────────────
 #
-# Caddy forwards the client's Host by default; preserveHostHeader pins it
-# explicitly, which matters once other handlers in the chain rewrite it.
+# preserveHostHeader pins Host explicitly, which matters once other handlers rewrite it.
 
 preserve=$(domain_for "preserve-host")
 create_host_or_fail "a host with preserveHostHeader can be created" "$(jq -nc --arg d "$preserve" '{
@@ -102,8 +99,7 @@ create_host_or_fail "a websocket-enabled host can be created" "$(jq -nc --arg d 
 
 wait_for_https "$ws" 120
 
-# curl performs the handshake; a 101 proves Caddy passed the Upgrade through
-# rather than answering or stripping it.
+# A 101 proves Caddy passed the Upgrade through rather than answering or stripping it.
 fetch "https://$ws/ws" \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
@@ -111,16 +107,40 @@ fetch "https://$ws/ws" \
 t_eq "the upgrade handshake is proxied" "101" "$FETCH_CODE"
 t_contains "the upgrade response comes from the origin" "Sec-WebSocket-Accept" "$FETCH_HEADERS"
 
-# Then a real frame exchange, so the connection is proven to stay open and
-# bidirectional after the handshake.
+# A real frame exchange proves the connection stays open and bidirectional.
 ws_reply=$(python3 /suite/helpers/ws_client.py "$ws" /ws "$CA_BUNDLE" hello-over-ws 2>&1)
 t_contains "a websocket frame round-trips through the proxy" "echo:hello-over-ws" "$ws_reply"
 
 # ── HTTPS upstreams ─────────────────────────────────────────────────────────
 #
-# origin-tls presents a certificate issued for a name it is not reachable
-# under. Caddy must refuse it by default and accept it only when the host opts
-# out of upstream hostname verification.
+# origin-tls's certificate names a host it is not reached under: refused unless the host opts out
+# of upstream hostname verification.
+
+# ── Cache assets ────────────────────────────────────────────────────────────
+# Caddy mode here too: the rig's image lacks the opt-in module, so it must degrade to browser mode
+# rather than emit a handler Caddy would refuse.
+
+cached=$(domain_for "cache-assets")
+create_host_or_fail "a host with cache assets can be created" "$(jq -nc --arg d "$cached" '{
+  name: "docker-test cache assets", domains: [$d], upstreams: ["origin-a:8080"],
+  cache: {mode: "caddy", maxAge: 3600}
+}')" && pass "a host with cache assets can be created"
+
+wait_for_https "$cached" 120
+fetch "https://$cached/app.css"
+t_eq "an asset is proxied" "200" "$FETCH_CODE"
+t_eq "an asset gets the host's max age" "max-age=3600" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cc=no-store"
+t_eq "the upstream's own Cache-Control wins" "no-store" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cookie=abc"
+t_eq "an asset setting a cookie is marked private" "private" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cookie=abc&cc=no-store"
+t_contains "a cookie never weakens the upstream's no-store" "no-store" \
+  "$(printf '%s' "$FETCH_HEADERS" | grep -i '^cache-control:')"
+fetch "https://$cached/app.css?status=404"
+t_eq "an error response is not given the max age" "" "$(header_value cache-control)"
+fetch "https://$cached/page"
+t_eq "a page is left alone" "" "$(header_value cache-control)"
 
 strict=$(domain_for "https-upstream-strict")
 create_host_or_fail "a host with an HTTPS upstream can be created" "$(jq -nc --arg d "$strict" '{
