@@ -15,7 +15,7 @@ function currentCertificate(stored: CaddyCertificate[], name: string) {
     .sort((a, b) => Date.parse(b.notAfter) - Date.parse(a.notAfter))[0];
 }
 
-/** With no agent to ask, the caller may say which certificate it means; it only shapes the window. */
+/** No agent to ask: the caller may say which certificate it means; it only shapes the window. */
 function datesFrom(body: { notBefore?: unknown; notAfter?: unknown }) {
   return typeof body.notBefore === "string" && typeof body.notAfter === "string"
     ? { notBefore: body.notBefore, notAfter: body.notAfter }

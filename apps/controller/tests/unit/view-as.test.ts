@@ -1,7 +1,6 @@
 /**
- * "View as" narrows an administrator's own session to another role and some groups. What has to
- * hold: the narrowed view sees exactly what that role and those groups grant, it never outlives
- * its expiry or its owner's admin role, and it can't be pointed at groups that don't exist.
+ * A narrowed view sees exactly what its role and groups grant, never outlives its expiry or its
+ * owner's admin role, and can't name groups that don't exist.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';

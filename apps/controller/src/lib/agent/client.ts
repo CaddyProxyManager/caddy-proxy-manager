@@ -251,10 +251,7 @@ function agentsWith(capability: "certificates" | "log-read") {
   return connectedAgents().filter((agent) => agent.status?.capabilities?.includes(capability));
 }
 
-/**
- * Every certificate in every reachable agent's Caddy storage. An agent that fails to answer is
- * reported as such rather than failing the whole list: one wedged host shouldn't blank the page.
- */
+/** A failed agent is reported per agent, so one wedged host doesn't blank the whole list. */
 export async function listAgentCertificates(): Promise<
   { agentId: string; name: string; certificates: CaddyCertificate[] | null }[]
 > {

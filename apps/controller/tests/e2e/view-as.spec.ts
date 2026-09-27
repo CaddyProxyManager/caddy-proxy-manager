@@ -1,8 +1,4 @@
-/**
- * E2E: an administrator views the dashboard as an operator, loses what an operator can't reach,
- * and returns. Uses its own admin: the shared admin session every other spec runs as must never be
- * narrowed underneath them.
- */
+/** Uses its own admin: the shared session every other spec runs as must never be narrowed. */
 import { test, expect, type Page } from '@playwright/test';
 import * as seed from '../helpers/seed';
 import { waitForHydration } from '../helpers/hydration';

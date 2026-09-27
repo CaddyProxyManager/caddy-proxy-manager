@@ -27,9 +27,8 @@ function runHealthCheck(port: number): void {
 }
 
 /**
- * `--reset-2fa <username>`: the way back in for an administrator who has lost their authenticator
- * and their backup codes. Asks the running server rather than writing the database itself, so the
- * reset is audited and a SQLite database never has a second writer. Console output, so English.
+ * `--reset-2fa <username>`: asks the running server rather than writing the database, so the reset
+ * is audited and a SQLite database never has a second writer. Console output, so English.
  */
 function runResetTwoFactor(port: number, username: string): void {
   const secret = process.env.SESSION_SECRET;

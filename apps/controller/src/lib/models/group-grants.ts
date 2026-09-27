@@ -147,7 +147,6 @@ export async function grantsForUser(userId: number): Promise<EffectiveGrants> {
   return await grantsForGroups(memberships.map((row) => row.groupId));
 }
 
-/** What membership of exactly these groups grants. */
 export async function grantsForGroups(groupIds: number[]): Promise<EffectiveGrants> {
   if (groupIds.length === 0) return emptyGrants();
 

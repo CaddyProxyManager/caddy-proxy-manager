@@ -1,7 +1,4 @@
-/**
- * E2E: turning on two-factor sign-in from the Profile page, then signing in with a TOTP code and
- * with a backup code. Uses its own account, so the admin every other spec runs as is untouched.
- */
+/** Uses its own account, so the admin every other spec runs as is untouched. */
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import * as seed from '../helpers/seed';
 import { waitForHydration } from '../helpers/hydration';

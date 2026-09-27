@@ -1,7 +1,3 @@
-/**
- * Access lists in the generated config: IP rules reach Caddy as client_ip matchers, and a location
- * rule can swap the host's list for its own, or for none, without the rest of the host changing.
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';

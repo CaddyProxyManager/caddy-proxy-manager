@@ -60,8 +60,7 @@ export const sessions = pgTable(
     // credential sign-ins and for providers that issue no `sid`.
     oidcProviderId: text("oidcProviderId"),
     oidcSid: text("oidcSid"),
-    // An administrator previewing the dashboard as another role, and optionally some groups
-    // (a JSON array of ids). Narrows this session only, until it expires.
+    // An admin's "view as" preview; narrows this session only. Groups are a JSON array of ids.
     viewAsRole: text("viewAsRole"),
     viewAsGroupIds: text("viewAsGroupIds"),
     viewAsExpiresAt: isoTimestamp("viewAsExpiresAt"),

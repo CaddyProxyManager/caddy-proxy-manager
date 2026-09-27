@@ -6,10 +6,9 @@ import { askLetsDebug } from "@/src/lib/letsdebug";
 import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 
 /**
- * Whether each of a host's domains reaches this Caddy over plain HTTP. With `letsDebug` naming one
- * of them, that domain is also sent to Let's Debug for a check from outside - only on request,
- * since it tells a third party the name. Only the host's own domains: this never fetches an
- * address someone typed.
+ * Whether each of a host's domains reaches this Caddy over plain HTTP. `letsDebug` also sends one
+ * to Let's Debug - only on request, since that tells a third party the name. Never fetches
+ * anything but the host's own domains.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const forbidden = checkSameOrigin(request);

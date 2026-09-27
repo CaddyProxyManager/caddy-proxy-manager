@@ -434,9 +434,8 @@ async function createAuth(baseURL: string): Promise<any> {
           after: async (session, context) => {
             const userId =
               typeof session.userId === "string" ? Number(session.userId) : session.userId;
-            // A password sign-in's session is created before the two-factor plugin decides whether
-            // it needs a code, and deleted again if so. The auth route audits it once it's final,
-            // and the verify endpoints' own session comes back through here.
+            // Created before the 2FA plugin decides it needs a code, then deleted if so; the auth
+            // route audits the final one.
             if (isCredentialSignInPath(context?.path)) return;
             // Turning 2FA on rotates the session through the verify endpoint; that isn't a sign-in.
             if (

@@ -1,10 +1,7 @@
 /**
- * Reading Caddy's logs for the controller's log viewer, a page at a time.
- *
- * Files are read from a cursor of `<inode>:<offset>`, so a page picks up where the last one ended
- * and a rotated file - a new inode, or one shorter than the offset - starts again from its top
- * rather than returning nothing forever. Caddy's own output isn't a file: it's the container's
- * stderr, read through `docker compose logs` with timestamps as the cursor.
+ * A file cursor is `<inode>:<offset>`, so a rotated file (new inode, or shorter than the offset)
+ * starts again from its top rather than returning nothing forever. Caddy's own output is container
+ * stderr, paged by timestamp.
  */
 import { open, stat } from "node:fs/promises";
 import type { LogReadRequest, LogReadResponse } from "@cpm/shared";

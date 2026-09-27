@@ -1,9 +1,6 @@
 /**
- * The half-finished portal sign-in between a correct password and a correct second factor.
- *
- * The portal has no Better Auth session to hang the challenge on, so the password step hands the
- * browser this instead: signed, bound to the user and the redirect intent, short-lived, and good
- * for a handful of codes. Same shape and reasoning as the CAPTCHA pass (`captcha/pass.ts`).
+ * A portal sign-in between password and second factor. The portal has no Better Auth session to
+ * hold the challenge, so the browser carries a signed, short-lived one, like `captcha/pass.ts`.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -70,7 +67,7 @@ export function redeemPortalChallenge(
   return { userId, nonce };
 }
 
-/** Ends a challenge once it has been used to sign in, so it can't be replayed for the rest of its TTL. */
+/** Spent on sign-in, so the challenge can't be replayed for the rest of its TTL. */
 export function spendPortalChallenge(nonce: string) {
   const entry = ATTEMPTS.get(nonce);
   if (entry) entry.count = PORTAL_CHALLENGE_ATTEMPTS;

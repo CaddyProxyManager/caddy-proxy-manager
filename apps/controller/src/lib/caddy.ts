@@ -1155,10 +1155,7 @@ const EMPTY_ACCESS_LIST: AccessListRuntime = {
 /** A no-op placeholder: an empty subroute just continues the chain. */
 const ACCESS_SLOT = () => ({ handler: "subroute", routes: [] });
 
-/**
- * The host's access-list handlers, by identity: every handler array a path mode builds is a copy
- * with things added around the host's, so the objects themselves are what survives to be found.
- */
+/** By identity: path modes copy the handler array, so only the objects survive to be found. */
 const HOST_ACCESS_HANDLERS = new WeakSet<object>();
 /** A location rule's own list (or `[]` for none), set while its host's chain is built. */
 const LOCATION_ACCESS = new WeakMap<LocationRuleMeta, Record<string, unknown>[]>();
@@ -1172,8 +1169,7 @@ function withLocationAccess(
   if (!own) return handlers;
   const at = handlers.findIndex((handler) => HOST_ACCESS_HANDLERS.has(handler));
   const rest = handlers.filter((handler) => !HOST_ACCESS_HANDLERS.has(handler));
-  // Every host whose rules override got a slot above, so `at` is only -1 in a chain built
-  // elsewhere; the rule's list then goes first rather than being dropped.
+  // -1 only for a chain built elsewhere; the rule's list then goes first rather than dropped.
   const index = at === -1 ? 0 : at;
   return [...rest.slice(0, index), ...own, ...rest.slice(index)];
 }

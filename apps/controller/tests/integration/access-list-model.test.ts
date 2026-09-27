@@ -1,8 +1,4 @@
-/**
- * The access-list model around IP rules and per-path lists: rules keep their order, a bad rule
- * writes nothing, deleting a list clears it from the location rules that name it (they have no
- * foreign key), and an entry can only be removed through the list it belongs to.
- */
+/** Location rules name access lists with no foreign key, so deleting a list must clear them. */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { vi } from '@/tests/helpers/vi';
@@ -105,7 +101,7 @@ describe('list options', () => {
       1,
     );
     expect([updated.satisfy, updated.ipDefault, updated.passAuth]).toEqual(['any', 'allow', true]);
-    // Clearing the description used to be impossible: `null ?? existing` kept it.
+    // Guards against `null ?? existing`, which kept the old description.
     expect(updated.description).toBeNull();
     await expect(updateAccessList(list.id, { satisfy: 'some' }, 1)).rejects.toMatchObject({
       code: 'accessListSatisfyInvalid',

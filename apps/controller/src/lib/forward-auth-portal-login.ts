@@ -10,11 +10,7 @@ import {
 
 type ApiErrors = Awaited<ReturnType<typeof getTranslations<"auth.apiErrors">>>;
 
-/**
- * The end of a portal sign-in, once every factor has checked out: spend the redirect intent, check
- * the user may reach that host, and hand back the callback that sets the forward-auth cookie there.
- * Shared by the password step and, for a user with 2FA, the code step after it.
- */
+/** Finishes a portal sign-in once every factor passed: the password step, or the 2FA code step. */
 export async function completePortalLogin(
   user: { id: number; email: string },
   rid: string,

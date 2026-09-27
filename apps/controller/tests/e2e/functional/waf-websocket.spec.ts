@@ -1,8 +1,7 @@
 /**
- * Issue #195, "Websockets mangled by WAF": coraza wrapped the response writer, breaking the
- * `101 Switching Protocols` hijack. Routing upgrades around the WAF fixed that but let any request
- * claiming to be one skip inspection; coraza-caddy >= 2.6 passes the hijack through, so upgrades
- * now go through the WAF. Upstream: traefik/whoami's /echo. Domain: func-waf-ws.test
+ * Issue #195: routing upgrades around the WAF let any request claiming one skip inspection; since
+ * coraza-caddy 2.6 passes the 101 hijack through, they go through it.
+ * Upstream: traefik/whoami's /echo. Domain: func-waf-ws.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

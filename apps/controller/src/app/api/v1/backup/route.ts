@@ -5,8 +5,8 @@ import { createBackup } from "@/src/lib/backup/service";
 import { backupDownload } from "@/src/lib/backup/respond";
 
 /**
- * A backup for scripts and cron. POST with the passphrase in the body, never the query string.
- * Restoring stays in the UI, behind a recent sign-in.
+ * For scripts and cron. POST, so the passphrase stays out of the query string; restoring stays
+ * in the UI, behind a recent sign-in.
  */
 export async function POST(request: NextRequest) {
   try {

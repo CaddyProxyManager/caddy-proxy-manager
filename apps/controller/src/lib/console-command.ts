@@ -1,11 +1,7 @@
 /**
- * Maintenance commands `cpm-server` sends to the server already running in the same container,
- * for the one situation the UI cannot help with: the only administrator has lost their
- * authenticator and their backup codes.
- *
- * Signed with a key derived from SESSION_SECRET, which `docker compose exec` hands the command the
- * same as the server. Dependency-free on purpose: the binary's entry imports it before, and apart
- * from, the app, and importing the app's config would validate the whole environment first.
+ * For when the only admin has lost their second factor. Signed from SESSION_SECRET, which
+ * `docker compose exec` also hands the command. Dependency-free: `cpm-server` imports it apart
+ * from the app, whose config would validate the whole environment first.
  */
 import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 

@@ -1,6 +1,6 @@
 /**
- * CA private keys are encrypted at rest like every other secret. Older releases stored them in
- * plain text, so reads have to accept that until the startup pass has sealed the row.
+ * Older releases stored CA private keys in plain text, so reads accept that until the startup
+ * pass has sealed the row.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';

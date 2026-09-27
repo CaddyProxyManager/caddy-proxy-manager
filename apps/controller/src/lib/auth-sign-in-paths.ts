@@ -1,7 +1,4 @@
-/**
- * Better Auth's password sign-in endpoints, relative to its base path. Shared by the auth route,
- * which gates and audits them, and the session hook, which must not audit them early.
- */
+/** Relative to Better Auth's base path. Shared so the session hook doesn't audit them early. */
 export const CREDENTIAL_SIGN_IN_PATHS = ["/sign-in/username", "/sign-in/email"] as const;
 
 /** Where a second factor is checked after a password sign-in asked for one. */
@@ -25,10 +22,7 @@ export function isTwoFactorVerifyPath(path: string | undefined): boolean {
   return (TWO_FACTOR_VERIFY_PATHS as readonly string[]).includes(path ?? "");
 }
 
-/**
- * The plugin's challenge cookie, `<prefix>.two_factor`, which only a sign-in part-way through has.
- * Confirming a new authenticator goes through the same verify endpoint without one.
- */
+/** Only a sign-in part-way through has it; enabling 2FA hits the same verify endpoint without. */
 export function hasTwoFactorChallengeCookie(cookieHeader: string | null | undefined): boolean {
   return /(?:^|;\s*)(?:__Secure-)?[^=;]*\.two_factor=/.test(cookieHeader ?? "");
 }

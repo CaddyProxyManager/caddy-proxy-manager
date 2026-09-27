@@ -13,7 +13,7 @@ export async function createApiTokenAction(
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
 
-  // A token carries the account's real role, which would be a confusing thing to mint mid-preview.
+  // A token carries the account's real role, a confusing thing to mint mid-preview.
   if (session.viewAs) {
     const t = await getTranslations("errors");
     return { error: t("viewAsForbidden") };

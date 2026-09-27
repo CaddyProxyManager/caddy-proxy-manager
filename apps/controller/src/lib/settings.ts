@@ -350,10 +350,7 @@ export async function saveTrustedProxiesSettings(settings: TrustedProxiesSetting
   await setSetting("trusted_proxies", settings);
 }
 
-/**
- * Which HTTP versions the main server offers. HTTP/1.1 is always on, since nothing can connect
- * without it. Caddy can only set this per listener, so it is global rather than per host.
- */
+/** HTTP/1.1 is always on. Caddy sets protocols per listener, so this is global, not per host. */
 export type HttpProtocolsSettings = { http2: boolean; http3: boolean };
 
 export const DEFAULT_HTTP_PROTOCOLS: HttpProtocolsSettings = { http2: true, http3: true };
@@ -371,7 +368,7 @@ export async function saveHttpProtocolsSettings(settings: unknown): Promise<void
   await setSetting("http_protocols", normalizeHttpProtocols(settings));
 }
 
-/** System > Caddy Build > Global Caddyfile. Merged into every agent's config by `caddy-global-config.ts`. */
+/** Merged into every agent's config by `caddy-global-config.ts`. */
 export type GlobalCaddyConfigSettings = { caddyfile: string };
 
 export async function getGlobalCaddyConfigSettings(): Promise<GlobalCaddyConfigSettings> {
@@ -388,7 +385,6 @@ export async function saveGlobalCaddyConfigSettings(settings: unknown): Promise<
   await setSetting("global_caddy_config", { caddyfile });
 }
 
-/** Security > Authentication > Two-factor sign-in. */
 export type TwoFactorPolicySettings = { requireForAdmins: boolean };
 
 export async function getTwoFactorPolicySettings(): Promise<TwoFactorPolicySettings> {

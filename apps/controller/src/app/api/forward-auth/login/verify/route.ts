@@ -10,7 +10,7 @@ import { isPublicOrigin } from "@/src/lib/public-url";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { type SecondFactorMethod, verifySecondFactor } from "@/src/lib/two-factor";
 
-/** The portal's second step: a TOTP or backup code against the challenge the password step issued. */
+/** The portal's second step: a TOTP or backup code against the password step's challenge. */
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("tooManyLoginAttempts") }, { status: 429 });
     }
 
-    // Counts this attempt against the challenge; a spent or forged one sends them back to the password.
+    // Counts against the challenge; a spent or forged one sends them back to the password.
     const redeemed = redeemPortalChallenge(challenge, rid);
     if (!redeemed) {
       return NextResponse.json(

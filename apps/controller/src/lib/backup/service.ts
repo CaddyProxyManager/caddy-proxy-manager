@@ -1,11 +1,6 @@
 /**
- * Backing up the whole configuration, and restoring it - onto this machine or a new one.
- *
- * Rows are copied table by table in foreign-key order with their ids, like the legacy importer
- * (whose table description and ordering this reuses). A backup made by an older version restores
- * onto a newer one: columns it lacks take their defaults, and columns it has that no longer exist
- * are dropped. One made by a newer version is refused, since it may rely on columns this one
- * would silently throw away.
+ * Rows keep their ids, in the legacy importer's FK order. An older backup restores (missing columns
+ * default, gone ones drop); a newer one is refused, since this build would drop columns it needs.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { isNewer } from "../updates";
@@ -50,7 +45,6 @@ function drizzleTable(table: Described): PgTable {
   return activeSchema[table.key as keyof typeof activeSchema] as PgTable;
 }
 
-/** Drizzle's field name for each database column name, for this backend's table. */
 function fieldsByColumn(table: Described): Map<string, string> {
   return new Map(
     Object.entries(getTableColumns(drizzleTable(table))).map(([field, column]) => [
@@ -93,7 +87,6 @@ export function describeBackup(file: Buffer) {
   };
 }
 
-/** Where the automatic backup taken before every restore is kept, on the controller's volume. */
 export function preRestoreBackupDir(): string {
   // The same volume the agent bootstrap token uses; see lib/agent/bootstrap.ts.
   return join(process.env.L4_PORTS_DIR || "/app/data", "backups");
@@ -101,13 +94,7 @@ export function preRestoreBackupDir(): string {
 
 export type RestoreResult = { tables: number; rows: number; safetyBackup: string };
 
-/**
- * Replace the configuration with the backup's.
- *
- * Everything is read, decrypted and converted before anything is written, and the write is one
- * transaction, so a bad file or a wrong passphrase leaves the database as it was. A backup of the
- * current state, under the same passphrase, is saved first.
- */
+/** Everything is converted before one write transaction, so a bad file changes nothing. */
 export async function restoreBackup(
   file: Buffer,
   passphrase: string,

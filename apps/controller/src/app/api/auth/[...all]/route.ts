@@ -28,9 +28,8 @@ const PASSWORD_SIGN_IN_PATHS = new Set(CREDENTIAL_SIGN_IN_PATHS.map((path) => `/
 const TWO_FACTOR_MANAGE = new Set(TWO_FACTOR_MANAGE_PATHS.map((path) => `/api/auth${path}`));
 
 /**
- * What a change to a signed-in user's own 2FA is logged as. Confirming a new authenticator goes
- * through verify-totp without a sign-in challenge cookie, which is how it's told apart from a code
- * entered while signing in.
+ * How a signed-in user's own 2FA change is logged. Confirming a new authenticator hits verify-totp
+ * with no sign-in challenge cookie, which tells it apart from a code entered while signing in.
  */
 function twoFactorManageAudit(
   pathname: string,

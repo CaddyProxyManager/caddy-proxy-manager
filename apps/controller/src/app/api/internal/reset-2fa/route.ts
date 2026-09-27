@@ -10,9 +10,9 @@ import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/peer-addres
 import { resetTwoFactor } from "@/src/lib/two-factor";
 
 /**
- * `cpm-server --reset-2fa <username>`, from inside the container. Answered only to a signed request
- * from this machine's own loopback, as the compiled server stamps it. Everything else - including
- * `vinext dev`, which stamps nothing - gets the same 404 as a path that doesn't exist.
+ * `cpm-server --reset-2fa <username>`, from inside the container. Answered only to a signed
+ * loopback request, as the compiled server stamps it; anything else, `vinext dev` included,
+ * gets the same 404 as a missing path.
  */
 export async function POST(request: NextRequest) {
   const notFound = NextResponse.json({ error: "Not found" }, { status: 404 });

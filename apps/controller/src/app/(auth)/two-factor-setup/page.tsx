@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("metaTitle") };
 }
 
-/** Outside the dashboard route group on purpose: the proxy redirects here, and nothing else loads. */
+/** Outside the dashboard group on purpose: the proxy redirects here, and nothing else loads. */
 export default async function TwoFactorSetupPage() {
   const session = await requireUser();
   // Reached directly by someone the policy doesn't cover, or right after turning 2FA on.

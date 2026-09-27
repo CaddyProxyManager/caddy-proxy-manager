@@ -5,16 +5,12 @@ function escapeRegexp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * The part of `from` before its first wildcard, without a trailing slash: what "after prefix"
- * strips, so `/old/*` sends `/old/a/b` on as `/a/b`.
- */
+/** What "after prefix" strips: `/old/*` sends `/old/a/b` on as `/a/b`. */
 export function redirectPrefix(from: string): string {
   const star = from.indexOf("*");
   return (star === -1 ? from : from.slice(0, star)).replace(/\/+$/, "");
 }
 
-/** One redirect rule as a route inside the host's redirect subroute. */
 export function buildRedirectRoute(rule: RedirectRule): Record<string, unknown> {
   if (!rule.preservePath) {
     return {
@@ -29,9 +25,8 @@ export function buildRedirectRoute(rule: RedirectRule): Record<string, unknown> 
     };
   }
 
-  // The request path is appended, and always starts with "/", so a target of "/" or "" would
-  // hand a path of "//evil.example" back as a protocol-relative URL. Browsers read "/\" the same
-  // way. Such requests are left unredirected instead.
+  // With a target of "/" or "", an appended "//evil.example" (or "/\") would be a
+  // protocol-relative URL, so such requests are left unredirected.
   const base = rule.to.replace(/\/+$/, "");
   const unsafe: Record<string, unknown>[] = [{ path_regexp: { pattern: "^/[/\\\\]" } }];
   const handle: Record<string, unknown>[] = [];

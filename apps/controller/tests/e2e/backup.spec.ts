@@ -1,7 +1,5 @@
 /**
- * E2E: Settings > Backup downloads an encrypted backup and previews one before restoring.
- *
- * The restore itself is not run here: it signs every session out, including the shared admin the
+ * The restore itself is not run here: it signs out every session, including the shared admin the
  * other specs run as in parallel. tests/integration/backup-restore.test.ts covers it.
  */
 import { readFileSync } from 'node:fs';

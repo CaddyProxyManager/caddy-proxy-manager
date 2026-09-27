@@ -1,7 +1,6 @@
 /**
- * The forward-auth portal signs people in without Better Auth, so it has to ask for the second
- * factor itself. Without that, every host behind CPM forward auth would take a password alone from
- * an account that has 2FA on.
+ * The forward-auth portal signs in without Better Auth, so it must ask for the second factor
+ * itself, or every forward-auth host would take a password alone from a 2FA account.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

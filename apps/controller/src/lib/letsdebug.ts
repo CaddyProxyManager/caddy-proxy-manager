@@ -1,8 +1,6 @@
 /**
- * A second opinion from Let's Debug (letsdebug.net), which checks a domain's HTTP-01 readiness from
- * the public internet - the view the controller's own check can't have.
- *
- * Only ever run when an administrator asks, per domain: it tells a third party the domain name.
+ * Let's Debug checks HTTP-01 readiness from the public internet, which the controller can't see.
+ * Only run when an administrator asks, per domain: it tells a third party the domain name.
  */
 
 const BASE = "https://letsdebug.net";

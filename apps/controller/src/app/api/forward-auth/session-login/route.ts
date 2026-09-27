@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: t("notAuthenticated") }, { status: 401 });
     }
-    // Viewing as a role is a dashboard preview; it doesn't carry into the hosts behind forward auth.
+    // View-as is a dashboard preview; it doesn't carry into the hosts behind forward auth.
     if (session.viewAs) {
       return NextResponse.json({ error: t("viewAsForbidden") }, { status: 403 });
     }

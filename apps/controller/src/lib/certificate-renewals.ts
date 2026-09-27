@@ -1,19 +1,7 @@
 /**
- * "Renew now" for a certificate Caddy manages.
- *
- * Caddy has no endpoint that renews a certificate on demand. What it does do, whenever a config is
- * loaded, is check each managed certificate against its policy's renewal window and renew the ones
- * inside it - in the background, still serving the current certificate meanwhile, so a failed
- * renewal can't take a site down. So a requested renewal moves that one name into a policy of its
- * own whose window already includes the current certificate, reloads, and moves it back once a
- * newer certificate shows up in Caddy's storage (or after a while, if none does).
- *
- * The check only runs for a name Caddy doesn't already have cached, and the cache outlives reloads,
- * so the reload is preceded by one that stops managing the name: Caddy evicts it, and the next load
- * reads it back from storage and checks it. TLS for that one name fails between the two.
- *
- * In memory: a request belongs to this controller process, and one lost to a restart only means
- * the certificate renews on its normal schedule.
+ * Caddy has no renew endpoint, but renews on load whatever sits inside its policy's window. So the
+ * name gets its own wide-window policy until a newer cert appears, after a load that unmanages it -
+ * the cache outlives reloads. In memory: a request lost to a restart just renews on schedule.
  */
 
 /** For a certificate whose dates are unknown: all but the last 0.01% of its lifetime. */
@@ -48,10 +36,8 @@ function prune(now: number) {
 }
 
 /**
- * The ratio whose window opens once a certificate is 90% as old as the current one: that one is
- * inside it, and its replacement stays outside about as long, so a reload can't renew it again
- * while the request lasts unless the old one was minutes old. A fixed ratio can't: 0.9999 of a
- * 5-year lifetime still shuts out a certificate's first 4 hours.
+ * Opens at 90% of the current cert's age, so its replacement stays outside the window while the
+ * request lasts. A fixed 0.9999 of a 5-year lifetime would still shut out the first 4 hours.
  */
 export function renewNowRatio(current: Lifetime | null | undefined, now = Date.now()): number {
   const notBefore = Date.parse(current?.notBefore ?? "");
@@ -70,10 +56,7 @@ export function renewalsPending(now = Date.now()): Map<string, Pending> {
   return new Map(pending);
 }
 
-/**
- * Forget the requests a newer certificate has answered. Returns whether any were, so the caller
- * can reload with the ordinary policy again.
- */
+/** True when any request was answered, so the caller reloads with the ordinary policy. */
 export function settleRenewals(
   certificates: { names: string[]; notBefore: string }[],
   now = Date.now(),
@@ -96,11 +79,7 @@ export function settleRenewals(
 
 type Policy = Record<string, unknown> & { subjects?: string[] };
 
-/**
- * The TLS automation policies with each pending name split out into a copy of the policy it came
- * from, carrying its wide renewal window. Only that name renews: widening the original policy
- * would renew every certificate it covers.
- */
+/** Each pending name gets a copy of its policy: widening the original would renew every cert. */
 export function withRenewalOverrides(policies: Policy[], now = Date.now()): Policy[] {
   const names = renewalsPending(now);
   if (evicting.size > 0) {

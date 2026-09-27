@@ -1,12 +1,7 @@
 /**
- * The `.cpmbak` file: a readable header line, then the configuration as JSON, encrypted with a key
- * derived from a passphrase the operator chooses.
- *
- * Passphrase rather than SESSION_SECRET, because the point of a backup is to survive losing the
- * machine - and with it the `.env` that holds the secret. Everything the database keeps encrypted
- * is decrypted into the payload (see `secrets.ts`), so the file is the only thing protecting it and
- * the whole payload is sealed. The header stays readable so a restore can say what it's about to
- * do before asking for the passphrase.
+ * A passphrase, not SESSION_SECRET: a backup must survive losing the machine and its `.env`. The
+ * payload carries decrypted secrets (`secrets.ts`), so it is sealed whole; the header stays
+ * readable so a restore can say what it will do before asking for the passphrase.
  */
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
 import { domainError } from "../domain-error";

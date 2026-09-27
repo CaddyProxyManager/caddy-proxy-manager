@@ -1,9 +1,6 @@
 /**
- * An access list as Caddy handlers: ordered IP rules, basic-auth accounts, and how the two combine.
- *
- * Pure, so the whole decision table is testable without a database. Every handler returned sits in
- * the host's shared chain, where a `subroute` whose matching route has no handlers of its own simply
- * carries on with the rest of the host - that is how an allowed address "passes".
+ * An access list as Caddy handlers. Pure, so the decision table is testable without a database.
+ * An allowed address "passes" because a subroute route with no handlers carries on with the host.
  */
 import { isIP } from "node:net";
 import { domainError } from "./domain-error";
@@ -42,7 +39,6 @@ export function normalizeCidr(value: string): string | null {
   return Number(prefix) <= (version === 4 ? 32 : 128) ? `${address}/${Number(prefix)}` : null;
 }
 
-/** Validates rules from the API or the editor, in the order given. */
 export function sanitizeIpRules(value: unknown): IpRule[] {
   if (!Array.isArray(value)) throw domainError("ipRulesInvalid", {}, { status: 400 });
   if (value.length > MAX_IP_RULES) {
@@ -77,13 +73,8 @@ function basicAuth(accounts: AccessListRuntime["accounts"]): Record<string, unkn
 }
 
 /**
- * The IP rules as one subroute: the first rule matching the client decides, then the default.
- * `onDeny` is what a denied address gets - a 403 when the password can't rescue it, or the
- * password prompt under "any".
- *
- * No route is terminal: a terminal route inside a subroute ends the whole request, so an allowed
- * address would get an empty 200 instead of the host. First-match order comes from each rule's
- * matcher excluding every range above it, and an allowed address simply matches nothing here.
+ * First matching rule decides. No route is terminal - inside a subroute that ends the request with
+ * an empty 200 - so first-match order comes from each matcher excluding every range above it.
  */
 function ipSubroute(list: AccessListRuntime, onDeny: Record<string, unknown>[]) {
   const routes: Record<string, unknown>[] = [];

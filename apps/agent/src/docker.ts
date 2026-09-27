@@ -297,10 +297,7 @@ export class DockerHost {
     });
   }
 
-  /**
-   * Caddy's own output, which it writes to stderr rather than a file. Timestamped, so a later page
-   * can ask for what came since the last line it has.
-   */
+  /** Caddy logs to stderr, not a file; timestamps let a later page ask for what came since. */
   async caddyLogs(options: { since?: string | null; tail: number }): Promise<CommandResult> {
     return this.compose(
       [
@@ -479,10 +476,9 @@ export class DockerHost {
   }
 
   /**
-   * Run a command against Caddy's storage, which only Caddy's user can read: a throwaway container
-   * of Caddy's image, with Caddy's volumes read-only and no network. Created, started and read back
-   * rather than `docker run`, which would need the attach endpoint the socket proxy doesn't open -
-   * the same steps validateCaddyConfig takes.
+   * Caddy's storage is readable only by Caddy's user, hence a throwaway container of its image.
+   * Created, started and read back rather than `docker run`, whose attach endpoint the socket proxy
+   * doesn't open - as validateCaddyConfig does.
    */
   async runInCaddyStorage(argv: string[], timeoutSeconds = 30): Promise<CommandResult> {
     const deadline = Date.now() + timeoutSeconds * 1000;

@@ -1,14 +1,7 @@
 /**
- * Whether a domain reaches this Caddy the way an ACME server's HTTP-01 check would: DNS first,
- * then a plain-HTTP request for a path every host answers.
- *
- * The generated config answers `/.well-known/cpm-reachability` on every host with a token only
- * this deployment produces, so "something answered" and "this Caddy answered" can be told apart -
- * a router's login page or a parked domain answers 200 too.
- *
- * The request is made from the controller, so it sees the network the way the controller does:
- * split-horizon DNS or a router without hairpin NAT can make it differ from the internet's view.
- * The UI says so, and offers Let's Debug for a check from outside.
+ * Probes like an HTTP-01 check, for a token only this deployment serves - a router's login page
+ * answers 200 too. It runs from the controller, so split-horizon DNS or missing hairpin NAT can
+ * differ from the internet's view; the UI offers Let's Debug for that.
  */
 import { createHmac } from "node:crypto";
 import { Resolver } from "node:dns/promises";
@@ -26,7 +19,6 @@ export function reachabilityToken(): string {
   return `cpm-reachability:${mac}`;
 }
 
-/** The route every HTTP server of the generated config puts first. */
 export function reachabilityRoute(): Record<string, unknown> {
   return {
     match: [{ path: [REACHABILITY_PATH] }],
@@ -65,7 +57,7 @@ async function caaRecords(resolver: Resolver, domain: string): Promise<string[]>
     try {
       const records = await resolver.resolveCaa(labels.slice(i).join("."));
       if (records.length > 0) {
-        // Each record is { critical, <tag>: value }, e.g. { critical: 0, issue: "letsencrypt.org" }.
+        // Each record is { critical, <tag>: value }.
         return records.map((record) => {
           const [tag, value] = Object.entries(record).find(([key]) => key !== "critical") ?? [];
           return `${tag ?? "?"} "${value ?? ""}"`;

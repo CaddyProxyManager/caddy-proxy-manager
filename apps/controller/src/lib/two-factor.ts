@@ -1,10 +1,7 @@
 /**
- * Second-factor checks outside Better Auth's own endpoints.
- *
- * The forward-auth portal signs people in without a Better Auth session, so it can't use the
- * plugin's `/two-factor/verify-*` routes, which read the challenge from the plugin's cookie. This
- * reads the same `two_factors` row with the same key and the same TOTP parameters, and counts
- * failures against the same per-account budget, so the two sign-ins can't drift apart.
+ * Second-factor checks for the forward-auth portal, which has no Better Auth session for the
+ * plugin's `/two-factor/verify-*` routes. Same row, key, TOTP parameters and failure budget as
+ * the plugin, so the two sign-ins can't drift apart.
  */
 
 // Pinned in package.json to the exact version better-auth depends on, so both check codes alike.

@@ -310,7 +310,6 @@ export async function addAccessListEntry(
   return (await getAccessList(accessListId))!;
 }
 
-/** Replaces a list's IP rules with these, in this order. */
 export async function setAccessListIpRules(id: number, rules: unknown, actorUserId: number) {
   const existing = await db.query.accessLists.findFirst({
     where: (table, operators) => operators.eq(table.id, id),

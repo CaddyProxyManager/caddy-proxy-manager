@@ -18,9 +18,8 @@ import { invalidateSettingsCache } from "@/src/lib/settings/resolve";
 const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
 
 /**
- * Settings > Backup's restore. `preview` only reads the header, to show what would be replaced.
- * A real restore needs a recent sign-in: it replaces every account, so a session left open on
- * someone's desk must not be enough.
+ * Settings > Backup's restore; `preview` only reads the header. A real restore replaces every
+ * account, so it needs a recent sign-in, not just a session left open on someone's desk.
  */
 export async function POST(request: NextRequest) {
   const forbidden = checkSameOrigin(request);

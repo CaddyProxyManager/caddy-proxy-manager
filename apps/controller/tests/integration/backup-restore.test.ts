@@ -1,8 +1,4 @@
-/**
- * Backup and restore, end to end against the test database: what goes out comes back, secrets
- * survive being carried to a deployment with a different key, a wrong passphrase changes nothing,
- * and no table is left out of the decision about whether it belongs in a backup.
- */
+/** Secrets must survive a restore onto a deployment with a different encryption key. */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -424,10 +424,7 @@ export function resolveEffectiveWaf(
   return null;
 }
 
-/**
- * Anything that could become a WebSocket, for refusing them: the token is case-insensitive in
- * HTTP/1.1, and HTTP/2 opens one with an extended CONNECT that carries no Upgrade header at all.
- */
+/** The token is case-insensitive, and HTTP/2's extended CONNECT carries no Upgrade header. */
 export const WEBSOCKET_ATTEMPT_MATCHERS: Record<string, unknown>[] = [
   { header_regexp: { Upgrade: { pattern: "(?i)websocket" } } },
   { method: ["CONNECT"] },

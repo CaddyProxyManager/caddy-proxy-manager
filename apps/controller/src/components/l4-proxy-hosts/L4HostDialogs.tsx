@@ -229,9 +229,8 @@ function L4HostForm({
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
 
-  // Astryx inputs are controlled, so every field that used defaultValue now
-  // needs seeded state. They are grouped rather than declared one useState at
-  // a time, since there are dozens of them.
+  // Astryx inputs are controlled, so every field needs seeded state; one object
+  // rather than a useState each, since there are dozens.
   const [text, setText] = useState<TextFields>(() => initialText(initialData));
   const set =
     <K extends keyof TextFields>(key: K) =>

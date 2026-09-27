@@ -1,11 +1,6 @@
 /**
- * "View as": an administrator previews the dashboard as another role, optionally narrowed to some
- * groups, to check what a delegated operator or a viewer would see and be able to do.
- *
- * CPM grants permissions to roles and groups rather than to people, so this previews those rather
- * than impersonating a user. It is kept on the admin's own session: nothing about the admin's
- * account changes, anything done while viewing is still done - and audited - as them, and the view
- * can only ever narrow what they could already do.
+ * "View as" previews a role and groups, not a user, since grants attach to those. It lives on the
+ * admin's own session: actions are still done and audited as them, and it can only narrow access.
  */
 
 import { eq, inArray } from "drizzle-orm";

@@ -1,14 +1,7 @@
 /**
- * Secrets in and out of a backup.
- *
- * The database encrypts its secrets with a key derived from this deployment's SESSION_SECRET. A
- * backup has to restore onto a machine with a different one, so on the way out every encrypted
- * value is replaced by its plaintext under a marker, and on the way in each marker is encrypted
- * again under the restoring deployment's key. The file itself is sealed with the passphrase.
- *
- * Two kinds of ciphertext: the app's own `enc:v1:` tokens - found anywhere in a text column,
- * including inside the JSON the settings are stored as - and Better Auth's, which only the
- * two-factor plugin's columns hold.
+ * Secrets are keyed to this deployment's SESSION_SECRET and a restore target has another, so they
+ * leave as marked plaintext and are re-encrypted on the way in. `enc:v1:` tokens can sit anywhere
+ * in a text column, settings JSON included; Better Auth's own are only in the 2FA columns.
  */
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { config } from "../config";

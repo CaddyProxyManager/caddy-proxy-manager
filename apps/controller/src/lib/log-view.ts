@@ -1,7 +1,4 @@
-/**
- * Turning Caddy's JSON log lines into something a person reads at a glance. Pure, and shared by
- * the log viewer and its tests.
- */
+/** Caddy's JSON log lines, made readable for the log viewer. */
 
 export type LogSource = "access" | "waf" | "caddy";
 /** What the viewer offers: the agent's sources, plus ACME, which is Caddy's output filtered. */

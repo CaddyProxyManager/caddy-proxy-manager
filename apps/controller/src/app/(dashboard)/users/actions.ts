@@ -217,8 +217,8 @@ export async function deleteUserAction(userId: number): Promise<ActionState> {
 }
 
 /**
- * For someone who lost their authenticator and their backup codes. Their sessions go too: the
- * reset is often the aftermath of a lost or stolen device, and it is a clean point to sign in fresh.
+ * For someone who lost their authenticator and backup codes. Their sessions go too: the reset
+ * often follows a lost or stolen device, and is a clean point to sign in fresh.
  */
 async function resetUserTwoFactorActionUntranslated(userId: number) {
   const session = await requireAdmin();

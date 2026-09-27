@@ -1,10 +1,6 @@
 /**
- * The global Caddyfile: raw Caddy configuration an operator adds to every agent's document.
- *
- * It is adapted by the Caddy that will load it, then merged in by addition only. Anything that would
- * replace what CPM generates is refused by name rather than merged: CPM rebuilds the whole document
- * on every apply, so an override would silently fight it. A snippet that fails to adapt or merge is
- * skipped with a warning, never allowed to stop the rest of the config from loading.
+ * Merged by addition only: CPM rebuilds the whole document on every apply, so an override would
+ * silently fight it. One that fails to adapt or merge is skipped, never blocking the rest.
  */
 
 import { CADDY_VALIDATE_REFUSED_STATUS } from "@cpm/shared";
@@ -66,11 +62,7 @@ function collides(listen: unknown, taken: PortRange[]): boolean {
   });
 }
 
-/**
- * The document with the adapted config added, and the paths it tried to replace. With anything
- * refused the caller keeps the original: half of an operator's config is harder to reason about
- * than none of it.
- */
+/** With anything refused the caller keeps the original: half a config is worse than none. */
 export function mergeGlobalConfig(
   document: Json,
   adapted: Json,
@@ -149,7 +141,6 @@ function mergeApps(apps: Json, adapted: Json, document: Json, refused: string[])
   return merged;
 }
 
-/** The document with the global Caddyfile merged in, or unchanged when there is none or it fails. */
 export async function withGlobalCaddyConfig(
   document: Json,
   caddyfile: string,
@@ -189,11 +180,7 @@ function assertShape(caddyfile: string) {
   }
 }
 
-/**
- * Throws when a global Caddyfile should not be saved: it doesn't adapt, it would replace part of
- * CPM's config, or `caddy validate` refuses the document it produces. Every connected agent is
- * asked, since each loads it; with none, only the shape is checked.
- */
+/** Every connected agent is asked, since each loads it; with none, only the shape is checked. */
 export async function assertGlobalCaddyConfigLoads(caddyfile: string): Promise<void> {
   assertShape(caddyfile);
   if (!caddyfile.trim()) return;

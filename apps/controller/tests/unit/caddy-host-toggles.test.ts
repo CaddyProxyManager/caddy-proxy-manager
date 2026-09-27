@@ -1,7 +1,4 @@
-/**
- * The per-host switches in the editor: Force HTTPS, HSTS and WebSocket support each change the
- * generated config, and turning one off must actually remove what it adds.
- */
+/** Turning a per-host switch off must actually remove what it adds to the config. */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';

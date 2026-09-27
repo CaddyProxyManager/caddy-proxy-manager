@@ -1,10 +1,6 @@
 /**
- * The certificates Caddy has issued and keeps in its storage, for the controller's Certificates
- * page: when each expires, and - for an administrator who asks - the files themselves.
- *
- * Caddy's storage is readable only by Caddy's user (0700 directories, 0600 files), so it is read
- * from a throwaway container of Caddy's own image, with Caddy's volumes mounted read-only and no
- * network - the same arrangement `caddy validate` runs in.
+ * Caddy's storage is readable only by Caddy's user (0700/0600), so it is read from a throwaway,
+ * network-less container of Caddy's image with its volumes read-only, as `caddy validate` runs.
  */
 import { X509Certificate } from "node:crypto";
 import type { CaddyCertificate, CertificateFileRequest, CertificateFiles } from "@cpm/shared";
