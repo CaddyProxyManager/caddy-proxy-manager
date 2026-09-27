@@ -9,6 +9,7 @@ import {
   type AgentAnalyticsResult,
   type TrafficEventRow,
   type WafEventRow,
+  redactWafEventRow,
 } from "@cpm/shared";
 import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
 
@@ -110,7 +111,8 @@ export function parseWafRow(value: unknown): WafEventRow | null {
   ) {
     return null;
   }
-  return {
+  // Again here: an older agent sends the audit entry unredacted.
+  return redactWafEventRow({
     ts: row.ts,
     host: row.host,
     client_ip: row.client_ip,
@@ -122,7 +124,7 @@ export function parseWafRow(value: unknown): WafEventRow | null {
     blocked: row.blocked,
     method: row.method,
     uri: row.uri,
-  };
+  });
 }
 
 function isKind(value: unknown): value is AgentAnalyticsKind {
