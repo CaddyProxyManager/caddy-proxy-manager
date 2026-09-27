@@ -20,6 +20,7 @@ import {
   proxyHostMetaView,
 } from "./models/proxy-hosts";
 import { parseProxyHostOptionUpdates, validateAndSanitizeCertificateId } from "./proxy-host-form";
+import { getWafSettings } from "./settings";
 
 export type DashboardHostFormView = ProxyHostMetaView & {
   certificateId: number | null;
@@ -74,7 +75,8 @@ export async function readDashboardHostOptions(
     : base.agentIds;
 
   const updates = parseProxyHostOptionUpdates(formData);
-  const meta = withoutForwardAuth(mergeProxyHostMeta(base.meta, updates));
+  const globalWaf = updates.waf ? await getWafSettings() : null;
+  const meta = withoutForwardAuth(mergeProxyHostMeta(base.meta, updates, globalWaf));
 
   await assertProxyHostOptionsStorable({
     domains: [domain],

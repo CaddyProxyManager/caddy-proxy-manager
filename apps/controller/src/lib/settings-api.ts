@@ -239,7 +239,9 @@ export async function saveSettingsGroup(group: string, input: unknown): Promise<
     throw new SettingsValidationError("Unknown settings group");
   }
   const handler = SETTINGS_HANDLERS[group];
-  const validated = validateSettingsGroup(group, input);
+  const validated = validateSettingsGroup(group, input, {
+    previousWaf: group === "waf" ? await getWafSettings() : null,
+  });
 
   await withSettingsUpdateLock(async () => {
     // The stored value, encrypted credentials included, not the redacted GET shape.

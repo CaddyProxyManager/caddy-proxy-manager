@@ -4,20 +4,25 @@ import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
 import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
-import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
+import {
+  type GeoBlockSettings,
+  type WafSettings,
+  getDnsProviderSettings,
+  getTailscaleSettings,
+  getWafSettings,
+} from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
 import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
 import {
   CORAZA_MAX_BODY_LIMIT,
   CORAZA_MIN_BODY_LIMIT,
-  droppedWafDirectiveDetails,
-  filterCustomDirectives,
-  findInvalidBodyLimitDirective,
+  customDirectivesError,
   seclangErrorDetails,
   isValidBodyLimit,
   normalizeWafPluginIds,
   normalizeWafPresetIds,
+  wafDirectiveSource,
 } from "../caddy-waf";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
@@ -411,11 +416,23 @@ export type MtlsConfig = {
   ca_certificate_ids?: number[];
 };
 
+/** Merge mode inherits an unset CRS flag, known here only when the global settings are. */
+function hostCrsLoaded(waf: WafHostConfig, globalWaf: WafSettings | null): boolean | undefined {
+  if (waf.waf_mode === "override") return Boolean(waf.load_owasp_crs);
+  return waf.load_owasp_crs ?? globalWaf?.load_owasp_crs;
+}
+
 /**
  * Coraza builds its WAF while Caddy loads the config, so one bad body limit rejects the whole
- * document and stalls every host - fail the write with a clear message instead.
+ * document and stalls every host - fail the write with a clear message instead. Directives are
+ * judged against `previous`: a stored line a later release started dropping must not block the
+ * enable toggle or a PATCH of other fields.
  */
-function validateWafMeta(waf: WafHostConfig): WafHostConfig {
+function validateWafMeta(
+  waf: WafHostConfig,
+  previous: WafHostConfig | undefined,
+  globalWaf: WafSettings | null,
+): WafHostConfig {
   // Codes rather than sentences: the host form reaches these too, while `/api/v1` keeps its 400.
   // Bounds go as strings, or the catalog would format 1073741824 with separators.
   const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
@@ -448,26 +465,24 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
     const pluginIds = normalizeWafPluginIds(waf.plugin_ids);
     waf = { ...waf, plugin_ids: pluginIds.length > 0 ? pluginIds : undefined };
   }
-  // Safe to echo: findInvalidBodyLimitDirective only ever returns a line that
-  // matched `<known directive name> <digits>`, never free-form user text.
-  const badDirective = findInvalidBodyLimitDirective(waf.custom_directives);
-  if (badDirective) {
-    throw domainError(
-      "hostWafDirectiveBodyLimitOutOfRange",
-      { directive: badDirective, ...bounds },
-      { status: 400 },
-    );
-  }
-  // Same reasoning for echoing the lines: only lines the allowlist is about to discard are named,
-  // and a discarded line that says nothing is what makes a WAF rule look like it does nothing.
-  const { dropped } = filterCustomDirectives(waf.custom_directives);
-  if (dropped.length > 0) {
-    throw domainError(
-      "hostWafDirectivesDropped",
-      { count: dropped.length, details: droppedWafDirectiveDetails(dropped) },
-      { status: 400 },
-    );
-  }
+  // Only lines the allowlist is about to discard are echoed, and a discarded line that says nothing
+  // is what makes a WAF rule look like it does nothing. A merge-mode host follows the global lines.
+  const directiveError = customDirectivesError(
+    waf.custom_directives,
+    {
+      crsLoaded: hostCrsLoaded(waf, globalWaf),
+      precedingDirectives: wafDirectiveSource(globalWaf, waf, "").globalDirectives,
+    },
+    previous && {
+      directives: previous.custom_directives,
+      options: {
+        crsLoaded: hostCrsLoaded(previous, globalWaf),
+        precedingDirectives: wafDirectiveSource(globalWaf, previous, "").globalDirectives,
+      },
+    },
+    "host",
+  );
+  if (directiveError) throw directiveError;
   const lintErrors = seclangErrors(waf.custom_directives ?? "", {
     crsLoaded: waf.load_owasp_crs === true,
   });
@@ -1473,8 +1488,9 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
     normalized.geoblock_mode = meta.geoblock_mode;
   }
 
+  // Validated in buildMeta, and only when the caller supplies `waf`.
   if (meta.waf) {
-    normalized.waf = validateWafMeta(meta.waf);
+    normalized.waf = meta.waf;
   }
 
   if (meta.mtls) {
@@ -2394,7 +2410,11 @@ function normalizeUpstreamDnsResolutionInput(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): string | null {
+function buildMeta(
+  existing: ProxyHostMeta,
+  input: Partial<ProxyHostInput>,
+  globalWaf: WafSettings | null = null,
+): string | null {
   const next: ProxyHostMeta = { ...existing };
 
   if (input.customReverseProxyJson !== undefined) {
@@ -2479,7 +2499,7 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
 
   if (input.waf !== undefined) {
     if (input.waf) {
-      next.waf = validateWafMeta(input.waf);
+      next.waf = validateWafMeta(input.waf, existing.waf, globalWaf);
     } else {
       delete next.waf;
     }
@@ -3037,8 +3057,9 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
 export function mergeProxyHostMeta(
   existing: string | null,
   input: Partial<ProxyHostInput>,
+  globalWaf: WafSettings | null = null,
 ): string | null {
-  return buildMeta(parseMeta(existing), input);
+  return buildMeta(parseMeta(existing), input, globalWaf);
 }
 
 /**
@@ -3270,7 +3291,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
   const now = nowIso();
-  const meta = buildMeta({}, input);
+  const meta = buildMeta({}, input, input.waf ? await getWafSettings() : null);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertLocationAccessListsExist(parseMeta(meta).location_rules);
@@ -3422,7 +3443,7 @@ export async function updateProxyHost(
       : {}),
     ...(existing.cache ? { cache: sanitizeHostCache(existing.cache) } : {}),
   };
-  const meta = buildMeta(existingMeta, input);
+  const meta = buildMeta(existingMeta, input, input.waf ? await getWafSettings() : null);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertLocationAccessListsExist(parseMeta(meta).location_rules);

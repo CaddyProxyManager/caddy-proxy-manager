@@ -16,6 +16,7 @@ import {
   checkDashboardDns,
 } from "@/src/lib/dashboard-host";
 import {
+  customDirectivesError,
   normalizeWafPluginIds,
   normalizeWafPresetIds,
   parseBodyLimitMib,
@@ -1861,6 +1862,18 @@ async function updateWafSettingsActionUnlocked(
       typeof formData.get("wafCustomDirectives") === "string"
         ? (formData.get("wafCustomDirectives") as string).trim()
         : "";
+    const existing = await getWafSettings();
+    // Only what this save newly drops: a stored rule a later release started dropping must not
+    // block unrelated fields, and buildWafHandler still leaves it out and says so.
+    const directiveError = customDirectivesError(
+      customDirectives,
+      { crsLoaded: loadOwasp },
+      {
+        directives: existing?.custom_directives,
+        options: { crsLoaded: Boolean(existing?.load_owasp_crs) },
+      },
+    );
+    if (directiveError) throw directiveError;
     const rawExcl = formData.get("wafExcludedRuleIds");
     let excluded_rule_ids: number[];
     if (rawExcl !== null) {
@@ -1868,20 +1881,19 @@ async function updateWafSettingsActionUnlocked(
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       );
     } else {
-      const existing = await getWafSettings();
       excluded_rule_ids = existing?.excluded_rule_ids ?? [];
     }
     const rawPresets = formData.get("wafPresetIds");
     const preset_ids =
       typeof rawPresets === "string"
         ? normalizeWafPresetIds(JSON.parse(rawPresets))
-        : ((await getWafSettings())?.preset_ids ?? []);
+        : (existing?.preset_ids ?? []);
     await assertWafPresetIdsExist(preset_ids);
     const rawPlugins = formData.get("wafPluginIds");
     const plugin_ids =
       typeof rawPlugins === "string"
         ? normalizeWafPluginIds(JSON.parse(rawPlugins))
-        : ((await getWafSettings())?.plugin_ids ?? []);
+        : (existing?.plugin_ids ?? []);
     await assertCrsPluginIdsExist(plugin_ids);
 
     const requestBodyLimit = parseBodyLimitMib(

@@ -4,15 +4,7 @@ import { logAuditEvent } from "../audit";
 import { proxyHosts, wafPresets } from "../db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
-import {
-  CORAZA_MAX_BODY_LIMIT,
-  CORAZA_MIN_BODY_LIMIT,
-  droppedWafDirectiveDetails,
-  filterCustomDirectives,
-  findInvalidBodyLimitDirective,
-  normalizeWafPresetIds,
-  seclangErrorDetails,
-} from "../caddy-waf";
+import { customDirectivesError, normalizeWafPresetIds, seclangErrorDetails } from "../caddy-waf";
 import { seclangErrors } from "../seclang";
 import { assertWafLoads, wafCandidatesSelecting } from "../waf-dry-run";
 import { getDashboardSettings, getWafSettings } from "../settings";
@@ -70,23 +62,8 @@ function validateDirectives(directives: string): string {
   // A browser submits textarea and hidden-input values with CRLF line breaks.
   const trimmed = directives.replace(/\r\n?/g, "\n").trim();
   if (!trimmed) throw domainError("wafPresetDirectivesRequired", {}, { status: 400 });
-  const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
-  const badDirective = findInvalidBodyLimitDirective(trimmed);
-  if (badDirective) {
-    throw domainError(
-      "wafPresetDirectiveBodyLimitOutOfRange",
-      { directive: badDirective, ...bounds },
-      { status: 400 },
-    );
-  }
-  const { dropped } = filterCustomDirectives(trimmed);
-  if (dropped.length > 0) {
-    throw domainError(
-      "wafPresetDirectivesDropped",
-      { count: dropped.length, details: droppedWafDirectiveDetails(dropped) },
-      { status: 400 },
-    );
-  }
+  const directiveError = customDirectivesError(trimmed, {}, undefined, "preset");
+  if (directiveError) throw directiveError;
   const lintErrors = seclangErrors(trimmed);
   if (lintErrors.length > 0) {
     throw domainError(

@@ -2,9 +2,7 @@ import { isHostname } from "./dashboard-host";
 import { isIP } from "node:net";
 import {
   bodyLimitRangeMessage,
-  droppedWafDirectiveDetails,
-  filterCustomDirectives,
-  findInvalidBodyLimitDirective,
+  customDirectivesError,
   isValidBodyLimit,
   seclangErrorDetails,
 } from "./caddy-waf";
@@ -470,7 +468,13 @@ function validateGeoBlock(value: Record<string, unknown>): void {
   httpUrl(redirect, "geoblock.redirect_url", true);
 }
 
-function validateWaf(value: Record<string, unknown>): void {
+/** The stored global WAF settings an update replaces. */
+export type PreviousWafSettings = {
+  custom_directives?: string | null;
+  load_owasp_crs?: boolean;
+} | null;
+
+function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettings): void {
   onlyKeys(
     value,
     [
@@ -498,19 +502,19 @@ function validateWaf(value: Record<string, unknown>): void {
     "waf.custom_directives",
     { max: 100_000, controls: true },
   );
-  const badDirective = findInvalidBodyLimitDirective(directives);
-  if (badDirective) {
-    invalid(
-      `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
-    );
-  }
-  // A dropped line is a rule the user believes is running, so refuse and name each one.
-  const { dropped } = filterCustomDirectives(directives);
-  if (dropped.length > 0) {
-    invalid(
-      `waf.custom_directives has ${dropped.length} line(s) that would be dropped and never sent to Caddy: ${droppedWafDirectiveDetails(dropped).join(", ")}. Remove or rewrite them for them to take effect.`,
-    );
-  }
+  // A dropped line is a rule the user believes is running, so refuse and name each one - but only
+  // what this update newly drops, or a rule a later release started dropping blocks every save.
+  const directiveError = customDirectivesError(
+    directives,
+    { crsLoaded: value.load_owasp_crs === true },
+    previous
+      ? {
+          directives: previous.custom_directives,
+          options: { crsLoaded: Boolean(previous.load_owasp_crs) },
+        }
+      : undefined,
+  );
+  if (directiveError) invalid(directiveError.message);
   // Past the allowlist, a line can still be one Coraza refuses, and that fails every host's config.
   const lintErrors = seclangErrors(directives, { crsLoaded: value.load_owasp_crs === true });
   if (lintErrors.length > 0) {
@@ -653,7 +657,11 @@ export function assertSettingsPayloadSize(input: unknown): void {
 }
 
 /** Strict runtime validation for REST settings writes. */
-export function validateSettingsGroup(group: string, input: unknown): unknown {
+export function validateSettingsGroup(
+  group: string,
+  input: unknown,
+  { previousWaf = null }: { previousWaf?: PreviousWafSettings } = {},
+): unknown {
   assertSettingsPayloadSize(input);
 
   const value = record(input, `${group} settings`);
@@ -698,7 +706,7 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       validateGeoBlock(value);
       break;
     case "waf":
-      validateWaf(value);
+      validateWaf(value, previousWaf);
       break;
     case "error-pages":
       validateErrorPages(value);
