@@ -131,15 +131,24 @@ export function resolveLegacyCaFingerprints(
   return allowed;
 }
 
-/** One TLS policy per CA set, so a cert from CA_B cannot authenticate to a host that chose CA_A. */
+/**
+ * One TLS policy per CA set, so a cert from CA_B cannot authenticate to a host that chose CA_A.
+ * The pinned leaves are part of the key too: buildClientAuthentication unions the leaves of every
+ * domain it is given, so hosts pinning different certs from one CA must not share a policy.
+ */
 export function groupMtlsDomainsByCaSet(
   domains: string[],
   mTlsDomainMap: Map<string, number[]>,
+  mTlsDomainLeafOverride?: Map<string, string[]>,
 ): Map<string, string[]> {
   const groups = new Map<string, string[]>();
   for (const domain of domains) {
     const ids = mTlsDomainMap.get(domain.toLowerCase()) ?? [];
-    const key = [...ids].sort((a, b) => a - b).join(",");
+    const caKey = [...ids].sort((a, b) => a - b).join(",");
+    const leafPems = mTlsDomainLeafOverride?.get(domain.toLowerCase());
+    const key = leafPems
+      ? `${caKey}|leaf:${[...new Set(leafPems.map((pem) => pem.trim()))].sort().join("\n")}`
+      : caKey;
     const group = groups.get(key) ?? [];
     group.push(domain);
     groups.set(key, group);

@@ -2456,7 +2456,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     ] as const) {
       if (domains.length === 0) continue;
 
-      const groups = groupMtlsDomainsByCaSet(domains, mTlsDomainMap);
+      const groups = groupMtlsDomainsByCaSet(domains, mTlsDomainMap, mTlsDomainLeafOverride);
       for (const domainGroup of groups.values()) {
         for (const priorityGroup of groupHostPatternsByPriority(domainGroup)) {
           const mTlsAuth = buildAuth(priorityGroup, mode);
