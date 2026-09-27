@@ -32,6 +32,8 @@ from urllib.parse import parse_qs
 
 ORIGIN_ID = os.environ.get("ORIGIN_ID", "origin")
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+# The Cache-Control values the cache tests ask an origin for.
+CACHE_CONTROL_VALUES = {v: v for v in ("no-store", "no-cache", "private", "public, max-age=60")}
 
 
 # ── HTTP / HTTPS ────────────────────────────────────────────────────────────
@@ -210,13 +212,14 @@ class OriginHandler(BaseHTTPRequestHandler):
             self._send_text("x" * 100000)
             return
 
-        # ?cc=, ?cookie= and ?status= shape the response, for the cache tests.
+        # ?cc=, ?cookie= and ?status= shape the response, for the cache tests. Looked up, never
+        # echoed: a query string written into a header could add headers of its own.
         params = parse_qs(query)
         extra = {}
         if "cc" in params:
-            extra["Cache-Control"] = params["cc"][0]
+            extra["Cache-Control"] = CACHE_CONTROL_VALUES.get(params["cc"][0], "no-cache")
         if "cookie" in params:
-            extra["Set-Cookie"] = "session=%s; Path=/" % params["cookie"][0]
+            extra["Set-Cookie"] = "session=test; Path=/"
         status = params.get("status", ["200"])[0]
         status = int(status) if status.isdigit() else 200
         self._send_json(self._reflect(), status=status, extra_headers=extra)

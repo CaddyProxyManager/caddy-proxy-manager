@@ -452,8 +452,9 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
 
     expect(policies).toHaveLength(2);
 
-    const appPolicy = policies.find((p) => p.sni.includes('app.example.com'))!;
-    const apiPolicy = policies.find((p) => p.sni.includes('api.example.com'))!;
+    // Membership in the SNI list, not a substring: each policy names its own domains.
+    const appPolicy = policies.find((p) => new Set(p.sni).has('app.example.com'))!;
+    const apiPolicy = policies.find((p) => new Set(p.sni).has('api.example.com'))!;
 
     expect(appPolicy.trusted_ca_certs).toContain('CA_A');
     expect(appPolicy.trusted_ca_certs).not.toContain('CA_B');
