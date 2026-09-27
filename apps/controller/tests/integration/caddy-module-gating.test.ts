@@ -239,6 +239,29 @@ describe('WAF gating', () => {
   });
 });
 
+describe('cache gating', () => {
+  const CACHE = { cache: { mode: 'caddy', maxAge: 3600 } };
+
+  it('emits the cache handler when cache-handler is selected and built', async () => {
+    setAppliedModules(ALL_MODULE_PATHS);
+    await selectAllModulesExcept();
+    await createHost(CACHE);
+
+    expect(handlerNames(await buildCaddyDocument())).toContain('cache');
+  });
+
+  it('falls back to browser caching while the opt-in module is not compiled in', async () => {
+    // Selected but not rebuilt: the shipped image lacks it.
+    setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('cache-handler')));
+    await selectAllModulesExcept();
+    await createHost(CACHE);
+
+    const document = await buildCaddyDocument();
+    expect(handlerNames(document)).not.toContain('cache');
+    expect(JSON.stringify(document)).toContain('max-age=3600');
+  });
+});
+
 describe('layer 4 gating', () => {
   beforeEach(async () => {
     await createL4ProxyHost(

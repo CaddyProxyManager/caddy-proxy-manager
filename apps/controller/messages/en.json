@@ -590,6 +590,10 @@
         "name": "Request Blocker",
         "description": "Country, continent, ASN, and CIDR blocking. Required by global geoblocking and by per-host geoblock rules."
       },
+      "cacheHandler": {
+        "name": "HTTP Cache",
+        "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild."
+      },
       "corazaWaf": {
         "name": "Coraza WAF",
         "description": "ModSecurity-compatible web application firewall with the OWASP Core Rule Set. Required by the WAF settings and the WAF events page."
@@ -1819,6 +1823,17 @@
     "pathPattern": "Path Pattern",
     "pathPrefixRewrite": "Path Prefix Rewrite",
     "pathPrefixRewriteHelp": "Prepend this prefix to every request before proxying (e.g. /recipes → /recipes/original/path)",
+    "cacheAssets": "Cache assets",
+    "cacheAssetsDescription": "Cache stylesheets, scripts, images and fonts. Pages and API responses are never cached.",
+    "enableCacheAssets": "Enable asset caching",
+    "cacheMode": "Cache mode",
+    "cacheModeBrowser": "Browser",
+    "cacheModeCaddy": "Caddy cache",
+    "cacheModeBrowserHelp": "Tells browsers to keep assets for the max age, unless the upstream already sets Cache-Control.",
+    "cacheModeCaddyHelp": "Caddy also keeps a shared copy, so repeat requests skip the upstream. Responses that set a cookie or are marked private or no-store are never stored.",
+    "cacheCaddyUnavailable": "Falling back to browser caching",
+    "cacheMaxAge": "Max age (seconds)",
+    "cacheMaxAgeHelp": "How long an asset stays cached: 60 seconds to one year. 86400 is a day.",
     "pathRewrites": "Path Rewrites",
     "port": "Port",
     "presets": "Presets:",

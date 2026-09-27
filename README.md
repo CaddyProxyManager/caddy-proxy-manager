@@ -240,6 +240,7 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 - **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, and per-host geo blocking. Automatic Docker Compose port management via agent
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
+- **Cache Assets** - Per-host asset caching: browser Cache-Control defaults, or a shared Caddy cache with the opt-in HTTP Cache module
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
 - **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, named rule presets, plugins from the CRS plugin registry, custom SecLang directives checked by the editor and by a real Caddy before they are saved, and a searchable event log with severity and blocked/detected classification
 - **Analytics** - Live traffic charts, protocol breakdown, country map, top user agents, and blocked request log with configurable time ranges

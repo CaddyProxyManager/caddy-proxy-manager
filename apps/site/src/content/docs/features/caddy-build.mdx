@@ -26,6 +26,9 @@ provider. Turning one off does two things:
   follow caddy-tailscale, and each DNS provider follows its own module - so disabling Cloudflare
   leaves Route 53 alone.
 
+**HTTP Cache** is the one module the shipped image leaves out: it is off until you turn it on and
+rebuild, and it unlocks the **Caddy cache** mode of a host's [Cache assets](/features/reverse-proxy/#cache-assets).
+
 <Demo title="Settings → Caddy Build" note="Nothing saves here, so the build stays current and Rebuild is never offered.">
   <CaddyBuildDemo client:visible />
 </Demo>
@@ -37,6 +40,9 @@ A module still being used cannot be switched off. The save is refused and names 
 and geo blocking, enabled L4 hosts, hosts served on the tailnet, and every DNS provider with
 credentials on file. Turn the
 feature off first.
+
+HTTP Cache is the exception: nothing is lost without it, so turning it off is allowed and hosts in
+Caddy cache mode fall back to browser caching.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
 only Caddy's adapter knows what a directive resolves to - for the binary running *now* rather than

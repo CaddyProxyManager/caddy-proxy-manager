@@ -2700,6 +2700,16 @@ const spec = {
         },
         required: ["from", "to", "status"],
       },
+      HostCacheConfig: {
+        type: "object",
+        description:
+          "Cache assets: static asset paths only. Caddy mode needs the opt-in cache-handler module and falls back to browser mode without it",
+        properties: {
+          mode: { type: "string", enum: ["browser", "caddy"] },
+          maxAge: { type: "integer", minimum: 60, maximum: 31536000, example: 86400 },
+        },
+        required: ["mode", "maxAge"],
+      },
       RewriteConfig: {
         type: "object",
         description: "Path rewrite (strip prefix)",
@@ -2907,6 +2917,7 @@ const spec = {
           },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
+          cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -2981,6 +2992,7 @@ const spec = {
           },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
+          cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },

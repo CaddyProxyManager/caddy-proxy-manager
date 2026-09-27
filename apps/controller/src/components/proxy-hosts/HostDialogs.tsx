@@ -38,6 +38,7 @@ import { PathBlocksFields } from "./PathBlocksFields";
 import { PathRewritesFields } from "./PathRewritesFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
 import { AdvancedConfigFields } from "./AdvancedConfigFields";
+import { CacheFields } from "./CacheFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
@@ -221,6 +222,7 @@ export function CreateHostDialog({
           <PathBlocksFields initialData={initialData?.pathBlocks} />
           <PathRewritesFields initialData={initialData?.pathRewrites} />
           <ErrorPagesFields initialData={initialData?.errorPages} />
+          <CacheFields cache={initialData?.cache} />
           <AdvancedConfigFields host={initialData} />
           <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
           <ForwardAuthFields
@@ -361,6 +363,7 @@ export function EditHostDialog({
           <PathBlocksFields initialData={host.pathBlocks} />
           <PathRewritesFields initialData={host.pathRewrites} />
           <ErrorPagesFields initialData={host.errorPages} />
+          <CacheFields cache={host.cache} />
           {canEditRawConfig && <AdvancedConfigFields host={host} />}
           <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
           <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />

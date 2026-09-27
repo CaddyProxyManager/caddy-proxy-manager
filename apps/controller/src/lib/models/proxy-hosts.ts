@@ -27,6 +27,12 @@ import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
 import { normalizeHostDescription } from "../host-description";
+import {
+  type HostCacheConfig,
+  type HostCacheMeta,
+  hydrateHostCache,
+  sanitizeHostCache,
+} from "../host-cache";
 
 /** A wildcard needs DNS-01: without a DNS provider, auto-managed TLS silently gets no cert. */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
@@ -896,6 +902,7 @@ type ProxyHostMeta = {
   path_blocks?: PathBlockRule[];
   path_rewrites?: PathRewriteRule[];
   error_pages?: ErrorPageRule[];
+  cache?: HostCacheMeta;
 };
 
 export type ProxyHost = {
@@ -936,6 +943,8 @@ export type ProxyHost = {
   pathBlocks: PathBlockRule[];
   pathRewrites: PathRewriteRule[];
   errorPages: ErrorPageRule[];
+  /** Cache assets; null when off. */
+  cache: HostCacheConfig | null;
 };
 
 export type ProxyHostInput = {
@@ -979,6 +988,8 @@ export type ProxyHostInput = {
   pathBlocks?: PathBlockRule[] | null;
   pathRewrites?: PathRewriteRule[] | null;
   errorPages?: ErrorPageRule[] | null;
+  /** Null turns it off. */
+  cache?: HostCacheConfig | null;
 };
 
 type ProxyHostRow = typeof proxyHosts.$inferSelect;
@@ -1519,6 +1530,9 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
     normalized.path_rewrites = meta.path_rewrites;
   }
 
+  const cache = sanitizeHostCache(meta.cache);
+  if (cache) normalized.cache = cache;
+
   if (meta.error_pages && meta.error_pages.length > 0) {
     const errorPages = sanitizeErrorPageRules(meta.error_pages);
     if (errorPages.length > 0) {
@@ -1789,6 +1803,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
       path_blocks: sanitizePathBlocks(parsed.path_blocks),
       path_rewrites: sanitizePathRewrites(parsed.path_rewrites),
       error_pages: sanitizeErrorPageRules(parsed.error_pages),
+      cache: sanitizeHostCache(parsed.cache),
     };
   } catch (error) {
     console.warn("Failed to parse proxy host meta", error);
@@ -2589,6 +2604,12 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
     }
   }
 
+  if (input.cache !== undefined) {
+    const cache = sanitizeHostCache(input.cache);
+    if (cache) next.cache = cache;
+    else delete next.cache;
+  }
+
   return serializeMeta(next);
 }
 
@@ -2971,6 +2992,7 @@ export type ProxyHostMetaView = Pick<
   | "pathBlocks"
   | "pathRewrites"
   | "errorPages"
+  | "cache"
 >;
 
 /**
@@ -3008,6 +3030,7 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
     pathBlocks: meta.path_blocks ?? [],
     pathRewrites: meta.path_rewrites ?? [],
     errorPages: meta.error_pages ?? [],
+    cache: hydrateHostCache(meta.cache),
   };
 }
 
@@ -3401,6 +3424,7 @@ export async function updateProxyHost(
     ...(existing.errorPages && existing.errorPages.length > 0
       ? { error_pages: existing.errorPages }
       : {}),
+    ...(existing.cache ? { cache: sanitizeHostCache(existing.cache) } : {}),
   };
   const meta = buildMeta(existingMeta, input);
   await assertTailscaleServable(meta);

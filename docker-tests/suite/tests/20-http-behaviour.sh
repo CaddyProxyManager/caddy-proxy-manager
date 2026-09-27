@@ -116,6 +116,27 @@ t_contains "a websocket frame round-trips through the proxy" "echo:hello-over-ws
 # origin-tls's certificate names a host it is not reached under: refused unless the host opts out
 # of upstream hostname verification.
 
+# ── Cache assets ────────────────────────────────────────────────────────────
+# Caddy mode here too: the rig's image lacks the opt-in module, so it must degrade to browser mode
+# rather than emit a handler Caddy would refuse.
+
+cached=$(domain_for "cache-assets")
+create_host_or_fail "a host with cache assets can be created" "$(jq -nc --arg d "$cached" '{
+  name: "docker-test cache assets", domains: [$d], upstreams: ["origin-a:8080"],
+  cache: {mode: "caddy", maxAge: 3600}
+}')" && pass "a host with cache assets can be created"
+
+wait_for_https "$cached" 120
+fetch "https://$cached/app.css"
+t_eq "an asset is proxied" "200" "$FETCH_CODE"
+t_eq "an asset gets the host's max age" "max-age=3600" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cc=no-store"
+t_eq "the upstream's own Cache-Control wins" "no-store" "$(header_value cache-control)"
+fetch "https://$cached/app.css?cookie=abc"
+t_eq "an asset setting a cookie is marked private" "private" "$(header_value cache-control)"
+fetch "https://$cached/page"
+t_eq "a page is left alone" "" "$(header_value cache-control)"
+
 strict=$(domain_for "https-upstream-strict")
 create_host_or_fail "a host with an HTTPS upstream can be created" "$(jq -nc --arg d "$strict" '{
   name: "docker-test https upstream", domains: [$d], upstreams: ["https://origin-tls:8443"]

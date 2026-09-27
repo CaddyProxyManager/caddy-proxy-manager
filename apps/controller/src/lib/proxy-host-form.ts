@@ -30,6 +30,7 @@ import {
   normalizeWafPresetIds,
   parseBodyLimitMib,
 } from "@/src/lib/caddy-waf";
+import { type HostCacheConfig, hydrateHostCache, sanitizeHostCache } from "@/src/lib/host-cache";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
@@ -652,6 +653,15 @@ export function parseRewriteConfig(formData: FormData): RewriteConfig | null {
   return { path_prefix: prefix.trim() };
 }
 
+/** Undefined without the section, null when switched off. */
+export function parseCacheConfig(formData: FormData): HostCacheConfig | null | undefined {
+  if (!formData.has("cachePresent")) return undefined;
+  if (!parseCheckbox(formData.get("cacheEnabled"))) return null;
+  return hydrateHostCache(
+    sanitizeHostCache({ mode: formData.get("cacheMode"), maxAge: formData.get("cacheMaxAge") }),
+  );
+}
+
 export function parsePathAllowsConfig(formData: FormData): PathAllowRule[] | null {
   const raw = formData.get("pathAllowsJson");
   if (!raw || typeof raw !== "string") return null;
@@ -772,6 +782,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     mtls: formData.has("mtlsPresent") ? parseMtlsConfig(formData) : undefined,
     redirects: formData.has("redirectsJson") ? parseRedirectsConfig(formData) : undefined,
     rewrite: formData.has("rewritePathPrefix") ? parseRewriteConfig(formData) : undefined,
+    cache: parseCacheConfig(formData),
     locationRules: formData.has("locationRulesJson")
       ? parseLocationRulesConfig(formData)
       : undefined,

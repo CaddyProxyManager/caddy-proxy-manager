@@ -28,6 +28,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 ORIGIN_ID = os.environ.get("ORIGIN_ID", "origin")
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -209,7 +210,14 @@ class OriginHandler(BaseHTTPRequestHandler):
             self._send_text("x" * 100000)
             return
 
-        self._send_json(self._reflect())
+        # ?cc= and ?cookie= set those response headers, for the cache tests.
+        params = parse_qs(query)
+        extra = {}
+        if "cc" in params:
+            extra["Cache-Control"] = params["cc"][0]
+        if "cookie" in params:
+            extra["Set-Cookie"] = "session=%s; Path=/" % params["cookie"][0]
+        self._send_json(self._reflect(), extra_headers=extra)
 
     def do_GET(self):  # noqa: N802 - name fixed by BaseHTTPRequestHandler
         self._dispatch()

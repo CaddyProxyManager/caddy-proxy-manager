@@ -48,7 +48,9 @@ export type CaddyBuildDiff = {
 /** A missing module id counts as enabled, so one added to the catalog since the last save is on. */
 export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): string[] {
   const overrides = settings?.modules ?? {};
-  return CADDY_MODULES.filter((m) => overrides[m.id] !== false).map((m) => m.id);
+  return CADDY_MODULES.filter((m) => overrides[m.id] ?? m.defaultEnabled !== false).map(
+    (m) => m.id,
+  );
 }
 
 export function resolveCustomModules(settings: CaddyBuildSettings | null): CaddyCustomModule[] {
@@ -291,7 +293,7 @@ export function sanitizeCaddyBuildSettings(input: {
 
 // ─── UI gate ─────────────────────────────────────────────────────────────────
 
-const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01"];
+const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01", "cache"];
 
 /** Gates on *desired*: following applied, a control stays greyed out right after it is enabled. */
 export async function getModuleGateState(

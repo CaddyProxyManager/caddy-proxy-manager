@@ -15,7 +15,8 @@ export type CaddyFeatureId =
   | "waf"
   | "tailscale"
   /** Satisfied by *any* enabled DNS module. */
-  | "dns01";
+  | "dns01"
+  | "cache";
 
 export type CaddyModuleCategory = "dns" | "proxy" | "security";
 
@@ -31,6 +32,11 @@ export type CaddyModuleDefinition = {
   dnsProvider?: string;
   /** The brand as written, which the translated module name is built around. */
   dnsProviderDisplayName?: string;
+  /**
+   * False for an opt-in module the shipped image leaves out: it is compiled in only once an admin
+   * selects it and rebuilds. Defaulting it on would ask every fresh install to rebuild.
+   */
+  defaultEnabled?: boolean;
 };
 
 const CORE_MODULES: CaddyModuleDefinition[] = [
@@ -74,6 +80,17 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     category: "security",
     features: ["waf"],
   },
+  {
+    id: "cache-handler",
+    name: "HTTP Cache",
+    modulePath: "github.com/caddyserver/cache-handler",
+    description:
+      "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild.",
+    docsUrl: "https://github.com/caddyserver/cache-handler",
+    category: "proxy",
+    features: ["cache"],
+    defaultEnabled: false,
+  },
 ];
 
 export function dnsModuleId(providerName: string): string {
@@ -108,8 +125,10 @@ export function modulesForFeature(feature: CaddyFeatureId): CaddyModuleDefinitio
   return CADDY_MODULES.filter((m) => m.features.includes(feature));
 }
 
-/** Everything on, so an upgrade never silently drops a plugin someone's hosts need. */
-export const DEFAULT_ENABLED_MODULE_IDS: string[] = CADDY_MODULES.map((m) => m.id);
+/** Everything but opt-in modules, so an upgrade never silently drops a plugin hosts need. */
+export const DEFAULT_ENABLED_MODULE_IDS: string[] = CADDY_MODULES.filter(
+  (m) => m.defaultEnabled !== false,
+).map((m) => m.id);
 
 // ─── Custom modules ──────────────────────────────────────────────────────────
 

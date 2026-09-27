@@ -81,10 +81,13 @@ afterEach(async () => {
 });
 
 describe('selection resolution', () => {
-  it('treats an unknown module id as enabled', async () => {
+  it('treats an unknown module id as enabled, unless it is opt-in', async () => {
     // A module added to the catalog after the last save is on, matching the running image.
     const ids = resolveEnabledModuleIds({ modules: { 'caddy-l4': true }, customModules: [] });
-    expect(ids).toEqual(CADDY_MODULES.map((m) => m.id));
+    expect(ids).toEqual(CADDY_MODULES.filter((m) => m.defaultEnabled !== false).map((m) => m.id));
+    expect(
+      resolveEnabledModuleIds({ modules: { 'cache-handler': true }, customModules: [] }),
+    ).toContain('cache-handler');
   });
 
   it('drops only the modules explicitly set to false', () => {

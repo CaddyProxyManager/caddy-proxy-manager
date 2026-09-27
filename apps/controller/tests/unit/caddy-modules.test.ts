@@ -65,12 +65,14 @@ describe('caddy module registry', () => {
     expect(dockerfileDefaultModules().sort()).toEqual([...SHIPPED_CADDY_MODULES].sort());
   });
 
-  it('offers exactly the modules the shipped image carries', () => {
+  it('enables by default exactly the modules the shipped image carries', () => {
     // The agent diffs a never-rebuilt host against the shared list, the UI against this catalog; a
     // drift would rebuild every fresh install on its first reconnect.
-    expect(CADDY_MODULES.map((m) => m.modulePath).sort()).toEqual(
-      [...SHIPPED_CADDY_MODULES].sort(),
-    );
+    expect(
+      CADDY_MODULES.filter((m) => m.defaultEnabled !== false)
+        .map((m) => m.modulePath)
+        .sort(),
+    ).toEqual([...SHIPPED_CADDY_MODULES].sort());
   });
 
   it('pins every catalog module in the Caddy build go.mod', () => {
@@ -112,9 +114,14 @@ describe('caddy module registry', () => {
     expect(declarations).toHaveLength(1);
   });
 
-  it('defaults to every module enabled', () => {
+  it('defaults to every module enabled except the opt-in ones', () => {
     // An upgrade must not silently drop a plugin someone's hosts depend on.
-    expect(DEFAULT_ENABLED_MODULE_IDS.sort()).toEqual(CADDY_MODULES.map((m) => m.id).sort());
+    expect(DEFAULT_ENABLED_MODULE_IDS.sort()).toEqual(
+      CADDY_MODULES.filter((m) => m.defaultEnabled !== false)
+        .map((m) => m.id)
+        .sort(),
+    );
+    expect(DEFAULT_ENABLED_MODULE_IDS).not.toContain('cache-handler');
   });
 
   it('maps each gated feature to at least one module', () => {

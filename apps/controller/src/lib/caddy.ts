@@ -130,6 +130,7 @@ import {
   isDnsProviderUsable,
   isFeatureUsable,
 } from "./caddy-build";
+import { buildHostCacheHandler, type HostCacheMeta, withHostCache } from "./host-cache";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
@@ -299,6 +300,7 @@ type ProxyHostMeta = {
   redirects?: RedirectRule[];
   rewrite?: RewriteConfig;
   location_rules?: LocationRuleMeta[];
+  cache?: HostCacheMeta;
   path_allows?: PathAllowRule[];
   path_blocks?: PathBlockRule[];
   path_rewrites?: PathRewriteRule[];
@@ -1024,6 +1026,7 @@ export function buildLocationReverseProxy(
   rule: LocationRuleMeta,
   skipHttpsValidation: boolean,
   preserveHostHeader: boolean,
+  cacheHandler: Record<string, unknown> | null = null,
 ): { safePath: string; reverseProxyHandler: Record<string, unknown> } {
   const parsedTargets = rule.upstreams.map(parseUpstreamTarget);
   const hasHttps = parsedTargets.some((t) => t.scheme === "https");
@@ -1062,7 +1065,7 @@ export function buildLocationReverseProxy(
     }
   }
 
-  return { safePath, reverseProxyHandler };
+  return { safePath, reverseProxyHandler: withHostCache(reverseProxyHandler, cacheHandler) };
 }
 
 // A Caddy server-level error route (handle_errors equivalent): serves a custom static
@@ -1103,6 +1106,7 @@ function appendLocationRoutes(options: {
   handlers: Record<string, unknown>[];
   extraHandlers?: Record<string, unknown>[];
   expression?: string;
+  cacheHandler?: Record<string, unknown> | null;
 }) {
   const {
     hostRoutes,
@@ -1113,6 +1117,7 @@ function appendLocationRoutes(options: {
     handlers,
     extraHandlers = [],
     expression,
+    cacheHandler = null,
   } = options;
 
   for (const rule of locationRules) {
@@ -1120,6 +1125,7 @@ function appendLocationRoutes(options: {
       rule,
       skipHttpsHostnameValidation,
       preserveHostHeader,
+      cacheHandler,
     );
     if (!safePath) continue;
 
@@ -1237,6 +1243,7 @@ function appendForwardAuthPathModeRoutes(options: {
    * the credential itself. These routes come first, so they win over every gated one.
    */
   bypassHeaders?: string[];
+  cacheHandler?: Record<string, unknown> | null;
 }) {
   const {
     hostRoutes,
@@ -1252,6 +1259,7 @@ function appendForwardAuthPathModeRoutes(options: {
     protectedModePreRoutePlacement = "before",
     apiAuthHandler = null,
     bypassHeaders = [],
+    cacheHandler = null,
   } = options;
 
   /**
@@ -1314,6 +1322,7 @@ function appendForwardAuthPathModeRoutes(options: {
         locationRules,
         skipHttpsHostnameValidation,
         preserveHostHeader,
+        cacheHandler,
         handlers: baseHandlers,
       });
       hostRoutes.push({
@@ -1345,6 +1354,7 @@ function appendForwardAuthPathModeRoutes(options: {
           rule,
           skipHttpsHostnameValidation,
           preserveHostHeader,
+          cacheHandler,
         );
         if (!safePath) continue;
         pushGatedRoutes({ host: domainGroup, path: [safePath] }, locationProxy);
@@ -1356,6 +1366,7 @@ function appendForwardAuthPathModeRoutes(options: {
         locationRules,
         skipHttpsHostnameValidation,
         preserveHostHeader,
+        cacheHandler,
         handlers: baseHandlers,
         extraHandlers: [authHandler],
       });
@@ -1381,6 +1392,7 @@ function appendMtlsPathModeRoutes(options: {
   buildUnprotectedCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
   /** Full-site mode: RBAC subroutes when configured, otherwise an open catch-all. */
   buildDefaultCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
+  cacheHandler?: Record<string, unknown> | null;
 }) {
   const {
     hostRoutes,
@@ -1396,6 +1408,7 @@ function appendMtlsPathModeRoutes(options: {
     buildProtectedCatchAll,
     buildUnprotectedCatchAll,
     buildDefaultCatchAll,
+    cacheHandler = null,
   } = options;
 
   for (const domainGroup of domainGroups) {
@@ -1412,6 +1425,7 @@ function appendMtlsPathModeRoutes(options: {
         locationRules,
         skipHttpsHostnameValidation,
         preserveHostHeader,
+        cacheHandler,
         handlers,
       });
 
@@ -1431,6 +1445,7 @@ function appendMtlsPathModeRoutes(options: {
           rule,
           skipHttpsHostnameValidation,
           preserveHostHeader,
+          cacheHandler,
         );
         if (!safePath) continue;
         hostRoutes.push({
@@ -1460,6 +1475,7 @@ function appendMtlsPathModeRoutes(options: {
       locationRules,
       skipHttpsHostnameValidation,
       preserveHostHeader,
+      cacheHandler,
       handlers,
     });
 
@@ -1883,6 +1899,13 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
     }
 
+    // Wraps the proxy itself, so it lands after any auth handler whatever the route shape.
+    const hostCacheHandler = buildHostCacheHandler(
+      meta.cache,
+      isFeatureUsable(context.moduleAvailability, "cache"),
+    );
+    const hostProxyHandler = withHostCache(reverseProxyHandler, hostCacheHandler);
+
     // Sanitize path_prefix to prevent Caddy placeholder injection
     if (meta.rewrite?.path_prefix) {
       const safePrefix = stripCaddyPlaceholders(meta.rewrite.path_prefix);
@@ -2004,8 +2027,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         authMode,
         baseHandlers: handlers,
         authHandler: forwardAuthHandler,
-        reverseProxyHandler,
+        reverseProxyHandler: hostProxyHandler,
         locationRules,
+        cacheHandler: hostCacheHandler,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
         preDomainRoute: outpostRoute,
@@ -2037,8 +2061,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           ? buildGenericForwardAuthHandler(forwardAuth, true)
           : null,
         bypassHeaders: forwardAuth.apiBypassHeaders,
-        reverseProxyHandler,
+        reverseProxyHandler: hostProxyHandler,
         locationRules,
+        cacheHandler: hostCacheHandler,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
       });
@@ -2173,8 +2198,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           authMode,
           baseHandlers: cpmHandlers,
           authHandler: cpmForwardAuthHandler,
-          reverseProxyHandler,
+          reverseProxyHandler: hostProxyHandler,
           locationRules,
+          cacheHandler: hostCacheHandler,
           skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
           preserveHostHeader: Boolean(row.preserveHostHeader),
           preDomainRoute: cpmCallbackRoute,
@@ -2196,8 +2222,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         authMode: resolvePathAuthMode(tailscale.protectedPaths, tailscale.excludedPaths),
         baseHandlers: tailscaleHandlers,
         authHandler: buildTailscaleAuthSubroute(tailscale.forwardIdentity),
-        reverseProxyHandler,
+        reverseProxyHandler: hostProxyHandler,
         locationRules,
+        cacheHandler: hostCacheHandler,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
       });
@@ -2248,7 +2275,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             context.mtlsRbac!.roleFingerprintMap,
             context.mtlsRbac!.certFingerprintMap,
             handlers,
-            reverseProxyHandler,
+            hostProxyHandler,
             true,
             hostGateFingerprints ?? undefined,
           );
@@ -2268,7 +2295,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             match: [
               { host: domainGroup, path: [path], expression: hostTrustedFingerprintExpression },
             ],
-            handle: [...handlers, cloneJson(reverseProxyHandler)],
+            handle: [...handlers, cloneJson(hostProxyHandler)],
             terminal: true,
           },
           {
@@ -2284,7 +2311,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       const buildExcludedPathRoute = (domainGroup: string[], path: string) => [
         {
           match: [{ host: domainGroup, path: [path] }],
-          handle: [...handlers, cloneJson(reverseProxyHandler)],
+          handle: [...handlers, cloneJson(hostProxyHandler)],
           terminal: true,
         },
       ];
@@ -2296,7 +2323,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             context.mtlsRbac!.roleFingerprintMap,
             context.mtlsRbac!.certFingerprintMap,
             handlers,
-            reverseProxyHandler,
+            hostProxyHandler,
             true,
             hostGateFingerprints ?? undefined,
           );
@@ -2314,7 +2341,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         return [
           {
             match: [{ host: domainGroup, expression: hostTrustedFingerprintExpression }],
-            handle: [...handlers, reverseProxyHandler],
+            handle: [...handlers, hostProxyHandler],
             terminal: true,
           },
           {
@@ -2332,7 +2359,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       const buildUnprotectedCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => [
         {
           match: [{ host: domainGroup }],
-          handle: [...handlers, reverseProxyHandler],
+          handle: [...handlers, hostProxyHandler],
           terminal: true,
         },
       ];
@@ -2347,7 +2374,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             context.mtlsRbac!.roleFingerprintMap,
             context.mtlsRbac!.certFingerprintMap,
             handlers,
-            reverseProxyHandler,
+            hostProxyHandler,
           );
           if (rbacSubroutes) {
             return [
@@ -2368,6 +2395,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         domainGroups,
         authMode: mtlsPathMode,
         locationRules,
+        cacheHandler: hostCacheHandler,
         handlers,
         hostTrustedFingerprintExpression,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
