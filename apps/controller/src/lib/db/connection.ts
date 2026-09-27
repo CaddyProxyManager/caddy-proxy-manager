@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
 import { type DatabaseDialect, driverOptions, resolveDatabaseTarget } from "./dialect";
 import { activeSchema, schemaDialect } from "./schema";
+import { restrictDatabaseFileModes, vacuumDeletedContent } from "./sqlite-hygiene";
 import * as pgSchema from "./schema.pg";
 
 export type Db = BunSQLDatabase<typeof pgSchema> & { $client: unknown };
@@ -47,7 +48,20 @@ function openSqlite(path: string): Database {
   // Readers stop blocking the writer; a second writer waits rather than failing at once.
   database.run("PRAGMA journal_mode = WAL");
   database.run("PRAGMA busy_timeout = 5000");
+  // Zeroes deleted and replaced content instead of leaving it in free pages, where a secret
+  // re-encrypted or removed after the fact could be read back from the file or a copy of it.
+  database.run("PRAGMA secure_delete = ON");
+  // After the pragmas, so the WAL files exist to be covered too.
+  restrictDatabaseFileModes(path);
   return database;
+}
+
+/** SQLite only; see ./sqlite-hygiene.ts. `force` after a startup pass rewrote secrets. */
+export function purgeDeletedDatabaseContent(force = false): boolean {
+  if (!(client instanceof Database) || target.kind !== "sqlite" || target.path === ":memory:") {
+    return false;
+  }
+  return vacuumDeletedContent(client, force);
 }
 
 /**

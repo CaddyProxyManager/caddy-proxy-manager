@@ -8,6 +8,7 @@ import { vi } from '@/tests/helpers/vi';
 const mocks = vi.hoisted(() => ({
   order: [] as string[],
   reencryptStoredSecrets: vi.fn(),
+  purgeForced: [] as boolean[],
 }));
 
 function step<T>(name: string, value?: T) {
@@ -37,6 +38,13 @@ vi.mock('../../src/lib/secret-rotation', () => ({
   reencryptStoredSecrets: async () => {
     mocks.order.push('rotation');
     return mocks.reencryptStoredSecrets();
+  },
+}));
+vi.mock('../../src/lib/db/connection', () => ({
+  purgeDeletedDatabaseContent: (force: boolean) => {
+    mocks.order.push('purge');
+    mocks.purgeForced.push(force);
+    return false;
   },
 }));
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig: step('applyCaddyConfig') }));
@@ -74,6 +82,7 @@ async function run(result: { reencrypted: number; failed: number; clearedOAuthTo
 
 beforeEach(() => {
   mocks.order.length = 0;
+  mocks.purgeForced.length = 0;
   vi.stubEnv('NEXT_RUNTIME', 'nodejs');
 });
 
@@ -92,6 +101,15 @@ describe('startup secret passes', () => {
     expect(at('rotation')).toBeGreaterThan(at('caCertificates'));
     expect(at('rotation')).toBeGreaterThan(at('plaintextDns'));
     expect(at('rotation')).toBeLessThan(at('applyCaddyConfig'));
+    expect(at('purge')).toBeGreaterThan(at('rotation'));
+    expect(at('purge')).toBeLessThan(at('applyCaddyConfig'));
+    // Nothing was rewritten, so only the once-per-database vacuum may run.
+    expect(mocks.purgeForced).toEqual([false]);
+  });
+
+  it('forces the vacuum when a pass rewrote secrets', async () => {
+    await run({ reencrypted: 0, failed: 0, clearedOAuthTokens: 2 });
+    expect(mocks.purgeForced).toEqual([true]);
   });
 
   it('summarizes cleared OAuth tokens in one informational line, not as failures', async () => {

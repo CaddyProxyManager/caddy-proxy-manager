@@ -60,12 +60,16 @@ export async function register() {
       }
     }
 
+    // Whether a pass below rewrote secrets, leaving their old bytes in SQLite's free pages.
+    let rewroteSecrets = false;
+
     // Older releases stored plaintext secrets; repair before any handler reads the rows.
     const { migrateLegacyCertificateStorage } = await import("./lib/models/certificates");
     const { migrateLegacyCaCertificateStorage } = await import("./lib/models/ca-certificates");
     try {
       const migrated =
         (await migrateLegacyCertificateStorage()) + (await migrateLegacyCaCertificateStorage());
+      rewroteSecrets ||= migrated > 0;
       if (migrated > 0) {
         console.log(`Hardened ${migrated} legacy certificate record(s)`);
       }
@@ -77,6 +81,7 @@ export async function register() {
     const { encryptPlaintextDnsCredentials } = await import("./lib/settings/plaintext-credentials");
     try {
       const encrypted = await encryptPlaintextDnsCredentials();
+      rewroteSecrets ||= encrypted > 0;
       if (encrypted > 0) {
         console.log(`Encrypted DNS provider credentials stored in plaintext (${encrypted} row(s))`);
       }
@@ -88,6 +93,7 @@ export async function register() {
     const { reencryptStoredSecrets } = await import("./lib/secret-rotation");
     try {
       const { reencrypted, failed, clearedOAuthTokens } = await reencryptStoredSecrets();
+      rewroteSecrets ||= reencrypted > 0 || clearedOAuthTokens > 0;
       if (reencrypted > 0) {
         console.log(`Re-encrypted ${reencrypted} stored secret(s) with the current SESSION_SECRET`);
       }
@@ -105,6 +111,13 @@ export async function register() {
     } catch (error) {
       // Values left behind still decrypt through the fallback keys.
       console.error("Failed to re-encrypt stored secrets:", error);
+    }
+
+    // secure_delete covers deletes from now on; VACUUM drops what earlier ones and the passes
+    // above left in the file. Once per database, then only after a rewrite.
+    const { purgeDeletedDatabaseContent } = await import("./lib/db/connection");
+    if (purgeDeletedDatabaseContent(rewroteSecrets)) {
+      console.log("Vacuumed the database so deleted and replaced secrets no longer remain in it");
     }
 
     // Before the startup apply, so the config lands on the demo agent's in-memory Caddy.
