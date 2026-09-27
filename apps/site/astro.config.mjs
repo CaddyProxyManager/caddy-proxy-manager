@@ -13,14 +13,21 @@ const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, impo
 const { version: controllerVersion } = createRequire(import.meta.url)("../controller/package.json");
 
 /**
- * Shims `./actions` under `app/setup/` only. A plugin, since an alias on a relative specifier
- * would catch every `./actions`, and those stay undemoable on purpose (see AGENTS.md).
+ * Shims `./actions` under the folders listed here only. A plugin, since an alias on a relative
+ * specifier would catch every `./actions`, and the rest stay undemoable on purpose (see AGENTS.md).
  */
-function setupActionsShim() {
-  const setupPages = controller("src/app/setup/").replaceAll("\\", "/");
-  const shim = fileURLToPath(new URL("./src/demos/shims/setup-actions.ts", import.meta.url));
+function relativeActionsShim() {
+  /** @type {[string, string][]} */
+  const folders = [
+    ["src/app/setup/", "./src/demos/shims/setup-actions.ts"],
+    ["src/app/(dashboard)/access-lists/", "./src/demos/shims/access-list-actions.ts"],
+  ].map(([folder, shim]) => [
+    controller(folder).replaceAll("\\", "/"),
+    // Slashed as Vite's own ids are, or a demo importing the shim directly gets a second copy.
+    fileURLToPath(new URL(shim, import.meta.url)).replaceAll("\\", "/"),
+  ]);
   return {
-    name: "cpm-setup-actions-shim",
+    name: "cpm-relative-actions-shim",
     enforce: /** @type {const} */ ("pre"),
     /**
      * @param {string} source
@@ -28,7 +35,8 @@ function setupActionsShim() {
      */
     resolveId(source, importer) {
       if (source !== "./actions" || !importer) return null;
-      return importer.replaceAll("\\", "/").startsWith(setupPages) ? shim : null;
+      const from = importer.replaceAll("\\", "/");
+      return folders.find(([folder]) => from.startsWith(folder))?.[1] ?? null;
     },
   };
 }
@@ -120,7 +128,7 @@ export default defineConfig({
   ],
 
   vite: {
-    plugins: [setupActionsShim()],
+    plugins: [relativeActionsShim()],
     resolve: {
       /**
        * Three controller tsconfig paths repeated (`@/*` is unused by demos), plus shims for

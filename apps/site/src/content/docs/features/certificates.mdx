@@ -5,6 +5,7 @@ description: Automatic ACME certificates, DNS-01 providers, manual imports, and 
 
 import Demo from "../../../components/Demo.astro";
 import CertificatesTableDemo from "../../../demos/samples/CertificatesTableDemo";
+import AcmeCertificatesDemo from "../../../demos/samples/AcmeCertificatesDemo";
 
 Caddy obtains and renews certificates on its own. CPM's job is to tell it what to obtain, to show
 you what exists, and to hold the credentials that DNS challenges need.
@@ -37,6 +38,10 @@ Each host's menu has three tools:
 - **Download.** The certificate, or its private key. The key needs a sign-in from the last ten
   minutes, and every key download is written to the [audit log](../audit-log/). Imported
   certificates have the same two downloads.
+
+<Demo title="Certificates → ACME" note="Renew one, or test its reachability, from its menu. Downloads need a controller.">
+  <AcmeCertificatesDemo client:visible />
+</Demo>
 
 For an internal CA, set the ACME directory URL under **Settings → General → ACME Server** and supply its root
 so Caddy trusts it.

@@ -41,7 +41,7 @@ configure and watch rather than things you write into a config file and hope abo
 <CardGrid>
   <Card title="Reverse proxy" icon="random">
     Multiple upstreams, twelve load-balancing policies, health checks, custom headers, location
-    rules, redirects, rewrites and upstream DNS pinning.
+    rules, redirects, rewrites, asset caching, Force HTTPS and HSTS, and upstream DNS pinning.
   </Card>
   <Card title="L4 TCP/UDP proxy" icon="puzzle">
     Layer 4 stream proxying. TLS SNI matching, PROXY protocol, health checks and geo blocking below
@@ -57,10 +57,11 @@ configure and watch rather than things you write into a config file and hope abo
   </Card>
   <Card title="Traffic analytics" icon="bars">
     Live request charts, protocol breakdown, a country map, top user agents and blocked requests,
-    backed by ClickHouse.
+    backed by ClickHouse - plus a live view of the raw access, WAF and Caddy logs.
   </Card>
   <Card title="Everything audited" icon="list-format">
-    Every configuration change is recorded with the account that made it, and searchable.
+    Every configuration change is recorded with the account that made it, and searchable. The
+    whole configuration backs up to one encrypted file.
   </Card>
 </CardGrid>
 

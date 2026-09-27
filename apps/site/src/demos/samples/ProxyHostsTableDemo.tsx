@@ -4,6 +4,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useFormatter, useTranslations } from "next-intl";
+import { HostNotesHint } from "@cpm/controller/src/components/proxy-hosts/HostNotesField";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
@@ -20,6 +21,7 @@ type Row = {
   /** Requests in the last 24h, or null when nothing was recorded for it. */
   requests: { total: number; blocked: number } | null;
   protections: string[];
+  notes: string | null;
   enabled: boolean;
 };
 
@@ -32,6 +34,7 @@ const HOSTS: Row[] = [
     agents: [],
     requests: { total: 18_412, blocked: 96 },
     protections: ["WAF", "LB"],
+    notes: null,
     enabled: true,
   },
   {
@@ -42,6 +45,7 @@ const HOSTS: Row[] = [
     agents: ["edge-fra"],
     requests: { total: 5_730, blocked: 0 },
     protections: ["Authentik"],
+    notes: null,
     enabled: true,
   },
   {
@@ -52,6 +56,7 @@ const HOSTS: Row[] = [
     agents: ["lab-nuc"],
     requests: null,
     protections: [],
+    notes: "Off until the next release candidate. Ask Priya before turning it back on.",
     enabled: false,
   },
   {
@@ -62,6 +67,7 @@ const HOSTS: Row[] = [
     agents: ["edge-fra", "edge-ams"],
     requests: { total: 812, blocked: 4 },
     protections: ["mTLS", "Tailnet"],
+    notes: null,
     enabled: true,
   },
 ];
@@ -121,9 +127,12 @@ function ProxyHostsTableDemoContent() {
       render: (r) => (
         <VStack gap={1}>
           <VStack gap={0}>
-            <Text type="body" size="sm" weight="semibold">
-              {r.domain}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {r.domain}
+              </Text>
+              <HostNotesHint notes={r.notes} />
+            </HStack>
             <Text type="code" size="xsm" color="secondary">
               {r.upstreams}
             </Text>

@@ -43,7 +43,9 @@ One compose file and two generated secrets. Everything else is entered in the br
 
    `SESSION_SECRET` is also the key every secret in the database is encrypted under: DNS provider
    credentials, imported private keys, agent secrets. It cannot live in the thing it encrypts, and
-   changing it later makes all of them unreadable. Generate it once and keep it.
+   changing it later makes all of them unreadable. Generate it once and keep it. A
+   [backup](../../features/settings/#backup-and-restore) is sealed with a passphrase instead, so it
+   restores onto an instance with a different one.
 
 3. Start it:
 

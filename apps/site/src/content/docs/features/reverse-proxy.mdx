@@ -17,10 +17,11 @@ import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
 mostly for, and most of the other features attach to it.
 
-Every host, HTTP or L4, can carry **notes**: free text for whatever the next person needs to know.
-They show as an icon beside the host's name in the list, and the search box finds them.
+Every host, HTTP or L4, can carry **notes**: free text for whatever the next person needs to know,
+up to 2000 characters. They show as an icon beside the host's name in the list, with the text on
+hover, and the search box finds them. Anyone who can see the host can read them.
 
-<Demo title="The proxy host list" note="Sort by domain or status, or switch to the enabled or disabled hosts.">
+<Demo title="The proxy host list" note="Sort by domain or status, switch to the enabled or disabled hosts, or hover the note on staging.">
   <ProxyHostsTableDemo client:visible />
 </Demo>
 
@@ -31,8 +32,8 @@ Each host has switches at the top of its editor:
 - **Force HTTPS** answers plain HTTP with a 308 redirect to the same URL over HTTPS.
 - **HSTS** tells browsers to use only HTTPS for the host for two years, optionally including its
   subdomains. It needs Force HTTPS, because a browser pinned to HTTPS never tries HTTP again.
-- **WebSocket support** lets upgrade requests through. They skip the WAF, which cannot inspect
-  them; with it off, an upgrade is refused with a 403.
+- **WebSocket support** lets upgrade requests through. The [WAF](../waf/) checks the handshake like
+  any other request, but not the messages after it. With it off, an upgrade is refused with a 403.
 - **Preserve Host header** sends the domain the client asked for rather than the upstream's
   own address.
 
@@ -73,9 +74,10 @@ Retries let a failed request try another upstream rather than surfacing the erro
 
 
 Path-based routing inside one host: send `/api/*` to one backend and `/ws/*` to another, each with
-its own upstreams, load balancing and health checks.
+its own upstreams, load balancing and health checks. A rule can also use an
+[access list](../access-control/#per-path-lists) of its own, or none, instead of the host's.
 
-<Demo title="Location rules" note="Expand a rule to give it its own load balancer.">
+<Demo title="Location rules" note="Expand a rule to give it its own load balancer, or change the access list it uses.">
   <LocationRulesDemo client:visible />
 </Demo>
 
@@ -128,5 +130,5 @@ because a single pinned address cannot carry more than one SNI name.
 ## Headers
 
 The host header is forwarded by default, which is what most applications behind a proxy expect;
-the **Preserve Host header** switch turns that off. Other request and response headers are set through the host's advanced configuration fields, which
-take raw Caddy JSON and are admin-only.
+the **Preserve Host header** switch turns that off. Other request and response headers are set
+through the host's advanced configuration fields, which take raw Caddy JSON and are admin-only.

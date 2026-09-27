@@ -1,6 +1,6 @@
 ---
 title: Caddy Build
-description: Choosing which plugins your Caddy binary is compiled with, and rebuilding from the UI.
+description: Choosing which plugins your Caddy binary is compiled with, rebuilding from the UI or building the image yourself, the HTTP cache storage and the global Caddyfile.
 ---
 
 import Demo from "../../../components/Demo.astro";
@@ -10,8 +10,8 @@ Caddy is a single static binary. A plugin either was compiled in with
 [xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime - there is no
 loading one later. **Settings → Caddy Build** makes that list editable from the dashboard.
 
-The default image ships with every supported module, so an existing install behaves exactly as it
-did before this page existed.
+The default image ships with every supported module except the opt-in HTTP caching ones, so an
+existing install behaves exactly as it did before this page existed.
 
 ## Choosing modules
 
@@ -65,16 +65,21 @@ progress as it goes. The running Caddy keeps serving until the new binary is rea
 
 Building needs BuildKit access through the Docker socket proxy. To keep that away from the agent,
 set `CADDY_BUILD_MODE=external` on it and `GRPC: 0` and `SESSION: 0` on `docker-socket-proxy`. The
-agent then never builds, and this page shows a `docker build` command for your selection in place
-of the Rebuild button. It builds from this release's tag on GitHub, so it runs anywhere Docker can
-build, without a checkout.
+agent then never builds: the page's **Build command** is a `docker build` for your selection, and
+**Load built image** takes the Rebuild button's place. The command builds from this release's tag
+on GitHub, so it runs anywhere Docker can build, without a checkout. In a fleet where only some
+agents are external, Rebuild leaves those alone; pick one under **Module selection for** to load
+its image.
 
 1. Run the command, on the agent's host or anywhere else. Push the image to a registry if it was
    built elsewhere.
 2. The first time, set `CADDY_IMAGE` to its tag in `.env` and run `docker compose up -d agent`.
    Use a tag of your own, not the shipped image's name.
-3. Click **Load built image**. The agent pulls the tag if it is in a registry, recreates Caddy if
-   it now names a different image, and waits for it to report healthy.
+3. Click **Load built image**. The agent pulls the tag if it is in a registry and reads the new
+   image's module list first. If Caddy has a module the image lacks, the controller pushes a config
+   without it before anything restarts, since Caddy would not start on a saved config naming it.
+   Then the agent recreates Caddy if the tag names a different image, and waits for it to report
+   healthy.
 
 The agent learns which modules the image has from `/etc/caddy/caddy-modules.txt`, which the
 Dockerfile writes. An image built another way has no such file and is treated as having no

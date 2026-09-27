@@ -92,7 +92,10 @@ The controls that matter are therefore:
   agent before it reaches Docker: published ports, Caddy module paths, the environment variables a
   managed service may receive, and GeoIP edition names. Caddy admin calls pass a path allowlist.
   A WAF dry run creates a container from the Caddy image itself, with no network, no mounts and
-  no capability but the one Caddy's binary needs, and copies the config in.
+  no capability but the one Caddy's binary needs, and copies the config in. Reading certificates
+  runs the same kind of throwaway, network-less container with Caddy's volumes read-only, for
+  names that must look like a storage path component. A log cursor must look like one before it
+  becomes a `docker compose logs` argument.
 - **The agent stays minimal.** Its image holds the compiled agent, the Docker CLI and the Compose
   plugin, and it is the only container on the proxy's internal network.
 - **The agent does not read `.env`.** It mounts the compose directory read-only to run Compose, but
@@ -124,6 +127,26 @@ Only admins can reach either surface. Custom Caddy configuration is likewise adm
 pointing an upstream at Caddy's admin port, a unix socket or a placeholder: an operator granted a
 host can edit its upstreams, but not reach the admin API through it.
 
+The Caddy image an agent in external build mode loads is whatever the operator built and tagged.
+The agent reads the module list from that image, and an image without one is treated as having no
+plugins, so config generation never names a module it may lack.
+
+### Proxied Traffic
+
+- **The WAF inspects WebSocket upgrades.** An upgrade used to skip it, so two added headers took
+  an attack past the WAF on any host with WebSocket support on. The handshake is now inspected like
+  any request; the messages after it are not. With **WebSocket Support** off a host refuses
+  upgrades with 403, matched case-insensitively and including HTTP/2's extended CONNECT.
+- **Access lists keep basic-auth credentials from the upstream** unless **Pass auth to host** is
+  on. Lists made before that switch existed keep forwarding them, as they always did. IP rules
+  match the client address Caddy resolves, so they see through trusted proxies only.
+- **The Caddy cache stores nothing per-user.** It covers static asset paths only, skips any
+  request carrying a cookie or an `Authorization` header, and a response that sets a cookie is
+  marked `private` before any cache sees it. A stored Redis password is kept only while the servers
+  stay the same, so repointing them cannot hand it to another host.
+- **Redirects that keep the path cannot be turned into open redirects.** A request path that would
+  make the `Location` protocol-relative (`//evil.example`, `/\evil.example`) is not redirected.
+
 ### First-run Setup
 
 An installation with no accounts serves nothing but the setup flow, and that flow is necessarily
@@ -132,7 +155,9 @@ first becomes its administrator.** Complete setup before the instance is reachab
 you do not control, or set `ADMIN_USERNAME`/`ADMIN_PASSWORD`, which seeds an admin at startup and
 skips the flow entirely.
 
-Once setup completes the flag is stored, and the setup screens redirect away for good.
+Once setup completes the flag is stored, and the setup screens redirect away for good. Two requests
+racing for the account step cannot both create an administrator: the step runs under a claim row
+in the database, and checks again that no account exists while it holds it.
 
 ### Sign-in and Forward Auth
 
@@ -146,7 +171,48 @@ Once setup completes the flag is stored, and the setup screens redirect away for
 - **Changing credentials takes a fresh sign-in.** Setting a first password on a provider-only
   account needs a session under ten minutes old, unlinking a provider needs the password, and a
   password change ends the user's other sessions and forward-auth sessions. Better Auth's own
-  password, profile, account and token routes are switched off in favour of the app's.
+  password, profile, account and token routes are switched off in favour of the app's. Downloading
+  a certificate's private key and restoring a backup need the same ten-minute session, and every
+  key downloaded is audited.
+- **Two-factor sign-in covers the portal too.** The forward-auth portal checks passwords itself,
+  so a password alone would otherwise reach every protected host. For an account with two-factor
+  sign-in it answers the password with a short-lived signed challenge, bound to the user and the
+  redirect, and finishes only on a TOTP or backup code, under the same per-account lockout as the
+  dashboard. A backup code is spent with a compare-and-swap, so two concurrent uses cannot both
+  succeed. The TOTP secret and backup codes are encrypted with a key from `SESSION_SECRET`.
+- **Requiring it for administrators binds sessions, not tokens.** Until an administrator with a
+  password enrols, the dashboard sends them to enrolment and their session's REST and GraphQL
+  calls answer 403, but an API token they already hold keeps working. Accounts that sign in only
+  through OAuth are left to the identity provider. `cpm-server --reset-2fa` is answered only on
+  loopback, signed with a key derived from `SESSION_SECRET`, and audited.
+- **View as only narrows.** An administrator previewing a role or group narrows their own session:
+  it is read against the account's real role, so a demotion cancels it, it ends after an hour, and
+  the require-2FA check reads the real role. Minting an API token and forward-auth sign-in are
+  refused while it is on.
+- **There is always an active administrator.** Every change that can remove one - role, status,
+  delete, and OIDC role sync - runs under one cross-process lock and refuses to remove the last.
+
+### Backups
+
+**A backup file holds every secret the database encrypts.** DNS credentials, certificate and CA
+private keys, agent secrets, OAuth client secrets, two-factor secrets and the rest are decrypted
+into it, beside password and API token hashes, so that it restores under a different
+`SESSION_SECRET`. The passphrase is then the only thing protecting it: the payload is sealed with
+AES-256-GCM under a key from scrypt, the passphrase must be at least 12 characters, and the
+readable header (version, date, row counts) is authenticated as additional data, so editing it
+breaks decryption. Live sessions and sign-in state are never included.
+
+- **Any admin can take one**, from Settings or with an admin API token through
+  `POST /api/v1/backup`. An admin token can therefore export every secret, under a passphrase of
+  its own choosing. Each download is audited.
+- **Restoring needs a sign-in from the last ten minutes**, since it replaces every account. It
+  signs everyone out, refuses a backup from a newer release (checked again once the header is
+  authenticated), and closes the stream of any connected agent the restored agents table no longer
+  vouches for before the restored config is pushed.
+- **A restore leaves a copy of what it replaced** in `backups/` on the controller's data volume,
+  mode `0600`, sealed with the passphrase of the backup being restored. The agent mounts that
+  volume read-only but reads it through the controller's group, which that mode excludes. Delete
+  the copies once you no longer need them.
 
 ### Controller and Agent
 
@@ -194,6 +260,13 @@ it is sent, and the health monitor re-applies config only to the agent that repo
 compromised agent can misconfigure its own Caddy, but never another agent's. A snippet is checked
 against every connected agent that serves the host before it is saved.
 
+**What an agent sends is decoded, never cast.** A signature proves which agent sent a value, not
+its shape, so status reports, command results, certificate listings and files, and log pages are
+checked and bounded field by field, with unknown fields dropped. A malformed report is refused, and
+a malformed answer fails its one command at once instead of leaving the caller waiting out the
+timeout. The image name and IDs an agent in external build mode reports are checked before they
+appear in the `docker build` command the Caddy Build page shows, since that is pasted into a shell.
+
 **Caddy's admin API is not on the upstream network.** The bundled compose file binds it to Caddy's
 address on the internal `caddy-admin` network, which only web and the agent share. The agent pins
 that address into every config it forwards, since the controller's own `admin` block binds every
@@ -217,8 +290,9 @@ alter or drop anyone's analytics. The one exception is the agent in the controll
 which is sent the ClickHouse password because Compose needs it to start the container there.
 
 **`SESSION_SECRET` is the root of all of it.** It derives the key that encrypts DNS provider
-credentials, imported private keys, agent secrets and the secret settings. Rotating it makes every
-one of them unreadable.
+credentials, imported and mTLS CA private keys, agent secrets, two-factor secrets and the secret
+settings, the HTTP cache's Redis password and CDN API key among them. Rotating it makes every one
+of them unreadable; only a [backup](#backups) carries them across.
 
 ### Dependency Management
 
@@ -261,6 +335,10 @@ Releases after 3.0.0-rc.3 move Caddy's admin API, PostgreSQL and ClickHouse onto
 and stop the agent reading `.env`. An existing Caddy container has to be replaced once, and a
 `CADDY_API_URL` or an override file that interpolates variables may need changing. The README's
 "Upgrading to the isolated Caddy admin API" lists the steps.
+
+WebSocket upgrades now go through the WAF, so a handshake the CRS flags is refused where it used to
+pass, and a host with WebSocket support off refuses upgrades whether or not its WAF is on. The
+README's "Upgrading to WAF-checked WebSockets" says what to check.
 
 ## Security Updates
 

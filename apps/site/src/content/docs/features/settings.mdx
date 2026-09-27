@@ -61,7 +61,8 @@ keys, access lists, users and their two-factor secrets, groups, API tokens, agen
 setting. The audit log and the settings history can be included too.
 
 - **The passphrase is the only protection.** Everything the database keeps encrypted is decrypted
-  into the file, and the file is sealed with the passphrase (scrypt and AES-256-GCM). That is what
+  into the file, and the file is sealed with the passphrase - at least 12 characters - using scrypt
+  and AES-256-GCM. That is what
   lets it restore onto a new machine whose `SESSION_SECRET` is different - and what makes losing the
   passphrase the same as losing the backup.
 - **Restoring replaces everything**, after showing what the file holds and when it was made. The
@@ -69,11 +70,12 @@ setting. The audit log and the settings history can be included too.
   controller's data volume. Everyone is signed out afterwards, and restoring needs a sign-in from
   the last ten minutes.
 - **Moving to a new machine?** Turn off **Keep the agent pairings**: the new machine's agents pair
-  afresh.
+  afresh, and hosts that were pinned to the old agents are served by every agent.
 - **Not in the file:** who is signed in, the certificates Caddy has issued (it issues them again -
   mind your certificate authority's rate limits with many hosts), analytics, and the GeoIP databases.
 - **A backup from a newer version is refused.** An older one restores onto a newer version, with
   anything added since taking its default.
 
 For a scheduled backup, `POST /api/v1/backup` with an admin API token and `{"passphrase": "..."}`
-returns the same file.
+returns the same file; add `"auditLog": true` or `"settingsHistory": true` to include those.
+Restoring is only in the dashboard.

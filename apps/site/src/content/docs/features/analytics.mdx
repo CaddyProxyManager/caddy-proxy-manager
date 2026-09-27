@@ -1,10 +1,11 @@
 ---
 title: Analytics
-description: Live traffic charts, protocol breakdown, a country map with a per-country breakdown, top user agents and blocked requests, backed by ClickHouse.
+description: Live traffic charts, protocol breakdown, a country map with a per-country breakdown, top user agents and blocked requests, backed by ClickHouse - and a viewer for the raw logs.
 ---
 
 import Demo from "../../../components/Demo.astro";
 import AnalyticsDemo from "../../../demos/samples/AnalyticsDemo";
+import LogViewerDemo from "../../../demos/samples/LogViewerDemo";
 
 Traffic and WAF events are written to a bundled ClickHouse instance and queried back as charts. It
 is optional - everything else works without it.
@@ -70,6 +71,11 @@ a day on an idle machine. CPM never queries them.
 - **Certificates** - just the issuance and renewal lines from Caddy's output, for when a certificate
   won't come through.
 
-It follows new lines as they arrive, pauses on request, and filters what it has on screen. Only
-administrators can open it: access logs name every client and every path they asked for. An agent
-older than the log viewer can't serve it; update it.
+It follows new lines as they arrive, pauses on request, and filters what it has on screen. It
+needs no ClickHouse: the agent reads Caddy's log files and its container's output. Only administrators can open it:
+access logs name every client and every path they asked for. An agent older than the log viewer
+can't serve it; update it.
+
+<Demo title="Logs" note="Switch the log or the agent, filter, or pause. The lines are made up in your browser.">
+  <LogViewerDemo client:visible />
+</Demo>

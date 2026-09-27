@@ -32,6 +32,9 @@ have done to your traffic before they start doing it.
 OWASP CRS covers SQL injection, cross-site scripting, local file inclusion, remote code execution
 and more. It is enabled by default when the WAF is on.
 
+A WebSocket upgrade is inspected like any other request, so claiming to be one does not get a
+request past the rules. Once the connection is upgraded, the messages on it are not inspected.
+
 ## When a rule is wrong
 
 Real applications trip generic rules. Two ways out, both from the event detail panel beside the

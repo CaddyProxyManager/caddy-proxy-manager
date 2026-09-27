@@ -6,6 +6,7 @@ description: Four roles, group-based delegation, and OAuth/OIDC single sign-on.
 import Demo from "../../../components/Demo.astro";
 import GroupAccessDemo from "../../../demos/samples/GroupAccessDemo";
 import SignInDemo from "../../../demos/samples/SignInDemo";
+import TwoFactorDemo from "../../../demos/samples/TwoFactorDemo";
 
 ## The four roles
 
@@ -17,11 +18,13 @@ import SignInDemo from "../../../demos/samples/SignInDemo";
 | Create hosts | No | No | No | Yes |
 | Manage certificates and access lists | No | No | No | Yes |
 | Manage users, groups and settings | No | No | No | Yes |
-| View analytics and the audit log | No | No | No | Yes |
+| View analytics, logs and the audit log | No | No | No | Yes |
 | Create and manage own API tokens | Yes | Yes | Yes | Yes |
 
 New accounts default to **user**. The first administrator comes from
-[first run](../../start/first-run/).
+[first run](../../start/first-run/). There is always at least one active administrator: a role
+change, a disable or a delete that would remove the last one is refused, and an OIDC role sync
+skips that demotion - even when two of them happen at the same moment.
 
 ## Operator is the delegating role
 
@@ -107,6 +110,10 @@ Anyone with a password can add a code from an authenticator app, from **Profile 
 sign-in**. Turning it on asks for the password, shows a QR code and the key behind it, and takes
 one code to prove the app is set up. Ten backup codes follow, shown once - each signs in a single
 time if the phone is lost.
+
+<Demo title="Profile → Two-factor sign-in" note="Any password and any six digits work here; nothing is saved.">
+  <TwoFactorDemo client:visible />
+</Demo>
 
 - **It applies to the forward-auth portal too.** A portal sign-in with a correct password asks for
   the code before it lets anyone through to the host. The portal doesn't offer to remember the

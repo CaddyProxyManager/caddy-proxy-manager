@@ -4,6 +4,7 @@ description: HTTP basic auth, mutual TLS with the built-in CA, and role-based pa
 ---
 
 import AccessListDemo from "../../../demos/samples/AccessListDemo";
+import AccessListNetworkDemo from "../../../demos/samples/AccessListNetworkDemo";
 
 import Demo from "../../../components/Demo.astro";
 import PasswordFieldDemo from "../../../demos/samples/PasswordFieldDemo";
@@ -33,6 +34,10 @@ IPv4 or IPv6 - checked from the top, where the first rule that matches decides. 
 matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
 The address is the one Caddy resolves after [trusted proxies](../geo-blocking/#trusted-proxies), so
 a CDN or load balancer in front is seen through rather than allowed or denied as a whole.
+
+<Demo title="An access list's Network tab" note="Reorder, add or remove rules and save; nothing leaves the page.">
+  <AccessListNetworkDemo client:visible />
+</Demo>
 
 A list can hold IP rules alone, users alone, or both. With both, **Satisfy** decides how they
 combine:
@@ -68,7 +73,8 @@ mTLS asks the *client* for a certificate. A visitor without one does not get a c
 which is a stronger boundary than any password - there is nothing to phish and nothing to guess.
 
 CPM includes a CA for this. Issue client certificates from the Certificates page, hand them to the
-people or machines that need them, and enable mTLS on the hosts they should reach.
+people or machines that need them, and enable mTLS on the hosts they should reach. The CA's private
+key is encrypted at rest like every other secret; Caddy only ever gets the CA certificate.
 
 **Revocation is fail-closed.** Revoking a certificate rejects it immediately, and revoking every
 certificate rejects every connection rather than falling open to none-required.
