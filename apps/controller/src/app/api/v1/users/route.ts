@@ -5,7 +5,11 @@ import { listUsers, createUser } from "@/src/lib/models/user";
 import { hashPassword } from "@/src/lib/password";
 import { DomainError, domainErrorMessage } from "@/src/lib/domain-error";
 import { isEmailAddress } from "@/src/lib/email-address";
-import { assertAcceptablePassword, isUserRole } from "@/src/lib/user-admin";
+import {
+  assertAcceptablePassword,
+  isUserRole,
+  signInUsernameRulesMessage,
+} from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -45,6 +49,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
     const role = isUserRole(body.role) ? body.role : "user";
+    // Optional: without one, createUser gives their own email when it can be a username.
+    const username: unknown = body.username ?? null;
+    if (username !== null && typeof username !== "string") {
+      return NextResponse.json({ error: signInUsernameRulesMessage() }, { status: 400 });
+    }
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
@@ -71,6 +80,7 @@ export async function POST(request: NextRequest) {
       provider: "credentials",
       subject: email,
       passwordHash,
+      username,
     });
 
     return NextResponse.json(stripPasswordHash(user as unknown as Record<string, unknown>), {

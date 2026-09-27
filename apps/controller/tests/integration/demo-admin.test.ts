@@ -21,6 +21,9 @@ vi.mock('../../src/lib/db', () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+  runInTransaction: async (build: (tx: TestDb) => unknown[]) => {
+    for (const statement of build(ctx.db)) await statement;
+  },
 }));
 
 import {

@@ -41,6 +41,7 @@ import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-at
 import { Timestamp } from "@/components/ui/Timestamp";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
+import { isUsableSignInUsername } from "@/src/lib/login-username";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -62,6 +63,8 @@ type UserEntry = {
   isSelf: boolean;
   email: string;
   name: string | null;
+  /** The login page's username; null until an administrator sets one. */
+  username: string | null;
   role: Role;
   provider: string | null;
   subject: string | null;
@@ -404,6 +407,9 @@ function UserDetail({
           <Heading level={3}>{t("details")}</Heading>
           <MetadataList>
             <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
+            <MetadataListItem label={t("signInUsername")}>
+              {isUsableSignInUsername(user.username) ? user.username : t("signInUsernameNone")}
+            </MetadataListItem>
             <MetadataListItem label={t("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
             <MetadataListItem label={t("signInMethod")}>
               {isExternal(user)
@@ -611,6 +617,7 @@ function CreateUserDialog({
   const [role, setRole] = useState<Role>("user");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -620,6 +627,7 @@ function CreateUserDialog({
       setRole("user");
       setEmail("");
       setName("");
+      setUsername("");
       setPassword("");
       setDialogError(null);
     }
@@ -680,6 +688,16 @@ function CreateUserDialog({
             onChange={setName}
             placeholder={t("displayName")}
           />
+          <TextInput
+            data-testid="create-username"
+            label={t("signInUsername")}
+            isOptional
+            htmlName="username"
+            value={username}
+            onChange={setUsername}
+            description={t("signInUsernameCreateHelp")}
+            autoComplete="off"
+          />
           <Selector
             data-testid="create-role"
             label={t("role")}
@@ -722,6 +740,7 @@ function EditUserDialog({
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
+  const [username, setUsername] = useState(user.username ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -729,6 +748,7 @@ function EditUserDialog({
       setRole(user.role);
       setName(user.name ?? "");
       setEmail(user.email);
+      setUsername(user.username ?? "");
     }
   }, [open, user]);
 
@@ -776,6 +796,14 @@ function EditUserDialog({
             value={email}
             onChange={setEmail}
             placeholder={t("emailAddress")}
+          />
+          <TextInput
+            label={t("signInUsername")}
+            htmlName="username"
+            value={username}
+            onChange={setUsername}
+            description={t("signInUsernameHelp")}
+            autoComplete="off"
           />
           <Selector
             label={t("role")}

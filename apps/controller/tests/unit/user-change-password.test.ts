@@ -25,6 +25,9 @@ vi.mock('../../src/lib/db', () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+  runInTransaction: async (build: (tx: TestDb) => unknown[]) => {
+    for (const statement of build(ctx.db)) await statement;
+  },
 }));
 
 vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
@@ -39,11 +42,17 @@ vi.mock('@/src/lib/auth', () => ({
 }));
 
 import type { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { POST } from '@/src/app/api/user/change-password/route';
-import { createUser, getUserById } from '../../src/lib/models/user';
+import { createUser, getPasswordSignInUsername, getUserById } from '../../src/lib/models/user';
 import { hashPassword, verifyPassword } from '../../src/lib/password';
-import { forwardAuthSessions, proxyHosts, sessions } from '../../src/lib/db/schema';
+import {
+  accounts,
+  forwardAuthSessions,
+  proxyHosts,
+  sessions,
+  users,
+} from '../../src/lib/db/schema';
 
 const PASSWORD = 'CorrectHorse2026!';
 const NEW_PASSWORD = 'BatteryStaple2027?';
@@ -194,5 +203,47 @@ describe('setting a first password on a provider-only account', () => {
     expect(response.status).toBe(200);
     const after = await getUserById(user.id);
     expect(await verifyPassword(NEW_PASSWORD, after!.passwordHash!)).toBe(true);
+  });
+
+  it('creates the credential account the login page checks, with the own-email username', async () => {
+    const user = await seedUser(null);
+    await ctx.db.update(users).set({ username: null }).where(eq(users.id, user.id));
+    const current = await seedSession(user.id, 'current');
+    ctx.session = { id: current, createdAt: new Date() };
+
+    const response = await post({ newPassword: NEW_PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(await getPasswordSignInUsername(user.id)).toBe(user.email);
+  });
+});
+
+describe('a self-registered account, whose hash is on the credential account only', () => {
+  it('still has to prove the current password, even from a fresh session', async () => {
+    const user = await seedUser(null);
+    const now = new Date().toISOString();
+    await ctx.db.insert(accounts).values({
+      userId: user.id,
+      accountId: String(user.id),
+      providerId: 'credential',
+      password: await hashPassword(PASSWORD),
+      createdAt: now,
+      updatedAt: now,
+    });
+    const current = await seedSession(user.id, 'current');
+    ctx.session = { id: current, createdAt: new Date() };
+
+    expect((await post({ newPassword: NEW_PASSWORD })).status).toBe(400);
+    const wrong = await post({ currentPassword: 'NotThePassword1!', newPassword: NEW_PASSWORD });
+    expect(wrong.status).toBe(401);
+    expect((await getUserById(user.id))?.passwordHash).toBeNull();
+
+    const right = await post({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD });
+    expect(right.status).toBe(200);
+    const [credential] = await ctx.db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, 'credential')));
+    expect(await verifyPassword(NEW_PASSWORD, credential.password!)).toBe(true);
   });
 });

@@ -1,6 +1,11 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { requireUser, getCurrentSessionId } from "@/src/lib/auth";
-import { getUserById, listUserOAuthProviders } from "@/src/lib/models/user";
+import {
+  getPasswordSignInUsername,
+  getUserById,
+  getUserPasswordHash,
+  listUserOAuthProviders,
+} from "@/src/lib/models/user";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
@@ -44,6 +49,11 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
+  // Self-registered users keep the hash on the credential account only.
+  const [passwordHash, signInUsername] = await Promise.all([
+    getUserPasswordHash(user),
+    getPasswordSignInUsername(userId),
+  ]);
   const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
 
   return (
@@ -54,7 +64,8 @@ export default async function ProfilePage() {
         name: user.name,
         provider: user.provider,
         subject: user.subject,
-        hasPassword: Boolean(user.passwordHash),
+        hasPassword: Boolean(passwordHash),
+        signInUsername,
         twoFactorEnabled: user.twoFactorEnabled,
         role: user.role,
         avatarUrl: user.avatarUrl,

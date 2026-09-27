@@ -7,14 +7,15 @@ import {
 } from "@/src/lib/api-auth";
 import {
   getUserById,
-  updateUserProfile,
+  updateUserAccount,
   updateUserRole,
   updateUserStatus,
   deleteUser,
 } from "@/src/lib/models/user";
+import { logAuditEvent } from "@/src/lib/audit";
 import { domainErrorMessage } from "@/src/lib/domain-error";
 import { isEmailAddress } from "@/src/lib/email-address";
-import { isUserRole, isUserStatus } from "@/src/lib/user-admin";
+import { isUserRole, isUserStatus, signInUsernameRulesMessage } from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -65,31 +66,42 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     ) {
       return NextResponse.json({ error: domainErrorMessage("emailInvalid") }, { status: 400 });
     }
+    // null is no change, so a GET body sent back as it is still works.
+    if (body.username != null && typeof body.username !== "string") {
+      return NextResponse.json({ error: signInUsernameRulesMessage() }, { status: 400 });
+    }
+    if (hasRole && auth.userId === targetId) {
+      return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
+    }
+    if (hasStatus && auth.userId === targetId) {
+      return NextResponse.json({ error: "Cannot change your own status" }, { status: 400 });
+    }
 
-    if (hasRole) {
-      if (auth.userId === targetId) {
-        return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
+    // First, in one update: a refused username or email (400) leaves every field unchanged.
+    const accountFields: Parameters<typeof updateUserAccount>[1] = {};
+    if (typeof body.username === "string") accountFields.username = body.username;
+    if (typeof body.email === "string") accountFields.email = body.email.trim();
+    if (body.name !== undefined) accountFields.name = body.name;
+    if (body.avatarUrl !== undefined) accountFields.avatarUrl = body.avatarUrl;
+    if (Object.keys(accountFields).length > 0) {
+      const changed = await updateUserAccount(targetId, accountFields);
+      if (!changed) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      await updateUserRole(targetId, body.role);
-    }
-
-    if (hasStatus) {
-      if (auth.userId === targetId) {
-        return NextResponse.json({ error: "Cannot change your own status" }, { status: 400 });
+      if (changed.user.username !== changed.previousUsername) {
+        await logAuditEvent({
+          userId: auth.userId,
+          action: "update",
+          entityType: "user",
+          entityId: targetId,
+          summary: `Changed user ${targetId} sign-in username to ${changed.user.username}`,
+          data: { previousUsername: changed.previousUsername, username: changed.user.username },
+        });
       }
-      await updateUserStatus(targetId, body.status);
     }
 
-    const profileFields: Record<string, unknown> = {};
-    if (body.email !== undefined) profileFields.email = body.email;
-    if (body.name !== undefined) profileFields.name = body.name;
-    if (body.avatarUrl !== undefined) profileFields.avatarUrl = body.avatarUrl;
-    if (Object.keys(profileFields).length > 0) {
-      await updateUserProfile(
-        targetId,
-        profileFields as { email?: string; name?: string | null; avatarUrl?: string | null },
-      );
-    }
+    if (hasRole) await updateUserRole(targetId, body.role);
+    if (hasStatus) await updateUserStatus(targetId, body.status);
 
     const user = await getUserById(targetId);
     if (!user) {

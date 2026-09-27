@@ -1,6 +1,6 @@
 /**
- * users.passwordChangedAt. The env-seeded admin is rehashed on every start, so a new hash on its
- * row is not a change - dating it would report one at every restart.
+ * users.passwordChangedAt. The env-seeded admin is re-checked on every start, and only an
+ * ADMIN_PASSWORD that changed is a change - dating anything else would report one per restart.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -22,6 +22,9 @@ vi.mock('../../src/lib/db', () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+  runInTransaction: async (build: (tx: TestDb) => unknown[]) => {
+    for (const statement of build(ctx.db)) await statement;
+  },
 }));
 
 import { eq } from 'drizzle-orm';
@@ -35,7 +38,7 @@ import {
 } from '../../src/lib/models/user';
 import { ensureAdminUser } from '../../src/lib/init-db';
 import { hashPassword } from '../../src/lib/password';
-import { accounts, users } from '../../src/lib/db/schema';
+import { accounts, settings, users } from '../../src/lib/db/schema';
 
 const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD'];
 
@@ -148,7 +151,7 @@ describe('the environment-seeded admin', () => {
     const seeded = await changedAt(1);
     expect(seeded).not.toBeNull();
 
-    // A restart with the same password: a fresh hash lands on the row, and that is not a change.
+    // A restart with the same password is not a change.
     await tick();
     await ensureAdminUser();
     expect(await changedAt(1)).toBe(seeded);
@@ -156,13 +159,14 @@ describe('the environment-seeded admin', () => {
     expect(account?.password).toBeTruthy();
 
     // A restart with a different ADMIN_PASSWORD. config caches the variable for the life of the
-    // process - a changed one means a new process - so the stored hash is what changes here, to a
-    // password the running configuration no longer matches.
+    // process, so the stored hash and the applied-environment marker are rewound instead.
     await tick();
+    const previous = await hashPassword('PreviousPassword2026!');
+    await ctx.db.update(users).set({ passwordHash: previous }).where(eq(users.id, 1));
     await ctx.db
-      .update(users)
-      .set({ passwordHash: await hashPassword('PreviousPassword2026!') })
-      .where(eq(users.id, 1));
+      .update(settings)
+      .set({ value: JSON.stringify({ v: 2, username: 'envadmin', passwordHash: previous }) })
+      .where(eq(settings.key, 'admin_env_credentials_fingerprint'));
     await ensureAdminUser();
     const changed = await changedAt(1);
     expect(changed! > seeded!).toBe(true);

@@ -1073,6 +1073,61 @@ const spec = {
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
+      post: {
+        tags: ["Users"],
+        summary: "Create a user",
+        operationId: "createUser",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  email: {
+                    type: "string",
+                    description:
+                      "Stored trimmed and lowercased. Fails with 400 when another account has it (in any case) or " +
+                      "signs in with it as username (for a @localhost address, also with the part before " +
+                      "it), or when lowercasing turns a character into an ASCII letter (such as the Kelvin sign)",
+                  },
+                  password: { type: "string" },
+                  name: { type: ["string", "null"] },
+                  role: {
+                    type: "string",
+                    enum: ["admin", "operator", "user", "viewer"],
+                    default: "user",
+                  },
+                  username: {
+                    type: "string",
+                    description:
+                      "Username for the login page, which signs in by username only, ignoring case. Surrounding " +
+                      "whitespace is removed; the rest must be 3-255 characters of lowercase letters (a-z), " +
+                      "digits and _ . @ -, and must not be another account's username, email address or " +
+                      "forward-auth portal name (the email <name>@localhost), compared case-insensitively." +
+                      " Optional: without it the user gets their email address as username only when it " +
+                      "qualifies. Otherwise the request fails with 400 and no user is created.",
+                  },
+                },
+                required: ["email", "password"],
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "User created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/User" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
     },
     "/api/v1/users/{id}": {
       get: {
@@ -1106,8 +1161,25 @@ const spec = {
                 type: "object",
                 properties: {
                   name: { type: ["string", "null"] },
-                  email: { type: "string" },
-                  role: { type: "string", enum: ["admin", "user"] },
+                  email: {
+                    type: "string",
+                    description:
+                      "Changing it leaves username unchanged. " +
+                      "Stored trimmed and lowercased. Fails with 400 when another account has it (in any case) or " +
+                      "signs in with it as username (for a @localhost address, also with the part before " +
+                      "it), or when lowercasing turns a character into an ASCII letter (such as the Kelvin sign)",
+                  },
+                  username: {
+                    type: ["string", "null"],
+                    description:
+                      "Username for the login page, which signs in by username only, ignoring case. Surrounding " +
+                      "whitespace is removed; the rest must be 3-255 characters of lowercase letters (a-z), " +
+                      "digits and _ . @ -, and must not be another account's username, email address or " +
+                      "forward-auth portal name (the email <name>@localhost), compared case-insensitively." +
+                      " The username the user already has, or null, is no change. Otherwise the request " +
+                      "fails with 400, and a request refused with 400 changes no field. Audited.",
+                  },
+                  role: { type: "string", enum: ["admin", "operator", "user", "viewer"] },
                   status: { type: "string", enum: ["active", "disabled"] },
                 },
               },
@@ -3764,6 +3836,14 @@ const spec = {
         properties: {
           id: { type: "integer" },
           email: { type: "string" },
+          username: {
+            type: ["string", "null"],
+            description:
+              "Username for the login page, which signs in by username only, ignoring case; null " +
+              "when the account has none. CPM stores only the account's own email address, " +
+              "lowercased, when it qualifies and no other account holds it, or one an administrator " +
+              "sets (POST /api/v1/users, PUT /api/v1/users/{id})",
+          },
           name: { type: ["string", "null"] },
           role: { type: "string", enum: ["admin", "user", "viewer"] },
           provider: { type: "string", example: "credentials" },

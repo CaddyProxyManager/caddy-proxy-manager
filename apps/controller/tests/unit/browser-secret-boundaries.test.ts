@@ -80,7 +80,7 @@ describe('browser secret boundaries', () => {
       'utf8',
     );
     expect(profilePage).not.toMatch(/user=\{user\}/);
-    expect(profilePage).toContain('hasPassword: Boolean(user.passwordHash)');
+    expect(profilePage).toContain('hasPassword: Boolean(passwordHash)');
     expect(profileClient).not.toContain('passwordHash');
   });
 });

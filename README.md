@@ -422,7 +422,7 @@ it win even then.
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
 | `CPM_APP_ROOT` / `CPM_HEALTHCHECK_URL` | Bootstrap paths for the `cpm-server` binary, used before the app starts | Executable's directory / `http://127.0.0.1:${PORT}/api/health` | No |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** - [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** - [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely. Applied again only when either value changes, which also ends the admin's sessions and re-enables it; a password changed in the UI survives restarts | None | No |
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |

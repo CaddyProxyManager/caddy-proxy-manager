@@ -31,6 +31,14 @@ export async function register() {
       // Let the app start; errors surface when users reach the features.
     }
 
+    // Only reports: a stored username is never changed on startup.
+    const { warnAboutSignInUsernamesToReview } = await import("./lib/models/user");
+    try {
+      await warnAboutSignInUsernamesToReview();
+    } catch (error) {
+      console.error("Failed to check sign-in usernames:", error);
+    }
+
     // After the seed, so an env-configured deployment is recognised by the account it just made.
     const { backfillSetupCompletion } = await import("./lib/setup");
     try {

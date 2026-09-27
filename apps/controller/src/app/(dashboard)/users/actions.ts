@@ -6,7 +6,7 @@ import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
 import {
   createUser,
-  updateUserProfile,
+  updateUserAccount,
   updateUserRole,
   updateUserStatus,
   deleteUser,
@@ -39,6 +39,8 @@ async function createUserActionUntranslated(formData: FormData) {
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;
   const role = assertUserRole(String(formData.get("role") ?? "user"));
   const password = String(formData.get("password") ?? "");
+  // Empty: their own email when it can be a username (createUser).
+  const username = String(formData.get("username") ?? "").trim() || null;
 
   if (!email || !password) {
     throw domainError("emailAndPasswordRequired");
@@ -55,6 +57,7 @@ async function createUserActionUntranslated(formData: FormData) {
     provider: "credentials",
     subject: email,
     passwordHash,
+    username,
   });
 
   await logAuditEvent({
@@ -116,8 +119,12 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
   const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
   const email = formData.get("email") ? String(formData.get("email")).trim() : undefined;
   if (email !== undefined) assertEmailAddress(email);
+  // A form without the field leaves the username alone.
+  const username = formData.has("username") ? String(formData.get("username")) : undefined;
 
-  await updateUserProfile(userId, { name, email });
+  // All or nothing: a refused username or email leaves the name unchanged too.
+  const changed = await updateUserAccount(userId, { name, email, username });
+  if (!changed) throw domainError("userNotFound");
 
   await logAuditEvent({
     userId: actorId,
@@ -126,6 +133,16 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
     entityId: userId,
     summary: `Updated user ${userId} profile`,
   });
+  if (changed.user.username !== changed.previousUsername) {
+    await logAuditEvent({
+      userId: actorId,
+      action: "update",
+      entityType: "user",
+      entityId: userId,
+      summary: `Changed user ${userId} sign-in username to ${changed.user.username}`,
+      data: { previousUsername: changed.previousUsername, username: changed.user.username },
+    });
+  }
 
   revalidatePath("/users");
 }

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { nextIntlServerMock } from '../helpers/next-intl';
+import { nextIntlServerMock, testTranslator } from '../helpers/next-intl';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
@@ -23,6 +23,9 @@ vi.mock('../../src/lib/db', () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+  runInTransaction: async (build: (tx: TestDb) => unknown[]) => {
+    for (const statement of build(ctx.db)) await statement;
+  },
 }));
 
 vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
@@ -34,7 +37,7 @@ import { POST } from '@/src/app/api/user/unlink-oauth/route';
 import { auth } from '@/src/lib/auth';
 import { createUser } from '../../src/lib/models/user';
 import { hashPassword } from '../../src/lib/password';
-import { accounts } from '../../src/lib/db/schema';
+import { accounts, users } from '../../src/lib/db/schema';
 
 const PASSWORD = 'CorrectHorse2026!';
 
@@ -113,5 +116,29 @@ describe('POST /api/user/unlink-oauth', () => {
 
     expect(response.status).toBe(401);
     expect(await providersOf(user.id)).toEqual(['authentik', 'credential']);
+  });
+
+  it('refuses while the login page has no username to sign them in with', async () => {
+    const user = await seedLinkedUser();
+    await ctx.db.update(users).set({ username: null }).where(eq(users.id, user.id));
+
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(
+      testTranslator('profile')('unlinkSignInUnavailable'),
+    );
+    expect(await providersOf(user.id)).toEqual(['authentik', 'credential']);
+  });
+
+  it('checks the password a self-registered user keeps on the credential account only', async () => {
+    const user = await seedLinkedUser();
+    await ctx.db.update(users).set({ passwordHash: null }).where(eq(users.id, user.id));
+
+    expect((await post({ currentPassword: 'NotThePassword1!' })).status).toBe(401);
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(await providersOf(user.id)).toEqual(['credential']);
   });
 });

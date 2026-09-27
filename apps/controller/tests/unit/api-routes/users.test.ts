@@ -4,7 +4,7 @@ import { vi } from '@/tests/helpers/vi';
 vi.mock('@/src/lib/models/user', () => ({
   listUsers: vi.fn(),
   getUserById: vi.fn(),
-  updateUserProfile: vi.fn(),
+  updateUserAccount: vi.fn(),
   updateUserRole: vi.fn(),
   updateUserStatus: vi.fn(),
   deleteUser: vi.fn(),
@@ -42,7 +42,7 @@ import { GET as getGET, PUT } from '@/src/app/api/v1/users/[id]/route';
 import {
   listUsers,
   getUserById,
-  updateUserProfile,
+  updateUserAccount,
   updateUserRole,
   updateUserStatus,
   createUser,
@@ -51,7 +51,7 @@ import { requireApiAdmin, requireApiUser } from '@/src/lib/api-auth';
 
 const mockListUsers = vi.mocked(listUsers);
 const mockGetUserById = vi.mocked(getUserById);
-const mockUpdateUserProfile = vi.mocked(updateUserProfile);
+const mockUpdateUserAccount = vi.mocked(updateUserAccount);
 const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
 const mockRequireApiUser = vi.mocked(requireApiUser);
 
@@ -152,7 +152,7 @@ describe('PUT /api/v1/users/[id]', () => {
   it('updates a user profile', async () => {
     const body = { name: 'Updated Name' };
     const updated = { ...sampleUser, name: 'Updated Name' };
-    mockUpdateUserProfile.mockResolvedValue(updated as any);
+    mockUpdateUserAccount.mockResolvedValue({ user: updated, previousUsername: null } as any);
     mockGetUserById.mockResolvedValue(updated as any);
 
     const response = await PUT(createMockRequest({ method: 'PUT', body }), {
@@ -163,7 +163,7 @@ describe('PUT /api/v1/users/[id]', () => {
     expect(response.status).toBe(200);
     expect(data.name).toBe('Updated Name');
     expect(data).not.toHaveProperty('passwordHash');
-    expect(mockUpdateUserProfile).toHaveBeenCalledWith(1, { name: 'Updated Name' });
+    expect(mockUpdateUserAccount).toHaveBeenCalledWith(1, { name: 'Updated Name' });
   });
 
   it('returns 404 when updating non-existent user', async () => {
@@ -218,7 +218,7 @@ describe('PUT /api/v1/users/[id] role and status', () => {
     expect(response.status).toBe(400);
     expect((await response.json()).error).toContain('valid email address');
     expect(vi.mocked(updateUserRole)).not.toHaveBeenCalled();
-    expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+    expect(mockUpdateUserAccount).not.toHaveBeenCalled();
   });
 });
 
@@ -263,5 +263,69 @@ describe('POST /api/v1/users', () => {
     expect(vi.mocked(createUser)).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'new@example.com', role: 'viewer' }),
     );
+  });
+});
+
+describe('PUT /api/v1/users/[id] email and username', () => {
+  const put = (body: unknown) =>
+    PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ id: '2' }) });
+
+  it('trims the email before storing it', async () => {
+    mockUpdateUserAccount.mockResolvedValue({ user: sampleUser, previousUsername: null } as any);
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2 } as any);
+
+    const response = await put({ email: '  new@example.com  ' });
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateUserAccount).toHaveBeenCalledWith(2, { email: 'new@example.com' });
+  });
+
+  it('refuses a username that is not a string before writing anything', async () => {
+    const response = await put({ username: 42, role: 'viewer' });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain('lowercase letters');
+    expect(mockUpdateUserAccount).not.toHaveBeenCalled();
+    expect(vi.mocked(updateUserRole)).not.toHaveBeenCalled();
+  });
+
+  it('treats a null username as no change', async () => {
+    mockUpdateUserAccount.mockResolvedValue({ user: sampleUser, previousUsername: null } as any);
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2 } as any);
+
+    const response = await put({ username: null, name: 'Changed' });
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateUserAccount).toHaveBeenCalledWith(2, { name: 'Changed' });
+  });
+});
+
+describe('POST /api/v1/users username', () => {
+  it('passes an explicit username to the model', async () => {
+    vi.mocked(createUser).mockResolvedValue({ ...sampleUser, id: 3 } as any);
+
+    const response = await createPOST(
+      createMockRequest({
+        method: 'POST',
+        body: { email: 'new@example.com', password: 'CorrectHorse2026!', username: 'newbie' },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(vi.mocked(createUser)).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@example.com', username: 'newbie' }),
+    );
+  });
+
+  it('refuses a username that is not a string', async () => {
+    const response = await createPOST(
+      createMockRequest({
+        method: 'POST',
+        body: { email: 'new@example.com', password: 'CorrectHorse2026!', username: 7 },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(vi.mocked(createUser)).not.toHaveBeenCalled();
   });
 });
