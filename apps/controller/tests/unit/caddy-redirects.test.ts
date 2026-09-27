@@ -47,6 +47,13 @@ describe('buildRedirectRoute', () => {
     expect(patterns.some((p) => p.test('/old/fine'))).toBe(false);
   });
 
+  it('escapes host placeholders in the target but keeps request placeholders', () => {
+    const plain = route({ from: '/a', to: '/{env.HOME}?q={http.request.uri}', status: 301 });
+    expect(location(plain)).toBe('/\\{env.HOME}?q={http.request.uri}');
+    const full = route({ from: '/*', to: 'https://{file./x}/', status: 308, preservePath: 'full' });
+    expect(location(full)).toBe('https://\\{file./x}{http.request.uri}');
+  });
+
   it('escapes regexp characters in the prefix', () => {
     const r = route({ from: '/a.b(c)/*', to: '/x', status: 301, preservePath: 'suffix' });
     const pattern = r.match[0].not?.[1]?.path_regexp.pattern ?? '';

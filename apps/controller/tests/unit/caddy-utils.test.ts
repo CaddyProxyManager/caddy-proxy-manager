@@ -13,6 +13,7 @@ import {
   formatDialAddress,
   toDurationMs,
   stripCaddyPlaceholders,
+  escapeHostPlaceholders,
 } from '@/src/lib/caddy-utils';
 
 // ---------------------------------------------------------------------------
@@ -390,6 +391,32 @@ describe('stripCaddyPlaceholders', () => {
     const start = performance.now();
     expect(stripCaddyPlaceholders('{'.repeat(100_000))).toBe('{'.repeat(100_000));
     expect(performance.now() - start).toBeLessThan(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// escapeHostPlaceholders
+// ---------------------------------------------------------------------------
+
+describe('escapeHostPlaceholders', () => {
+  it('escapes file, env and system placeholders', () => {
+    expect(escapeHostPlaceholders('<p>{file./etc/hosts}</p>')).toBe('<p>\\{file./etc/hosts}</p>');
+    expect(escapeHostPlaceholders('{env.HOME} {system.hostname}')).toBe(
+      '\\{env.HOME} \\{system.hostname}',
+    );
+  });
+
+  it('leaves request placeholders and ordinary braces alone', () => {
+    const body = 'body{margin:0} {http.request.uri} {http.error.status_code}';
+    expect(escapeHostPlaceholders(body)).toBe(body);
+  });
+
+  it('does not double-escape an already escaped brace', () => {
+    expect(escapeHostPlaceholders('\\{file.x}')).toBe('\\{file.x}');
+  });
+
+  it('escapes a placeholder nested after another brace', () => {
+    expect(escapeHostPlaceholders('{{file.x}}')).toBe('{\\{file.x}}');
   });
 });
 

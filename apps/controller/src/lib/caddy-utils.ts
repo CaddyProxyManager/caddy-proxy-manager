@@ -17,6 +17,19 @@ export function expandPrivateRanges(proxies: string[]): string[] {
   return proxies.flatMap((p) => (p === "private_ranges" ? PRIVATE_RANGES_CIDRS : [p]));
 }
 
+// ── Host placeholders ────────────────────────────────────────────────────────
+
+const HOST_PLACEHOLDER_RE = /(?<!\\)\{(?=(?:file|env|system)\.)/g;
+
+/**
+ * Caddy expands `{file.*}`, `{env.*}` and `{system.*}` in response bodies and header values, so
+ * operator-written text could read the Caddy host. A backslashed brace is served literally, minus
+ * the backslash; request placeholders (`{http.*}`) keep working.
+ */
+export function escapeHostPlaceholders(value: string): string {
+  return value.replace(HOST_PLACEHOLDER_RE, "\\{");
+}
+
 // ── Header names ─────────────────────────────────────────────────────────────
 
 /** Go's canonical form ("X-Cpm-User"): Caddy's header placeholders look names up literally. */

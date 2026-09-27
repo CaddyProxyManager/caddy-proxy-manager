@@ -18,6 +18,7 @@ import {
   canonicalHeaderName,
   upstreamHeaderPlaceholder,
   stripCaddyPlaceholders,
+  escapeHostPlaceholders,
   isReservedL4ListenAddress,
 } from "./caddy-utils";
 import {
@@ -1088,8 +1089,10 @@ export function buildErrorPageRoute(rule: ErrorPageRule, hosts?: string[]): Cadd
       {
         handler: "static_response",
         status_code: "{http.error.status_code}",
-        body: rule.body,
-        headers: { "Content-Type": [rule.contentType || "text/html; charset=utf-8"] },
+        body: escapeHostPlaceholders(rule.body),
+        headers: {
+          "Content-Type": [escapeHostPlaceholders(rule.contentType || "text/html; charset=utf-8")],
+        },
       },
     ],
     terminal: true,
@@ -1675,7 +1678,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           status_code: block.status,
         };
         if (block.body) {
-          handle.body = block.body;
+          handle.body = escapeHostPlaceholders(block.body);
         }
         const matcher: Record<string, unknown> = { path: [safePath] };
         if (allowPatterns.length > 0) {

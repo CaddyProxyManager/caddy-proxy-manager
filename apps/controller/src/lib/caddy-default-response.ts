@@ -5,6 +5,7 @@ import {
   domainError,
   domainErrorMessage,
 } from "./domain-error";
+import { escapeHostPlaceholders } from "./caddy-utils";
 
 export type DefaultResponseMode = "caddy" | "respond" | "redirect" | "abort";
 
@@ -150,7 +151,9 @@ function caddyHeaders(
   headers: Record<string, string> | undefined,
 ): Record<string, string[]> | undefined {
   if (!headers) return undefined;
-  return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, [value]]));
+  return Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [name, [escapeHostPlaceholders(value)]]),
+  );
 }
 
 export function buildDefaultResponseRoute(
@@ -170,13 +173,15 @@ export function buildDefaultResponseRoute(
     for (const name of Object.keys(headers)) {
       if (name.toLowerCase() === "location") delete headers[name];
     }
-    headers.Location = [settings.redirectUrl ?? ""];
+    headers.Location = [escapeHostPlaceholders(settings.redirectUrl ?? "")];
   }
 
   const handler: Record<string, unknown> = {
     handler: "static_response",
     status_code: settings.status,
-    ...(settings.mode === "respond" && settings.body ? { body: settings.body } : {}),
+    ...(settings.mode === "respond" && settings.body
+      ? { body: escapeHostPlaceholders(settings.body) }
+      : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
   };
 

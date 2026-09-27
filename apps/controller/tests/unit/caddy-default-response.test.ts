@@ -87,6 +87,32 @@ describe('default response validation and route builder', () => {
     expect(buildDefaultResponseRoute({ mode: 'caddy' })).toBeNull();
   });
 
+  it('escapes host placeholders in body, headers and redirect target', () => {
+    const respond = buildDefaultResponseRoute(
+      normalizeDefaultResponseSettings({
+        mode: 'respond',
+        status: 404,
+        body: '{file./etc/hosts} {http.request.host}',
+        headers: { 'X-Info': '{env.HOME}' },
+      }),
+    );
+    const handler = respond?.handle[0] as { body: string; headers: Record<string, string[]> };
+    expect(handler.body).toBe('\\{file./etc/hosts} {http.request.host}');
+    expect(handler.headers['X-Info']).toEqual(['\\{env.HOME}']);
+
+    const redirect = buildDefaultResponseRoute(
+      normalizeDefaultResponseSettings({
+        mode: 'redirect',
+        status: 308,
+        redirectUrl: 'https://example.com/{system.hostname}{http.request.uri}',
+      }),
+    );
+    const redirectHandler = redirect?.handle[0] as { headers: Record<string, string[]> };
+    expect(redirectHandler.headers.Location).toEqual([
+      'https://example.com/\\{system.hostname}{http.request.uri}',
+    ]);
+  });
+
   it("builds custom response headers in Caddy's array-valued format", () => {
     expect(
       buildDefaultResponseRoute({
@@ -226,6 +252,27 @@ describe('buildCaddyDocument default response', () => {
     expect(routes.length).toBeGreaterThan(0);
     expect(routes.every((route) => route.match !== undefined)).toBe(true);
     expect(JSON.stringify(routes)).toContain('known.example.test');
+  });
+
+  it('escapes host placeholders in path-block response bodies', async () => {
+    await seedAdminAndHost();
+    await createProxyHost(
+      {
+        name: 'Blocked path host',
+        domains: ['blocked.example.test'],
+        upstreams: ['10.0.0.6:8080'],
+        pathBlocks: [
+          { path: '/private/*', status: 403, body: 'no {file./data/secret} {http.request.uri}' },
+        ],
+      },
+      1,
+    );
+
+    const json = JSON.stringify(await buildCaddyDocument());
+    expect(json).toContain(
+      JSON.stringify('no \\{file./data/secret} {http.request.uri}').slice(1, -1),
+    );
+    expect(json).not.toMatch(/[^\\]\{file\.\/data\/secret\}/);
   });
 });
 
