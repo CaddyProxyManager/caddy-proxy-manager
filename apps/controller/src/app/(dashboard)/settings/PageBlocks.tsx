@@ -96,13 +96,74 @@ export function FocusField() {
 
 export type PageAnchor = { id: string; label: string };
 
+/** The nearest ancestor that scrolls: the content pane, not the window. */
+function scrollParent(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+  }
+  return null;
+}
+
 /**
- * Only from three blocks up. Highlights on click rather than scroll position, because a scroll
- * observer argues with the jump.
+ * Only from three blocks up. Follows the scroll: the current block is the last whose top has
+ * reached the header. A clicked entry holds until its jump settles, or the blocks it passes on
+ * the way would flicker through the list.
  */
 export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
   const t = useTranslations("settings");
   const [current, setCurrent] = useState<string | null>(null);
+  const heldUntil = useRef(0);
+
+  useEffect(() => {
+    const first = anchors[0] && document.getElementById(anchors[0].id);
+    if (!first) return;
+    const scroller = scrollParent(first);
+    const target: HTMLElement | Window = scroller ?? window;
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (performance.now() < heldUntil.current) return;
+      const header = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(HEADER_HEIGHT_VAR),
+      );
+      const top = (scroller?.getBoundingClientRect().top ?? 0) + (header || 0);
+      // A few pixels of slack: a jump lands the block a margin below the header, not on it.
+      const line = top + 32;
+      let next: string | null = anchors[0].id;
+      for (const anchor of anchors) {
+        const element = document.getElementById(anchor.id);
+        if (element && element.getBoundingClientRect().top <= line) next = anchor.id;
+      }
+      // Short last blocks never reach the line; at the bottom, the last one is what is in view.
+      const atBottom = scroller
+        ? scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
+        : window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom && (scroller?.scrollTop ?? window.scrollY) > 0) {
+        next = anchors[anchors.length - 1].id;
+      }
+      setCurrent(next);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    // A jump's end releases the hold at once, rather than waiting out the timeout.
+    const onScrollEnd = () => {
+      heldUntil.current = 0;
+    };
+
+    update();
+    target.addEventListener("scroll", onScroll, { passive: true });
+    target.addEventListener("scrollend", onScrollEnd);
+    return () => {
+      cancelAnimationFrame(frame);
+      target.removeEventListener("scroll", onScroll);
+      target.removeEventListener("scrollend", onScrollEnd);
+    };
+  }, [anchors]);
 
   return (
     <nav
@@ -125,6 +186,8 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
             href={`#${anchor.id}`}
             onClick={(event) => {
               setCurrent(anchor.id);
+              // Until the jump lands; scrollend clears it sooner where the browser has it.
+              heldUntil.current = performance.now() + 1000;
               const target = document.getElementById(anchor.id);
               if (!target) return;
               // Scrolled here: the router's hash jump scrolls the window, and the content pane is
