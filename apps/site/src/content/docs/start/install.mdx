@@ -18,7 +18,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    it into a directory of its own:
 
    ```bash
-   VERSION=v3.4.0   # the release you downloaded
+   VERSION=v3.5.0   # the release you downloaded
    mkdir caddy-proxy-manager && cd caddy-proxy-manager
    tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
    ```
@@ -101,7 +101,7 @@ not in the archive, so it is left alone; the compose file is replaced with one n
 images.
 
 ```bash
-VERSION=v3.4.0   # the release you are moving to
+VERSION=v3.5.0   # the release you are moving to
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 docker compose pull
 docker compose up -d

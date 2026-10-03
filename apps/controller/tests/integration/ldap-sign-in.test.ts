@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { createTestDatabase } from '@/tests/helpers/db';
 import { TEST_ENV } from '@/tests/helpers/env';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadConfig } from '@/tests/helpers/config';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 import { vi } from '@/tests/helpers/vi';
@@ -52,19 +52,16 @@ beforeAll(async () => {
   process.env.AUTH_ALLOW_OAUTH_REGISTRATION = 'true';
   resetDbModuleState();
 
-  const config = await import(`@/src/lib/config${fresh()}`);
-  vi.mock('@/src/lib/config', () => ({ ...config }));
+  await reloadConfig();
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
 
-  const users = (await import(
-    `@/src/lib/models/user${fresh()}`
-  )) as typeof import('@/src/lib/models/user');
+  const users = await import('@/src/lib/models/user');
   const directories = (await import(
-    `@/src/lib/models/ldap-directories${fresh()}`
+    '@/src/lib/models/ldap-directories'
   )) as typeof import('@/src/lib/models/ldap-directories');
   const { hashPassword } = await import('@/src/lib/password');
-  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
+  const authServer = await import('@/src/lib/auth-server');
   const auth = await authServer.getAuth();
 
   const directory = await directories.createLdapDirectory({
@@ -295,7 +292,7 @@ describe('/sign-in/ldap', () => {
   });
 
   live('stays out of every OIDC reader', async () => {
-    const oauth = await import(`@/src/lib/models/oauth-providers${fresh()}`);
+    const oauth = await import('@/src/lib/models/oauth-providers');
     expect((await oauth.listOAuthProviders()).map((p: { id: string }) => p.id)).not.toContain(
       env.directory.id,
     );

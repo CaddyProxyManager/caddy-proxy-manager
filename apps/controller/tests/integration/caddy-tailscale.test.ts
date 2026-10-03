@@ -4,35 +4,28 @@
  */
 import { describe, it, expect, afterEach, beforeEach, spyOn } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // createTestDb is async and a Bun mock factory must be synchronous, so it is hoisted out.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { setCaddyAdminTransport } from '../../src/lib/caddy-admin';
 import { buildCaddyDocument } from '../../src/lib/caddy';
 import { CADDY_MODULES } from '../../src/lib/caddy-modules';
-import { saveCaddyBuildSettings, saveTailscaleSettings } from '../../src/lib/settings';
+import {
+  saveCaddyBuildSettings,
+  saveHttpProtocolsSettings,
+  saveTailscaleSettings,
+} from '../../src/lib/settings';
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { startFakeAgent } from '../helpers/fake-agent';
 import * as schema from '../../src/lib/db/schema';
@@ -219,6 +212,42 @@ describe('serving a host on the tailnet', () => {
     await createHost();
 
     expect((await buildCaddyDocument()) as CaddyDocument).not.toHaveProperty('apps.tailscale');
+  });
+});
+
+describe('HTTP/3 on tailnet listeners', () => {
+  type ServerWithProtocols = { protocols?: string[] };
+  const protocolsOf = (document: CaddyDocument, name: string) =>
+    (servers(document)[name] as ServerWithProtocols | undefined)?.protocols;
+
+  it('leaves h3 off the tailnet server by default, and the public server alone', async () => {
+    // An h3 listener brings the node up inside config load, which hangs while the control
+    // server is unreachable and holds Caddy's admin API with it.
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(protocolsOf(document, 'cpm_tailscale_caddy')).toEqual(['h1', 'h2']);
+    expect(protocolsOf(document, 'cpm')).toBeUndefined();
+  });
+
+  it('follows Caddy default, h3 included, once the operator opts in', async () => {
+    await enableTailscale({ http3: true });
+    await createHost({ tailscale: { serve: true } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(servers(document).cpm_tailscale_caddy).toBeDefined();
+    expect(protocolsOf(document, 'cpm_tailscale_caddy')).toBeUndefined();
+  });
+
+  it('still honours HTTP/3 being off globally', async () => {
+    await enableTailscale({ http3: true });
+    await saveHttpProtocolsSettings({ http2: true, http3: false });
+    await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(protocolsOf(document, 'cpm_tailscale_caddy')).toEqual(['h1', 'h2']);
+    expect(protocolsOf(document, 'cpm')).toEqual(['h1', 'h2']);
   });
 });
 

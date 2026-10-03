@@ -13,7 +13,7 @@ import {
   SUGGESTED_CADDY_IMAGE,
 } from '@/src/lib/caddy-image-build';
 import { caddyBuildAgents, requestCaddyImageLoad } from '@/src/lib/agent/client';
-import { modulesChanged } from '@/src/lib/agent/module-change';
+import { modulesChanged, portsReapplied } from '@/src/lib/agent/module-change';
 import { attach, recordStatus, resetRegistry, settleResults } from '@/src/lib/agent/registry';
 
 const status = (patch: Partial<AgentStatus['caddyBuild']> = {}, capabilities = ['caddy-image']) =>
@@ -145,5 +145,27 @@ describe('a changed module set', () => {
     expect(
       modulesChanged(status({ applied: null }), status({ applied: [...SHIPPED_CADDY_MODULES] })),
     ).toBe(false);
+  });
+});
+
+// A config sent while a port change recreated Caddy never reached the new container.
+describe('a finished port change', () => {
+  const ports = (l4Ports: AgentStatus['l4Ports']['status']) =>
+    ({ ...status(), l4Ports: { applied: [], status: l4Ports } }) as AgentStatus;
+  const applied = (appliedAt: string) => ports({ state: 'applied', appliedAt });
+
+  it('re-applies config once per new apply, not on a first report or while it runs', () => {
+    expect(portsReapplied(null, applied('2026-09-30T00:00:00Z'))).toBe(false);
+    expect(portsReapplied(ports({ state: 'idle' }), ports({ state: 'applying' }))).toBe(false);
+    expect(portsReapplied(ports({ state: 'applying' }), applied('2026-09-30T00:00:00Z'))).toBe(
+      true,
+    );
+    expect(portsReapplied(applied('2026-09-30T00:00:00Z'), applied('2026-09-30T00:00:00Z'))).toBe(
+      false,
+    );
+    expect(portsReapplied(applied('2026-09-30T00:00:00Z'), applied('2026-09-30T00:05:00Z'))).toBe(
+      true,
+    );
+    expect(portsReapplied(ports({ state: 'idle' }), ports({ state: 'failed' }))).toBe(false);
   });
 });

@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { proxyHosts, users } from '../../src/lib/db/schema';
 import type { DomainError } from '../../src/lib/domain-error';
 import { type CaddyValidator, setCaddyValidator } from '../../src/lib/waf-dry-run';
@@ -13,11 +14,7 @@ let db: TestDb;
 let globalWaf: { preset_ids?: number[] } | null = null;
 let dashboardMeta: string | null = null;
 
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (v: string | null) => v,
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 const applyCaddyConfig = vi.fn(async () => {});
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));

@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
 import type { SettingDefinition } from '@/src/lib/settings/registry';
 
 /**
@@ -19,6 +18,12 @@ vi.mock('@/src/lib/settings/resolve', () => ({
     }
   },
 }));
+
+// One module for the file, so each test starts with no config, client or schema cached.
+beforeEach(async () => {
+  const { invalidateClickHouseConfig } = await import('@/src/lib/clickhouse/client');
+  await invalidateClickHouseConfig();
+});
 
 describe('clickhouse client analytics enablement', () => {
   afterEach(() => {
@@ -46,9 +51,7 @@ describe('clickhouse client analytics enablement', () => {
       createClient,
     }));
 
-    const { isAnalyticsEnabled, querySummary } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { isAnalyticsEnabled, querySummary } = await import('@/src/lib/clickhouse/client');
 
     await expect(isAnalyticsEnabled()).resolves.toBe(true);
 
@@ -78,9 +81,7 @@ describe('clickhouse client analytics enablement', () => {
     const createClient = vi.fn();
     vi.mock('@clickhouse/client', () => ({ createClient }));
 
-    const { isAnalyticsEnabled, querySummary } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { isAnalyticsEnabled, querySummary } = await import('@/src/lib/clickhouse/client');
 
     await expect(isAnalyticsEnabled()).resolves.toBe(false);
 
@@ -112,9 +113,7 @@ describe('clickhouse client analytics enablement', () => {
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { getRetentionDays, initClickHouse } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { getRetentionDays, initClickHouse } = await import('@/src/lib/clickhouse/client');
     await expect(getRetentionDays()).resolves.toBe(30);
 
     await initClickHouse();
@@ -145,9 +144,7 @@ describe('clickhouse client analytics enablement', () => {
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { getRetentionDays, initClickHouse } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { getRetentionDays, initClickHouse } = await import('@/src/lib/clickhouse/client');
     await expect(getRetentionDays()).resolves.toBe(7);
 
     await initClickHouse();
@@ -167,7 +164,7 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', 'not-a-number');
     vi.mock('@clickhouse/client', () => ({ createClient: vi.fn() }));
 
-    const { getRetentionDays } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { getRetentionDays } = await import('@/src/lib/clickhouse/client');
     await expect(getRetentionDays()).resolves.toBe(30);
   });
 
@@ -224,7 +221,7 @@ describe('clickhouse client analytics enablement', () => {
     ];
     const calls = mockClient(liveTables);
 
-    const { initClickHouse } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { initClickHouse } = await import('@/src/lib/clickhouse/client');
     await initClickHouse();
 
     const enumeration = calls.queries.find((q) => q.query.includes('match(name'));
@@ -257,7 +254,7 @@ describe('clickhouse client analytics enablement', () => {
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const { initClickHouse } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { initClickHouse } = await import('@/src/lib/clickhouse/client');
     // Best-effort: a privilege error must not reject and abort startup.
     await expect(initClickHouse()).resolves.toBeUndefined();
 
@@ -298,9 +295,7 @@ describe('clickhouse client analytics enablement', () => {
       insert,
     );
 
-    const { initClickHouse, insertTrafficEvents } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { initClickHouse, insertTrafficEvents } = await import('@/src/lib/clickhouse/client');
     await expect(initClickHouse()).rejects.toThrow('ENOTFOUND');
 
     reachable = true;
@@ -323,9 +318,7 @@ describe('clickhouse client analytics enablement', () => {
     const insert = vi.fn().mockRejectedValueOnce(unknownTable).mockResolvedValue(undefined);
     const calls = mockClient([], undefined, insert);
 
-    const { initClickHouse, insertTrafficEvents } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
-    );
+    const { initClickHouse, insertTrafficEvents } = await import('@/src/lib/clickhouse/client');
     await initClickHouse();
     await insertTrafficEvents([trafficRow]);
 
@@ -341,7 +334,7 @@ describe('clickhouse client analytics enablement', () => {
 
     const calls = mockClient([]);
     const { initClickHouse, insertTrafficEvents, invalidateClickHouseConfig } = await import(
-      `@/src/lib/clickhouse/client${fresh()}`
+      '@/src/lib/clickhouse/client'
     );
     await initClickHouse();
     await invalidateClickHouseConfig();
@@ -372,7 +365,7 @@ describe('clickhouse client analytics enablement', () => {
       createClient: vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { queryWafEventStatsWithSearch } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { queryWafEventStatsWithSearch } = await import('@/src/lib/clickhouse/client');
 
     await expect(queryWafEventStatsWithSearch('example.com')).resolves.toEqual({
       total: 5400,
@@ -393,7 +386,7 @@ describe('clickhouse client analytics enablement', () => {
       createClient: vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { queryWafCountWithSearch } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { queryWafCountWithSearch } = await import('@/src/lib/clickhouse/client');
     await queryWafCountWithSearch({
       search: "' OR 1=1",
       host: 'app.example.com',
@@ -451,7 +444,7 @@ describe('per-country analytics', () => {
       },
     ]);
 
-    const { queryCountries } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { queryCountries } = await import('@/src/lib/clickhouse/client');
 
     await expect(queryCountries(0, 1, [])).resolves.toEqual([
       { countryCode: 'DE', total: 120, blocked: 2, uniqueIps: 31 },
@@ -487,7 +480,7 @@ describe('per-country analytics', () => {
       { match: /GROUP BY user_agent/, rows: [{ user_agent: 'curl/8.7.1', count: '9' }] },
     ]);
 
-    const { queryCountryBreakdown } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { queryCountryBreakdown } = await import('@/src/lib/clickhouse/client');
 
     await expect(queryCountryBreakdown(0, 1, [], 'DE')).resolves.toEqual({
       countryCode: 'DE',
@@ -515,7 +508,7 @@ describe('per-country analytics', () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
     const calls = clientAnswering([]);
 
-    const { queryCountryBreakdown } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const { queryCountryBreakdown } = await import('@/src/lib/clickhouse/client');
     const result = await queryCountryBreakdown(0, 1, [], 'XX');
 
     // "XX" is GeoIP's unplaced bucket; matching it literally would open an empty breakdown.

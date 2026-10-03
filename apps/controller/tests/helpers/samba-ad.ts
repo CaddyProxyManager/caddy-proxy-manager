@@ -52,18 +52,20 @@ samba-domain-provision
 conf=/usr/local/samba/etc/smb.conf
 sed -i '/ldap server require strong auth/d' "$conf"
 sed -i 's|^\[global\]$|[global]\n\tldap server require strong auth = yes\n\ttls enabled = yes\n\ttls keyfile = /cpm/tls/key.pem\n\ttls certfile = /cpm/tls/cert.pem\n\ttls cafile = /cpm/tls/ca.pem|' "$conf"
-# Samba refuses a key anyone else can read.
+# Samba refuses a key anyone else can read or own; docker cp keeps the host uid (1001 on CI).
+chown root:root /cpm/tls/key.pem
 chmod 600 /cpm/tls/key.pem
-exec samba -F
+# Otherwise it logs to a file, and a start that fails prints nothing docker logs can show.
+exec samba -F --debug-stdout
 `;
 
 export async function startActiveDirectory(): Promise<TestActiveDirectory | null> {
   if ((await docker(['version', '--format', '{{.Server.Version}}'])).code !== 0) return null;
 
   const container = `cpm-test-ad-${process.pid}-${Date.now()}`;
+  // No --rm: a DC that exits during provisioning would take the log saying why with it.
   const create = await docker([
     'create',
-    '--rm',
     '--name',
     container,
     '--hostname',
@@ -140,11 +142,18 @@ export async function startActiveDirectory(): Promise<TestActiveDirectory | null
         lastError = error;
         await client.unbind().catch(() => {});
       }
-      if (Date.now() > deadline) {
-        const logs = await docker(['logs', '--tail', '20', container]);
-        throw new Error(
-          `${IMAGE} was not ready in time: ${lastError}\n${logs.stdout}${logs.stderr}`,
-        );
+      // A DC that exited will not come up; say why now rather than at the deadline.
+      const state = await docker([
+        'inspect',
+        '-f',
+        '{{.State.Status}} {{.State.ExitCode}}',
+        container,
+      ]);
+      const exited = state.stdout.trim().startsWith('exited');
+      if (exited || Date.now() > deadline) {
+        const logs = await docker(['logs', '--tail', '40', container]);
+        const why = exited ? `exited (${state.stdout.trim()})` : 'not ready in time';
+        throw new Error(`${IMAGE} ${why}: ${lastError}\n${logs.stdout}${logs.stderr}`);
       }
       await Bun.sleep(1_000);
     }

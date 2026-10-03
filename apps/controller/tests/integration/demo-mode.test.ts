@@ -5,25 +5,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { AgentDesiredState } from '@cpm/shared';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory: a Bun mock factory must be synchronous.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null => {
-    if (!value) return null;
-    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 const { broadcastDesiredState, connectedAgents, detach, dispatchCaddyAdmin, resetRegistry } =
   await import('../../src/lib/agent/registry');

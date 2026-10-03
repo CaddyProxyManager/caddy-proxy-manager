@@ -149,6 +149,15 @@ export async function ensureAdminUser(): Promise<void> {
   const usernameChanged = existingUser.username !== identity.username;
 
   const marker = await getAdminEnvMarker();
+  // Neither a marker nor a password: not the account this seeded. An OIDC-only start seeds none,
+  // so the first sign-in takes id 1, and applying the environment would rewrite that person.
+  if (!marker && !storedHash) {
+    throw new Error(
+      `ADMIN_USERNAME ${JSON.stringify(adminUsername)} is not applied: user #${adminId} ` +
+        `(${existingUser.email}) was not created from it and has no password, so it is left as it ` +
+        "is. Sign in as that account instead, or give it a password on the Users page.",
+    );
+  }
   let applyEnv: boolean;
   if (marker) {
     applyEnv =

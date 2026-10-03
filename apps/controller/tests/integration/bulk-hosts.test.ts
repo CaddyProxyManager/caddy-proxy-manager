@@ -4,28 +4,13 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
-import { createTestDb, currentDb, testDialect, type TestDb } from '../helpers/db';
+import { createTestDb, type TestDb } from '../helpers/db';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (v: string | null) => v,
-  // A real transaction, so a failing statement really does roll the batch back.
-  runInTransaction: async (build: (tx: unknown) => { run?: () => unknown }[]) => {
-    if (testDialect === 'sqlite') {
-      (db as any).transaction((tx: unknown) => {
-        for (const statement of build(tx)) statement.run?.();
-      });
-      return;
-    }
-    await (db as any).transaction(async (tx: unknown) => {
-      for (const statement of build(tx)) await statement;
-    });
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 const applyCaddyConfig = vi.fn(async () => {});
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));
 vi.mock('next-intl/server', () => nextIntlServerMock());

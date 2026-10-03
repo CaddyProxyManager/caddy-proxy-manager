@@ -8,20 +8,19 @@ import {
   redeemCaptchaPass,
 } from "@/src/lib/captcha/pass";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
-import {
-  accountKey,
-  accountRetryAfterMs,
-  registerAccountFailure,
-  resetAccountFailures,
-} from "@/src/lib/rate-limit";
+import { accountKey, accountRetryAfterMs, resetAccountFailures } from "@/src/lib/rate-limit";
+import { recordAccountFailure } from "@/src/lib/account-failures";
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import {
   CREDENTIAL_SIGN_IN_PATHS,
+  LDAP_SIGN_IN_PATH,
   PASSKEY_MANAGE_PATHS,
   TWO_FACTOR_MANAGE_PATHS,
   hasTwoFactorChallengeCookie,
 } from "@/src/lib/auth-sign-in-paths";
 import { isDemoAdmin, isDemoMode } from "@/src/lib/demo-mode";
 import { createAuditEvent } from "@/src/lib/models/audit";
+import { ACCOUNT_LOCKED } from "@/src/lib/sign-in-error";
 
 export const dynamic = "force-dynamic";
 
@@ -80,13 +79,23 @@ async function withClientIp(request: Request): Promise<Request> {
   } as RequestInit);
 }
 
-async function signInName(request: Request): Promise<string | null> {
+async function signInBody(
+  request: Request,
+): Promise<{ name: string | null; directoryId: string | null }> {
   try {
-    const body = (await request.json()) as { username?: unknown; email?: unknown };
+    const body = (await request.json()) as {
+      username?: unknown;
+      email?: unknown;
+      directoryId?: unknown;
+    };
     const name = typeof body.username === "string" ? body.username : body.email;
-    return typeof name === "string" && name.trim() ? name : null;
+    return {
+      name: typeof name === "string" && name.trim() ? name : null,
+      directoryId:
+        typeof body.directoryId === "string" && body.directoryId ? body.directoryId : null,
+    };
   } catch {
-    return null;
+    return { name: null, directoryId: null };
   }
 }
 
@@ -130,16 +139,18 @@ export async function POST(request: Request) {
     return toNextJsHandler(await getAuth()).POST(forwarded);
   }
 
-  const name = await signInName(forwarded.clone());
+  const { name, directoryId } = await signInBody(forwarded.clone());
 
   // Shares its counter with the forward-auth portal, whatever address the guesses come from.
   const account = name ? accountKey(name) : null;
-  const retryAfterMs = account ? accountRetryAfterMs(account) : 0;
+  const retryAfterMs = account ? await accountRetryAfterMs(account) : 0;
   if (retryAfterMs > 0) {
     const t = await getTranslations("auth.apiErrors");
+    const retryAfter = Math.ceil(retryAfterMs / 1000);
+    // In the body too: the auth client's error carries the body, not the headers.
     return Response.json(
-      { code: "TOO_MANY_REQUESTS", message: t("tooManyLoginAttempts") },
-      { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } },
+      { code: ACCOUNT_LOCKED, message: t("tooManyLoginAttempts"), retryAfter },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
 
@@ -159,8 +170,14 @@ export async function POST(request: Request) {
 
   const response = await toNextJsHandler(await getAuth()).POST(forwarded);
   if (account) {
-    if (response.status === 401) registerAccountFailure(account);
-    else if (response.ok) resetAccountFailures(account);
+    if (response.status === 401) {
+      // With no directory picked, /sign-in/ldap tries the local password first, so a wrong one
+      // there is a local failure too; the portal counts it the same way.
+      const directory =
+        pathname === `/api/auth${LDAP_SIGN_IN_PATH}` &&
+        (directoryId !== null || (await localUsersDisabled()));
+      await recordAccountFailure(account, directory ? "directory" : "local");
+    } else if (response.ok) resetAccountFailures(account);
   }
   if (captcha) response.headers.append("Set-Cookie", CAPTCHA_PASS_CLEAR_COOKIE);
   if (response.ok) await auditCompletedSignIn(response);

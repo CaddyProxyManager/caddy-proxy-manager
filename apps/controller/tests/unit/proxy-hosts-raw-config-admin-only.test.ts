@@ -4,27 +4,17 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
@@ -152,6 +142,40 @@ describe('raw Caddy config is admin-only', () => {
   });
 });
 
+// The builder drops JSON it cannot use, so a typo used to replace working handlers with none.
+describe('raw JSON must be usable', () => {
+  it.each([
+    ['customPreHandlersJson', '[{"handler": "headers"', 'customPreHandlersJsonInvalid'],
+    ['customPreHandlersJson', '["headers"]', 'customPreHandlersJsonInvalid'],
+    ['customReverseProxyJson', '{"headers":', 'customReverseProxyJsonInvalid'],
+    ['customReverseProxyJson', '[{"headers": {}}]', 'customReverseProxyJsonInvalid'],
+  ] as const)('refuses %s = %s', async (field, value, code) => {
+    const host = await hostWithSnippet();
+    await expect(updateProxyHost(host.id, { [field]: value }, ADMIN)).rejects.toMatchObject({
+      code,
+      status: 400,
+    });
+    await expect(
+      createProxyHost(
+        { name: 'bad', domains: ['bad.example.com'], upstreams: ['10.0.0.5:8080'], [field]: value },
+        ADMIN,
+      ),
+    ).rejects.toMatchObject({ code });
+    expect((await getProxyHost(host.id))?.customPreHandlersJson).toBe(PRE_HANDLERS);
+  });
+
+  it('accepts a single handler object, and a stored value resubmitted unchanged', async () => {
+    const host = await hostWithSnippet();
+    await updateProxyHost(host.id, { customPreHandlersJson: '{"handler":"headers"}' }, ADMIN);
+    const legacy = '{not json';
+    await ctx.db
+      .update(schema.proxyHosts)
+      .set({ meta: JSON.stringify({ custom_pre_handlers_json: legacy }) });
+    await updateProxyHost(host.id, { name: 'renamed', customPreHandlersJson: legacy }, ADMIN);
+    expect((await getProxyHost(host.id))?.name).toBe('renamed');
+  });
+});
+
 describe('upstreams that reach the Caddy admin API are admin-only', () => {
   async function expectUpstreamAdminOnly(promise: Promise<unknown>) {
     await expect(promise).rejects.toMatchObject({ code: 'upstreamTargetAdminOnly' });
@@ -213,6 +237,64 @@ describe('upstreams that reach the Caddy admin API are admin-only', () => {
       OPERATOR,
     );
     expect((await getProxyHost(host.id))?.anubis?.upstream).toBe('http://anubis:8923');
+  });
+
+  it('refuses an operator sending a location rule to the admin port', async () => {
+    const rule = { path: '/api/*', upstreams: ['caddy:2019'] };
+    await expectUpstreamAdminOnly(
+      createProxyHost(
+        {
+          name: 'op',
+          domains: ['op.example.com'],
+          upstreams: ['10.0.0.5:8080'],
+          locationRules: [rule],
+        },
+        OPERATOR,
+      ),
+    );
+    const host = await createProxyHost(
+      { name: 'plain', domains: ['plain.example.com'], upstreams: ['10.0.0.5:8080'] },
+      ADMIN,
+    );
+    await expectUpstreamAdminOnly(updateProxyHost(host.id, { locationRules: [rule] }, OPERATOR));
+    expect((await getProxyHost(host.id))?.locationRules).toEqual([]);
+
+    // One an admin set may be kept, or moved off the port, by an operator.
+    await updateProxyHost(host.id, { locationRules: [rule] }, ADMIN);
+    await updateProxyHost(host.id, { name: 'renamed', locationRules: [rule] }, OPERATOR);
+    await updateProxyHost(
+      host.id,
+      { locationRules: [{ ...rule, upstreams: ['api:8080'] }] },
+      OPERATOR,
+    );
+    expect((await getProxyHost(host.id))?.locationRules[0]?.upstreams).toEqual(['api:8080']);
+  });
+
+  it('refuses an operator pointing forward auth at the admin port', async () => {
+    const forwardAuth = {
+      enabled: true,
+      provider: 'authelia' as const,
+      authUpstream: 'http://caddy:2019',
+    };
+    await expectUpstreamAdminOnly(
+      createProxyHost(
+        { name: 'op', domains: ['op.example.com'], upstreams: ['10.0.0.5:8080'], forwardAuth },
+        OPERATOR,
+      ),
+    );
+    const host = await createProxyHost(
+      { name: 'plain', domains: ['plain.example.com'], upstreams: ['10.0.0.5:8080'] },
+      ADMIN,
+    );
+    await expectUpstreamAdminOnly(updateProxyHost(host.id, { forwardAuth }, OPERATOR));
+    expect((await getProxyHost(host.id))?.forwardAuth).toBeNull();
+
+    await updateProxyHost(
+      host.id,
+      { forwardAuth: { ...forwardAuth, authUpstream: 'http://authelia:9091' } },
+      OPERATOR,
+    );
+    expect((await getProxyHost(host.id))?.forwardAuth?.authUpstream).toBe('http://authelia:9091');
   });
 
   it('lets an operator keep a target an admin set, and an admin set one', async () => {

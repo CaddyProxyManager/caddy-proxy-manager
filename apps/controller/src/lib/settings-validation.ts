@@ -721,10 +721,12 @@ function validateTailscale(value: Record<string, unknown>): void {
       "validateAuthKey",
       "apiAccessToken",
       "apiTailnet",
+      "http3",
     ],
     "Tailscale settings",
   );
   booleanValue(required(value, "enabled", "Tailscale settings"), "tailscale.enabled");
+  if (value.http3 !== undefined) booleanValue(value.http3, "tailscale.http3");
   try {
     // The normalizer also runs on every read; duplicated rules could accept what a read then drops.
     normalizeTailscaleSettings(value);

@@ -1,10 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { eq, or } from "drizzle-orm";
-import db from "@/src/lib/db";
-import { users } from "@/src/lib/db/schema";
 import { config } from "@/src/lib/config";
 import { logAuditEvent } from "@/src/lib/audit";
 import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/console-command";
+import { findUserByConsoleName } from "@/src/lib/console-user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/peer-address";
 import { resetTwoFactor } from "@/src/lib/two-factor";
@@ -26,15 +24,7 @@ export async function POST(request: NextRequest) {
   );
   if (!username) return notFound;
 
-  // The names a person types at a prompt: the sign-in name, or the full address.
-  const name = username.trim().toLowerCase();
-  const user = await db.query.users.findFirst({
-    where: or(
-      eq(users.email, `${name}@localhost`),
-      eq(users.email, name),
-      eq(users.username, name),
-    ),
-  });
+  const user = await findUserByConsoleName(username);
   if (!user) {
     return NextResponse.json({ error: `No user named ${username}` }, { status: 404 });
   }

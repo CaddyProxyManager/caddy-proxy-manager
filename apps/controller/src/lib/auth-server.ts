@@ -13,6 +13,7 @@ import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
 import {
   extractGroups,
+  isAppRole,
   mapGroupsToLocalGroups,
   mapGroupsToRole,
   needsGroupClaims,
@@ -199,8 +200,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       operatorGroup: row.operatorGroup,
       userGroup: row.userGroup,
       viewerGroup: row.viewerGroup,
-      defaultRole:
-        row.defaultRole === "admin" || row.defaultRole === "viewer" ? row.defaultRole : "user",
+      defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
       syncGroups: row.syncGroups,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

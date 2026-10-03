@@ -1,0 +1,42 @@
+# The second agent's Caddy, which that agent starts, recreates and stops through this file as the
+# bundled agent does through the project's. A project of its own, on a network of its own: a
+# service named `caddy` on the rig's network would answer for the rig's Caddy's name too.
+name: cpm-test-fleet
+
+networks:
+  cpm-test-fleet:
+    name: cpm-test-fleet
+    external: true
+
+volumes:
+  caddy-data:
+  caddy-config:
+  caddy-logs:
+  # The rig's, for the ACME CA root web writes: the config names the file.
+  acme-ca:
+    name: cpm-docker-tests_acme-ca
+    external: true
+  geoip:
+    name: cpm-docker-tests_geoip
+    external: true
+
+services:
+  caddy:
+    profiles: ["caddy"]
+    image: ${CADDY_IMAGE:-cpm-test/caddy:latest}
+    container_name: cpm-test-caddy-2
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/logs
+      - acme-ca:/acme-ca:ro
+      - geoip:/usr/share/GeoIP:ro
+    networks:
+      cpm-test-fleet:
+        ipv4_address: 172.29.0.14
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s

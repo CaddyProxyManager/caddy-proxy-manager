@@ -82,6 +82,7 @@ import {
   TAILSCALE_DEFAULT_NODE,
 } from "./caddy-tailscale";
 import { buildDnsChallengeConfig } from "./dns-provider-credentials";
+import { parseStoredCertificateProviderOptions } from "./certificate-provider-options";
 import { partitionDnsChallenges } from "./dns-challenge-delegation";
 import { caddyAdminRequest } from "./caddy-admin";
 import { getPublicBaseUrl } from "./public-url";
@@ -2780,7 +2781,8 @@ export async function buildTlsAutomation(
     managedCertificateIds.add(entry.certificate.id);
 
     let effectiveProvider = globalDnsProvider;
-    const certOptions = entry.certificate.providerOptions as { provider?: string } | null;
+    // Stored as JSON text: read as an object, the certificate's own provider was never seen.
+    const certOptions = parseStoredCertificateProviderOptions(entry.certificate.providerOptions);
     if (certOptions?.provider && dnsProviderSettings?.providers[certOptions.provider]) {
       effectiveProvider = certOptions.provider;
     }
@@ -3636,6 +3638,12 @@ export async function buildCaddyDocument(
   // One server per tailnet node, so tailnet-only routes stay off the public server. No
   // default-response route: an unmatched tailnet request is a misconfiguration, and Caddy's
   // own 404 says so better than a catch-all meant for the open internet.
+  // h3 only on opt-in: its listener runs tsnet.Up inside config load, which hangs (and holds
+  // Caddy's admin API) for as long as the control server is unreachable.
+  const tailnetProtocols = buildServerProtocols({
+    http2: httpProtocols.http2,
+    http3: httpProtocols.http3 && tailscaleRuntime.settings.http3,
+  });
   for (const [node, nodeRoutes] of tailnetRoutes) {
     if (nodeRoutes.length === 0) continue;
     servers[`cpm_tailscale_${node}`] = {
@@ -3645,6 +3653,7 @@ export async function buildCaddyDocument(
       ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
       ...(errorRoutes.length > 0 ? { errors: { routes: errorRoutes } } : {}),
       ...serverTrustedProxies,
+      ...tailnetProtocols,
       ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {}),
     };
   }
@@ -3821,7 +3830,23 @@ export async function applyCaddyConfig() {
     return;
   }
   // A CRS plugin Coraza will not build is switched off rather than left to fail every apply.
-  await loadWithCrsPluginRecovery(loadEveryAgent);
+  await reportedApply(null, () => loadWithCrsPluginRecovery(loadEveryAgent));
+}
+
+/** Imported lazily: the notifications reach the settings, which this module is built from. */
+async function reportedApply(
+  target: { agentId: string; name: string } | null,
+  load: () => Promise<void>,
+): Promise<void> {
+  try {
+    await load();
+  } catch (error) {
+    const { reportApplyFailure } = await import("./notifications/caddy-apply");
+    await reportApplyFailure(target, error);
+    throw error;
+  }
+  const { reportApplySuccess } = await import("./notifications/caddy-apply");
+  await reportApplySuccess(target);
 }
 
 async function loadEveryAgent(): Promise<void> {
@@ -3903,7 +3928,7 @@ export async function applyCaddyConfigToAgent(agent: {
   name: string;
 }): Promise<void> {
   if (currentStagingScope()?.suppressApply) return;
-  await loadWithCrsPluginRecovery(() => loadOne(agent, agent.name));
+  await reportedApply(agent, () => loadWithCrsPluginRecovery(() => loadOne(agent, agent.name)));
 }
 
 /**

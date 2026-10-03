@@ -4,7 +4,8 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '@/tests/helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
@@ -14,15 +15,7 @@ const schemaModule = await import('@/src/lib/db/schema');
 // synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('@/src/lib/db', () => ({
-  default: currentDb(() => ctx.db),
-  db: currentDb(() => ctx.db),
-  client: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('@/src/lib/clickhouse/client', () => ({ isAnalyticsEnabled: async () => true }));
 vi.mock('@/src/lib/agent/desired-state', () => ({ pushDesiredState: async () => {} }));

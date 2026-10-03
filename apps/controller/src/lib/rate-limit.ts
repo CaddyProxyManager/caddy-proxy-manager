@@ -130,14 +130,51 @@ type AccountEntry = { failures: number; lockedUntil: number; lastFailureAt: numb
 
 const ACCOUNTS = new Map<string, AccountEntry>();
 
-/** So a few typos never slow a real person down. */
-const ACCOUNT_FREE_FAILURES = 5;
-const ACCOUNT_BASE_DELAY_MS = 1_000;
-/** Capped rather than a hard lock: an attacker can slow the owner's sign-in, never shut it off. */
-export const ACCOUNT_MAX_DELAY_MS = 15 * 60_000;
+export type AccountLockPolicy = {
+  enabled: boolean;
+  /** So a few typos never slow a real person down. */
+  freeFailures: number;
+  baseDelayMs: number;
+  /** Capped rather than a hard lock: an attacker can slow the owner's sign-in, never shut it off. */
+  maxDelayMs: number;
+  /** Failures before the account is disabled outright (lib/account-failures.ts); null when off. */
+  disableAfter: number | null;
+};
+
+export const DEFAULT_ACCOUNT_LOCK: AccountLockPolicy = {
+  enabled: true,
+  freeFailures: 5,
+  baseDelayMs: 1_000,
+  maxDelayMs: 15 * 60_000,
+  disableAfter: null,
+};
 const ACCOUNT_FORGET_MS = 24 * 60 * 60_000;
 /** Keys are attacker-chosen names, so the map is bounded; the least recently failed goes first. */
 const MAX_TRACKED_ACCOUNTS = 10_000;
+
+/** Per call, like `limits`, so a settings change needs no restart. */
+export async function accountLockPolicy(): Promise<AccountLockPolicy> {
+  const [registry, { getSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  const [enabled, freeFailures, baseDelayMs, maxDelayMs, disableEnabled, disableAfter] =
+    await Promise.all([
+      getSetting(registry.accountLockEnabled),
+      getSetting(registry.accountLockFreeFailures),
+      getSetting(registry.accountLockBaseDelayMs),
+      getSetting(registry.accountLockMaxDelayMs),
+      getSetting(registry.accountLockDisableEnabled),
+      getSetting(registry.accountLockDisableAfter),
+    ]);
+  return {
+    enabled,
+    freeFailures,
+    baseDelayMs,
+    maxDelayMs,
+    disableAfter: disableEnabled ? disableAfter : null,
+  };
+}
 
 /** One key per account however it signed in: the portal's username and the dashboard's email. */
 export function accountKey(emailOrUsername: string): string {
@@ -146,7 +183,13 @@ export function accountKey(emailOrUsername: string): string {
 }
 
 /** 0 when it may try now. */
-export function accountRetryAfterMs(account: string, now = Date.now()): number {
+export async function accountRetryAfterMs(
+  account: string,
+  now = Date.now(),
+  policy?: AccountLockPolicy,
+): Promise<number> {
+  const { enabled } = policy ?? (await accountLockPolicy());
+  if (!enabled) return 0;
   const entry = ACCOUNTS.get(account);
   if (!entry) return 0;
   if (now - entry.lastFailureAt > ACCOUNT_FORGET_MS) {
@@ -157,7 +200,15 @@ export function accountRetryAfterMs(account: string, now = Date.now()): number {
 }
 
 /** Returns the delay now imposed. */
-export function registerAccountFailure(account: string, now = Date.now()): number {
+export async function registerAccountFailure(
+  account: string,
+  now = Date.now(),
+  policy?: AccountLockPolicy,
+): Promise<number> {
+  const { enabled, freeFailures, baseDelayMs, maxDelayMs, disableAfter } =
+    policy ?? (await accountLockPolicy());
+  // Counted with the lock off too, while auto-disable reads the count.
+  if (!enabled && disableAfter === null) return 0;
   let entry = ACCOUNTS.get(account);
   if (!entry || now - entry.lastFailureAt > ACCOUNT_FORGET_MS) {
     entry = { failures: 0, lockedUntil: 0, lastFailureAt: now };
@@ -165,10 +216,9 @@ export function registerAccountFailure(account: string, now = Date.now()): numbe
   ACCOUNTS.delete(account);
   entry.failures += 1;
   entry.lastFailureAt = now;
-  const over = entry.failures - ACCOUNT_FREE_FAILURES;
-  if (over > 0) {
-    entry.lockedUntil =
-      now + Math.min(ACCOUNT_MAX_DELAY_MS, ACCOUNT_BASE_DELAY_MS * 2 ** (over - 1));
+  const over = entry.failures - freeFailures;
+  if (enabled && over > 0) {
+    entry.lockedUntil = now + Math.min(maxDelayMs, baseDelayMs * 2 ** (over - 1));
   }
   ACCOUNTS.set(account, entry);
   if (ACCOUNTS.size > MAX_TRACKED_ACCOUNTS) {
@@ -182,16 +232,34 @@ export function resetAccountFailures(account: string): void {
   ACCOUNTS.delete(account);
 }
 
+/** Failures counted against the account since it last signed in, or was forgotten. */
+export function accountFailureCount(account: string, now = Date.now()): number {
+  const entry = ACCOUNTS.get(account);
+  if (!entry || now - entry.lastFailureAt > ACCOUNT_FORGET_MS) return 0;
+  return entry.failures;
+}
+
+/** Every key an account's names reach, so re-enabling it cannot leave a count behind. */
+export function resetAccountFailuresFor(names: ReadonlyArray<string | null | undefined>): void {
+  for (const name of names) if (name?.trim()) ACCOUNTS.delete(accountKey(name));
+}
+
 const ACCOUNTS_RESERVED = new Map<string, number>();
 
 /**
  * The account's side of `reserveAttempt`: in flight at once, no more than its free failures left,
  * and one at a time once past them, so a burst from many addresses waits out each delay.
  */
-export function reserveAccountAttempt(account: string, now = Date.now()): (() => void) | null {
-  if (accountRetryAfterMs(account, now) > 0) return null;
+export async function reserveAccountAttempt(
+  account: string,
+  now = Date.now(),
+  policy?: AccountLockPolicy,
+): Promise<(() => void) | null> {
+  const resolved = policy ?? (await accountLockPolicy());
+  if (!resolved.enabled) return () => {};
+  if ((await accountRetryAfterMs(account, now, resolved)) > 0) return null;
   const failures = ACCOUNTS.get(account)?.failures ?? 0;
-  const inFlight = Math.max(1, ACCOUNT_FREE_FAILURES - failures);
+  const inFlight = Math.max(1, resolved.freeFailures - failures);
   if ((ACCOUNTS_RESERVED.get(account) ?? 0) >= inFlight) return null;
   return holdSlot(ACCOUNTS_RESERVED, account);
 }
@@ -232,4 +300,9 @@ export function resetWindow(key: string): void {
 /** Test seam: forget every window whose key starts with `prefix`. */
 export function resetWindows(prefix: string): void {
   for (const key of WINDOWS.keys()) if (key.startsWith(prefix)) WINDOWS.delete(key);
+}
+
+/** Test seam: forget every attempt, account, reservation and window. */
+export function resetRateLimitsForTests(): void {
+  for (const map of [ATTEMPTS, RESERVED, ACCOUNTS, ACCOUNTS_RESERVED, WINDOWS]) map.clear();
 }

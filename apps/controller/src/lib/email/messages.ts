@@ -80,7 +80,8 @@ export function renderBody(body: Body): { text: string; html: string } {
   return { text, html };
 }
 
-async function context(locale: Locale) {
+/** Shared with the admin notifications (lib/notifications/email.ts). */
+export async function emailContext(locale: Locale) {
   const [t, appName, url] = await Promise.all([
     emailTranslator(locale),
     getAppName(),
@@ -94,7 +95,7 @@ export async function testEmail(
   host: string,
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {
-  const { t, appName, footer } = await context(locale);
+  const { t, appName, footer } = await emailContext(locale);
   return {
     to,
     subject: t("test.subject", { appName }),
@@ -106,7 +107,7 @@ export async function resetLinkEmail(
   input: { to: string; link: string; minutes: number },
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {
-  const { t, appName, footer } = await context(locale);
+  const { t, appName, footer } = await emailContext(locale);
   return {
     to: input.to,
     subject: t("passwordReset.subject", { appName }),
@@ -123,7 +124,7 @@ export async function inviteEmail(
   input: { to: string; link: string; days: number; inviter: string },
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {
-  const { t, appName, footer } = await context(locale);
+  const { t, appName, footer } = await emailContext(locale);
   return {
     to: input.to,
     subject: t("invite.subject", { appName }),
@@ -151,7 +152,7 @@ export async function certificateAlertEmail(
   input: { to: string[]; items: CertificateAlertItem[]; thresholdDays: number; now?: number },
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {
-  const { t, appName, url, footer } = await context(locale);
+  const { t, appName, url, footer } = await emailContext(locale);
   const now = input.now ?? Date.now();
   const items = input.items.map((item) => {
     const notAfter = Date.parse(item.notAfter);

@@ -111,9 +111,10 @@ async function seedAuthState(): Promise<void> {
 
 export default async function globalSetup() {
   console.log('[global-setup] Starting Docker Compose test stack...');
+  // Keycloak's first start, which imports its realm, is the slowest to turn healthy.
   execFileSync(
     'docker',
-    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '120'],
+    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '240'],
     {
       stdio: 'inherit',
       cwd: COMPOSE_CWD,

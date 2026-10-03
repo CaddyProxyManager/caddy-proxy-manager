@@ -110,6 +110,10 @@ consequences worth knowing before touching either side:
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
   is for answers that stay on the controller.
+- **A new analytics kind goes the other way round from a command.** The agent relays
+  `upstream-errors` only while `FleetConfig.upstreamErrors` says so, since an older controller
+  refuses a kind it does not know. Those counts feed `lib/notifications`, which is also where
+  anything else the administrators should be emailed about gets reported.
 - **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately
   does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
   not answer on 80 and 443. Never add a `depends_on: caddy` - the agent is what starts it, so
@@ -265,11 +269,15 @@ the same app code:
 `bun run test` from the root runs everything. It starts a throwaway PostgreSQL container, gives
 each test its own schema, and removes it afterwards; `TEST_POSTGRES_URL` points at a server of your
 own instead. `bun run test:sqlite` runs the same suite on an in-memory SQLite database per test.
-Two constraints are not obvious from reading the suites:
+Three constraints are not obvious from reading the suites:
 
 - **`mock.module` is global and leaks across files sharing a process.** The agent's tests run with
   `--parallel` for that reason - a `node:fs` mock in one file was reaching every file that ran
   after it. A test that passes alone and fails in the suite is this, not flake.
+- **Mock `src/lib/db` with `dbModuleMock` (`tests/helpers/db-module.ts`), never inline.** The
+  preload has already loaded the real module, so Bun patches its exports in place and a name a
+  factory leaves out stays real - a `runInTransaction` left out wrote to the app's own connection.
+  That connection is never migrated under test, so such a miss fails loudly instead of sharing data.
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
   unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
   `bun` - see `tests/helpers/build-legacy-db.ts`.

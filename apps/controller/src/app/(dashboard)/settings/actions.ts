@@ -19,6 +19,7 @@ import {
   customDirectivesError,
   normalizeWafPluginIds,
   normalizeWafPresetIds,
+  parseWafIdListJson,
   parseBodyLimitMib,
 } from "@/src/lib/caddy-waf";
 import { parseDefaultResponseHeaders } from "@/src/lib/caddy-default-response";
@@ -130,6 +131,7 @@ import {
 } from "@/src/lib/agent/bootstrap";
 import { detach } from "@/src/lib/agent/registry";
 import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/models/agents";
+import { caddyBuildAgents } from "@/src/lib/agent/client";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
 import type { AppRole } from "@/src/lib/oidc-groups";
 
@@ -697,6 +699,7 @@ async function updateTailscaleSettingsActionUnlocked(
       validateAuthKey,
       apiAccessToken,
       apiTailnet,
+      http3: parseCheckbox(formData.get("tailscaleHttp3")),
     });
 
     revalidatePath("/settings");
@@ -1016,6 +1019,11 @@ async function updateRegistrySettingsActionUnlocked(
     // The auth instance caches these; drop it or the old policy stays live.
     const { invalidateProviderCache } = await import("@/src/lib/auth-server");
     invalidateProviderCache();
+    // The agents count upstream errors only while that notification is on.
+    if (keys.some((key) => key.startsWith("config:notify_upstream"))) {
+      const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
+      void pushFleetConfig().catch(() => {});
+    }
 
     // "layout" scope: the root layout and dashboard shell read the app name and sign-in policy.
     revalidatePath("/", "layout");
@@ -1047,6 +1055,9 @@ async function saveEmailRegistryValues(
     }
     throw error;
   }
+  // Agents count upstream errors only while email can tell anyone about them.
+  const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
+  void pushFleetConfig().catch(() => {});
   // "layout" scope: the sign-in page and the Users screen offer mail only once it is set up.
   revalidatePath("/", "layout");
   return { success: true, message: t("email.saved") };
@@ -2182,7 +2193,7 @@ async function updateWafSettingsActionUnlocked(
     const rawExcl = formData.get("wafExcludedRuleIds");
     let excluded_rule_ids: number[];
     if (rawExcl !== null) {
-      excluded_rule_ids = (JSON.parse(rawExcl as string) as unknown[]).filter(
+      excluded_rule_ids = parseWafIdListJson(rawExcl as string).filter(
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       );
     } else {
@@ -2191,13 +2202,13 @@ async function updateWafSettingsActionUnlocked(
     const rawPresets = formData.get("wafPresetIds");
     const preset_ids =
       typeof rawPresets === "string"
-        ? normalizeWafPresetIds(JSON.parse(rawPresets))
+        ? normalizeWafPresetIds(parseWafIdListJson(rawPresets))
         : (existing?.preset_ids ?? []);
     await assertWafPresetIdsExist(preset_ids);
     const rawPlugins = formData.get("wafPluginIds");
     const plugin_ids =
       typeof rawPlugins === "string"
-        ? normalizeWafPluginIds(JSON.parse(rawPlugins))
+        ? normalizeWafPluginIds(parseWafIdListJson(rawPlugins))
         : (existing?.plugin_ids ?? []);
     await assertCrsPluginIdsExist(plugin_ids);
 
@@ -2310,27 +2321,11 @@ async function updateCaddyBuildSettingsActionUnlocked(
     } else {
       await setAgentBuildSettings(agentRowId, settings);
     }
-    // The module set is part of desired state, so the agent learns what to build from this.
-    await pushDesiredState();
 
-    const diff = await getCaddyBuildDiff(agentRowId);
-    // Advisory, not a refusal. One message, so a translator decides how it follows the saved one.
-    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
-    const saved = snippetWarning
-      ? t("results.caddyBuildSavedSnippetWarning", {
-          rebuild: diff.needsRebuild ? "yes" : "no",
-          count: snippetWarning.count,
-          names: (await getFormatter()).list(snippetWarning.names, { type: "unit" }),
-          more: snippetWarning.more,
-        })
-      : diff.needsRebuild
-        ? t("results.caddyBuildSavedRebuild")
-        : t("results.caddyBuildSaved");
-
+    // Config before the push, as REST does: the module set is desired state, so the push starts
+    // the build, and the Caddy it recreates resumes an autosave that must not name a lost module.
     try {
       await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: saved };
     } catch (error) {
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
@@ -2340,6 +2335,36 @@ async function updateCaddyBuildSettingsActionUnlocked(
         message: t("results.caddyBuildApplyFailed", { error: errorMsg }),
       };
     }
+    await pushDesiredState();
+    revalidatePath("/settings");
+
+    const diff = await getCaddyBuildDiff(agentRowId);
+    const { builders, external } = caddyBuildAgents(agentRowId);
+    // What the save set off: a build, an image to load (external mode), or nothing until one connects.
+    const outcome = !diff.needsRebuild
+      ? "none"
+      : builders > 0
+        ? "building"
+        : external.length > 0
+          ? "loadImage"
+          : "noAgent";
+    // Advisory, not a refusal. One message, so a translator decides how it follows the saved one.
+    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
+    const message = snippetWarning
+      ? t("results.caddyBuildSavedSnippetWarning", {
+          outcome,
+          count: snippetWarning.count,
+          names: (await getFormatter()).list(snippetWarning.names, { type: "unit" }),
+          more: snippetWarning.more,
+        })
+      : outcome === "building"
+        ? t("results.caddyBuildSavedBuilding")
+        : outcome === "loadImage"
+          ? t("results.caddyBuildSavedLoadImage")
+          : outcome === "noAgent"
+            ? t("results.caddyBuildSavedNoAgent")
+            : t("results.caddyBuildSaved");
+    return { success: true, message };
   } catch (error) {
     console.error("Failed to save Caddy build settings:", error);
     return {
@@ -2485,6 +2510,29 @@ export const updateEmailSettingsAction = serializedSettingsAction(
 export const updateCertificateAlertSettingsAction = serializedSettingsAction(
   updateCertificateAlertSettingsActionUnlocked,
 );
+
+/** To whoever the notifications go to, so it proves the recipients as well as the server. */
+export async function sendTestNotificationAction(): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const { sendTestNotification } = await import("@/src/lib/notifications");
+    const recipients = await sendTestNotification();
+    if (recipients.length === 0) {
+      return { success: false, message: t("email.testNotificationNoRecipients") };
+    }
+    const format = await getFormatter();
+    return {
+      success: true,
+      message: t("email.testNotificationSent", {
+        recipients: format.list(recipients, { type: "conjunction" }),
+      }),
+    };
+  } catch (error) {
+    console.error("Failed to send a test notification:", error);
+    return { success: false, message: await errorText(error, t("email.testNotificationFailed")) };
+  }
+}
 
 /** Sends with the saved settings, to `recipient` or the signed-in administrator. */
 export async function sendTestEmailAction(recipient: string): Promise<ActionResult> {

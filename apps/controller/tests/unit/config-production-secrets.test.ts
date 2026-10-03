@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { readConfig } from '@/src/lib/config';
 
 const STRONG_SECRET = 'q7Jm2vX9pL4rT8wZ1nB6cH3kF5sD0gA2yE7uR4tW';
 
@@ -17,7 +17,7 @@ async function loadConfig(env: Record<string, string | undefined>) {
   })) {
     vi.stubEnv(key, value);
   }
-  return (await import(`../../src/lib/config${fresh()}`)).config;
+  return readConfig().config;
 }
 
 afterEach(() => {

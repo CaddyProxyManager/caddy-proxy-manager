@@ -5,28 +5,18 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
 // synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
@@ -50,6 +40,7 @@ import { GET as getOpenApi } from '../../src/app/api/v1/openapi.json/route';
 import * as schema from '../../src/lib/db/schema';
 import { getCertificate, migrateLegacyCertificateStorage } from '../../src/lib/models/certificates';
 import { decryptSecret, isEncryptedSecret } from '../../src/lib/secret';
+import { createSelfSignedServerCertificate } from '../helpers/certs';
 
 function mockRequest(body: unknown): any {
   return {
@@ -264,14 +255,17 @@ describe('v1 API contract: camelCase round-trip', () => {
   });
 
   it('POST /api/v1/certificates persists an imported key but never returns it', async () => {
-    const privateKeyPem =
-      '-----BEGIN PRIVATE KEY-----\nmultiline\nprivate-key-sentinel\n-----END PRIVATE KEY-----';
+    const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(
+      'write-only.example.com',
+      ['write-only.example.com'],
+    );
+    const keyBody = privateKeyPem.split('\n')[1];
     const payload = {
       name: 'Write-only imported key',
       type: 'imported',
       domainNames: ['write-only.example.com'],
       autoRenew: false,
-      certificatePem: '-----BEGIN CERTIFICATE-----\npublic-data\n-----END CERTIFICATE-----',
+      certificatePem,
       privateKeyPem,
     };
 
@@ -287,7 +281,7 @@ describe('v1 API contract: camelCase round-trip', () => {
     expect(data.hasPrivateKey).toBe(true);
     expect(data.privateKeyPem).toBeUndefined();
     expect(bodyText).not.toContain(privateKeyPem);
-    expect(bodyText).not.toContain('private-key-sentinel');
+    expect(bodyText).not.toContain(keyBody);
     expect(stored?.privateKeyPem).toBeDefined();
     expect(isEncryptedSecret(stored!.privateKeyPem!)).toBe(true);
     expect(decryptSecret(stored!.privateKeyPem!)).toBe(privateKeyPem);

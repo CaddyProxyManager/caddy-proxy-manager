@@ -300,16 +300,22 @@ export async function updateL4ProxyHostAction(
     assertCanManage(access, "l4ProxyHost", id);
     const userId = access.userId;
 
-    const matcherType = parseMatcherType(formData);
+    // Every field is gated on presence, as for proxy hosts: a partial form must not turn UDP into
+    // TCP or drop the matcher. A switch submits nothing when off, hence its `*Present` marker.
+    const matcherType = formData.has("matcherType") ? parseMatcherType(formData) : undefined;
     const matcherValue =
-      matcherType === "tls_sni" || matcherType === "http_host"
-        ? parseCsv(formData.get("matcherValue"))
-        : [];
+      matcherType === undefined
+        ? formData.has("matcherValue")
+          ? parseCsv(formData.get("matcherValue"))
+          : undefined
+        : matcherType === "tls_sni" || matcherType === "http_host"
+          ? parseCsv(formData.get("matcherValue"))
+          : [];
 
     const input: Partial<L4ProxyHostInput> = {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
       description: formData.has("description") ? String(formData.get("description")) : undefined,
-      protocol: parseProtocol(formData),
+      protocol: formData.has("protocol") ? parseProtocol(formData) : undefined,
       listenAddress: formData.get("listenAddress")
         ? String(formData.get("listenAddress")).trim()
         : undefined,
@@ -317,9 +323,15 @@ export async function updateL4ProxyHostAction(
       upstreamPortMode: parseUpstreamPortMode(formData),
       matcherType: matcherType,
       matcherValue: matcherValue,
-      tlsTermination: parseCheckbox(formData.get("tlsTermination")),
-      proxyProtocolVersion: parseProxyProtocolVersion(formData),
-      proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
+      tlsTermination: formData.has("tlsTerminationPresent")
+        ? parseCheckbox(formData.get("tlsTermination"))
+        : undefined,
+      proxyProtocolVersion: formData.has("proxyProtocolVersion")
+        ? parseProxyProtocolVersion(formData)
+        : undefined,
+      proxyProtocolReceive: formData.has("proxyProtocolReceivePresent")
+        ? parseCheckbox(formData.get("proxyProtocolReceive"))
+        : undefined,
       accessListId: formData.has("accessListId")
         ? parseAccessListId(formData.get("accessListId"))
         : undefined,
@@ -330,7 +342,7 @@ export async function updateL4ProxyHostAction(
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
-      ...parseL4GeoBlockConfig(formData),
+      ...(formData.has("geoblockPresent") ? parseL4GeoBlockConfig(formData) : {}),
       crowdsec: formData.has("crowdsecPresent")
         ? parseCheckbox(formData.get("crowdsecEnabled"))
         : undefined,

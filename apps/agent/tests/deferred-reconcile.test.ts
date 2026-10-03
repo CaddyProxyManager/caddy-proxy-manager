@@ -169,3 +169,44 @@ describe("a frame deferred by a running operation", () => {
     expect(applies).toEqual([]);
   });
 });
+
+// The controller reloads a recreated Caddy on hearing the port change finished; at the heartbeat,
+// an L4 host saved during the recreate stayed unserved for up to a minute.
+describe("a port change", () => {
+  it("reports status again the moment it ends", async () => {
+    let ended: (() => void) | null = null;
+    const ports: string[][] = [];
+    const lifecycle = new AgentLifecycle({
+      config: loadConfig(),
+      store,
+      docker: { caddyRunning: async () => false } as unknown as DockerHost,
+      operations: {
+        applyL4Ports: (next: string[]) => ports.push(next),
+        applyCaddyBuild: () => {},
+        applyManagedServices: () => {},
+        whenIdle: (listener: () => void) => {
+          ended = listener;
+        },
+      } as unknown as Operations,
+    });
+    const inner = lifecycle as unknown as {
+      handle(event: unknown): Promise<void>;
+      reportStatus(): Promise<void>;
+    };
+    let reports = 0;
+    inner.reportStatus = async () => {
+      reports++;
+    };
+
+    await inner.handle({
+      type: "desired-state",
+      state: { ...desired(ON), l4Ports: ["9000:9000"] },
+    });
+    expect(ports).toEqual([["9000:9000"]]);
+    const before = reports;
+    expect(ended).not.toBeNull();
+    (ended as (() => void) | null)?.();
+    expect(reports).toBe(before + 1);
+    lifecycle.stop();
+  });
+});

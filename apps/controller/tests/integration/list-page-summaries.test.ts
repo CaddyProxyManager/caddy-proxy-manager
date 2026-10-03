@@ -4,19 +4,12 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 
 let db: TestDb;
 
-// currentDb: the factory runs once, so a captured handle would pin every test to the first db.
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null => {
-    if (!value) return null;
-    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 

@@ -188,7 +188,7 @@
   "analytics": {
     "accessLoggingDisabledTitle": "Caddy access logging is not enabled",
     "allHosts": "All hosts",
-    "analyticsDisabledDescription": "Traffic and WAF data is not being collected. Add COMPOSE_PROFILES=clickhouse and CLICKHOUSE_PASSWORD=… to your .env and restart to enable analytics.",
+    "analyticsDisabledDescription": "Traffic and WAF data is not being collected. <link>Turn analytics on in Settings</link>.",
     "analyticsDisabledTitle": "ClickHouse analytics is not enabled",
     "blockRate": "Block Rate",
     "blockedRequests": "Blocked Requests",
@@ -372,6 +372,8 @@
       "twoFactorBackupCodes": "User replaced their backup codes",
       "twoFactorReset": "Two-factor sign-in reset for user {email} by an administrator",
       "twoFactorResetConsole": "Two-factor sign-in reset for user {email} from the server console",
+      "userDisabledFailedSignIns": "Disabled user {email} after {count} failed sign-ins",
+      "userEnabledConsole": "Enabled user {email} from the server console",
       "passkeyAdded": "User added a passkey",
       "passkeyRemoved": "User removed a passkey",
       "passkeysRemoved": "Passkeys removed for user {email} by an administrator",
@@ -535,6 +537,7 @@
     },
     "username": "Username",
     "errors": {
+      "accountLocked": "Too many login attempts for this account. Try again {retry}.",
       "emailNotVerified": "Email not verified",
       "invalidUsername": "Username is invalid",
       "invalidUsernameOrPassword": "Invalid username or password",
@@ -1001,6 +1004,9 @@
     "geoipCheckFailed": "Failed to check MaxMind for updates",
     "groupNotFound": "Group not found",
     "importedCertificatePemRequired": "Imported certificates require certificate and key PEM data",
+    "importedCertificateInvalid": "The certificate is not a PEM-encoded X.509 certificate",
+    "importedCertificateKeyInvalid": "The private key is not an unencrypted PEM private key",
+    "importedCertificateKeyMismatch": "The private key does not belong to the certificate",
     "invalidForwardAuthAudience": "Invalid forward-auth audience",
     "invalidForwardAuthRedirectTarget": "Redirect URI is not a forward-auth target",
     "invalidL4Protocol": "Protocol must be 'tcp' or 'udp'",
@@ -1071,6 +1077,7 @@
     "hostWafRequestBodyLimitInvalid": "WAF request body limit must be a whole number of MiB between {min} and {max}",
     "wafInMemoryBodyLimitInvalid": "In-memory body limit must be a whole number of MiB between {min} and {max}",
     "wafRequestBodyLimitInvalid": "Request body limit must be a whole number of MiB between {min} and {max}",
+    "wafIdListInvalid": "The WAF rule exclusions, presets or plugins could not be read. Reload the page and try again.",
     "applyCaddyConfigFailed": "Failed to apply Caddy configuration",
     "caCertificateInUse": "CA certificate is in use by proxy host(s): {names}",
     "defaultRedirectStatusInvalid": "Default redirect status must be 301, 302, 303, 307, or 308",
@@ -1265,6 +1272,8 @@
     "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
     "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Network → Tailscale first.",
     "customCaddyfileInvalid": "Custom Caddyfile: {error}",
+    "customPreHandlersJsonInvalid": "Custom pre-handlers must be a JSON object, or an array of JSON objects",
+    "customReverseProxyJsonInvalid": "Custom reverse proxy JSON must be a JSON object",
     "caddyImageNoExternalAgent": "No connected agent loads an image you build. Set CADDY_BUILD_MODE=external on the agent first.",
     "caddyImageLoadFailed": "{agent} could not start loading the Caddy image: {error}",
     "httpCacheRedisAddressInvalid": "The Redis server \"{value}\" must be host:port.",
@@ -2703,6 +2712,30 @@
     "redirectUrl": "Redirect URL",
     "registerNodesAsEphemeral": "Register nodes as ephemeral",
     "registry": {
+      "account_lock_base_delay_ms": {
+        "description": "How long the first lock lasts. Each failure after it doubles the wait.",
+        "label": "First account lock (milliseconds)"
+      },
+      "account_lock_disable_after": {
+        "description": "Counted like the lock above: forgotten a day after the last failure, and reset by a successful sign-in.",
+        "label": "Failed sign-ins before an account is disabled"
+      },
+      "account_lock_disable_enabled": {
+        "description": "Disable an account once it reaches the number of failed sign-ins below, until an administrator enables it again. Anyone who knows a username can then disable that account by guessing at it. The last active administrator is never disabled, only locked.",
+        "label": "Disable accounts after repeated failed sign-ins"
+      },
+      "account_lock_enabled": {
+        "description": "Slow down guesses at one account whatever address they come from. Separate from the per-client lockout above.",
+        "label": "Lock accounts after failed sign-ins"
+      },
+      "account_lock_free_failures": {
+        "description": "How many failures an account takes before each further one locks it.",
+        "label": "Failed sign-ins before an account is locked"
+      },
+      "account_lock_max_delay_ms": {
+        "description": "The doubling stops here, so guessing can slow the owner's sign-in but never shut it off.",
+        "label": "Longest account lock (milliseconds)"
+      },
       "analytics_enabled": {
         "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
@@ -2864,12 +2897,64 @@
         "label": "Sender address"
       },
       "email_alert_recipients": {
-        "description": "Comma-separated addresses that certificate alerts go to. If left empty they go to every active administrator.",
+        "description": "Comma-separated addresses that certificate alerts and notifications go to. If left empty they go to every active administrator.",
         "label": "Alert recipients"
       },
       "certificate_expiry_alert_days": {
         "description": "Email the alert recipients once a certificate has fewer days than this left. Caddy renews on its own well before then, so an alert means renewal is failing. 0 turns alerts off.",
         "label": "Certificate alert threshold (days)"
+      },
+      "notify_account_disabled": {
+        "description": "When an account is disabled after failed sign-ins, or the last administrator is kept enabled.",
+        "label": "Account disabled after failed sign-ins"
+      },
+      "notify_admin_locked": {
+        "description": "When failed sign-ins lock an administrator's account.",
+        "label": "Administrator account locked"
+      },
+      "notify_admin_added": {
+        "description": "When an administrator account is created, or a user is made an administrator.",
+        "label": "New administrator"
+      },
+      "notify_agent_offline": {
+        "description": "When an agent stays disconnected longer than the time below, and when it is back.",
+        "label": "Agent offline"
+      },
+      "notify_agent_offline_minutes": {
+        "description": "How long an agent may be disconnected before anyone is told. After a restart of this server every agent gets this long to reconnect.",
+        "label": "Agent offline after (minutes)"
+      },
+      "notify_upstream_errors": {
+        "description": "When a proxy host answers 502, 503 or 504 as often as set below, and when it has been quiet for as long again. Read from the access log, so access logging must be on.",
+        "label": "Upstream errors"
+      },
+      "notify_upstream_error_count": {
+        "description": "How many 502, 503 or 504 responses from one host, within the minutes below.",
+        "label": "Upstream errors before telling (responses)"
+      },
+      "notify_upstream_error_minutes": {
+        "description": "Also how long a host must go without one before it counts as recovered.",
+        "label": "Upstream error window (minutes)"
+      },
+      "notify_caddy_apply": {
+        "description": "When Caddy refuses a configuration, and when it loads one again. An unreachable Caddy is the agent's to report.",
+        "label": "Caddy configuration refused"
+      },
+      "notify_agent_problems": {
+        "description": "When an agent reports a failed Caddy build, optional service or L4 port change, or log files it cannot read or prune.",
+        "label": "Agent failures"
+      },
+      "notify_geoip_failed": {
+        "description": "When the GeoIP database update has failed three times in a row, and when it works again.",
+        "label": "GeoIP update failing"
+      },
+      "notify_crs_plugin_disabled": {
+        "description": "When a CRS plugin Caddy refuses is switched off so the rest of the configuration loads.",
+        "label": "CRS plugin switched off"
+      },
+      "notify_update_available": {
+        "description": "Once per release, while the update check under General is on.",
+        "label": "New release"
       }
     },
     "releaseUpdates": "Release updates",
@@ -2944,9 +3029,13 @@
     "strictTrustedProxiesHelp": "Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers.",
     "tags": "Tags",
     "tailnet": "Tailnet",
-    "tailscale": "Tailscale",
     "tailscaleControlServerHelp": "Point at a Headscale or other coordination server. Empty uses Tailscale's own.",
     "tailscaleDefaultNodeHelp": "The tailnet machine name used by hosts that do not name one of their own. Lowercase letters, digits and hyphens.",
+    "tailscaleNodeDefaults": "Node defaults",
+    "tailscaleHttp3Help": "Lets clients on the tailnet reach served hosts over QUIC. Off by default; the global HTTP/3 setting must also be on.",
+    "tailscaleHttp3Label": "Serve HTTP/3 on tailnet listeners",
+    "tailscaleHttp3WarningBody": "With HTTP/3 on, Caddy has to reach the control server while it loads a configuration. Whenever the control server is unreachable, that load can hang and lock Caddy's admin API, so no proxy host on this agent can be updated until it comes back.",
+    "tailscaleHttp3WarningTitle": "HTTP/3 can hang Caddy's config load",
     "tailscaleHelp": "Runs a Tailscale node inside Caddy. A proxy host can then be served privately on your tailnet, gated on tailnet identity, or proxied to a backend that only exists on the tailnet.",
     "tailscaleKeyValidationDisabledTitle": "Auth keys are not being checked",
     "tailscaleKeyValidationHelp": "Catches a revoked, expired or mistyped key here instead of at the next config apply. Needs a Tailscale API access token, because an auth key cannot authenticate to the API.",
@@ -3123,7 +3212,7 @@
       },
       "email": {
         "name": "Email",
-        "desc": "The SMTP server resets, invitations and alerts are sent through"
+        "desc": "The SMTP server resets, invitations and notifications are sent through"
       }
     },
     "blocks": {
@@ -3264,8 +3353,8 @@
         "desc": "The server this instance sends mail through, and the address it sends as"
       },
       "certificateAlerts": {
-        "name": "Certificate Alerts",
-        "desc": "Who is told when a certificate is about to expire"
+        "name": "Notifications",
+        "desc": "What the administrators are emailed about, and who else is"
       },
       "ldap": {
         "name": "Directories (LDAP)",
@@ -3802,13 +3891,15 @@
       "wafFailed": "Failed to save WAF settings",
       "caddyBuildFollowsFleet": "That agent now follows the fleet module selection.",
       "caddyBuildSaved": "Caddy module selection saved.",
-      "caddyBuildSavedRebuild": "Caddy module selection saved. Rebuild Caddy to apply the change to the running container.",
+      "caddyBuildSavedBuilding": "Caddy module selection saved. The agent is rebuilding Caddy with it; the running Caddy keeps serving until the new build is ready.",
+      "caddyBuildSavedLoadImage": "Caddy module selection saved. Build the image with the build command, then load it to apply the change.",
+      "caddyBuildSavedNoAgent": "Caddy module selection saved. Caddy is rebuilt with it once an agent connects.",
       "caddyBuildApplyFailed": "Selection saved, but could not apply to Caddy: {error}",
       "caddyBuildFailed": "Failed to save Caddy module selection",
       "rebuildTriggered": "Rebuild triggered.",
       "stagedApplied": "Applied as revision #{revision}",
       "stagedAppliedReloadFailed": "Changes applied, but Caddy did not reload: {error}",
-      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.",
+      "caddyBuildSavedSnippetWarning": "{outcome, select, building {Caddy module selection saved. The agent is rebuilding Caddy with it; the running Caddy keeps serving until the new build is ready.} loadImage {Caddy module selection saved. Build the image with the build command, then load it to apply the change.} noAgent {Caddy module selection saved. Caddy is rebuilt with it once an agent connects.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them - a snippet Caddy can no longer adapt is skipped silently.",
       "registrySaved": "Settings saved",
       "registryFailed": "Could not save the settings",
       "registryUnknownBlock": "Those settings do not belong to a settings block",
@@ -3964,7 +4055,7 @@
       "incompleteTitle": "Email is on, but nothing can be sent yet",
       "incompleteBody": "Name an SMTP server and a sender address, then save.",
       "enabled": "Send email",
-      "enabledHelp": "Password reset links, user invitations and certificate alerts go out through this server. Off, the sign-in page offers no password reset.",
+      "enabledHelp": "Password reset links, user invitations, certificate alerts and notifications go out through this server. Off, the sign-in page offers no password reset.",
       "host": "SMTP server",
       "hostHelp": "The host name or address of the mail server to relay through.",
       "security": "Encryption",
@@ -3994,13 +4085,26 @@
       "alertDays": "Alert threshold (days)",
       "alertDaysHelp": "Email once a certificate has fewer days than this left. Caddy renews managed certificates well before then, so an alert about one means its renewal is failing. 0 turns alerts off.",
       "alertRecipients": "Recipients",
-      "alertRecipientsHelp": "Comma-separated addresses. If left empty, alerts go to every active administrator with a deliverable address.",
+      "alertRecipientsHelp": "Comma-separated addresses, for certificate alerts and every notification below. If left empty, they go to every active administrator with a deliverable address.",
       "alertRecipientsPlaceholder": "Every active administrator",
-      "alertsNeedEmailTitle": "Alerts wait for email",
+      "alertsNeedEmailTitle": "Alerts and notifications wait for email",
       "alertsNeedEmailBody": "Nothing is sent until the SMTP server above is set up.",
       "alertsLastChecked": "Certificates last checked {when}",
       "alertsNeverChecked": "Certificates have not been checked yet. The first check runs a few minutes after the controller starts, then twice a day.",
-      "alertsFailed": "The last check failed: {error}"
+      "alertsFailed": "The last check failed: {error}",
+      "notificationsLastSent": "Last notification sent {when}",
+      "notificationsNeverSent": "No notification has been sent yet. Events raised within a minute go out together in one email.",
+      "notificationsPending": "{count, plural, one {# notification is} other {# notifications are}} waiting to be sent.",
+      "notificationsFailed": "The last notification could not be sent: {error}. It is tried again every five minutes, for a day.",
+      "notificationsNoRecipients": "The last notifications were dropped: no recipients are set, and no active administrator has a deliverable address.",
+      "notificationsTitle": "Events to email about",
+      "upstreamNeedsAccessLogTitle": "Upstream errors need the access log",
+      "upstreamNeedsAccessLogBody": "They are counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+      "testNotification": "Send a test notification",
+      "testNotificationHelp": "Sends one to the recipients above, or every active administrator, straight away.",
+      "testNotificationSent": "Test notification sent to {recipients}.",
+      "testNotificationNoRecipients": "There is no one to send it to: set recipients, or give an active administrator a deliverable address.",
+      "testNotificationFailed": "The test notification could not be sent."
     },
     "ldap": {
       "emptyTitle": "No directories",
@@ -4517,6 +4621,7 @@
     "details": "Details",
     "disabledBannerDescription": "This account cannot sign in, and its sessions and API tokens are refused. Enable it to restore access.",
     "disabledBannerTitle": "This account is disabled",
+    "disabledByFailedSignInsDescription": "It was disabled automatically after too many failed sign-ins (Settings → Authentication → Sign-in). It cannot sign in, and its sessions and API tokens are refused. Enable it to restore access; its count of failed sign-ins starts over.",
     "edit": "Edit",
     "filterActive": "Active",
     "filterDisabled": "Disabled",
@@ -4839,6 +4944,85 @@
       "sourceAgent": "managed on {agent}",
       "action": "Open certificates",
       "once": "Each certificate is reported once as it nears expiry and once more if it expires."
+    },
+    "notifications": {
+      "subjectOne": "{appName}: {title}",
+      "subjectMany": "{appName}: {count} notifications",
+      "intro": "{count, plural, one {Something happened} other {# things happened}} on {appName} that an administrator should know about:",
+      "item": "{time}: {text}",
+      "withDetail": "{text} ({detail})",
+      "action": "Open the dashboard",
+      "manage": "Sent to the notification recipients, or every active administrator when none are set. Choose what is sent under Settings → Email → Notifications.",
+      "kinds": {
+        "accountDisabled": {
+          "title": "Account disabled after failed sign-ins",
+          "item": "{email} was disabled after {failures} failed sign-ins. An administrator must enable it again, from Users or with cpm-server --enable-user."
+        },
+        "lastAdminKept": {
+          "title": "Last administrator kept enabled",
+          "item": "{email} reached {failures} failed sign-ins but is the last active administrator, so it was not disabled. It stays on the timed lock."
+        },
+        "adminLocked": {
+          "title": "Administrator account locked",
+          "item": "The administrator account {email} was locked after {failures} failed sign-ins. Each further failure locks it for longer."
+        },
+        "adminAdded": {
+          "title": "{promoted, select, yes {User made an administrator} other {New administrator account}}",
+          "item": "{promoted, select, yes {{email} was made an administrator.} other {A new administrator account was created: {email}.}}"
+        },
+        "agentOffline": {
+          "title": "Agent {agent} is offline",
+          "item": "The agent {agent} has been disconnected for more than {minutes, plural, one {# minute} other {# minutes}}. Its Caddy keeps its last configuration but gets no changes."
+        },
+        "agentOnline": {
+          "title": "Agent {agent} is back online",
+          "item": "The agent {agent} is connected again."
+        },
+        "upstreamErrors": {
+          "title": "Upstream errors on {host}",
+          "item": "{host} answered {count, plural, one {# request} other {# requests}} with 502, 503 or 504 within {minutes, plural, one {# minute} other {# minutes}}. Its upstream may be down."
+        },
+        "upstreamRecovered": {
+          "title": "{host} has recovered",
+          "item": "{host} has answered no 502, 503 or 504 for a while."
+        },
+        "caddyApplyFailed": {
+          "title": "{scope, select, agent {Caddy on {agent} refused its configuration} other {Caddy refused its configuration}}",
+          "item": "{scope, select, agent {Caddy on {agent} did not load its configuration: {error}} other {Caddy did not load its configuration: {error}}}. It keeps serving the last one it loaded."
+        },
+        "caddyApplyRecovered": {
+          "title": "{scope, select, agent {Caddy on {agent} loads its configuration again} other {Caddy loads its configuration again}}",
+          "item": "{scope, select, agent {Caddy on {agent} loaded its configuration again.} other {Caddy loaded its configuration again.}}"
+        },
+        "agentProblem": {
+          "title": "{problem, select, caddyBuild {Caddy build failed} services {Optional service failed} l4Ports {L4 port change failed} other {Log files need attention}} on {agent}",
+          "item": "{problem, select, caddyBuild {The Caddy image build failed on {agent}} services {Starting or stopping ClickHouse or CrowdSec failed on {agent}} l4Ports {Changing the L4 ports failed on {agent}} other {Caddy's log files on {agent} cannot be read or pruned, so its disk may fill}}"
+        },
+        "agentProblemResolved": {
+          "title": "{problem, select, caddyBuild {Caddy build works again} services {Optional services work again} l4Ports {L4 ports work again} other {Log files are fine again}} on {agent}",
+          "item": "{problem, select, caddyBuild {The Caddy image on {agent} was built.} services {The optional services on {agent} were applied.} l4Ports {The L4 ports on {agent} were applied.} other {Caddy's log files on {agent} can be read and pruned again.}}"
+        },
+        "geoipFailed": {
+          "title": "GeoIP update keeps failing",
+          "item": "The GeoIP database update failed {failures} times in a row: {error}. Geo-blocking keeps using the databases already downloaded."
+        },
+        "geoipRecovered": {
+          "title": "GeoIP update works again",
+          "item": "The GeoIP database update succeeded again."
+        },
+        "crsPluginDisabled": {
+          "title": "CRS plugin {plugin} switched off",
+          "item": "Caddy refused the WAF with the CRS plugin {plugin} {version}, so it was switched off and the rest of the configuration loaded. It stays off until it is turned on again from the WAF page."
+        },
+        "updateAvailable": {
+          "title": "Version {version} is available",
+          "item": "Release {version} is available. This instance runs {current}."
+        },
+        "test": {
+          "title": "test notification",
+          "item": "This is a test notification: administrator notifications reach this address."
+        }
+      }
     }
   }
 }

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createTestDatabase } from '@/tests/helpers/db';
 import { TEST_ENV } from '@/tests/helpers/env';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadConfig } from '@/tests/helpers/config';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { vi } from '@/tests/helpers/vi';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -49,12 +49,13 @@ async function boot() {
   process.env.AUTH_RATE_LIMIT_ENABLED = 'false';
   resetDbModuleState();
 
-  const config = await import(`@/src/lib/config${fresh()}`);
-  vi.mock('@/src/lib/config', () => ({ ...config }));
+  await reloadConfig();
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
 
-  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
+  const authServer = await import('@/src/lib/auth-server');
+  // Or getAuth() hands back the instance built on the previous boot's database.
+  authServer.invalidateProviderCache();
   // betterAuth's instance type is generated from its config; the test tree allows `any`.
   const auth = (await authServer.getAuth()) as any;
   const userModel = await import('@/src/lib/models/user');

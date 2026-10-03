@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# IP blocking, per host and global. The offline rig has no MaxMind databases, so only CIDR and
-# bare-IP rules (same handler) are asserted; a handler that won't load without one skips the file.
+# IP blocking, per host and global: CIDR and bare-IP rules, which need no database. Countries,
+# continents and ASNs are 51-geoblock-geoip's, against MaxMind's test databases.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "geo/IP blocking"

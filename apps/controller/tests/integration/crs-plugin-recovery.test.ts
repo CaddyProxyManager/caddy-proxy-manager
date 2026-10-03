@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { crsPlugins, users } from '../../src/lib/db/schema';
 import { CaddyApplyError } from '../../src/lib/caddy-apply-error';
 
@@ -19,11 +20,7 @@ let quotesRuleId = false;
 let alwaysRefuse = false;
 const loads: string[][] = [];
 
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (v: string | null) => v,
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: audit }));
 vi.mock('../../src/lib/settings', () => ({
   getWafSettings: async () => globalWaf,

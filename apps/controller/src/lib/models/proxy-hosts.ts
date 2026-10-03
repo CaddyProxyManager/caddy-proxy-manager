@@ -12,7 +12,7 @@ import {
   getWafSettings,
 } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
-import { stripCaddyPlaceholders } from "../caddy-utils";
+import { isPlainObject, stripCaddyPlaceholders } from "../caddy-utils";
 import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
 import {
   CORAZA_MAX_BODY_LIMIT,
@@ -2512,6 +2512,35 @@ function normalizeUpstreamDnsResolutionInput(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+/**
+ * The builder drops raw JSON it cannot use, so a typo would quietly remove the handlers it replaced.
+ * A stored value resubmitted unchanged passes, so an older host can still be saved.
+ */
+function assertRawJsonUsable(
+  value: string | null,
+  stored: string | undefined,
+  kind: "preHandlers" | "reverseProxy",
+): void {
+  if (!value || value === stored) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    parsed = undefined;
+  }
+  const usable =
+    kind === "reverseProxy"
+      ? isPlainObject(parsed)
+      : isPlainObject(parsed) || (Array.isArray(parsed) && parsed.every(isPlainObject));
+  if (!usable) {
+    throw domainError(
+      kind === "reverseProxy" ? "customReverseProxyJsonInvalid" : "customPreHandlersJsonInvalid",
+      {},
+      { status: 400 },
+    );
+  }
+}
+
 function buildMeta(
   existing: ProxyHostMeta,
   input: Partial<ProxyHostInput>,
@@ -2521,6 +2550,7 @@ function buildMeta(
 
   if (input.customReverseProxyJson !== undefined) {
     const reverse = normalizeMetaValue(input.customReverseProxyJson ?? null);
+    assertRawJsonUsable(reverse, existing.custom_reverse_proxy_json, "reverseProxy");
     if (reverse) {
       next.custom_reverse_proxy_json = reverse;
     } else {
@@ -2530,6 +2560,7 @@ function buildMeta(
 
   if (input.customPreHandlersJson !== undefined) {
     const pre = normalizeMetaValue(input.customPreHandlersJson ?? null);
+    assertRawJsonUsable(pre, existing.custom_pre_handlers_json, "preHandlers");
     if (pre) {
       next.custom_pre_handlers_json = pre;
     } else {
@@ -3427,22 +3458,32 @@ async function assertRawConfigChangeAllowed(
   }
 }
 
-/** The raw-config guard's twin for ordinary upstreams and the Authentik and Anubis upstreams. */
+/**
+ * The raw-config guard's twin for every address a host makes Caddy dial: its upstreams, each
+ * location rule's, and the Authentik, Anubis and forward-auth servers.
+ */
 async function assertDialTargetsAllowed(
-  existing: Pick<ProxyHost, "upstreams" | "authentik" | "anubis"> | null,
+  existing: Pick<
+    ProxyHost,
+    "upstreams" | "authentik" | "anubis" | "locationRules" | "forwardAuth"
+  > | null,
   input: Partial<ProxyHostInput>,
   actorUserId: number,
 ): Promise<void> {
   await assertNoNewAdminDialTargets(
     [
       ...(existing?.upstreams ?? []),
+      ...(existing?.locationRules ?? []).flatMap((rule) => rule.upstreams),
       existing?.authentik?.outpostUpstream ?? "",
       existing?.anubis?.upstream ?? "",
+      existing?.forwardAuth?.authUpstream ?? "",
     ],
     [
       ...(input.upstreams ?? []),
+      ...(input.locationRules ?? []).flatMap((rule) => rule.upstreams ?? []),
       input.authentik?.outpostUpstream ?? "",
       input.anubis?.upstream ?? "",
+      input.forwardAuth?.authUpstream ?? "",
     ],
     actorUserId,
   );

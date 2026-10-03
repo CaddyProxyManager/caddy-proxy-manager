@@ -28,7 +28,9 @@ services:
 
   web:
     environment:
-      SESSION_SECRET: "test-session-secret-32chars!xxxY"
+      # Interpolated only so tests/e2e/functional/secret-rotation.spec.ts can rotate and restore it.
+      SESSION_SECRET: "${E2E_WEB_SESSION_SECRET:-test-session-secret-32chars!xxxY}"
+      SESSION_SECRET_PREVIOUS: "${E2E_WEB_SESSION_SECRET_PREVIOUS:-}"
       ADMIN_USERNAME: testadmin
       ADMIN_PASSWORD: "TestPassword2026!"
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
@@ -88,6 +90,84 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+  # Auth rate limiting and the login throttle on, which the main instance turns off; its own
+  # database, so neither its counters nor its lockouts reach another spec.
+  web-ratelimit:
+    container_name: caddy-proxy-manager-web-ratelimit
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3006:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-ratelimit-session-secret-32chars!xY"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      BASE_URL: http://localhost:3006
+      NEXTAUTH_URL: http://localhost:3006
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm_ratelimit
+      CADDY_API_URL: http://127.0.0.1:9
+      CADDY_MONITOR_ENABLED: "false"
+      AUTH_RATE_LIMIT_ENABLED: "true"
+      OAUTH_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - web-ratelimit-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+      - database
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # DEMO_MODE: an in-memory Caddy and a simulated agent. The seeded admin is every visitor's.
+  web-demo:
+    container_name: caddy-proxy-manager-web-demo
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3008:3000"
+    environment:
+      NODE_ENV: production
+      DEMO_MODE: "true"
+      SESSION_SECRET: "test-demo-session-secret-32chars!xxxYYZ"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      BASE_URL: http://localhost:3008
+      NEXTAUTH_URL: http://localhost:3008
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm_demo
+      # Unreachable on purpose: demo mode must never need it.
+      CADDY_API_URL: http://127.0.0.1:9
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      OAUTH_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - web-demo-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+      - database
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   clickhouse:
     environment:
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
@@ -119,6 +199,23 @@ services:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/docker-compose.test.yml
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+  # A second agent for tests/e2e/agents.spec.ts to pair, re-pair and unpair from the UI. Its Docker
+  # and Caddy addresses lead nowhere: an idle agent stops Caddy, and this one must never reach the
+  # stack's. It idles, unpaired, until that spec runs.
+  agent-remote:
+    container_name: caddy-proxy-manager-agent-remote
+    image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
+    environment:
+      DATA_DIR: /data
+      DOCKER_HOST: tcp://127.0.0.1:9
+      CADDY_API_URL: http://127.0.0.1:9
+      CADDY_CONTAINER_NAME: caddy-proxy-manager-agent-remote-caddy
+      COMPOSE_PROJECT_NAME: cpm-e2e-agent-remote
+      CADDY_BUILD_MODE: external
+    volumes:
+      - agent-remote-data:/data
+    networks:
+      - caddy-network
   # ── First-run setup, on instances that have never been set up ────────────────
   # Setup is single-use, hence fresh instances. A dead Caddy admin address, or an empty database's
   # startup apply would wipe the routes the other tests created.
@@ -248,6 +345,61 @@ services:
       - "5557:8080"
     networks:
       - caddy-network
+  # A real IdP for back-channel logout. One name for the browser and web alike, since the issuer
+  # must match both: specs map `keycloak` to 127.0.0.1 with --host-resolver-rules.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HTTP_PORT: "8180"
+      KC_HOSTNAME: http://keycloak:8180
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: e2e-keycloak-admin
+    volumes:
+      - ./apps/controller/tests/keycloak/cpm-realm.json:/opt/keycloak/data/import/cpm-realm.json:ro
+    ports:
+      - "8180:8180"
+    networks:
+      - caddy-network
+    healthcheck:
+      # No curl in the image; the management port answers readiness.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '"UP"' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+  # Catches the mail web sends. SMTP auth is enforced, so a send proves the stored password.
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    environment:
+      MP_SMTP_AUTH: "cpm-smtp:SmtpE2ePassword2026"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "8025:8025"
+    networks:
+      - caddy-network
+  # Cap Standalone, the self-hosted CAPTCHA. The browser reaches it through page.route.
+  cap:
+    image: tiago2/cap:3.1.14
+    environment:
+      ADMIN_KEY: e2e-cap-admin-key-0123456789abcdefghij
+      REDIS_URL: redis://cap-valkey:6379
+    ports:
+      - "3007:3000"
+    depends_on:
+      - cap-valkey
+    networks:
+      - caddy-network
+  cap-valkey:
+    image: valkey/valkey:8.1-alpine
+    networks:
+      - caddy-network
   echo-server:
     image: hashicorp/http-echo
     command: ["-text=echo-ok", "-listen=:8080"]
@@ -308,10 +460,16 @@ volumes:
     name: caddy-manager-registration-data-test
   agent-data:
     name: agent-data-test
+  agent-remote-data:
+    name: agent-remote-data-test
   web-setup-data:
     name: web-setup-data-test
   web-migrate-data:
     name: web-migrate-data-test
+  web-ratelimit-data:
+    name: web-ratelimit-data-test
+  web-demo-data:
+    name: web-demo-data-test
   caddy-data:
     name: caddy-data-test
   caddy-config:

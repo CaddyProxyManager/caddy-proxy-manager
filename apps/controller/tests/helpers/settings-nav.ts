@@ -76,6 +76,7 @@ const SETTING_PAGES: Record<string, string> = {
   'OAuth Providers': 'Authentication',
   'Directories (LDAP)': 'Authentication',
   'Password Policy': 'Authentication',
+  'Sign-in': 'Authentication',
   'Authentik Defaults': 'Forward Auth',
   'Forward Auth Defaults': 'Forward Auth',
   'GeoIP Databases': 'Geo-blocking',

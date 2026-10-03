@@ -7,6 +7,7 @@ import { deleteUserForwardAuthSessions } from "./forward-auth";
 import { isDemoAdmin } from "../demo-mode";
 import { domainError } from "../domain-error";
 import { withRowLock } from "../db-claim";
+import { resetAccountFailuresFor } from "../rate-limit";
 import {
   isUsableSignInUsername,
   LOGIN_USERNAME_MAX_LENGTH,
@@ -139,7 +140,7 @@ export async function createUser(data: {
   const email = storedEmail(data.email);
   const provider = data.provider === "credential" ? "credentials" : data.provider;
 
-  return withSignInNamesLock(async () => {
+  const created = await withSignInNamesLock(async () => {
     await assertEmailAvailable(null, email);
     const username =
       data.username != null
@@ -180,6 +181,28 @@ export async function createUser(data: {
 
     return parseDbUser(user);
   });
+  if (role === "admin") await reportNewAdmin(created, false);
+  return created;
+}
+
+/**
+ * Tells the other administrators, except for the first one setup creates. Imported lazily: the
+ * notifications reach the settings, which import other models.
+ */
+export async function reportNewAdmin(
+  user: { id: number; email: string },
+  promoted: boolean,
+): Promise<void> {
+  try {
+    const [{ isSetupCompleted }, { notify }] = await Promise.all([
+      import("../setup"),
+      import("../notifications"),
+    ]);
+    if (!(await isSetupCompleted())) return;
+    await notify(`admin-added:${user.id}`, { kind: "adminAdded", email: user.email, promoted });
+  } catch (error) {
+    console.error("Failed to report a new administrator:", error);
+  }
 }
 
 type ProfileChanges = { email?: string; name?: string | null; avatarUrl?: string | null };
@@ -571,15 +594,24 @@ async function assertKeepsAnAdmin(userId: number): Promise<void> {
 
 export async function updateUserRole(userId: number, role: User["role"]): Promise<User | null> {
   if (role !== "admin") assertNotDemoAdmin(userId);
-  return withAdminLock(async () => {
+  let promoted = false;
+  const result = await withAdminLock(async () => {
     if (role !== "admin") await assertKeepsAnAdmin(userId);
+    const [before] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     const [updated] = await db
       .update(users)
       .set({ role, updatedAt: nowIso() })
       .where(eq(users.id, userId))
       .returning();
+    promoted = role === "admin" && before !== undefined && before.role !== "admin";
     return updated ? parseDbUser(updated) : null;
   });
+  if (promoted && result) await reportNewAdmin(result, true);
+  return result;
 }
 
 export async function updateUserStatus(userId: number, status: string): Promise<User | null> {
@@ -598,6 +630,9 @@ export async function updateUserStatus(userId: number, status: string): Promise<
   if (status !== "active") {
     await db.delete(sessions).where(eq(sessions.userId, userId));
     await deleteUserForwardAuthSessions(userId);
+  } else if (updated) {
+    // Or an account auto-disabled for its failed sign-ins is disabled again by the next typo.
+    resetAccountFailuresFor([updated.email, updated.username]);
   }
 
   return updated ? parseDbUser(updated) : null;

@@ -45,6 +45,12 @@ status=$(cpm_sign_in "$CPM_API" "$COOKIE_JAR" "$CPM_ADMIN_USER" "$CPM_ADMIN_PASS
 [ "$status" = "200" ] || die "admin sign-in failed (HTTP $status): $SIGN_IN_BODY"
 info "signed in as $CPM_ADMIN_USER"
 
+# A user holds at most ten tokens, and every run mints one: a rig kept up would run out.
+api_session GET /api/v1/tokens
+for stale in $(jqr '.[]? | select(.name == "docker-test-suite") | .id'); do
+  api_session DELETE "/api/v1/tokens/$stale"
+done
+
 cpm_mint_token "$CPM_API" "$COOKIE_JAR" "docker-test-suite" >"$TOKEN_FILE"
 [ -s "$TOKEN_FILE" ] || die "could not mint an API token - the response carried no raw_token"
 chmod 600 "$TOKEN_FILE"

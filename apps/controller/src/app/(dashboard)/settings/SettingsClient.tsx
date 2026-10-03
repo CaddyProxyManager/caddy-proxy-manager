@@ -13,6 +13,7 @@ import { CodeEditor } from "@/components/ui/CodeEditor";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { EmailInput } from "@/src/components/ui/EmailInput";
 import {
@@ -128,7 +129,7 @@ import { CaptchaSection } from "./CaptchaSection";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
-import { CertificateAlertsSection, EmailServerSection } from "./EmailSection";
+import { EmailServerSection, NotificationsSection, UpstreamAccessLogWarning } from "./EmailSection";
 import type { EmailSettingsView } from "@/src/lib/email/view";
 import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
@@ -308,6 +309,10 @@ export default function SettingsClient({
     null,
   );
   const [forwardAuthRegistryState, forwardAuthRegistryFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
+  const [notificationsRegistryState, notificationsRegistryFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
   );
@@ -584,11 +589,21 @@ export default function SettingsClient({
     geoip: <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />,
     email: <EmailServerSection email={email} state={emailState} formAction={emailFormAction} />,
     "certificate-alerts": (
-      <CertificateAlertsSection
-        email={email}
-        state={certificateAlertsState}
-        formAction={certificateAlertsFormAction}
-      />
+      <VStack gap={4}>
+        <NotificationsSection
+          email={email}
+          state={certificateAlertsState}
+          formAction={certificateAlertsFormAction}
+        />
+        <Heading level={3}>{t("email.notificationsTitle")}</Heading>
+        <UpstreamAccessLogWarning email={email} />
+        <RegistrySettingsBlock
+          block="notifications"
+          fields={registry.notifications ?? []}
+          state={notificationsRegistryState}
+          formAction={notificationsRegistryFormAction}
+        />
+      </VStack>
     ),
     geoblock: (
       <GeoBlockSection
@@ -1521,13 +1536,14 @@ function TailscaleSection({
   const [stateDir, setStateDir] = useState(tailscale.stateDir);
   const [tags, setTags] = useState(tailscale.tags.join(", "));
   const [ephemeral, setEphemeral] = useState(tailscale.ephemeral);
+  const [http3, setHttp3] = useState(tailscale.http3);
   const [validateAuthKey, setValidateAuthKey] = useState(tailscale.validateAuthKey);
   const [apiAccessToken, setApiAccessToken] = useState("");
   const [apiTailnet, setApiTailnet] = useState(tailscale.apiTailnet);
   const moduleDisabledReason = useDisabledReason("tailscale");
 
   return (
-    <FormCard title={t("tailscale")}>
+    <FormCard title={t("tailscaleNodeDefaults")}>
       <form action={tailscaleFormAction}>
         <VStack gap={3}>
           {tailscaleState?.message && (
@@ -1611,6 +1627,16 @@ function TailscaleSection({
             value={ephemeral}
             onChange={setEphemeral}
           />
+          <Switch
+            label={t("tailscaleHttp3Label")}
+            description={t("tailscaleHttp3Help")}
+            htmlName="tailscaleHttp3"
+            value={http3}
+            onChange={setHttp3}
+          />
+          <WarnAlert title={t("tailscaleHttp3WarningTitle")}>
+            {t("tailscaleHttp3WarningBody")}
+          </WarnAlert>
           <Switch
             label={t("tailscaleKeyValidationLabel")}
             description={t("tailscaleKeyValidationHelp")}

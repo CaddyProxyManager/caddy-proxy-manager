@@ -19,6 +19,7 @@ Caddy JSON configuration and applies it over Caddy's admin API.
 | **PostgreSQL** | Where everything is stored. SQLite instead, when `DATABASE_URL` names a file |
 | **Socket proxy** | The only thing that touches the Docker socket; the agent reaches Docker through it |
 | **ClickHouse** | Optional. Only for [analytics](../../features/analytics/) |
+| **CrowdSec** | Optional. The security engine behind [CrowdSec](../../features/crowdsec/) in managed mode |
 
 The controller never dials the agent. The agent connects out and holds an event stream open, which
 is what lets a Caddy host sit behind NAT with no inbound port.

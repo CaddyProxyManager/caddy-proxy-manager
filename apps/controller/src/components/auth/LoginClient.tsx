@@ -3,7 +3,7 @@
 import { KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -33,7 +33,7 @@ import {
 import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
-import { signInErrorMessage } from "@/src/lib/sign-in-error";
+import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/sign-in-error";
 import { twoFactorError } from "@/src/lib/two-factor-error";
 
 interface LoginClientProps {
@@ -67,6 +67,7 @@ export default function LoginClient({
   const tPasskey = useTranslations("auth.passkey");
   const tErrors = useTranslations("auth.errors");
   const tApi = useTranslations("auth.apiErrors");
+  const format = useFormatter();
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
@@ -106,7 +107,7 @@ export default function LoginClient({
     // reached through the client's path proxy, so cast a stable shape.
     type SignInResult = Promise<{
       data: { twoFactorRedirect?: boolean } | null;
-      error: { status?: number; code?: string; message?: string } | null;
+      error: { status?: number; code?: string; message?: string; retryAfter?: unknown } | null;
     }>;
     const client = authClient.signIn as unknown as {
       username: (input: { username: string; password: string }) => SignInResult;
@@ -133,7 +134,12 @@ export default function LoginClient({
       // Any attempt spends the pass.
       captchaStep.spent();
       // By code: Better Auth's `message` is always English.
-      setLoginError(signInErrorMessage(error, (key) => tErrors(key)));
+      const lockSeconds = accountLockSeconds(error);
+      setLoginError(
+        lockSeconds === null
+          ? signInErrorMessage(error, (key) => tErrors(key))
+          : tErrors("accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
+      );
       setLoginPending(false);
       // Keep the name on screen so a typo in it can be told from a wrong password.
       setOnPasswordStep(true);

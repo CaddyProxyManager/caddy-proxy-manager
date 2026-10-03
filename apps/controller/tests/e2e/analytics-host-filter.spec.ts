@@ -1,6 +1,7 @@
 /** #171: traffic-only hosts stay hidden in the analytics host dropdown until the toggle is on. */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { ANALYTICS_OFF } from '../helpers/compose';
 
 const ORIGIN = 'http://localhost:3000';
 const API_PROXY_HOSTS = `${ORIGIN}/api/v1/proxy-hosts`;
@@ -20,6 +21,7 @@ function chDateTime(unixSeconds: number): string {
 }
 
 test.describe('Analytics host filter (#171)', () => {
+  test.skip(ANALYTICS_OFF, 'no ClickHouse in the analytics-off run');
   test('"Include unconfigured hosts" toggle reveals traffic-only hosts', async ({ page }) => {
     const stamp = Date.now();
     const tag = `hostfilter-${stamp}`;

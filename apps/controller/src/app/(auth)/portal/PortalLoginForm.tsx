@@ -23,6 +23,7 @@ import { type SignInProvider, SignInProviders } from "@/src/components/auth/Sign
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
 import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
+import { accountLockSeconds, lockLiftsIn } from "@/src/lib/sign-in-error";
 import { twoFactorError } from "@/src/lib/two-factor-error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import {
@@ -30,7 +31,7 @@ import {
   AUTOFILL_USERNAME_WEBAUTHN,
 } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 interface PortalLoginFormProps {
   rid: string;
@@ -96,6 +97,7 @@ export default function PortalLoginForm({
   const t = useTranslations("auth");
   const tl = useTranslations("auth.login");
   const tPasskey = useTranslations("auth.passkey");
+  const format = useFormatter();
   const [error, setError] = useState<string | null>(initialError);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
@@ -178,7 +180,12 @@ export default function PortalLoginForm({
 
       if (!response.ok) {
         captchaStep.spent();
-        setError(data.error ?? t("login.failed"));
+        const lockSeconds = accountLockSeconds({ ...data, status: response.status });
+        setError(
+          lockSeconds === null
+            ? (data.error ?? t("login.failed"))
+            : t("errors.accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
+        );
         setPending(false);
         // So the name that failed is still readable.
         setOnPasswordStep(true);

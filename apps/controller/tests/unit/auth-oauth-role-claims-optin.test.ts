@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, afterAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { reloadConfig } from '@/tests/helpers/config';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => {
@@ -17,24 +18,12 @@ afterAll(async () => {
 });
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
 // synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    get sqlite() {
-      return undefined;
-    },
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (v: string | Date | null | undefined): string | null =>
-      !v ? null : v instanceof Date ? v.toISOString() : new Date(v).toISOString(),
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
@@ -44,10 +33,9 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
-// config snapshots process.env on first evaluation, which has already happened, so a fresh copy
-// is evaluated now and the plain specifier points at it for auth-server.
-const freshConfig = await import(`../../src/lib/config${fresh()}`);
-vi.mock('../../src/lib/config', () => ({ ...freshConfig }));
+// config snapshots process.env on first evaluation, which has already happened, so it is re-read
+// now and the plain specifier points at the result for auth-server.
+await reloadConfig();
 
 import { getAuth } from '../../src/lib/auth-server';
 

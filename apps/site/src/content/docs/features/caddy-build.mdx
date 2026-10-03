@@ -66,8 +66,10 @@ commit. It is compiled from source at build time.
 
 ## Rebuilding
 
-The [agent](../agent/) runs the build and recreates the Caddy container when it finishes, reporting
-progress as it goes. The running Caddy keeps serving until the new binary is ready.
+Saving a changed selection starts the rebuild - in Settings and over `PUT /api/v1/caddy/modules`
+alike. The [agent](../agent/) runs the build and recreates the Caddy container when it finishes,
+reporting progress as it goes. The running Caddy keeps serving until the new binary is ready.
+**Rebuild** retries a build that failed; an agent that was offline builds when it next connects.
 
 ## Building the image yourself
 

@@ -9,7 +9,12 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import pkg from "../package.json";
 import { installPeerAddressStamp } from "../src/lib/peer-address";
-import { CONSOLE_RESET_TWO_FACTOR_PATH, signConsoleCommand } from "../src/lib/console-command";
+import {
+  CONSOLE_ENABLE_USER_PATH,
+  CONSOLE_RESET_TWO_FACTOR_PATH,
+  type ConsoleCommandPurpose,
+  signConsoleCommand,
+} from "../src/lib/console-command";
 
 function resolveAppRoot(): string {
   return process.env.CPM_APP_ROOT?.trim() || dirname(process.execPath);
@@ -24,26 +29,60 @@ function runHealthCheck(port: number): void {
 }
 
 /**
- * Asks the running server rather than writing the database, so the reset is audited and SQLite
+ * Asks the running server rather than writing the database, so the change is audited and SQLite
  * never has a second writer. Console output, so English.
  */
-function runResetTwoFactor(port: number, username: string): void {
+function postConsoleCommand(
+  port: number,
+  path: string,
+  purpose: ConsoleCommandPurpose,
+  username: string,
+): Promise<Response> {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
     console.error("[cpm] SESSION_SECRET is not set. Run this inside the web container.");
     process.exit(2);
   }
   const timestamp = Date.now();
-  fetch(`http://127.0.0.1:${port}${CONSOLE_RESET_TWO_FACTOR_PATH}`, {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       username,
       timestamp,
-      signature: signConsoleCommand(secret, username, timestamp),
+      signature: signConsoleCommand(secret, username, timestamp, purpose),
     }),
     signal: AbortSignal.timeout(15_000),
-  })
+  });
+}
+
+function runEnableUser(port: number, username: string): void {
+  postConsoleCommand(port, CONSOLE_ENABLE_USER_PATH, "enable-user", username)
+    .then(async (response) => {
+      const body = (await response.json().catch(() => ({}))) as {
+        email?: string;
+        wasDisabled?: boolean;
+        error?: string;
+      };
+      if (!response.ok) {
+        console.error(`[cpm] Enable refused: ${body.error ?? response.status}`);
+        process.exit(1);
+      }
+      console.log(
+        body.wasDisabled
+          ? `[cpm] Enabled ${body.email}. Its count of failed sign-ins starts over.`
+          : `[cpm] ${body.email} was not disabled; its count of failed sign-ins starts over.`,
+      );
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("[cpm] Could not reach the running server:", error);
+      process.exit(1);
+    });
+}
+
+function runResetTwoFactor(port: number, username: string): void {
+  postConsoleCommand(port, CONSOLE_RESET_TWO_FACTOR_PATH, "reset-2fa", username)
     .then(async (response) => {
       const body = (await response.json().catch(() => ({}))) as {
         email?: string;
@@ -101,6 +140,11 @@ const argv = yargs(hideBin(process.argv))
     describe:
       "Turn off two-factor sign-in and remove the passkeys of a user on the running server, then exit",
   })
+  .option("enable-user", {
+    type: "string",
+    describe:
+      "Enable a disabled user on the running server and start their failed sign-ins over, then exit",
+  })
   .version(pkg.version)
   // A mistyped HEALTHCHECK flag would otherwise start a second server that reports healthy.
   .strict()
@@ -114,6 +158,8 @@ if (!Number.isInteger(argv.port) || argv.port < 1 || argv.port > 65535) {
 
 if (argv["reset-2fa"] !== undefined) {
   runResetTwoFactor(argv.port, argv["reset-2fa"]);
+} else if (argv["enable-user"] !== undefined) {
+  runEnableUser(argv.port, argv["enable-user"]);
 } else if (argv.healthcheck) {
   // The resolved port, so probing a server started with --port still reaches it.
   runHealthCheck(argv.port);

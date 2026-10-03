@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+
+// Settings resolve through the database: its own, not the app's connection every file shares.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 
 // updateGeneralSettingsAction reads its messages from the catalog; there is no request scope here.

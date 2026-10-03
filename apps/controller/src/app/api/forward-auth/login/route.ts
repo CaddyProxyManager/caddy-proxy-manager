@@ -22,6 +22,7 @@ import { authPolicy } from "@/src/lib/auth-policy";
 import { getAuth } from "@/src/lib/auth-server";
 import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import { resolveSignInDirectory, signInWithDirectory } from "@/src/lib/ldap/sign-in";
+import { ACCOUNT_LOCKED } from "@/src/lib/sign-in-error";
 
 // The form posts a username, a password and a rid; anything larger is not a login.
 const MAX_BODY_BYTES = 16 * 1024;
@@ -103,8 +104,16 @@ export async function POST(request: NextRequest) {
     const ip = (await getClientIp(request.headers)) ?? "unknown";
     const account = accountKey(username);
     const rateLimitResult = await isRateLimited(ip);
-    if (rateLimitResult.blocked || accountRetryAfterMs(account) > 0) {
+    if (rateLimitResult.blocked) {
       return NextResponse.json({ error: t("tooManyLoginAttempts") }, { status: 429 });
+    }
+    const lockedMs = await accountRetryAfterMs(account);
+    if (lockedMs > 0) {
+      const retryAfter = Math.ceil(lockedMs / 1000);
+      return NextResponse.json(
+        { error: t("tooManyLoginAttempts"), code: ACCOUNT_LOCKED, retryAfter },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
+      );
     }
 
     // Before the password, so a request without a live intent learns nothing about credentials.
@@ -181,7 +190,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user || !isValid) {
-      await attempt.fail();
+      // Only a picked directory skips the local account; see account-failures.ts.
+      await attempt.fail(directoryId || localDisabled ? "directory" : "local");
       await logAuditEvent({
         userId: user?.id ?? null,
         action: "forward_auth_login_failed",

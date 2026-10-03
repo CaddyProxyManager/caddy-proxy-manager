@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import type { TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 
 // getAnalyticsHosts merges configured and observed hosts, flagging the configured ones (#171).
 const { allMock, queryDistinctHostsMock } = vi.hoisted(() => ({
@@ -7,11 +9,10 @@ const { allMock, queryDistinctHostsMock } = vi.hoisted(() => ({
   queryDistinctHostsMock: vi.fn(),
 }));
 // `.from()` resolves rather than exposing `.all()`, since the query is awaited under PostgreSQL.
-vi.mock('@/src/lib/db', () => ({
-  default: {
-    select: vi.fn().mockReturnValue({ from: vi.fn(() => Promise.resolve(allMock())) }),
-  },
-}));
+const fakeDb = {
+  select: vi.fn().mockReturnValue({ from: vi.fn(() => Promise.resolve(allMock())) }),
+} as unknown as TestDb;
+vi.mock('@/src/lib/db', () => dbModuleMock(() => fakeDb));
 vi.mock('@/src/lib/clickhouse/client', () => ({
   queryDistinctHosts: queryDistinctHostsMock,
 }));

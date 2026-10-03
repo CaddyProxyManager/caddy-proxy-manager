@@ -22,6 +22,7 @@ const ENV = { ...process.env, CLICKHOUSE_PASSWORD: 'test-clickhouse-password-202
 const SESSION_HEADERS = { Origin: BASE_URL };
 
 type L4StatusResponse = {
+  diff: { needsApply: boolean };
   status: {
     state: string;
     appliedAt?: string;
@@ -79,11 +80,18 @@ test.describe
       // The poll below outlasts the global 60 s timeout.
       test.setTimeout(180_000);
 
-      // The agent republishes unconditionally, so this completes with an unchanged port set.
+      // An earlier spec's L4 host can leave a port unpublished, so this apply may recreate Caddy.
+      // Then the "applied" already showing is the last apply's, and the traffic test below would
+      // race the recreate: wait for this one. An unchanged port set is not reapplied at all.
+      const before = await fetchL4Status(page);
       const res = await page.request.post('/api/l4-ports', { headers: SESSION_HEADERS });
       expect(res.ok(), `POST /api/l4-ports failed: ${await res.text()}`).toBe(true);
 
-      const state = await waitForL4Terminal(page, 90_000);
+      const state = await waitForL4Terminal(
+        page,
+        90_000,
+        before.diff.needsApply ? (before.status.appliedAt ?? '0') : undefined,
+      );
       expect(
         state,
         'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-agent',

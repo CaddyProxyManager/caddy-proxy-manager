@@ -517,6 +517,78 @@ test.describe('Settings - Upstream DNS Pinning', () => {
   });
 });
 
+// ─── Tailscale section ───────────────────────────────────────────────────────
+
+test.describe('Settings - Tailscale', () => {
+  const API_SETTINGS_TAILSCALE = 'http://localhost:3000/api/v1/settings/tailscale';
+
+  test.afterEach(async ({ page }) => {
+    const res = await page.request.put(API_SETTINGS_TAILSCALE, {
+      headers: { Origin: SETTINGS_ORIGIN },
+      data: { enabled: false, http3: false },
+    });
+    expect(res.ok(), `Tailscale reset failed: ${res.status()}`).toBe(true);
+  });
+
+  test('HTTP/3 on tailnet listeners is off by default and carries its warning', async ({
+    page,
+  }) => {
+    await goToSection(page, 'Tailscale');
+    await expect(page.getByLabel('Serve HTTP/3 on tailnet listeners')).toBeVisible();
+    await expect(page.getByLabel('Serve HTTP/3 on tailnet listeners')).not.toBeChecked();
+    await expect(page.getByText("HTTP/3 can hang Caddy's config load")).toBeVisible();
+    await expect(page.getByText(/lock Caddy's admin API/)).toBeVisible();
+  });
+
+  test('turning HTTP/3 on reaches the REST API once applied', async ({ page }) => {
+    await goToSection(page, 'Tailscale');
+    const toggle = page.getByLabel('Serve HTTP/3 on tailnet listeners');
+    await expect(toggle).not.toBeChecked();
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+
+    await savePage(page);
+    await expectStaged(page, 15_000);
+    await applyStagedChanges(page);
+
+    const res = await page.request.get(API_SETTINGS_TAILSCALE);
+    expect((await res.json()).http3).toBe(true);
+
+    await goToSection(page, 'Tailscale');
+    await expect(page.getByLabel('Serve HTTP/3 on tailnet listeners')).toBeChecked();
+  });
+});
+
+// ─── Sign-in: per-account lock ───────────────────────────────────────────────
+
+test.describe('Settings - Sign-in account lock', () => {
+  const FREE_FAILURES = 'Failed sign-ins before an account is locked';
+  // Registry blocks save at once rather than staging.
+  const saved = (page: Page) =>
+    expect(page.getByRole('status').filter({ hasText: 'Settings saved' })).toBeVisible({
+      timeout: 15_000,
+    });
+
+  test('shows the account lock settings, and a changed value persists', async ({ page }) => {
+    await goToSection(page, 'Sign-in');
+    await expect(page.getByLabel('Lock accounts after failed sign-ins')).toBeChecked();
+    await expect(page.getByLabel('First account lock (milliseconds)')).toHaveValue('1000');
+    await expect(page.getByLabel('Longest account lock (milliseconds)')).toHaveValue('900000');
+    const free = page.getByLabel(FREE_FAILURES);
+    await expect(free).toHaveValue('5');
+
+    await free.fill('3');
+    await savePage(page);
+    await saved(page);
+    await goToSection(page, 'Sign-in');
+    await expect(page.getByLabel(FREE_FAILURES)).toHaveValue('3');
+
+    await page.getByLabel(FREE_FAILURES).fill('5');
+    await savePage(page);
+    await saved(page);
+  });
+});
+
 // ─── Authentik Defaults section ──────────────────────────────────────────────
 
 test.describe('Settings - Authentik Defaults', () => {

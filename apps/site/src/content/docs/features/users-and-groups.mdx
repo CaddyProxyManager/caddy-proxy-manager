@@ -97,6 +97,9 @@ once it is solved.
   right or not, and the server remembers it was, so replaying it does nothing. After a wrong
   password the CAPTCHA appears again beside the password field, rather than sending you back to
   the username. An unused pass lapses after ten minutes, or when the controller restarts.
+- **A failed solve and a broken setup read differently.** A wrong answer is refused as failed.
+  The provider not answering, or refusing the secret or site key - a wrong Cap key pair included -
+  is reported as unavailable, since that one is the administrator's to fix.
 - **Each portal host can opt out.** A host using the built-in forward auth has **Require the
   sign-in CAPTCHA**, on by default. Turned off, that host's portal skips it - and its sign-in is
   open to scripted guessing again, held back only by the login throttles.
@@ -189,7 +192,8 @@ password, after confirming the current one, so the account signs in through the 
 Two options worth knowing:
 
 - **Group-based role mapping.** Members of a claimed group become admins, operators, users or
-  viewers automatically, so role changes happen in your IdP rather than here.
+  viewers automatically, so role changes happen in your IdP rather than here. **Role when no
+  group matches**, per provider, sets the role for anyone in none of them; it defaults to user.
 - **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in -
   every identity comes from the provider.
 
@@ -260,3 +264,33 @@ to the directory, as it does OAuth ones.
 Production enforces strong passwords, and two independent throttles guard the auth endpoints: a
 request limit and a login lockout, both configurable in Settings. Accounts still on an older
 password hash can be forced to reset, which rehashes them on next sign-in.
+
+An account that keeps failing is locked for a delay that doubles with each failure past the fifth,
+from 1 second up to 15 minutes, whichever address the guesses come from. The number of free
+failures, the first delay and the cap are fields under **Settings → Authentication → Sign-in**,
+next to a switch that turns the lock off. A sign-in to a locked account gets a 429
+with the code `ACCOUNT_LOCKED`, the wait in seconds as `retryAfter` in the body and a `Retry-After`
+header, so the sign-in page and the forward-auth portal can say how long. It replaced
+`TOO_MANY_REQUESTS` for that response. The per-address limit keeps its generic message.
+
+**Disable accounts after repeated failed sign-ins**, off by default in the same place, goes
+further: once an account reaches that many failures (10 by default), it is disabled until an
+administrator enables it again. The count is the lock's own, so it is forgotten a day after the last
+failure and a successful sign-in resets it. Turning it on means **anyone who knows a username can
+disable that account** by guessing at it, which is why it is off.
+
+- **The sign-in answers as for any wrong password**, so the guesser is not told.
+- **The last active administrator is never disabled.** It stays on the timed lock, and the
+  administrators are [notified](../email/#notifications) either way.
+- **A directory account is left to its directory.** A refused LDAP password names no CPM account,
+  so it never disables one; use the directory's own lockout.
+- **Enabling it on Users starts the count over**, and the user's page says an account was disabled
+  by failed sign-ins rather than by an administrator. It is audited as
+  `user_disabled_failed_sign_ins`.
+
+If the account disabled is the only administrator's, the server can enable it from inside its own
+container, the same way it resets a second factor:
+
+```bash
+docker compose exec web /app/cpm-server --enable-user admin
+```

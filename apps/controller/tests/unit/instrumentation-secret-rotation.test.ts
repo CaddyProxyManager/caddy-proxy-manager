@@ -40,7 +40,10 @@ vi.mock('../../src/lib/secret-rotation', () => ({
     return mocks.reencryptStoredSecrets();
   },
 }));
+// Spread: the preload already loaded it, so an omitted name would stay real anyway, but silently.
+const actualConnection = await import('../../src/lib/db/connection');
 vi.mock('../../src/lib/db/connection', () => ({
+  ...actualConnection,
   purgeDeletedDatabaseContent: (force: boolean) => {
     mocks.order.push('purge');
     mocks.purgeForced.push(force);

@@ -131,7 +131,13 @@ export function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean
 }
 
 export function stringSetting(
-  spec: Common<string> & { maxLength?: number; pattern?: RegExp; patternHint?: string },
+  spec: Common<string> & {
+    maxLength?: number;
+    pattern?: RegExp;
+    patternHint?: string;
+    /** Blank reads as the default, as it does for the variable and in Compose's `${VAR:-x}`. */
+    emptyIsDefault?: boolean;
+  },
 ): SettingDefinition<string> {
   const key = `${KEY_PREFIX}${spec.name}`;
   const maxLength = spec.maxLength ?? 2048;
@@ -139,6 +145,7 @@ export function stringSetting(
     if (value === null || value === undefined) return spec.default;
     if (typeof value !== "string") return reject(key, "text", { label: spec.label });
     const trimmed = value.trim();
+    if (trimmed === "" && spec.emptyIsDefault) return spec.default;
     if (trimmed.length > maxLength) {
       return reject(key, "tooLong", { label: spec.label, max: maxLength });
     }
@@ -454,6 +461,76 @@ export const loginBlockMs = numberSetting({
   max: 24 * 60 * 60 * 1000,
 });
 
+export const accountLockEnabled = booleanSetting({
+  name: "account_lock_enabled",
+  env: "ACCOUNT_LOCK_ENABLED",
+  group: "authentication",
+  label: "Lock accounts after failed sign-ins",
+  description:
+    "Slow down guesses at one account whatever address they come from. Separate from the " +
+    "per-client lockout above.",
+  default: true,
+});
+
+export const accountLockFreeFailures = numberSetting({
+  name: "account_lock_free_failures",
+  env: "ACCOUNT_LOCK_FREE_FAILURES",
+  group: "authentication",
+  label: "Failed sign-ins before an account is locked",
+  description: "How many failures an account takes before each further one locks it.",
+  default: 5,
+  min: 1,
+  max: 1000,
+});
+
+export const accountLockBaseDelayMs = numberSetting({
+  name: "account_lock_base_delay_ms",
+  env: "ACCOUNT_LOCK_BASE_DELAY_MS",
+  group: "authentication",
+  label: "First account lock (milliseconds)",
+  description: "How long the first lock lasts. Each failure after it doubles the wait.",
+  default: 1000,
+  min: 100,
+  max: 60 * 60 * 1000,
+});
+
+export const accountLockMaxDelayMs = numberSetting({
+  name: "account_lock_max_delay_ms",
+  env: "ACCOUNT_LOCK_MAX_DELAY_MS",
+  group: "authentication",
+  label: "Longest account lock (milliseconds)",
+  description:
+    "The doubling stops here, so guessing can slow the owner's sign-in but never shut it off.",
+  default: 900_000,
+  min: 1000,
+  max: 24 * 60 * 60 * 1000,
+});
+
+export const accountLockDisableEnabled = booleanSetting({
+  name: "account_lock_disable_enabled",
+  env: "ACCOUNT_LOCK_DISABLE_ENABLED",
+  group: "authentication",
+  label: "Disable accounts after repeated failed sign-ins",
+  description:
+    "Disable an account once it reaches the number of failed sign-ins below, until an " +
+    "administrator enables it again. Anyone who knows a username can then disable that account " +
+    "by guessing at it. The last active administrator is never disabled, only locked.",
+  default: false,
+});
+
+export const accountLockDisableAfter = numberSetting({
+  name: "account_lock_disable_after",
+  env: "ACCOUNT_LOCK_DISABLE_AFTER",
+  group: "authentication",
+  label: "Failed sign-ins before an account is disabled",
+  description:
+    "Counted like the lock above: forgotten a day after the last failure, and reset by a " +
+    "successful sign-in.",
+  default: 10,
+  min: 1,
+  max: 1000,
+});
+
 export const forwardAuthAllowedPorts = stringSetting({
   name: "forward_auth_allowed_ports",
   env: "FORWARD_AUTH_ALLOWED_PORTS",
@@ -572,8 +649,8 @@ export const emailAlertRecipients = stringSetting({
   group: "email",
   label: "Alert recipients",
   description:
-    "Comma-separated addresses that certificate alerts go to. If left empty they go to every " +
-    "active administrator.",
+    "Comma-separated addresses that certificate alerts and notifications go to. If left empty " +
+    "they go to every active administrator.",
   default: "",
   // Linear: each address is one run of non-separators, split on a comma the address cannot hold.
   pattern: /^[^\s,@]+@[^\s,@]+(\s*,\s*[^\s,@]+@[^\s,@]+)*$/,
@@ -593,6 +670,120 @@ export const certificateExpiryAlertDays = numberSetting({
   min: 0,
   max: 90,
 });
+
+// ── Admin notifications (lib/notifications) ──────────────────────────────────
+
+function notifySetting(name: string, env: string, label: string, description: string) {
+  return booleanSetting({ name, env, group: "email", label, description, default: true });
+}
+
+export const notifyAccountDisabled = notifySetting(
+  "notify_account_disabled",
+  "NOTIFY_ACCOUNT_DISABLED",
+  "Account disabled after failed sign-ins",
+  "When an account is disabled after failed sign-ins, or the last administrator is kept enabled.",
+);
+
+export const notifyAdminLocked = notifySetting(
+  "notify_admin_locked",
+  "NOTIFY_ADMIN_LOCKED",
+  "Administrator account locked",
+  "When failed sign-ins lock an administrator's account.",
+);
+
+export const notifyAdminAdded = notifySetting(
+  "notify_admin_added",
+  "NOTIFY_ADMIN_ADDED",
+  "New administrator",
+  "When an administrator account is created, or a user is made an administrator.",
+);
+
+export const notifyAgentOffline = notifySetting(
+  "notify_agent_offline",
+  "NOTIFY_AGENT_OFFLINE",
+  "Agent offline",
+  "When an agent stays disconnected longer than the time below, and when it is back.",
+);
+
+export const notifyAgentOfflineMinutes = numberSetting({
+  name: "notify_agent_offline_minutes",
+  env: "NOTIFY_AGENT_OFFLINE_MINUTES",
+  group: "email",
+  label: "Agent offline after (minutes)",
+  description:
+    "How long an agent may be disconnected before anyone is told. After a restart of this " +
+    "server every agent gets this long to reconnect.",
+  default: 5,
+  min: 1,
+  max: 1440,
+});
+
+export const notifyUpstreamErrors = notifySetting(
+  "notify_upstream_errors",
+  "NOTIFY_UPSTREAM_ERRORS",
+  "Upstream errors",
+  "When a proxy host answers 502, 503 or 504 as often as set below, and when it has been quiet " +
+    "for as long again. Read from the access log, so access logging must be on.",
+);
+
+export const notifyUpstreamErrorCount = numberSetting({
+  name: "notify_upstream_error_count",
+  env: "NOTIFY_UPSTREAM_ERROR_COUNT",
+  group: "email",
+  label: "Upstream errors before telling (responses)",
+  description: "How many 502, 503 or 504 responses from one host, within the minutes below.",
+  default: 10,
+  min: 1,
+  max: 100_000,
+});
+
+export const notifyUpstreamErrorMinutes = numberSetting({
+  name: "notify_upstream_error_minutes",
+  env: "NOTIFY_UPSTREAM_ERROR_MINUTES",
+  group: "email",
+  label: "Upstream error window (minutes)",
+  description: "Also how long a host must go without one before it counts as recovered.",
+  default: 5,
+  min: 1,
+  max: 1440,
+});
+
+export const notifyCaddyApply = notifySetting(
+  "notify_caddy_apply",
+  "NOTIFY_CADDY_APPLY",
+  "Caddy configuration refused",
+  "When Caddy refuses a configuration, and when it loads one again. An unreachable Caddy is " +
+    "the agent's to report.",
+);
+
+export const notifyAgentProblems = notifySetting(
+  "notify_agent_problems",
+  "NOTIFY_AGENT_PROBLEMS",
+  "Agent failures",
+  "When an agent reports a failed Caddy build, optional service or L4 port change, or log " +
+    "files it cannot read or prune.",
+);
+
+export const notifyGeoipFailed = notifySetting(
+  "notify_geoip_failed",
+  "NOTIFY_GEOIP_FAILED",
+  "GeoIP update failing",
+  "When the GeoIP database update has failed three times in a row, and when it works again.",
+);
+
+export const notifyCrsPluginDisabled = notifySetting(
+  "notify_crs_plugin_disabled",
+  "NOTIFY_CRS_PLUGIN_DISABLED",
+  "CRS plugin switched off",
+  "When a CRS plugin Caddy refuses is switched off so the rest of the configuration loads.",
+);
+
+export const notifyUpdateAvailable = notifySetting(
+  "notify_update_available",
+  "NOTIFY_UPDATE_AVAILABLE",
+  "New release",
+  "Once per release, while the update check under General is on.",
+);
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 
@@ -621,6 +812,7 @@ export const clickhouseUrl = stringSetting({
   default: "http://clickhouse:8123",
   pattern: URL_PATTERN,
   patternHint: "must start with http:// or https://",
+  emptyIsDefault: true,
   maxLength: 512,
 });
 
@@ -632,6 +824,7 @@ export const clickhouseUser = stringSetting({
   label: "ClickHouse user",
   description: "The account traffic and WAF events are written as.",
   default: "cpm",
+  emptyIsDefault: true,
   maxLength: 128,
 });
 
@@ -660,6 +853,7 @@ export const clickhouseDb = stringSetting({
   // Interpolated into DDL, which has no placeholder for an identifier.
   pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
   patternHint: "must start with a letter or underscore and contain only letters, digits and _",
+  emptyIsDefault: true,
   maxLength: 128,
 });
 
@@ -747,6 +941,12 @@ export const SETTING_DEFINITIONS = [
   loginMaxAttempts,
   loginWindowMs,
   loginBlockMs,
+  accountLockEnabled,
+  accountLockFreeFailures,
+  accountLockBaseDelayMs,
+  accountLockMaxDelayMs,
+  accountLockDisableEnabled,
+  accountLockDisableAfter,
   forwardAuthAllowedPorts,
   forwardAuthSequentialUserIds,
   smtpEnabled,
@@ -758,6 +958,19 @@ export const SETTING_DEFINITIONS = [
   smtpFrom,
   emailAlertRecipients,
   certificateExpiryAlertDays,
+  notifyAccountDisabled,
+  notifyAdminLocked,
+  notifyAdminAdded,
+  notifyAgentOffline,
+  notifyAgentOfflineMinutes,
+  notifyUpstreamErrors,
+  notifyUpstreamErrorCount,
+  notifyUpstreamErrorMinutes,
+  notifyCaddyApply,
+  notifyAgentProblems,
+  notifyGeoipFailed,
+  notifyCrsPluginDisabled,
+  notifyUpdateAvailable,
   analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,

@@ -7,6 +7,7 @@
 import { APP_VERSION } from "./app-version";
 import { type StoredErrorCode, domainError, storedErrorCode } from "./domain-error";
 import { getSetting, setSetting } from "./settings";
+import { outsideStagingScope } from "./settings/staging-context";
 
 const CACHE_KEY = "update_check";
 
@@ -270,6 +271,11 @@ export async function checkForUpdates(): Promise<CachedCheck> {
         );
         result.latest = newestRelease(tags);
         if (!result.latest) recordFailure(result, domainError("updateNoReleases"));
+        else if (isNewer(APP_VERSION, result.latest)) {
+          // Imported here: the notifications reach the settings, and this module is read by pages.
+          const { reportReleaseAvailable } = await import("./notifications/jobs");
+          await reportReleaseAvailable(result.latest, APP_VERSION);
+        }
       } catch (error) {
         recordFailure(
           result,
@@ -282,7 +288,8 @@ export async function checkForUpdates(): Promise<CachedCheck> {
       }
     }
 
-    await setSetting<CachedCheck>(CACHE_KEY, result);
+    // A cache: the check Settings runs on save must not land in the operator's staged change set.
+    await outsideStagingScope(() => setSetting<CachedCheck>(CACHE_KEY, result));
     return result;
   })().finally(() => {
     inFlight = null;

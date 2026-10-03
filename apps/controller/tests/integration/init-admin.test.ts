@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({
@@ -13,20 +14,10 @@ const ctx = vi.hoisted(() => ({
 }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-  runInTransaction: async (build: (tx: TestDb) => unknown[]) => {
-    for (const statement of build(ctx.db)) await statement;
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 // config caches the environment for the process; a restart with new values is a new process.
 const actualConfig = await import('../../src/lib/config');
@@ -126,11 +117,15 @@ async function sessionCounts(userId: number) {
   return { sessions: dashboard.length, forwardAuth: forwardAuth.length };
 }
 
+let otherId = 100;
+
+/** Never id 1: on a fresh table the sequence would hand it out, and that is the admin's id. */
 async function seedOtherUser(email: string, username: string | null) {
   const now = new Date().toISOString();
   const [row] = await ctx.db
     .insert(users)
     .values({
+      id: ++otherId,
       email,
       username,
       displayUsername: username,
@@ -274,6 +269,27 @@ describe('ensureAdminUser', () => {
       ctx.env.adminUsername = 'root';
       await expect(ensureAdminUser()).rejects.toThrow(/is not applied/);
       expect((await adminRow()).username).toBe('admin');
+    });
+
+    // An OIDC-only start seeds no admin, so the first person to sign in is id 1.
+    it('never rewrites an id 1 account the environment did not create', async () => {
+      const now = new Date().toISOString();
+      await ctx.db.insert(users).values({
+        id: 1,
+        email: 'first@example.com',
+        name: 'First Sign-in',
+        role: 'viewer',
+        provider: 'oidc',
+        subject: 'idp|first',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      });
+      const before = await adminRow();
+
+      await expect(ensureAdminUser()).rejects.toThrow(/user #1 \(first@example.com\)/);
+      expect(await adminRow()).toEqual(before);
+      expect(await storedMarker()).toBeNull();
     });
 
     it('does not create the primary admin with it', async () => {

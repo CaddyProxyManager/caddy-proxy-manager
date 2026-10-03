@@ -88,6 +88,7 @@ beforeEach(() => {
     docker: stubDocker(),
     operations: {
       applyL4Ports: () => {},
+      whenIdle: (listener: () => void) => listener(),
       applyManagedServices: () => {},
       applyCaddyBuild: () => {},
     } as unknown as Operations,

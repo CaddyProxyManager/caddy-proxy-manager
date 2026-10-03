@@ -255,6 +255,14 @@ export async function register() {
       console.error("Failed to start the certificate expiry alerts:", error);
     }
 
+    // Queues nothing while email is off; each tick also runs the checks the events register.
+    const { startNotifications } = await import("./lib/notifications");
+    try {
+      startNotifications();
+    } catch (error) {
+      console.error("Failed to start the admin notifications:", error);
+    }
+
     process.on("SIGTERM", () => {
       closeClickHouse();
     });

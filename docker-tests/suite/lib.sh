@@ -105,6 +105,7 @@ t_fails() {  # t_fails NAME CMD... - passes when the command exits non-zero
 # ── CPM REST API ────────────────────────────────────────────────────────────
 #
 # api METHOD PATH [BODY] -> API_STATUS, API_BODY, with bootstrap.sh's token unless API_TOKEN is set.
+# API_MAX_TIME raises the 60s limit for a call that waits on something slow on purpose.
 
 API_STATUS=
 API_BODY=
@@ -120,7 +121,7 @@ api() {
   local token="${API_TOKEN-$(cat "$TOKEN_FILE" 2>/dev/null)}"
   local base="${API_BASE:-$CPM_API}"
   local out="$STATE_DIR/api-out.$$"
-  local args=(-sS -X "$method" --max-time 60 -o "$out" -w '%{http_code}')
+  local args=(-sS -X "$method" --max-time "${API_MAX_TIME:-60}" -o "$out" -w '%{http_code}')
   [ -n "$token" ] && args+=(-H "Authorization: Bearer $token")
   if [ -n "$body" ]; then
     args+=(-H 'Content-Type: application/json' --data-binary "$body")
@@ -174,6 +175,12 @@ cpm_mint_token() {
     -H 'Content-Type: application/json' -H "Origin: $1" \
     --data-binary "$(jq -nc --arg n "$3" '{name:$n}')" \
     "$1/api/v1/tokens" 2>/dev/null | jq -r '.raw_token // empty'
+}
+
+# A new admin session in bootstrap's jar. Key downloads and restores want a sign-in from the last
+# ten minutes, which bootstrap's is not by the time a full run reaches them.
+fresh_session() {
+  [ "$(cpm_sign_in "$CPM_API" "$STATE_DIR/cookies.txt" "$CPM_ADMIN_USER" "$CPM_ADMIN_PASSWORD")" = "200" ]
 }
 
 # Endpoints outside /api/v1 (waf-events, geoip-status, l4-ports) need a session cookie, not a token.
@@ -489,6 +496,39 @@ ACTION_RESULT=
 server_action() {
   ACTION_RESULT=$(python3 "$(dirname "${BASH_SOURCE[0]}")/helpers/server_action.py" \
     "$CPM_API" "$STATE_DIR/cookies.txt" "$@" 2>&1)
+}
+
+# ── Mail ────────────────────────────────────────────────────────────────────
+#
+# What mailpit received, through its API. BOX is a server's base URL: $MAILBOX or $MAILBOX_TLS.
+
+MAILBOX="${MAILBOX:-http://mailpit:8025}"
+MAILBOX_TLS="${MAILBOX_TLS:-http://mailpit-tls:8025}"
+
+mail_clear() { curl -sS --max-time 10 -X DELETE "${1:-$MAILBOX}/api/v1/messages" >/dev/null 2>&1; }
+
+# mail_find BOX TO SUBJECT_PART -> the newest matching message's id, empty when there is none
+mail_find() {
+  curl -sS --max-time 10 "$1/api/v1/messages?limit=200" 2>/dev/null | jq -r --arg to "$2" --arg s "$3" \
+    'first(.messages[]? | select(any(.To[]?; .Address == $to) and (.Subject | contains($s)))) | .ID // empty'
+}
+
+_mail_present() { [ -n "$(mail_find "$1" "$2" "$3")" ]; }
+
+# mail_wait BOX TO SUBJECT_PART [TIMEOUT] -> MAIL_ID, and the message as MAIL_JSON
+MAIL_ID=; MAIL_JSON=
+mail_wait() {
+  local box="$1" to="$2" subject="$3" timeout="${4:-30}"
+  MAIL_ID=; MAIL_JSON=
+  wait_for "mail to $to about '$subject'" "$timeout" _mail_present "$box" "$to" "$subject" || return 1
+  MAIL_ID=$(mail_find "$box" "$to" "$subject")
+  MAIL_JSON=$(curl -sS --max-time 10 "$box/api/v1/message/$MAIL_ID" 2>/dev/null)
+  [ -n "$MAIL_JSON" ]
+}
+
+mail_count() {  # mail_count BOX TO -> how many messages TO has received
+  curl -sS --max-time 10 "$1/api/v1/messages?limit=200" 2>/dev/null \
+    | jq -r --arg to "$2" '[.messages[]? | select(any(.To[]?; .Address == $to))] | length'
 }
 
 # ── Misc ────────────────────────────────────────────────────────────────────

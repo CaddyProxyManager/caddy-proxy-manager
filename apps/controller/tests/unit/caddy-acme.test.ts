@@ -121,6 +121,44 @@ describe('buildTlsAutomation - DNS-01 challenge resolvers', () => {
     expect(challenge.resolvers).toEqual(['1.1.1.1', '9.9.9.9', '1.0.0.1', '149.112.112.112']);
   });
 
+  // Regression: the column is JSON text, and was read as an object, so this fell back to HTTP-01.
+  it("uses a managed certificate's own provider, as stored", async () => {
+    const usage = new Map<number, any>([
+      [
+        1,
+        {
+          certificate: {
+            id: 1,
+            type: 'managed',
+            autoRenew: true,
+            domainNames: '["*.wild.example.com"]',
+            providerOptions: JSON.stringify({ provider: 'rfc2136' }),
+          },
+          domains: new Set(['*.wild.example.com']),
+        },
+      ],
+    ]);
+    const result = await buildTlsAutomation(usage, new Set(), {
+      dnsSettings: { enabled: false } as never,
+      dnsProviderSettings: {
+        default: null,
+        providers: {
+          rfc2136: {
+            key_name: 'k',
+            key_alg: 'hmac-sha256',
+            key: 'c2VjcmV0',
+            server: '10.0.0.53:53',
+          },
+        },
+      } as never,
+    });
+    const policies = (result.tlsApp as any).automation.policies as any[];
+    expect(policies[0].issuers[0].challenges.dns.provider).toMatchObject({
+      name: 'rfc2136',
+      server: '10.0.0.53:53',
+    });
+  });
+
   it('omits resolvers entirely when DNS settings are disabled', async () => {
     const challenge = await dnsChallenge({
       enabled: false,

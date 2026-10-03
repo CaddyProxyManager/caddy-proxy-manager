@@ -1,6 +1,8 @@
 /** With analytics off, the overview must not query a ClickHouse that is not there and 500. */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import type { TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 
 const ch = vi.hoisted(() => ({
   isAnalyticsEnabled: vi.fn(),
@@ -11,7 +13,7 @@ const ch = vi.hoisted(() => ({
   queryTrafficEvents: vi.fn(),
 }));
 
-vi.mock('@/src/lib/db', () => ({ default: {} }));
+vi.mock('@/src/lib/db', () => dbModuleMock(() => ({}) as TestDb));
 vi.mock('@/src/lib/clickhouse/client', () => ch);
 vi.mock('@/src/lib/agent/client', () => ({
   getAllAgentStatuses: vi

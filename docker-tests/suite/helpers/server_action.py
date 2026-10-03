@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Calls a dashboard server action the way the browser does, for flows with no REST route.
 
-    server_action.py BASE COOKIE_JAR PAGE ACTION [--form] [key=value ...]
+    server_action.py BASE COOKIE_JAR PAGE ACTION [--form|--form-only] [--args JSON] [key=value ...]
 
 The action id is `<hash>#<export>`, fixed per build, so it is read from the page's own client
 chunks. Arguments are React's `encodeReply` shape: `--form` sends `(null, FormData)`, which is what
-`useActionState` passes; without it the action is called with no arguments. Prints the action's
-return value as JSON; exits 2 when the action threw or could not be found.
+`useActionState` passes; `--form-only` sends the FormData alone, as a plain `<form action>` does;
+`--args` sends a JSON array of plain arguments; with none of them the action gets no arguments.
+Prints the action's return value as JSON; exits 2 when the action threw or could not be found.
 """
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -79,8 +81,14 @@ def main():
     args = sys.argv[1:]
     base, jar, page, action = args[:4]
     rest = args[4:]
-    form = "--form" in rest
-    pairs = [item.split("=", 1) for item in rest if item != "--form"]
+    form_only = "--form-only" in rest
+    form = form_only or "--form" in rest
+    plain = "[]"
+    if "--args" in rest:
+        at = rest.index("--args")
+        plain = rest[at + 1]
+        rest = rest[:at] + rest[at + 2:]
+    pairs = [item.split("=", 1) for item in rest if item not in ("--form", "--form-only")]
     cookies = cookie_header(jar)
 
     action_id = find_action_id(base, cookies, page, action)
@@ -90,10 +98,11 @@ def main():
 
     if form:
         # encodeReply: the root row is field 0; a FormData argument's entries follow as `_<ref>_<key>`.
-        fields = [("0", json.dumps([None, "$K1"]))] + [(f"_1_{k}", v) for k, v in pairs]
+        root = ["$K1"] if form_only else [None, "$K1"]
+        fields = [("0", json.dumps(root))] + [(f"_1_{k}", v) for k, v in pairs]
         body, content_type = multipart(fields)
     else:
-        body, content_type = b"[]", "text/plain;charset=UTF-8"
+        body, content_type = plain.encode(), "text/plain;charset=UTF-8"
 
     request = urllib.request.Request(
         base + page,
@@ -108,7 +117,7 @@ def main():
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=int(os.environ.get("SERVER_ACTION_TIMEOUT", "60"))) as response:
             payload = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as error:
         payload = error.read().decode("utf-8", "replace")

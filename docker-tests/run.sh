@@ -50,6 +50,9 @@ compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "$@"; }
 # managed one the agent starts itself.
 AGENT_PROFILES=(--profile agent --profile agent-build --profile crowdsec)
 agent_compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "${AGENT_PROFILES[@]}" "$@"; }
+# The second agent's Caddy, a project of its own that the agent creates; down first, since it holds
+# the fleet network the rig's `down` removes.
+fleet_down() { docker compose -p cpm-test-fleet -f fleet/docker-compose.yml --profile caddy down -v "$@"; }
 
 # The shipped modules, read off the Dockerfile's default so the opt-in image cannot drift from it.
 shipped_modules() {
@@ -59,6 +62,7 @@ shipped_modules() {
            if ($0 ~ /"$/) exit}' ../docker/caddy/Dockerfile
 }
 CPM_TEST_OPT_IN_MODULES="$(shipped_modules)github.com/mholt/caddy-ratelimit github.com/hslatman/caddy-crowdsec-bouncer"
+CPM_TEST_OPT_IN_MODULES+=" github.com/caddyserver/cache-handler github.com/darkweak/storages/redis/caddy"
 export CPM_TEST_OPT_IN_MODULES
 
 # Which half a filter selects: a pattern matching nothing in a half skips that half.
@@ -78,6 +82,7 @@ MAIN=0; matches suite/tests && MAIN=1
 case "$ACTION" in
   down)
     echo "==> tearing the rig down"
+    fleet_down >/dev/null 2>&1
     agent_compose down -v --remove-orphans
     exit $?
     ;;
@@ -95,6 +100,7 @@ teardown() {
   fi
   echo
   echo "==> tearing the rig down"
+  fleet_down >/dev/null 2>&1
   agent_compose down -v --remove-orphans >/dev/null 2>&1
 }
 
@@ -123,7 +129,8 @@ compose up -d --force-recreate dns >/dev/null 2>&1
 # whose exit --wait would treat as a failure to become healthy.
 if ! compose up -d --wait --wait-timeout 300 \
       dns coredns acme-dns pebble caddy web origin-a origin-b origin-tls origin-tcp origin-udp \
-      anubis; then
+      anubis mailpit mailpit-tls bind files caddy-route headscale tsclient h3client authelia \
+      authentik-db authentik-server authentik-worker registry; then
   echo "the rig did not come up healthy" >&2
   compose ps
   compose logs --tail 60 web caddy pebble
@@ -151,8 +158,10 @@ fi
 if [ "$AGENT" = "1" ]; then
   echo
   echo "==> agent phase: an agent in external build mode"
-  if ! agent_compose up -d --wait --wait-timeout 300 crowdsec-lapi runner-docker-proxy ||
-     ! agent_compose up -d docker-socket-proxy agent; then
+  # It shares Caddy's network namespace, which the agent replaces when it recreates Caddy.
+  compose rm -sf caddy-route >/dev/null 2>&1
+  if ! agent_compose up -d --wait --wait-timeout 300 crowdsec-lapi runner-docker-proxy redis ||
+     ! agent_compose up -d docker-socket-proxy agent agent-2 fleet-gw; then
     echo "the agent did not start" >&2
     status=1
   else

@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
+// web keeps the ClickHouse password the default suite needs, and an unset toggle with a password
+// means analytics on - so the agent would start ClickHouse. Set here, not in global-setup, so every
+// compose call a worker makes (a spec recreating web) interpolates the same.
+process.env.ANALYTICS_ENABLED = 'false';
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './global-setup.no-clickhouse.ts',

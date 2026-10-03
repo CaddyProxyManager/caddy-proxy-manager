@@ -85,6 +85,8 @@ type UserEntry = {
   passwordChangedAt: string | null;
   /** The shared demo account, which cannot be disabled, deleted or demoted. */
   isDemoAdmin: boolean;
+  /** Disabled by the auto-disable after failed sign-ins, not by an administrator. */
+  disabledByFailedSignIns?: boolean;
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
@@ -416,7 +418,11 @@ function UserDetail({
         <Banner
           status="warning"
           title={t("disabledBannerTitle")}
-          description={t("disabledBannerDescription")}
+          description={
+            user.disabledByFailedSignIns
+              ? t("disabledByFailedSignInsDescription")
+              : t("disabledBannerDescription")
+          }
         />
       )}
 

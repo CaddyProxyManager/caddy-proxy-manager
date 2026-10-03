@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'bun:test';
 import {
+  envGroupMapping,
   extractGroups,
   mapGroupsToLocalGroups,
   mapGroupsToRole,
@@ -297,5 +298,30 @@ describe('mapGroupsToLocalGroups', () => {
 
   it('returns nothing when group sync is off', () => {
     expect(mapGroupsToLocalGroups(['CPM_Devs'], base)).toEqual([]);
+  });
+});
+
+describe('envGroupMapping', () => {
+  const env = {
+    groupsClaim: null,
+    groupPrefix: null,
+    roleMappingEnabled: true,
+    adminGroup: null,
+    operatorGroup: null,
+    userGroup: null,
+    viewerGroup: null,
+    defaultRole: null,
+    syncGroups: false,
+  };
+
+  it('keeps every role as OAUTH_DEFAULT_ROLE, operator included', () => {
+    for (const role of ['admin', 'operator', 'user', 'viewer'] as const) {
+      expect(envGroupMapping({ ...env, defaultRole: role }).defaultRole).toBe(role);
+    }
+  });
+
+  it('falls back to user for an unset or unknown role, and to the groups claim', () => {
+    expect(envGroupMapping(env)).toMatchObject({ defaultRole: 'user', groupsClaim: 'groups' });
+    expect(envGroupMapping({ ...env, defaultRole: 'root' }).defaultRole).toBe('user');
   });
 });

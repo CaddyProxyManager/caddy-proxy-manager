@@ -163,7 +163,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       {
         id: "email",
         name: "Email",
-        desc: "The SMTP server resets, invitations and alerts are sent through",
+        desc: "The SMTP server resets, invitations and notifications are sent through",
         icon: Mail,
         blocks: [
           {
@@ -181,10 +181,27 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             ],
           },
           {
+            // Was "Certificate Alerts"; the id stays, so anchors and links still land here.
             id: "certificate-alerts",
-            name: "Certificate Alerts",
-            desc: "Who is told when a certificate is about to expire",
-            envSearch: ["CERTIFICATE_EXPIRY_ALERT_DAYS", "EMAIL_ALERT_RECIPIENTS"],
+            name: "Notifications",
+            desc: "What the administrators are emailed about, and who else is",
+            envSearch: [
+              "CERTIFICATE_EXPIRY_ALERT_DAYS",
+              "EMAIL_ALERT_RECIPIENTS",
+              "NOTIFY_ACCOUNT_DISABLED",
+              "NOTIFY_ADMIN_LOCKED",
+              "NOTIFY_ADMIN_ADDED",
+              "NOTIFY_AGENT_OFFLINE",
+              "NOTIFY_AGENT_OFFLINE_MINUTES",
+              "NOTIFY_UPSTREAM_ERRORS",
+              "NOTIFY_UPSTREAM_ERROR_COUNT",
+              "NOTIFY_UPSTREAM_ERROR_MINUTES",
+              "NOTIFY_CADDY_APPLY",
+              "NOTIFY_AGENT_PROBLEMS",
+              "NOTIFY_GEOIP_FAILED",
+              "NOTIFY_CRS_PLUGIN_DISABLED",
+              "NOTIFY_UPDATE_AVAILABLE",
+            ],
           },
         ],
       },
@@ -307,6 +324,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "LOGIN_MAX_ATTEMPTS",
               "LOGIN_WINDOW_MS",
               "LOGIN_BLOCK_MS",
+              "ACCOUNT_LOCK_ENABLED",
+              "ACCOUNT_LOCK_FREE_FAILURES",
+              "ACCOUNT_LOCK_BASE_DELAY_MS",
+              "ACCOUNT_LOCK_MAX_DELAY_MS",
+              "ACCOUNT_LOCK_DISABLE_ENABLED",
+              "ACCOUNT_LOCK_DISABLE_AFTER",
             ],
           },
           {

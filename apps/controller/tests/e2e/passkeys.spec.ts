@@ -50,6 +50,21 @@ async function attachAuthenticator(target: Page) {
   };
 }
 
+/**
+ * With automatic presence the virtual authenticator completes the username field's autofill
+ * ceremony unprompted, ~100ms after hydration, racing any click. Conditional UI is off unless this
+ * cookie is set, so each test drives exactly one ceremony.
+ */
+const AUTOFILL_COOKIE = 'e2e-passkey-autofill';
+
+async function gateConditionalUi(target: BrowserContext) {
+  await target.addInitScript((cookie) => {
+    if (!window.PublicKeyCredential) return;
+    PublicKeyCredential.isConditionalMediationAvailable = () =>
+      Promise.resolve(document.cookie.includes(`${cookie}=1`));
+  }, AUTOFILL_COOKIE);
+}
+
 async function admin(browser: Browser) {
   return (await browser.newContext({ storageState: ADMIN_STATE })).request;
 }
@@ -61,6 +76,7 @@ test.describe('Passkeys', () => {
     seed.ensureTestUser(USERNAME, PASSWORD, 'user');
     seed.clearPasskeys(EMAIL);
     context = await browser.newContext();
+    await gateConditionalUi(context);
     page = await context.newPage();
     authenticator = await attachAuthenticator(page);
   });
@@ -104,6 +120,20 @@ test.describe('Passkeys', () => {
     await expect(page.getByText(EMAIL).first()).toBeVisible();
   });
 
+  test('signs in from the username field autofill, with no click at all', async () => {
+    await context.clearCookies();
+    await context.addCookies([{ name: AUTOFILL_COOKIE, value: '1', url: BASE }]);
+    try {
+      await page.goto(`${BASE}/login`);
+      await waitForHydration(page);
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15_000 });
+      await page.goto(`${BASE}/profile`);
+      await expect(page.getByText(EMAIL).first()).toBeVisible();
+    } finally {
+      await context.clearCookies({ name: AUTOFILL_COOKIE });
+    }
+  });
+
   test('signs in through the forward-auth portal', async ({ browser }) => {
     const request = await admin(browser);
     const created = await request.post(`${API}/proxy-hosts`, {
@@ -130,8 +160,6 @@ test.describe('Passkeys', () => {
     let redirectTo: string | null = null;
     await page.route('**/api/forward-auth/session-login', async (route) => {
       const response = await route.fetch();
-      // The virtual authenticator also completes the autofill ceremony unprompted, so the click
-      // below exchanges a second time and finds the one-time intent spent: keep the first answer.
       redirectTo ??= (await response.json()).redirectTo ?? null;
       // Not followed: the test domain resolves only through the test's own HTTP helper.
       await route.fulfill({ status: 200, json: {} });

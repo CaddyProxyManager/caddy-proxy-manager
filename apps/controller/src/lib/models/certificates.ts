@@ -6,6 +6,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { getDashboardSettings } from "../settings";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
 import { domainError } from "../domain-error";
+import { checkCertificatePair } from "../certificate-pem";
 import {
   normalizeCertificateProviderOptions,
   parseStoredCertificateProviderOptions,
@@ -89,6 +90,19 @@ function validateCertificateInput(input: CertificateInput) {
   if (input.type === "imported") {
     if (!input.certificatePem || !input.privateKeyPem) {
       throw domainError("importedCertificatePemRequired");
+    }
+    // Caddy refuses a pair it cannot load, and with it the whole config: every host stops updating.
+    const pair = checkCertificatePair(input.certificatePem, input.privateKeyPem);
+    if (!pair.ok && pair.error !== "no-names") {
+      throw domainError(
+        pair.error === "not-a-certificate"
+          ? "importedCertificateInvalid"
+          : pair.error === "not-a-key"
+            ? "importedCertificateKeyInvalid"
+            : "importedCertificateKeyMismatch",
+        {},
+        { status: 400 },
+      );
     }
   }
 }

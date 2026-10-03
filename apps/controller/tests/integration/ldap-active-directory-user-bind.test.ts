@@ -18,7 +18,7 @@ import { DomainError } from '@/src/lib/domain-error';
 import type { LdapDirectory } from '@/src/lib/models/ldap-directories';
 import { createTestDatabase } from '@/tests/helpers/db';
 import { TEST_ENV } from '@/tests/helpers/env';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadConfig } from '@/tests/helpers/config';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 import {
@@ -86,8 +86,7 @@ beforeAll(async () => {
   process.env.AUTH_ALLOW_OAUTH_REGISTRATION = 'true';
   resetDbModuleState();
 
-  const config = await import(`@/src/lib/config${fresh()}`);
-  vi.mock('@/src/lib/config', () => ({ ...config }));
+  await reloadConfig();
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
 
@@ -98,16 +97,16 @@ beforeAll(async () => {
   }));
 
   const directories = (await import(
-    `@/src/lib/models/ldap-directories${fresh()}`
+    '@/src/lib/models/ldap-directories'
   )) as typeof import('@/src/lib/models/ldap-directories');
-  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
+  const authServer = await import('@/src/lib/auth-server');
   const auth = await authServer.getAuth();
   const forwardAuth = (await import(
-    `@/src/lib/models/forward-auth${fresh()}`
+    '@/src/lib/models/forward-auth'
   )) as typeof import('@/src/lib/models/forward-auth');
-  const portal = await import(`@/src/app/api/forward-auth/login/route${fresh()}`);
+  const portal = await import('@/src/app/api/forward-auth/login/route');
   const actions = (await import(
-    `@/src/app/(dashboard)/settings/ldap-actions${fresh()}`
+    '@/src/app/(dashboard)/settings/ldap-actions'
   )) as typeof import('@/src/app/(dashboard)/settings/ldap-actions');
 
   const directory = await directories.createLdapDirectory(directoryInput(ad.ldapsUrl));

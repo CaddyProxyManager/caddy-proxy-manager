@@ -941,7 +941,15 @@ export default function AnalyticsClient() {
         <Banner
           status="info"
           title={t("analyticsDisabledTitle")}
-          description={t("analyticsDisabledDescription")}
+          description={
+            <Text type="body" size="sm">
+              {t.rich("analyticsDisabledDescription", {
+                link: (chunks) => (
+                  <AstryxLink href={settingsHref("analytics")}>{chunks}</AstryxLink>
+                ),
+              })}
+            </Text>
+          }
         />
       )}
 

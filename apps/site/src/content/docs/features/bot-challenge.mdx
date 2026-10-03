@@ -78,7 +78,8 @@ through", so without `DENY: 403` every bot your policy denies reaches the upstre
 
 1. Open the host's editor and switch on **Bot challenge (Anubis)**.
 
-2. Enter the **Anubis URL** as Caddy reaches it, such as `http://anubis:8923`.
+2. Enter the **Anubis URL** as Caddy reaches it, such as `http://anubis:8923`. Like an upstream,
+   only an administrator can point it at Caddy's admin port, a unix socket or a placeholder.
 
 3. List any **Exempt paths**, one per line, and save.
 
@@ -98,6 +99,9 @@ What CPM adds to the host:
 - **The client address** is the one Caddy resolved through **Settings → Network → Trusted
   Proxies**, sent as `X-Real-Ip`. Behind a CDN, set that up first, or Anubis sees the CDN's
   address and every visitor shares its challenges.
+- **The client's `Authorization` header is withheld** from Anubis. The check runs before an access
+  list strips it, and whoever edits the host picks the Anubis URL, so credentials never leave for
+  it. Cookies still go, since Anubis's pass cookie has a configurable name.
 
 The check runs after CrowdSec, rate limiting, geo blocking and the WAF, which refuse from memory or
 on their own, and before path rules, redirects, access lists and any

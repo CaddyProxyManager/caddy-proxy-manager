@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '@/tests/helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
@@ -15,15 +16,7 @@ const schemaModule = await import('@/src/lib/db/schema');
 // synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('@/src/lib/db', () => ({
-  default: currentDb(() => ctx.db),
-  db: currentDb(() => ctx.db),
-  client: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 
 const registry = await import('@/src/lib/settings/registry');
 const {
@@ -180,6 +173,28 @@ describe('secrets', () => {
   it('stores an empty secret as-is rather than encrypting nothing', async () => {
     await saveSettings({ [registry.clickhousePassword.key]: '' });
     expect(await getSetting(registry.clickhousePassword)).toBe('');
+  });
+});
+
+describe('the ClickHouse connection fields', () => {
+  it('reads an emptied field as its default, as Compose and an empty variable do', async () => {
+    await saveSettings({
+      [registry.clickhouseUrl.key]: '',
+      [registry.clickhouseUser.key]: ' ',
+      [registry.clickhouseDb.key]: '',
+    });
+    expect(await getSetting(registry.clickhouseUrl)).toBe('http://clickhouse:8123');
+    expect(await getSetting(registry.clickhouseUser)).toBe('cpm');
+    expect(await getSetting(registry.clickhouseDb)).toBe('analytics');
+  });
+
+  it('reads an empty database name stored before that as the default too', async () => {
+    await ctx.db.insert(schemaModule.settings).values({
+      key: registry.clickhouseDb.key,
+      value: '""',
+      updatedAt: new Date().toISOString(),
+    });
+    expect(await getSetting(registry.clickhouseDb)).toBe('analytics');
   });
 });
 

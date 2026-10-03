@@ -1,0 +1,8 @@
+$ORIGIN rfc.cpm.test.
+$TTL 1
+@   IN SOA ns.rfc.cpm.test. admin.cpm.test. 1 60 60 60 1
+@   IN NS  ns.rfc.cpm.test.
+ns  IN A   172.28.0.53
+; The zone's names are Caddy's, as the rest of cpm.test is.
+@   IN A   172.28.0.10
+*   IN A   172.28.0.10

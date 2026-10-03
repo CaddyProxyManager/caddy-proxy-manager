@@ -58,13 +58,14 @@ Credentials are encrypted at rest, and propagation delay and timeout are configu
 - netcup ships with slow-propagation defaults because it needs them.
 
 A provider can be overridden per certificate when one domain lives somewhere else - through the
-[API](../api/) only; the dashboard uses the global provider.
+REST [API](../api/) only (`providerOptions.provider`); the dashboard uses the global provider. The
+override needs that provider's credentials saved in Settings, or the global provider is used.
 
 ### Challenge delegation
 
 A domain whose DNS host has no API can still use DNS-01. Create a CNAME from its
 `_acme-challenge` name to a record in a zone you *can* write through a supported provider, and add
-a delegation under **Settings → DNS Providers → Challenge delegation**:
+a delegation under **Settings → DNS → DNS Providers → Challenge delegation**:
 
 - **Domain** - covers itself and every name under it; the longest matching domain wins. A
   wildcard `*.example.com` answers at `_acme-challenge.example.com`, so it shares the apex's record.
@@ -119,10 +120,13 @@ A DNS provider is a compiled-in Caddy module. If the one you want is greyed out,
 
 ## Manual imports
 
-Bring your own certificate and key. Expiry is tracked, and the page counts down to the next import
-to lapse, so one that is about to expire is visible rather than a surprise. With
-[email](../email/#certificate-alerts) set up, the administrators are also told by mail - about an
-imported certificate nearing expiry, and about a managed one Caddy has failed to renew.
+Bring your own certificate and key. A pair is refused on save if the certificate is not PEM X.509,
+the key is not an unencrypted PEM key, or the key does not match the certificate - Caddy would
+refuse to load it, and every host would stop updating with it. Expiry is tracked, and the page
+counts down to the next import to lapse, so one that is about to expire is visible rather than a
+surprise. With [email](../email/#certificate-alerts) set up, the administrators are also told by
+mail - about an imported certificate nearing expiry, and about a managed one Caddy has failed to
+renew.
 
 A certificate a host still uses cannot be deleted - the dialog names the hosts, and the REST API
 answers 409. Choose another certificate on them first, so no host quietly falls back to automatic

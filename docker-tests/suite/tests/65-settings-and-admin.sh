@@ -36,7 +36,8 @@ api PUT /api/v1/settings/upstream-dns '{"enabled":true,"family":"ipv4"}'
 t_eq "upstream DNS resolution settings can be saved" "200" "$API_STATUS"
 api GET /api/v1/settings/upstream-dns
 t_eq "upstream DNS resolution settings round-trip" "ipv4" "$(jqr '.family')"
-api PUT /api/v1/settings/upstream-dns '{"enabled":false,"family":null}'
+api PUT /api/v1/settings/upstream-dns '{"enabled":false,"family":"both"}'
+t_eq "upstream DNS resolution can be switched off again" "200" "$API_STATUS"
 
 api PUT /api/v1/settings/dns \
   '{"enabled":true,"resolvers":["172.28.0.5"],"fallbacks":["172.28.0.5"],"timeout":"5s"}'
@@ -54,7 +55,8 @@ create_host_or_fail "a host can be created with a custom DNS resolver in effect"
 wait_for_https "$dnsdomain" 120
 t_eq "upstream resolution through the configured resolver works" "200" "$(http_code "https://$dnsdomain/")"
 
-api PUT /api/v1/settings/dns '{"enabled":false,"resolvers":[],"fallbacks":[],"timeout":null}'
+api PUT /api/v1/settings/dns '{"enabled":false,"resolvers":[]}'
+t_eq "DNS resolver settings can be switched off again" "200" "$API_STATUS"
 
 # ── Metrics listener ────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ t_eq "access logging can be enabled" "200" "$API_STATUS"
 api GET /api/v1/settings/logging
 t_eq "the log format round-trips" "json" "$(jqr '.format')"
 api PUT /api/v1/settings/logging '{"enabled":false}'
+t_eq "access logging can be switched off again" "200" "$API_STATUS"
 
 # ── Groups ──────────────────────────────────────────────────────────────────
 

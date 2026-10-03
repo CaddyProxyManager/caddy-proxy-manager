@@ -7,12 +7,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Just under today's numbers: raise as coverage improves, never lower to pass a build. They assume
- * the serial `bun run test:coverage`; under `--parallel` both sides of the ratio move.
+ * Under today's numbers by about the run-to-run spread, which has been a point: raise as coverage
+ * improves, never lower to pass a build. They assume the serial `bun run test:coverage`; under
+ * `--parallel` both sides of the ratio move.
  */
 const THRESHOLDS = {
-  lines: 76,
-  functions: 81,
+  lines: 90,
+  functions: 93,
 } as const;
 
 const LCOV_PATH = resolve(import.meta.dir, "..", "coverage", "lcov.info");

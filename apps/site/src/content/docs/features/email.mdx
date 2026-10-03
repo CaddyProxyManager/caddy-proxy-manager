@@ -1,13 +1,15 @@
 ---
 title: Email
-description: Password resets, invitations and certificate alerts, sent through your own SMTP server.
+description: Password resets, invitations, certificate alerts and admin notifications, sent through your own SMTP server.
 ---
 
-CPM sends three kinds of mail, all through an SMTP server you name under **Settings → Email**:
+CPM sends four kinds of mail, all through an SMTP server you name under **Settings → Email**:
 
 - **Password reset links**, from **Forgot your password?** on the sign-in page.
 - **Invitations**, so an administrator can create an account and let its owner choose the password.
 - **Certificate alerts**, a digest for the administrators when a certificate is about to expire.
+- **Notifications**, when something an administrator should know about happens: an agent gone
+  offline, a host whose upstream keeps failing, an account disabled after failed sign-ins.
 
 Until a server and a sender address are saved, none of these is offered: the sign-in page has no
 reset link, and **Users** has no invitation option.
@@ -58,7 +60,7 @@ still without a password, **Email a reset link** for one with.
 
 Twice a day the controller looks at every certificate - imported ones, and the ones each agent's
 Caddy manages - and emails a digest of those that have fewer days left than the threshold under
-**Settings → Email → Certificate Alerts** (14 by default; 0 turns alerts off).
+**Settings → Email → Notifications** (14 by default; 0 turns alerts off).
 
 - **Caddy renews on its own.** A managed certificate is reported only once it is also in the last
   quarter of its life, well past the point Caddy starts renewing, so an alert means renewal is
@@ -67,3 +69,48 @@ Caddy manages - and emails a digest of those that have fewer days left than the 
   A renewed certificate starts over.
 - **Recipients** are the addresses you list, or every active administrator with a deliverable
   address when the list is empty.
+
+## Notifications
+
+**Settings → Email → Notifications** has a switch for each kind of event, all on by default. They
+go to the same recipients as the certificate alerts.
+
+| Event | What raises it | Told again when |
+| --- | --- | --- |
+| Account disabled | An account [disabled after failed sign-ins](../users-and-groups/#password-policy), or the last active administrator kept enabled instead | - |
+| Administrator locked | The per-account lock engaging on an administrator (at most hourly per account) | - |
+| New administrator | An administrator account created, or a user made one: on **Users**, over the API, or by an identity provider's groups | - |
+| Agent offline | An agent that had connected, gone longer than a threshold (5 minutes) | It is back |
+| Upstream errors | A proxy host answering 502, 503 or 504 a number of times (10) within some minutes (5) | A whole window without one |
+| Caddy configuration refused | Caddy refusing a configuration, on the whole fleet or one agent | A configuration loads again |
+| Agent failures | An agent reporting a failed Caddy build, optional service or L4 port change, or log files it cannot read or prune (so its disk may fill) | The operation applies |
+| GeoIP update failing | The GeoIP update failing three runs in a row | It works again |
+| CRS plugin switched off | A CRS plugin Caddy refused, switched off so the rest loads | - |
+| New release | A newer release, once per version, while the update check is on | - |
+
+- **One email a minute at most.** Whatever happens within a minute goes out together. A problem is
+  told once however long it lasts, and its recovery once; one that is over before its email goes out
+  costs no email at all.
+- **A failed send is retried** every five minutes for a day. The block shows when a notification
+  was last sent, how many are waiting, and the last error. **Send a test notification** sends one
+  to the real recipients straight away.
+- **Nothing is queued while email is off**, so setting it up later does not bring a backlog.
+- **Times are in UTC**, and say so: an email has no reader whose time zone could be asked.
+
+### Agents going offline
+
+The controller times an agent from when it first saw it disconnected. After the controller itself
+restarts, every agent gets the whole threshold to reconnect before anyone is told. An agent that
+never connected, is switched off or has been unpaired is no news.
+
+### Upstream errors
+
+These are counted from Caddy's access log, so **access logging must be on**, in JSON, under
+**Settings → Observability → Access Logging**; the block says so when it is not. ClickHouse is not
+needed: while this notification is on and email is set up, each agent reads its access log and
+sends the controller counts of 502, 503 and 504 answers per host and minute, analytics or not. A
+logged name that is not one of your proxy hosts is ignored. The access log does not record which
+upstream answered, so the email names the host.
+
+The counts are kept in memory. After the controller restarts, nothing is called recovered until a
+whole window has passed.

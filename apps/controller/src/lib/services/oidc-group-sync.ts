@@ -9,7 +9,7 @@ import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { type AppRole, normalizeGroupName } from "../oidc-groups";
 import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
-import { isLastActiveAdmin, withAdminLock } from "../models/user";
+import { isLastActiveAdmin, reportNewAdmin, withAdminLock } from "../models/user";
 
 export type PendingOidcSync = {
   providerId: string;
@@ -106,6 +106,7 @@ async function applyRoleLocked(
     entityId: userId,
     summary: `Role for user ${userId} set to "${entry.role}" from ${entry.providerName} groups (was "${current.role}")`,
   });
+  if (role === "admin") await reportNewAdmin(current, true);
 }
 
 async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void> {

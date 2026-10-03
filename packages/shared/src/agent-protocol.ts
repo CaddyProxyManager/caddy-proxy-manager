@@ -307,6 +307,13 @@ export type FleetConfig = {
   analytics: boolean;
 
   /**
+   * Count the access log's 502/503/504 answers per host and relay them (`upstream-errors`),
+   * whatever `analytics` says: the admin notification needs no ClickHouse. Absent from an older
+   * controller, which would refuse the kind.
+   */
+  upstreamErrors?: boolean;
+
+  /**
    * Pulled, not pushed: tens of megabytes. Agents prefer their paired address joined to
    * `CONTROLLER_GEOIP_ROUTE`, since one beside the controller would otherwise fetch through the
    * Caddy it has not started; `url` (the public address) remains for older agents.
@@ -345,6 +352,18 @@ export type WafEventRow = {
   blocked: boolean;
   method: string;
   uri: string;
+};
+
+/** The answers a dead or overloaded upstream gets a proxy to give. */
+export const UPSTREAM_ERROR_STATUSES = [502, 503, 504] as const;
+
+/** Access-log answers in `UPSTREAM_ERROR_STATUSES`, per host and minute: counts, never requests. */
+export type UpstreamErrorRow = {
+  /** Unix seconds at the start of the minute, from the log's own timestamps. */
+  minute: number;
+  host: string;
+  status: number;
+  count: number;
 };
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
@@ -388,7 +407,8 @@ export const AGENT_OPERATIONS = {
     "mutation AgentCertificateFiles($results: [JSON!]!) { agentCertificateFiles(results: $results) }",
 } as const;
 
-export const AGENT_ANALYTICS_KINDS = ["traffic", "waf"] as const;
+/** `upstream-errors` goes only to a controller that set `FleetConfig.upstreamErrors`. */
+export const AGENT_ANALYTICS_KINDS = ["traffic", "waf", "upstream-errors"] as const;
 export type AgentAnalyticsKind = (typeof AGENT_ANALYTICS_KINDS)[number];
 
 /** A malformed row is dropped, not fatal. */

@@ -1,12 +1,15 @@
 # shellcheck shell=bash
-# Sourced by agent-phase files that need Rate Limit or CrowdSec, after lib.sh. Puts Caddy on the
-# image with both, the way an operator does it: select the modules, rebuild under the tag the agent
-# runs (a retag of cpm-test/caddy:opt-in here), then Load built image. Skipped when already done.
+# Sourced by agent-phase files that need Rate Limit, CrowdSec or the HTTP cache, after lib.sh. Puts
+# Caddy on the image with all of them, the way an operator does it: select the modules, rebuild
+# under the tag the agent runs (a retag of cpm-test/caddy:opt-in here), then Load built image.
+# Skipped when already done.
 
 OPT_IN_IMAGE=cpm-test/caddy:opt-in
 AGENT_IMAGE=cpm-test/caddy:external
 RATELIMIT_MODULE=github.com/mholt/caddy-ratelimit
 CROWDSEC_MODULE=github.com/hslatman/caddy-crowdsec-bouncer
+CACHE_MODULE=github.com/caddyserver/cache-handler
+CACHE_REDIS_MODULE=github.com/darkweak/storages/redis/caddy
 
 opt_in_agent_ready() {
   api_session GET /api/caddy-build
@@ -17,15 +20,16 @@ opt_in_agent_ready() {
 opt_in_applied() {
   api_session GET /api/caddy-build
   [ "$API_STATUS" = "200" ] &&
-    [ "$(jqr '(.diff.appliedSpecs | index($r) != null) and (.diff.appliedSpecs | index($c) != null)' \
-      --arg r "$RATELIMIT_MODULE" --arg c "$CROWDSEC_MODULE")" = "true" ]
+    [ "$(printf '%s' "$API_BODY" | jq -r '[$ARGS.positional[] as $m | .diff.appliedSpecs | index($m) != null] | all' \
+      --args "$RATELIMIT_MODULE" "$CROWDSEC_MODULE" "$CACHE_MODULE" "$CACHE_REDIS_MODULE")" = "true" ]
 }
 
 # Merged into the stored selection: PUT replaces the map, and a module left out reverts to default.
 opt_in_select() {
   api GET /api/v1/caddy/modules
   local selection
-  selection=$(jqr '.selection.modules + {"caddy-ratelimit": true, "caddy-crowdsec": true}' -c)
+  selection=$(jqr '.selection.modules + {"caddy-ratelimit": true, "caddy-crowdsec": true,
+    "cache-handler": true, "souin-storage-redis": true}' -c)
   api PUT /api/v1/caddy/modules "$(jq -nc --argjson m "$selection" '{modules: $m}')"
   [ "$API_STATUS" = "200" ]
 }
@@ -44,14 +48,14 @@ ensure_opt_in_caddy() {
     finish
   fi
   if opt_in_select; then
-    pass "Rate Limit and CrowdSec can be selected in Settings → Caddy Build"
+    pass "the opt-in modules can be selected in Settings → Caddy Build"
   else
-    fail "Rate Limit and CrowdSec can be selected in Settings → Caddy Build" \
+    fail "the opt-in modules can be selected in Settings → Caddy Build" \
       "HTTP $API_STATUS: $(printf '%.300s' "$API_BODY")"
   fi
 
   if opt_in_applied; then
-    info "Caddy already runs an image with both modules"
+    info "Caddy already runs an image with the opt-in modules"
     return 0
   fi
 
@@ -67,14 +71,14 @@ ensure_opt_in_caddy() {
     case "$API_BODY" in *"already running"*) sleep 3 ;; *) break ;; esac
   done
   if [ "$loaded" != "1" ]; then
-    fail "the image with both modules can be loaded" "HTTP $API_STATUS: $(printf '%.300s' "$API_BODY")"
+    fail "the image with the opt-in modules can be loaded" "HTTP $API_STATUS: $(printf '%.300s' "$API_BODY")"
     finish
   fi
 
-  if wait_for "the agent to report both modules applied" 300 opt_in_applied; then
-    pass "the agent reads both modules off the loaded image's caddy-modules.txt"
+  if wait_for "the agent to report the opt-in modules applied" 300 opt_in_applied; then
+    pass "the agent reads the opt-in modules off the loaded image's caddy-modules.txt"
   else
-    fail "the agent reads both modules off the loaded image's caddy-modules.txt" \
+    fail "the agent reads the opt-in modules off the loaded image's caddy-modules.txt" \
       "applied: $(jqr -c '.diff.appliedSpecs') status: $(jqr -c '.status')"
     finish
   fi

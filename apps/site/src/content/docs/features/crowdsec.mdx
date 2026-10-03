@@ -140,12 +140,16 @@ when AppSec is unavailable** reverses that. AppSec does not apply to L4 hosts.
 
 ## The bouncer key
 
-In managed mode CPM makes the key and nobody types it. In external mode, the key is stored encrypted, never shown again, and left out of REST and GraphQL reads (they
-report only `hasApiKey`) and of the config diff in the review sheet. Leaving the field blank keeps
-the stored key, but only while both the Local API and AppSec addresses stay the same - move either
-and the key has to be entered again, so a stored key cannot be redirected to another server. A
-Caddy placeholder such as `{env.CROWDSEC_API_KEY}` works too and keeps the key out of the
-database, though **Test connection** cannot check it.
+In managed mode CPM makes the key and nobody types it. In external mode, the key is stored
+encrypted, never shown again, and left out of REST and GraphQL reads (they report only `hasApiKey`)
+and of the config diff in the review sheet. Leaving the field blank keeps the stored key, but only
+while both the Local API and AppSec addresses stay the same - move either and the key has to be
+entered again, so a stored key cannot be redirected to another server. A Caddy placeholder such as
+`{env.CROWDSEC_API_KEY}` works too and keeps the key out of the database, though **Test connection**
+cannot check it. The variable has to be in Caddy's own environment, which the bundled `caddy`
+service does not pass: add it under `caddy.environment` in a `docker-compose.override.yml`. The
+agent never reads `.env`, so a `${CROWDSEC_API_KEY}` there also needs the variable forwarded under
+`agent.environment`.
 
 In external mode every agent whose Caddy has the module compiled in is sent the key; in managed
 mode only the bundled agent is. Plain `http` is accepted only for a private address; a LAPI on the

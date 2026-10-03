@@ -28,6 +28,7 @@ import {
 import {
   normalizeWafPluginIds,
   normalizeWafPresetIds,
+  parseWafIdListJson,
   parseBodyLimitMib,
 } from "@/src/lib/caddy-waf";
 import { type HostCacheConfig, hydrateHostCache, sanitizeHostCache } from "@/src/lib/host-cache";
@@ -501,14 +502,18 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
       : "";
   const rawExcl = formData.get("wafExcludedRuleIds");
   const excluded_rule_ids: number[] = rawExcl
-    ? (JSON.parse(rawExcl as string) as unknown[]).filter(
+    ? parseWafIdListJson(rawExcl as string).filter(
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       )
     : [];
   const rawPresets = formData.get("wafPresetIds");
-  const preset_ids = rawPresets ? normalizeWafPresetIds(JSON.parse(rawPresets as string)) : [];
+  const preset_ids = rawPresets
+    ? normalizeWafPresetIds(parseWafIdListJson(rawPresets as string))
+    : [];
   const rawPlugins = formData.get("wafPluginIds");
-  const plugin_ids = rawPlugins ? normalizeWafPluginIds(JSON.parse(rawPlugins as string)) : [];
+  const plugin_ids = rawPlugins
+    ? normalizeWafPluginIds(parseWafIdListJson(rawPlugins as string))
+    : [];
 
   if (!enabled) {
     return { waf: { enabled: false, waf_mode: wafMode } };
@@ -864,7 +869,8 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     loadBalancer: parseLoadBalancerConfig(formData),
     dnsResolver: parseDnsResolverConfig(formData),
     upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),
-    ...parseGeoBlockConfig(formData),
+    // parseGeoBlockConfig reads no section as "no rules", which is creation's default, not an edit.
+    ...(formData.has("geoblockPresent") ? parseGeoBlockConfig(formData) : {}),
     ...parseWafConfig(formData),
     mtls: formData.has("mtlsPresent") ? parseMtlsConfig(formData) : undefined,
     redirects: formData.has("redirectsJson") ? parseRedirectsConfig(formData) : undefined,

@@ -18,7 +18,7 @@ import {
   type CertificateFilesAck,
 } from "@cpm/shared";
 import { AnalyticsIngestError, ingestAnalytics } from "../agent/analytics-ingest";
-import { modulesChanged, reapplyAfterModuleChange } from "../agent/module-change";
+import { modulesChanged, portsReapplied, reapplyAfterRecreate } from "../agent/module-change";
 import {
   attach,
   connectedAgents,
@@ -137,7 +137,12 @@ export const agentResolvers = {
       const previous =
         connectedAgents().find((candidate) => candidate.agentId === agent.agentId)?.status ?? null;
       recordStatus(agent.agentId, status);
-      if (modulesChanged(previous, status)) reapplyAfterModuleChange(agent.agentId);
+      if (modulesChanged(previous, status) || portsReapplied(previous, status)) {
+        reapplyAfterRecreate(agent.agentId);
+      }
+      void import("../notifications/agents")
+        .then(({ reportAgentStatus }) => reportAgentStatus(agent, previous, status))
+        .catch((error: unknown) => console.error("[notifications] agent status:", error));
       // The attach-time state went out before this agent's capabilities were known.
       const shapesState = (s: AgentStatus | null) =>
         DESIRED_STATE_CAPABILITIES.map((c) => s?.capabilities?.includes(c) ?? false).join();

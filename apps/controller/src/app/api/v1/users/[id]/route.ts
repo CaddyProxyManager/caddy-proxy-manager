@@ -101,7 +101,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if (hasRole) await updateUserRole(targetId, body.role);
-    if (hasStatus) await updateUserStatus(targetId, body.status);
+    if (hasStatus) {
+      await updateUserStatus(targetId, body.status);
+      // As the Users page does: the page reads the latest status change back from here.
+      await logAuditEvent({
+        userId: auth.userId,
+        action: "update",
+        entityType: "user",
+        entityId: targetId,
+        summary: `Changed user ${targetId} status to ${body.status}`,
+      });
+    }
 
     const user = await getUserById(targetId);
     if (!user) {

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Simulated proxy destinations for the caddy-proxy-manager docker test rig.
 
-One script, five modes, chosen by argv[1]:
+One script, several modes, chosen by argv[1]:
 
     http  PORT              plain HTTP origin (also speaks WebSocket on /ws)
     https PORT CERT KEY     the same origin behind TLS
     tcp   PORT              raw TCP line echo, no protocol awareness
     udp   PORT              raw UDP datagram echo
+    files PORT CERT KEY DIR static files over TLS, standing in for third-party hosts
 
 The HTTP origin reflects everything the proxy did to a request - the Host it
 forwarded, every header it added, the address it connected from - so the test
@@ -333,6 +334,94 @@ def serve_udp(port):
         sock.sendto(("ECHO %s %s\n" % (ORIGIN_ID, text)).encode(), addr)
 
 
+# ── Static files for third-party hosts ──────────────────────────────────────
+#
+# dnsmasq points names like download.maxmind.com here, so a request is answered from
+# DIR/<Host>/<path>, the query ignored. Beside a file, `<file>.redirect` holds a Location to send
+# instead; in a host's directory, `.auth` holds the Authorization header every request must carry.
+# The tests write DIR through a volume they share.
+
+FILES_ROOT = "/srv/files"
+FILES_LOG = collections.deque(maxlen=500)
+
+
+class FilesHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    server_version = "cpm-test-files"
+    sys_version = ""
+
+    def log_message(self, fmt, *args):  # noqa: D102
+        sys.stderr.write("[files] %s - %s\n" % (self.client_address[0], fmt % args))
+
+    def _send(self, status, body=b"", headers=None):
+        self.send_response(status)
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _dispatch(self):
+        host = (self.headers.get("Host") or "").split(":")[0].lower()
+        path = self.path.split("?", 1)[0]
+        if path == "/__requests":
+            with REQUEST_LOG_LOCK:
+                body = json.dumps(list(FILES_LOG)).encode()
+            self._send(200, body, {"Content-Type": "application/json"})
+            return
+        with REQUEST_LOG_LOCK:
+            FILES_LOG.append({
+                "host": host,
+                "method": self.command,
+                "raw_path": self.path,
+                "authorization": self.headers.get("Authorization"),
+            })
+
+        base = os.path.realpath(os.path.join(FILES_ROOT, host))
+        target = os.path.realpath(os.path.join(base, path.lstrip("/")))
+        if not target.startswith(base + os.sep):
+            self._send(404, b"not found")
+            return
+        auth_file = os.path.join(base, ".auth")
+        if os.path.isfile(auth_file):
+            with open(auth_file, encoding="utf-8") as handle:
+                wanted = handle.read().strip()
+            if self.headers.get("Authorization") != wanted:
+                self._send(401, b"unauthorized", {"WWW-Authenticate": 'Basic realm="rig"'})
+                return
+        if os.path.isfile(target + ".redirect"):
+            with open(target + ".redirect", encoding="utf-8") as handle:
+                self._send(302, b"", {"Location": handle.read().strip()})
+            return
+        if not os.path.isfile(target):
+            self._send(404, b"not found")
+            return
+        with open(target, "rb") as handle:
+            body = handle.read()
+        # API answers are stored without an extension, so sniff rather than guess from the name.
+        kind = "application/json" if body[:1] in (b"{", b"[") else "application/octet-stream"
+        self._send(200, body, {"Content-Type": kind})
+
+    def do_GET(self):  # noqa: N802
+        self._dispatch()
+
+    def do_HEAD(self):  # noqa: N802
+        self._dispatch()
+
+
+def serve_files(port, certfile, keyfile, root):
+    global FILES_ROOT
+    FILES_ROOT = root
+    httpd = ThreadingHTTPServer(("0.0.0.0", port), FilesHandler)
+    httpd.daemon_threads = True
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile, keyfile)
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+    print("files: serving %s over https on :%d" % (root, port), flush=True)
+    httpd.serve_forever()
+
+
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 
@@ -350,6 +439,8 @@ def main(argv):
         serve_tcp(int(argv[2]))
     elif mode == "udp":
         serve_udp(int(argv[2]))
+    elif mode == "files":
+        serve_files(int(argv[2]), argv[3], argv[4], argv[5])
     else:
         print("unknown mode %r" % mode, file=sys.stderr)
         return 2

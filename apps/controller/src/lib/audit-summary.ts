@@ -459,6 +459,19 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     message: "twoFactorResetConsole",
     pattern: /^Two-factor sign-in reset for user (?<email>.+?) from the server console$/s,
   },
+  // lib/account-failures.ts, and `cpm-server --enable-user`
+  {
+    entityType: "user",
+    action: "user_disabled_failed_sign_ins",
+    message: "userDisabledFailedSignIns",
+    pattern: /^Disabled user (?<email>.+?) after (?<count>.+?) failed sign-ins$/s,
+  },
+  {
+    entityType: "user",
+    action: "user_enabled_console",
+    message: "userEnabledConsole",
+    pattern: /^Enabled user (?<email>.+?) from the server console$/s,
+  },
   // app/api/auth/[...all]/route.ts, users/actions.ts, the console reset
   {
     entityType: "user",

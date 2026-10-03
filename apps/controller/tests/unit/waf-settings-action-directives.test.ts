@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { nextIntlServerMock } from '@/tests/helpers/next-intl';
+import { nextIntlServerMock, testTranslator } from '@/tests/helpers/next-intl';
 import type { WafSettings } from '@/src/lib/settings';
 
 vi.mock('next-intl/server', () => nextIntlServerMock());
@@ -150,4 +150,19 @@ describe('updateWafSettingsAction custom directives', () => {
     expect(result.message).toMatch(/OWASP CRS is loaded/);
     expect(saveWafSettingsMock).not.toHaveBeenCalled();
   });
+});
+
+describe('updateWafSettingsAction id lists', () => {
+  it.each(['wafExcludedRuleIds', 'wafPresetIds', 'wafPluginIds'])(
+    'refuses a malformed %s with the catalog sentence, saving nothing',
+    async (field) => {
+      const result = await updateWafSettingsAction(null, wafForm('', { [field]: '[1,' }));
+
+      expect(result).toEqual({
+        success: false,
+        message: testTranslator()('errors.wafIdListInvalid'),
+      });
+      expect(saveWafSettingsMock).not.toHaveBeenCalled();
+    },
+  );
 });

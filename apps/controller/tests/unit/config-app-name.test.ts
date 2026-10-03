@@ -4,11 +4,11 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { readConfig } from '@/src/lib/config';
 
 async function loadAppName(env: Record<string, string | undefined>): Promise<string> {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const { config } = await import(`../../src/lib/config${fresh()}`);
+  const { config } = readConfig();
   return config.appName;
 }
 

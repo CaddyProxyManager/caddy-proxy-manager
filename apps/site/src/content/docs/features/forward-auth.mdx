@@ -94,3 +94,7 @@ serving the portal itself, with configurable header forwarding and protected pat
 <Demo title="Pointing a host at an Authentik outpost" note="Blank fields fall back to the global defaults.">
   <AuthentikDemo client:visible />
 </Demo>
+
+The route that proxies the outpost's own paths (such as `/outpost.goauthentik.io/*`) drops the
+client's `Authorization` header: none of the host's other handlers run there to strip it, and the
+outpost's start, callback and sign-out endpoints work from cookies.

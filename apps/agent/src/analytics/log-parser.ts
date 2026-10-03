@@ -4,9 +4,14 @@
  */
 import { existsSync, statSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
-import type { TrafficEventRow } from "@cpm/shared";
+import { type TrafficEventRow, UPSTREAM_ERROR_STATUSES, type UpstreamErrorRow } from "@cpm/shared";
 import type { AgentStore } from "../db";
-import { relayTrafficEvents } from "./relay";
+import {
+  analyticsEnabled,
+  relayTrafficEvents,
+  relayUpstreamErrors,
+  upstreamErrorsEnabled,
+} from "./relay";
 import { readLines as readLinesFrom } from "./log-read";
 import { accessLogPath, geoipCountryDb } from "./paths";
 
@@ -195,6 +200,20 @@ export async function readLines(
   return readLinesFrom(startOffset, file);
 }
 
+/** Per host, status and minute: a flood of errors is a handful of rows, and no request leaves. */
+export function countUpstreamErrors(rows: readonly TrafficEventRow[]): UpstreamErrorRow[] {
+  const counts = new Map<string, UpstreamErrorRow>();
+  for (const row of rows) {
+    if (!(UPSTREAM_ERROR_STATUSES as readonly number[]).includes(row.status) || !row.host) continue;
+    const minute = Math.floor(row.ts / 60) * 60;
+    const key = `${minute}|${row.status}|${row.host}`;
+    const entry = counts.get(key);
+    if (entry) entry.count += 1;
+    else counts.set(key, { minute, host: row.host, status: row.status, count: 1 });
+  }
+  return [...counts.values()];
+}
+
 async function insertBatch(rows: TrafficEventRow[]): Promise<void> {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await relayTrafficEvents(rows.slice(i, i + BATCH_SIZE));
@@ -232,7 +251,13 @@ export async function parseNewLogEntries(): Promise<void> {
     if (lines.length > 0) {
       const blocked = collectBlockedSignatures(lines, pendingBlocked);
       const rows = lines.map((l) => parseLine(l, blocked)).filter((r) => r !== null);
-      await insertBatch(rows);
+      if (analyticsEnabled()) await insertBatch(rows);
+      // After the rows: a refused batch is read again next pass, and would be counted twice.
+      if (upstreamErrorsEnabled()) {
+        await relayUpstreamErrors(countUpstreamErrors(rows)).catch((error: unknown) => {
+          console.warn("[log-parser] could not relay upstream error counts:", error);
+        });
+      }
       // A loop, not Math.max(...spread): a large backlog would overflow the argument list.
       let latestTs = rows.length ? -Infinity : Math.floor(Date.now() / 1000);
       let blockedRows = 0;
@@ -241,7 +266,9 @@ export async function parseNewLogEntries(): Promise<void> {
         if (r.is_blocked) blockedRows++;
       }
       pendingBlocked = pruneBlockedSignatures(blocked, latestTs);
-      console.log(`[log-parser] inserted ${rows.length} traffic events (${blockedRows} blocked)`);
+      if (analyticsEnabled()) {
+        console.log(`[log-parser] inserted ${rows.length} traffic events (${blockedRows} blocked)`);
+      }
     }
 
     await setState("access_log_offset", String(newOffset));

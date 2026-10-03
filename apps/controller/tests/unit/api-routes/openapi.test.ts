@@ -78,6 +78,13 @@ describe('GET /api/v1/openapi.json', () => {
     expect(Object.keys(data.components.schemas).length).toBeGreaterThan(0);
   });
 
+  it('documents every role and status a user can have', async () => {
+    const response = await GET(makeRequest());
+    const user = (await response.json()).components.schemas.User.properties;
+    expect(user.role.enum).toEqual(['admin', 'operator', 'user', 'viewer']);
+    expect(user.status.enum).toEqual(['active', 'disabled']);
+  });
+
   it('documents DNS credentials and certificate private keys as write-only', async () => {
     const response = await GET(makeRequest());
     const data = await response.json();

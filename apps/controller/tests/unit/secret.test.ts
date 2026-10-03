@@ -1,5 +1,4 @@
-import { afterEach, describe, it, expect } from 'bun:test';
-import { fresh } from '@/tests/helpers/fresh';
+import { afterEach, describe, it, expect, setSystemTime } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import {
   encryptUnderOtherSecret,
@@ -94,21 +93,20 @@ describe('secret', () => {
       expect(() => decryptSecret(undecryptable())).toThrow(/LEGACY_KEY_CUTOFF_DATE=never/);
     });
 
-    it('with legacy support enabled, reports failure with both keys', async () => {
-      // The cutoff is read once at module evaluation, so this needs its own copy of the module.
-      const previous = process.env.LEGACY_KEY_CUTOFF_DATE;
-      process.env.LEGACY_KEY_CUTOFF_DATE = 'never';
-      const legacyEnabled = await import(`../../src/lib/secret${fresh()}`);
-      if (previous === undefined) delete process.env.LEGACY_KEY_CUTOFF_DATE;
-      else process.env.LEGACY_KEY_CUTOFF_DATE = previous;
-
-      const value = undecryptable();
-      expect(() => legacyEnabled.decryptSecret(value, 'certificate "my-cert"')).toThrow(
-        /certificate "my-cert"/,
-      );
-      expect(() => legacyEnabled.decryptSecret(value)).toThrow(/HKDF\).*legacy/);
-      expect(() => legacyEnabled.decryptSecret(value)).toThrow(/SESSION_SECRET changed/);
-      expect(() => legacyEnabled.decryptSecret(value)).toThrow(/set SESSION_SECRET_PREVIOUS/);
+    it('within the grace period, reports failure with both keys', () => {
+      // The cutoff is read once at import, so the clock moves instead of LEGACY_KEY_CUTOFF_DATE.
+      setSystemTime(new Date('2026-05-31T00:00:00Z'));
+      try {
+        const value = undecryptable();
+        expect(() => decryptSecret(value, 'certificate "my-cert"')).toThrow(
+          /certificate "my-cert"/,
+        );
+        expect(() => decryptSecret(value)).toThrow(/HKDF\).*legacy/);
+        expect(() => decryptSecret(value)).toThrow(/SESSION_SECRET changed/);
+        expect(() => decryptSecret(value)).toThrow(/set SESSION_SECRET_PREVIOUS/);
+      } finally {
+        setSystemTime();
+      }
     });
   });
 

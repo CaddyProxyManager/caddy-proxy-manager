@@ -31,7 +31,7 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
 ```bash
-VERSION=v3.4.0   # the release you downloaded
+VERSION=v3.5.0   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
@@ -244,6 +244,10 @@ on the running server - the way back in for an administrator who has lost both t
 and their backup codes.
 Run it inside the container: `docker compose exec web /app/cpm-server --reset-2fa admin`.
 
+`cpm-server --enable-user <username>` enables a user disabled after repeated failed sign-ins, and
+starts their count over - the way back in when that user is the only administrator:
+`docker compose exec web /app/cpm-server --enable-user admin`.
+
 ---
 
 ## Features
@@ -260,7 +264,7 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 - **Bot Challenge** - A proof-of-work challenge from your own [Anubis](https://anubis.techaro.lol/) instance, in its subrequest mode, per proxy host: checked after the WAF and before any sign-in, so it combines with forward auth, with exempt paths for API clients and webhooks. Never on the dashboard host
 - **CrowdSec** - Caddy as a CrowdSec bouncer, against a CrowdSec container the bundled agent runs and feeds Caddy's access log, or your own Local API: every proxy host and L4 host refuses banned addresses (403, or 429 with Retry-After for a throttle), with a per-host opt-out, optional AppSec inspection and a Test connection button. Sharing signals with CrowdSec's online API is off unless you turn it on. The bouncer key is encrypted at rest and never returned. Needs the opt-in CrowdSec module
 - **Access Lists** - Multi-account HTTP basic auth (bcrypt-hashed) and ordered IP allow/deny rules (IPv4, IPv6, and hostnames such as dynamic-DNS names, which the controller re-resolves as their TTLs expire), combined as "all" or "any", assignable per proxy host or per location rule, and by their IP rules alone to L4 hosts. A list something uses cannot be deleted. The upstream only sees the credentials when "Pass auth to host" is on - off for new lists, on for lists made before the switch existed
-- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, Renew now, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring (a certificate a host uses cannot be deleted; unused imports go in one click), and a built-in CA for issuing and revoking internal client certificates (mTLS)
+- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, Renew now, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring (a certificate a host uses cannot be deleted; unused imports go in one click), certificates read from files an agent's host keeps renewing (`CERT_FILES_HOST_DIR`), and a built-in CA for issuing and revoking internal client certificates (mTLS)
 - **mTLS** - Mutual TLS per proxy host using built-in CA certificates. Issue, track, and revoke client certificates. Fail-closed revocation (all certs revoked = all connections rejected)
 - **mTLS RBAC** - Role-based access control for mTLS client certificates. Define roles, assign certs to roles, and create path-based access rules per proxy host (e.g. `/admin/*` requires the "ops" role)
 - **User Roles** - Four roles (Viewer, User, Operator, Admin) controlling dashboard access, API permissions, and feature visibility
@@ -279,7 +283,8 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults). Challenge delegation: CNAME `_acme-challenge` to a zone a provider can write, per domain, with a live CNAME check; acme-dns accounts per domain, registered from the UI
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
-- **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, and a certificate expiry digest for the administrators, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
+- **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, a certificate expiry digest for the administrators, and admin notifications, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
+- **Notifications** - Emails the administrators, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications**
 - **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. Optionally required for administrators; resettable by an admin or from the container console
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
@@ -395,6 +400,12 @@ it win even then.
 | Failed sign-ins before lockout | `LOGIN_MAX_ATTEMPTS` | `5` |
 | Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
+| Lock an account after failed sign-ins, whatever address they come from | `ACCOUNT_LOCK_ENABLED` | `true` |
+| Failed sign-ins before an account is locked | `ACCOUNT_LOCK_FREE_FAILURES` | `5` |
+| First account lock, in ms. Each further failure doubles it | `ACCOUNT_LOCK_BASE_DELAY_MS` | `1000` |
+| Longest account lock, in ms | `ACCOUNT_LOCK_MAX_DELAY_MS` | `900000` |
+| Disable an account after repeated failed sign-ins, until an administrator enables it. Anyone who knows a username can then disable that account | `ACCOUNT_LOCK_DISABLE_ENABLED` | `false` |
+| Failed sign-ins before an account is disabled | `ACCOUNT_LOCK_DISABLE_AFTER` | `10` |
 | Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
 | Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
@@ -416,8 +427,21 @@ it win even then.
 | SMTP username. Empty for a relay that needs no sign-in | `SMTP_USERNAME` | None |
 | SMTP password. Encrypted at rest | `SMTP_PASSWORD` | None |
 | Sender address; the application name is the sender's name | `SMTP_FROM` | None |
-| Comma-separated recipients of certificate alerts. Empty sends them to every active administrator | `EMAIL_ALERT_RECIPIENTS` | None |
+| Comma-separated recipients of certificate alerts and notifications. Empty sends them to every active administrator | `EMAIL_ALERT_RECIPIENTS` | None |
 | Email once a certificate has fewer days than this left, 0-90. `0` turns alerts off | `CERTIFICATE_EXPIRY_ALERT_DAYS` | `14` |
+| Notify: An account disabled after failed sign-ins, or the last administrator kept enabled | `NOTIFY_ACCOUNT_DISABLED` | `true` |
+| Notify: Failed sign-ins locking an administrator's account | `NOTIFY_ADMIN_LOCKED` | `true` |
+| Notify: An administrator account created, or a user made an administrator | `NOTIFY_ADMIN_ADDED` | `true` |
+| Notify: An agent disconnected for longer than `NOTIFY_AGENT_OFFLINE_MINUTES`, and back online | `NOTIFY_AGENT_OFFLINE` | `true` |
+| Notify: Minutes an agent may be disconnected before anyone is told, 1-1440 | `NOTIFY_AGENT_OFFLINE_MINUTES` | `5` |
+| Notify: A proxy host answering 502, 503 or 504 `NOTIFY_UPSTREAM_ERROR_COUNT` times within `NOTIFY_UPSTREAM_ERROR_MINUTES`, and recovered. Needs access logging | `NOTIFY_UPSTREAM_ERRORS` | `true` |
+| Notify: Upstream error responses from one host before telling | `NOTIFY_UPSTREAM_ERROR_COUNT` | `10` |
+| Notify: The window they are counted in, and the quiet time before a host counts as recovered, 1-1440 | `NOTIFY_UPSTREAM_ERROR_MINUTES` | `5` |
+| Notify: Caddy refusing a configuration, and loading one again | `NOTIFY_CADDY_APPLY` | `true` |
+| Notify: An agent reporting a failed Caddy build, optional service or L4 port change, or log files it cannot read or prune | `NOTIFY_AGENT_PROBLEMS` | `true` |
+| Notify: The GeoIP update failing three times in a row, and working again | `NOTIFY_GEOIP_FAILED` | `true` |
+| Notify: A CRS plugin switched off because Caddy refused it | `NOTIFY_CRS_PLUGIN_DISABLED` | `true` |
+| Notify: A new release, once each, while the update check is on | `NOTIFY_UPDATE_AVAILABLE` | `true` |
 
 > Compose reads `CLICKHOUSE_PASSWORD` too, to provision the `clickhouse` container. **With an agent
 > running the stack you do not need to keep it in `.env`**: the agent starts ClickHouse itself and
@@ -521,6 +545,13 @@ That split is deliberate. Those shapes change with the product and are validated
 already exist; restating them in SDL would be thousands of lines that can drift out of step with
 the validator while looking authoritative. It also means a GraphQL mutation and the REST route
 beside it hand identical input to identical validation, which is what makes them interchangeable.
+
+### Changing many hosts
+
+`bulkProxyHosts` and `bulkL4ProxyHosts` take `{ action, ids }` (up to 500) and return how many hosts
+changed; the REST equivalents are `POST /api/v1/proxy-hosts/bulk` and
+`POST /api/v1/l4-proxy-hosts/bulk`. A batch is all or nothing, each host is audited on its own, and
+Caddy is applied once.
 
 ### Roles
 
@@ -779,8 +810,17 @@ its agents then pair afresh.
 - Production enforces strong passwords (12+ chars, mixed case, numbers, special characters)
 - 32+ character session secrets required
 - Two independent throttles on the auth endpoints: Better Auth's request limit (5 per 60 seconds)
-  and the login lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
+  and a per-address lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
   fields
+- A per-account lock on top, whatever address the guesses come from: past five failures each one
+  doubles the wait, from 1 second up to 15 minutes. All three, or the lock itself, are Settings
+  fields. A locked account gets a 429 with code `ACCOUNT_LOCKED` (it
+  was `TOO_MANY_REQUESTS`), `retryAfter` seconds in the body and a `Retry-After` header; the login
+  page and the forward-auth portal say how long. The per-address limit keeps its generic message
+- Optionally, an account disabled outright after 10 failed sign-ins (the lock's own count), until an
+  administrator enables it or `cpm-server --enable-user` does. Off by default: anyone who knows a
+  username could then disable that account. The last active administrator is only ever locked, and
+  the administrators are emailed either way
 - Optional two-factor sign-in (TOTP and backup codes) on the dashboard and the forward-auth portal,
   which can be required for administrators
 - Passkeys with user verification required; adding one needs a sign-in from the last ten minutes
@@ -914,7 +954,7 @@ Caddy automatically obtains Let's Encrypt certificates for all proxy hosts.
 
 **DNS-01 Challenge** (optional): Configure a DNS provider in **Settings → DNS → DNS Providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate. For a domain whose DNS host has no API, delegate its challenges under **Challenge delegation** on the same page, to another zone or to an acme-dns server.
 
-**Custom Certificates** (optional): Import your own certificates via the Certificates page. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads. The built-in mTLS CA's private keys are encrypted the same way.
+**Custom Certificates** (optional): Import your own certificates via the Certificates page, pasted in or read from a file on an agent's host (`CERT_FILES_HOST_DIR`). A pair is refused unless the certificate is PEM X.509, the key is an unencrypted PEM key, and the key matches the certificate. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads. The built-in mTLS CA's private keys are encrypted the same way.
 
 **What Caddy holds.** The ACME tab reads each agent's certificate storage, so it shows the expiry
 and issuer of the certificate Caddy is actually serving. This needs a [current
@@ -1018,7 +1058,7 @@ for a Compose file and the caveats.
 
 ## Analytics
 
-Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window under **Settings → Observability → Analytics** (`CLICKHOUSE_RETENTION_DAYS` until a value is stored) - on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
+Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window under **Settings → Observability → Analytics** (`CLICKHOUSE_RETENTION_DAYS` until a value is stored) - saving it re-checks the schema on the next write, which migrates the existing tables' TTL to the new value and purges expired data, with no restart.
 
 ### Enabling and disabling analytics
 
@@ -1146,7 +1186,13 @@ the command that fixes it. The agent never changes a permission itself.
 The log viewer, the certificate details and downloads on the ACME tab, and **Load built image** are
 commands the controller sends an agent, and an agent lists the ones it understands. An older agent
 is never sent one it did not list: it keeps serving, and those features are unavailable on it until
-it is upgraded.
+it is upgraded. The same goes for:
+
+- **Certificates from files** - only an agent with `CERT_FILES_HOST_DIR` set, and new enough to
+  read it, is offered in the picker.
+- **Managed CrowdSec** - an older agent ignores the `crowdsec` service and reports it off.
+- **L4 port ranges** - an older agent is sent a range one port at a time, since its pattern
+  refuses a range.
 
 ### One controller, many configurations
 
@@ -1310,7 +1356,8 @@ Two things worth knowing:
 
 Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
 stops Caddy** - so unpairing takes that host out of service. Pair it again with a fresh code to
-bring it back.
+bring it back. A stream that goes silent for three keepalives (60 seconds) is reconnected, so an
+agent whose stream stayed open after the controller closed it still notices within a minute.
 
 ### Stopping the agent
 
@@ -1404,10 +1451,12 @@ Add only modules you trust, from sources you would trust with the proxy itself.
 
 ### Rebuilding
 
-Saving records the selection; it does not change the running container. **Rebuild
-Caddy** sends the selection to the agent, which runs `docker compose build caddy`
-and then recreates the container. Compiling Caddy takes several minutes; the proxy
-keeps serving on the current binary until the new one is ready, then restarts.
+Saving a changed selection starts the rebuild - in Settings and over `PUT /api/v1/caddy/modules`
+alike. The config is applied first, then the selection is pushed to the agent, which runs
+`docker compose build caddy` at once and recreates the container. With `CADDY_BUILD_MODE=external`
+it waits for **Load built image** instead, and with no agent connected the build starts when one
+connects. Compiling Caddy takes several minutes; the proxy keeps serving on the current binary
+until the new one is ready, then restarts. **Rebuild Caddy** only retries a build that failed.
 
 Because *enabling* a module only takes effect once it is actually in the binary,
 config generation uses the intersection of what you selected and what the running
@@ -1423,9 +1472,9 @@ build harmless:
 
 If a build fails, the applied set is left alone, so the app keeps generating
 config the current binary can load. Nothing needs cleaning up by hand - fix the
-selection and click Rebuild again. If the agent is restarted mid-build (a host
-reboot, say), it clears the stale "building" state on startup and the button
-becomes available again.
+selection and save it, or click Rebuild to retry it as it is. If the agent is
+restarted mid-build (a host reboot, say), it clears the stale "building" state on
+startup and the button becomes available again.
 
 Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
 default in `docker-compose.yml`), which BuildKit builds through. To keep build access
@@ -1445,7 +1494,7 @@ docker build \
   --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
   --build-arg PUID=10000 --build-arg PGID=10000 \
   -t caddy-proxy-manager-caddy:custom \
-  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.4.0
+  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.5.0
 ```
 
 Build it on the agent's host, or elsewhere and push it to a registry. The first time,
@@ -1480,8 +1529,11 @@ The same selection is available under `/api/v1/caddy/modules`:
 - `PUT` replaces the selection. It applies the same refusal as the UI, returning
   `409` and naming what is still using a module you tried to disable.
 
-Saving over the API does not rebuild - same as the UI. The rebuild trigger and
-its progress live at `POST` / `GET /api/caddy-build`, and external mode's
+Saving over the API starts the rebuild, the same as saving in the UI: the selection
+is part of the agent's desired state, and the config is re-applied without the removed
+modules first. External mode has nothing to build, so there it waits for **Load built
+image**. The rebuild trigger (to retry one) and its progress live at `POST` /
+`GET /api/caddy-build`, and external mode's
 **Load built image** at `POST /api/caddy-build/image`. They take the same admin
 Bearer token but sit outside the versioned `/api/v1` contract: they back the
 Settings panel and may change without a version bump. Prefer the button.
@@ -1579,10 +1631,10 @@ public internet - and it does not need anything else on the host. The
 userspace inside the Caddy process: no `tailscaled`, no `/dev/net/tun`, no extra published ports,
 and no change to `docker-compose.yml`.
 
-Turn it on in **Settings → Network → Tailscale**. The one thing it needs is a reusable auth key from the
-Tailscale admin console. If you would rather not store the key in the database, put a Caddy
-placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through untouched, and Caddy
-resolves it from the container's environment.
+Turn it on in **Settings → Network → Tailscale**, on the **Node defaults** card. The one thing it
+needs is a reusable auth key from the Tailscale admin console. If you would rather not store the key
+in the database, put a Caddy placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through
+untouched, and Caddy resolves it from the container's environment.
 
 | Setting | What it does |
 | --- | --- |
@@ -1593,6 +1645,12 @@ resolves it from the container's environment.
 | **State directory** | Where each node keeps its identity, one subdirectory per node. Defaults to `/data/tailscale`, which is on the `caddy-data` volume - keep it on a volume, or every restart registers a new machine. |
 | **Ephemeral** | Nodes leave the tailnet when Caddy stops instead of lingering as offline machines. |
 | **Check the auth key** | Verify the key against the Tailscale API before saving. Off by default; see [Checking the auth key](#checking-the-auth-key). |
+| **Serve HTTP/3 on tailnet listeners** | Off by default. Adds QUIC to the tailnet listeners, if HTTP/3 is also on globally. HTTP/2 there follows the global switch alone. |
+
+> **HTTP/3 on the tailnet can hang Caddy's config load.** An HTTP/3 listener makes Caddy bring the
+> node up while it loads a configuration. Whenever the control server is unreachable, that load
+> hangs and holds Caddy's admin API, so no host on that agent can be updated until it is back.
+> Leave it off unless your tailnet clients need QUIC.
 
 ### Per host
 
@@ -1885,7 +1943,8 @@ Where two of a user's groups map to different roles the more privileged one wins
 admin, operator, user, viewer - so losing the admin group demotes an account to operator rather
 than all the way down.
 
-`OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups.
+`OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups: `admin`, `operator`,
+`user` or `viewer`, and anything else counts as `user`.
 
 Notes:
 

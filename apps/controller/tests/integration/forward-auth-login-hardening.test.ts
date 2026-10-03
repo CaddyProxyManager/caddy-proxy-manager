@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import { NextRequest } from 'next/server';
 import type { TestDb } from '../helpers/db';
 
@@ -15,21 +16,11 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 // bun evaluates a vi.mock factory synchronously while linking, so the helpers it needs are
 // imported above it rather than awaited inside it.
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 const { testTranslator } = await import('../helpers/next-intl');
 
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  sqlite: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null => {
-    if (!value) return null;
-    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
@@ -193,7 +184,15 @@ describe('forward-auth login', () => {
       expect((await attempt(`wrong-${i}`, rid)).status).toBe(401);
     }
     // Even the right password waits out the delay, from an address never seen before.
-    expect((await attempt(PASSWORD, rid, '198.51.100.200')).status).toBe(429);
+    const locked = await attempt(PASSWORD, rid, '198.51.100.200');
+    expect(locked.status).toBe(429);
+    // Told apart from a throttled address, with the wait, so the form can say how long.
+    expect(await locked.json()).toEqual({
+      error: 'Too many login attempts. Please try again later.',
+      code: 'ACCOUNT_LOCKED',
+      retryAfter: 1,
+    });
+    expect(locked.headers.get('retry-after')).toBe('1');
   });
 });
 
@@ -338,7 +337,10 @@ describe('forward-auth login limits and uniform rejection', () => {
     expect((await signIn('mallory', PASSWORD, ip)).status).toBe(200);
     // ...but not its failures against heidi: the fifth one blocks that pair.
     expect((await signIn('heidi', 'wrong-4', ip)).status).toBe(401);
-    expect((await signIn('heidi', PASSWORD, ip)).status).toBe(429);
+    const throttled = await signIn('heidi', PASSWORD, ip);
+    expect(throttled.status).toBe(429);
+    // A throttled client, not a locked account: the generic refusal.
+    expect((await throttled.json()).code).toBeUndefined();
 
     // The client can still use its own account, and heidi can sign in elsewhere.
     expect((await signIn('mallory', PASSWORD, ip)).status).toBe(200);

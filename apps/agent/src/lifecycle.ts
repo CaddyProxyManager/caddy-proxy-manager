@@ -10,6 +10,7 @@ import {
   AGENT_RECONNECT_MAX_MS,
   AGENT_RECONNECT_MIN_MS,
   AGENT_STATUS_HEARTBEAT_MS,
+  AGENT_STREAM_KEEPALIVE_MS,
   type AgentCommand,
   type AgentCommandResult,
   type AgentDesiredState,
@@ -73,12 +74,18 @@ export type LifecycleDeps = {
   operations: Operations;
   /** For a controller-requested restart; the entrypoint releases socket and store first. */
   exit?: (reason: string) => void;
+  /** Tests only: a minute of silence is too long to wait for. */
+  streamSilenceMs?: number;
 };
 
 /** Pairs a co-starting stack in seconds; cheap for remote agents that never get a token. */
 const BOOTSTRAP_POLL_MS = 3_000;
 /** How long an image load waits for the controller's narrowed config before recreating anyway. */
 const NARROWED_CONFIG_TIMEOUT_MS = 60_000;
+/** Three missed pings: a stream the controller closed can stay open under us, reading nothing. */
+const STREAM_SILENCE_MS = 3 * AGENT_STREAM_KEEPALIVE_MS;
+const FORGOTTEN_MESSAGE =
+  "The controller no longer recognises this agent. Pair it again with a fresh code.";
 
 export type PairOutcome = { ok: true } | { ok: false; error: string };
 
@@ -107,7 +114,10 @@ export class AgentLifecycle {
       const client = this.client;
       const secret = this.secret;
       if (!client || !secret) return Promise.reject(new Error("Not paired."));
-      return client.postCertificateFiles(secret, results);
+      return client.postCertificateFiles(secret, results).catch((error: unknown) => {
+        if (isUnpaired(error)) void this.forget(secret);
+        throw error;
+      });
     });
   }
 
@@ -360,6 +370,18 @@ export class AgentLifecycle {
     this.message = null;
   }
 
+  /**
+   * Any signed call answered 401 means the controller dropped this agent, not only the stream:
+   * without this, a stream that never noticed the unpair kept an agent posting into 401s.
+   */
+  private async forget(secret: string): Promise<void> {
+    // A call signed before a re-pair must not discard the pairing that replaced it.
+    if (this.stopped || this.secret !== secret) return;
+    this.deps.store.clearPairing();
+    await this.goIdle(FORGOTTEN_MESSAGE);
+    this.rearmBootstrapWatch();
+  }
+
   /** Stops Caddy too: a revoked agent must not serve a config nobody can change any more. */
   private async goIdle(message: string): Promise<void> {
     this.lifecycle = "idle";
@@ -393,26 +415,36 @@ export class AgentLifecycle {
 
       const connection = new AbortController();
       this.connection = connection;
+      // Paused while an event is handled, so a slow reconcile is not mistaken for silence.
+      let silent = false;
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const watch = () => {
+        watchdog = setTimeout(() => {
+          silent = true;
+          connection.abort();
+        }, this.deps.streamSilenceMs ?? STREAM_SILENCE_MS);
+      };
 
       try {
+        watch();
         for await (const event of client.events(secret, connection.signal)) {
+          clearTimeout(watchdog);
           backoff = AGENT_RECONNECT_MIN_MS;
           await this.handle(event);
+          watch();
         }
       } catch (error) {
-        if (connection.signal.aborted) return;
-        if (error instanceof ControllerRejected && error.status === 401) {
-          this.deps.store.clearPairing();
-          await this.goIdle(
-            "The controller no longer recognises this agent. Pair it again with a fresh code.",
-          );
-          this.rearmBootstrapWatch();
+        if (connection.signal.aborted && !silent) return;
+        if (isUnpaired(error)) {
+          await this.forget(secret);
           return;
         }
         console.warn(`[agent] stream lost, retrying in ${Math.round(backoff / 1000)}s:`, error);
+      } finally {
+        clearTimeout(watchdog);
       }
 
-      if (this.stopped || connection.signal.aborted) return;
+      if (this.stopped || (connection.signal.aborted && !silent)) return;
       await Bun.sleep(backoff);
       backoff = Math.min(backoff * 2, AGENT_RECONNECT_MAX_MS);
     }
@@ -462,6 +494,14 @@ export class AgentLifecycle {
     return next;
   }
 
+  /**
+   * When the recreate ends, not at the next heartbeat: the controller reloads the new Caddy on
+   * hearing of it, since a config sent while the old one was stopping never reached it.
+   */
+  private reportWhenRecreated(): void {
+    this.deps.operations.whenIdle(() => void this.reportStatus());
+  }
+
   /** Once per busy spell, and against whatever frame is newest by then. */
   private retryWhenIdle(): void {
     if (this.retryQueued) return;
@@ -496,6 +536,7 @@ export class AgentLifecycle {
       // As port sets: the same ports come as ranges or one by one, as the controller knew this agent.
       if (!sameL4PortSet(state.l4Ports, store.appliedL4Ports())) {
         operations.applyL4Ports(state.l4Ports);
+        this.reportWhenRecreated();
       }
 
       // Null means never rebuilt (the shipped image), not "skip", or no first rebuild ever runs.
@@ -506,6 +547,7 @@ export class AgentLifecycle {
         !sameList(state.caddyModules, appliedModules)
       ) {
         operations.applyCaddyBuild(state.caddyModules);
+        this.reportWhenRecreated();
       }
 
       const appliedServices = store.appliedManagedServices();
@@ -556,6 +598,7 @@ export class AgentLifecycle {
     const secret = this.secret;
     if (!client || !secret) return;
     await client.postResults(secret, [result]).catch((error: unknown) => {
+      if (isUnpaired(error)) return this.forget(secret);
       // No retry: the controller times the command out, and a late result finds no waiter.
       console.warn(`[agent] could not return the result of command ${command.id}:`, error);
     });
@@ -796,10 +839,15 @@ export class AgentLifecycle {
       const status = await buildStatus(this.deps);
       await client.postStatus(secret, status);
     } catch (error) {
+      if (isUnpaired(error)) return this.forget(secret);
       // Status is advisory; the stream is what proves the agent is alive.
       console.warn("[agent] could not report status:", error);
     }
   }
+}
+
+function isUnpaired(error: unknown): boolean {
+  return error instanceof ControllerRejected && error.status === 401;
 }
 
 /** Order-insensitive comparison: the controller sorts, but a stored list may predate that. */

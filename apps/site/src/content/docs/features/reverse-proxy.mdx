@@ -63,7 +63,8 @@ Each host has switches at the top of its editor:
 
 HTTP/2 and HTTP/3 are offered on every host. **Settings → Network → HTTP Versions** turns either
 off, for all hosts at once: Caddy decides this per listening port, and every host shares one.
-HTTP/1.1 always stays on.
+HTTP/1.1 always stays on. Hosts served on a [tailnet](../tailscale/) get HTTP/2 from the same
+switch, but HTTP/3 only when **Serve HTTP/3 on tailnet listeners** is on as well.
 
 Responses are compressed with zstd or gzip, whichever the browser prefers, and turned off for
 every host in **Settings → Network → Compression**. Only text formats are compressed - HTML, CSS,
@@ -178,11 +179,14 @@ maintenance keeps its certificate and tells visitors, and crawlers, that it will
 - **Page** - the HTML visitors see. Left empty, the host's own custom error page for a 503 is used,
   then the global one from **Settings → Responses → Error Pages**, then a short built-in page.
 
-The 503 comes before anything else in the host's configuration - geo blocking, the WAF, forward
-auth and location rules included - and is sent with `Cache-Control: no-store`, so no cache keeps it
-past the maintenance window. Its settings are kept while it is off. The host list shows a
-**Maintenance** status, and the row's menu turns it on or off in one click; either way the change is
-recorded in the [audit log](../audit-log/).
+The 503 comes before everything else in the host's configuration but the WebSocket refusal - geo
+blocking, the WAF, forward auth and location rules included - and is sent with
+`Cache-Control: no-store`, so no cache keeps it past the maintenance window. Its settings are kept
+while it is off. The host list shows a **Maintenance** status, and the row's menu turns it on or off
+in one click; either way the change is recorded in the [audit log](../audit-log/).
+
+It never applies to the [dashboard host](../dashboard-host/), which would lock out the administrator
+who has to turn it off.
 
 ## Rate limiting
 
@@ -231,3 +235,7 @@ because a single pinned address cannot carry more than one SNI name.
 The host header is forwarded by default, which is what most applications behind a proxy expect;
 the **Preserve Host header** switch turns that off. Other request and response headers are set
 through the host's advanced configuration fields, which take raw Caddy JSON and are admin-only.
+
+Custom pre-handlers must be a JSON object or an array of objects, and the reverse proxy override a
+JSON object; anything else is refused on save with a 400, rather than dropped from the config
+without a word. A stored value left unchanged still saves, so an older host is never stuck.

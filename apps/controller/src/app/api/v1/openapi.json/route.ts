@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { APP_VERSION } from "@/src/lib/app-version";
+import { APP_ROLES } from "@/src/lib/oidc-groups";
+import { USER_STATUSES } from "@/src/lib/user-admin";
 import { SETTINGS_GROUPS } from "@/src/lib/settings-api";
 import {
   DEFAULT_CACHE_MAX_AGE,
@@ -2250,7 +2252,7 @@ const spec = {
         tags: ["Caddy"],
         summary: "Replace the Caddy module selection",
         description:
-          "Saves which plugins the Caddy image should be built with. Does not rebuild - plugins are compiled in, so the running container keeps its current set until a rebuild is triggered.",
+          "Saves which plugins the Caddy image should be built with, re-applies the config without any module removed, and pushes the selection to the agents. An agent that builds its own image starts rebuilding at once; the running container keeps its current set until the new one is ready. An agent in external build mode waits for its image to be loaded.",
         operationId: "updateCaddyModules",
         requestBody: {
           required: true,
@@ -2890,6 +2892,12 @@ const spec = {
             example: "-",
             description: 'Tailnet the check addresses. "-" means the token\'s own tailnet.',
           },
+          http3: {
+            type: "boolean",
+            default: false,
+            description:
+              "Serve HTTP/3 on tailnet listeners. While the control server is unreachable, an h3 listener stalls Caddy's config load and its admin API.",
+          },
         },
         required: ["enabled"],
       },
@@ -3031,6 +3039,7 @@ const spec = {
           defaultNode: { type: "string" },
           validateAuthKey: { type: "boolean" },
           apiTailnet: { type: "string" },
+          http3: { type: "boolean" },
         },
       },
       RedirectRule: {
@@ -4397,11 +4406,11 @@ const spec = {
               "sets (POST /api/v1/users, PUT /api/v1/users/{id})",
           },
           name: { type: ["string", "null"] },
-          role: { type: "string", enum: ["admin", "user", "viewer"] },
+          role: { type: "string", enum: [...APP_ROLES] },
           provider: { type: "string", example: "credentials" },
           subject: { type: "string" },
           avatarUrl: { type: ["string", "null"] },
-          status: { type: "string", enum: ["active", "inactive"] },
+          status: { type: "string", enum: [...USER_STATUSES] },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },

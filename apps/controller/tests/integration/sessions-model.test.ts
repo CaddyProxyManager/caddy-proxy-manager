@@ -4,19 +4,13 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { users, sessions } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: currentDb(() => db),
-    get sqlite() {
-      return undefined;
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 
 import {
   listUserSessions,

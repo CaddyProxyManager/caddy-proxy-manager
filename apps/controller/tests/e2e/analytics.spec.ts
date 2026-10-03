@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ANALYTICS_OFF } from '../helpers/compose';
 
 test.describe('Analytics', () => {
   test('analytics page loads without redirecting to login', async ({ page }) => {
@@ -28,11 +29,16 @@ test.describe('Analytics', () => {
     });
   });
 
-  test('analytics page does not show disabled banner when ClickHouse is configured', async ({
-    page,
-  }) => {
+  test('analytics page shows the disabled banner only while analytics is off', async ({ page }) => {
     await page.goto('/analytics');
-    await expect(page.getByText('ClickHouse analytics is not enabled')).not.toBeVisible();
+    const banner = page.getByText('ClickHouse analytics is not enabled');
+    const link = page.getByRole('link', { name: 'Turn analytics on in Settings' });
+    if (ANALYTICS_OFF) {
+      await expect(banner).toBeVisible({ timeout: 15_000 });
+      await expect(link).toHaveAttribute('href', /\/settings/);
+    } else {
+      await expect(banner).not.toBeVisible();
+    }
   });
 
   test('analytics page has time range toggle buttons', async ({ page }) => {

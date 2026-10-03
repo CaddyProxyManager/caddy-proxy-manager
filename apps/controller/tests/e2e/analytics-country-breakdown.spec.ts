@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { ANALYTICS_OFF } from '../helpers/compose';
 
 const ORIGIN = 'http://localhost:3000';
 const COUNTRY = 'IS';
@@ -23,6 +24,7 @@ function chDateTime(unixSeconds: number): string {
 }
 
 test.describe('Analytics country breakdown', () => {
+  test.skip(ANALYTICS_OFF, 'no ClickHouse in the analytics-off run');
   test('the country route validates its code and breaks one country down', async ({ page }) => {
     const host = `breakdown-api-${Date.now()}.example.com`;
     const ch = makeClient();

@@ -38,11 +38,11 @@ function hostsWithSnippets(count: number): Host[] {
 }
 
 /** With the list style the settings action uses. */
-async function render(rebuild: boolean): Promise<string | null> {
+async function render(outcome: string): Promise<string | null> {
   const warning = await describeCaddyfileSnippetWarning({ modules: {}, customModules: [] });
   if (!warning) return null;
   return t('results.caddyBuildSavedSnippetWarning', {
-    rebuild: rebuild ? 'yes' : 'no',
+    outcome,
     count: warning.count,
     names: new Intl.ListFormat('en', { type: 'unit' }).format(warning.names),
     more: warning.more,
@@ -50,7 +50,7 @@ async function render(rebuild: boolean): Promise<string | null> {
 }
 
 const ADVICE =
-  'which may reference a module you just switched off. Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.';
+  'which may reference a module you just switched off. Review them - a snippet Caddy can no longer adapt is skipped silently.';
 
 describe('describeCaddyfileSnippetWarning', () => {
   it('names the first three hosts and counts the rest', async () => {
@@ -84,23 +84,30 @@ describe('settings.results.caddyBuildSavedSnippetWarning', () => {
   it('reads as the saved message followed by the old warning', async () => {
     ctx.enabled = [];
     ctx.hosts = hostsWithSnippets(5);
-    expect(await render(false)).toBe(
+    expect(await render('none')).toBe(
       `Caddy module selection saved. 5 proxy hosts (host-1, host-2, host-3, and 2 more) use custom Caddyfile directives, ${ADVICE}`,
     );
   });
 
-  it('keeps the rebuild advice when a rebuild is needed', async () => {
+  it('opens with what the save set off, as the plain saved messages do', async () => {
     ctx.enabled = [];
     ctx.hosts = hostsWithSnippets(2);
-    expect(await render(true)).toBe(
-      `${messages.settings.results.caddyBuildSavedRebuild} 2 proxy hosts (host-1, host-2) use custom Caddyfile directives, ${ADVICE}`,
-    );
+    const { results } = messages.settings;
+    for (const [outcome, saved] of [
+      ['building', results.caddyBuildSavedBuilding],
+      ['loadImage', results.caddyBuildSavedLoadImage],
+      ['noAgent', results.caddyBuildSavedNoAgent],
+    ]) {
+      expect(await render(outcome)).toBe(
+        `${saved} 2 proxy hosts (host-1, host-2) use custom Caddyfile directives, ${ADVICE}`,
+      );
+    }
   });
 
   it('agrees with a single host', async () => {
     ctx.enabled = [];
     ctx.hosts = hostsWithSnippets(1);
-    expect(await render(false)).toBe(
+    expect(await render('none')).toBe(
       `${messages.settings.results.caddyBuildSaved} 1 proxy host (host-1) uses custom Caddyfile directives, ${ADVICE}`,
     );
   });

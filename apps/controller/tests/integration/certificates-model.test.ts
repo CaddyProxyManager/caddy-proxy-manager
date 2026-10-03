@@ -4,18 +4,15 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { certificates, proxyHosts, users } from '../../src/lib/db/schema';
 import { DomainError } from '../../src/lib/domain-error';
 
 let db: TestDb;
 let dashboardCertificateId: number | null = null;
 
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (v: string | null) => v,
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 const applyCaddyConfig = vi.fn(async () => {});
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));
@@ -28,7 +25,10 @@ vi.mock('../../src/lib/settings', () => ({
   }),
 }));
 
-const { deleteCertificate } = await import('../../src/lib/models/certificates');
+const { createCertificate, deleteCertificate, updateCertificate } = await import(
+  '../../src/lib/models/certificates'
+);
+const { createSelfSignedServerCertificate } = await import('../helpers/certs');
 
 let userId: number;
 
@@ -127,5 +127,58 @@ describe('deleteCertificate', () => {
     const left = await db.select({ id: certificates.id }).from(certificates);
     expect(left.map((c) => c.id)).toEqual([used.id]);
     expect(applyCaddyConfig).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Caddy refuses a pair it cannot load, and with it every host's config.
+describe('importing a certificate', () => {
+  const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate('pair.example.com', [
+    'pair.example.com',
+  ]);
+  const other = createSelfSignedServerCertificate('other.example.com', ['other.example.com']);
+  const imported = (certificate: string, key: string) => ({
+    name: 'Imported',
+    type: 'imported' as const,
+    domainNames: ['pair.example.com'],
+    certificatePem: certificate,
+    privateKeyPem: key,
+  });
+  const garbage = (label: string) => `-----BEGIN ${label}-----\nnot\n-----END ${label}-----`;
+
+  it.each([
+    [
+      'a key from another certificate',
+      certificatePem,
+      other.privateKeyPem,
+      'importedCertificateKeyMismatch',
+    ],
+    [
+      'a certificate that does not parse',
+      garbage('CERTIFICATE'),
+      privateKeyPem,
+      'importedCertificateInvalid',
+    ],
+    [
+      'a key that does not parse',
+      certificatePem,
+      garbage('PRIVATE KEY'),
+      'importedCertificateKeyInvalid',
+    ],
+  ])('refuses %s', async (_label, certificate, key, code) => {
+    const error = await failure(createCertificate(imported(certificate, key), userId));
+    expect(error.code).toBe(code as never);
+    expect(error.status).toBe(400);
+    expect(await db.select().from(certificates)).toHaveLength(0);
+    expect(applyCaddyConfig).not.toHaveBeenCalled();
+  });
+
+  it('refuses an update that would break a stored pair, and keeps the pair', async () => {
+    const created = await createCertificate(imported(certificatePem, privateKeyPem), userId);
+    const error = await failure(
+      updateCertificate(created.id, { privateKeyPem: other.privateKeyPem }, userId),
+    );
+    expect(error.code).toBe('importedCertificateKeyMismatch');
+    const [row] = await db.select().from(certificates);
+    expect(row.certificatePem).toBe(certificatePem);
   });
 });

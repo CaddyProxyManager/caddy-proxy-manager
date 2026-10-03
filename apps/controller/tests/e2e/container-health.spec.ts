@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { COMPOSE_ARGS, COMPOSE_CWD } from '../helpers/compose';
+import { ANALYTICS_OFF, COMPOSE_ARGS, COMPOSE_CWD } from '../helpers/compose';
 
 type ContainerInfo = {
   name: string;
@@ -67,12 +67,16 @@ test.describe('Container health', () => {
   });
 
   test('clickhouse container is healthy', () => {
+    test.skip(ANALYTICS_OFF, 'analytics is switched off in this run');
     const ch = containers.find((c) => c.service === 'clickhouse');
-    test.skip(
-      !ch,
-      'ClickHouse container not started (profile not active - analytics disabled run)',
-    );
+    expect(ch, 'clickhouse container not found').toBeTruthy();
     expect(ch!.health, `clickhouse container health: ${ch!.health}`).toBe('healthy');
+  });
+
+  test('no clickhouse container runs with analytics switched off', () => {
+    test.skip(!ANALYTICS_OFF, 'analytics is on in this run');
+    const ch = containers.find((c) => c.service === 'clickhouse');
+    expect(ch, `ClickHouse is ${ch?.state} although analytics is off`).toBeUndefined();
   });
 
   test('agent container is running (not crash-looping)', () => {

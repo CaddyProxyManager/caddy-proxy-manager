@@ -390,6 +390,8 @@ function L4HostForm({
           />
         )}
 
+        {/* Unconditional: over UDP the switch is gone and the update must read that as off. */}
+        <input type="hidden" name="tlsTerminationPresent" value="1" />
         {protocol === "tcp" && (
           <Switch
             label={t("tlsTermination")}
@@ -399,6 +401,7 @@ function L4HostForm({
           />
         )}
 
+        <input type="hidden" name="proxyProtocolReceivePresent" value="1" />
         <Switch
           label={t("acceptInboundProxyProtocol")}
           htmlName="proxyProtocolReceive"

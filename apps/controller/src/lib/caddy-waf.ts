@@ -505,6 +505,21 @@ export function seclangErrorDetails(issues: readonly SeclangIssue[], limit = 5):
   );
 }
 
+/**
+ * A form's hidden JSON id list. Refused whole rather than half-read, and with a code: the engine's
+ * SyntaxError would otherwise be the sentence the user reads.
+ */
+export function parseWafIdListJson(raw: string): unknown[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw domainError("wafIdListInvalid", {}, { status: 400 });
+  }
+  if (!Array.isArray(value)) throw domainError("wafIdListInvalid", {}, { status: 400 });
+  return value;
+}
+
 /** Positive integers, deduplicated, in first-seen order - the order presets are emitted in. */
 export function normalizeWafPresetIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
