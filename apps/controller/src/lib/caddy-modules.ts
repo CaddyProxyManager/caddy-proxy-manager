@@ -71,10 +71,12 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
   {
     id: "caddy-blocker",
     name: "Request Blocker",
+    // The repository moved to ingres-si, but its go.mod still declares this path, and saved
+    // Caddy Build settings are keyed by it.
     modulePath: "github.com/fuomag9/caddy-blocker-plugin",
     description:
       "Country, continent, ASN, and CIDR blocking. Required by global geoblocking and by per-host geoblock rules.",
-    docsUrl: "https://github.com/fuomag9/caddy-blocker-plugin",
+    docsUrl: "https://github.com/ingres-si/caddy-blocker-plugin",
     category: "security",
     features: ["geoblock"],
   },

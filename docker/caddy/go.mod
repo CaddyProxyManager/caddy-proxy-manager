@@ -13,7 +13,7 @@
 // xcaddy itself is deliberately absent - it comes from the caddy:<version>-builder image the
 // Dockerfile pins, not from here, so there is only one place its version lives.
 
-module github.com/fuomag9/caddy-proxy-manager/docker/caddy
+module github.com/ingres-si/caddy-proxy-manager/docker/caddy
 
 go 1.26.6
 
