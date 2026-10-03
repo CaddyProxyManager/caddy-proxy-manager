@@ -9,9 +9,10 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import type { SectionHealth } from "@/src/lib/settings/health";
-import { settingsHref } from "./sections";
+import { SETTINGS_GROUPS, SETTINGS_HUES, settingsGroupLabel, settingsHref } from "./sections";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "./SettingsFrame";
 
@@ -20,8 +21,6 @@ type Props = {
   attention: SectionHealth[];
   staged: StagedView;
 };
-
-const GROUP_ORDER: SectionHealth["group"][] = ["traffic", "access", "runtime"];
 
 /** Colour alone is invisible to a screen reader, so each dot gets a catalog label. */
 type StatusLabelKey =
@@ -58,11 +57,17 @@ function StatusDot({ status }: { status: SectionHealth["status"] }) {
 export default function SettingsHome({ sections, attention, staged }: Props) {
   const t = useTranslations("settings");
 
-  const groupLabel: Record<SectionHealth["group"], string> = {
-    traffic: t("homeGroupTraffic"),
-    access: t("homeGroupAccess"),
-    runtime: t("homeGroupRuntime"),
-  };
+  // In the rail's order and groups, each tile in its section's colour.
+  const byId = new Map(sections.map((section) => [section.id, section]));
+  const groups = SETTINGS_GROUPS.map((group) => ({
+    group,
+    tiles: group.items.flatMap((item) =>
+      item.blocks.flatMap((block) => {
+        const section = byId.get(block.id);
+        return section ? [{ section, hue: SETTINGS_HUES[item.id] ?? ("gray" as const) }] : [];
+      }),
+    ),
+  }));
 
   // No page header here: the frame renders it, so the overview and every section share one.
   return (
@@ -110,14 +115,13 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
           </Card>
         )}
 
-        {GROUP_ORDER.map((group) => {
-          const inGroup = sections.filter((section) => section.group === group);
-          if (inGroup.length === 0) return null;
+        {groups.map(({ group, tiles }) => {
+          if (tiles.length === 0) return null;
           return (
-            <VStack key={group} gap={3}>
+            <VStack key={group.id} gap={3}>
               <HStack gap={3} vAlign="center">
                 <Text type="label" size="sm" color="secondary">
-                  {groupLabel[group]}
+                  {settingsGroupLabel(t, group)}
                 </Text>
                 <div style={{ flexGrow: 1 }}>
                   <Divider />
@@ -130,8 +134,8 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
                   gap: "var(--spacing-3)",
                 }}
               >
-                {inGroup.map((section) => (
-                  <SectionTile key={section.id} section={section} />
+                {tiles.map(({ section, hue }) => (
+                  <SectionTile key={section.id} section={section} hue={hue} />
                 ))}
               </div>
             </VStack>
@@ -142,7 +146,7 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
   );
 }
 
-function SectionTile({ section }: { section: SectionHealth }) {
+function SectionTile({ section, hue }: { section: SectionHealth; hue: Hue }) {
   const t = useTranslations("settings");
   return (
     <Link
@@ -151,7 +155,7 @@ function SectionTile({ section }: { section: SectionHealth }) {
       data-testid={`settings-tile-${section.id}`}
       data-status={section.status}
     >
-      <Card padding={3} height="100%">
+      <Card padding={3} height="100%" className={ACCENTS[hue].edge}>
         <VStack gap={2}>
           <HStack gap={2} vAlign="center">
             <Text type="body" style={{ ...CARD_TITLE_STYLE, flexGrow: 1, minWidth: 0 }}>

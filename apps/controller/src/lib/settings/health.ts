@@ -25,7 +25,6 @@ export type SectionHealth = {
   /** The settings navigation's section id, so a tile links straight to it. */
   id: string;
   name: string;
-  group: "traffic" | "access" | "runtime";
   status: SectionStatus;
   /** Already translated; rendered as-is. */
   value: string;
@@ -48,6 +47,41 @@ export type HealthInput = {
   oauthProviderCount: number;
   agentsConnected: number;
   agentsPaired: number;
+  /**
+   * The rest of the blocks, reduced on the server to what a tile says: never a raw settings blob,
+   * which can carry credentials (tests/unit/browser-secret-boundaries.test.ts).
+   */
+  general: { defaultDomain: string; acmeEmail: string };
+  updates: {
+    enabled: boolean;
+    current: string;
+    latest: string | null;
+    updateAvailable: boolean;
+    error: string | null;
+  };
+  faviconSet: boolean;
+  instance: { appName: string; baseUrl: string };
+  gravatarEnabled: boolean;
+  errorPageRules: number;
+  globalCaddyfileLines: number;
+  httpCacheStorage: string;
+  dashboardHost: { enabled: boolean; domain: string; tls: boolean } | null;
+  email: { status: "off" | "incomplete" | "ready"; host: string };
+  notifications: { alertDays: number; lastError: string | null; noRecipients: boolean };
+  dnsResolvers: { enabled: boolean; count: number };
+  upstreamDns: { enabled: boolean; family: "ipv4" | "ipv6" | "both" } | null;
+  httpProtocols: { http2: boolean; http3: boolean };
+  compressionEnabled: boolean;
+  tailscaleEnabled: boolean;
+  ldapDirectoryCount: number;
+  signIn: { localUsersDisabled: boolean; accountLockEnabled: boolean };
+  captchaProvider: string | null;
+  twoFactorRequiredForAdmins: boolean;
+  requireChangeOnLegacyHash: boolean;
+  authentikOutpost: string;
+  forwardAuth: { provider: "authelia" | "custom"; upstream: string } | null;
+  crowdsec: { enabled: boolean; mode: "external" | "managed" };
+  logging: { enabled: boolean; format: "json" | "console" };
   stagedKeys: ReadonlySet<string>;
   /** Injected so staleness is a pure function of the input. */
   now?: number;
@@ -64,7 +98,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "dns-providers",
     name: t("blocks.dnsProviders.name"),
-    group: "traffic",
     status: activeProvider ? "ok" : "unset",
     value: activeProvider
       ? providers.length > 1
@@ -82,7 +115,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "acme",
     name: t("blocks.acme.name"),
-    group: "traffic",
     status: "ok",
     value: input.acmeConfigured
       ? t("health.acme.valueCustom", { count: certificateCount })
@@ -96,7 +128,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "trusted-proxies",
     name: t("blocks.trustedProxies.name"),
-    group: "traffic",
     status: geoBlockNeedsProxies ? "attention" : ranges.length > 0 ? "ok" : "unset",
     value:
       ranges.length > 0
@@ -110,7 +141,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "default-response",
     name: t("blocks.defaultResponse.name"),
-    group: "traffic",
     status: hasDefaultResponse ? "ok" : "unset",
     value: hasDefaultResponse
       ? t("health.defaultResponse.valueConfigured")
@@ -122,7 +152,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "oauth",
     name: t("blocks.oauth.name"),
-    group: "access",
     status: input.oauthProviderCount > 0 ? "ok" : "unset",
     value:
       input.oauthProviderCount > 0
@@ -151,7 +180,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "geoip",
     name: t("health.geoip.name"),
-    group: "access",
     status: geoipAttention ? "attention" : input.geoip.enabled ? "ok" : "unset",
     value: !input.geoip.enabled
       ? t("health.off")
@@ -188,7 +216,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "geoblock",
     name: t("health.geoblock.name"),
-    group: "access",
     status:
       blockingWithoutData || blockingOnStaleData
         ? "attention"
@@ -210,7 +237,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "agent",
     name: t("blocks.agent.name"),
-    group: "runtime",
     status: input.agentsPaired === 0 ? "unset" : agentsMissing ? "attention" : "ok",
     value:
       input.agentsPaired === 0
@@ -235,7 +261,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "caddy-build",
     name: t("blocks.caddyBuild.name"),
-    group: "runtime",
     status: "ok",
     value:
       custom > 0 || disabled > 0
@@ -250,7 +275,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "metrics",
     name: t("health.metrics.name"),
-    group: "runtime",
     status: input.metrics?.enabled ? "ok" : "unset",
     value: input.metrics?.enabled
       ? t("health.metrics.valuePort", { port: String(input.metrics.port ?? 9090) })
@@ -263,7 +287,6 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   sections.push({
     id: "analytics",
     name: t("blocks.analytics.name"),
-    group: "runtime",
     status: analyticsFromEnv ? "env" : input.analytics.enabled ? "ok" : "unset",
     value: input.analytics.enabled
       ? t("health.analytics.valueRetention", { days: String(input.analytics.retentionDays) })
@@ -271,6 +294,263 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     detail: analyticsFromEnv ? t("health.analytics.detailEnv") : undefined,
     staged: staged("analytics"),
   });
+
+  // ── The remaining blocks: one tile each, so the overview covers every block ──
+
+  const onOff = (on: boolean) => (on ? t("health.on") : t("health.off"));
+  const push = (
+    id: string,
+    nameKey: string,
+    status: SectionStatus,
+    value: string,
+    detail?: string,
+  ) =>
+    sections.push({
+      id,
+      name: (t as unknown as (key: string) => string)(`blocks.${nameKey}.name`),
+      status,
+      value,
+      detail,
+      staged: staged(id),
+    });
+
+  push(
+    "general",
+    "general",
+    input.general.defaultDomain ? "ok" : "unset",
+    input.general.defaultDomain || t("health.general.valueNone"),
+    input.general.acmeEmail
+      ? t("health.general.detailAcmeEmail", { email: input.general.acmeEmail })
+      : undefined,
+  );
+
+  const { updates } = input;
+  push(
+    "updates",
+    "updates",
+    !updates.enabled ? "unset" : updates.error ? "attention" : "ok",
+    !updates.enabled
+      ? t("health.off")
+      : updates.updateAvailable && updates.latest
+        ? t("health.updates.valueAvailable", { latest: updates.latest, current: updates.current })
+        : updates.latest
+          ? t("health.updates.valueCurrent", { current: updates.current })
+          : t("health.updates.valueUnchecked"),
+    updates.enabled && updates.error
+      ? t("health.updates.detailError", { error: updates.error })
+      : undefined,
+  );
+
+  push(
+    "branding",
+    "branding",
+    input.faviconSet ? "ok" : "unset",
+    input.faviconSet ? t("health.branding.valueCustom") : t("health.branding.valueDefault"),
+  );
+
+  push("instance", "instance", "ok", input.instance.appName, input.instance.baseUrl || undefined);
+
+  push(
+    "avatars",
+    "avatars",
+    input.gravatarEnabled ? "ok" : "unset",
+    input.gravatarEnabled ? t("health.avatars.valueGravatar") : t("health.off"),
+  );
+
+  push(
+    "error-pages",
+    "errorPages",
+    input.errorPageRules > 0 ? "ok" : "unset",
+    input.errorPageRules > 0
+      ? t("health.errorPages.valueRules", { count: input.errorPageRules })
+      : t("health.errorPages.valueNone"),
+  );
+
+  push(
+    "global-caddy-config",
+    "globalCaddyConfig",
+    input.globalCaddyfileLines > 0 ? "ok" : "unset",
+    input.globalCaddyfileLines > 0
+      ? t("health.globalCaddyConfig.valueLines", { count: input.globalCaddyfileLines })
+      : t("health.globalCaddyConfig.valueNone"),
+  );
+
+  push(
+    "http-cache",
+    "httpCache",
+    "ok",
+    t("health.httpCache.valueStorage", { storage: input.httpCacheStorage }),
+  );
+
+  const dashboard = input.dashboardHost;
+  push(
+    "dashboard",
+    "dashboard",
+    dashboard?.enabled ? "ok" : "unset",
+    dashboard?.enabled && dashboard.domain
+      ? `${dashboard.tls ? "https" : "http"}://${dashboard.domain}`
+      : t("health.off"),
+  );
+
+  push(
+    "email",
+    "email",
+    input.email.status === "ready"
+      ? "ok"
+      : input.email.status === "incomplete"
+        ? "attention"
+        : "unset",
+    input.email.status === "ready"
+      ? t("health.email.valueReady", { host: input.email.host })
+      : input.email.status === "incomplete"
+        ? t("health.email.valueIncomplete")
+        : t("health.off"),
+    input.email.status === "incomplete" ? t("health.email.detailIncomplete") : undefined,
+  );
+
+  const { notifications } = input;
+  const notificationsFailing = Boolean(notifications.lastError) || notifications.noRecipients;
+  push(
+    "certificate-alerts",
+    "certificateAlerts",
+    notificationsFailing ? "attention" : notifications.alertDays > 0 ? "ok" : "unset",
+    notifications.alertDays > 0
+      ? t("health.certificateAlerts.valueDays", { days: notifications.alertDays })
+      : t("health.certificateAlerts.valueAlertsOff"),
+    notifications.lastError
+      ? t("health.certificateAlerts.detailFailed", { error: notifications.lastError })
+      : notifications.noRecipients
+        ? t("health.certificateAlerts.detailNoRecipients")
+        : undefined,
+  );
+
+  push(
+    "dns-resolvers",
+    "dnsResolvers",
+    input.dnsResolvers.enabled && input.dnsResolvers.count > 0 ? "ok" : "unset",
+    input.dnsResolvers.enabled && input.dnsResolvers.count > 0
+      ? t("health.dnsResolvers.valueResolvers", { count: input.dnsResolvers.count })
+      : t("health.dnsResolvers.valueDefault"),
+  );
+
+  push(
+    "upstream-dns",
+    "upstreamDns",
+    input.upstreamDns?.enabled ? "ok" : "unset",
+    input.upstreamDns?.enabled
+      ? t("health.upstreamDns.valueFamily", { family: input.upstreamDns.family })
+      : t("health.off"),
+  );
+
+  const { http2, http3 } = input.httpProtocols;
+  push(
+    "http-protocols",
+    "httpProtocols",
+    "ok",
+    http2 && http3
+      ? t("health.httpProtocols.valueBoth")
+      : http2
+        ? t("health.httpProtocols.valueHttp2")
+        : http3
+          ? t("health.httpProtocols.valueHttp3")
+          : t("health.httpProtocols.valueHttp1"),
+  );
+
+  push(
+    "compression",
+    "compression",
+    input.compressionEnabled ? "ok" : "unset",
+    onOff(input.compressionEnabled),
+  );
+
+  push(
+    "tailscale",
+    "tailscale",
+    input.tailscaleEnabled ? "ok" : "unset",
+    onOff(input.tailscaleEnabled),
+  );
+
+  push(
+    "ldap",
+    "ldap",
+    input.ldapDirectoryCount > 0 ? "ok" : "unset",
+    input.ldapDirectoryCount > 0
+      ? t("health.ldap.valueDirectories", { count: input.ldapDirectoryCount })
+      : t("health.ldap.valueNone"),
+  );
+
+  push(
+    "sign-in",
+    "signIn",
+    "ok",
+    input.signIn.localUsersDisabled
+      ? t("health.signIn.valueSsoOnly")
+      : t("health.signIn.valueLocal"),
+    input.signIn.accountLockEnabled ? undefined : t("health.signIn.detailNoLock"),
+  );
+
+  push(
+    "captcha",
+    "captcha",
+    input.captchaProvider ? "ok" : "unset",
+    input.captchaProvider ?? t("health.off"),
+  );
+
+  push(
+    "two-factor",
+    "twoFactor",
+    input.twoFactorRequiredForAdmins ? "ok" : "unset",
+    input.twoFactorRequiredForAdmins
+      ? t("health.twoFactor.valueRequired")
+      : t("health.twoFactor.valueOptional"),
+  );
+
+  push(
+    "password-policy",
+    "passwordPolicy",
+    "ok",
+    input.requireChangeOnLegacyHash
+      ? t("health.passwordPolicy.valueRequireChange")
+      : t("health.passwordPolicy.valueAccept"),
+  );
+
+  push(
+    "authentik",
+    "authentik",
+    input.authentikOutpost ? "ok" : "unset",
+    input.authentikOutpost || t("health.notSet"),
+  );
+
+  push(
+    "forward-auth",
+    "forwardAuth",
+    input.forwardAuth ? "ok" : "unset",
+    input.forwardAuth
+      ? t("health.forwardAuth.valueProvider", {
+          provider: input.forwardAuth.provider,
+          upstream: input.forwardAuth.upstream,
+        })
+      : t("health.notSet"),
+  );
+
+  push(
+    "crowdsec",
+    "crowdsec",
+    input.crowdsec.enabled ? "ok" : "unset",
+    input.crowdsec.enabled
+      ? t("health.crowdsec.valueMode", { mode: input.crowdsec.mode })
+      : t("health.off"),
+  );
+
+  // Off is worth knowing about: upstream-error notifications and CrowdSec both read this log.
+  push(
+    "logging",
+    "logging",
+    input.logging.enabled ? "ok" : "unset",
+    input.logging.enabled
+      ? t("health.logging.valueFormat", { format: input.logging.format })
+      : t("health.off"),
+  );
 
   return sections;
 }

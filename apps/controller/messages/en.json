@@ -2679,9 +2679,6 @@
     "homeConfigure": "Configure",
     "homeEnvBadge": "env",
     "save": "Save",
-    "homeGroupAccess": "Access",
-    "homeGroupRuntime": "Runtime",
-    "homeGroupTraffic": "Traffic",
     "homeOverview": "Overview",
     "homeStagedBadge": "staged",
     "homeStatusAttention": "Needs attention",
@@ -3730,6 +3727,86 @@
     "oauthDialogAddDescription": "Configure a new OAuth or OIDC provider for single sign-on.",
     "health": {
       "off": "Off",
+      "on": "On",
+      "notSet": "Not set",
+      "general": {
+        "valueNone": "No primary domain",
+        "detailAcmeEmail": "ACME contact {email}"
+      },
+      "updates": {
+        "valueAvailable": "{latest} available, running {current}",
+        "valueCurrent": "Up to date, {current}",
+        "valueUnchecked": "Not checked yet",
+        "detailError": "The last check failed: {error}"
+      },
+      "branding": {
+        "valueCustom": "Custom favicon",
+        "valueDefault": "Default favicon"
+      },
+      "avatars": {
+        "valueGravatar": "Gravatar on"
+      },
+      "errorPages": {
+        "valueRules": "{count, plural, one {# custom page} other {# custom pages}}",
+        "valueNone": "Caddy's defaults"
+      },
+      "globalCaddyConfig": {
+        "valueLines": "{count, plural, one {# line} other {# lines}} of Caddyfile",
+        "valueNone": "None"
+      },
+      "httpCache": {
+        "valueStorage": "Stored in {storage}"
+      },
+      "email": {
+        "valueReady": "Sending through {host}",
+        "valueIncomplete": "Incomplete",
+        "detailIncomplete": "Email is on, but the server or sender address is missing, so nothing can be sent."
+      },
+      "certificateAlerts": {
+        "valueDays": "Certificate alerts at {days, plural, one {# day} other {# days}}",
+        "valueAlertsOff": "Certificate alerts off",
+        "detailFailed": "The last notification could not be sent: {error}",
+        "detailNoRecipients": "The last notifications were dropped: there was nobody to send them to."
+      },
+      "dnsResolvers": {
+        "valueResolvers": "{count, plural, one {# resolver} other {# resolvers}}",
+        "valueDefault": "System resolvers"
+      },
+      "upstreamDns": {
+        "valueFamily": "Pinning {family, select, ipv4 {IPv4} ipv6 {IPv6} other {IPv4 and IPv6}}"
+      },
+      "httpProtocols": {
+        "valueBoth": "HTTP/2 and HTTP/3",
+        "valueHttp2": "HTTP/2, no HTTP/3",
+        "valueHttp3": "HTTP/3, no HTTP/2",
+        "valueHttp1": "HTTP/1.1 only"
+      },
+      "ldap": {
+        "valueDirectories": "{count, plural, one {# directory} other {# directories}}",
+        "valueNone": "No directories"
+      },
+      "signIn": {
+        "valueLocal": "Local accounts and single sign-on",
+        "valueSsoOnly": "Single sign-on and directories only",
+        "detailNoLock": "Accounts do not lock after failed sign-ins."
+      },
+      "twoFactor": {
+        "valueRequired": "Required for administrators",
+        "valueOptional": "Optional"
+      },
+      "passwordPolicy": {
+        "valueRequireChange": "Old password hashes must be changed",
+        "valueAccept": "Old password hashes accepted"
+      },
+      "forwardAuth": {
+        "valueProvider": "{provider, select, authelia {Authelia} other {Custom}} at {upstream}"
+      },
+      "crowdsec": {
+        "valueMode": "{mode, select, managed {Managed} other {External}} bouncer"
+      },
+      "logging": {
+        "valueFormat": "{format, select, console {Console format} other {JSON}}"
+      },
       "dnsProviders": {
         "valueMore": "{provider} and {count} more",
         "valueNone": "No provider - DNS-01 unavailable",

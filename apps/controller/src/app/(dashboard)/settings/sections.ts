@@ -465,7 +465,6 @@ export const LEGACY_SECTION_PAGES: ReadonlyMap<string, { page: string; anchor: s
   ),
 );
 
-/** Callers link through this so none needs updating when a block moves page. */
 /**
  * The rail's icon colours, by section id. Where a section configures a page, the page's hue: the
  * agent teal, CrowdSec red beside the WAF, observability blue like Analytics.
@@ -486,6 +485,7 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   observability: "blue",
 };
 
+/** Callers link through this so none needs updating when a block moves page. */
 export function settingsHref(id: string): string {
   const legacy = LEGACY_SECTION_PAGES.get(id);
   return legacy ? `/settings/${legacy.page}#${legacy.anchor}` : `/settings/${id}`;

@@ -9,14 +9,6 @@ Web interface for managing [Caddy Server](https://caddyserver.com/) reverse prox
 > and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta -
 > take a backup before upgrading.
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
-
-[Report Bug](https://github.com/silentspud/caddy-proxy-manager/issues) • [Request Feature](https://github.com/silentspud/caddy-proxy-manager/issues)
-
-<img width="100%" alt="Dashboard" src="apps/site/assets/screenshots/dashboard-main.png" />
-
 ## Overview
 
 This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through an Astryx interface. Built with Vinext version whatever, React 19, Astryx, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
