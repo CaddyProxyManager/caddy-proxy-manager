@@ -30,8 +30,14 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 `docker-compose.yml`, `.env.example` and the files they mount, flat, with the images pinned to that
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
+Each release has two archives, the same but for CrowdSec. `-deploy.tar.gz` leaves out the
+[managed CrowdSec](#crowdsec) container; `-deploy-crowdsec.tar.gz` adds it, its network and its
+volumes. Take the second only for managed mode - an external CrowdSec works with either. Upgrade
+with the same one you installed from: the plain archive unpacked over a CrowdSec install removes
+the service from the compose file.
+
 ```bash
-VERSION=v3.5.0   # the release you downloaded
+VERSION=v3.5.1   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
@@ -1020,7 +1026,8 @@ Every agent - the one in the same stack included - fetches its own copy from the
 Caddy becomes a CrowdSec bouncer. Turn on **CrowdSec** under **Settings → Caddy Build** and
 rebuild, then pick where the Local API is under **Settings → CrowdSec**:
 
-- **Managed (bundled host only).** The bundled agent runs a `crowdsec` container
+- **Managed (bundled host only).** Needs the `-deploy-crowdsec.tar.gz` archive's compose file. The
+  bundled agent runs a `crowdsec` container
   (`crowdsecurity/crowdsec`, pinned) behind the `crowdsec` Compose profile, as it does ClickHouse.
   It reads Caddy's access log from `caddy-logs`, read-only, with the `crowdsecurity/caddy`
   collection, and the controller keeps that log on and in JSON while CrowdSec is managed. The
@@ -1030,10 +1037,17 @@ rebuild, then pick where the Local API is under **Settings → CrowdSec**:
   default, so no attacker address leaves the host; switch **Share signals** on for the community
   blocklist. AppSec (virtual patching and generic rules) is one switch away. Hosts served by other
   agents are not checked in this mode.
-- **External.** A CrowdSec you run yourself: create a key with `cscli bouncers add caddy` and enter
-  the Local API URL and the key. The key is encrypted at rest, never returned by the API, and kept
-  only while the Local API and AppSec addresses are unchanged. **Test connection** runs from the
-  controller, which may not reach a Local API only Caddy's network can.
+- **External.** A CrowdSec you run yourself, with either archive. CPM does not feed it logs or
+  connect it to Caddy; you mount `<project>_caddy-logs` into it read-only with the
+  `crowdsecurity/caddy` collection reading `access.log` (Access Logging on), and put it on a
+  network Caddy shares - a dedicated one added to `caddy` in `docker-compose.override.yml` and
+  picked up with `docker compose restart agent`, since anything on `caddy-network` could reach the
+  Local API. Then create a key with `cscli bouncers add caddy` and enter the Local API URL as Caddy
+  reaches it and the key. The key is encrypted at rest, never returned by the API, and kept only
+  while the Local API and AppSec addresses are unchanged. **Test connection** runs from the
+  controller, which may not reach a Local API only Caddy's network can. The
+  [CrowdSec docs](https://silentspud.github.io/caddy-proxy-manager/features/crowdsec/#external)
+  walk through it.
 
 Every proxy host and L4 host then refuses the addresses CrowdSec has decided against, first in the
 chain, ahead of rate limiting, geo blocking and the WAF; a host can opt out in its editor. The
@@ -1497,7 +1511,7 @@ docker build \
   --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
   --build-arg PUID=10000 --build-arg PGID=10000 \
   -t caddy-proxy-manager-caddy:custom \
-  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.5.0
+  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.5.1
 ```
 
 Build it on the agent's host, or elsewhere and push it to a registry. The first time,
