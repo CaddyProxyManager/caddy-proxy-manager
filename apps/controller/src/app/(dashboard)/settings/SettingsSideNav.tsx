@@ -34,7 +34,22 @@ export default function SettingsSideNav({
   const staged = new Set(stagedKeys);
 
   return (
-    <SideNav footer={footer} data-testid="settings-rail">
+    <SideNav
+      // History sits with the account controls, apart from the sections it records changes to.
+      footer={
+        <VStack gap={2}>
+          <SideNavItem
+            as={Link}
+            href="/settings/history"
+            label={t("history.navLabel")}
+            icon={<History className={ACCENTS.orange.text} />}
+            isSelected={pathname === "/settings/history"}
+          />
+          {footer}
+        </VStack>
+      }
+      data-testid="settings-rail"
+    >
       <VStack gap={2} padding={2}>
         <SideNavItem as={Link} href="/" label={t("backToDashboard")} icon={<ArrowLeft />} />
         <PaletteSearchButton />
@@ -47,13 +62,6 @@ export default function SettingsSideNav({
           label={t("homeOverview")}
           icon={<LayoutGrid className={ACCENTS.gray.text} />}
           isSelected={pathname === "/settings"}
-        />
-        <SideNavItem
-          as={Link}
-          href="/settings/history"
-          label={t("history.navLabel")}
-          icon={<History className={ACCENTS.orange.text} />}
-          isSelected={pathname === "/settings/history"}
         />
         <SideNavItem
           as={Link}
