@@ -22,6 +22,7 @@ export const SHIPPED_CADDY_MODULES: readonly string[] = [
   "github.com/caddy-dns/dynu",
   "github.com/caddy-dns/acmedns",
   "github.com/caddy-dns/infomaniak",
+  "github.com/caddy-dns/inwx",
   "github.com/caddy-dns/cloudns",
   "github.com/caddy-dns/rfc2136",
   "github.com/mholt/caddy-l4",

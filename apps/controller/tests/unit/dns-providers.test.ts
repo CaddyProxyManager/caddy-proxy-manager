@@ -293,6 +293,49 @@ describe('DNS provider registry', () => {
     });
   });
 
+  it('registers INWX with the Caddy module path and credential fields', () => {
+    const provider = getProviderDefinition('inwx');
+
+    expect(provider).toMatchObject({
+      name: 'inwx',
+      displayName: 'INWX',
+      docsUrl: 'https://github.com/caddy-dns/inwx',
+      modulePath: 'github.com/caddy-dns/inwx',
+    });
+    expect(provider?.fields).toEqual([
+      { key: 'username', label: 'Username', type: 'string', required: true },
+      { key: 'password', label: 'Password', type: 'password', required: true },
+      { key: 'shared_secret', label: '2FA Shared Secret', type: 'password', required: false },
+      { key: 'endpoint_url', label: 'Endpoint URL', type: 'string', required: false },
+      ...challengeOptionFields(),
+    ]);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('inwx');
+  });
+
+  it('encrypts the INWX password and 2FA secret and emits them for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('inwx', {
+      username: 'inwx-user',
+      password: 'inwx-password',
+      shared_secret: 'inwx-shared-secret',
+      endpoint_url: 'https://api.ote.domrobot.com/jsonrpc/',
+    });
+
+    expect(encrypted.username).toBe('inwx-user');
+    expect(encrypted.endpoint_url).toBe('https://api.ote.domrobot.com/jsonrpc/');
+    expect(isEncryptedSecret(encrypted.password)).toBe(true);
+    expect(isEncryptedSecret(encrypted.shared_secret)).toBe(true);
+    expect(buildDnsChallengeConfig('inwx', encrypted, ['1.1.1.1'])).toEqual({
+      provider: {
+        name: 'inwx',
+        username: 'inwx-user',
+        password: 'inwx-password',
+        shared_secret: 'inwx-shared-secret',
+        endpoint_url: 'https://api.ote.domrobot.com/jsonrpc/',
+      },
+      resolvers: ['1.1.1.1'],
+    });
+  });
+
   it('registers netcup with the Caddy module path, customer/key/password fields, and slow-propagation defaults', () => {
     const provider = getProviderDefinition('netcup');
 

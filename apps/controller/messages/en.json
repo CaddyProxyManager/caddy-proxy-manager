@@ -3591,6 +3591,23 @@
           }
         }
       },
+      "inwx": {
+        "description": "INWX DNS API",
+        "fields": {
+          "username": {
+            "label": "Username"
+          },
+          "password": {
+            "label": "Password"
+          },
+          "sharedSecret": {
+            "label": "2FA Shared Secret"
+          },
+          "endpointUrl": {
+            "label": "Endpoint URL"
+          }
+        }
+      },
       "netcup": {
         "description": "netcup CCP DNS API",
         "fields": {
