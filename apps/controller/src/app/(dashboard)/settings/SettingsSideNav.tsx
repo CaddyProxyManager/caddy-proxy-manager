@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import {
   SETTINGS_GROUPS,
   SETTINGS_HUES,
+  STAGED_SLOT_ID,
   settingsGroupLabel,
   settingsSectionName,
 } from "./sections";
@@ -38,6 +39,8 @@ export default function SettingsSideNav({
       // History sits with the account controls, apart from the sections it records changes to.
       footer={
         <VStack gap={2}>
+          {/* The page fills this: the rail is the layout's, the staged change set the page's. */}
+          <div id={STAGED_SLOT_ID} />
           <SideNavItem
             as={Link}
             href="/settings/history"

@@ -485,6 +485,9 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   observability: "blue",
 };
 
+/** Where the rail takes the revision and the staged controls, filled by SettingsFrame. */
+export const STAGED_SLOT_ID = "settings-rail-staged";
+
 /** Callers link through this so none needs updating when a block moves page. */
 export function settingsHref(id: string): string {
   const legacy = LEGACY_SECTION_PAGES.get(id);

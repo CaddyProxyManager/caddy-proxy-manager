@@ -22,7 +22,7 @@ import { sectionForStorageKey, stagedChangeLabel } from "@/src/lib/settings/sect
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
 
-/** In the header, so the apply control has one address and covers no form field. */
+/** In the rail (the header on a phone), so the apply control has one address and covers no field. */
 export function StagedControls({ view }: { view: StagedView }) {
   const t = useTranslations("settings");
   const [open, setOpen] = useState(false);
@@ -39,7 +39,7 @@ export function StagedControls({ view }: { view: StagedView }) {
   };
 
   return (
-    <HStack gap={2} vAlign="center" data-testid="staged-bar">
+    <HStack gap={2} vAlign="center" wrap="wrap" data-testid="staged-bar">
       <Button
         variant="ghost"
         size="sm"
