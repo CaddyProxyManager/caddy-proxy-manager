@@ -5,6 +5,7 @@
  * one page-level bar replaces the per-card Save buttons and submits whichever were edited.
  */
 
+import { HEADER_HEIGHT_VAR } from "./SettingsFrame";
 import {
   type ReactNode,
   type RefObject,
@@ -48,7 +49,9 @@ export function SettingsBlockShell({
       id={block.id}
       // The dirty tracker keys baselines on this; ids also appear on design-system elements.
       data-settings-block={block.id}
-      style={{ scrollMarginTop: "var(--spacing-5)" }}
+      style={{
+        scrollMarginTop: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
+      }}
     >
       {showHeading ? (
         <VStack gap={1}>
@@ -104,7 +107,13 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
   return (
     <nav
       aria-label={t("onThisPage")}
-      style={{ width: "176px", flexShrink: 0, position: "sticky", top: 0 }}
+      style={{
+        width: "176px",
+        flexShrink: 0,
+        position: "sticky",
+        // The frame's padding again, so it does not jump up to the header once it sticks.
+        top: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
+      }}
     >
       <VStack gap={1}>
         <Text type="label" size="sm" color="secondary">
@@ -114,7 +123,16 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
           <a
             key={anchor.id}
             href={`#${anchor.id}`}
-            onClick={() => setCurrent(anchor.id)}
+            onClick={(event) => {
+              setCurrent(anchor.id);
+              const target = document.getElementById(anchor.id);
+              if (!target) return;
+              // Scrolled here: the router's hash jump scrolls the window, and the content pane is
+              // the scroller. scrollIntoView honours the block's header-clearing scroll-margin.
+              event.preventDefault();
+              target.scrollIntoView({ behavior: "smooth" });
+              window.history.replaceState(window.history.state, "", `#${anchor.id}`);
+            }}
             style={{
               display: "block",
               padding: "var(--spacing-1) var(--spacing-2)",
