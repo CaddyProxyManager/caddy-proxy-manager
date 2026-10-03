@@ -23,6 +23,7 @@ import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useFormatter, useTranslations } from "next-intl";
+import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
@@ -40,6 +41,12 @@ const STAT_ICONS = {
   certificates: ShieldCheck,
   accessLists: KeyRound,
 } as const;
+
+const STAT_HUES: Record<keyof typeof STAT_ICONS, Hue> = {
+  proxyHosts: "purple",
+  certificates: "green",
+  accessLists: "yellow",
+};
 
 export type StatCard = {
   label: string;
@@ -76,6 +83,7 @@ type TimelineBucket = {
   clientErrors: number;
   serverErrors: number;
   bytes: number;
+  serverEvents: number;
 };
 
 type TrafficEvent = {
@@ -121,13 +129,16 @@ type MetricKey =
 /**
  * `filter` and `series` come from the same window, so a tile's number, line and rows agree.
  * `color` is per metric, not per position, so a series keeps its colour alone or overlaid.
- * `serverEvents` has no series: audit rows are not bucketed, and inventing one would be fake.
+ * `serverEvents` is audit rows, bucketed by the server on the traffic timeline's buckets.
  */
 type MetricDef = {
   key: MetricKey;
   filter: "all" | "server-errors" | "client-errors" | "largest" | "blocked";
   series:
-    | keyof Pick<TimelineBucket, "total" | "blocked" | "clientErrors" | "serverErrors" | "bytes">
+    | keyof Pick<
+        TimelineBucket,
+        "total" | "blocked" | "clientErrors" | "serverErrors" | "bytes" | "serverEvents"
+      >
     | null;
   format: "count" | "bytes";
   color?: keyof ChartTheme["series"];
@@ -135,7 +146,13 @@ type MetricDef = {
 
 const METRICS: MetricDef[] = [
   { key: "requests", filter: "all", series: "total", format: "count", color: "blue" },
-  { key: "serverEvents", filter: "all", series: null, format: "count" },
+  {
+    key: "serverEvents",
+    filter: "all",
+    series: "serverEvents",
+    format: "count",
+    color: "green",
+  },
   {
     key: "serverErrors",
     filter: "server-errors",
@@ -223,26 +240,35 @@ const AUDIT_VARIANT: Record<string, "success" | "error" | "info"> = {
   remove: "error",
 };
 
+/** In its chart series' hue, so a tile and its line read as one. */
 function Tile({
   label,
   value,
+  hue,
   isSelected,
   onSelect,
   children,
 }: {
   label: string;
   value: string;
+  hue: Hue;
   isSelected: boolean;
   onSelect: () => void;
   children?: ReactNode;
 }) {
   return (
-    <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
+    <SelectableCard
+      label={label}
+      isSelected={isSelected}
+      onChange={onSelect}
+      padding={4}
+      className={ACCENTS[hue].edge}
+    >
       <VStack gap={1}>
         <Text type="body" weight="semibold" style={CARD_TITLE_STYLE}>
           {label}
         </Text>
-        <Text type="large" weight="semibold" hasTabularNumbers>
+        <Text type="large" weight="semibold" hasTabularNumbers className={ACCENTS[hue].text}>
           {value}
         </Text>
         {children}
@@ -356,8 +382,11 @@ export default function OverviewClient({
   );
 
   const chartOptions: ApexOptions = useMemo(() => {
-    // Counts share one axis so they compare honestly; bytes take the right-hand one.
-    const countAxis = chartSeries[plotted.findIndex((m) => m.format === "count")]?.name;
+    // Counts share one axis so they compare honestly; bytes take the right-hand one. Server
+    // events get a scale of their own: a few changes beside thousands of requests read as zero.
+    const ownScale = (m: PlottedMetric) => m.key === "serverEvents" && isOverlay;
+    const countAxis =
+      chartSeries[plotted.findIndex((m) => m.format === "count" && !ownScale(m))]?.name;
     return {
       ...chartTheme.base,
       chart: {
@@ -382,8 +411,8 @@ export default function OverviewClient({
       // One entry per series; a shared `seriesName` is what makes the counts share a scale.
       yaxis: plotted.map((m, index) => ({
         opposite: m.format === "bytes",
-        seriesName: m.format === "bytes" ? chartSeries[index]?.name : countAxis,
-        show: m.format === "bytes" || chartSeries[index]?.name === countAxis,
+        seriesName: m.format === "bytes" || ownScale(m) ? chartSeries[index]?.name : countAxis,
+        show: !ownScale(m) && (m.format === "bytes" || chartSeries[index]?.name === countAxis),
         labels: {
           style: { colors: chartTheme.labelColor },
           formatter: (value: number) =>
@@ -522,7 +551,12 @@ export default function OverviewClient({
   }, [payload, previewPayload, filter, isEventsOnly, blendsEvents, recentEvents]);
 
   const tileValue = (key: MetricKey): string => {
-    if (key === "serverEvents") return format.number(serverEventCount);
+    // The range's own count once loaded, so the tile and its line agree; the 24h figure before.
+    if (key === "serverEvents") {
+      return format.number(
+        payload ? timeline.reduce((sum, b) => sum + (b.serverEvents ?? 0), 0) : serverEventCount,
+      );
+    }
     if (!payload) return emptyValue;
     switch (key) {
       case "requests":
@@ -599,12 +633,19 @@ export default function OverviewClient({
             })}
             href={stat.href}
             padding={4}
+            className={ACCENTS[STAT_HUES[stat.icon]].edge}
           >
             <HStack gap={3} vAlign="center">
-              <Icon icon={STAT_ICONS[stat.icon]} />
+              <Card variant={STAT_HUES[stat.icon]} padding={2}>
+                <Icon icon={STAT_ICONS[stat.icon]} color={STAT_HUES[stat.icon]} />
+              </Card>
               <VStack gap={0}>
                 <HStack gap={1} vAlign="end">
-                  <Text type="display-3" hasTabularNumbers>
+                  <Text
+                    type="display-3"
+                    hasTabularNumbers
+                    className={ACCENTS[STAT_HUES[stat.icon]].text}
+                  >
                     {String(stat.count)}
                   </Text>
                   {stat.total !== undefined && (
@@ -628,6 +669,7 @@ export default function OverviewClient({
             key={m.key}
             label={metricLabel(m.key)}
             value={tileValue(m.key)}
+            hue={m.color ?? "gray"}
             isSelected={m.key === metricKey}
             onSelect={() => setMetricKey((current) => (current === m.key ? null : m.key))}
           />

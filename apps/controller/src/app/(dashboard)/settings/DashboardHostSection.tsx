@@ -139,7 +139,11 @@ export function DashboardHostSection({
             {options && (
               <Collapsible
                 defaultIsOpen={false}
-                trigger={<Text size="sm">{t("dashboardProxyOptions")}</Text>}
+                trigger={
+                  <Text type="label" size="lg">
+                    {t("dashboardProxyOptions")}
+                  </Text>
+                }
               >
                 <VStack gap={3} padding={2}>
                   <Text size="xsm" color="secondary">

@@ -21,6 +21,7 @@ export interface ChartTheme {
     purple: string;
     cyan: string;
     orange: string;
+    green: string;
   };
   /** Text drawn on top of a filled series colour (donut slice labels). */
   onSeries: string;
@@ -53,6 +54,7 @@ export function useChartTheme(): ChartTheme {
         purple: token("--color-data-categorical-purple"),
         cyan: token("--color-data-categorical-cyan"),
         orange: token("--color-data-categorical-orange"),
+        green: token("--color-data-categorical-green"),
       },
       // Saturated mid-tones, so "on dark" stays legible on each in both modes.
       onSeries: token("--color-on-dark"),

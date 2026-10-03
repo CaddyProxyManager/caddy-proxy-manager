@@ -15,9 +15,11 @@ import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Icon } from "@astryxdesign/core/Icon";
-import { DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { ACCENTS, type Hue } from "@/src/components/ui/accent";
 import { visibleDestinations } from "@/src/lib/nav/destinations";
 import {
+  SETTINGS_HUES,
   SETTINGS_ITEMS,
   groupForSection,
   settingsGroupLabel,
@@ -37,6 +39,8 @@ type PaletteItem = {
     /** Searchable but not shown. */
     keywords: string[];
     icon: LucideIcon;
+    /** The colour the navigation shows it in. */
+    hue?: Hue;
   };
 };
 
@@ -121,6 +125,7 @@ export function GlobalCommandPaletteProvider({
         desc: "",
         keywords: [destination.id],
         icon: DESTINATION_ICONS[destination.id],
+        hue: DESTINATION_HUES[destination.id],
       },
     }));
 
@@ -145,6 +150,7 @@ export function GlobalCommandPaletteProvider({
                   ]),
                 ],
                 icon: item.icon,
+                hue: SETTINGS_HUES[item.id],
               },
             };
           })
@@ -173,7 +179,15 @@ export function GlobalCommandPaletteProvider({
           }}
           renderItem={(item) => (
             <HStack gap={3} vAlign="center">
-              <Icon icon={item.auxiliaryData.icon} size="sm" color="secondary" />
+              {item.auxiliaryData.hue ? (
+                <Icon
+                  icon={item.auxiliaryData.icon}
+                  size="sm"
+                  className={ACCENTS[item.auxiliaryData.hue].text}
+                />
+              ) : (
+                <Icon icon={item.auxiliaryData.icon} size="sm" color="secondary" />
+              )}
               <VStack gap={0}>
                 <Text type="body" size="sm" weight="medium">
                   {item.label}

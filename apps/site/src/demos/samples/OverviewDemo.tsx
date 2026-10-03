@@ -3,6 +3,17 @@ import OverviewClient, {
 } from "@cpm/controller/src/app/(dashboard)/OverviewClient";
 import { DemoSurface } from "../DemoSurface";
 
+const SERVER_EVENTS_BY_HOUR: Record<number, number> = {
+  9: 2,
+  10: 1,
+  13: 3,
+  17: 4,
+  18: 2,
+  19: 1,
+  21: 3,
+  22: 1,
+};
+
 /** Shaped like a home server's day rather than a flat line. */
 const TIMELINE: OverviewPayload["timeline"] = (() => {
   const start = Math.floor(Date.parse("2026-02-11T12:00:00.000Z") / 1000) - 24 * 3600;
@@ -18,6 +29,8 @@ const TIMELINE: OverviewPayload["timeline"] = (() => {
     clientErrors: Math.round(total * 0.021) + (hour >= 2 && hour <= 4 ? 90 : 0),
     serverErrors: hour === 18 || hour === 19 ? 140 : Math.round(total * 0.0008),
     bytes: total * 41_000,
+    // Seventeen changes, matching the tile; the cluster at 17:00 precedes the 5xx spike.
+    serverEvents: SERVER_EVENTS_BY_HOUR[hour] ?? 0,
   }));
 })();
 

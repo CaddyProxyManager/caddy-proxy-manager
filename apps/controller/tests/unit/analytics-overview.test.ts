@@ -11,6 +11,7 @@ const ch = vi.hoisted(() => ({
   queryWafCount: vi.fn(),
   queryTimeline: vi.fn(),
   queryTrafficEvents: vi.fn(),
+  bucketSizeForDuration: (seconds: number) => (seconds <= 3600 ? 300 : 3600),
 }));
 
 vi.mock('@/src/lib/db', () => dbModuleMock(() => ({}) as TestDb));
@@ -26,7 +27,7 @@ vi.mock('@/src/lib/agent/client', () => ({
 import { getOverviewAnalytics } from '@/src/lib/analytics-db';
 
 beforeEach(() => {
-  for (const fn of Object.values(ch)) fn.mockReset();
+  for (const fn of Object.values(ch)) if ('mockReset' in fn) fn.mockReset();
 });
 
 describe('getOverviewAnalytics', () => {

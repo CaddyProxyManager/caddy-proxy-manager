@@ -532,7 +532,13 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </div>
             </VStack>
 
-            <Collapsible trigger={t("trustedProxiesBlockResponse")}>
+            <Collapsible
+              trigger={
+                <Text type="label" size="lg">
+                  {t("trustedProxiesBlockResponse")}
+                </Text>
+              }
+            >
               <VStack gap={4}>
                 <TagInput
                   key={`trusted-proxies-${resetKey}`}

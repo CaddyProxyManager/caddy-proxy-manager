@@ -20,6 +20,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { Hue } from "@/src/components/ui/accent";
 import type { useTranslations } from "next-intl";
 
 /** `id` is the anchor, the `settings.blocks.*` key, and where legacy links redirect. */
@@ -465,6 +466,26 @@ export const LEGACY_SECTION_PAGES: ReadonlyMap<string, { page: string; anchor: s
 );
 
 /** Callers link through this so none needs updating when a block moves page. */
+/**
+ * The rail's icon colours, by section id. Where a section configures a page, the page's hue: the
+ * agent teal, CrowdSec red beside the WAF, observability blue like Analytics.
+ */
+export const SETTINGS_HUES: Record<string, Hue> = {
+  general: "blue",
+  responses: "red",
+  "caddy-build": "orange",
+  dashboard: "purple",
+  agent: "teal",
+  email: "pink",
+  dns: "cyan",
+  network: "green",
+  authentication: "yellow",
+  "forward-auth": "purple",
+  geo: "teal",
+  crowdsec: "red",
+  observability: "blue",
+};
+
 export function settingsHref(id: string): string {
   const legacy = LEGACY_SECTION_PAGES.get(id);
   return legacy ? `/settings/${legacy.page}#${legacy.anchor}` : `/settings/${id}`;

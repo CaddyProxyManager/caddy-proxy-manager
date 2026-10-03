@@ -141,8 +141,8 @@ function Section({
         defaultIsOpen={defaultIsOpen}
         trigger={
           <HStack gap={2} vAlign="center">
-            <Icon icon={icon} size="sm" />
-            <Text type="body" size="sm" weight="medium">
+            <Icon icon={icon} />
+            <Text type="label" size="lg">
               {title}
             </Text>
           </HStack>

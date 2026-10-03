@@ -1,5 +1,6 @@
+import { and, gte, lte } from "drizzle-orm";
 import db from "./db";
-import { proxyHosts } from "./db/schema";
+import { auditEvents, proxyHosts } from "./db/schema";
 import {
   querySummary,
   queryTimeline,
@@ -14,6 +15,7 @@ import {
   queryDistinctHosts,
   queryHostTotals,
   isAnalyticsEnabled,
+  bucketSizeForDuration,
   type AnalyticsSummary as CHSummary,
   type TimelineBucket,
   type CountryStats,
@@ -173,12 +175,64 @@ export async function getAnalyticsBlocked(
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 
+export type OverviewTimelineBucket = TimelineBucket & {
+  /** Audit rows - changes made on the controller - in the same bucket. */
+  serverEvents: number;
+};
+
 export interface OverviewAnalytics {
   summary: AnalyticsSummary;
   statusClasses: StatusClassCounts;
   wafBlocked: number;
-  timeline: TimelineBucket[];
+  timeline: OverviewTimelineBucket[];
   events: TrafficEvent[];
+}
+
+/**
+ * Audit rows counted into the traffic timeline's buckets, aligned the way ClickHouse aligns them,
+ * so both lines share an x-axis. Bucketed here: the rows live in the app database. A bucket with
+ * events and no traffic is added with zero traffic, since that is what it had.
+ */
+async function withServerEvents(
+  timeline: TimelineBucket[],
+  from: number,
+  to: number,
+): Promise<OverviewTimelineBucket[]> {
+  const size = bucketSizeForDuration(to - from);
+  const buckets = new Map<number, OverviewTimelineBucket>(
+    timeline.map((bucket) => [bucket.ts, { ...bucket, serverEvents: 0 }]),
+  );
+  try {
+    const rows = await db
+      .select({ createdAt: auditEvents.createdAt })
+      .from(auditEvents)
+      .where(
+        and(
+          gte(auditEvents.createdAt, new Date(from * 1000).toISOString()),
+          lte(auditEvents.createdAt, new Date(to * 1000).toISOString()),
+        ),
+      );
+    for (const { createdAt } of rows) {
+      const seconds = Math.floor(Date.parse(createdAt) / 1000);
+      if (!Number.isFinite(seconds)) continue;
+      const ts = Math.floor(seconds / size) * size;
+      const bucket = buckets.get(ts) ?? {
+        ts,
+        total: 0,
+        blocked: 0,
+        clientErrors: 0,
+        serverErrors: 0,
+        bytes: 0,
+        serverEvents: 0,
+      };
+      bucket.serverEvents += 1;
+      buckets.set(ts, bucket);
+    }
+  } catch (error) {
+    // The traffic is still worth showing without the line.
+    console.error("[analytics] could not count server events for the timeline:", error);
+  }
+  return [...buckets.values()].sort((a, b) => a.ts - b.ts);
 }
 
 /**
@@ -207,7 +261,8 @@ export async function getOverviewAnalytics(
       },
       statusClasses: { ok: 0, clientErrors: 0, serverErrors: 0, blocked: 0 },
       wafBlocked: 0,
-      timeline: [],
+      // Controller changes are recorded whether or not traffic is.
+      timeline: await withServerEvents([], from, to),
       events: [],
     };
   }
@@ -219,7 +274,13 @@ export async function getOverviewAnalytics(
     queryTimeline(from, to, hosts),
     queryTrafficEvents(from, to, hosts, filter, limit),
   ]);
-  return { summary, statusClasses, wafBlocked, timeline, events };
+  return {
+    summary,
+    statusClasses,
+    wafBlocked,
+    timeline: await withServerEvents(timeline, from, to),
+    events,
+  };
 }
 
 // ── Per-host traffic ─────────────────────────────────────────────────────────

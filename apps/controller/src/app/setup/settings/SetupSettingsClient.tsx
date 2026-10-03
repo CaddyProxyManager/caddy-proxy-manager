@@ -660,7 +660,14 @@ function IdentityProviderCard({
           onChange={set("clientSecret")}
         />
 
-        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">{t("moreOptions")}</Text>}>
+        <Collapsible
+          defaultIsOpen={false}
+          trigger={
+            <Text type="label" size="lg">
+              {t("moreOptions")}
+            </Text>
+          }
+        >
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
               {t("manualEndpointsHelp")}

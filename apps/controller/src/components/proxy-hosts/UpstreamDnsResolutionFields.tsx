@@ -64,7 +64,7 @@ export function UpstreamDnsResolutionFields({
         defaultIsOpen={mode !== "inherit" || family !== "inherit"}
         trigger={
           <VStack gap={1} hAlign="start">
-            <Text type="body" size="sm" weight="semibold">
+            <Text type="label" size="lg">
               {t("upstreamDnsPinning")}
             </Text>
             <Text type="body" size="sm" color="secondary">

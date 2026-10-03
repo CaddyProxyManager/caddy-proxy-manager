@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
+import { ACCENTS } from "@/components/ui/accent";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
@@ -539,7 +540,11 @@ export default function ProxyHostsClient({
   ];
 
   const mobileCard = (host: ProxyHost) => (
-    <Card>
+    <Card
+      className={
+        ACCENTS[!host.enabled ? "gray" : host.maintenance?.enabled ? "yellow" : "green"].edge
+      }
+    >
       <HStack justify="between" vAlign="start" gap={2}>
         <VStack gap={1}>
           <Text type="body" size="sm" weight="semibold">

@@ -9,7 +9,13 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { ArrowLeft, DatabaseBackup, History, LayoutGrid } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { SETTINGS_GROUPS, settingsGroupLabel, settingsSectionName } from "./sections";
+import {
+  SETTINGS_GROUPS,
+  SETTINGS_HUES,
+  settingsGroupLabel,
+  settingsSectionName,
+} from "./sections";
+import { ACCENTS } from "@/src/components/ui/accent";
 import { PaletteSearchButton } from "@/src/components/command-palette/GlobalCommandPalette";
 import { storageKeysForSection } from "@/src/lib/settings/section-keys";
 
@@ -39,21 +45,21 @@ export default function SettingsSideNav({
           as={Link}
           href="/settings"
           label={t("homeOverview")}
-          icon={<LayoutGrid />}
+          icon={<LayoutGrid className={ACCENTS.gray.text} />}
           isSelected={pathname === "/settings"}
         />
         <SideNavItem
           as={Link}
           href="/settings/history"
           label={t("history.navLabel")}
-          icon={<History />}
+          icon={<History className={ACCENTS.orange.text} />}
           isSelected={pathname === "/settings/history"}
         />
         <SideNavItem
           as={Link}
           href="/settings/backup"
           label={t("backup.navLabel")}
-          icon={<DatabaseBackup />}
+          icon={<DatabaseBackup className={ACCENTS.green.text} />}
           isSelected={pathname === "/settings/backup"}
         />
       </SideNavSection>
@@ -71,7 +77,7 @@ export default function SettingsSideNav({
                 as={Link}
                 href={`/settings/${item.id}`}
                 label={settingsSectionName(t, item)}
-                icon={<item.icon />}
+                icon={<item.icon className={ACCENTS[SETTINGS_HUES[item.id] ?? "gray"].text} />}
                 isSelected={pathname === `/settings/${item.id}`}
                 // A description, not the name: "General staged" would stop matching by name.
                 aria-description={isStaged ? t("homeStagedBadge") : undefined}

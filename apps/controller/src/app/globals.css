@@ -20,6 +20,52 @@
 /* Unlayered last so existing app utility classes keep winning during migration. */
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* The coloured numbers on cards (components/ui/accent.ts). Light mode's text tokens are near-black
+   (the theme gives text and icon the same tone), so there they are lightened, keeping their chroma;
+   dark mode keeps the text token as it is. */
+@theme inline {
+  --color-blue-number: light-dark(
+    oklch(from var(--color-text-blue) calc(l + 0.18) c h),
+    var(--color-text-blue)
+  );
+  --color-cyan-number: light-dark(
+    oklch(from var(--color-text-cyan) calc(l + 0.18) c h),
+    var(--color-text-cyan)
+  );
+  --color-gray-number: light-dark(
+    oklch(from var(--color-text-gray) calc(l + 0.18) c h),
+    var(--color-text-gray)
+  );
+  --color-green-number: light-dark(
+    oklch(from var(--color-text-green) calc(l + 0.18) c h),
+    var(--color-text-green)
+  );
+  --color-orange-number: light-dark(
+    oklch(from var(--color-text-orange) calc(l + 0.18) c h),
+    var(--color-text-orange)
+  );
+  --color-pink-number: light-dark(
+    oklch(from var(--color-text-pink) calc(l + 0.18) c h),
+    var(--color-text-pink)
+  );
+  --color-purple-number: light-dark(
+    oklch(from var(--color-text-purple) calc(l + 0.18) c h),
+    var(--color-text-purple)
+  );
+  --color-red-number: light-dark(
+    oklch(from var(--color-text-red) calc(l + 0.18) c h),
+    var(--color-text-red)
+  );
+  --color-teal-number: light-dark(
+    oklch(from var(--color-text-teal) calc(l + 0.18) c h),
+    var(--color-text-teal)
+  );
+  --color-yellow-number: light-dark(
+    oklch(from var(--color-text-yellow) calc(l + 0.18) c h),
+    var(--color-text-yellow)
+  );
+}
+
 @layer base {
   /* light-dark() tokens resolved by `color-scheme`, no `.dark` block. See src/lib/theme-mode.ts. */
   * {

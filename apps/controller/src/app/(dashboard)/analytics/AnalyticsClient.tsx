@@ -42,6 +42,7 @@ import { useChartTheme } from "./chart-theme";
 import { settingsHref } from "../settings/sections";
 import { useFormatter, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { CountryBreakdown } from "./CountryBreakdown";
 import type { MapMetric } from "./WorldMapInner";
@@ -256,19 +257,22 @@ function StatCard({
   value,
   sub,
   tone,
+  hue,
 }: {
   label: string;
   value: string;
   sub?: string;
+  /** Overrides the hue for the number, when the number itself is the warning. */
   tone?: StatTone;
+  hue: Hue;
 }) {
   return (
-    <Card padding={5} height="100%">
+    <Card padding={5} height="100%" className={ACCENTS[hue].edge}>
       <VStack gap={1}>
         <Text type="body" style={CARD_TITLE_STYLE}>
           {label}
         </Text>
-        <Text type="display-3" hasTabularNumbers>
+        <Text type="display-3" hasTabularNumbers className={tone ? undefined : ACCENTS[hue].text}>
           <span style={tone ? { color: STAT_TONE_VAR[tone] } : undefined}>{value}</span>
         </Text>
         {sub && (
@@ -1023,9 +1027,14 @@ export default function AnalyticsClient() {
             data-testid="analytics-stats"
             className="cpm-desktop-only"
           >
-            <StatCard label={t("totalRequests")} value={format.number(summary.totalRequests)} />
-            <StatCard label={t("uniqueIps")} value={format.number(summary.uniqueIps)} />
             <StatCard
+              label={t("totalRequests")}
+              value={format.number(summary.totalRequests)}
+              hue="blue"
+            />
+            <StatCard label={t("uniqueIps")} value={format.number(summary.uniqueIps)} hue="teal" />
+            <StatCard
+              hue="red"
               label={t("blockedRequests")}
               value={format.number(summary.blockedRequests)}
               sub={
@@ -1036,12 +1045,14 @@ export default function AnalyticsClient() {
               tone={summary.blockedRequests > 0 ? "error" : undefined}
             />
             <StatCard
+              hue="orange"
               label={t("blockRate")}
               value={`${summary.blockedPercent}%`}
               sub={t("bytesServed", { bytes: formatBytes(format, summary.bytesServed) })}
               tone={summary.blockedPercent > 10 ? "warning" : undefined}
             />
             <StatCard
+              hue="purple"
               label={t("wafEvents")}
               value={format.number(wafStats?.total ?? 0)}
               sub={
