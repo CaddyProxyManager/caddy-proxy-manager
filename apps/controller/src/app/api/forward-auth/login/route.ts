@@ -18,6 +18,10 @@ import {
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { logAuditEvent } from "@/src/lib/audit";
 import { accountKey, accountRetryAfterMs, isRateLimited } from "@/src/lib/rate-limit";
+import { authPolicy } from "@/src/lib/auth-policy";
+import { getAuth } from "@/src/lib/auth-server";
+import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
+import { resolveSignInDirectory, signInWithDirectory } from "@/src/lib/ldap/sign-in";
 
 // The form posts a username, a password and a rid; anything larger is not a login.
 const MAX_BODY_BYTES = 16 * 1024;
@@ -62,8 +66,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 
-    // The portal falls back to the provider buttons.
-    if (await localUsersDisabled()) {
+    // The portal falls back to the provider buttons, unless a directory still takes passwords.
+    const localDisabled = await localUsersDisabled();
+    if (localDisabled && (await listLdapDirectoryChoices()).length === 0) {
       return NextResponse.json({ error: t("passwordSignInDisabled") }, { status: 403 });
     }
 
@@ -82,6 +87,8 @@ export async function POST(request: NextRequest) {
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
     const rid = typeof body.rid === "string" ? body.rid : "";
+    const directoryId =
+      typeof body.directoryId === "string" && body.directoryId ? body.directoryId : null;
 
     if (!username || !password) {
       return NextResponse.json({ error: t("credentialsRequired") }, { status: 400 });
@@ -130,19 +137,44 @@ export async function POST(request: NextRequest) {
     }
 
     let user: Awaited<ReturnType<typeof db.query.users.findFirst>>;
-    let isValid: boolean;
+    let isValid = false;
     try {
-      const email = `${username}@localhost`;
-      user = await db.query.users.findFirst({
-        where: (table, operators) => operators.eq(table.email, email),
-      });
-      const passwordHash = user?.status === "active" ? user.passwordHash : null;
-      // One verify either way, so a missing, inactive or passwordless account answers as slowly.
-      const matches = await verifyPassword(
-        password,
-        passwordHash || (await getDummyPasswordHash()),
-      );
-      isValid = Boolean(passwordHash) && matches;
+      // Picking a directory skips the local account, as on /login.
+      if (!directoryId && !localDisabled) {
+        const email = `${username}@localhost`;
+        user = await db.query.users.findFirst({
+          where: (table, operators) => operators.eq(table.email, email),
+        });
+        const passwordHash = user?.status === "active" ? user.passwordHash : null;
+        // One verify either way, so a missing, inactive or passwordless account answers as slowly.
+        const matches = await verifyPassword(
+          password,
+          passwordHash || (await getDummyPasswordHash()),
+        );
+        isValid = Boolean(passwordHash) && matches;
+      }
+      if (!isValid) {
+        const directory = await resolveSignInDirectory(directoryId);
+        if (directory) {
+          const [{ internalAdapter }, { allowOauthRegistration }] = await Promise.all([
+            (await getAuth()).$context,
+            authPolicy(),
+          ]);
+          const ldapUserId = await signInWithDirectory(
+            internalAdapter,
+            directory,
+            username,
+            password,
+            allowOauthRegistration,
+          );
+          if (ldapUserId !== null) {
+            user = await db.query.users.findFirst({
+              where: (table, operators) => operators.eq(table.id, ldapUserId),
+            });
+            isValid = user?.status === "active";
+          }
+        }
+      }
     } catch (error) {
       attempt.release();
       throw error;

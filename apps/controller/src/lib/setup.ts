@@ -10,6 +10,7 @@ import { accounts, settings, users } from "./db/schema";
 import { claimRow, releaseRow } from "./db-claim";
 import { getUserCount } from "./models/user";
 import { listEnabledOAuthProviders } from "./models/oauth-providers";
+import { listEnabledLdapDirectories } from "./models/ldap-directories";
 import { scanForLegacyDatabases } from "./migration/legacy-database";
 import { logAuditEvent } from "./audit";
 
@@ -230,10 +231,11 @@ export function releaseSetupStep(key: string, claim: string): Promise<void> {
   return releaseRow(key, claim);
 }
 
-/** A local account or an enabled OAuth provider, checked regardless of mode. */
+/** A local account, an enabled OAuth provider or directory, checked regardless of mode. */
 export async function hasAnySignIn(): Promise<boolean> {
   if ((await getUserCount()) > 0) return true;
-  return (await listEnabledOAuthProviders()).length > 0;
+  if ((await listEnabledOAuthProviders()).length > 0) return true;
+  return (await listEnabledLdapDirectories()).length > 0;
 }
 
 /**

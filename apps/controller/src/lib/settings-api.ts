@@ -6,6 +6,7 @@
 import { applyCaddyConfig } from "./caddy";
 import { logUnexpectedApiError } from "./api-auth";
 import { redactTailscaleSettingsForApi } from "./caddy-tailscale";
+import { type CrowdSecSettings, redactCrowdSecSettings } from "./crowdsec";
 import { type HttpCacheSettings, redactHttpCacheSettings } from "./http-cache";
 import {
   redactDnsProviderSettingsForApi,
@@ -46,12 +47,16 @@ import {
   saveTrustedProxiesSettings,
   saveTwoFactorPolicySettings,
   saveHttpProtocolsSettings,
+  getCompressionSettings,
+  saveCompressionSettings,
   getGlobalCaddyConfigSettings,
   getHttpCacheSettings,
   saveHttpCacheSettings,
   saveGlobalCaddyConfigSettings,
   getTailscaleSettings,
   saveTailscaleSettings,
+  getCrowdSecSettings,
+  saveCrowdSecSettings,
   defaultTailscaleSettings,
   getSetting,
   setSetting,
@@ -68,6 +73,8 @@ type SettingsHandler = {
   save: (data: never) => Promise<void>;
   storageKey: string;
   applyCaddy?: boolean;
+  /** After the save and its Caddy apply: what else follows the group. */
+  afterSave?: () => Promise<void>;
   /** Present for a group holding credentials; its output is what a client sees instead. */
   redact?: (value: never) => unknown;
 };
@@ -172,6 +179,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     storageKey: "http_protocols",
     applyCaddy: true,
   },
+  compression: {
+    get: getCompressionSettings,
+    save: saveCompressionSettings as (data: never) => Promise<void>,
+    storageKey: "compression",
+    applyCaddy: true,
+  },
   "global-caddy-config": {
     get: getGlobalCaddyConfigSettings,
     save: saveGlobalCaddyConfigSettings as (data: never) => Promise<void>,
@@ -198,6 +211,19 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     storageKey: "tailscale",
     applyCaddy: true,
     redact: (value: TailscaleSettings) => redactTailscaleSettingsForApi(value),
+  },
+  crowdsec: {
+    get: getCrowdSecSettings,
+    save: saveCrowdSecSettings as (data: never) => Promise<void>,
+    storageKey: "crowdsec",
+    applyCaddy: true,
+    // Managed mode starts or stops the bundled agent's crowdsec container.
+    afterSave: async () => {
+      const { applyManagedServices } = await import("./agent/managed-services");
+      await applyManagedServices();
+    },
+    // Write-only: an omitted key keeps the stored one while the addresses stay the same.
+    redact: (value: CrowdSecSettings) => redactCrowdSecSettings(value),
   },
 };
 
@@ -279,5 +305,6 @@ export async function saveSettingsGroup(group: string, input: unknown): Promise<
         502,
       );
     }
+    await handler.afterSave?.();
   });
 }

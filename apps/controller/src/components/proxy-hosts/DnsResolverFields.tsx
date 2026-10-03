@@ -70,12 +70,12 @@ export function DnsResolverFields({
               description={t("fallbackResolversHelp")}
             />
             <TextInput
-              label={t("dnsQueryTimeout")}
+              label={t("dnsConnectTimeout")}
               htmlName="dnsTimeout"
               placeholder="5s"
               value={timeout}
               onChange={setTimeout}
-              description={t("dnsQueryTimeoutHelp")}
+              description={t("dnsConnectTimeoutHelp")}
             />
             <Banner
               status="info"

@@ -38,6 +38,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "accounts",
       "verifications",
       "two_factors",
+      "passkeys",
       "pending_oauth_links",
       "api_tokens",
       "groups",
@@ -88,7 +89,12 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "accessLists",
     label: "Access lists",
     description: "Basic-auth lists and the usernames in them.",
-    tables: ["access_lists", "access_list_entries", "access_list_ip_rules"],
+    tables: [
+      "access_lists",
+      "access_list_entries",
+      "access_list_ip_rules",
+      "access_list_dns_cache",
+    ],
     requires: [],
   },
   {

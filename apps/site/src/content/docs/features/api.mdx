@@ -39,6 +39,23 @@ That split is deliberate. Those shapes change with the product and are already v
 that exists; restating them in the schema would be thousands of lines that can drift out of step
 with the validator while looking authoritative.
 
+## Changing many hosts
+
+`bulkProxyHosts` and `bulkL4ProxyHosts` take `{ action, ids }` and return how many hosts changed.
+Proxy hosts accept `enable`, `disable`, `delete`, `maintenanceOn`, `maintenanceOff`,
+`setCertificate` (with `certificateId`, null for automatic) and `setAccessList` (with
+`accessListId`, null for none); L4 hosts the first three. Up to 500 ids per call.
+
+```graphql
+mutation {
+  bulkProxyHosts(input: { action: "disable", ids: [4, 7, 9] })
+}
+```
+
+A batch is all or nothing: an unknown id, or a change one host cannot take, fails the call and
+writes nothing. Each host is audited on its own, and Caddy is applied once. The REST equivalents
+are `POST /api/v1/proxy-hosts/bulk` and `POST /api/v1/l4-proxy-hosts/bulk`.
+
 ## Authentication
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an

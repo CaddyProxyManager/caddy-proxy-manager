@@ -206,6 +206,35 @@ services:
       - "5556:5556"
     networks:
       - caddy-network
+  # The LDAP directory for tests/e2e/ldap.spec.ts, reached as openldap:389 by web. Plain LDAP:
+  # the image's bundled CA has expired, and TLS is covered by tests/integration/ldap-client.test.ts.
+  openldap:
+    image: osixia/openldap:1.5.0
+    # Copies the read-only mount below before bootstrap edits it.
+    command: ["--copy-service"]
+    environment:
+      LDAP_TLS: "false"
+    volumes:
+      - ./apps/controller/tests/ldap/seed.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-seed.ldif:ro
+    networks:
+      - caddy-network
+    healthcheck:
+      test:
+        - CMD
+        - ldapsearch
+        - -x
+        - -H
+        - ldap://localhost
+        - -D
+        - cn=admin,dc=example,dc=org
+        - -w
+        - admin
+        - -b
+        - uid=ldap-alice,ou=people,dc=example,dc=org
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
   # Hostile IdP for the role-injection (H3) test: Dex cannot emit custom claims, so this injects
   # `role: admin`. The browser uses localhost:5557; mock-oidc:8080 is also the token `iss`.
   mock-oidc:

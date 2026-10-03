@@ -142,7 +142,39 @@ docker compose exec web /app/cpm-server --reset-2fa admin
 
 It asks the running server to do it, so the reset is in the audit log like any other, and it only
 works from inside the container: the request is signed with a key derived from `SESSION_SECRET` and
-answered only on the container's own loopback.
+answered only on the container's own loopback. It removes the user's passkeys too.
+
+### Passkeys
+
+A passkey signs in with a fingerprint, a face or the device's PIN, and no password. **Profile →
+Passkeys** lists them, renames and removes them, and adds new ones; the sign-in screen and the
+forward-auth portal get a **Sign in with a passkey** button, and browsers that support it also
+offer saved passkeys in the username field's autofill.
+
+- **A passkey is both factors.** The authenticator must verify the person, not just that someone
+  is present, and a passkey that did not is refused. So a passkey sign-in never asks for a
+  two-factor code, and skips the CAPTCHA and the per-account login lockout, which exist to slow
+  password guessing: there is no name to guess against, and no guess without the private key.
+  Better Auth's request limit (**Settings → Authentication → Sign-in**) still applies to each
+  address.
+- **It does not count as two-factor sign-in.** An administrator required to use two-factor
+  sign-in who also has a password still has to set up an authenticator app.
+- **Adding one needs a recent sign-in.** It is a new way into the account, so a session more than
+  ten minutes old is asked to sign in again first - a borrowed or stolen one usually is older.
+- **It needs HTTPS and the Public URL's hostname.** Every passkey belongs to the hostname of the
+  **Public URL**, and browsers only offer it on that hostname or a subdomain of it, over HTTPS or
+  on `localhost`. At `http://192.168.1.10:3000` the Profile section says why it can't add one.
+  Changing the Public URL to another hostname orphans every passkey already registered, which
+  **Settings → General → Instance** warns about while any exist.
+- **The portal works because it is on the Public URL.** A host behind CPM's forward auth still
+  sends people to the portal on the dashboard's address, where the passkey belongs.
+- **The last way in can't be removed.** Removing the only passkey of an account with no password
+  and no linked provider is refused; with a passkey, the password can be removed instead.
+- **Not in OIDC-only mode**, where the identity provider is the only way in.
+
+An administrator can remove another user's passkeys from **Users**, next to the two-factor reset,
+which signs them out everywhere too. Removing a passkey here doesn't delete it from the device or
+password manager that holds it; it just no longer signs in.
 
 ## OAuth / SSO
 
@@ -160,6 +192,68 @@ Two options worth knowing:
   viewers automatically, so role changes happen in your IdP rather than here.
 - **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in -
   every identity comes from the provider.
+
+## LDAP and Active Directory
+
+**Settings → Authentication → Directories (LDAP)** adds an LDAP server, and its users sign in on the
+ordinary sign-in form and the forward-auth portal with their directory username and password.
+Nothing about a directory is set by environment variable.
+
+- **One directory is invisible.** The form tries an account on this instance first, then the
+  directory, so local accounts keep working and nobody has to pick. With several directories the
+  form shows a **Sign in with** selector instead.
+- **How a user is found.** A service account (the bind DN) searches the base DN with the user
+  filter, which has to match exactly one entry; then CPM binds as that entry with the typed
+  password. Or, with **Bind as the user**, there is no service account: the typed name fills a
+  bind name, such as `uid={username},ou=people,dc=example,dc=org` for OpenLDAP. The typed name is
+  escaped for the filter or the DN, so `*` or `)(` in it is just a character. **OpenLDAP** and
+  **Active Directory** buttons fill in the usual filters.
+- **Active Directory without a service account.** Choose **Bind as the user** and the Active
+  Directory preset fills in a UPN, `{username}@ad.example.org` from the base DN; a down-level name
+  such as `EXAMPLE\{username}` works too. This is the recommended setup when there is no service
+  account. CPM binds with the user's own password, then finds their entry with the user filter
+  using the user's own rights, and reads their groups, nested ones included, the same way. The
+  entry found must be the account that bound - its `userPrincipalName` for a UPN, its
+  `sAMAccountName` for a down-level name - or the sign-in is refused, so a filter matching too
+  much can never sign someone in as another person. A UPN or down-level name can't be escaped, so
+  in these two forms a username may hold only letters, digits, dots, hyphens and underscores;
+  anything else is refused like a wrong password. These forms need `ldaps://` or StartTLS, and
+  saving without either is refused, since every sign-in sends the user's real password.
+- **TLS is verified.** Use `ldaps://`, or `ldap://` with **StartTLS**; a server that refuses the
+  upgrade fails the sign-in rather than carrying on unencrypted. A private CA's certificate can be
+  pasted in. Turning verification off works, and says loudly what it gives up.
+- **The first sign-in makes the account**, when **Let a first-time OAuth identity create an
+  account** is on (**Settings → Authentication → Sign-in**); otherwise an administrator's account
+  has to exist and be linked first. The account is tied to the entry's `objectGUID` or `entryUUID`,
+  which survive a rename, never to its name.
+- **An existing account is joined only by choice.** An entry whose email matches an existing
+  account is refused, unless **Link accounts by email** is on for that directory. Turn that on only
+  where administrators, not users, set the directory's email addresses: whoever holds an address
+  takes over the account with it, an administrator's included.
+- **No password here.** A directory account has no local password and can't set one; Profile says
+  its password is managed by the directory. Disabling someone in the directory stops their next
+  password sign-in, but not a session they already have or a passkey they added - disable them
+  in **Users** as well.
+- **A passkey lasts as long as the directory.** For someone the directory is the only way in for,
+  a passkey stops working while the directory is disabled, and deleting the directory removes
+  their passkeys and signs them out.
+- **Groups work as for OAuth.** Groups come from the entry's `memberOf`, or from a search for
+  groups naming the user - Active Directory's preset searches nested groups too. Each group is known
+  by its name, the first part of its DN: `CN=Proxy Admins,OU=Groups,...` is `Proxy Admins`. Role
+  mapping, the group prefix and explicit group mappings behave exactly as they do for a provider.
+- **The same door as a password.** A directory sign-in goes through the CAPTCHA and the
+  per-account lockout, asks for a two-factor code when the account has one, and is audited once
+  it completes. Every refusal - a wrong password, an unknown name, a name matching two entries, a
+  filter finding someone other than who bound, a directory that is down - answers "Invalid username or password"; the reason is in the server log.
+- **Test before saving.** **Test connection** checks the address, the TLS handshake, the bind and
+  the base DN, and with a test username and password signs in as that user and shows the groups
+  and role it would get. Binding as the user has no account to test with, so without a test user
+  it checks only the address and TLS, and says so. A stored bind password is only ever sent to the address and bind DN it
+  was saved with: change either and it has to be typed again.
+
+Two-factor sign-in can't be set up on a directory account (it protects a local password, and there
+isn't one), so **Require two-factor sign-in for administrators** leaves directory administrators
+to the directory, as it does OAuth ones.
 
 ## Password policy
 

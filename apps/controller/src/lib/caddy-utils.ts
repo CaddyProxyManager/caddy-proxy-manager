@@ -246,20 +246,71 @@ export function splitHostPort(value: string): HostPort | null {
   return { host: raw.host, port };
 }
 
+export type HostPortRange = {
+  /** As {@link HostPort.host}. */
+  host: string;
+  start: number;
+  /** Equal to `start` for a single port. */
+  end: number;
+};
+
+/** An L4 listen address: {@link splitHostPort}'s forms, where the port may be a range `A-B`. */
+export function splitHostPortRange(value: string): HostPortRange | null {
+  const trimmed = value.trim();
+  const dash = trimmed.lastIndexOf("-");
+  const colon = trimmed.lastIndexOf(":");
+  if (dash === -1 || dash < colon) {
+    const single = splitHostPort(trimmed);
+    return single ? { host: single.host, start: single.port, end: single.port } : null;
+  }
+  // The end is checked here and the rest by splitHostPort, so both halves obey the same rules.
+  const endText = trimmed.slice(dash + 1);
+  if (!/^\d{1,5}$/.test(endText)) return null;
+  const start = splitHostPort(trimmed.slice(0, dash));
+  const end = Number(endText);
+  if (!start || end > 65535 || end <= start.port) return null;
+  return { host: start.host, start: start.port, end };
+}
+
+/** A bare host for `same`: the port is the connection's. IPv6 bracketed, as in `fixed` mode. */
+export function splitL4UpstreamHost(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    const inner = trimmed.slice(1, -1);
+    return isIP(inner) === 6 ? inner : null;
+  }
+  if (isIP(trimmed) === 4) return trimmed;
+  return /^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(trimmed) ? trimmed : null;
+}
+
+export function l4PortCount(range: HostPortRange): number {
+  return range.end - range.start + 1;
+}
+
 /**
  * L4 ports are published on the host, so 2019 would expose the admin API; 9090 is the default
  * metrics listener and 3000 the controller's own port.
  */
 export const RESERVED_L4_PORTS: ReadonlySet<number> = new Set([80, 443, 2019, 3000, 9090]);
 
+/** The first reserved port inside the range, or null. */
+export function reservedL4Port(range: HostPortRange, metricsPort: number | null): number | null {
+  for (const port of [...RESERVED_L4_PORTS, ...(metricsPort === null ? [] : [metricsPort])].sort(
+    (a, b) => a - b,
+  )) {
+    if (port >= range.start && port <= range.end) return port;
+  }
+  return null;
+}
+
 /** Both the port publisher and the document builder skip such a row, so neither acts alone. */
 export function isReservedL4ListenAddress(
   listenAddress: string,
   metricsPort: number | null,
 ): boolean {
-  const parsed = splitHostPort(listenAddress);
+  const parsed = splitHostPortRange(listenAddress);
   if (!parsed) return false;
-  return RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort;
+  return reservedL4Port(parsed, metricsPort) !== null;
 }
 
 /** The inverse of splitHostPort. */

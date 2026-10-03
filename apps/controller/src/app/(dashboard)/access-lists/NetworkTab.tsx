@@ -11,15 +11,24 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import type { AccessList } from "@/lib/models/access-lists";
+import type { AccessList, AccessListIpRule } from "@/lib/models/access-lists";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
 
-type Rule = { action: "allow" | "deny"; cidr: string; note: string };
+/** `target` is an address, a range or a hostname; the server tells them apart. */
+type Rule = { action: "allow" | "deny"; target: string; note: string };
+
+const targetOf = (rule: AccessListIpRule) => rule.cidr ?? rule.hostname ?? "";
 
 function toRules(list: AccessList): WithRowId<Rule>[] {
-  return withRowIds(list.ipRules.map((rule) => ({ ...rule, note: rule.note ?? "" })));
+  return withRowIds(
+    list.ipRules.map((rule) => ({
+      action: rule.action,
+      target: targetOf(rule),
+      note: rule.note ?? "",
+    })),
+  );
 }
 
 /**
@@ -69,10 +78,10 @@ export function NetworkTab({
       const updated = await setAccessListIpRulesAction(
         list.id,
         rules
-          .filter((rule) => rule.cidr.trim())
-          .map(({ action, cidr, note }) => ({
+          .filter((rule) => rule.target.trim())
+          .map(({ action, target, note }) => ({
             action,
-            cidr: cidr.trim(),
+            target: target.trim(),
             note: note.trim() || null,
           })),
       );
@@ -94,12 +103,43 @@ export function NetworkTab({
   };
 
   const savedRules = JSON.stringify(
-    list.ipRules.map(({ action, cidr, note }) => [action, cidr, note ?? ""]),
+    list.ipRules.map((rule) => [rule.action, targetOf(rule), rule.note ?? ""]),
   );
   const editedRules = JSON.stringify(
-    rules.map(({ action, cidr, note }) => [action, cidr.trim(), note.trim()]),
+    rules.map(({ action, target, note }) => [action, target.trim(), note.trim()]),
   );
   const dirty = savedRules !== editedRules;
+
+  // Keyed by what was saved, so a status never shows beside a name edited since.
+  const statusByTarget = new Map(
+    list.ipRules.flatMap((rule) =>
+      rule.hostname && rule.resolved ? [[`${rule.action} ${rule.hostname}`, rule.resolved]] : [],
+    ),
+  );
+  const failingOpen = list.ipRules.some(
+    (rule) => rule.action === "deny" && rule.resolved && rule.resolved.ranges.length === 0,
+  );
+
+  const hostnameStatus = (rule: Rule) => {
+    const status = statusByTarget.get(`${rule.action} ${rule.target.trim()}`);
+    if (!status) return null;
+    if (status.ranges.length > 0) {
+      return (
+        <Text type="supporting" size="sm">
+          {status.lastError
+            ? t("ipHostnameStale", { ranges: status.ranges.join(", "), error: status.lastError })
+            : t("ipHostnameResolved", { ranges: status.ranges.join(", ") })}
+        </Text>
+      );
+    }
+    return (
+      <Text type="supporting" size="sm">
+        {status.lastError
+          ? t("ipHostnameFailed", { action: rule.action, error: status.lastError })
+          : t("ipHostnamePending", { action: rule.action })}
+      </Text>
+    );
+  };
 
   return (
     <VStack gap={4} maxWidth={720}>
@@ -107,60 +147,72 @@ export function NetworkTab({
         {t("ipRulesHelp")}
       </Text>
       {error && <Banner status="error" title={t("ipRulesSaveFailed")} description={error} />}
+      {failingOpen && (
+        <Banner
+          status="warning"
+          title={t("ipHostnameFailOpenTitle")}
+          description={t("ipHostnameFailOpenHelp")}
+        />
+      )}
 
       {rules.length > 0 && (
         <VStack gap={2}>
           {rules.map((rule, index) => (
-            <HStack key={rule.rowId} gap={2} vAlign="end" wrap="wrap">
-              <Selector
-                label={t("ipAction")}
-                isLabelHidden={index > 0}
-                size="sm"
-                width={110}
-                options={actionOptions}
-                value={rule.action}
-                onChange={(next) => patch(rule.rowId, { action: next as Rule["action"] })}
-              />
-              <TextInput
-                {...NO_SPELLCHECK}
-                label={t("ipCidr")}
-                isLabelHidden={index > 0}
-                size="sm"
-                placeholder="192.168.1.0/24"
-                value={rule.cidr}
-                onChange={(next) => patch(rule.rowId, { cidr: next })}
-              />
-              <TextInput
-                label={t("ipNote")}
-                isLabelHidden={index > 0}
-                size="sm"
-                value={rule.note}
-                onChange={(next) => patch(rule.rowId, { note: next })}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                label={t("ipMoveUp", { index: index + 1 })}
-                icon={<ArrowUp />}
-                isDisabled={index === 0}
-                onClick={() => move(index, -1)}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                label={t("ipMoveDown", { index: index + 1 })}
-                icon={<ArrowDown />}
-                isDisabled={index === rules.length - 1}
-                onClick={() => move(index, 1)}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                label={t("ipRemove", { index: index + 1 })}
-                icon={<Trash2 />}
-                onClick={() => setRules((current) => current.filter((r) => r.rowId !== rule.rowId))}
-              />
-            </HStack>
+            <VStack key={rule.rowId} gap={1}>
+              <HStack gap={2} vAlign="end" wrap="wrap">
+                <Selector
+                  label={t("ipAction")}
+                  isLabelHidden={index > 0}
+                  size="sm"
+                  width={110}
+                  options={actionOptions}
+                  value={rule.action}
+                  onChange={(next) => patch(rule.rowId, { action: next as Rule["action"] })}
+                />
+                <TextInput
+                  {...NO_SPELLCHECK}
+                  label={t("ipCidr")}
+                  isLabelHidden={index > 0}
+                  size="sm"
+                  placeholder={t("ipTargetPlaceholder")}
+                  value={rule.target}
+                  onChange={(next) => patch(rule.rowId, { target: next })}
+                />
+                <TextInput
+                  label={t("ipNote")}
+                  isLabelHidden={index > 0}
+                  size="sm"
+                  value={rule.note}
+                  onChange={(next) => patch(rule.rowId, { note: next })}
+                />
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  label={t("ipMoveUp", { index: index + 1 })}
+                  icon={<ArrowUp />}
+                  isDisabled={index === 0}
+                  onClick={() => move(index, -1)}
+                />
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  label={t("ipMoveDown", { index: index + 1 })}
+                  icon={<ArrowDown />}
+                  isDisabled={index === rules.length - 1}
+                  onClick={() => move(index, 1)}
+                />
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  label={t("ipRemove", { index: index + 1 })}
+                  icon={<Trash2 />}
+                  onClick={() =>
+                    setRules((current) => current.filter((r) => r.rowId !== rule.rowId))
+                  }
+                />
+              </HStack>
+              {hostnameStatus(rule)}
+            </VStack>
           ))}
         </VStack>
       )}
@@ -172,7 +224,10 @@ export function NetworkTab({
           icon={<Plus />}
           label={t("ipAddRule")}
           onClick={() =>
-            setRules((current) => [...current, withRowId({ action: "allow", cidr: "", note: "" })])
+            setRules((current) => [
+              ...current,
+              withRowId({ action: "allow", target: "", note: "" }),
+            ])
           }
         />
         <Button

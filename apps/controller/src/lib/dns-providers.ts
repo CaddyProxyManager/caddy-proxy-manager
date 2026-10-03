@@ -1,3 +1,6 @@
+import { CADDY_DURATION_SEGMENT } from "./caddy-duration";
+import type { AcmeDnsAccount, DnsChallengeDelegation } from "./dns-challenge-delegation";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type DnsProviderFieldType = "string" | "password" | "duration";
@@ -40,6 +43,9 @@ export type DnsProviderCredentials = {
 export type DnsProviderApiStatus = {
   providers: Record<string, { configuredFields: string[] }>;
   default: string | null;
+  delegations: DnsChallengeDelegation[];
+  /** Only the CNAME target, which is public in DNS anyway; the rest stays write-only. */
+  acmeDnsAccounts: Record<string, { fulldomain: string }>;
 };
 
 export type LegacyCloudflareApiStatus = {
@@ -282,14 +288,15 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/acmedns",
     modulePath: "github.com/caddy-dns/acmedns",
     fields: [
-      { key: "username", label: "Username", type: "string", required: true },
-      { key: "password", label: "Password", type: "password", required: true },
-      { key: "subdomain", label: "Subdomain", type: "string", required: true },
+      // Optional: per-domain accounts from Register replace the single one.
+      { key: "username", label: "Username", type: "string", required: false },
+      { key: "password", label: "Password", type: "password", required: false },
+      { key: "subdomain", label: "Subdomain", type: "string", required: false },
       {
         key: "server_url",
         label: "Server URL",
         type: "string",
-        required: true,
+        required: false,
         placeholder: "https://auth.acme-dns.io",
       },
     ],
@@ -398,9 +405,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = BASE_DNS_PROVIDERS.map((pr
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Go durations plus caddy.ParseDuration's "d". Lax on unit order; Caddy reports the exotic.
-const DURATION_SEGMENT = String.raw`(?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h|d)`;
-const DURATION_PATTERN = new RegExp(`^-1$|^[+-]?(?:${DURATION_SEGMENT})+$`);
+const DURATION_PATTERN = new RegExp(`^-1$|^[+-]?(?:${CADDY_DURATION_SEGMENT})+$`);
 
 /** "-1" disables propagation checks. Unit-less numbers are refused: Caddy reads them as ns. */
 export function isValidDnsDuration(value: string): boolean {
@@ -415,6 +420,8 @@ export function getProviderDefinition(name: string): DnsProviderDefinition | und
 export function redactDnsProviderSettingsForApi(settings: {
   providers: Record<string, Record<string, string>>;
   default: string | null;
+  delegations?: DnsChallengeDelegation[];
+  acmeDnsAccounts?: Record<string, AcmeDnsAccount>;
 }): DnsProviderApiStatus {
   return {
     providers: Object.fromEntries(
@@ -429,6 +436,17 @@ export function redactDnsProviderSettingsForApi(settings: {
       ]),
     ),
     default: settings.default,
+    delegations: (settings.delegations ?? []).map((delegation) => ({
+      domain: delegation.domain,
+      target: delegation.target ?? null,
+      provider: delegation.provider ?? null,
+    })),
+    acmeDnsAccounts: Object.fromEntries(
+      Object.entries(settings.acmeDnsAccounts ?? {}).map(([domain, account]) => [
+        domain,
+        { fulldomain: account.fulldomain },
+      ]),
+    ),
   };
 }
 

@@ -77,9 +77,10 @@ export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
 
 /**
  * Compose services behind a profile, which nothing inside the stack can enable - only the agent,
- * which runs the compose CLI. An older agent reads a missing name (`geoipupdate`) as off.
+ * which runs the compose CLI. A name an agent does not know is ignored, not refused, so an older
+ * agent never starts `crowdsec` and reports it off; a missing one (`geoipupdate`) reads as off.
  */
-export const MANAGED_SERVICES = ["clickhouse"] as const;
+export const MANAGED_SERVICES = ["clickhouse", "crowdsec"] as const;
 export type ManagedServiceName = (typeof MANAGED_SERVICES)[number];
 
 /** An allowlist: an unconstrained key would let the controller set any variable compose reads. */
@@ -87,6 +88,9 @@ export const MANAGED_SERVICE_ENV_KEYS = [
   "CLICKHOUSE_USER",
   "CLICKHOUSE_PASSWORD",
   "CLICKHOUSE_DB",
+  // The bouncer key the controller generated; the image registers it for Caddy on first start.
+  "CROWDSEC_BOUNCER_KEY",
+  "CROWDSEC_DISABLE_ONLINE_API",
 ] as const;
 export type ManagedServiceEnvKey = (typeof MANAGED_SERVICE_ENV_KEYS)[number];
 
@@ -135,6 +139,10 @@ export const AGENT_CAPABILITIES = [
   "log-read",
   "certificates",
   "caddy-image",
+  // Only listed with CERT_FILES_HOST_DIR set, so a picker never offers an agent with no files.
+  "certificate-files",
+  // Not a command: an agent without it is sent a port range one port at a time.
+  "l4-port-ranges",
 ] as const;
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
@@ -169,7 +177,8 @@ export type AgentMode = "standalone" | "managed";
 
 /** `env` carries credentials the controller holds in settings, which the host `.env` lacks. */
 export type ManagedServicesRequest = {
-  services: Record<ManagedServiceName, boolean>;
+  /** A missing name is off. */
+  services: Partial<Record<ManagedServiceName, boolean>>;
   env: Partial<Record<ManagedServiceEnvKey, string>>;
 };
 
@@ -226,6 +235,52 @@ export type CaddyCertificate = {
 
 export type CertificateFileRequest = { issuerKey: string; name: string; includeKey?: boolean };
 export type CertificateFiles = { certificatePem: string; keyPem?: string };
+
+// ─── Certificates from files on the agent's host ─────────────────────────────
+
+/** Paths are relative to the agent's CERT_FILES_HOST_DIR; see `isValidCertificateFilePath`. */
+export type CertificateFileSource = { id: number; certPath: string; keyPath: string };
+
+/** Codes, not sentences: the controller renders them in its reader's language. */
+export const CERTIFICATE_FILE_ERRORS = [
+  "not-configured",
+  "unavailable",
+  "invalid-path",
+  "not-found",
+  "outside-directory",
+  "too-large",
+  "not-a-certificate",
+  "not-a-key",
+  "key-mismatch",
+  "no-names",
+] as const;
+export type CertificateFileError = (typeof CERTIFICATE_FILE_ERRORS)[number];
+
+/**
+ * `fingerprint` is the SHA-256 (hex) of the chain as sent. The PEM is left out when the agent sent
+ * this fingerprint before; the controller answers with the ids it wants in full again.
+ */
+export type CertificateFileResult = { id: number } & (
+  | { ok: true; fingerprint: string; certificatePem?: string; keyPem?: string }
+  | { ok: false; error: CertificateFileError }
+);
+
+/** What the picker lists. Never a key's content: a key file is only named. */
+export type CertificateFileEntry =
+  | {
+      path: string;
+      kind: "certificate";
+      names: string[];
+      notAfter: string;
+      /** The leaf's SHA-256, as `X509Certificate.fingerprint256` spells it. */
+      fingerprint: string;
+    }
+  | { path: string; kind: "key" };
+
+export type CertificateFilesReadRequest = { files: CertificateFileSource[] };
+
+/** The `agentCertificateFiles` answer. */
+export type CertificateFilesAck = { resend: number[] };
 
 export type LogReadResponse = {
   lines: string[];
@@ -329,6 +384,8 @@ export const AGENT_OPERATIONS = {
     "mutation AgentCommandResults($results: [JSON!]!) { agentCommandResults(results: $results) }",
   analytics:
     "mutation AgentAnalytics($kind: String!, $rows: [JSON!]!) { agentAnalytics(kind: $kind, rows: $rows) }",
+  certificateFiles:
+    "mutation AgentCertificateFiles($results: [JSON!]!) { agentCertificateFiles(results: $results) }",
 } as const;
 
 export const AGENT_ANALYTICS_KINDS = ["traffic", "waf"] as const;
@@ -399,12 +456,15 @@ export type AgentPairResponse = {
 
 /** Absolute, never incremental, so a dropped stream costs nothing but the reconnect. */
 export type AgentDesiredState = {
+  /** Ranges only for an agent listing `l4-port-ranges`. */
   l4Ports: string[];
   caddyModules: string[];
   services: ManagedServicesRequest;
   fleetConfig: FleetConfig;
   /** False until there is something to serve, keeping 80 and 443 shut on a fresh host. */
   caddyEnabled: boolean;
+  /** Only for an agent listing `certificate-files`; absent otherwise. */
+  certificateFiles?: CertificateFileSource[];
 };
 
 // ─── Stream frames ───────────────────────────────────────────────────────────
@@ -428,6 +488,10 @@ export type AgentCommand = {
    * outlasts the command timeout; the outcome is reported in `caddyBuild.status`.
    */
   | { kind: "caddy-image-load"; request: Record<string, never> }
+  /** Under `certificate-files`: a 200 whose text is `CertificateFileEntry[]`. */
+  | { kind: "certificate-files-list"; request: Record<string, never> }
+  /** Likewise: a 200 whose text is `CertificateFileResult[]`, every PEM included. */
+  | { kind: "certificate-files-read"; request: CertificateFilesReadRequest }
 );
 
 export type AgentServerEvent =

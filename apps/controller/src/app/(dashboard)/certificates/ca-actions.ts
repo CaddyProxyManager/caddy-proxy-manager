@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
+import { internalCaSubject } from "@/src/lib/ca-subject";
 import { withTranslatedErrors } from "@/src/lib/translated-action";
 import {
   createCaCertificate,
@@ -130,10 +131,7 @@ async function generateCaCertificateActionUntranslated(
   cert.validity.notAfter = new Date();
   cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
 
-  const attrs = [
-    { name: "commonName", value: commonName },
-    { name: "organizationName", value: "Caddy Proxy Manager" },
-  ];
+  const attrs = await internalCaSubject(commonName);
   cert.setSubject(attrs);
   cert.setIssuer(attrs);
   cert.setExtensions([

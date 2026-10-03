@@ -348,3 +348,72 @@ describe('isAgentAvailable', () => {
     clearAgentEnv();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Port ranges
+// ---------------------------------------------------------------------------
+
+describe('port ranges', () => {
+  it('publishes a range as one compose entry, with the protocol suffix', async () => {
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values([
+        makeL4Host({ name: 'rtp', listenAddress: ':10000-10099', protocol: 'udp' }),
+        makeL4Host({ name: 'ftp', listenAddress: '[::]:30000-30009' }),
+      ]);
+    expect(await getRequiredL4Ports()).toEqual([
+      '10000-10099:10000-10099/udp',
+      '30000-30009:30000-30009',
+    ]);
+  });
+
+  it('merges overlapping and adjacent ports, so none is published twice', async () => {
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values([
+        makeL4Host({ name: 'a', listenAddress: '10.0.0.1:5000-5010' }),
+        makeL4Host({ name: 'b', listenAddress: '10.0.0.2:5005-5020' }),
+        makeL4Host({ name: 'c', listenAddress: ':5021' }),
+        makeL4Host({ name: 'd', listenAddress: ':5023' }),
+        makeL4Host({ name: 'e', listenAddress: ':5005', protocol: 'udp' }),
+      ]);
+    expect(await getRequiredL4Ports()).toEqual([
+      '5000-5021:5000-5021',
+      '5005:5005/udp',
+      '5023:5023',
+    ]);
+  });
+
+  it('publishes nothing for a range with a reserved port inside it', async () => {
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values([
+        makeL4Host({ name: 'legacy', listenAddress: ':2000-2100' }),
+        makeL4Host({ name: 'ok', listenAddress: ':5432' }),
+      ]);
+    expect(await getRequiredL4Ports()).toEqual(['5432:5432']);
+  });
+
+  it('sees no change while an older agent reports the range port by port', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5000-5002' }));
+    agent.state.appliedPorts = ['5000:5000', '5001:5001', '5002:5002'];
+    expect((await getL4PortsDiff()).needsApply).toBe(false);
+    agent.state.appliedPorts = ['5000:5000', '5001:5001'];
+    expect((await getL4PortsDiff()).needsApply).toBe(true);
+  });
+
+  it('sends an agent without l4-port-ranges each port on its own', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5000-5002' }));
+    await applyL4Ports();
+    expect(agent.desired?.l4Ports).toEqual(['5000:5000', '5001:5001', '5002:5002']);
+  });
+
+  it('sends the range itself to an agent that takes ranges', async () => {
+    await agent.stop();
+    agent = await startFakeAgent({}, { capabilities: ['l4-port-ranges'] });
+    agent.report();
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5000-5002' }));
+    await applyL4Ports();
+    expect(agent.desired?.l4Ports).toEqual(['5000-5002:5000-5002']);
+  });
+});

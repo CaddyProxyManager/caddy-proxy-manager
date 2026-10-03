@@ -1,0 +1,29 @@
+# 23-bot-challenge's policy. First match wins, so the address probes come before the UA rules.
+bots:
+  # Keyed on the address Anubis is told, to prove it is the client's and not Caddy's.
+  - name: probe-client-address
+    path_regex: ^/address-probe/client
+    remote_addresses: ["172.28.0.40/32"]
+    action: DENY
+  - name: probe-caddy-address
+    path_regex: ^/address-probe/caddy
+    remote_addresses: ["172.28.0.10/32"]
+    action: DENY
+  - name: test-allowed
+    user_agent_regex: ^cpm-test-allowed/
+    action: ALLOW
+  - name: test-denied
+    user_agent_regex: ^cpm-test-denied/
+    action: DENY
+  # Difficulty 0 reads as unset and falls back to the default of 4.
+  - name: everyone-else
+    path_regex: .*
+    action: CHALLENGE
+    challenge:
+      algorithm: fast
+      difficulty: 1
+
+# Subrequest mode: a 2xx from the check lets the request through, so DENY must not be one.
+status_codes:
+  CHALLENGE: 200
+  DENY: 403

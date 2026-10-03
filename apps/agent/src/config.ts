@@ -50,6 +50,11 @@ export type AgentConfig = {
   healthTimeoutSeconds: number;
   /** Dial plain http to a public controller address anyway. See `checkControllerTransport`. */
   allowInsecureHttp: boolean;
+  /**
+   * The one host directory certificates may be read from, as the Docker daemon sees it. Null
+   * turns the feature off: the controller can only name paths inside it.
+   */
+  certFilesHostDir: string | null;
 };
 
 function optional(name: string): string | null {
@@ -77,6 +82,22 @@ function resolveBuildMode(): CaddyBuildMode {
   const raw = optional("CADDY_BUILD_MODE") ?? "agent";
   if (raw === "agent" || raw === "external") return raw;
   throw new Error(`CADDY_BUILD_MODE must be "agent" or "external"; got "${raw}".`);
+}
+
+/**
+ * It becomes a `--mount` source, where a comma starts another option and a missing path is an
+ * error rather than an empty directory created as root.
+ */
+function resolveCertFilesHostDir(): string | null {
+  const raw = optional("CERT_FILES_HOST_DIR");
+  if (raw === null) return null;
+  const absolute = raw.startsWith("/") || /^[A-Za-z]:[\\/]/.test(raw);
+  if (!absolute || /[,\r\n]/.test(raw)) {
+    throw new Error(
+      `CERT_FILES_HOST_DIR must be an absolute host path without commas; got "${raw}".`,
+    );
+  }
+  return raw;
 }
 
 /** CLI flags beat the environment: fixing a bad `CONTROLLER_URL` must not need a compose edit. */
@@ -151,5 +172,6 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     buildTimeoutSeconds: positiveInteger("CADDY_BUILD_TIMEOUT", 1800),
     serviceTimeoutSeconds: positiveInteger("SERVICE_START_TIMEOUT", 900),
     healthTimeoutSeconds: positiveInteger("CADDY_HEALTH_TIMEOUT", 60),
+    certFilesHostDir: resolveCertFilesHostDir(),
   };
 }

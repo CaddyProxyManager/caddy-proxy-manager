@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
-import { VStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
+import type { HostCompressionMode } from "@/lib/host-compression";
 
 type ToggleKey =
   | "sslForced"
@@ -15,7 +17,8 @@ type ToggleKey =
   | "hstsSubdomains"
   | "allowWebsocket"
   | "preserveHostHeader"
-  | "skipHttpsHostnameValidation";
+  | "skipHttpsHostnameValidation"
+  | "discourageIndexing";
 
 type ToggleSetting = {
   key: ToggleKey;
@@ -25,14 +28,16 @@ type ToggleSetting = {
     | "hstsSubdomains"
     | "websocketSupport"
     | "preserveHostHeader"
-    | "skipHttpsValidation";
+    | "skipHttpsValidation"
+    | "discourageIndexing";
   descriptionKey:
     | "forceHttpsHelp"
     | "hstsHelp"
     | "hstsSubdomainsHelp"
     | "websocketSupportHelp"
     | "preserveHostHeaderHelp"
-    | "skipHttpsValidationHelp";
+    | "skipHttpsValidationHelp"
+    | "discourageIndexingHelp";
   /** Only meaningful while this other toggle is on; disabled (and so submitted off) otherwise. */
   requires?: ToggleKey;
   /** Hidden on the managed dashboard host, which derives these from its own settings. */
@@ -46,7 +51,9 @@ type SettingsTogglesProps = {
   allowWebsocket?: boolean;
   preserveHostHeader?: boolean;
   skipHttpsValidation?: boolean;
+  discourageIndexing?: boolean;
   enabled?: boolean;
+  compression?: HostCompressionMode;
   /** Off for the dashboard host, whose form already posts its own `enabled` field. */
   showEnabled?: boolean;
 };
@@ -84,6 +91,12 @@ const SETTINGS: ToggleSetting[] = [
     labelKey: "skipHttpsValidation",
     descriptionKey: "skipHttpsValidationHelp",
   },
+  {
+    key: "discourageIndexing",
+    labelKey: "discourageIndexing",
+    descriptionKey: "discourageIndexingHelp",
+    hostOnly: true,
+  },
 ];
 
 export function SettingsToggles({
@@ -93,10 +106,13 @@ export function SettingsToggles({
   allowWebsocket = true,
   preserveHostHeader = true,
   skipHttpsValidation = false,
+  discourageIndexing = false,
   enabled = true,
+  compression: initialCompression = "inherit",
   showEnabled = true,
 }: SettingsTogglesProps) {
   const t = useTranslations("proxyHosts");
+  const [compression, setCompression] = useState<HostCompressionMode>(initialCompression);
   const [values, setValues] = useState({
     sslForced,
     hstsEnabled,
@@ -104,6 +120,7 @@ export function SettingsToggles({
     allowWebsocket,
     preserveHostHeader,
     skipHttpsHostnameValidation: skipHttpsValidation,
+    discourageIndexing,
     enabled,
   });
   const settings = showEnabled ? SETTINGS : SETTINGS.filter((setting) => !setting.hostOnly);
@@ -166,6 +183,32 @@ export function SettingsToggles({
               </VStack>
             );
           })}
+          {showEnabled && (
+            <>
+              <Divider />
+              <input type="hidden" name="compression" value={compression} />
+              <HStack justify="between" vAlign="center" gap={4}>
+                <VStack gap={1}>
+                  <Text type="body" size="sm">
+                    {t("compression")}
+                  </Text>
+                  <Text type="body" size="sm" color="secondary">
+                    {t("compressionHelp")}
+                  </Text>
+                </VStack>
+                <SegmentedControl
+                  label={t("compression")}
+                  size="sm"
+                  value={compression}
+                  onChange={(next) => setCompression(next as HostCompressionMode)}
+                >
+                  <SegmentedControlItem value="inherit" label={t("compressionInherit")} />
+                  <SegmentedControlItem value="on" label={t("compressionOn")} />
+                  <SegmentedControlItem value="off" label={t("compressionOff")} />
+                </SegmentedControl>
+              </HStack>
+            </>
+          )}
         </VStack>
       </Card>
     </VStack>

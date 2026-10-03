@@ -44,10 +44,11 @@ export function dashboardHostFormView(options?: DashboardHostOptions): Dashboard
 
 /**
  * Its grants are keyed by host id, which the dashboard host lacks, and gating the dashboard behind
- * the sign-in it serves is a loop, not a protection.
+ * the sign-in it serves is a loop, not a protection. Maintenance mode would lock out the admin who
+ * has to turn it off again, and a bot challenge every agent and API client.
  */
 function withoutForwardAuth(meta: string | null): string | null {
-  return mergeProxyHostMeta(meta, { cpmForwardAuth: null });
+  return mergeProxyHostMeta(meta, { cpmForwardAuth: null, maintenance: null, anubis: null });
 }
 
 /**

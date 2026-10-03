@@ -7,18 +7,35 @@ import { hashBcrypt } from "../password";
 const ACCESS_LIST_COST = 10;
 import db, { nowIso, runInTransaction, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
-import { logAuditEvent } from "../audit";
-import { accessListEntries, accessListIpRules, accessLists, proxyHosts } from "../db/schema";
+import { auditEventRow, logAuditEvent } from "../audit";
+import {
+  accessListEntries,
+  accessListIpRules,
+  accessLists,
+  auditEvents,
+  l4ProxyHosts,
+  proxyHosts,
+} from "../db/schema";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { getDashboardSettings } from "../settings";
 import {
   ACCESS_LIST_SATISFY,
   type AccessListSatisfy,
   IP_RULE_ACTIONS,
   type IpRule,
   type IpRuleAction,
+  hostnameRanges,
   sanitizeIpRules,
+  splitRuleHostname,
 } from "../access-list-rules";
+import {
+  type HostnameResolution,
+  SAVE_TIMEOUT_MS,
+  lookupNames,
+  readHostnameResolutions,
+  resolveHostnames,
+} from "../access-list-dns";
 
 export type AccessListEntry = {
   id: number;
@@ -27,13 +44,24 @@ export type AccessListEntry = {
   updatedAt: string;
 };
 
+/** Where a hostname rule stands: the ranges it puts in Caddy's config, and why it has none. */
+export type HostnameRuleStatus = {
+  ranges: string[];
+  resolvedAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+};
+
+/** `resolved` only on a hostname rule. */
+export type AccessListIpRule = IpRule & { resolved?: HostnameRuleStatus };
+
 export type AccessList = {
   id: number;
   name: string;
   description: string | null;
   entries: AccessListEntry[];
   /** In the order they're checked. */
-  ipRules: IpRule[];
+  ipRules: AccessListIpRule[];
   ipDefault: IpRuleAction;
   satisfy: AccessListSatisfy;
   passAuth: boolean;
@@ -86,10 +114,35 @@ function buildEntry(row: AccessListEntryRow): AccessListEntry {
   };
 }
 
+function toIpRule(
+  rule: AccessListIpRuleRow,
+  resolutions: Map<string, HostnameResolution>,
+): AccessListIpRule {
+  const base: IpRule = {
+    action: rule.action === "allow" ? "allow" : "deny",
+    cidr: rule.cidr,
+    hostname: rule.hostname,
+    note: rule.note,
+  };
+  if (!rule.hostname) return base;
+  const { name, ipv6Prefix } = splitRuleHostname(rule.hostname);
+  const found = resolutions.get(name);
+  return {
+    ...base,
+    resolved: {
+      ranges: hostnameRanges(found?.addresses ?? [], ipv6Prefix),
+      resolvedAt: found?.resolvedAt ?? null,
+      lastError: found?.lastError ?? null,
+      lastErrorAt: found?.lastErrorAt ?? null,
+    },
+  };
+}
+
 function toAccessList(
   row: AccessListRow,
   entries: AccessListEntryRow[],
   ipRules: AccessListIpRuleRow[],
+  resolutions: Map<string, HostnameResolution>,
 ): AccessList {
   return {
     id: row.id,
@@ -102,11 +155,7 @@ function toAccessList(
     ipRules: ipRules
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((rule) => ({
-        action: rule.action === "allow" ? "allow" : "deny",
-        cidr: rule.cidr,
-        note: rule.note,
-      })),
+      .map((rule) => toIpRule(rule, resolutions)),
     ipDefault: row.ipDefault === "allow" ? "allow" : "deny",
     satisfy: row.satisfy === "any" ? "any" : "all",
     passAuth: row.passAuth,
@@ -146,10 +195,32 @@ export async function listAccessLists(): Promise<AccessList[]> {
     bucket.push(rule);
     rulesByList.set(rule.accessListId, bucket);
   }
+  const resolutions = await readHostnameResolutions(lookupNames(rules.map((r) => r.hostname)));
 
   return lists.map((list) =>
-    toAccessList(list, entriesByList.get(list.id) ?? [], rulesByList.get(list.id) ?? []),
+    toAccessList(
+      list,
+      entriesByList.get(list.id) ?? [],
+      rulesByList.get(list.id) ?? [],
+      resolutions,
+    ),
   );
+}
+
+/** What the L4 host editor offers: at layer 4 only IP rules apply, so it needs their count. */
+export type L4AccessListOption = { id: number; name: string; ipRuleCount: number };
+
+export async function listL4AccessListOptions(): Promise<L4AccessListOption[]> {
+  const [lists, rules] = await Promise.all([
+    db
+      .select({ id: accessLists.id, name: accessLists.name })
+      .from(accessLists)
+      .orderBy(asc(accessLists.name)),
+    db.select({ accessListId: accessListIpRules.accessListId }).from(accessListIpRules),
+  ]);
+  const counts = new Map<number, number>();
+  for (const rule of rules) counts.set(rule.accessListId, (counts.get(rule.accessListId) ?? 0) + 1);
+  return lists.map((list) => ({ ...list, ipRuleCount: counts.get(list.id) ?? 0 }));
 }
 
 export async function getAccessList(id: number): Promise<AccessList | null> {
@@ -171,7 +242,21 @@ export async function getAccessList(id: number): Promise<AccessList | null> {
       .where(eq(accessListIpRules.accessListId, id))
       .orderBy(asc(accessListIpRules.sortOrder)),
   ]);
-  return toAccessList(list, entries, rules);
+  const resolutions = await readHostnameResolutions(lookupNames(rules.map((r) => r.hostname)));
+  return toAccessList(list, entries, rules, resolutions);
+}
+
+/**
+ * Names no cache entry knows are looked up before the apply, so a new rule works on save rather
+ * than at the refresher's next pass. Briefly: an answer that is slow is left to the refresher.
+ */
+async function resolveNewHostnames(rules: IpRule[]): Promise<void> {
+  const names = lookupNames(rules.map((rule) => rule.hostname));
+  const known = await readHostnameResolutions(names);
+  await resolveHostnames(
+    names.filter((name) => !known.has(name)),
+    { timeoutMs: SAVE_TIMEOUT_MS },
+  );
 }
 
 export async function createAccessList(input: AccessListInput, actorUserId: number) {
@@ -213,6 +298,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
   }
   if (ipRules.length > 0) {
     await db.insert(accessListIpRules).values(ipRuleRows(accessList.id, ipRules, now));
+    await resolveNewHostnames(ipRules);
   }
 
   await logAuditEvent({
@@ -232,6 +318,7 @@ function ipRuleRows(accessListId: number, rules: IpRule[], now: string) {
     accessListId,
     action: rule.action,
     cidr: rule.cidr,
+    hostname: rule.hostname,
     note: rule.note,
     sortOrder: index,
     createdAt: now,
@@ -318,6 +405,17 @@ export async function setAccessListIpRules(id: number, rules: unknown, actorUser
     throw domainError("accessListNotFound");
   }
   const sanitized = sanitizeIpRules(rules);
+  if (sanitized.length === 0) {
+    // At layer 4 the rules are all of the list, so emptying them would close every connection.
+    const l4Hosts = (await getAccessListUsageMap()).get(id)?.filter((h) => h.kind === "l4") ?? [];
+    if (l4Hosts.length > 0) {
+      throw domainError(
+        "accessListIpRulesNeededByL4Hosts",
+        { hosts: l4Hosts.map((host) => host.name) },
+        { status: 409 },
+      );
+    }
+  }
   const now = nowIso();
   await runInTransaction((tx) => [
     tx.delete(accessListIpRules).where(eq(accessListIpRules.accessListId, id)),
@@ -326,6 +424,7 @@ export async function setAccessListIpRules(id: number, rules: unknown, actorUser
       : []),
     tx.update(accessLists).set({ updatedAt: now }).where(eq(accessLists.id, id)),
   ]);
+  await resolveNewHostnames(sanitized);
 
   await logAuditEvent({
     userId: actorUserId,
@@ -370,6 +469,49 @@ export async function removeAccessListEntry(
   return (await getAccessList(accessListId))!;
 }
 
+/** All or nothing, one apply: an id from another list refuses the batch. */
+export async function removeAccessListEntries(
+  accessListId: number,
+  entryIds: number[],
+  actorUserId: number,
+) {
+  const list = await db.query.accessLists.findFirst({
+    where: (table, operators) => operators.eq(table.id, accessListId),
+  });
+  if (!list) {
+    throw domainError("accessListNotFound");
+  }
+  const ids = [...new Set(entryIds)];
+  if (ids.length === 0) return (await getAccessList(accessListId))!;
+
+  const scoped = and(
+    inArray(accessListEntries.id, ids),
+    eq(accessListEntries.accessListId, accessListId),
+  );
+  const found = await db.select({ id: accessListEntries.id }).from(accessListEntries).where(scoped);
+  if (found.length !== ids.length) {
+    throw domainError("accessListEntryNotFound");
+  }
+
+  await runInTransaction((tx) => [
+    tx.delete(accessListEntries).where(scoped),
+    tx.insert(auditEvents).values(
+      ids.map((entryId) =>
+        auditEventRow({
+          userId: actorUserId,
+          action: "delete",
+          entityType: "access_list_entry",
+          entityId: entryId,
+          summary: `Removed entry from access list ${list.name}`,
+          data: { bulk: true },
+        }),
+      ),
+    ),
+  ]);
+  await applyCaddyConfig();
+  return (await getAccessList(accessListId))!;
+}
+
 export async function deleteAccessList(id: number, actorUserId: number) {
   const existing = await db.query.accessLists.findFirst({
     where: (table, operators) => operators.eq(table.id, id),
@@ -377,9 +519,9 @@ export async function deleteAccessList(id: number, actorUserId: number) {
   if (!existing) {
     throw domainError("accessListNotFound");
   }
+  await assertAccessListUnused(id);
 
   await db.delete(accessLists).where(eq(accessLists.id, id));
-  await scrubLocationRuleReferences(id);
 
   await logAuditEvent({
     userId: actorUserId,
@@ -392,39 +534,47 @@ export async function deleteAccessList(id: number, actorUserId: number) {
 }
 
 /**
- * Location rules keep their list in the host's meta JSON, which no foreign key can reach. Left in
- * place, a deleted list's id would fail closed there - or, worse, match a list created later.
+ * The host's foreign key is `set null` and a location rule's null means "no list", so either
+ * would quietly unprotect whatever the list guarded. A delete is refused instead.
  */
-async function scrubLocationRuleReferences(accessListId: number): Promise<void> {
-  const rows = await db.select({ id: proxyHosts.id, meta: proxyHosts.meta }).from(proxyHosts);
-  for (const row of rows) {
-    if (!row.meta) continue;
-    let meta: { location_rules?: { access_list_id?: number | null }[] };
-    try {
-      meta = JSON.parse(row.meta);
-    } catch {
-      continue;
-    }
-    let changed = false;
-    for (const rule of meta.location_rules ?? []) {
-      if (rule.access_list_id === accessListId) {
-        // None rather than inherit: whoever gave the path its own list didn't want the host's.
-        rule.access_list_id = null;
-        changed = true;
-      }
-    }
-    if (changed) {
-      await db
-        .update(proxyHosts)
-        .set({ meta: JSON.stringify(meta), updatedAt: nowIso() })
-        .where(eq(proxyHosts.id, row.id));
-    }
+async function assertAccessListUnused(id: number): Promise<void> {
+  const [usage, dashboard] = await Promise.all([getAccessListUsageMap(), getDashboardSettings()]);
+  const hosts = usage.get(id) ?? [];
+  if (hosts.length > 0) {
+    throw domainError(
+      "accessListInUseByHosts",
+      { hosts: hosts.map((host) => host.name) },
+      { status: 409 },
+    );
+  }
+  // Counted while the dashboard host is off too: turning it back on would come up unprotected.
+  const options = dashboard?.options;
+  if (options && listIdsNamedBy(options.accessListId, options.meta).has(id)) {
+    throw domainError("accessListInUseByDashboard", {}, { status: 409 });
   }
 }
 
+/** The host's own list and any a location rule on it names. */
+function listIdsNamedBy(accessListId: number | null, meta: string | null): Set<number> {
+  const listIds = new Set<number>();
+  if (accessListId != null) listIds.add(accessListId);
+  try {
+    const parsed = meta ? JSON.parse(meta) : {};
+    for (const rule of parsed.location_rules ?? []) {
+      if (typeof rule.access_list_id === "number") listIds.add(rule.access_list_id);
+    }
+  } catch {
+    // Unreadable meta names no lists.
+  }
+  return listIds;
+}
+
 export type AccessListUsage = {
+  /** Unique per kind only. */
   id: number;
+  kind: "proxy" | "l4";
   name: string;
+  /** An L4 host's listen address, which is all it has for a name on the wire. */
   domains: string[];
   enabled: boolean;
 };
@@ -443,20 +593,12 @@ export async function getAccessListUsageMap(): Promise<Map<number, AccessListUsa
 
   const map = new Map<number, AccessListUsage[]>();
   for (const row of rows) {
-    // The host's own list, and any a location rule on it names: each counts the host once.
-    const listIds = new Set<number>();
-    if (row.accessListId != null) listIds.add(row.accessListId);
-    try {
-      const meta = row.meta ? JSON.parse(row.meta) : {};
-      for (const rule of meta.location_rules ?? []) {
-        if (typeof rule.access_list_id === "number") listIds.add(rule.access_list_id);
-      }
-    } catch {
-      // Unreadable meta names no lists.
-    }
+    // Each list counts the host once, however many of its rules name it.
+    const listIds = listIdsNamedBy(row.accessListId, row.meta);
     if (listIds.size === 0) continue;
-    const usage = {
+    const usage: AccessListUsage = {
       id: row.id,
+      kind: "proxy",
       name: row.name,
       domains: JSON.parse(row.domains),
       enabled: row.enabled,
@@ -466,6 +608,27 @@ export async function getAccessListUsageMap(): Promise<Map<number, AccessListUsa
       bucket.push(usage);
       map.set(listId, bucket);
     }
+  }
+  const l4Rows = await db
+    .select({
+      id: l4ProxyHosts.id,
+      name: l4ProxyHosts.name,
+      listenAddress: l4ProxyHosts.listenAddress,
+      enabled: l4ProxyHosts.enabled,
+      accessListId: l4ProxyHosts.accessListId,
+    })
+    .from(l4ProxyHosts);
+  for (const row of l4Rows) {
+    if (row.accessListId == null) continue;
+    const bucket = map.get(row.accessListId) ?? [];
+    bucket.push({
+      id: row.id,
+      kind: "l4",
+      name: row.name,
+      domains: [row.listenAddress],
+      enabled: row.enabled,
+    });
+    map.set(row.accessListId, bucket);
   }
   return map;
 }

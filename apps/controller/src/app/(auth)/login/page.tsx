@@ -6,6 +6,7 @@ import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { cspNonce } from "@/src/lib/csp";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
+import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import LoginClient from "@/src/components/auth/LoginClient";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
@@ -23,9 +24,10 @@ interface LoginPageProps {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const [session, enabledProviders, t, params] = await Promise.all([
+  const [session, enabledProviders, directories, t, params] = await Promise.all([
     auth(),
     getProviderDisplayList(),
+    listLdapDirectoryChoices(),
     getTranslations("auth.login"),
     searchParams,
   ]);
@@ -35,8 +37,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const oauthError = oauthCallbackErrorMessage(params.error, t);
   const localLoginEnabled = !(await localUsersDisabled());
-  // No local accounts, no username step to put it on.
-  const captcha = localLoginEnabled ? await getActiveCaptcha() : null;
+  // No local accounts and no directory, no username step to put it on.
+  const captcha = localLoginEnabled || directories.length > 0 ? await getActiveCaptcha() : null;
 
   return (
     <LoginClient
@@ -46,6 +48,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       initialError={oauthError}
       captcha={captcha}
       passwordResetEnabled={localLoginEnabled && (await emailReady())}
+      directories={directories}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
     />
   );

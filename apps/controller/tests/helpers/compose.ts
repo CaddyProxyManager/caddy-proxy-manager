@@ -35,4 +35,4 @@ export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE
  * `caddy`, started by the agent) would survive and hold its volumes, and the next run's agent
  * would resume a stale pairing and stop Caddy. A profile with no containers is a no-op.
  */
-export const TEARDOWN_PROFILES = 'caddy,clickhouse,tools';
+export const TEARDOWN_PROFILES = 'caddy,clickhouse,crowdsec,tools';

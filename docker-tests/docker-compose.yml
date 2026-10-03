@@ -16,6 +16,11 @@ networks:
     name: cpm-test-docker
     driver: bridge
     internal: true
+  # The runner's, for `cscli` in the CrowdSec containers and retagging the operator's Caddy image.
+  cpm-test-runner-docker:
+    name: cpm-test-runner-docker
+    driver: bridge
+    internal: true
 
 volumes:
   postgres-data: # postgres: the controller's database
@@ -26,6 +31,13 @@ volumes:
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
   agent-data:    # agent phase: the agent's state
+  crowdsec-lapi-data: # agent phase: the external CrowdSec's database
+  crowdsec-data:      # agent phase: the managed CrowdSec, as docker-compose.yml names them
+  crowdsec-config:
+  rig-zones:          # the dyn.cpm.test zone file: the runner writes it, CoreDNS serves it
+  # agent phase: CERT_FILES_HOST_DIR. Named, so its host path below is known in advance.
+  cert-files:
+    name: cpm-test-cert-files
 
 services:
   # ── Test PKI ────────────────────────────────────────────────────────────
@@ -62,6 +74,28 @@ services:
       interval: 3s
       timeout: 5s
       retries: 10
+
+  # dnsmasq forwards dyn.cpm.test here. No healthcheck: the image has nothing to run one with.
+  coredns:
+    image: coredns/coredns:1.12.4@sha256:986f04c2e15e147d00bdd51e8c51bcef3644b13ff806be7d2ff1b261d6dfbae1
+    container_name: cpm-test-coredns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./config/coredns/Corefile:/etc/coredns/Corefile:ro
+      - rig-zones:/zones:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.6
+
+  # For DNS challenge delegation: an acme-dns account per domain, CNAMEd to from dyn.cpm.test.
+  acme-dns:
+    image: joohoi/acme-dns:v1.0@sha256:08435bf0c6cfe7c29816ff48beabcc333743b5bb060cae3867777d9b0d956517
+    container_name: cpm-test-acme-dns
+    volumes:
+      - ./config/acme-dns/config.cfg:/etc/acme-dns/config.cfg:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.27
 
   # ── ACME certificate authority ──────────────────────────────────────────
   # httpPort/tlsPort are overridden so validation hits Caddy on the standard ports.
@@ -123,6 +157,10 @@ services:
       - caddy-config:/config
       - caddy-logs:/logs
       - acme-ca:/acme-ca:ro
+    # Docker's resolver forwards what it does not know here, as a host's would go to its own DNS:
+    # certmagic dials the nameserver a DNS-01 propagation check finds by name.
+    dns:
+      - 172.28.0.5
     networks:
       cpm-test:
         ipv4_address: 172.28.0.10
@@ -167,6 +205,9 @@ services:
         condition: service_healthy
       caddy:
         condition: service_healthy
+    # For the lookups the controller makes with the system resolver, the delegation check's among them.
+    dns:
+      - 172.28.0.5
     networks:
       cpm-test:
         ipv4_address: 172.28.0.11
@@ -262,8 +303,30 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.24
 
-  # ── Simulated client ────────────────────────────────────────────────────
-  # Drives the tests, resolving through dnsmasq as a browser would.
+  # ── Bot challenge ───────────────────────────────────────────────────────
+  # Anubis in subrequest mode (TARGET a space), as bot-challenge.mdx tells operators to run it.
+  anubis:
+    image: ghcr.io/techarohq/anubis:v1.27.0
+    container_name: cpm-test-anubis
+    environment:
+      TARGET: " "
+      BIND: ":8923"
+      POLICY_FNAME: /data/policy.yaml
+      REDIRECT_DOMAINS: bot-challenge.cpm.test
+      # Fixed, so a pass survives a restart of the rig's Anubis between runs.
+      ED25519_PRIVATE_KEY_HEX: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLOG_LEVEL: DEBUG
+    volumes:
+      - ./config/anubis/policy.yaml:/data/policy.yaml:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.25
+    healthcheck:
+      test: ["CMD", "/ko-app/anubis", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   # ── Agent phase (run.sh, after the main suite) ─────────────────────────
   # An agent in external build mode, behind a socket proxy with BuildKit denied: it must load an
   # image built elsewhere, never build one. Last, because pairing moves every admin call onto it.
@@ -278,6 +341,89 @@ services:
       args:
         CADDY_MODULES: github.com/caddy-dns/cloudflare
     image: cpm-test/caddy:external
+
+  # The shipped list plus Rate Limit and CrowdSec, which run.sh reads off the Dockerfile's default.
+  # Tests retag it as cpm-test/caddy:external and load it, as an operator rebuilding would.
+  # Not `:?`: the agent's compose interpolates this file too, and would fail on every call.
+  caddy-opt-in:
+    profiles: ["agent-build"]
+    build:
+      context: ..
+      dockerfile: docker/caddy/Dockerfile
+      args:
+        CADDY_MODULES: ${CPM_TEST_OPT_IN_MODULES:-}
+    image: cpm-test/caddy:opt-in
+
+  # An operator's own CrowdSec, for Settings → CrowdSec in external mode. Same image as the managed
+  # one below, with a bouncer key the tests hand to the settings API.
+  crowdsec-lapi:
+    profiles: ["agent"]
+    build:
+      context: ..
+      dockerfile: docker-tests/images/crowdsec/Dockerfile
+    image: cpm-test/crowdsec:latest
+    container_name: cpm-test-crowdsec-lapi
+    environment:
+      COLLECTIONS: crowdsecurity/caddy crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      BOUNCER_KEY_caddy: cpm-docker-tests-crowdsec-bouncer-key
+      DISABLE_ONLINE_API: "true"
+      # The image dropped it already; the COLLECTIONS reinstall must not bring it back.
+      DISABLE_PARSERS: crowdsecurity/whitelists
+    volumes:
+      - crowdsec-lapi-data:/var/lib/crowdsec/data
+      - caddy-logs:/logs:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.26
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
+  # docker-compose.yml's managed service, which the agent starts with `--profile crowdsec`. The
+  # image replaces the pinned one only to carry the hub content; the whitelists parser is the one
+  # other difference, since every address in the rig is private.
+  crowdsec:
+    profiles: ["crowdsec"]
+    image: cpm-test/crowdsec:latest
+    # Built by crowdsec-lapi; the agent's compose must never try to pull or build it.
+    pull_policy: never
+    container_name: cpm-test-crowdsec
+    environment:
+      COLLECTIONS: crowdsecurity/caddy crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      BOUNCER_KEY_caddy: ${CROWDSEC_BOUNCER_KEY:-}
+      DISABLE_ONLINE_API: ${CROWDSEC_DISABLE_ONLINE_API:-true}
+      DISABLE_PARSERS: crowdsecurity/whitelists
+    volumes:
+      - crowdsec-data:/var/lib/crowdsec/data
+      - crowdsec-config:/etc/crowdsec
+      - caddy-logs:/logs:ro
+    networks:
+      cpm-test:
+        aliases:
+          - cpm-crowdsec
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
+  # The runner's: exec for `cscli`, images for the retag. Not the agent's proxy, which denies exec.
+  runner-docker-proxy:
+    profiles: ["agent"]
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    container_name: cpm-test-runner-docker-proxy
+    environment:
+      CONTAINERS: 1
+      EXEC: 1
+      IMAGES: 1
+      POST: 1
+      EVENTS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - cpm-test-runner-docker
 
   docker-socket-proxy:
     profiles: ["agent"]
@@ -322,6 +468,9 @@ services:
       CADDY_BUILD_MODE: external
       CADDY_IMAGE: cpm-test/caddy:external
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+      # A path on the Docker host, which the agent bind-mounts into a throwaway container: the
+      # named volume's own directory, which the runner writes through its mount of it.
+      CERT_FILES_HOST_DIR: ${CPM_TEST_DOCKER_ROOT:-/var/lib/docker}/volumes/cpm-test-cert-files/_data
     group_add:
       # web's, for the bootstrap token.
       - "10001"
@@ -339,6 +488,8 @@ services:
         ipv4_address: 172.28.0.12
       cpm-test-docker: {}
 
+  # ── Simulated client ────────────────────────────────────────────────────
+  # Drives the tests, resolving through dnsmasq as a browser would.
   runner:
     build:
       context: ./images/runner
@@ -356,9 +507,16 @@ services:
       PEBBLE_MGMT: https://pebble:15000
       TEST_GEOBLOCK: ${CPM_TEST_GEOBLOCK:-1}
       TEST_WAF: ${CPM_TEST_WAF:-1}
+      # Up in the agent phase only.
+      DOCKER_HOST: tcp://runner-docker-proxy:2375
     volumes:
       - ./suite:/suite:ro
       - test-certs:/certs:ro
+      - rig-zones:/zones
+      - cert-files:/cert-files
+    # To add a second source address (lib.sh, add_client_alias): "another client" to an IP rule.
+    cap_add:
+      - NET_ADMIN
     depends_on:
       web:
         condition: service_healthy
@@ -376,8 +534,15 @@ services:
         condition: service_started
       origin-udp:
         condition: service_started
+      anubis:
+        condition: service_healthy
+      coredns:
+        condition: service_started
+      acme-dns:
+        condition: service_started
     dns:
       - 172.28.0.5
     networks:
       cpm-test:
         ipv4_address: 172.28.0.40
+      cpm-test-runner-docker: {}

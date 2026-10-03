@@ -122,10 +122,35 @@ describe('caddy module registry', () => {
         .sort(),
     );
     expect(DEFAULT_ENABLED_MODULE_IDS).not.toContain('cache-handler');
+    expect(DEFAULT_ENABLED_MODULE_IDS).not.toContain('caddy-ratelimit');
+  });
+
+  it('offers rate limiting as an opt-in module the shipped image leaves out', () => {
+    expect(modulesForFeature('ratelimit').map((m) => m.modulePath)).toEqual([
+      'github.com/mholt/caddy-ratelimit',
+    ]);
+    expect(SHIPPED_CADDY_MODULES).not.toContain('github.com/mholt/caddy-ratelimit');
+    expect(dockerfileDefaultModules()).not.toContain('github.com/mholt/caddy-ratelimit');
+  });
+
+  it('offers CrowdSec as one opt-in module pinned at its root, which imports every part', () => {
+    const path = 'github.com/hslatman/caddy-crowdsec-bouncer';
+    expect(modulesForFeature('crowdsec').map((m) => m.modulePath)).toEqual([path]);
+    expect(DEFAULT_ENABLED_MODULE_IDS).not.toContain('caddy-crowdsec');
+    expect(SHIPPED_CADDY_MODULES).not.toContain(path);
+    expect(dockerfileDefaultModules()).not.toContain(path);
   });
 
   it('maps each gated feature to at least one module', () => {
-    for (const feature of ['l4', 'geoblock', 'waf', 'tailscale', 'dns01'] as const) {
+    for (const feature of [
+      'l4',
+      'geoblock',
+      'waf',
+      'tailscale',
+      'dns01',
+      'ratelimit',
+      'crowdsec',
+    ] as const) {
       expect(modulesForFeature(feature).length, `no module powers "${feature}"`).toBeGreaterThan(0);
     }
   });

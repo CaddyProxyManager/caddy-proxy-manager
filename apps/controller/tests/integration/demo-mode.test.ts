@@ -99,7 +99,7 @@ describe('simulated agent', () => {
     const status = demoStatus();
     expect(status?.caddyBuild.applied).toEqual(state.caddyModules);
     expect(status?.l4Ports.applied).toEqual(state.l4Ports);
-    expect(status?.services.applied).toEqual({ clickhouse: true });
+    expect(status?.services.applied).toEqual({ clickhouse: true, crowdsec: false });
     expect(status?.analytics).toEqual({ enabled: true, accessLogPresent: true });
   });
 

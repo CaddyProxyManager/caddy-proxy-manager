@@ -17,6 +17,12 @@ const certificate = {
   privateKeyPem: 'private-key-secret-sentinel',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  source: 'agent-file' as const,
+  sourceAgentId: 3,
+  sourceCertPath: 'live/example.com/fullchain.pem',
+  sourceKeyPath: 'live/example.com/privkey.pem',
+  sourceReadAt: '2026-01-01T00:00:00.000Z',
+  sourceError: null,
 };
 
 describe('browser secret boundaries', () => {

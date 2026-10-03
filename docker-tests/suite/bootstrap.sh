@@ -29,6 +29,14 @@ wait_for "Pebble's directory" 120 \
   || die "pebble never served $PEBBLE_DIRECTORY"
 info "Pebble ACME directory is up"
 
+# An empty dyn.cpm.test: CoreDNS serves nothing for it until the file exists.
+: >"$RIG_ZONE_DIR/records"
+rig_zone_write
+wait_for "CoreDNS to load dyn.cpm.test" 30 \
+  bash -c "dig +norec @$COREDNS '$DYN_DOMAIN' SOA | grep -q 'status: NOERROR'" \
+  || die "CoreDNS never loaded $RIG_ZONE_DIR/db.$DYN_DOMAIN"
+info "rig DNS zone $DYN_DOMAIN is up"
+
 # ── 2. Sign in and mint an API token ────────────────────────────────────────
 
 rm -f "$COOKIE_JAR"

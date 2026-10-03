@@ -4,6 +4,7 @@
  * with one that throws when the Settings page loads.
  */
 
+import type { AcmeDnsAccount } from "./dns-challenge-delegation";
 import {
   CHALLENGE_OPTION_KEYS,
   type DnsProviderCredentials,
@@ -43,6 +44,19 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function encryptAcmeDnsAccounts(accounts: unknown): unknown {
+  if (!isJsonObject(accounts)) return accounts;
+  return Object.fromEntries(
+    Object.entries(accounts).map(([domain, account]) => {
+      if (!isJsonObject(account)) return [domain, account];
+      const { password } = account;
+      return typeof password === "string" && password && !isEncryptedSecret(password)
+        ? [domain, { ...account, password: encryptSecret(password) }]
+        : [domain, account];
+    }),
+  );
+}
+
 /**
  * A whole `dns_provider` value with its password fields encrypted, in the current
  * `{ providers, default }` shape or the legacy `{ provider, credentials }` one. Anything else is
@@ -59,7 +73,9 @@ export function encryptDnsProviderSettingCredentials<T>(value: T): T {
           : credentials,
       ]),
     );
-    return { ...value, providers };
+    return "acmeDnsAccounts" in value
+      ? { ...value, providers, acmeDnsAccounts: encryptAcmeDnsAccounts(value.acmeDnsAccounts) }
+      : { ...value, providers };
   }
   if (typeof value.provider === "string" && isJsonObject(value.credentials)) {
     const credentials = value.credentials as Record<string, string>;
@@ -88,6 +104,23 @@ export function decryptProviderCredentials(
   return result;
 }
 
+function decryptAcmeDnsConfig(
+  config: Record<string, AcmeDnsAccount>,
+): Record<string, Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(config).map(([domain, account]) => {
+      const entry: Record<string, string> = {};
+      for (const [key, value] of Object.entries(account)) {
+        if (typeof value === "string" && value) entry[key] = value;
+      }
+      if (entry.password && isEncryptedSecret(entry.password)) {
+        entry.password = decryptSecret(entry.password, `acme-dns account "${domain}" password`);
+      }
+      return [domain, entry];
+    }),
+  );
+}
+
 /**
  * The Caddy DNS challenge config for `issuer.challenges.dns`. Challenge options are hoisted out
  * of the credentials to the challenge level; `resolvers` comes from the global DNS settings.
@@ -96,6 +129,10 @@ export function buildDnsChallengeConfig(
   providerName: string,
   credentials: Record<string, string>,
   dnsResolvers: string[],
+  delegation: {
+    overrideDomain?: string | null;
+    acmeDnsConfig?: Record<string, AcmeDnsAccount> | null;
+  } = {},
 ): Record<string, unknown> | null {
   const def = getProviderDefinition(providerName);
   if (!def) return null;
@@ -103,14 +140,22 @@ export function buildDnsChallengeConfig(
   const decrypted = decryptProviderCredentials(providerName, credentials);
 
   // Challenge option keys configure the challenge, not the provider module, so they go below.
-  const providerConfig: Record<string, string> = { name: providerName };
-  for (const [key, value] of Object.entries(decrypted)) {
-    if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
-      providerConfig[key] = value;
+  const providerConfig: Record<string, unknown> = { name: providerName };
+  if (delegation.acmeDnsConfig) {
+    // With `config` set the module ignores the single-account fields.
+    providerConfig.config = decryptAcmeDnsConfig(delegation.acmeDnsConfig);
+  } else {
+    for (const [key, value] of Object.entries(decrypted)) {
+      if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
+        providerConfig[key] = value;
+      }
     }
   }
 
   const dnsChallenge: Record<string, unknown> = { provider: providerConfig };
+  if (delegation.overrideDomain) {
+    dnsChallenge.override_domain = delegation.overrideDomain;
+  }
   if (dnsResolvers.length > 0) {
     dnsChallenge.resolvers = dnsResolvers;
   }

@@ -145,6 +145,16 @@ export async function register() {
       }
     }
 
+    // A controller down for days must not load a stale answer as an allow before its first lookup.
+    const { expireStaleHostnames, startAccessListDnsRefresher } = await import(
+      "./lib/access-list-dns"
+    );
+    try {
+      await expireStaleHostnames();
+    } catch (error) {
+      console.error("Failed to expire stale access-list hostnames:", error);
+    }
+
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {
       console.log("Applying Caddy configuration from database...");
@@ -182,7 +192,11 @@ export async function register() {
       console.log("ClickHouse analytics initialized");
       if (demoMode) await (await import("./lib/demo/traffic")).startLiveDemoTraffic();
     } catch (error) {
-      console.error("Failed to initialize ClickHouse:", error);
+      // Expected on a fresh stack: the agent starts ClickHouse after pairing.
+      console.warn(
+        "ClickHouse not ready; its schema is created on the first analytics write:",
+        error,
+      );
     }
 
     // Before the fleet push, so an agent coming up now finds a token rather than idling.
@@ -216,6 +230,13 @@ export async function register() {
       startGeoipUpdater();
     } catch (error) {
       console.error("Failed to start the GeoIP updater:", error);
+    }
+
+    // Looks up hostnames in access-list IP rules as their TTLs run out.
+    try {
+      startAccessListDnsRefresher();
+    } catch (error) {
+      console.error("Failed to start the access-list hostname refresher:", error);
     }
 
     const { startCrsRegistryUpdater } = await import("./lib/crs-plugins/sync");

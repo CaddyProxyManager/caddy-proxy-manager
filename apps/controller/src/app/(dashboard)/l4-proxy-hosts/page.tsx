@@ -6,8 +6,9 @@ import {
 } from "@/src/lib/models/l4-proxy-hosts";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
+import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
+import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -49,11 +50,12 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 
-  const [hosts, total, counts, agents] = await Promise.all([
+  const [hosts, total, counts, agents, accessLists] = await Promise.all([
     listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol),
     countL4ProxyHosts(search, visibleIds, protocol),
     countL4ProxyHostsByProtocol(search, visibleIds),
     listAgentOptions().catch(() => []),
+    listL4AccessListOptions(),
   ]);
 
   // Only the hosts on this page - the map is for the edit dialog.
@@ -71,8 +73,10 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       initialSearch={search ?? ""}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
       agents={agents}
+      accessLists={accessLists}
       agentAssignments={Object.fromEntries(assignments)}
       canCreate={canCreate(access)}
+      manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
     />
   );
 }

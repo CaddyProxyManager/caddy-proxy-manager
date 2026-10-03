@@ -190,6 +190,31 @@ describe('upstreams that reach the Caddy admin API are admin-only', () => {
     );
   });
 
+  it('refuses an operator pointing Anubis at the admin port', async () => {
+    const anubis = { enabled: true, upstream: 'http://caddy:2019', exemptPaths: [] };
+    await expectUpstreamAdminOnly(
+      createProxyHost(
+        { name: 'op', domains: ['op.example.com'], upstreams: ['10.0.0.5:8080'], anubis },
+        OPERATOR,
+      ),
+    );
+    const host = await createProxyHost(
+      { name: 'plain', domains: ['plain.example.com'], upstreams: ['10.0.0.5:8080'] },
+      ADMIN,
+    );
+    await expectUpstreamAdminOnly(updateProxyHost(host.id, { anubis }, OPERATOR));
+    expect((await getProxyHost(host.id))?.anubis).toBeNull();
+
+    await updateProxyHost(host.id, { anubis }, ADMIN);
+    await updateProxyHost(host.id, { name: 'renamed', anubis }, OPERATOR);
+    await updateProxyHost(
+      host.id,
+      { anubis: { ...anubis, upstream: 'http://anubis:8923' } },
+      OPERATOR,
+    );
+    expect((await getProxyHost(host.id))?.anubis?.upstream).toBe('http://anubis:8923');
+  });
+
   it('lets an operator keep a target an admin set, and an admin set one', async () => {
     const host = await createProxyHost(
       { name: 'admin-set', domains: ['admin.example.com'], upstreams: ['caddy:2019'] },

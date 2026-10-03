@@ -236,6 +236,8 @@ services:
       caddy-admin:
         aliases:
           - caddy-admin
+      # The bouncer's way to the managed crowdsec; see there.
+      crowdsec: {}
     healthcheck:
       # The bound name: the admin API does not listen on loopback.
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://caddy-admin:2019/config/"]
@@ -310,6 +312,8 @@ services:
       CADDY_BUILD_MODE: ${CADDY_BUILD_MODE:-agent}
       # Generous: clickhouse's first start pulls the image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
+      # A host directory certificates may be read from, as the daemon sees it; unset is off.
+      CERT_FILES_HOST_DIR: ${CERT_FILES_HOST_DIR:-}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       # The agent never reads .env (it holds the secrets), so what caddy and clickhouse
       # interpolate, including from an override file, is forwarded here.
@@ -400,6 +404,40 @@ services:
         soft: 262144
         hard: 262144
 
+  # Settings -> CrowdSec in managed mode: the agent passes `--profile crowdsec` and the bouncer key
+  # the controller generated. For the bundled agent's host only.
+  crowdsec:
+    container_name: caddy-proxy-manager-crowdsec
+    image: crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+    profiles: [crowdsec]
+    restart: unless-stopped
+    environment:
+      # AppSec's too, always: acquis.yaml listens for it, so switching it on needs no recreate.
+      COLLECTIONS: crowdsecurity/caddy crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      # Not `:?`, for the same reason as CLICKHOUSE_PASSWORD. Registered once, on the first start.
+      BOUNCER_KEY_caddy: ${CROWDSEC_BOUNCER_KEY:-}
+      # Off unless Settings shares signals: the online API sends CrowdSec every attacker address.
+      DISABLE_ONLINE_API: ${CROWDSEC_DISABLE_ONLINE_API:-true}
+    volumes:
+      - crowdsec-data:/var/lib/crowdsec/data
+      - crowdsec-config:/etc/crowdsec
+      - caddy-logs:/logs:ro
+      - ./docker/crowdsec/acquis.yaml:/etc/crowdsec/acquis.d/cpm.yaml:ro
+    networks:
+      # Not caddy-network, where an upstream could reach the LAPI. Not internal either: the hub and
+      # the online API are on the internet. The alias is unlikely to be taken by a user container,
+      # which, sharing a network with Caddy, would otherwise be sent the bouncer key.
+      crowdsec:
+        aliases:
+          - cpm-crowdsec
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # The first start downloads the hub collections.
+      start_period: 120s
+
 networks:
   caddy-network:
     driver: bridge
@@ -418,6 +456,9 @@ networks:
   socket-proxy:
     driver: bridge
     internal: true
+  # Caddy and the managed crowdsec only. It has egress, which Caddy already has on caddy-network.
+  crowdsec:
+    driver: bridge
 
 volumes:
   caddy-manager-data:
@@ -426,5 +467,7 @@ volumes:
   caddy-config:
   caddy-logs:
   clickhouse-data:
+  crowdsec-data:
+  crowdsec-config:
   postgres-data:
   acme-ca:

@@ -121,6 +121,32 @@ export const twoFactors = sqliteTable(
   }),
 );
 
+// Better Auth's `passkey` model (@better-auth/passkey). `publicKey` is a COSE key, not a secret;
+// `transports` is comma-separated. A credential is bound to the rpID it was made on, the Public
+// URL's hostname, so changing that hostname orphans every row here.
+export const passkeys = sqliteTable(
+  "passkeys",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name"),
+    publicKey: text("publicKey").notNull(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    credentialID: text("credentialID").notNull(),
+    counter: integer("counter").notNull(),
+    deviceType: text("deviceType").notNull(),
+    backedUp: integer("backedUp", { mode: "boolean" }).notNull(),
+    transports: text("transports"),
+    aaguid: text("aaguid"),
+    createdAt: isoTimestamp("createdAt"),
+  },
+  (table) => ({
+    credentialUnique: uniqueIndex("passkeys_credential_unique").on(table.credentialID),
+    userIdx: index("passkeys_user_idx").on(table.userId),
+  }),
+);
+
 export const oauthProviders = sqliteTable(
   "oauth_providers",
   {
@@ -153,6 +179,8 @@ export const oauthProviders = sqliteTable(
     defaultRole: text("defaultRole").notNull().default("user"),
     // Mirror the remaining prefixed IdP groups into CPM groups.
     syncGroups: integer("syncGroups", { mode: "boolean" }).notNull().default(false),
+    // type='ldap' only (lib/ldap/config.ts); such a row borrows issuer, clientId and clientSecret.
+    ldapConfig: text("ldapConfig"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),
   },
@@ -303,7 +331,9 @@ export const accessListIpRules = sqliteTable(
       .references(() => accessLists.id, { onDelete: "cascade" })
       .notNull(),
     action: text("action").notNull(),
-    cidr: text("cidr").notNull(),
+    // Exactly one of the two. A hostname may end in /N, the IPv6 prefix its AAAA answers widen to.
+    cidr: text("cidr"),
+    hostname: text("hostname"),
     note: text("note"),
     sortOrder: integer("sortOrder").notNull(),
     createdAt: text("createdAt").notNull(),
@@ -313,6 +343,20 @@ export const accessListIpRules = sqliteTable(
     accessListIdIdx: index("access_list_ip_rules_list_idx").on(table.accessListId),
   }),
 );
+
+/**
+ * What the hostnames in IP rules last resolved to, so a restart keeps the last known set. A cache:
+ * never backed up, and rebuilt by the refresher (lib/access-list-dns.ts).
+ */
+export const accessListDnsCache = sqliteTable("access_list_dns_cache", {
+  hostname: text("hostname").primaryKey(),
+  // JSON array of addresses; empty until a lookup succeeds, and again 24 h after the last one did.
+  addresses: text("addresses").notNull(),
+  resolvedAt: text("resolvedAt"),
+  expiresAt: text("expiresAt").notNull(),
+  lastError: text("lastError"),
+  lastErrorAt: text("lastErrorAt"),
+});
 
 export const certificates = sqliteTable("certificates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -326,6 +370,15 @@ export const certificates = sqliteTable("certificates", {
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
+  /** `upload`, or `agent-file`: read by `sourceAgentId` from paths in its CERT_FILES_HOST_DIR. */
+  source: text("source").notNull().default("upload"),
+  /** Null once that agent is deleted: the last PEM stays, but no agent serves it. */
+  sourceAgentId: integer("sourceAgentId").references(() => agents.id, { onDelete: "set null" }),
+  sourceCertPath: text("sourceCertPath"),
+  sourceKeyPath: text("sourceKeyPath"),
+  sourceReadAt: text("sourceReadAt"),
+  /** A `CertificateFileError` code; the last good PEM keeps serving meanwhile. */
+  sourceError: text("sourceError"),
 });
 
 export const caCertificates = sqliteTable("ca_certificates", {
@@ -667,6 +720,8 @@ export const l4ProxyHosts = sqliteTable("l4_proxy_hosts", {
   proxyProtocolReceive: integer("proxyProtocolReceive", { mode: "boolean" })
     .notNull()
     .default(false),
+  /** Its IP rules only. Deleting a list a host uses is refused by the model, not this key. */
+  accessListId: integer("accessListId").references(() => accessLists.id, { onDelete: "set null" }),
   ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
   meta: text("meta"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),

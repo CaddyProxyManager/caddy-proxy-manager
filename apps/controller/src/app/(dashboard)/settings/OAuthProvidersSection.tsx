@@ -8,7 +8,6 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
-import { Grid } from "@astryxdesign/core/Grid";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
@@ -24,6 +23,7 @@ import {
   withOAuthClientSecretRotation,
   type OAuthProviderView,
 } from "@/src/lib/oauth-provider-view";
+import { type AppRole, GroupMappingFields } from "./GroupMappingFields";
 import {
   createOAuthProviderAction,
   setPrimaryOAuthProviderAction,
@@ -39,8 +39,6 @@ interface OAuthProvidersSectionProps {
   /** True when AUTH_DISABLE_LOCAL_USERS=true - SSO is the only way in. */
   localUsersDisabled?: boolean;
 }
-
-type AppRole = "admin" | "operator" | "user" | "viewer";
 
 type FormData = {
   name: string;
@@ -85,13 +83,6 @@ const emptyForm: FormData = {
   defaultRole: "user",
   syncGroups: false,
 };
-
-const ROLE_OPTIONS = [
-  { value: "admin", labelKey: "roleAdmin" },
-  { value: "operator", labelKey: "roleOperator" },
-  { value: "user", labelKey: "roleUser" },
-  { value: "viewer", labelKey: "roleViewer" },
-] as const;
 
 export default function OAuthProvidersSection({
   initialProviders,
@@ -536,104 +527,12 @@ export default function OAuthProvidersSection({
             description={t("oauthAutoLinkHelp")}
           />
 
-          <Card variant="muted" padding={3}>
-            <VStack gap={3}>
-              <VStack gap={0}>
-                <Text type="body" size="sm" weight="semibold">
-                  {t("groupMapping")}
-                </Text>
-                <Text type="body" size="xsm" color="secondary">
-                  {t("groupMappingHelp")}
-                </Text>
-              </VStack>
-
-              {/* No <code> in the help: Astryx types a description as a string, and only
-                  that keeps its aria-describedby link. */}
-              <TextInput
-                label={t("groupsClaim")}
-                size="sm"
-                value={form.groupsClaim}
-                onChange={(v) => updateField("groupsClaim", v)}
-                placeholder="groups"
-                description={t("groupsClaimHelp")}
-              />
-
-              <TextInput
-                label={t("groupPrefix")}
-                isOptional
-                size="sm"
-                value={form.groupPrefix}
-                onChange={(v) => updateField("groupPrefix", v)}
-                placeholder="CPM_"
-                description={t("groupPrefixHelp")}
-              />
-
-              <Switch
-                label={t("assignRolesFromGroups")}
-                value={form.roleMappingEnabled}
-                onChange={(v) => updateField("roleMappingEnabled", v)}
-                description={t("roleMappingAuthorityHelp")}
-              />
-
-              {form.roleMappingEnabled && (
-                <>
-                  <Grid columns={{ minWidth: 160, max: 3 }} gap={2}>
-                    <TextInput
-                      label={t("adminGroups")}
-                      size="sm"
-                      value={form.adminGroup}
-                      onChange={(v) => updateField("adminGroup", v)}
-                      placeholder={
-                        form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"
-                      }
-                    />
-                    <TextInput
-                      label={t("operatorGroups")}
-                      size="sm"
-                      value={form.operatorGroup}
-                      onChange={(v) => updateField("operatorGroup", v)}
-                      placeholder={form.groupPrefix ? `${form.groupPrefix}Operator` : "proxy-ops"}
-                    />
-                    <TextInput
-                      label={t("userGroups")}
-                      size="sm"
-                      value={form.userGroup}
-                      onChange={(v) => updateField("userGroup", v)}
-                      placeholder={form.groupPrefix ? `${form.groupPrefix}User` : "staff"}
-                    />
-                    <TextInput
-                      label={t("viewerGroups")}
-                      size="sm"
-                      value={form.viewerGroup}
-                      onChange={(v) => updateField("viewerGroup", v)}
-                      placeholder={form.groupPrefix ? `${form.groupPrefix}Viewer` : "auditors"}
-                    />
-                  </Grid>
-                  <Text type="body" size="xsm" color="secondary">
-                    {t("roleGroupNamesHelp")}
-                  </Text>
-
-                  <Selector
-                    label={t("defaultRoleLabel")}
-                    size="sm"
-                    options={ROLE_OPTIONS.map(({ value, labelKey }) => ({
-                      value,
-                      label: t(labelKey),
-                    }))}
-                    value={form.defaultRole}
-                    onChange={(v) => updateField("defaultRole", v as AppRole)}
-                  />
-                </>
-              )}
-
-              <Switch
-                label={t("mirrorGroupsIntoCpm")}
-                value={form.syncGroups}
-                onChange={(v) => updateField("syncGroups", v)}
-                description={t("groupSyncHelp")}
-              />
-            </VStack>
-          </Card>
+          <GroupMappingFields
+            value={form}
+            onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+            claimLabel={t("groupsClaim")}
+            claimHelp={t("groupsClaimHelp")}
+          />
 
           {editingProvider && (
             <VStack gap={1}>

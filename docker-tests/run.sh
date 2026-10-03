@@ -46,9 +46,20 @@ while [ "$#" -gt 0 ]; do
 done
 
 compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "$@"; }
-# The agent phase's services, which `down` must name too or they outlive the rig.
-AGENT_PROFILES=(--profile agent --profile agent-build)
+# The agent phase's services, which `down` must name too or they outlive the rig. `crowdsec` is the
+# managed one the agent starts itself.
+AGENT_PROFILES=(--profile agent --profile agent-build --profile crowdsec)
 agent_compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "${AGENT_PROFILES[@]}" "$@"; }
+
+# The shipped modules, read off the Dockerfile's default so the opt-in image cannot drift from it.
+shipped_modules() {
+  awk '/^ARG CADDY_MODULES="/ {on=1; next}
+       on {line=$0; gsub(/[\\"]/, "", line); gsub(/^ +| +$/, "", line)
+           if (line != "") printf "%s ", line
+           if ($0 ~ /"$/) exit}' ../docker/caddy/Dockerfile
+}
+CPM_TEST_OPT_IN_MODULES="$(shipped_modules)github.com/mholt/caddy-ratelimit github.com/hslatman/caddy-crowdsec-bouncer"
+export CPM_TEST_OPT_IN_MODULES
 
 # Which half a filter selects: a pattern matching nothing in a half skips that half.
 matches() {  # matches DIR - true when a file in DIR matches a filter, or there are none
@@ -96,7 +107,8 @@ if ! compose build "${build_args[@]}"; then
   echo "build failed" >&2
   exit 1
 fi
-if [ "$AGENT" = "1" ] && ! agent_compose build "${build_args[@]}" agent caddy-external; then
+if [ "$AGENT" = "1" ] && ! agent_compose build "${build_args[@]}" \
+     agent caddy-external caddy-opt-in crowdsec-lapi; then
   echo "build failed (agent phase)" >&2
   exit 1
 fi
@@ -110,7 +122,8 @@ compose up -d --force-recreate dns >/dev/null 2>&1
 # certgen is left off on purpose: a one-shot others wait on via `service_completed_successfully`,
 # whose exit --wait would treat as a failure to become healthy.
 if ! compose up -d --wait --wait-timeout 300 \
-      dns pebble caddy web origin-a origin-b origin-tls origin-tcp origin-udp; then
+      dns coredns acme-dns pebble caddy web origin-a origin-b origin-tls origin-tcp origin-udp \
+      anubis; then
   echo "the rig did not come up healthy" >&2
   compose ps
   compose logs --tail 60 web caddy pebble
@@ -138,7 +151,8 @@ fi
 if [ "$AGENT" = "1" ]; then
   echo
   echo "==> agent phase: an agent in external build mode"
-  if ! agent_compose up -d docker-socket-proxy agent; then
+  if ! agent_compose up -d --wait --wait-timeout 300 crowdsec-lapi runner-docker-proxy ||
+     ! agent_compose up -d docker-socket-proxy agent; then
     echo "the agent did not start" >&2
     status=1
   else

@@ -11,7 +11,13 @@ import { CACHE_STORAGES, CDN_PROVIDERS, normalizeHttpCacheSettings } from "./htt
 import { seclangErrors } from "./seclang";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
 import { normalizeTailscaleSettings } from "./caddy-tailscale";
+import { normalizeCrowdSecSettings } from "./crowdsec";
 import { getProviderDefinition, isValidDnsDuration } from "./dns-providers";
+import {
+  ACMEDNS_PROVIDER,
+  MAX_DNS_DELEGATIONS,
+  normalizeDnsName,
+} from "./dns-challenge-delegation";
 import { isEmailAddress } from "./email-address";
 
 export class SettingsValidationError extends Error {
@@ -351,8 +357,79 @@ function validateDns(value: Record<string, unknown>): void {
   optionalString(value, "timeout", "dns", 64);
 }
 
+/** Stored as sent, so it must already be in the form the builder uses. */
+function dnsName(value: unknown, label: string): string {
+  const name = stringValue(value, label, { min: 1, max: 253 });
+  if (normalizeDnsName(name) !== name.toLowerCase()) {
+    invalid(`${label} must be a domain name without a wildcard or trailing dot`);
+  }
+  return name.toLowerCase();
+}
+
+const ACMEDNS_ACCOUNT_KEYS = ["username", "password", "subdomain", "server_url"] as const;
+
+function validateDnsDelegations(value: unknown, providers: Record<string, unknown>): void {
+  if (!Array.isArray(value) || value.length > MAX_DNS_DELEGATIONS) {
+    invalid(
+      `dns-provider.delegations must be an array with at most ${MAX_DNS_DELEGATIONS} entries`,
+    );
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const label = `dns-provider.delegations[${index}]`;
+    const delegation = record(entry, label);
+    onlyKeys(delegation, ["domain", "target", "provider"], label);
+    const domain = dnsName(required(delegation, "domain", label), `${label}.domain`);
+    if (seen.has(domain)) invalid(`${label}.domain is listed twice`);
+    seen.add(domain);
+    const target = delegation.target ?? null;
+    const provider = delegation.provider ?? null;
+    if (target !== null) dnsName(target, `${label}.target`);
+    if (provider !== null) {
+      if (typeof provider !== "string" || !Object.hasOwn(providers, provider)) {
+        invalid(`${label}.provider must identify a configured provider`);
+      }
+    }
+    if (target === null && provider === null) {
+      invalid(`${label} needs a target, a provider or both`);
+    }
+  });
+}
+
+function validateAcmeDnsAccounts(value: unknown): void {
+  const accounts = record(value, "dns-provider.acmeDnsAccounts");
+  const domains = Object.keys(accounts);
+  if (domains.length > MAX_DNS_DELEGATIONS) {
+    invalid(`dns-provider.acmeDnsAccounts must contain at most ${MAX_DNS_DELEGATIONS} accounts`);
+  }
+  for (const domain of domains) {
+    const label = `dns-provider.acmeDnsAccounts.${domain}`;
+    // The builder looks accounts up by lowercase name.
+    if (dnsName(domain, `${label} key`) !== domain) {
+      invalid(`${label} key must be a lowercase domain name`);
+    }
+    const account = record(accounts[domain], label);
+    onlyKeys(account, [...ACMEDNS_ACCOUNT_KEYS, "fulldomain"], label);
+    for (const key of ["username", "password", "subdomain"] as const) {
+      stringValue(required(account, key, label), `${label}.${key}`, {
+        min: 1,
+        max: MAX_SECRET_LENGTH,
+      });
+    }
+    dnsName(required(account, "fulldomain", label), `${label}.fulldomain`);
+    httpUrl(
+      stringValue(required(account, "server_url", label), `${label}.server_url`, { min: 1 }),
+      `${label}.server_url`,
+    );
+  }
+}
+
 function validateDnsProvider(value: Record<string, unknown>): void {
-  onlyKeys(value, ["providers", "default"], "DNS provider settings");
+  onlyKeys(
+    value,
+    ["providers", "default", "delegations", "acmeDnsAccounts"],
+    "DNS provider settings",
+  );
   const providers = record(
     required(value, "providers", "DNS provider settings"),
     "dns-provider.providers",
@@ -396,6 +473,18 @@ function validateDnsProvider(value: Record<string, unknown>): void {
   if (typeof value.default === "string" && !Object.hasOwn(providers, value.default)) {
     invalid("dns-provider.default must identify a configured provider");
   }
+  const acmeDns = providers[ACMEDNS_PROVIDER] as Record<string, unknown> | undefined;
+  if (acmeDns) {
+    // The single account is all or nothing: the module refuses one with a field missing.
+    const set = ACMEDNS_ACCOUNT_KEYS.filter((key) => acmeDns[key]);
+    if (set.length > 0 && set.length < ACMEDNS_ACCOUNT_KEYS.length) {
+      invalid(
+        `dns-provider.providers.${ACMEDNS_PROVIDER} needs all of ${ACMEDNS_ACCOUNT_KEYS.join(", ")}, or none`,
+      );
+    }
+  }
+  if (value.delegations !== undefined) validateDnsDelegations(value.delegations, providers);
+  if (value.acmeDnsAccounts !== undefined) validateAcmeDnsAccounts(value.acmeDnsAccounts);
 }
 
 function validateUpstreamDns(value: Record<string, unknown>): void {
@@ -644,6 +733,39 @@ function validateTailscale(value: Record<string, unknown>): void {
   }
 }
 
+function validateCrowdSec(value: Record<string, unknown>): void {
+  // No managedApiKey: the controller generates it, and nothing may set it.
+  onlyKeys(
+    value,
+    [
+      "enabled",
+      "mode",
+      "onlineApi",
+      "managedAppsec",
+      "apiUrl",
+      "apiKey",
+      "appsecUrl",
+      "appsecFailOpen",
+      "tickerInterval",
+    ],
+    "CrowdSec settings",
+  );
+  booleanValue(required(value, "enabled", "CrowdSec settings"), "crowdsec.enabled");
+  for (const key of ["mode", "apiUrl", "apiKey", "appsecUrl", "tickerInterval"]) {
+    if (value[key] !== undefined) stringValue(value[key], `crowdsec.${key}`);
+  }
+  for (const key of ["appsecFailOpen", "onlineApi", "managedAppsec"]) {
+    if (value[key] !== undefined) booleanValue(value[key], `crowdsec.${key}`);
+  }
+  try {
+    // Whether a key is present is only known once the stored one is merged, on save.
+    normalizeCrowdSecSettings(value);
+  } catch (error) {
+    if (error instanceof DomainError) invalid(error.message);
+    throw error;
+  }
+}
+
 export function assertSettingsPayloadSize(input: unknown): void {
   let serialized: string;
   try {
@@ -717,10 +839,17 @@ export function validateSettingsGroup(
     case "tailscale":
       validateTailscale(value);
       break;
+    case "crowdsec":
+      validateCrowdSec(value);
+      break;
     case "http-protocols":
       onlyKeys(value, ["http2", "http3"], "HTTP version settings");
       booleanValue(required(value, "http2", "HTTP version settings"), "http2");
       booleanValue(required(value, "http3", "HTTP version settings"), "http3");
+      break;
+    case "compression":
+      onlyKeys(value, ["enabled"], "compression settings");
+      booleanValue(required(value, "enabled", "compression settings"), "enabled");
       break;
     case "two-factor":
       onlyKeys(value, ["requireForAdmins"], "two-factor settings");

@@ -35,9 +35,13 @@ import { CLIENT_IP_HEADER } from '@/src/lib/client-ip';
 import { accountKey, resetAccountFailures } from '@/src/lib/rate-limit';
 import { CAPTCHA_PASS_COOKIE, isValidCaptchaPass, issueCaptchaPass } from '@/src/lib/captcha/pass';
 
-function signIn(body: Record<string, string>, headers: Record<string, string> = {}) {
+function signIn(
+  body: Record<string, string>,
+  headers: Record<string, string> = {},
+  path = '/sign-in/username',
+) {
   return POST(
-    new Request('http://localhost:3000/api/auth/sign-in/username', {
+    new Request(`http://localhost:3000/api/auth${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify(body),
@@ -90,6 +94,13 @@ describe('/api/auth route', () => {
     expect(blocked.status).toBe(429);
     expect(ctx.seen).toHaveLength(6);
     expect(blocked.headers.get('retry-after')).toBe('1');
+  });
+
+  it('counts a directory sign-in against the same account', async () => {
+    for (let i = 0; i < 6; i++) {
+      await signIn({ username: 'alice', password: `wrong-${i}` }, {}, '/sign-in/ldap');
+    }
+    expect((await signIn({ username: 'alice', password: 'pw' })).status).toBe(429);
   });
 
   it('resets the account on a successful sign-in', async () => {
@@ -166,6 +177,12 @@ describe('/api/auth route', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('set-cookie')).toContain(`${CAPTCHA_PASS_COOKIE}=;`);
       expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    });
+
+    it('demands a pass for a directory sign-in too', async () => {
+      const response = await signIn({ username: 'alice', password: 'pw' }, {}, '/sign-in/ldap');
+      expect(response.status).toBe(403);
+      expect(ctx.seen).toHaveLength(0);
     });
 
     it('leaves every other auth route alone', async () => {

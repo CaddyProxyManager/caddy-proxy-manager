@@ -1,6 +1,7 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
+import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import {
   isForwardAuthDomain,
   createRedirectIntent,
@@ -82,9 +83,10 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     }
   }
 
-  const [session, enabledProviders, t, tAuth] = await Promise.all([
+  const [session, enabledProviders, directories, t, tAuth] = await Promise.all([
     auth(),
     getProviderDisplayList(),
+    listLdapDirectoryChoices(),
     getTranslations("auth.login"),
     getTranslations("auth"),
   ]);
@@ -99,7 +101,8 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       : null;
   const localLoginEnabled = !(await localUsersDisabled());
   // Per host: an operator can switch it off for one whose users cannot solve it.
-  const configured = localLoginEnabled && rid ? await getActiveCaptcha() : null;
+  const configured =
+    (localLoginEnabled || directories.length > 0) && rid ? await getActiveCaptcha() : null;
   const captcha = configured && (await redirectIntentWantsCaptcha(rid)) ? configured : null;
 
   return (
@@ -111,6 +114,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       errorMessage={errorMessage}
       enabledProviders={enabledProviders}
       localLoginEnabled={localLoginEnabled}
+      directories={directories}
       captcha={captcha}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
       existingSession={

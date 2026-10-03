@@ -1,0 +1,23 @@
+# The e2e directory (tests/e2e/ldap.spec.ts). Groups come after their members: the memberOf
+# overlay fills in memberOf only for members that exist when a group is written.
+dn: ou=people,dc=example,dc=org
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=example,dc=org
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=ldap-alice,ou=people,dc=example,dc=org
+objectClass: inetOrgPerson
+uid: ldap-alice
+cn: ldap-alice
+sn: Example
+displayName: Alice Directory
+mail: ldap-alice@example.org
+userPassword: AliceDirectory2026!
+
+dn: cn=CPM Operators,ou=groups,dc=example,dc=org
+objectClass: groupOfUniqueNames
+cn: CPM Operators
+uniqueMember: uid=ldap-alice,ou=people,dc=example,dc=org

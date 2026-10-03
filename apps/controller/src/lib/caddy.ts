@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
-import { buildDashboardHostRow } from "./dashboard-host";
+import { buildDashboardHostRow, DASHBOARD_HOST_ID } from "./dashboard-host";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
 import { isConnectionError } from "./net-errors";
+import {
+  type DnsResolverRouteConfig,
+  getLookupServers,
+  getLookupTimeoutMs,
+  resolveHostnameAddresses,
+} from "./dns-lookup";
 import {
   expandPrivateRanges,
   isPlainObject,
@@ -14,7 +20,6 @@ import {
   parseCustomHandlers,
   formatDialAddress,
   parseUpstreamTarget,
-  toDurationMs,
   canonicalHeaderName,
   buildAuthResponseCopyRoutes,
   buildIdentityHeaderStripHandler,
@@ -22,6 +27,7 @@ import {
   stripCaddyPlaceholders,
   escapeHostPlaceholders,
   isReservedL4ListenAddress,
+  splitL4UpstreamHost,
 } from "./caddy-utils";
 import {
   groupHostPatternsByPriority,
@@ -48,6 +54,8 @@ import {
   getTrustedProxiesSettings,
   getHttpCacheSettings,
   getHttpProtocolsSettings,
+  getCompressionSettings,
+  getCrowdSecSettings,
   getGlobalCaddyConfigSettings,
   type HttpProtocolsSettings,
   getTailscaleSettings,
@@ -73,13 +81,14 @@ import {
   tailscaleListenAddresses,
   TAILSCALE_DEFAULT_NODE,
 } from "./caddy-tailscale";
-import type { DnsProviderCredentials } from "./dns-providers";
 import { buildDnsChallengeConfig } from "./dns-provider-credentials";
+import { partitionDnsChallenges } from "./dns-challenge-delegation";
 import { caddyAdminRequest } from "./caddy-admin";
 import { getPublicBaseUrl } from "./public-url";
 import {
   accessListEntries,
   accessListIpRules,
+  accessListDnsCache,
   accessLists,
   certificates,
   caCertificates,
@@ -128,7 +137,13 @@ import { buildRedirectRoute } from "./caddy-redirects";
 import { evictedNames, withRenewalOverrides } from "./certificate-renewals";
 import { withGlobalCaddyConfig } from "./caddy-global-config";
 import { reachabilityRoute } from "./domain-reachability";
-import { type AccessListRuntime, buildAccessListHandlers, type IpRule } from "./access-list-rules";
+import {
+  type AccessListRuntime,
+  buildAccessListHandlers,
+  expandIpRules,
+  type IpRule,
+  ipDenyMatcherSets,
+} from "./access-list-rules";
 import {
   type CaddyModuleAvailability,
   getCaddyModuleAvailability,
@@ -138,6 +153,37 @@ import {
 } from "./caddy-build";
 import { buildHttpCacheApp } from "./http-cache";
 import { buildHostCacheHandler, type HostCacheMeta, withHostCache } from "./host-cache";
+import {
+  buildEncodeHandler,
+  type CompressionSettings,
+  type HostCompressionMode,
+  isCompressionOn,
+} from "./host-compression";
+import { buildNoIndexHandlers } from "./host-robots";
+import { buildAnubisHandler, type HostAnubisMeta } from "./host-anubis";
+import {
+  buildMaintenanceHandler,
+  type HostMaintenanceMeta,
+  resolveMaintenancePage,
+  sanitizeHostMaintenance,
+} from "./host-maintenance";
+import {
+  handlerTimeoutFields,
+  type HostUpstreamTimeoutsMeta,
+  sanitizeHostUpstreamTimeouts,
+  transportTimeoutFields,
+} from "./host-upstream-timeouts";
+import { buildRateLimitHandler, type HostRateLimitMeta } from "./host-rate-limit";
+import {
+  buildAppSecHandler,
+  buildCrowdSecApp,
+  buildCrowdSecHandler,
+  crowdSecConnection,
+  crowdSecL4DenySets,
+  type HostCrowdSecMeta,
+  hostCrowdSecEnabled,
+} from "./crowdsec";
+import { isCaddyDuration } from "./caddy-duration";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import {
   FORWARD_AUTH_PORTAL_TARGET_HEADER,
@@ -305,6 +351,7 @@ type ProxyHostMeta = {
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
   upstream_dns_resolution?: UpstreamDnsResolutionMeta;
+  upstream_timeouts?: HostUpstreamTimeoutsMeta;
   geoblock?: GeoBlockSettings;
   geoblock_mode?: GeoBlockMode;
   waf?: WafHostConfig;
@@ -313,19 +360,30 @@ type ProxyHostMeta = {
   rewrite?: RewriteConfig;
   location_rules?: LocationRuleMeta[];
   cache?: HostCacheMeta;
+  compression?: HostCompressionMode;
+  discourage_indexing?: boolean;
+  maintenance?: HostMaintenanceMeta;
   path_allows?: PathAllowRule[];
   path_blocks?: PathBlockRule[];
   path_rewrites?: PathRewriteRule[];
   error_pages?: ErrorPageRule[];
+  rate_limit?: HostRateLimitMeta;
+  crowdsec?: HostCrowdSecMeta;
+  anubis?: HostAnubisMeta;
 };
 
 type L4Meta = {
+  crowdsec?: HostCrowdSecMeta;
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
   upstream_dns_resolution?: UpstreamDnsResolutionMeta;
   geoblock?: GeoBlockSettings;
   geoblock_mode?: GeoBlockMode;
+  upstream_port_mode?: "same";
 };
+
+/** Set by the `vars_regexp` matcher a `same`-mode host's routes carry; see buildL4Servers. */
+const L4_SAME_PORT_PLACEHOLDER = "{l4.regexp.lport.1}";
 
 type ProxyHostAuthentikMeta = {
   enabled?: boolean;
@@ -516,127 +574,6 @@ function resolveEffectiveUpstreamDnsResolution(
     enabled: hostSetting?.enabled ?? globalEnabled,
     family: hostSetting?.family ?? globalFamily,
   };
-}
-
-function getLookupServers(
-  dnsConfig: DnsResolverRouteConfig | null,
-  globalDnsSettings: DnsSettings | null,
-): string[] {
-  if (dnsConfig?.enabled && dnsConfig.resolvers.length > 0) {
-    const servers = [...dnsConfig.resolvers];
-    if (dnsConfig.fallbacks && dnsConfig.fallbacks.length > 0) {
-      servers.push(...dnsConfig.fallbacks);
-    }
-    return servers;
-  }
-
-  if (
-    globalDnsSettings?.enabled &&
-    Array.isArray(globalDnsSettings.resolvers) &&
-    globalDnsSettings.resolvers.length > 0
-  ) {
-    const servers = [...globalDnsSettings.resolvers];
-    if (Array.isArray(globalDnsSettings.fallbacks) && globalDnsSettings.fallbacks.length > 0) {
-      servers.push(...globalDnsSettings.fallbacks);
-    }
-    return servers;
-  }
-
-  return [];
-}
-
-function getLookupTimeoutMs(
-  dnsConfig: DnsResolverRouteConfig | null,
-  globalDnsSettings: DnsSettings | null,
-): number | null {
-  const hostTimeout = toDurationMs(dnsConfig?.timeout ?? null);
-  if (hostTimeout !== null) {
-    return hostTimeout;
-  }
-
-  if (globalDnsSettings?.enabled) {
-    const globalTimeout = toDurationMs(globalDnsSettings.timeout ?? null);
-    if (globalTimeout !== null) {
-      return globalTimeout;
-    }
-  }
-
-  return null;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number | null,
-  timeoutLabel: string,
-): Promise<T> {
-  if (!timeoutMs || timeoutMs <= 0) {
-    return promise;
-  }
-
-  let timeoutHandle: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => {
-          reject(new Error(`${timeoutLabel} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
-  }
-}
-
-async function resolveHostnameAddresses(
-  resolver: Resolver,
-  hostname: string,
-  family: UpstreamDnsAddressFamily,
-  timeoutMs: number | null,
-): Promise<string[]> {
-  // Each lookup reports its own failure so the two can run together and still join errors in
-  // AAAA-then-A order.
-  const lookup = async (
-    query: () => Promise<string[]>,
-    label: string,
-  ): Promise<{ addresses: string[]; error: string | null }> => {
-    try {
-      return { addresses: await withTimeout(query(), timeoutMs, label), error: null };
-    } catch (error) {
-      return { addresses: [], error: error instanceof Error ? error.message : String(error) };
-    }
-  };
-
-  const resolve6 = () => lookup(() => resolver.resolve6(hostname), `AAAA lookup for ${hostname}`);
-  const resolve4 = () => lookup(() => resolver.resolve4(hostname), `A lookup for ${hostname}`);
-
-  const results =
-    family === "ipv6"
-      ? [await resolve6()]
-      : family === "ipv4"
-        ? [await resolve4()]
-        : await Promise.all([resolve6(), resolve4()]);
-
-  const resolved: string[] = [];
-  const seen = new Set<string>();
-  const errors: string[] = [];
-  for (const result of results) {
-    if (result.error !== null) errors.push(result.error);
-    for (const address of result.addresses) {
-      if (!seen.has(address)) {
-        seen.add(address);
-        resolved.push(address);
-      }
-    }
-  }
-
-  if (resolved.length === 0 && errors.length > 0) {
-    throw new Error(errors.join("; "));
-  }
-
-  return resolved;
 }
 
 type ResolveUpstreamsResult = {
@@ -1007,6 +944,10 @@ type CaddyBuildContext = {
   globalUpstreamDnsResolutionSettings: UpstreamDnsResolutionSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalWaf?: WafSettings | null;
+  /** Unset means on, as on a fresh install. */
+  compression?: CompressionSettings | null;
+  /** The 503 page a maintenance host falls back to. */
+  globalErrorPages?: ErrorPageRule[];
   /** waf_presets id -> directives. */
   wafPresets?: ReadonlyMap<number, string>;
   /** crs_plugins id -> rule files. */
@@ -1018,6 +959,8 @@ type CaddyBuildContext = {
   moduleAvailability: CaddyModuleAvailability;
   /** Null outside buildCaddyDocument - callers exercising route shapes have no settings to read. */
   tailscale?: TailscaleRuntime | null;
+  /** Set only when the `crowdsec` app is in this document, so a handler never names a missing app. */
+  crowdsec?: { appsec: boolean } | null;
   /**
    * The agent this document is loaded onto, whose own Caddy adapts its Caddyfile snippets. Unset
    * only for a document no agent loads: a preview, or a controller with no agent attached.
@@ -1034,11 +977,41 @@ type CaddyBuildContext = {
   };
 };
 
+/**
+ * A reverse_proxy takes one transport, so everything that configures it is merged here. Null when
+ * Caddy's default would do.
+ */
+function buildHttpTransport(options: {
+  https: boolean;
+  skipVerify: boolean;
+  serverName?: string | null;
+  resolver?: DnsResolverRouteConfig | null;
+  timeouts?: HostUpstreamTimeoutsMeta;
+}): Record<string, unknown> | null {
+  const transport: Record<string, unknown> = { protocol: "http" };
+  if (options.https) {
+    const tls: Record<string, unknown> = options.skipVerify ? { insecure_skip_verify: true } : {};
+    if (options.serverName) tls.server_name = options.serverName;
+    transport.tls = tls;
+  }
+  const resolver = options.resolver ? buildResolverConfig(options.resolver) : null;
+  if (resolver) {
+    transport.resolver = resolver;
+    // The resolver's own timeout field has always been written here: it bounds lookup and connect.
+    // An explicit connect timeout below wins over it.
+    if (options.resolver?.timeout) transport.dial_timeout = options.resolver.timeout;
+  }
+  Object.assign(transport, transportTimeoutFields(options.timeouts));
+  return Object.keys(transport).length > 1 ? transport : null;
+}
+
 export function buildLocationReverseProxy(
   rule: LocationRuleMeta,
   skipHttpsValidation: boolean,
   preserveHostHeader: boolean,
   cacheHandler: Record<string, unknown> | null = null,
+  /** The host's: a location rule has no timeouts of its own. */
+  timeouts?: HostUpstreamTimeoutsMeta,
 ): { safePath: string; reverseProxyHandler: Record<string, unknown> } {
   const parsedTargets = rule.upstreams.map(parseUpstreamTarget);
   const hasHttps = parsedTargets.some((t) => t.scheme === "https");
@@ -1057,12 +1030,13 @@ export function buildLocationReverseProxy(
     };
   }
 
-  if (hasHttps) {
-    reverseProxyHandler.transport = {
-      protocol: "http",
-      tls: skipHttpsValidation ? { insecure_skip_verify: true } : {},
-    };
-  }
+  const transport = buildHttpTransport({
+    https: hasHttps,
+    skipVerify: skipHttpsValidation,
+    timeouts,
+  });
+  if (transport) reverseProxyHandler.transport = transport;
+  Object.assign(reverseProxyHandler, handlerTimeoutFields(timeouts));
 
   // Per-rule load balancing / health checks (mirrors the host-level config).
   const lbConfig = parseLoadBalancerConfig(rule.load_balancer);
@@ -1121,6 +1095,7 @@ function appendLocationRoutes(options: {
   extraHandlers?: Record<string, unknown>[];
   expression?: string;
   cacheHandler?: Record<string, unknown> | null;
+  upstreamTimeouts?: HostUpstreamTimeoutsMeta;
 }) {
   const {
     hostRoutes,
@@ -1132,6 +1107,7 @@ function appendLocationRoutes(options: {
     extraHandlers = [],
     expression,
     cacheHandler = null,
+    upstreamTimeouts,
   } = options;
 
   for (const rule of locationRules) {
@@ -1140,6 +1116,7 @@ function appendLocationRoutes(options: {
       skipHttpsHostnameValidation,
       preserveHostHeader,
       cacheHandler,
+      upstreamTimeouts,
     );
     if (!safePath) continue;
 
@@ -1258,6 +1235,7 @@ function appendForwardAuthPathModeRoutes(options: {
    */
   bypassHeaders?: string[];
   cacheHandler?: Record<string, unknown> | null;
+  upstreamTimeouts?: HostUpstreamTimeoutsMeta;
 }) {
   const {
     hostRoutes,
@@ -1274,6 +1252,7 @@ function appendForwardAuthPathModeRoutes(options: {
     apiAuthHandler = null,
     bypassHeaders = [],
     cacheHandler = null,
+    upstreamTimeouts,
   } = options;
 
   /**
@@ -1337,6 +1316,7 @@ function appendForwardAuthPathModeRoutes(options: {
         skipHttpsHostnameValidation,
         preserveHostHeader,
         cacheHandler,
+        upstreamTimeouts,
         handlers: baseHandlers,
       });
       hostRoutes.push({
@@ -1369,6 +1349,7 @@ function appendForwardAuthPathModeRoutes(options: {
           skipHttpsHostnameValidation,
           preserveHostHeader,
           cacheHandler,
+          upstreamTimeouts,
         );
         if (!safePath) continue;
         pushGatedRoutes({ host: domainGroup, path: [safePath] }, locationProxy);
@@ -1381,6 +1362,7 @@ function appendForwardAuthPathModeRoutes(options: {
         skipHttpsHostnameValidation,
         preserveHostHeader,
         cacheHandler,
+        upstreamTimeouts,
         handlers: baseHandlers,
         extraHandlers: [authHandler],
       });
@@ -1407,6 +1389,7 @@ function appendMtlsPathModeRoutes(options: {
   /** Full-site mode: RBAC subroutes when configured, otherwise an open catch-all. */
   buildDefaultCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
   cacheHandler?: Record<string, unknown> | null;
+  upstreamTimeouts?: HostUpstreamTimeoutsMeta;
 }) {
   const {
     hostRoutes,
@@ -1423,6 +1406,7 @@ function appendMtlsPathModeRoutes(options: {
     buildUnprotectedCatchAll,
     buildDefaultCatchAll,
     cacheHandler = null,
+    upstreamTimeouts,
   } = options;
 
   for (const domainGroup of domainGroups) {
@@ -1440,6 +1424,7 @@ function appendMtlsPathModeRoutes(options: {
         skipHttpsHostnameValidation,
         preserveHostHeader,
         cacheHandler,
+        upstreamTimeouts,
         handlers,
       });
 
@@ -1460,6 +1445,7 @@ function appendMtlsPathModeRoutes(options: {
           skipHttpsHostnameValidation,
           preserveHostHeader,
           cacheHandler,
+          upstreamTimeouts,
         );
         if (!safePath) continue;
         hostRoutes.push({
@@ -1490,6 +1476,7 @@ function appendMtlsPathModeRoutes(options: {
       skipHttpsHostnameValidation,
       preserveHostHeader,
       cacheHandler,
+      upstreamTimeouts,
       handlers,
     });
 
@@ -1523,6 +1510,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
   // the whole config.
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
+  const rateLimitUsable = isFeatureUsable(context.moduleAvailability, "ratelimit");
   // Where a forward-auth host sends an unauthenticated visitor: the Public URL, so a value stored
   // by setup is honoured. Read once; every host's portal redirect is built from the same address.
   const portalBaseUrl = await getPublicBaseUrl();
@@ -1605,19 +1593,67 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const locationRules = meta.location_rules ?? [];
     const hostRoutes: CaddyHttpRoute[] = [];
 
+    // The shared chain, pushed in order, cheapest refusals first so a request turned away never
+    // costs a Coraza transaction: ws-refuse, maintenance, encode, crowdsec, rate_limit, geoblock,
+    // appsec, WAF, headers (HSTS, X-Robots-Tag), robots.txt, Anubis, path rules, redirects, access
+    // list.
+    if (!row.allowWebsocket) {
+      handlers.push({
+        handler: "subroute",
+        routes: WEBSOCKET_ATTEMPT_MATCHERS.map((matcher) => ({
+          match: [matcher],
+          handle: [{ handler: "static_response", status_code: 403 }],
+        })),
+      });
+    }
+
+    // Never on the dashboard host: it would lock out the admin who has to turn it off. Sanitized
+    // again because one malformed bypass range would fail the config for every host.
+    const maintenance = sanitizeHostMaintenance(meta.maintenance);
+    if (maintenance?.enabled && row.id !== DASHBOARD_HOST_ID) {
+      handlers.push(
+        buildMaintenanceHandler(
+          maintenance,
+          resolveMaintenancePage(maintenance, meta.error_pages, context.globalErrorPages),
+        ),
+      );
+    }
+
+    // Wraps everything after it, so WAF refusals, auth redirects and cached responses shrink too.
+    if (isCompressionOn(context.compression, meta.compression)) {
+      handlers.push(buildEncodeHandler());
+    }
+
+    // An in-memory lookup, so the cheapest refusal of all: ahead of rate limiting too.
+    const crowdsecOn = Boolean(context.crowdsec) && hostCrowdSecEnabled(meta.crowdsec);
+    if (crowdsecOn) handlers.push(buildCrowdSecHandler());
+
+    const rateLimit = buildRateLimitHandler(row.id, meta.rate_limit);
+    if (rateLimit && rateLimitUsable) {
+      handlers.push(rateLimit);
+    } else if (rateLimit) {
+      console.warn(
+        `Skipping rate limiting on proxy host "${row.name}": the Rate Limit module is not in ` +
+          "Caddy. Enable it in Settings → Caddy Build and rebuild Caddy.",
+      );
+    }
+
     const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
       geoblock: meta.geoblock ?? null,
       geoblock_mode: meta.geoblock_mode ?? "merge",
     });
     if (effectiveGeoBlock?.enabled && geoblockUsable) {
-      handlers.unshift(buildBlockerHandler(effectiveGeoBlock));
+      handlers.push(buildBlockerHandler(effectiveGeoBlock));
     }
+
+    // A round trip to AppSec per request, so after everything that refuses from memory.
+    if (crowdsecOn && context.crowdsec?.appsec) handlers.push(buildAppSecHandler());
 
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       // WebSocket upgrades included: routing them around the WAF let any request claiming to be
       // one skip inspection (#195). coraza-caddy >= 2.6 passes the 101 hijack through.
-      handlers.unshift(
+      handlers.push(
         buildWafHandler(
           effectiveWaf,
           context.wafPresets,
@@ -1631,17 +1667,6 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       );
     }
 
-    // Ahead of the WAF, so a refused upgrade never costs a Coraza transaction.
-    if (!row.allowWebsocket) {
-      handlers.unshift({
-        handler: "subroute",
-        routes: WEBSOCKET_ATTEMPT_MATCHERS.map((matcher) => ({
-          match: [matcher],
-          handle: [{ handler: "static_response", status_code: 403 }],
-        })),
-      });
-    }
-
     if (row.hstsEnabled) {
       const value = row.hstsSubdomains ? "max-age=63072000; includeSubDomains" : "max-age=63072000";
       handlers.push({
@@ -1652,6 +1677,19 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           },
         },
       });
+    }
+
+    if (meta.discourage_indexing) {
+      handlers.push(...buildNoIndexHandlers());
+    }
+
+    // Ahead of path rewrites, whose URI would otherwise become the post-challenge redirect, and of
+    // every sign-in, so a bot never reaches an auth server. Never on the dashboard host: agents
+    // and API clients cannot solve a challenge.
+    if (meta.anubis?.enabled && row.id !== DASHBOARD_HOST_ID) {
+      const anubis = buildAnubisHandler(meta.anubis);
+      if (anubis) handlers.push(anubis);
+      else console.warn(`Skipping the bot challenge on "${row.name}": its Anubis URL is invalid.`);
     }
 
     if (row.sslForced) {
@@ -1763,6 +1801,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
     const lbConfig = parseLoadBalancerConfig(meta.load_balancer);
     const dnsConfig = parseDnsResolverConfig(meta.dns_resolver);
+    const hostTimeouts = sanitizeHostUpstreamTimeouts(meta.upstream_timeouts);
     const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
     // Pinning resolves the upstream here and writes the address into the config. Through a tailnet
     // node the name has to be resolved by MagicDNS on the other side, and this container's resolver
@@ -1798,6 +1837,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         outpostDial = authentik.outpostUpstream.replace(/^https?:\/\//, "").replace(/\/$/, "");
       }
 
+      // No base handlers run here, so nothing else strips Authorization. The outpost's start,
+      // callback and sign-out endpoints work from cookies; only its auth endpoints read the header.
       const outpostHandler: Record<string, unknown> = {
         handler: "reverse_proxy",
         upstreams: [
@@ -1805,17 +1846,15 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             dial: outpostDial,
           },
         ],
-      };
-
-      if (authentik.setOutpostHostHeader) {
-        outpostHandler.headers = {
+        headers: {
           request: {
-            set: {
-              Host: ["{http.reverse_proxy.upstream.host}"],
-            },
+            ...(authentik.setOutpostHostHeader
+              ? { set: { Host: ["{http.reverse_proxy.upstream.host}"] } }
+              : {}),
+            delete: ["Authorization"],
           },
-        };
-      }
+        },
+      };
 
       // Sanitize outpostDomain to prevent path traversal and placeholder injection
       const safeOutpostPath = stripCaddyPlaceholders(
@@ -1843,21 +1882,15 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       };
     }
 
-    if (resolvedUpstreams.hasHttpsUpstream) {
-      const tlsTransport: Record<string, unknown> = row.skipHttpsHostnameValidation
-        ? {
-            insecure_skip_verify: true,
-          }
-        : {};
-      if (resolvedUpstreams.httpsTlsServerName) {
-        tlsTransport.server_name = resolvedUpstreams.httpsTlsServerName;
-      }
-
-      reverseProxyHandler.transport = {
-        protocol: "http",
-        tls: tlsTransport,
-      };
-    }
+    const hostTransport = buildHttpTransport({
+      https: resolvedUpstreams.hasHttpsUpstream,
+      skipVerify: Boolean(row.skipHttpsHostnameValidation),
+      serverName: resolvedUpstreams.httpsTlsServerName,
+      resolver: dnsConfig,
+      timeouts: hostTimeouts,
+    });
+    if (hostTransport) reverseProxyHandler.transport = hostTransport;
+    Object.assign(reverseProxyHandler, handlerTimeoutFields(hostTimeouts));
 
     // Configure load balancing and health checks. Counted against the *resolved* upstreams, since
     // DNS pinning can expand one hostname into several dials and the weights must match what ships.
@@ -1872,26 +1905,6 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
     }
 
-    if (dnsConfig?.enabled && dnsConfig.resolvers.length > 0) {
-      const resolverConfig = buildResolverConfig(dnsConfig);
-      if (resolverConfig) {
-        // Keep the TLS settings HTTPS upstreams already have.
-        if (reverseProxyHandler.transport) {
-          (reverseProxyHandler.transport as Record<string, unknown>).resolver = resolverConfig;
-          if (dnsConfig.timeout) {
-            (reverseProxyHandler.transport as Record<string, unknown>).dial_timeout =
-              dnsConfig.timeout;
-          }
-        } else {
-          reverseProxyHandler.transport = {
-            protocol: "http",
-            resolver: resolverConfig,
-            ...(dnsConfig.timeout ? { dial_timeout: dnsConfig.timeout } : {}),
-          };
-        }
-      }
-    }
-
     // Replaces the http transport rather than extending it: the plugin's transport knows only
     // `tls`, so a resolver or dial timeout would be an unknown field failing the whole document.
     // Any non-nil TLS value means "speak https" to it.
@@ -1901,6 +1914,11 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         console.warn(
           `Ignoring the DNS resolver on host "${row.name}": its upstreams are dialled through the ` +
             `Tailscale node "${tailscale.upstreamNode}", which resolves names on the tailnet itself.`,
+        );
+      }
+      if (Object.keys(transportTimeoutFields(hostTimeouts)).length > 0) {
+        console.warn(
+          `Ignoring the upstream timeouts on host "${row.name}": the Tailscale transport takes none.`,
         );
       }
       reverseProxyHandler.transport = buildTailscaleTransport(
@@ -2022,6 +2040,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         reverseProxyHandler: hostProxyHandler,
         locationRules,
         cacheHandler: hostCacheHandler,
+        upstreamTimeouts: hostTimeouts,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
         preDomainRoute: outpostRoute,
@@ -2050,6 +2069,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         reverseProxyHandler: hostProxyHandler,
         locationRules,
         cacheHandler: hostCacheHandler,
+        upstreamTimeouts: hostTimeouts,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
       });
@@ -2175,6 +2195,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           reverseProxyHandler: hostProxyHandler,
           locationRules,
           cacheHandler: hostCacheHandler,
+          upstreamTimeouts: hostTimeouts,
           skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
           preserveHostHeader: Boolean(row.preserveHostHeader),
           preDomainRoute: cpmCallbackRoute,
@@ -2199,6 +2220,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         reverseProxyHandler: hostProxyHandler,
         locationRules,
         cacheHandler: hostCacheHandler,
+        upstreamTimeouts: hostTimeouts,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
       });
@@ -2370,6 +2392,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         authMode: mtlsPathMode,
         locationRules,
         cacheHandler: hostCacheHandler,
+        upstreamTimeouts: hostTimeouts,
         handlers,
         hostTrustedFingerprintExpression,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
@@ -2624,12 +2647,9 @@ export async function buildTlsAutomation(
   }
 
   const dnsProviderSettings = options.dnsProviderSettings;
-  const globalDnsProvider: DnsProviderCredentials | null =
+  const globalDnsProvider: string | null =
     dnsProviderSettings?.default && dnsProviderSettings.providers[dnsProviderSettings.default]
-      ? {
-          provider: dnsProviderSettings.default,
-          credentials: dnsProviderSettings.providers[dnsProviderSettings.default],
-        }
+      ? dnsProviderSettings.default
       : null;
 
   const dnsSettings = options.dnsSettings;
@@ -2693,34 +2713,61 @@ export async function buildTlsAutomation(
     }
   };
 
+  // Memoized: it warns, and every policy asks.
+  const usableProviders = new Map<string, boolean>();
+  const providerUsable = (provider: string): boolean => {
+    let usable = usableProviders.get(provider);
+    if (usable === undefined) {
+      usable = dnsProviderAllowed(provider);
+      usableProviders.set(provider, usable);
+    }
+    return usable;
+  };
+  const warnings = new Set<string>();
+
+  /** One policy per delegation partition, since `override_domain` covers a whole policy. */
+  const pushAcmePolicies = (subjects: string[], baseProvider: string | null) => {
+    const partitions = partitionDnsChallenges(
+      subjects,
+      dnsProviderSettings,
+      baseProvider,
+      providerUsable,
+      (message) => {
+        if (!warnings.has(message)) console.warn(message);
+        warnings.add(message);
+      },
+    );
+    for (const partition of partitions) {
+      const issuer: Record<string, unknown> = { module: "acme" };
+      applyAcmeOverrides(issuer);
+      if (options.acmeEmail) {
+        issuer.email = options.acmeEmail;
+      }
+      const credentials = partition.provider
+        ? dnsProviderSettings?.providers[partition.provider]
+        : undefined;
+      if (partition.provider && credentials) {
+        const dnsChallenge = buildDnsChallengeConfig(
+          partition.provider,
+          credentials,
+          dnsResolvers,
+          { overrideDomain: partition.target, acmeDnsConfig: partition.acmeDnsConfig },
+        );
+        if (dnsChallenge) {
+          issuer.challenges = { dns: dnsChallenge };
+        }
+      }
+      policies.push({ subjects: partition.subjects, issuers: [issuer] });
+    }
+  };
+
   // Add policy for auto-managed domains (certificateId = null)
   if (hasAutoManagedDomains) {
     for (const group of groupHostPatternsByPriority(Array.from(autoManagedDomains))) {
       const subjects = takeTailscaleSubjects(group);
       if (subjects.length === 0) continue;
 
-      const issuer: Record<string, unknown> = { module: "acme" };
-      applyAcmeOverrides(issuer);
-
-      if (options.acmeEmail) {
-        issuer.email = options.acmeEmail;
-      }
-
-      if (globalDnsProvider && dnsProviderAllowed(globalDnsProvider.provider)) {
-        const dnsChallenge = buildDnsChallengeConfig(
-          globalDnsProvider.provider,
-          globalDnsProvider.credentials,
-          dnsResolvers,
-        );
-        if (dnsChallenge) {
-          issuer.challenges = { dns: dnsChallenge };
-        }
-      }
-
-      policies.push({
-        subjects,
-        issuers: [issuer],
-      });
+      pushAcmePolicies(subjects, globalDnsProvider);
     }
   }
 
@@ -2735,38 +2782,13 @@ export async function buildTlsAutomation(
     let effectiveProvider = globalDnsProvider;
     const certOptions = entry.certificate.providerOptions as { provider?: string } | null;
     if (certOptions?.provider && dnsProviderSettings?.providers[certOptions.provider]) {
-      effectiveProvider = {
-        provider: certOptions.provider,
-        credentials: dnsProviderSettings.providers[certOptions.provider],
-      };
+      effectiveProvider = certOptions.provider;
     }
 
     for (const group of groupHostPatternsByPriority(subjects)) {
       const subjectGroup = takeTailscaleSubjects(group);
       if (subjectGroup.length === 0) continue;
-
-      const issuer: Record<string, unknown> = { module: "acme" };
-      applyAcmeOverrides(issuer);
-
-      if (options.acmeEmail) {
-        issuer.email = options.acmeEmail;
-      }
-
-      if (effectiveProvider && dnsProviderAllowed(effectiveProvider.provider)) {
-        const dnsChallenge = buildDnsChallengeConfig(
-          effectiveProvider.provider,
-          effectiveProvider.credentials,
-          dnsResolvers,
-        );
-        if (dnsChallenge) {
-          issuer.challenges = { dns: dnsChallenge };
-        }
-      }
-
-      policies.push({
-        subjects: subjectGroup,
-        issuers: [issuer],
-      });
+      pushAcmePolicies(subjectGroup, effectiveProvider);
     }
   }
 
@@ -2789,11 +2811,50 @@ export async function buildTlsAutomation(
 
 type L4BuildContext = Pick<
   CaddyBuildContext,
+  | "accessLists"
   | "globalDnsSettings"
   | "globalUpstreamDnsResolutionSettings"
   | "globalGeoBlock"
   | "moduleAvailability"
+  | "crowdsec"
 >;
+
+/**
+ * One L4 host's routes: its guards (each closes the connection) and then the proxy. With PROXY
+ * protocol received, everything runs in a subroute after `proxy_protocol`, because only the
+ * connection it wraps carries the client's address - a guard ahead of it would see the load
+ * balancer's.
+ */
+function l4HostRoutes(
+  hostMatch: Record<string, unknown> | undefined,
+  guards: Record<string, unknown>[][],
+  proxyHandlers: Record<string, unknown>[],
+  proxyProtocolReceive: boolean,
+): Record<string, unknown>[] {
+  const close = [{ handler: "close" }];
+  const matchHost = hostMatch ? { match: [hostMatch] } : {};
+  // No sets means every connection. Not `match: [{}]`: caddy-l4 never matches an empty set.
+  const guard = (sets: Record<string, unknown>[], host: Record<string, unknown> | undefined) => {
+    if (sets.length === 0) return { ...(host ? { match: [host] } : {}), handle: close };
+    return { match: host ? sets.map((set) => ({ ...set, ...host })) : sets, handle: close };
+  };
+
+  if (!proxyProtocolReceive) {
+    return [
+      ...guards.map((sets) => guard(sets, hostMatch)),
+      { ...matchHost, handle: proxyHandlers },
+    ];
+  }
+  const inner = guards.map((sets) => guard(sets, undefined));
+  const handle =
+    inner.length === 0
+      ? [{ handler: "proxy_protocol" }, ...proxyHandlers]
+      : [
+          { handler: "proxy_protocol" },
+          { handler: "subroute", routes: [...inner, { handle: proxyHandlers }] },
+        ];
+  return [{ ...matchHost, handle }];
+}
 
 async function buildL4Servers(
   context: L4BuildContext,
@@ -2823,35 +2884,47 @@ async function buildL4Servers(
 
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
 
-  // Group hosts by listen address - multiple hosts on the same port share routes in one server
+  // Hosts on one listen address share a server's routes. Keyed on the protocol too: a TCP and a
+  // UDP host on the same port are two listeners.
   const serverMap = new Map<string, typeof l4Hosts>();
   for (const host of l4Hosts) {
-    const key = host.listenAddress;
+    const key = `${host.protocol}/${host.listenAddress}`;
     if (!serverMap.has(key)) serverMap.set(key, []);
     serverMap.get(key)!.push(host);
   }
 
   const servers: Record<string, unknown> = {};
   let serverIdx = 0;
-  for (const [listenAddr, hosts] of serverMap) {
+  for (const hosts of serverMap.values()) {
+    const listenAddr = hosts[0].listenAddress;
     const routes: Record<string, unknown>[] = [];
 
     for (const host of hosts) {
-      const route: Record<string, unknown> = {};
-
       const matcherType = host.matcherType as string;
       const matcherValues = host.matcherValue ? parseJson<string[]>(host.matcherValue, []) : [];
 
+      // Undefined for "none", a catch-all.
+      let hostMatch: Record<string, unknown> | undefined;
       if (matcherType === "tls_sni" && matcherValues.length > 0) {
-        route.match = [{ tls: { sni: matcherValues } }];
+        hostMatch = { tls: { sni: matcherValues } };
       } else if (matcherType === "http_host" && matcherValues.length > 0) {
-        route.match = [{ http: [{ host: matcherValues }] }];
+        hostMatch = { http: [{ host: matcherValues }] };
       } else if (matcherType === "proxy_protocol") {
-        route.match = [{ proxy_protocol: {} }];
+        hostMatch = { proxy_protocol: {} };
       }
-      // "none" = no match block (catch-all)
 
       const meta = parseJson<L4Meta>(host.meta, {});
+      const samePort = meta.upstream_port_mode === "same";
+      if (samePort) {
+        // Always matches; it is here for the capture. local_addr is the listener's, so a PROXY
+        // protocol header cannot steer the dial to another port.
+        hostMatch = {
+          ...hostMatch,
+          vars_regexp: {
+            "{l4.conn.local_addr}": { name: "lport", pattern: ":(\\d+)$" },
+          },
+        };
+      }
 
       const lbMeta = meta.load_balancer;
       let lbConfig: LoadBalancerRouteConfig | null = null;
@@ -2870,25 +2943,27 @@ async function buildL4Servers(
           tryDuration: lbMeta.try_duration ?? null,
           tryInterval: lbMeta.try_interval ?? null,
           retries: lbMeta.retries ?? null,
-          activeHealthCheck: lbMeta.active_health_check?.enabled
-            ? {
-                enabled: true,
-                uri: null,
-                port: lbMeta.active_health_check.port ?? null,
-                interval: lbMeta.active_health_check.interval ?? null,
-                timeout: lbMeta.active_health_check.timeout ?? null,
-                status: null,
-                body: null,
-                passes: lbMeta.active_health_check.passes ?? null,
-                fails: lbMeta.active_health_check.fails ?? null,
-                // No HTTP probe at layer 4 - the check is a dial, so there is no method, body,
-                // redirect to follow or header to send.
-                method: null,
-                requestBody: null,
-                followRedirects: false,
-                headers: null,
-              }
-            : null,
+          // Refused on save in `same` mode: the probe would dial an unexpanded placeholder.
+          activeHealthCheck:
+            lbMeta.active_health_check?.enabled && !samePort
+              ? {
+                  enabled: true,
+                  uri: null,
+                  port: lbMeta.active_health_check.port ?? null,
+                  interval: lbMeta.active_health_check.interval ?? null,
+                  timeout: lbMeta.active_health_check.timeout ?? null,
+                  status: null,
+                  body: null,
+                  passes: lbMeta.active_health_check.passes ?? null,
+                  fails: lbMeta.active_health_check.fails ?? null,
+                  // No HTTP probe at layer 4 - the check is a dial, so there is no method, body,
+                  // redirect to follow or header to send.
+                  method: null,
+                  requestBody: null,
+                  followRedirects: false,
+                  headers: null,
+                }
+              : null,
           passiveHealthCheck: lbMeta.passive_health_check?.enabled
             ? {
                 enabled: true,
@@ -2912,15 +2987,16 @@ async function buildL4Servers(
 
       const handlers: Record<string, unknown>[] = [];
 
-      if (host.proxyProtocolReceive) {
-        handlers.push({ handler: "proxy_protocol" });
-      }
-
       if (host.tlsTermination) {
         handlers.push({ handler: "tls" });
       }
 
-      const upstreams = parseJson<string[]>(host.upstreams, []);
+      // In `same` mode an upstream is a bare host, given the port of the listener that accepted.
+      const upstreams = parseJson<string[]>(host.upstreams, []).map((upstream) => {
+        if (!samePort) return upstream;
+        const bare = splitL4UpstreamHost(upstream);
+        return bare === null ? upstream : formatDialAddress(bare, L4_SAME_PORT_PLACEHOLDER);
+      });
 
       let resolvedDials = upstreams;
       if (effectiveDnsResolution.enabled) {
@@ -2982,32 +3058,33 @@ async function buildL4Servers(
       }
       handlers.push(proxyHandler);
 
-      route.handle = handlers;
-
-      // Geo blocking: a blocking route BEFORE the proxy route. At L4 the blocker is a matcher
-      // (layer4.matchers.blocker) - blocked connections match this route and are closed, the
-      // rest fall through to the proxy route.
+      // Routes that close the connection before it is proxied: each a list of matcher sets, any
+      // one matching, where an empty list matches everything.
+      const guards: Record<string, unknown>[][] = [];
+      if (host.accessListId != null) {
+        const list = context.accessLists.get(host.accessListId);
+        if (!list || list.ipRules.length === 0) {
+          // Deleted mid-build, or no rules left to admit by: fail closed, as HTTP does.
+          guards.push([]);
+        } else {
+          const denySets = ipDenyMatcherSets(list, "remote_ip");
+          // Only allow rules over a default of allow deny nobody.
+          if (denySets.length > 0) guards.push(denySets);
+        }
+      }
       const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
         geoblock: meta.geoblock ?? null,
         geoblock_mode: meta.geoblock_mode ?? "merge",
       });
       if (effectiveGeoBlock && geoblockUsable) {
-        const blockerMatcher = buildGeoBlockMatcher(effectiveGeoBlock);
-
-        // Build the same route matcher as the proxy route (if any)
-        const blockRoute: Record<string, unknown> = {
-          match: [
-            {
-              blocker: blockerMatcher,
-              ...(route.match ? (route.match as Record<string, unknown>[])[0] : {}),
-            },
-          ],
-          handle: [{ handler: "close" }],
-        };
-        routes.push(blockRoute);
+        // At L4 the blocker is a matcher (layer4.matchers.blocker), not a handler.
+        guards.push([{ blocker: buildGeoBlockMatcher(effectiveGeoBlock) }]);
+      }
+      if (context.crowdsec && hostCrowdSecEnabled(meta.crowdsec)) {
+        guards.push(crowdSecL4DenySets());
       }
 
-      routes.push(route);
+      routes.push(...l4HostRoutes(hostMatch, guards, handlers, host.proxyProtocolReceive));
     }
 
     // Protocol comes from the hosts on this listen address; all of them must agree.
@@ -3030,10 +3107,27 @@ async function buildL4Servers(
  * its own binary's modules. Omitted, nothing is filtered and the gate uses the fleet-wide
  * intersection. `options.adaptVia` must be the agent this document is loaded onto.
  */
+/**
+ * Whether this document's agent runs the managed containers. Imported late: the agent modules
+ * import this one. No agent (a preview, or the direct transport) answers yes, as they do.
+ */
+async function runsManagedServices(agentRowId: number | undefined): Promise<boolean> {
+  if (agentRowId === undefined) return true;
+  const { runsControllerServices } = await import("./agent/managed-services");
+  return runsControllerServices(agentRowId);
+}
+
 export async function buildCaddyDocument(
   agentRowId?: number,
-  /** `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands. */
-  options: { adaptVia?: string; globalCaddyfile?: string } = {},
+  /**
+   * `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands.
+   * `includeAgentFileCertificates` is for a document never loaded anywhere, such as a diff.
+   */
+  options: {
+    adaptVia?: string;
+    globalCaddyfile?: string;
+    includeAgentFileCertificates?: boolean;
+  } = {},
 ) {
   const [
     proxyHostRecords,
@@ -3041,6 +3135,7 @@ export async function buildCaddyDocument(
     accessListEntryRecords,
     accessListRecords,
     accessListIpRuleRecords,
+    accessListDnsRecords,
     caCertRows,
     issuedClientCertRows,
     allIssuedCaCertIds,
@@ -3076,6 +3171,8 @@ export async function buildCaddyDocument(
         privateKeyPem: certificates.privateKeyPem,
         autoRenew: certificates.autoRenew,
         providerOptions: certificates.providerOptions,
+        source: certificates.source,
+        sourceAgentId: certificates.sourceAgentId,
       })
       .from(certificates),
     db
@@ -3098,9 +3195,16 @@ export async function buildCaddyDocument(
         accessListId: accessListIpRules.accessListId,
         action: accessListIpRules.action,
         cidr: accessListIpRules.cidr,
+        hostname: accessListIpRules.hostname,
       })
       .from(accessListIpRules)
       .orderBy(asc(accessListIpRules.accessListId), asc(accessListIpRules.sortOrder)),
+    db
+      .select({
+        hostname: accessListDnsCache.hostname,
+        addresses: accessListDnsCache.addresses,
+      })
+      .from(accessListDnsCache),
     db
       .select({
         id: caCertificates.id,
@@ -3167,7 +3271,16 @@ export async function buildCaddyDocument(
     ? [dashboardRow, ...storedHostRows]
     : storedHostRows;
 
-  const certRowsMapped: CertificateRow[] = certRows.map((c: (typeof certRows)[0]) => ({
+  // A file certificate's key goes to the agent that read it and no other; a host using it
+  // elsewhere finds no certificate and is left out, as with one that was deleted. Unscoped is the
+  // direct transport's Caddy, which is no agent's.
+  const servedCertRows = options.includeAgentFileCertificates
+    ? certRows
+    : certRows.filter(
+        (c) =>
+          c.source !== "agent-file" || (agentRowId !== undefined && c.sourceAgentId === agentRowId),
+      );
+  const certRowsMapped: CertificateRow[] = servedCertRows.map((c: (typeof certRows)[0]) => ({
     id: c.id,
     name: c.name,
     type: c.type as "managed" | "imported",
@@ -3324,7 +3437,9 @@ export async function buildCaddyDocument(
     metricsSettings,
     loggingSettings,
     httpProtocols,
+    compressionSettings,
     httpCacheSettings,
+    crowdsecSettings,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3344,11 +3459,35 @@ export async function buildCaddyDocument(
     getMetricsSettings(),
     getLoggingSettings(),
     getHttpProtocolsSettings(),
+    getCompressionSettings(),
     // Read only for a binary that can load it, still alongside the rest.
     moduleAvailabilityRead.then((availability) =>
       isFeatureUsable(availability, "cache") ? getHttpCacheSettings() : null,
     ),
+    getCrowdSecSettings(),
   ]);
+
+  // The app carries the bouncer key, so it goes only to a binary that can load it.
+  const crowdsec = crowdSecConnection(
+    crowdsecSettings,
+    crowdsecSettings.mode !== "managed" || (await runsManagedServices(agentRowId)),
+  );
+  const crowdsecUsable = crowdsec !== null && isFeatureUsable(moduleAvailability, "crowdsec");
+  if (crowdsec && !crowdsecUsable) {
+    console.warn(
+      "CrowdSec is enabled in settings but its Caddy module is not in the running binary. " +
+        "Enable it in Settings → Caddy Build and rebuild Caddy.",
+    );
+  }
+  const crowdsecApp =
+    crowdsec && crowdsecUsable
+      ? {
+          crowdsec: buildCrowdSecApp(
+            crowdsec,
+            decryptSecret(crowdsec.apiKey, "CrowdSec bouncer key"),
+          ),
+        }
+      : {};
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
   // answer. "Enabled but not usable" is worth saying out loud: the operator turned Tailscale on,
@@ -3415,15 +3554,20 @@ export async function buildCaddyDocument(
   });
 
   // Grouped once; the query already orders each list's rules.
-  const ipRulesByList = new Map<number, IpRule[]>();
+  const ipRulesByList = new Map<number, Pick<IpRule, "action" | "cidr" | "hostname">[]>();
   for (const rule of accessListIpRuleRecords) {
     const rules = ipRulesByList.get(rule.accessListId) ?? [];
     rules.push({
       action: rule.action === "allow" ? "allow" : "deny",
       cidr: rule.cidr,
-      note: null,
+      hostname: rule.hostname,
     });
     ipRulesByList.set(rule.accessListId, rules);
+  }
+  const resolvedHostnames = new Map<string, string[]>();
+  for (const entry of accessListDnsRecords) {
+    const addresses = parseJson<unknown>(entry.addresses, []);
+    if (Array.isArray(addresses)) resolvedHostnames.set(entry.hostname, addresses.map(String));
   }
 
   const caddyBuildContext: CaddyBuildContext = {
@@ -3433,7 +3577,9 @@ export async function buildCaddyDocument(
         list.id,
         {
           accounts: accessMap.get(list.id) ?? [],
-          ipRules: ipRulesByList.get(list.id) ?? [],
+          ipRules: expandIpRules(ipRulesByList.get(list.id) ?? [], (name) =>
+            resolvedHostnames.get(name),
+          ),
           ipDefault: list.ipDefault === "allow" ? ("allow" as const) : ("deny" as const),
           satisfy: list.satisfy === "any" ? ("any" as const) : ("all" as const),
           passAuth: list.passAuth,
@@ -3445,10 +3591,13 @@ export async function buildCaddyDocument(
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
+    compression: compressionSettings,
+    globalErrorPages: globalErrorPages?.rules ?? [],
     wafPresets,
     crsPlugins: crsPluginRules,
     moduleAvailability,
     tailscale: tailscaleRuntime,
+    crowdsec: crowdsec && crowdsecUsable ? { appsec: Boolean(crowdsec.appsecUrl) } : null,
     adaptVia: options.adaptVia,
     mtlsRbac: {
       roleFingerprintMap,
@@ -3468,10 +3617,12 @@ export async function buildCaddyDocument(
     buildProxyRoutes(caddyBuildContext),
     buildL4Servers(
       {
+        accessLists: caddyBuildContext.accessLists,
         globalDnsSettings: dnsSettings,
         globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
         globalGeoBlock: effectiveGlobalGeoBlock,
         moduleAvailability,
+        crowdsec: caddyBuildContext.crowdsec,
       },
       agentRowId,
     ),
@@ -3495,8 +3646,11 @@ export async function buildCaddyDocument(
   const metricsEnabled = metricsSettings?.enabled ?? false;
   const metricsPort = metricsSettings?.port ?? 9090;
 
-  const loggingEnabled = loggingSettings?.enabled ?? false;
-  const loggingFormat = loggingSettings?.format ?? "json";
+  // The managed container's only input is this log, and its parser reads JSON alone. Forced even
+  // without the module: the container runs regardless, and a later rebuild should find it fed.
+  const crowdsecReadsLog = crowdsec?.managed === true;
+  const loggingEnabled = crowdsecReadsLog || (loggingSettings?.enabled ?? false);
+  const loggingFormat = crowdsecReadsLog ? "json" : (loggingSettings?.format ?? "json");
 
   const servers: Record<string, unknown> = {};
 
@@ -3622,6 +3776,7 @@ export async function buildCaddyDocument(
       ...l4App,
       ...tailscaleApp,
       ...cacheApp,
+      ...crowdsecApp,
     },
   };
   const globalCaddyfile =
@@ -4269,13 +4424,6 @@ function buildLoadBalancingConfig(
   return Object.keys(loadBalancing).length > 0 ? loadBalancing : null;
 }
 
-type DnsResolverRouteConfig = {
-  enabled: boolean;
-  resolvers: string[];
-  fallbacks: string[] | null;
-  timeout: string | null;
-};
-
 function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string, unknown> | null {
   const healthChecks: Record<string, unknown> = {};
 
@@ -4377,7 +4525,9 @@ function parseDnsResolverConfig(
     ? meta.fallbacks.map((r) => (typeof r === "string" ? r.trim() : "")).filter((r) => r.length > 0)
     : null;
 
-  const timeout = typeof meta.timeout === "string" ? meta.timeout.trim() || null : null;
+  // Saved before it was validated; anything else would fail the whole document at Caddy.
+  const rawTimeout = typeof meta.timeout === "string" ? meta.timeout.trim() : "";
+  const timeout = isCaddyDuration(rawTimeout) ? rawTimeout : null;
 
   return {
     enabled: true,

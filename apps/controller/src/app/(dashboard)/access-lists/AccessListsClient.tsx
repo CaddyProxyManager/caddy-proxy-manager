@@ -473,7 +473,11 @@ function SettingsTab({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deleteAccessListAction(list.id);
+      const result = await deleteAccessListAction(list.id);
+      if (!result.success) {
+        toast.error(result.error ?? t("deleteFailed"));
+        return;
+      }
       toast.success(t("deletedToast", { name: list.name }));
       onDeleted();
     } finally {
@@ -626,11 +630,17 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
       <List hasDividers>
         {hosts.map((h) => (
           <ListItem
-            key={h.id}
-            startContent={<Icon icon={Globe} size="sm" color="secondary" />}
-            label={h.domains[0] ?? h.name}
+            key={`${h.kind}-${h.id}`}
+            startContent={
+              <Icon icon={h.kind === "l4" ? Network : Globe} size="sm" color="secondary" />
+            }
+            label={h.kind === "l4" ? h.name : (h.domains[0] ?? h.name)}
             description={
-              h.domains.length > 1 ? t("moreDomains", { count: h.domains.length - 1 }) : undefined
+              h.kind === "l4"
+                ? t("l4HostUsage", { listen: h.domains[0] ?? "" })
+                : h.domains.length > 1
+                  ? t("moreDomains", { count: h.domains.length - 1 })
+                  : undefined
             }
             endContent={
               <Badge

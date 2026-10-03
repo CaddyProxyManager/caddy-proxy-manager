@@ -44,6 +44,18 @@ describe('assertWildcardIssuable', () => {
     await expect(assertWildcardIssuable(['*.example.com'], null)).resolves.toBeUndefined();
   });
 
+  it('allows a wildcard a delegation covers with its own provider, and no default', async () => {
+    mockGetDnsProviderSettings.mockResolvedValue({
+      providers: { acmedns: {} },
+      default: null,
+      delegations: [{ domain: 'example.com', provider: 'acmedns' }],
+    });
+    await expect(assertWildcardIssuable(['*.example.com'], null)).resolves.toBeUndefined();
+    await expect(assertWildcardIssuable(['*.example.org'], null)).rejects.toMatchObject({
+      code: 'wildcardDomainNeedsDnsProvider',
+    });
+  });
+
   it('skips the check entirely for non-wildcard domains', async () => {
     await assertWildcardIssuable(['app.example.com', 'example.com'], null);
     expect(mockGetDnsProviderSettings).not.toHaveBeenCalled();

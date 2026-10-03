@@ -308,6 +308,37 @@ const spec = {
       },
     },
 
+    "/api/v1/proxy-hosts/bulk": {
+      post: {
+        tags: ["Proxy Hosts"],
+        summary: "Change many proxy hosts at once",
+        description:
+          "All or nothing: an unknown id or an invalid target refuses the whole batch and changes nothing. One audit row per host, then one Caddy apply.",
+        operationId: "bulkProxyHosts",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ProxyHostBulkInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Every host changed",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BulkResult" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
     // ── L4 Proxy Hosts ──────────────────────────────────────────────
     "/api/v1/l4-proxy-hosts": {
       get: {
@@ -414,6 +445,36 @@ const spec = {
       },
     },
 
+    "/api/v1/l4-proxy-hosts/bulk": {
+      post: {
+        tags: ["L4 Proxy Hosts"],
+        summary: "Change many L4 proxy hosts at once",
+        description: "All or nothing, as for proxy hosts.",
+        operationId: "bulkL4ProxyHosts",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/L4ProxyHostBulkInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Every host changed",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BulkResult" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
     // ── Certificates ────────────────────────────────────────────────
     "/api/v1/certificates": {
       get: {
@@ -438,12 +499,19 @@ const spec = {
       post: {
         tags: ["Certificates"],
         summary: "Create a certificate",
+        description:
+          "With `source: agent-file` the agent reads the two files first, and the certificate is created only if they parse and the key matches. Its names come from the certificate's SANs.",
         operationId: "createCertificate",
         requestBody: {
           required: true,
           content: {
             "application/json": {
-              schema: { $ref: "#/components/schemas/CertificateInput" },
+              schema: {
+                oneOf: [
+                  { $ref: "#/components/schemas/CertificateInput" },
+                  { $ref: "#/components/schemas/AgentFileCertificateInput" },
+                ],
+              },
             },
           },
         },
@@ -510,12 +578,37 @@ const spec = {
       delete: {
         tags: ["Certificates"],
         summary: "Delete a certificate",
+        description: "Refused with 409 while a proxy host or the dashboard host uses it.",
         operationId: "deleteCertificate",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "A host still uses the certificate" },
+        },
+      },
+    },
+    "/api/v1/certificates/{id}/reread": {
+      post: {
+        tags: ["Certificates"],
+        summary: "Read a file certificate again now",
+        description:
+          "Only for a certificate with `source: agent-file`. A failed read is recorded in `sourceError`, and the last good certificate keeps serving.",
+        operationId: "rereadCertificate",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "The certificate after the read",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Certificate" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "The source agent is not connected" },
         },
       },
     },
@@ -801,12 +894,15 @@ const spec = {
       delete: {
         tags: ["Access Lists"],
         summary: "Delete an access list",
+        description:
+          "Refused with 409 while a proxy host, one of its location rules, an L4 host, or the dashboard host uses it.",
         operationId: "deleteAccessList",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "A host still uses the access list" },
         },
       },
     },
@@ -904,7 +1000,7 @@ const spec = {
         tags: ["Access Lists"],
         summary: "Replace an access list's IP rules",
         description:
-          "The array sent becomes the whole set, in its order. An empty array removes every rule.",
+          "The array sent becomes the whole set, in its order. An empty array removes every rule, and is refused with 409 while an L4 host uses the list. A hostname no cached answer knows is looked up before the response, for up to 3 seconds; a slower one is left to the background refresh.",
         operationId: "setAccessListIpRules",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         requestBody: {
@@ -927,6 +1023,9 @@ const spec = {
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { $ref: "#/components/responses/NotFound" },
+          "409": {
+            description: "An L4 host uses the list, and emptying it would close every connection",
+          },
         },
       },
     },
@@ -991,6 +1090,7 @@ const spec = {
                     { $ref: "#/components/schemas/DefaultResponseSettings" },
                     { $ref: "#/components/schemas/TailscaleSettingsStatus" },
                     { $ref: "#/components/schemas/HttpCacheSettingsStatus" },
+                    { $ref: "#/components/schemas/CrowdSecSettingsStatus" },
                   ],
                 },
               },
@@ -1034,6 +1134,7 @@ const spec = {
                   { $ref: "#/components/schemas/DefaultResponseSettings" },
                   { $ref: "#/components/schemas/TailscaleSettings" },
                   { $ref: "#/components/schemas/HttpCacheSettings" },
+                  { $ref: "#/components/schemas/CrowdSecSettings" },
                 ],
               },
             },
@@ -2281,6 +2382,56 @@ const spec = {
         properties: { error: { type: "string" } },
         required: ["error"],
       },
+      ProxyHostBulkInput: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: [
+              "enable",
+              "disable",
+              "delete",
+              "maintenanceOn",
+              "maintenanceOff",
+              "setCertificate",
+              "setAccessList",
+            ],
+          },
+          ids: {
+            type: "array",
+            items: { type: "integer" },
+            minItems: 1,
+            maxItems: 500,
+          },
+          certificateId: {
+            type: ["integer", "null"],
+            description: "Required with setCertificate; null is automatic (ACME).",
+          },
+          accessListId: {
+            type: ["integer", "null"],
+            description: "Required with setAccessList; null removes it.",
+          },
+        },
+        required: ["action", "ids"],
+      },
+      L4ProxyHostBulkInput: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["enable", "disable", "delete"] },
+          ids: {
+            type: "array",
+            items: { type: "integer" },
+            minItems: 1,
+            maxItems: 500,
+          },
+        },
+        required: ["action", "ids"],
+      },
+      BulkResult: {
+        type: "object",
+        properties: { count: { type: "integer" } },
+        required: ["count"],
+      },
       Token: {
         type: "object",
         properties: {
@@ -2430,7 +2581,11 @@ const spec = {
           enabled: { type: "boolean" },
           resolvers: { type: "array", items: { type: "string" }, example: ["1.1.1.1", "9.9.9.9"] },
           fallbacks: { type: ["array", "null"], items: { type: "string" } },
-          timeout: { type: ["string", "null"], example: "5s" },
+          timeout: {
+            type: ["string", "null"],
+            example: "5s",
+            description: "A Caddy duration. On a proxy host it bounds lookup and connect together",
+          },
         },
       },
       UpstreamDnsResolutionConfig: {
@@ -2777,6 +2932,75 @@ const spec = {
           "HttpCacheSettings with redis.hasPassword and cdn.hasApiKey in place of the secrets",
         allOf: [{ $ref: "#/components/schemas/HttpCacheSettings" }],
       },
+      CrowdSecSettings: {
+        type: "object",
+        description:
+          "The CrowdSec Local API every proxy host and L4 host checks clients against. Needs the opt-in caddy-crowdsec-bouncer module; without it nothing is checked",
+        properties: {
+          enabled: { type: "boolean" },
+          mode: {
+            type: "string",
+            enum: ["external", "managed"],
+            description:
+              "external: the apiUrl and apiKey below. managed: a crowdsec container the bundled agent runs, with a bouncer key the controller generates and never returns; hosts on other agents are then not checked. Omitted means external",
+          },
+          onlineApi: {
+            type: "boolean",
+            description:
+              "Managed only: register with CrowdSec's Central API, sharing signals for the community blocklist. Defaults to false",
+          },
+          managedAppsec: {
+            type: "boolean",
+            description:
+              "Managed only: send every HTTP request to the container's AppSec component",
+          },
+          apiUrl: {
+            type: "string",
+            description: "Local API base URL. Plain http only for a private address",
+            example: "http://crowdsec:8080",
+          },
+          apiKey: {
+            type: "string",
+            writeOnly: true,
+            description:
+              "Bouncer key from `cscli bouncers add`. Stored encrypted and never returned. Omitted or empty keeps the stored key, but only while apiUrl and appsecUrl are unchanged",
+          },
+          appsecUrl: {
+            type: "string",
+            description: "AppSec component URL; empty leaves AppSec off",
+            example: "http://crowdsec:7422",
+          },
+          appsecFailOpen: {
+            type: "boolean",
+            description: "Let requests through while AppSec is unavailable. Defaults to false",
+          },
+          tickerInterval: {
+            type: "string",
+            description: "Go duration between decision pulls, 1s to 24h",
+            example: "60s",
+          },
+        },
+        required: ["enabled"],
+      },
+      CrowdSecSettingsStatus: {
+        type: "object",
+        description: "CrowdSec settings as returned by GET, with the bouncer key withheld",
+        properties: {
+          enabled: { type: "boolean" },
+          mode: { type: "string", enum: ["external", "managed"] },
+          onlineApi: { type: "boolean" },
+          managedAppsec: { type: "boolean" },
+          apiUrl: { type: "string" },
+          hasApiKey: {
+            type: "boolean",
+            description:
+              "Whether an external bouncer key is stored. The managed one is never reported",
+          },
+          appsecUrl: { type: "string" },
+          appsecFailOpen: { type: "boolean" },
+          tickerInterval: { type: "string" },
+        },
+      },
       TailscaleSettingsStatus: {
         type: "object",
         description: "Tailscale settings as returned by GET, with the auth key withheld",
@@ -2812,6 +3036,115 @@ const spec = {
           },
         },
         required: ["from", "to", "status"],
+      },
+      HostMaintenanceConfig: {
+        type: "object",
+        description:
+          "Maintenance mode: a 503 for every client outside bypassCidrs, ahead of everything else on the host. Kept while off",
+        properties: {
+          enabled: { type: "boolean" },
+          retryAfter: {
+            oneOf: [{ type: "integer", minimum: 1, maximum: 604800 }, { type: "null" }],
+            description: "Seconds, sent as Retry-After",
+          },
+          bypassCidrs: {
+            type: "array",
+            maxItems: 100,
+            items: { type: "string", example: "203.0.113.0/24" },
+          },
+          body: {
+            oneOf: [{ type: "string", maxLength: 65536 }, { type: "null" }],
+            description:
+              "HTML page; null uses the host's 503 error page, then the global one, then a built-in page",
+          },
+        },
+        required: ["enabled"],
+      },
+      HostUpstreamTimeoutsConfig: {
+        type: "object",
+        description:
+          "Caddy durations (30s, 1m30s, 2h, 1d); null or omitted keeps Caddy's default. Replaced as a whole. Location rules inherit them; a Tailscale upstream node takes only the stream pair",
+        properties: {
+          dialTimeout: { type: ["string", "null"], example: "5s" },
+          responseHeaderTimeout: { type: ["string", "null"] },
+          readTimeout: { type: ["string", "null"] },
+          writeTimeout: { type: ["string", "null"] },
+          keepAliveIdleTimeout: { type: ["string", "null"] },
+          streamTimeout: {
+            type: ["string", "null"],
+            description: "Closes WebSockets and other upgraded connections after this long",
+          },
+          streamCloseDelay: {
+            type: ["string", "null"],
+            description: "How long upgraded connections survive a config reload",
+          },
+        },
+      },
+      HostRateLimitConfig: {
+        type: "object",
+        description:
+          "Per-client request limits, answered with 429 and Retry-After. Needs the opt-in caddy-ratelimit module; without it the host is served unlimited. Zones are replaced as a whole and kept while disabled",
+        properties: {
+          enabled: { type: "boolean" },
+          zones: {
+            type: "array",
+            maxItems: 20,
+            items: {
+              type: "object",
+              properties: {
+                paths: {
+                  type: "array",
+                  maxItems: 50,
+                  items: { type: "string" },
+                  description: "Caddy path matchers; empty covers every request",
+                  example: ["/login", "/api/*"],
+                },
+                maxEvents: { type: "integer", minimum: 1, maximum: 1000000, example: 100 },
+                window: {
+                  type: "string",
+                  description: "A Caddy duration above zero",
+                  example: "1m",
+                },
+                key: {
+                  type: "string",
+                  enum: ["ip", "ip+path"],
+                  description: "Count per client IP, or per client IP and path",
+                },
+                ipv6Prefix: {
+                  type: ["integer", "null"],
+                  minimum: 1,
+                  maximum: 128,
+                  description: "Counts a whole IPv6 prefix as one client; ignored for ip+path",
+                  example: 64,
+                },
+              },
+              required: ["maxEvents", "window"],
+            },
+          },
+        },
+        required: ["enabled", "zones"],
+      },
+      HostAnubisConfig: {
+        type: "object",
+        description:
+          "A proof-of-work bot challenge from an Anubis instance you run in subrequest mode (TARGET set to a space). Checked after geo blocking and the WAF and before any sign-in; /.within.website/* is proxied to Anubis. Kept while disabled. Ignored on the dashboard host",
+        properties: {
+          enabled: { type: "boolean" },
+          upstream: {
+            type: ["string", "null"],
+            description: "Anubis's http or https base URL; required to enable it",
+            example: "http://anubis:8923",
+          },
+          exemptPaths: {
+            type: "array",
+            maxItems: 50,
+            items: { type: "string" },
+            description:
+              "Caddy path matchers that skip the challenge, for API clients and webhooks",
+            example: ["/api/*"],
+          },
+        },
+        required: ["enabled"],
       },
       HostCacheConfig: {
         type: "object",
@@ -3036,6 +3369,33 @@ const spec = {
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
           cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
+          compression: {
+            type: "string",
+            enum: ["inherit", "on", "off"],
+            description: "Response compression; inherit follows the global compression setting",
+          },
+          crowdsec: {
+            type: "boolean",
+            description:
+              "Check clients against CrowdSec's decisions when CrowdSec is set up. Defaults to true; false opts this host out",
+          },
+          discourageIndexing: {
+            type: "boolean",
+            description:
+              "Send X-Robots-Tag: noindex, nofollow and a robots.txt disallowing everything",
+          },
+          maintenance: {
+            oneOf: [{ $ref: "#/components/schemas/HostMaintenanceConfig" }, { type: "null" }],
+          },
+          upstreamTimeouts: {
+            oneOf: [{ $ref: "#/components/schemas/HostUpstreamTimeoutsConfig" }, { type: "null" }],
+          },
+          rateLimit: {
+            oneOf: [{ $ref: "#/components/schemas/HostRateLimitConfig" }, { type: "null" }],
+          },
+          anubis: {
+            oneOf: [{ $ref: "#/components/schemas/HostAnubisConfig" }, { type: "null" }],
+          },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -3111,6 +3471,33 @@ const spec = {
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
           cache: { oneOf: [{ $ref: "#/components/schemas/HostCacheConfig" }, { type: "null" }] },
+          compression: {
+            type: "string",
+            enum: ["inherit", "on", "off"],
+            description: "Response compression; inherit follows the global compression setting",
+          },
+          crowdsec: {
+            type: "boolean",
+            description:
+              "Check clients against CrowdSec's decisions when CrowdSec is set up. Defaults to true; false opts this host out",
+          },
+          discourageIndexing: {
+            type: "boolean",
+            description:
+              "Send X-Robots-Tag: noindex, nofollow and a robots.txt disallowing everything",
+          },
+          maintenance: {
+            oneOf: [{ $ref: "#/components/schemas/HostMaintenanceConfig" }, { type: "null" }],
+          },
+          upstreamTimeouts: {
+            oneOf: [{ $ref: "#/components/schemas/HostUpstreamTimeoutsConfig" }, { type: "null" }],
+          },
+          rateLimit: {
+            oneOf: [{ $ref: "#/components/schemas/HostRateLimitConfig" }, { type: "null" }],
+          },
+          anubis: {
+            oneOf: [{ $ref: "#/components/schemas/HostAnubisConfig" }, { type: "null" }],
+          },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -3148,9 +3535,21 @@ const spec = {
             description:
               "Address to listen on: ':port', 'host:port', or '[ipv6]:port'. An IPv6 literal " +
               "must be bracketed - unbracketed, its last group is indistinguishable from a port. " +
+              "The port may be a range 'A-B' of up to 1000 ports. " +
               "Ports 80, 443, 2019, 3000, 9090 and the enabled metrics port are reserved and rejected.",
           },
-          upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
+          upstreams: {
+            type: "array",
+            items: { type: "string" },
+            example: ["db-server:5432"],
+            description: "'host:port' each, or a bare host when upstreamPortMode is 'same'",
+          },
+          upstreamPortMode: {
+            type: "string",
+            enum: ["fixed", "same"],
+            description:
+              "same: each connection is dialled on the port it arrived on, for a listen range",
+          },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
           matcherValue: {
             type: "array",
@@ -3162,6 +3561,11 @@ const spec = {
           proxyProtocolReceive: {
             type: "boolean",
             description: "Trust inbound PROXY protocol header from upstream LBs",
+          },
+          accessListId: {
+            type: ["integer", "null"],
+            description:
+              "An access list whose IP rules close connections from the addresses they deny. Passwords do not apply at layer 4, so a list without IP rules is refused (400).",
           },
           enabled: { type: "boolean" },
           loadBalancer: {
@@ -3175,6 +3579,11 @@ const spec = {
           },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
           geoblockMode: { type: "string", enum: ["merge", "override"] },
+          crowdsec: {
+            type: "boolean",
+            description:
+              "Check clients against CrowdSec's decisions when CrowdSec is set up. Defaults to true; false opts this host out",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -3203,15 +3612,35 @@ const spec = {
             type: "string",
             example: ":5432",
             description:
-              "':port', 'host:port', or '[ipv6]:port'. Ports 80, 443, 2019, 3000, 9090 and the " +
-              "enabled metrics port are reserved and rejected.",
+              "':port', 'host:port', or '[ipv6]:port', where the port may be a range 'A-B' of up " +
+              "to 1000 ports. Ports 80, 443, 2019, 3000, 9090 and the enabled metrics port are " +
+              "reserved and rejected, as is a port another enabled host uses with a different " +
+              "listen address (400). An agent publishes at most 2000 ports.",
           },
-          upstreams: { type: "array", items: { type: "string" }, example: ["db:5432"] },
+          upstreams: {
+            type: "array",
+            items: { type: "string" },
+            example: ["db:5432"],
+            description: "'host:port' each, or a bare host when upstreamPortMode is 'same'",
+          },
+          upstreamPortMode: {
+            type: "string",
+            enum: ["fixed", "same"],
+            description:
+              "same: each connection is dialled on the port it arrived on, so one host can forward a " +
+              "listen range. Upstreams are then bare hosts, and an active health check is refused " +
+              "(400). Omitted keeps the current mode; fixed on create",
+          },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
           matcherValue: { type: "array", items: { type: "string" } },
           tlsTermination: { type: "boolean" },
           proxyProtocolVersion: { type: ["string", "null"], enum: ["v1", "v2", null] },
           proxyProtocolReceive: { type: "boolean" },
+          accessListId: {
+            type: ["integer", "null"],
+            description:
+              "An access list whose IP rules close connections from the addresses they deny. Passwords do not apply at layer 4, so a list without IP rules is refused (400).",
+          },
           enabled: { type: "boolean" },
           loadBalancer: {
             oneOf: [{ $ref: "#/components/schemas/L4LoadBalancerConfig" }, { type: "null" }],
@@ -3224,6 +3653,11 @@ const spec = {
           },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
           geoblockMode: { type: "string", enum: ["merge", "override"] },
+          crowdsec: {
+            type: "boolean",
+            description:
+              "Check clients against CrowdSec's decisions when CrowdSec is set up. Defaults to true; false opts this host out",
+          },
         },
         required: ["name", "listenAddress", "upstreams", "protocol"],
       },
@@ -3257,8 +3691,38 @@ const spec = {
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+          source: {
+            type: "string",
+            enum: ["upload", "agent-file"],
+            description:
+              "`agent-file`: read from files on one agent's host; its PEM and names are read-only.",
+          },
+          sourceAgentId: { type: ["integer", "null"] },
+          sourceCertPath: { type: ["string", "null"] },
+          sourceKeyPath: { type: ["string", "null"] },
+          sourceReadAt: { type: ["string", "null"], format: "date-time" },
+          sourceError: {
+            type: ["string", "null"],
+            description:
+              "Why the last read failed, as a code. The last good certificate keeps serving.",
+          },
         },
         required: ["id", "name", "type", "domainNames", "hasPrivateKey", "createdAt", "updatedAt"],
+      },
+      AgentFileCertificateInput: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          source: { type: "string", enum: ["agent-file"] },
+          sourceAgentId: { type: "integer", description: "The agent that reads the files" },
+          sourceCertPath: {
+            type: "string",
+            description: "Relative to the agent's CERT_FILES_HOST_DIR",
+            example: "live/example.com/fullchain.pem",
+          },
+          sourceKeyPath: { type: "string", example: "live/example.com/privkey.pem" },
+        },
+        required: ["name", "source", "sourceAgentId", "sourceCertPath", "sourceKeyPath"],
       },
       CertificateInput: {
         type: "object",
@@ -3407,14 +3871,32 @@ const spec = {
         properties: {
           action: { type: "string", enum: ["allow", "deny"] },
           cidr: {
-            type: "string",
+            type: ["string", "null"],
             example: "192.168.1.0/24",
             description:
-              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128.",
+              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128. Exactly one of cidr and hostname.",
+          },
+          hostname: {
+            type: ["string", "null"],
+            example: "home.example.com",
+            description:
+              "A hostname the controller resolves (A and AAAA) and re-resolves as its TTL expires, clamped to 60 s-1 h. It stands for each IPv4 address as a /32 and each IPv6 address widened to its /64; end the name in /48 to /128 to set that prefix. Up to 16 addresses per name. On a failed lookup the last answer is kept for 24 h. A name with no answer stands for no addresses: an allow rule admits nobody, a deny rule denies nobody.",
           },
           note: { type: ["string", "null"] },
+          resolved: {
+            type: "object",
+            readOnly: true,
+            description: "Hostname rules only: what the name currently stands for.",
+            properties: {
+              ranges: { type: "array", items: { type: "string" } },
+              resolvedAt: { type: ["string", "null"], format: "date-time" },
+              lastError: { type: ["string", "null"] },
+              lastErrorAt: { type: ["string", "null"], format: "date-time" },
+            },
+            required: ["ranges", "resolvedAt", "lastError", "lastErrorAt"],
+          },
         },
-        required: ["action", "cidr"],
+        required: ["action"],
       },
       AccessListInput: {
         type: "object",
@@ -3522,8 +4004,49 @@ const spec = {
             description:
               "Name of the default provider used for DNS-01 challenges (null = HTTP-01 only)",
           },
+          delegations: {
+            type: "array",
+            maxItems: 256,
+            items: { $ref: "#/components/schemas/DnsChallengeDelegation" },
+            description:
+              "Challenge delegations. Omitting the field on a PUT removes every delegation.",
+          },
+          acmeDnsAccounts: {
+            type: "object",
+            description:
+              "acme-dns accounts keyed by the lowercase domain each was registered for. The password is encrypted at rest and never returned.",
+            additionalProperties: {
+              type: "object",
+              properties: {
+                username: { type: "string", writeOnly: true },
+                password: { type: "string", writeOnly: true },
+                subdomain: { type: "string", writeOnly: true },
+                fulldomain: { type: "string", description: "The CNAME target" },
+                server_url: { type: "string", format: "uri", writeOnly: true },
+              },
+              required: ["username", "password", "subdomain", "fulldomain", "server_url"],
+            },
+          },
         },
         required: ["providers", "default"],
+      },
+      DnsChallengeDelegation: {
+        type: "object",
+        description:
+          "Sends DNS-01 challenges for a domain and every name under it (longest match wins) to override_domain, and optionally to another provider. At least one of target and provider is set.",
+        properties: {
+          domain: { type: "string", example: "example.com" },
+          target: {
+            type: ["string", "null"],
+            description: "Where _acme-challenge.<name> is CNAMEd to; Caddy's override_domain",
+            example: "_acme-challenge.example.com.validation.example.net",
+          },
+          provider: {
+            type: ["string", "null"],
+            description: "A configured provider; null uses the certificate's or the default",
+          },
+        },
+        required: ["domain"],
       },
       DnsProviderStatus: {
         type: "object",
@@ -3550,8 +4073,21 @@ const spec = {
             type: ["string", "null"],
             description: "Name of the default provider used for DNS-01 challenges",
           },
+          delegations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/DnsChallengeDelegation" },
+          },
+          acmeDnsAccounts: {
+            type: "object",
+            description: "acme-dns accounts by domain; only the CNAME target is returned",
+            additionalProperties: {
+              type: "object",
+              properties: { fulldomain: { type: "string" } },
+              required: ["fulldomain"],
+            },
+          },
         },
-        required: ["providers", "default"],
+        required: ["providers", "default", "delegations", "acmeDnsAccounts"],
       },
       AuthentikSettings: {
         type: "object",

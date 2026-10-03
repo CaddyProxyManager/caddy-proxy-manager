@@ -25,6 +25,8 @@ export const BACKUP_NEVER = [
   "forward_auth_exchanges",
   "forward_auth_redirect_intents",
   "settings_staged",
+  // Re-resolved within a minute of starting, and a name's answer may differ on the new host.
+  "access_list_dns_cache",
 ] as const;
 
 /** History rather than configuration: large, and only included when asked for. */
@@ -112,11 +114,19 @@ export async function restoreBackup(
   const all = inFkOrder(describeTables());
   const known = new Map(all.map((table) => [table.name, table]));
   const skip = new Set<string>(BACKUP_NEVER);
+  /** Columns naming an agent that is not restored: the row stays, pointing at no agent. */
+  const orphaned = new Map<string, string[]>();
   if (!options.keepAgents) {
     // Pairings are with the machine the backup came from; on a new one the agents pair afresh.
     for (const table of all) {
-      if (table.name === "agents" || table.references.some((r) => r.target === "agents")) {
+      const toAgents = table.references.filter((r) => r.target === "agents");
+      if (table.name === "agents" || toAgents.some((r) => r.required)) {
         skip.add(table.name);
+      } else if (toAgents.length > 0) {
+        orphaned.set(
+          table.name,
+          toAgents.flatMap((r) => r.columns),
+        );
       }
     }
   }
@@ -134,6 +144,7 @@ export async function restoreBackup(
       rows: await Promise.all(
         rows.map(async (raw) => {
           const row = await importRow(table.name, raw);
+          for (const column of orphaned.get(table.name) ?? []) row[column] = null;
           const kept: Record<string, unknown> = {};
           for (const [column, value] of Object.entries(row)) {
             const field = fieldOf.get(column);

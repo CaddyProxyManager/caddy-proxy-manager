@@ -1,5 +1,5 @@
 /**
- * The inverse of unlink-oauth: never without a linked provider or the current password, and
+ * The inverse of unlink-oauth: never without a linked provider or passkey, or the current password, and
  * nothing changes when either check fails.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
@@ -32,7 +32,7 @@ import { POST } from '@/src/app/api/user/remove-password/route';
 import { auth } from '@/src/lib/auth';
 import { createUser, getUserById } from '../../src/lib/models/user';
 import { hashPassword } from '../../src/lib/password';
-import { accounts } from '../../src/lib/db/schema';
+import { accounts, passkeys } from '../../src/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 const PASSWORD = 'CorrectHorse2026!';
@@ -110,6 +110,25 @@ describe('POST /api/user/remove-password', () => {
     expect(response.status).toBe(400);
     expect(await providersOf(user.id)).toEqual(['credential']);
     expect((await getUserById(user.id))?.passwordHash).not.toBeNull();
+  });
+
+  it('drops the password of an account that signs in with a passkey instead', async () => {
+    const user = await seedUser({ linkProvider: false });
+    await ctx.db.insert(passkeys).values({
+      userId: user.id,
+      publicKey: 'cose',
+      credentialID: `credential-${user.id}`,
+      counter: 0,
+      deviceType: 'multiDevice',
+      backedUp: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(await providersOf(user.id)).toEqual([]);
+    expect((await getUserById(user.id))?.passwordHash).toBeNull();
   });
 
   it('refuses a wrong current password and changes nothing', async () => {

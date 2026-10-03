@@ -12,12 +12,15 @@ export function ListPageHeader({
   summary,
   filters,
   search,
+  bulkBar,
   ...header
 }: PageHeaderProps & {
   stats?: ReactNode;
   summary?: ReactNode;
   filters?: ReactNode;
   search?: ReactNode;
+  /** Takes the filters row's place while rows are selected. */
+  bulkBar?: ReactNode;
 }) {
   return (
     <>
@@ -25,17 +28,21 @@ export function ListPageHeader({
         <PageHeader {...header} />
         {stats && <div className="cpm-desktop-only">{stats}</div>}
         {summary && <div className="cpm-desktop-only">{summary}</div>}
-        {(filters || search) && (
-          <HStack
-            gap={4}
-            vAlign="center"
-            wrap="wrap"
-            justify="between"
-            className="cpm-list-toolbar"
-          >
-            {filters && <div className="cpm-list-filters">{filters}</div>}
-            {search && <div className="cpm-list-search">{search}</div>}
-          </HStack>
+        {bulkBar ? (
+          <div className="cpm-list-toolbar">{bulkBar}</div>
+        ) : (
+          (filters || search) && (
+            <HStack
+              gap={4}
+              vAlign="center"
+              wrap="wrap"
+              justify="between"
+              className="cpm-list-toolbar"
+            >
+              {filters && <div className="cpm-list-filters">{filters}</div>}
+              {search && <div className="cpm-list-search">{search}</div>}
+            </HStack>
+          )
         )}
       </div>
       {summary && <div className="cpm-mobile-only">{summary}</div>}

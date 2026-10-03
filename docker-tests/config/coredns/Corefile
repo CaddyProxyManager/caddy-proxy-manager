@@ -1,0 +1,15 @@
+# dyn.cpm.test: records the tests write at run time (suite/lib.sh, rig_dns_*), for what dnsmasq's
+# static answers cannot do - a CNAME into acme-dns that a resolver follows, an address that changes.
+# The file plugin chases an out-of-zone CNAME through this server, so the acme block answers it.
+dyn.cpm.test:53 {
+    file /zones/db.dyn.cpm.test {
+        reload 1s
+    }
+    errors
+    log
+}
+
+acmedns.cpm.test:53 {
+    forward . 172.28.0.27
+    errors
+}

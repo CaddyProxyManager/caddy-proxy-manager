@@ -1,0 +1,360 @@
+{
+  "denyDefault": [
+    {
+      "handler": "subroute",
+      "routes": [
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["10.9.0.0/16"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["2001:db8::/32"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16", "2001:db8::/32", "192.168.1.5/32"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "allowDefault": [
+    {
+      "handler": "subroute",
+      "routes": [
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["10.9.0.0/16"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["2001:db8::/32"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "firstDeny": [
+    {
+      "handler": "subroute",
+      "routes": [
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["10.9.0.0/16"]
+              }
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.9.0.0/16", "10.0.0.0/8"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "both": [
+    {
+      "handler": "subroute",
+      "routes": [
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["10.9.0.0/16"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["2001:db8::/32"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16", "2001:db8::/32", "192.168.1.5/32"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "static_response",
+              "status_code": 403,
+              "body": "Access denied"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "handler": "authentication",
+      "providers": {
+        "http_basic": {
+          "accounts": [
+            {
+              "username": "alice",
+              "password": "$2b$10$hash"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "handler": "headers",
+      "request": {
+        "delete": ["Authorization"]
+      }
+    }
+  ],
+  "any": [
+    {
+      "handler": "subroute",
+      "routes": [
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["10.9.0.0/16"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "authentication",
+              "providers": {
+                "http_basic": {
+                  "accounts": [
+                    {
+                      "username": "alice",
+                      "password": "$2b$10$hash"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "client_ip": {
+                "ranges": ["2001:db8::/32"]
+              },
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "authentication",
+              "providers": {
+                "http_basic": {
+                  "accounts": [
+                    {
+                      "username": "alice",
+                      "password": "$2b$10$hash"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "match": [
+            {
+              "not": [
+                {
+                  "client_ip": {
+                    "ranges": ["10.0.0.0/8", "10.9.0.0/16", "2001:db8::/32", "192.168.1.5/32"]
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": [
+            {
+              "handler": "authentication",
+              "providers": {
+                "http_basic": {
+                  "accounts": [
+                    {
+                      "username": "alice",
+                      "password": "$2b$10$hash"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

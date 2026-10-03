@@ -151,8 +151,12 @@ export async function compareRevisions(from: number, to: number): Promise<Revisi
   if (keys.length > 0) {
     try {
       const [left, right] = await Promise.all([
-        withStagedReads(overlayFor(before), () => buildCaddyDocument()),
-        withStagedReads(overlayFor(after), () => buildCaddyDocument()),
+        withStagedReads(overlayFor(before), () =>
+          buildCaddyDocument(undefined, { includeAgentFileCertificates: true }),
+        ),
+        withStagedReads(overlayFor(after), () =>
+          buildCaddyDocument(undefined, { includeAgentFileCertificates: true }),
+        ),
       ]);
       config = diffConfigDocuments(left, right);
     } catch (error) {

@@ -1,12 +1,22 @@
 import { randomUUID } from "node:crypto";
 import db, { nowIso } from "../db";
 import { oauthProviders, settings } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { encryptSecret, decryptSecret } from "../secret";
 import type { AppRole } from "../oidc-groups";
 import { isAppRole } from "../oidc-groups";
 import { toOAuthProviderView, type OAuthProviderView } from "../oauth-provider-view";
 import { domainError } from "../domain-error";
+import { LDAP_PROVIDER_TYPE } from "../ldap/defaults";
+
+/** LDAP directories share the table (models/ldap-directories.ts); no reader here may see one. */
+const isOidc = ne(oauthProviders.type, LDAP_PROVIDER_TYPE);
+
+/** A directory is made through its own model, never turned into one here. */
+function assertOidcType(type: string | undefined): void {
+  if (type === LDAP_PROVIDER_TYPE)
+    throw domainError("oauthProviderTypeInvalid", {}, { status: 400 });
+}
 
 /** Per-provider OIDC group mapping, shared by the type, create and update paths. */
 export type OAuthGroupMapping = {
@@ -86,6 +96,7 @@ export async function createOAuthProvider(
     source?: string;
   } & Partial<OAuthGroupMapping>,
 ): Promise<OAuthProvider> {
+  assertOidcType(data.type);
   const now = nowIso();
   const id = randomUUID();
 
@@ -123,27 +134,33 @@ export async function createOAuthProvider(
 }
 
 export async function listOAuthProviders(): Promise<OAuthProviderView[]> {
-  const rows = await db.query.oauthProviders.findMany({
-    orderBy: (table, { asc }) => asc(table.name),
-  });
+  const rows = await db
+    .select()
+    .from(oauthProviders)
+    .where(isOidc)
+    .orderBy(asc(oauthProviders.name));
   return rows.map((row) => toOAuthProviderView(parseDbProvider(row)));
 }
 
 export async function listEnabledOAuthProviders(): Promise<OAuthProvider[]> {
-  const rows = await db.query.oauthProviders.findMany({
-    where: (table, { eq }) => eq(table.enabled, true),
-    orderBy: (table, { asc }) => asc(table.name),
-  });
+  const rows = await db
+    .select()
+    .from(oauthProviders)
+    .where(and(isOidc, eq(oauthProviders.enabled, true)))
+    .orderBy(asc(oauthProviders.name));
   return rows.map(parseDbProvider);
 }
 
 export async function getOAuthProvider(id: string): Promise<OAuthProvider | null> {
-  const row = await db.query.oauthProviders.findFirst({
-    where: (table, { eq }) => eq(table.id, id),
-  });
+  const [row] = await db
+    .select()
+    .from(oauthProviders)
+    .where(and(isOidc, eq(oauthProviders.id, id)))
+    .limit(1);
   return row ? parseDbProvider(row) : null;
 }
 
+/** Unfiltered: the env sync must see a directory holding the name, or its insert would clash. */
 export async function getOAuthProviderByName(name: string): Promise<OAuthProvider | null> {
   const row = await db.query.oauthProviders.findFirst({
     where: (table, { eq }) => eq(table.name, name),
@@ -168,6 +185,7 @@ export async function updateOAuthProvider(
   }> &
     Partial<OAuthGroupMapping>,
 ): Promise<OAuthProvider | null> {
+  assertOidcType(data.type);
   const now = nowIso();
 
   const updates: Record<string, unknown> = { updatedAt: now };
@@ -201,16 +219,14 @@ export async function updateOAuthProvider(
   const [row] = await db
     .update(oauthProviders)
     .set(updates)
-    .where(eq(oauthProviders.id, id))
+    .where(and(isOidc, eq(oauthProviders.id, id)))
     .returning();
 
   return row ? parseDbProvider(row) : null;
 }
 
 export async function deleteOAuthProvider(id: string): Promise<void> {
-  const row = await db.query.oauthProviders.findFirst({
-    where: (table, { eq }) => eq(table.id, id),
-  });
+  const row = await getOAuthProvider(id);
 
   if (!row) {
     throw domainError("oauthProviderNotFound");
@@ -220,7 +236,7 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
     throw domainError("environmentOAuthProviderDeletionForbidden");
   }
 
-  await db.delete(oauthProviders).where(eq(oauthProviders.id, id));
+  await db.delete(oauthProviders).where(and(isOidc, eq(oauthProviders.id, id)));
 }
 
 /**
@@ -255,11 +271,15 @@ export async function setPrimaryProviderId(id: string | null): Promise<void> {
 export async function getProviderDisplayList(): Promise<
   Array<{ id: string; name: string; autoLink: boolean; isPrimary: boolean }>
 > {
-  const rows = await db.query.oauthProviders.findMany({
-    where: (table, { eq }) => eq(table.enabled, true),
-    orderBy: (table, { asc }) => asc(table.name),
-    columns: { id: true, name: true, autoLink: true },
-  });
+  const rows = await db
+    .select({
+      id: oauthProviders.id,
+      name: oauthProviders.name,
+      autoLink: oauthProviders.autoLink,
+    })
+    .from(oauthProviders)
+    .where(and(isOidc, eq(oauthProviders.enabled, true)))
+    .orderBy(asc(oauthProviders.name));
   const primaryId = await getPrimaryProviderId();
   const list = rows.map((r) => ({
     id: r.id,

@@ -15,6 +15,7 @@ import {
   Package,
   Server,
   Settings2,
+  ShieldBan,
   UserCheck,
   Waypoints,
 } from "lucide-react";
@@ -219,7 +220,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       {
         id: "network",
         name: "Network",
-        desc: "Trusted proxies, HTTP versions, and the tailnet hosts are served on",
+        desc: "Trusted proxies, HTTP versions, compression, and the tailnet hosts are served on",
         icon: Waypoints,
         blocks: [
           {
@@ -231,6 +232,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "http-protocols",
             name: "HTTP Versions",
             desc: "Turn HTTP/2 or HTTP/3 off for every host",
+          },
+          {
+            id: "compression",
+            name: "Compression",
+            desc: "Compress text responses with zstd or gzip",
           },
           {
             id: "tailscale",
@@ -279,6 +285,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "OAUTH_USER_GROUP",
               "OAUTH_VIEWER_GROUP",
             ],
+          },
+          {
+            id: "ldap",
+            name: "Directories (LDAP)",
+            desc: "Sign in with an LDAP or Active Directory account",
           },
           {
             id: "sign-in",
@@ -357,6 +368,19 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "geoblock",
             name: "Global Geoblocking",
             desc: "Default geoblock rules across all hosts",
+          },
+        ],
+      },
+      {
+        id: "crowdsec",
+        name: "CrowdSec",
+        desc: "Refuse addresses your CrowdSec Local API has decided to block",
+        icon: ShieldBan,
+        blocks: [
+          {
+            id: "crowdsec",
+            name: "CrowdSec",
+            desc: "The Local API and bouncer key every host checks clients against",
           },
         ],
       },

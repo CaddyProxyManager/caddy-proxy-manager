@@ -10,6 +10,9 @@ import AuthentikDemo from "../../../demos/samples/AuthentikDemo";
 Forward auth puts a login page in front of an application that has none. Caddy asks CPM about every
 request; CPM either says yes or redirects the visitor to sign in.
 
+A host has one sign-in, but it can add a [bot challenge](/features/bot-challenge/) in front of it:
+Anubis is a separate switch, checked first, so bots never reach the login page.
+
 ## The built-in portal
 
 No external identity provider required. CPM serves the login page itself, issues a session cookie,

@@ -74,6 +74,7 @@ const SETTING_PAGES: Record<string, string> = {
   'Trusted Proxies': 'Network',
   Tailscale: 'Network',
   'OAuth Providers': 'Authentication',
+  'Directories (LDAP)': 'Authentication',
   'Password Policy': 'Authentication',
   'Authentik Defaults': 'Forward Auth',
   'Forward Auth Defaults': 'Forward Auth',

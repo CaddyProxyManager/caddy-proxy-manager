@@ -48,6 +48,7 @@ function runResetTwoFactor(port: number, username: string): void {
       const body = (await response.json().catch(() => ({}))) as {
         email?: string;
         hadTwoFactor?: boolean;
+        passkeysRemoved?: number;
         error?: string;
       };
       if (!response.ok) {
@@ -59,6 +60,9 @@ function runResetTwoFactor(port: number, username: string): void {
           ? `[cpm] Two-factor sign-in reset for ${body.email}. They can sign in with their password and set it up again.`
           : `[cpm] ${body.email} had no two-factor sign-in; nothing to reset. Their sessions were ended.`,
       );
+      if (body.passkeysRemoved) {
+        console.log(`[cpm] Removed ${body.passkeysRemoved} passkey(s) for ${body.email} too.`);
+      }
       process.exit(0);
     })
     .catch((error) => {
@@ -94,7 +98,8 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("reset-2fa", {
     type: "string",
-    describe: "Turn off two-factor sign-in for a user on the running server, then exit",
+    describe:
+      "Turn off two-factor sign-in and remove the passkeys of a user on the running server, then exit",
   })
   .version(pkg.version)
   // A mistyped HEALTHCHECK flag would otherwise start a second server that reports healthy.

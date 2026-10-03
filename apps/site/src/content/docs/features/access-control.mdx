@@ -29,11 +29,39 @@ is chosen.
 
 ### IP rules
 
-A list's **Network** tab holds allow and deny rules on client addresses - single IPs or CIDR ranges,
-IPv4 or IPv6 - checked from the top, where the first rule that matches decides. **When no rule
+A list's **Network** tab holds allow and deny rules on client addresses - single IPs, CIDR ranges
+or hostnames, IPv4 or IPv6 - checked from the top, where the first rule that matches decides. **When no rule
 matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
 The address is the one Caddy resolves after [trusted proxies](../geo-blocking/#trusted-proxies), so
 a CDN or load balancer in front is seen through rather than allowed or denied as a whole.
+
+The same rules can guard an [L4 host](../l4-proxy/#ip-rules-from-an-access-list), where only they
+apply - a list's users and passwords have no meaning below HTTP. Either way the rules can only see
+the address that reaches Caddy: with Docker's userland proxy in the path, some setups show every
+client as the bridge gateway, which the L4 page explains.
+
+#### Hostnames
+
+A rule can name a host instead of an address - a dynamic-DNS name for someone's home connection,
+say. Caddy's IP matchers only take ranges, so the controller does the lookup: it resolves A and
+AAAA records, writes the answer into the config, and looks the name up again whenever the record's
+TTL runs out (clamped to between a minute and an hour), reloading Caddy only when the answer
+changed. A name is looked up as soon as it is saved, and the Network tab shows what each one
+currently stands for, or why it stands for nothing.
+
+- **IPv4 answers are exact; IPv6 answers cover their /64.** A home connection's IPv6 address moves
+  around inside its /64 as privacy addresses rotate, so one address would stop matching within
+  hours. End the name in a prefix length to change that: `home.example.com/56` for a whole /56,
+  `home.example.com/128` for the exact address. Anything wider than /48 is refused.
+- **A failed lookup keeps the last answer for 24 hours**, retried every minute. After that, and for
+  a name that has never resolved, the name stands for no addresses at all.
+- **No addresses fails closed for allow, and open for deny.** An allow rule with nothing behind it
+  admits nobody; a deny rule with nothing behind it denies nobody, and the Network tab warns about
+  it. A list whose only rule is an unresolved allow shuts everyone out - on an L4 host too.
+- A name counts as one rule towards a list's limit of 500, and stands for at most 16 addresses.
+  Lookups go to the servers under **Settings → DNS → DNS Resolvers** when those are enabled, and
+  to the controller's own resolver otherwise - so a name that only resolves inside a network needs
+  a controller that can see that network's DNS.
 
 <Demo title="An access list's Network tab" note="Reorder, add or remove rules and save; nothing leaves the page.">
   <AccessListNetworkDemo client:visible />
@@ -50,8 +78,13 @@ combine:
 
 A [location rule](../reverse-proxy/#location-rules) can use a list of its own instead of the host's,
 or none at all: keep `/admin/*` to a stricter list, or leave `/.well-known/*` open on an otherwise
-protected host. Deleting a list sets any path that used it to none, so an old id can never come to
-mean a newer list.
+protected host.
+
+### Deleting a list
+
+A list a host still uses cannot be deleted - whether the host itself, a location rule on it, an L4
+host or the dashboard host uses it. The page names the hosts, and the REST API answers 409. Choose
+another list on them first, so nothing that was protected quietly stops being so.
 
 ### Passing the password on
 

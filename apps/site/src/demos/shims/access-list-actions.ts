@@ -29,15 +29,35 @@ export async function updateAccessListAction(
   return save(id, input as Partial<AccessList>);
 }
 
+/** Digits, dots and slashes, or any colon, is an address; the server tells them apart with `isIP`. */
+const looksLikeAddress = (target: string) => /^[\d./]+$|:/.test(target);
+
 export async function setAccessListIpRulesAction(
   id: number,
-  rules: { action: string; cidr: string; note?: string | null }[],
+  rules: { action: string; target: string; note?: string | null }[],
 ): Promise<AccessList> {
+  // A name saved before keeps its answer; a new one has nothing to look it up with, so it shows as
+  // not looked up yet.
+  const known = new Map(
+    (lists.get(id)?.ipRules ?? []).flatMap((rule) =>
+      rule.hostname && rule.resolved ? [[rule.hostname, rule.resolved]] : [],
+    ),
+  );
   return save(id, {
-    ipRules: rules.map((rule) => ({
-      action: rule.action === "deny" ? "deny" : "allow",
-      cidr: rule.cidr,
-      note: rule.note ?? null,
-    })),
+    ipRules: rules.map((rule) => {
+      const action = rule.action === "deny" ? "deny" : "allow";
+      const note = rule.note ?? null;
+      if (looksLikeAddress(rule.target)) {
+        return { action, cidr: rule.target, hostname: null, note };
+      }
+      const hostname = rule.target.toLowerCase();
+      const resolved = known.get(hostname) ?? {
+        ranges: [],
+        resolvedAt: null,
+        lastError: null,
+        lastErrorAt: null,
+      };
+      return { action, cidr: null, hostname, note, resolved };
+    }),
   });
 }

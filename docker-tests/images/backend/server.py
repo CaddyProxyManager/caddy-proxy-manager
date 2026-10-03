@@ -17,6 +17,7 @@ needs no package installs and cannot drift.
 """
 
 import base64
+import collections
 import hashlib
 import json
 import os
@@ -34,6 +35,9 @@ ORIGIN_ID = os.environ.get("ORIGIN_ID", "origin")
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 # The Cache-Control values the cache tests ask an origin for.
 CACHE_CONTROL_VALUES = {v: v for v in ("no-store", "no-cache", "private", "public, max-age=60")}
+# Every request but /__*, for asserting that one never arrived or what a subrequest carried.
+REQUEST_LOG = collections.deque(maxlen=500)
+REQUEST_LOG_LOCK = threading.Lock()
 
 
 # ── HTTP / HTTPS ────────────────────────────────────────────────────────────
@@ -181,6 +185,21 @@ class OriginHandler(BaseHTTPRequestHandler):
             self._send_text("ok")
             return
 
+        if path == "/__requests":
+            with REQUEST_LOG_LOCK:
+                self._send_json(list(REQUEST_LOG))
+            return
+
+        if not path.startswith("/__"):
+            entry = {
+                "method": self.command,
+                "raw_path": self.path,
+                "peer": self.client_address[0],
+                "headers": {k.lower(): v for k, v in self.headers.items()},
+            }
+            with REQUEST_LOG_LOCK:
+                REQUEST_LOG.append(entry)
+
         if path == "/ws":
             if self._is_websocket_upgrade():
                 self._websocket()
@@ -210,6 +229,11 @@ class OriginHandler(BaseHTTPRequestHandler):
 
         if path == "/large":
             self._send_text("x" * 100000)
+            return
+
+        # Compressible bytes behind an image type, so only the type can keep encode off it.
+        if path == "/image.png":
+            self._send_text("x" * 100000, content_type="image/png")
             return
 
         # ?cc=, ?cookie= and ?status= shape the response, for the cache tests. Looked up, never

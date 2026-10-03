@@ -9,8 +9,18 @@ import {
   INITIAL_ACTION_STATE,
   type ActionState,
 } from "@/src/lib/actions";
-import { createProxyHost, deleteProxyHost, updateProxyHost } from "@/src/lib/models/proxy-hosts";
+import {
+  createProxyHost,
+  deleteProxyHost,
+  setProxyHostMaintenance,
+  updateProxyHost,
+} from "@/src/lib/models/proxy-hosts";
 import { parseAgentIds } from "@/src/lib/models/host-agents";
+import {
+  type ProxyHostBulkRequest,
+  bulkUpdateProxyHosts,
+  parseProxyHostBulkRequest,
+} from "@/src/lib/models/bulk-hosts";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
 import { getTranslations } from "next-intl/server";
 import {
@@ -36,6 +46,12 @@ import {
   parsePathRewritesConfig,
   parseProxyHostOptionUpdates,
   parseCacheConfig,
+  parseCompressionMode,
+  parseMaintenanceConfig,
+  parseUpstreamTimeoutsConfig,
+  parseRateLimitConfig,
+  parseCrowdSecEnabled,
+  parseAnubisConfig,
   parseRedirectsConfig,
   parseRewriteConfig,
   parseTailscaleConfig,
@@ -80,6 +96,7 @@ export async function createProxyHostAction(
         allowWebsocket: boolField("allowWebsocket"),
         preserveHostHeader: boolField("preserveHostHeader"),
         skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
+        discourageIndexing: boolField("discourageIndexing"),
         enabled: parseCheckbox(formData.get("enabled")),
         customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
         customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),
@@ -97,6 +114,12 @@ export async function createProxyHostAction(
         redirects: parseRedirectsConfig(formData),
         rewrite: parseRewriteConfig(formData),
         cache: parseCacheConfig(formData) ?? null,
+        compression: parseCompressionMode(formData),
+        maintenance: parseMaintenanceConfig(formData),
+        upstreamTimeouts: parseUpstreamTimeoutsConfig(formData),
+        rateLimit: parseRateLimitConfig(formData),
+        crowdsec: parseCrowdSecEnabled(formData),
+        anubis: parseAnubisConfig(formData),
         locationRules: parseLocationRulesConfig(formData),
         pathAllows: parsePathAllowsConfig(formData),
         pathBlocks: parsePathBlocksConfig(formData),
@@ -254,5 +277,44 @@ export async function toggleProxyHostAction(id: number, enabled: boolean): Promi
     const t = await getTranslations();
     console.error("Failed to toggle proxy host:", id, error);
     return actionError(t, error, t("errors.toggleProxyHostFailed"));
+  }
+}
+
+export async function setProxyHostMaintenanceAction(
+  id: number,
+  enabled: boolean,
+): Promise<ActionState> {
+  try {
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    await setProxyHostMaintenance(id, enabled, access.userId);
+    revalidatePath("/proxy-hosts");
+    const t = await getTranslations("proxyHosts");
+    return actionSuccess(enabled ? t("maintenanceOnResult") : t("maintenanceOffResult"));
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to switch maintenance mode:", id, error);
+    return actionError(t, error, t("errors.toggleMaintenanceFailed"));
+  }
+}
+
+/** All or nothing: one host the operator may not manage refuses the whole batch. */
+export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promise<ActionState> {
+  try {
+    const access = await requireAccess();
+    const parsed = parseProxyHostBulkRequest(request);
+    for (const id of parsed.ids) assertCanManage(access, "proxyHost", id);
+    const { count } = await bulkUpdateProxyHosts(parsed, access.userId);
+    revalidatePath("/proxy-hosts");
+    const t = await getTranslations("ui");
+    return actionSuccess(
+      parsed.action === "delete"
+        ? t("bulk.deletedResult", { count })
+        : t("bulk.updatedResult", { count }),
+    );
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to change proxy hosts in bulk:", error);
+    return actionError(t, error, t("errors.bulkHostsFailed"));
   }
 }

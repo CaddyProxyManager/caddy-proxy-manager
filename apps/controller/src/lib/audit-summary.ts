@@ -42,6 +42,22 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("access_list", "access list", "accessList"),
   ...lifecycle("group", "group", "group"),
   ...lifecycle("waf_preset", "WAF preset", "wafPreset"),
+  // settings/ldap-actions.ts
+  ...lifecycle("ldap_directory", "directory", "ldapDirectory"),
+
+  // models/proxy-hosts.ts, the row menu's maintenance switch
+  {
+    entityType: "proxy_host",
+    action: "update",
+    message: "proxyHostMaintenanceOn",
+    pattern: /^Turned on maintenance mode for proxy host (?<name>.+)$/s,
+  },
+  {
+    entityType: "proxy_host",
+    action: "update",
+    message: "proxyHostMaintenanceOff",
+    pattern: /^Turned off maintenance mode for proxy host (?<name>.+)$/s,
+  },
 
   // models/crs-plugins.ts
   {
@@ -370,6 +386,19 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     message: "certificateRenewRequested",
     pattern: /^Asked Caddy to renew the certificate for (?<name>.+)$/s,
   },
+  // models/certificate-files.ts: an agent read a renewed certificate from its files
+  {
+    entityType: "certificate",
+    action: "certificate_file_renewed",
+    message: "certificateFileRenewed",
+    pattern: /^Read a new version of certificate (?<name>.+)$/s,
+  },
+  {
+    entityType: "certificate",
+    action: "certificate_file_names_changed",
+    message: "certificateFileNamesChanged",
+    pattern: /^Read a new version of certificate (?<name>.+) with different names$/s,
+  },
   {
     entityType: "certificate",
     action: "certificate_key_exported",
@@ -429,6 +458,31 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "two_factor_reset",
     message: "twoFactorResetConsole",
     pattern: /^Two-factor sign-in reset for user (?<email>.+?) from the server console$/s,
+  },
+  // app/api/auth/[...all]/route.ts, users/actions.ts, the console reset
+  {
+    entityType: "user",
+    action: "passkey_added",
+    message: "passkeyAdded",
+    pattern: /^User added a passkey$/,
+  },
+  {
+    entityType: "user",
+    action: "passkey_removed",
+    message: "passkeyRemoved",
+    pattern: /^User removed a passkey$/,
+  },
+  {
+    entityType: "user",
+    action: "passkey_removed",
+    message: "passkeysRemoved",
+    pattern: /^Passkeys removed for user (?<email>.+?) by an administrator$/s,
+  },
+  {
+    entityType: "user",
+    action: "passkey_removed",
+    message: "passkeysRemovedConsole",
+    pattern: /^Passkeys removed for user (?<email>.+?) from the server console$/s,
   },
   {
     entityType: "user",

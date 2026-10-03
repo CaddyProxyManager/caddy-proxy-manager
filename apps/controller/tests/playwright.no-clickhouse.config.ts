@@ -17,6 +17,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     storageState: resolve(moduleDir, '.auth/admin.json'),
     trace: 'on-first-retry',
+    // The server's default, as on CI. Any other zone refreshes each fresh context once after
+    // hydration, and on the portal that second render mints a second intent from a per-IP budget.
+    timezoneId: 'UTC',
   },
   projects: [
     {

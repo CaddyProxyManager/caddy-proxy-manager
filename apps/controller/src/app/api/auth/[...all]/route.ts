@@ -16,6 +16,7 @@ import {
 } from "@/src/lib/rate-limit";
 import {
   CREDENTIAL_SIGN_IN_PATHS,
+  PASSKEY_MANAGE_PATHS,
   TWO_FACTOR_MANAGE_PATHS,
   hasTwoFactorChallengeCookie,
 } from "@/src/lib/auth-sign-in-paths";
@@ -25,10 +26,16 @@ import { createAuditEvent } from "@/src/lib/models/audit";
 export const dynamic = "force-dynamic";
 
 const PASSWORD_SIGN_IN_PATHS = new Set(CREDENTIAL_SIGN_IN_PATHS.map((path) => `/api/auth${path}`));
-const TWO_FACTOR_MANAGE = new Set(TWO_FACTOR_MANAGE_PATHS.map((path) => `/api/auth${path}`));
+/** Demo-locked: the second factor and the passkeys, the account's credentials beyond its password. */
+const CREDENTIAL_MANAGE = new Set(
+  [...TWO_FACTOR_MANAGE_PATHS, ...PASSKEY_MANAGE_PATHS].map((path) => `/api/auth${path}`),
+);
 
-/** Confirming a new authenticator hits verify-totp with no sign-in challenge cookie. */
-function twoFactorManageAudit(
+/**
+ * Confirming a new authenticator hits verify-totp with no sign-in challenge cookie. A passkey
+ * sign-in is audited by the session hook, like any sign-in without a password.
+ */
+function credentialManageAudit(
   pathname: string,
   cookies: string | null,
 ): { action: string; summary: string } | null {
@@ -41,11 +48,15 @@ function twoFactorManageAudit(
       return { action: "two_factor_disabled", summary: "User turned off two-factor sign-in" };
     case "/api/auth/two-factor/generate-backup-codes":
       return { action: "two_factor_backup_codes", summary: "User replaced their backup codes" };
+    case "/api/auth/passkey/verify-registration":
+      return { action: "passkey_added", summary: "User added a passkey" };
+    case "/api/auth/passkey/delete-passkey":
+      return { action: "passkey_removed", summary: "User removed a passkey" };
   }
   return null;
 }
 
-/** Every demo visitor shares one account, and a second factor on it would lock the next one out. */
+/** Every demo visitor shares one account, and a second factor or passkey would lock the next out. */
 async function isDemoAdminRequest(request: Request): Promise<boolean> {
   if (!isDemoMode()) return false;
   const session = await (await getAuth()).api.getSession({ headers: request.headers });
@@ -79,21 +90,26 @@ async function signInName(request: Request): Promise<string | null> {
   }
 }
 
+async function demoLocked(): Promise<Response> {
+  const t = await getTranslations("errors");
+  return Response.json({ code: "DEMO_LOCKED", message: t("demoAdminProtected") }, { status: 403 });
+}
+
 export async function GET(request: Request) {
+  // Registration starts with a GET that issues the challenge.
+  if (CREDENTIAL_MANAGE.has(new URL(request.url).pathname) && (await isDemoAdminRequest(request))) {
+    return demoLocked();
+  }
   return toNextJsHandler(await getAuth()).GET(await withClientIp(request));
 }
 
 export async function POST(request: Request) {
   const forwarded = await withClientIp(request);
   const pathname = new URL(request.url).pathname;
-  if (TWO_FACTOR_MANAGE.has(pathname) && (await isDemoAdminRequest(request))) {
-    const t = await getTranslations("errors");
-    return Response.json(
-      { code: "DEMO_LOCKED", message: t("demoAdminProtected") },
-      { status: 403 },
-    );
+  if (CREDENTIAL_MANAGE.has(pathname) && (await isDemoAdminRequest(request))) {
+    return demoLocked();
   }
-  const managedAudit = twoFactorManageAudit(pathname, request.headers.get("cookie"));
+  const managedAudit = credentialManageAudit(pathname, request.headers.get("cookie"));
   if (managedAudit) {
     const session = await (await getAuth()).api.getSession({ headers: request.headers });
     const response = await toNextJsHandler(await getAuth()).POST(forwarded);
@@ -108,6 +124,8 @@ export async function POST(request: Request) {
     }
     return response;
   }
+  // Passkey sign-in included: it has no name to throttle or CAPTCHA against, and a guess needs
+  // the private key. Better Auth's per-address request limit still applies.
   if (!PASSWORD_SIGN_IN_PATHS.has(pathname)) {
     return toNextJsHandler(await getAuth()).POST(forwarded);
   }

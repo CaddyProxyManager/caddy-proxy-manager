@@ -15,6 +15,10 @@ an SSH endpoint, anything that speaks its own protocol. Like HTTP hosts, each ca
   <L4HostsTableDemo client:visible />
 </Demo>
 
+Tick hosts in the list to enable, disable or delete them together. As for proxy hosts, a batch is
+all or nothing, audited per host and applied once; the [API](../api/#changing-many-hosts) has it as
+the `bulkL4ProxyHosts` mutation.
+
 ## What it can match on
 
 - **Port** - the listening port on the Caddy host.
@@ -28,6 +32,19 @@ an SSH endpoint, anything that speaks its own protocol. Like HTTP hosts, each ca
 <Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send.">
   <L4HostEditorDemo client:visible />
 </Demo>
+
+## Port ranges
+
+The listen address can name a range, such as `:27015-27030`, of up to 1000 ports - for game
+servers, RTP media, or passive FTP. By default every connection goes to the upstreams' own port as
+written. Turn on **Upstreams get the listen port** and each upstream becomes a host without a port:
+a connection that arrived on 27020 is sent to port 27020, so one host forwards the whole range.
+That works because Caddy's container publishes each port as itself. Active health checks are not
+available in that mode, since there is no single port to probe; passive ones still work.
+
+Hosts share a port only with the exact same listen address, so a range that overlaps another
+host's port on a different address is refused - Caddy could not bind both. The IP rules, geo
+blocking and CrowdSec apply to a range host as to any other.
 
 ## PROXY protocol
 
@@ -45,7 +62,28 @@ and timeout for active checks, fail duration and max fails for passive ones, and
 ## Geo blocking below HTTP
 
 [Geo blocking](../geo-blocking/) applies here too, per host. At layer 4 there is no response body to
-send, so a blocked connection is closed rather than answered.
+send, so a blocked connection is closed rather than answered. On a host that accepts PROXY protocol,
+the country is looked up for the client address in the header, not the load balancer's.
+
+## IP rules from an access list
+
+An L4 host can use an [access list](../access-control/#ip-rules), and its IP rules decide who gets
+a connection: one from an address the list denies is closed before anything is proxied. Only the IP
+rules apply - there is no request at this layer to ask a password in - so the editor offers only
+lists that have some, and a list an L4 host uses keeps at least one rule. Behind a load balancer,
+turn on **Accept inbound PROXY protocol**: the rules, like geo blocking, then check the client in
+the header rather than the balancer.
+
+With [CrowdSec](../crowdsec/) set up, an L4 host also closes connections from addresses CrowdSec
+has decided against, after the IP rules and geo blocking, unless its CrowdSec section opts it out.
+
+:::caution[The address Caddy sees]
+Docker publishes ports through a userland proxy by default, and on some setups - Docker Desktop, or
+IPv6 on a host without an IPv6 route into the container network - every connection then arrives
+from the bridge gateway's address instead of the client's. Rules would then allow or deny everyone
+at once. Set `"userland-proxy": false` in Docker's `daemon.json`, or check the address in the access
+log before relying on a rule. The same applies to HTTP hosts.
+:::
 
 ## Ports are managed for you
 
@@ -54,6 +92,11 @@ created. Adding an L4 host therefore needs the Caddy container recreated - the [
 writes a compose override with the new port list and recreates Caddy, so the port appears without
 you editing a compose file. The dashboard shows when a port change is pending, and **Apply Ports**
 is what recreates the container - it is not done behind your back.
+
+An agent publishes at most 2000 ports. Docker starts a `docker-proxy` process for every published
+port and address family, so for large ranges set `"userland-proxy": false` in Docker's
+`daemon.json` - which also keeps client addresses intact, as above. An agent older than the
+controller is sent a range one port at a time, and takes it just the same.
 
 :::note
 Layer 4 is a compiled-in Caddy module. If L4 hosts are greyed out, turn the module on in

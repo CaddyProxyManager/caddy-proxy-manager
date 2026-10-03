@@ -1,8 +1,9 @@
-import db, { nowIso, toIso } from "../db";
-import { logAuditEvent } from "../audit";
+import db, { nowIso, runInTransaction, toIso } from "../db";
+import { auditEventRow, logAuditEvent } from "../audit";
 import { applyCaddyConfig } from "../caddy";
-import { certificates } from "../db/schema";
-import { desc, eq } from "drizzle-orm";
+import { auditEvents, certificates, proxyHosts } from "../db/schema";
+import { desc, eq, inArray } from "drizzle-orm";
+import { getDashboardSettings } from "../settings";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
 import { domainError } from "../domain-error";
 import {
@@ -12,6 +13,9 @@ import {
 } from "../certificate-provider-options";
 
 export type CertificateType = "managed" | "imported";
+
+/** `agent-file`: read from files on one agent's host; see models/certificate-files.ts. */
+export type CertificateSource = "upload" | "agent-file";
 
 export type Certificate = {
   id: number;
@@ -24,6 +28,13 @@ export type Certificate = {
   privateKeyPem: string | null;
   createdAt: string;
   updatedAt: string;
+  source: CertificateSource;
+  sourceAgentId: number | null;
+  sourceCertPath: string | null;
+  sourceKeyPath: string | null;
+  sourceReadAt: string | null;
+  /** A `CertificateFileError` code. */
+  sourceError: string | null;
 };
 
 export type CertificateInput = {
@@ -50,6 +61,12 @@ function parseCertificate(row: CertificateRow): Certificate {
     privateKeyPem: row.privateKeyPem ? decryptSecret(row.privateKeyPem) : null,
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!,
+    source: row.source === "agent-file" ? "agent-file" : "upload",
+    sourceAgentId: row.sourceAgentId,
+    sourceCertPath: row.sourceCertPath,
+    sourceKeyPath: row.sourceKeyPath,
+    sourceReadAt: toIso(row.sourceReadAt),
+    sourceError: row.sourceError,
   };
 }
 
@@ -122,6 +139,18 @@ export async function updateCertificate(
   if (!existing) {
     throw domainError("certificateNotFound");
   }
+  // The files are the source of truth; an edit here would be overwritten on the next read.
+  const changes = <T>(next: T | null | undefined, current: T) =>
+    next != null && JSON.stringify(next) !== JSON.stringify(current);
+  if (
+    existing.source === "agent-file" &&
+    (changes(input.certificatePem, existing.certificatePem) ||
+      changes(input.privateKeyPem, existing.privateKeyPem) ||
+      changes(input.domainNames, existing.domainNames) ||
+      changes(input.type, existing.type))
+  ) {
+    throw domainError("certificateFileFieldsReadOnly", { name: existing.name }, { status: 400 });
+  }
 
   const merged: CertificateInput = {
     name: input.name ?? existing.name,
@@ -162,11 +191,38 @@ export async function updateCertificate(
   return (await getCertificate(id))!;
 }
 
+/**
+ * The foreign key is `set null`, which would quietly move every host using it to ACME - a public
+ * issuance nobody asked for, and a broken host behind a firewall - so a delete is refused instead.
+ */
+async function assertCertificatesUnused(ids: number[]): Promise<void> {
+  const [dashboard, hosts] = await Promise.all([
+    getDashboardSettings(),
+    db
+      .select({ name: proxyHosts.name })
+      .from(proxyHosts)
+      .where(inArray(proxyHosts.certificateId, ids)),
+  ]);
+  if (hosts.length > 0) {
+    throw domainError(
+      "certificateInUseByHosts",
+      { hosts: hosts.map((host) => host.name) },
+      { status: 409 },
+    );
+  }
+  // Counted while the dashboard host is off too: turning it back on would fall back the same way.
+  const dashboardCertificateId = dashboard?.options?.certificateId;
+  if (dashboardCertificateId != null && ids.includes(dashboardCertificateId)) {
+    throw domainError("certificateInUseByDashboard", {}, { status: 409 });
+  }
+}
+
 export async function deleteCertificate(id: number, actorUserId: number) {
   const existing = await getCertificate(id);
   if (!existing) {
     throw domainError("certificateNotFound");
   }
+  await assertCertificatesUnused([id]);
 
   await db.delete(certificates).where(eq(certificates.id, id));
   await logAuditEvent({
@@ -177,6 +233,44 @@ export async function deleteCertificate(id: number, actorUserId: number) {
     summary: `Deleted certificate ${existing.name}`,
   });
   await applyCaddyConfig();
+}
+
+/**
+ * The imported tab's "Delete unused": the ids the dialog listed, with usage recomputed here so a
+ * host that took one in the meantime refuses the whole batch rather than losing it.
+ */
+export async function deleteUnusedCertificates(
+  ids: number[],
+  actorUserId: number,
+): Promise<{ count: number }> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { count: 0 };
+  const rows = await db
+    .select({ id: certificates.id, name: certificates.name, type: certificates.type })
+    .from(certificates)
+    .where(inArray(certificates.id, unique));
+  if (rows.length !== unique.length || rows.some((row) => row.type !== "imported")) {
+    throw domainError("certificateNotFound", {}, { status: 404 });
+  }
+  await assertCertificatesUnused(unique);
+
+  await runInTransaction((tx) => [
+    tx.delete(certificates).where(inArray(certificates.id, unique)),
+    tx.insert(auditEvents).values(
+      rows.map((row) =>
+        auditEventRow({
+          userId: actorUserId,
+          action: "delete",
+          entityType: "certificate",
+          entityId: row.id,
+          summary: `Deleted certificate ${row.name}`,
+          data: { bulk: true },
+        }),
+      ),
+    ),
+  ]);
+  await applyCaddyConfig();
+  return { count: rows.length };
 }
 
 /** Idempotent, with no one-time flag, so a restored legacy backup is repaired on next startup. */

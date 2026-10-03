@@ -12,6 +12,12 @@ export type CertificateApiResponse = {
   hasPrivateKey: boolean;
   createdAt: string;
   updatedAt: string;
+  source: Certificate["source"];
+  sourceAgentId: number | null;
+  sourceCertPath: string | null;
+  sourceKeyPath: string | null;
+  sourceReadAt: string | null;
+  sourceError: string | null;
 };
 
 export type CertificatePickerOption = Pick<Certificate, "id" | "name">;
@@ -35,6 +41,12 @@ export function toCertificateApiResponse(certificate: Certificate): CertificateA
     hasPrivateKey: Boolean(certificate.privateKeyPem),
     createdAt: certificate.createdAt,
     updatedAt: certificate.updatedAt,
+    source: certificate.source,
+    sourceAgentId: certificate.sourceAgentId,
+    sourceCertPath: certificate.sourceCertPath,
+    sourceKeyPath: certificate.sourceKeyPath,
+    sourceReadAt: certificate.sourceReadAt,
+    sourceError: certificate.sourceError,
   };
 }
 

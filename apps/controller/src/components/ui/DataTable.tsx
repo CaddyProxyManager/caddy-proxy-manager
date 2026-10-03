@@ -1,6 +1,15 @@
 "use client";
 
-import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from "react";
+import {
+  type Dispatch,
+  type MouseEvent,
+  type ReactNode,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import {
@@ -9,6 +18,8 @@ import {
   proportional,
   useTableRowExpansion,
   useTableRowStatus,
+  useTableSelection,
+  useTableSelectionState,
   type TableColumn,
   type TablePlugin,
   type TableRowStatus,
@@ -38,6 +49,42 @@ export type { TableRowStatus };
 /** Row shape Astryx's Table works in; see the note in DataTable below. */
 type TableRow = Record<string, unknown>;
 
+/** Row checkboxes over the rendered page. The set is the caller's, so a bulk bar can read it. */
+export type RowSelection<T> = {
+  selectedKeys: Set<string>;
+  onChange: Dispatch<SetStateAction<Set<string>>>;
+  /** A row that fails this shows a disabled checkbox, e.g. a host an operator may only view. */
+  isRowSelectable?: (row: T) => boolean;
+  /** Names the row to a screen reader: "Select <label>". */
+  rowLabel?: (row: T) => string;
+};
+
+/**
+ * Selection state for one page of `rows`. Cleared whenever the query string changes (page,
+ * filter, search, sort), so a bulk action never reaches a row the reader cannot see, and pruned
+ * to the rows still present after a refresh.
+ */
+export function useRowSelection<T>(
+  rows: T[],
+  keyField: keyof T,
+): [Set<string>, Dispatch<SetStateAction<Set<string>>>] {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const query = useSearchParams().toString();
+  useEffect(() => {
+    void query;
+    setSelected(new Set());
+  }, [query]);
+  const present = rows.map((row) => String(row[keyField])).join(",");
+  useEffect(() => {
+    const keys = new Set(present.split(","));
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((key) => keys.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [present]);
+  return [selected, setSelected];
+}
+
 type DataTableProps<T> = {
   columns: Column<T>[];
   data: T[];
@@ -58,6 +105,8 @@ type DataTableProps<T> = {
   expandedRow?: (row: T) => ReactNode;
   /** With expandedRow: a click anywhere on the row toggles it, not only the chevron. */
   expandOnRowClick?: boolean;
+  /** Adds the checkbox column. Desktop only: the phone cards have no selection. */
+  selection?: RowSelection<T>;
 };
 
 // Fixed keys, so the skeletons need no index keys.
@@ -162,6 +211,7 @@ export function DataTable<T>({
   mobileCard,
   expandedRow,
   expandOnRowClick = false,
+  selection,
 }: DataTableProps<T>) {
   const t = useTranslations("ui");
   const emptyTitle = emptyMessage ?? t("noDataAvailable");
@@ -230,7 +280,22 @@ export function DataTable<T>({
     [astryxExpansion, expandOnRowClick, toggleExpanded, getRowKey],
   );
 
+  // Hooks run unconditionally; without a `selection` prop the fallback set is simply never shown.
+  const [fallbackKeys, setFallbackKeys] = useState<Set<string>>(() => new Set());
+  const { selectionConfig } = useTableSelectionState<TableRow>({
+    data: data as readonly unknown[] as TableRow[],
+    idKey: getRowKey,
+    selectedKeys: selection?.selectedKeys ?? fallbackKeys,
+    setSelectedKeys: selection?.onChange ?? setFallbackKeys,
+    getIsItemEnabled: (row) => selection?.isRowSelectable?.(row as T) ?? true,
+  });
+  const selectionPlugin = useTableSelection<TableRow>({
+    ...selectionConfig,
+    getRowLabel: selection?.rowLabel ? (row) => selection.rowLabel!(row as T) : undefined,
+  });
+
   const plugins = {
+    ...(selection ? { selection: selectionPlugin } : {}),
     ...(rowStatus ? { rowStatus: statusPlugin } : {}),
     ...(expandedRow ? { expansion: expansionPlugin } : {}),
   };

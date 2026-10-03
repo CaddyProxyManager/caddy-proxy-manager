@@ -14,6 +14,7 @@ import {
   type TailscaleSettings,
 } from "./caddy-tailscale";
 import { encryptDnsProviderSettingCredentials } from "./dns-provider-credentials";
+import type { AcmeDnsAccount, DnsChallengeDelegation } from "./dns-challenge-delegation";
 import { encryptSecret } from "./secret";
 import {
   DEFAULT_HTTP_CACHE_SETTINGS,
@@ -23,9 +24,20 @@ import {
   normalizeHttpCacheSettings,
 } from "./http-cache";
 import { currentStagingScope } from "./settings/staging-context";
+import { type CompressionSettings, normalizeCompressionSettings } from "./host-compression";
+import {
+  assertCrowdSecComplete,
+  type CrowdSecSettings,
+  DEFAULT_CROWDSEC_SETTINGS,
+  keepStoredCrowdSecKey,
+  normalizeCrowdSecSettings,
+  withManagedCrowdSecKey,
+} from "./crowdsec";
 
 export type { DefaultResponseSettings } from "./caddy-default-response";
 export type { TailscaleSettings } from "./caddy-tailscale";
+export type { CompressionSettings } from "./host-compression";
+export type { CrowdSecSettings } from "./crowdsec";
 
 export type SettingValue<T> = T | null;
 
@@ -104,6 +116,9 @@ export type DnsProviderSettings = {
   providers: Record<string, Record<string, string>>;
   /** Null means no DNS-01 challenges. */
   default: string | null;
+  delegations?: DnsChallengeDelegation[];
+  /** Keyed by the domain each was registered for. */
+  acmeDnsAccounts?: Record<string, AcmeDnsAccount>;
 };
 
 export type UpstreamDnsAddressFamily = "ipv6" | "ipv4" | "both";
@@ -337,6 +352,47 @@ export async function getHttpProtocolsSettings(): Promise<HttpProtocolsSettings>
 
 export async function saveHttpProtocolsSettings(settings: unknown): Promise<void> {
   await setSetting("http_protocols", normalizeHttpProtocols(settings));
+}
+
+export async function getCompressionSettings(): Promise<CompressionSettings> {
+  return normalizeCompressionSettings(await getSetting<CompressionSettings>("compression"));
+}
+
+export async function saveCompressionSettings(settings: unknown): Promise<void> {
+  await setSetting("compression", normalizeCompressionSettings(settings));
+}
+
+/** The key stays encrypted, as Tailscale's does; config generation decrypts it. */
+export async function getCrowdSecSettings(): Promise<CrowdSecSettings> {
+  const stored = await getSetting<unknown>("crowdsec");
+  if (stored === null) return { ...DEFAULT_CROWDSEC_SETTINGS };
+  try {
+    return normalizeCrowdSecSettings(stored);
+  } catch (error) {
+    // Throwing would fail every config apply, taking every other host down with it.
+    console.warn("Ignoring invalid CrowdSec settings", error);
+    return { ...DEFAULT_CROWDSEC_SETTINGS };
+  }
+}
+
+/** The form and REST alike: a blank key keeps the stored one (`keepStoredCrowdSecKey`). */
+export async function saveCrowdSecSettings(value: unknown): Promise<void> {
+  const submitted = normalizeCrowdSecSettings(value);
+  const raw = await getSetting<unknown>("crowdsec");
+  let stored: CrowdSecSettings | null = null;
+  try {
+    stored = raw === null ? null : normalizeCrowdSecSettings(raw);
+  } catch {
+    // An unreadable row has nothing worth keeping.
+  }
+  const merged = withManagedCrowdSecKey(keepStoredCrowdSecKey(submitted, stored), stored);
+  assertCrowdSecComplete(merged, stored);
+  // encryptSecret passes an already-encrypted value through, which is what a kept key is.
+  await setSetting("crowdsec", {
+    ...merged,
+    apiKey: merged.apiKey ? encryptSecret(merged.apiKey) : "",
+    managedApiKey: merged.managedApiKey ? encryptSecret(merged.managedApiKey) : "",
+  });
 }
 
 /** Merged into every agent's config by `caddy-global-config.ts`. */

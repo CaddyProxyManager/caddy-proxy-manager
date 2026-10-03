@@ -105,7 +105,9 @@ t_eq "it reaches the upstream" "origin-a" "$(fetch_json '.origin')"
 # caddy-forward-auth-copy-headers.test.ts.
 t_eq "the upstream is told who the user is" "$CPM_ADMIN_USER" "$(fetch_json '.headers["x-cpm-user"]')"
 t_eq "the upstream is told the user's email" "$CPM_ADMIN_USER@localhost" "$(fetch_json '.headers["x-cpm-email"]')"
-t_eq "the upstream is told the user's id" "1" "$(fetch_json '.headers["x-cpm-user-id"]')"
+# A UUIDv7 since 3.x; only users imported from pre-3.0 keep a number.
+t_matches "the upstream is told the user's id" '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' \
+  "$(fetch_json '.headers["x-cpm-user-id"]')"
 
 # Even with a valid session, a forged header must be replaced, not passed alongside.
 fetch "https://$domain/private/page" -b "$JAR" -H 'X-CPM-User: mallory'

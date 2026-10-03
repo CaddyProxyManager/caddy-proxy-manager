@@ -415,6 +415,82 @@ wait_for_http() {  # wait until an HTTP request to the domain returns a status
   wait_for "$url to respond" "$timeout" curl -sS --max-time 5 -o /dev/null --cacert "$CA_BUNDLE" "$url"
 }
 
+# ── Rig DNS: dyn.cpm.test ───────────────────────────────────────────────────
+#
+# Records a test sets at run time, served by CoreDNS from a zone file on a volume the runner shares.
+# The zone is rewritten whole with a higher serial, which CoreDNS reloads within a second. A file
+# owns the names it sets and removes them itself.
+
+RIG_ZONE_DIR="${RIG_ZONE_DIR:-/zones}"
+RIG_DNS=172.28.0.5
+COREDNS=172.28.0.6
+DYN_DOMAIN="dyn.$TEST_DOMAIN"
+
+rig_zone_write() {
+  local serial now
+  now=$(date +%s)
+  serial=$(( $(cat "$RIG_ZONE_DIR/serial" 2>/dev/null || echo 0) + 1 ))
+  [ "$serial" -lt "$now" ] && serial=$now
+  printf '%s\n' "$serial" >"$RIG_ZONE_DIR/serial"
+  touch "$RIG_ZONE_DIR/records"
+  {
+    printf '$ORIGIN %s.\n$TTL 1\n' "$DYN_DOMAIN"
+    printf '@ IN SOA ns.%s. admin.%s. %s 60 60 60 1\n' "$DYN_DOMAIN" "$TEST_DOMAIN" "$serial"
+    printf '@ IN NS ns.%s.\nns IN A %s\n' "$DYN_DOMAIN" "$COREDNS"
+    cat "$RIG_ZONE_DIR/records"
+  } >"$RIG_ZONE_DIR/zone.tmp" && mv "$RIG_ZONE_DIR/zone.tmp" "$RIG_ZONE_DIR/db.$DYN_DOMAIN"
+}
+
+rig_dns_answer() { dig +short +norec @"$COREDNS" "$1" "$2" 2>/dev/null; }
+
+# rig_dns_set NAME TYPE VALUE - replaces NAME's records of TYPE; waits until CoreDNS answers.
+rig_dns_set() {
+  local name="${1%.}" type="$2" value="$3"
+  rig_dns_del "$name" "$type" --no-wait
+  printf '%s. IN %s %s\n' "$name" "$type" "$value" >>"$RIG_ZONE_DIR/records"
+  rig_zone_write
+  wait_for "$name $type $value in the rig DNS" 15 \
+    bash -c "dig +short +norec @$COREDNS '$name' '$type' | grep -qxF '$value'"
+}
+
+# rig_dns_del NAME [TYPE] - every record of NAME, or only those of TYPE.
+rig_dns_del() {
+  local name="${1%.}" type="${2:-}" records="$RIG_ZONE_DIR/records"
+  touch "$records"
+  awk -v n="$name." -v t="$type" '!($1 == n && (t == "" || $3 == t))' "$records" \
+    >"$records.tmp" && mv "$records.tmp" "$records"
+  [ "${3:-}" = "--no-wait" ] && return 0
+  rig_zone_write
+  wait_for "$name to leave the rig DNS" 15 \
+    bash -c "[ -z \"\$(dig +short +norec @$COREDNS '$name' '${type:-A}')\" ]"
+}
+
+# ── A second client address ─────────────────────────────────────────────────
+#
+# An alias on the runner's own interface, so an IP rule can be seen admitting one client and not
+# the other. Outside Docker's allocation range in practice: nothing else is given .200.
+
+ALT_CLIENT_IP="${ALT_CLIENT_IP:-172.28.0.200}"
+
+add_client_alias() {
+  local dev
+  ip -o -4 addr show | grep -q " inet $ALT_CLIENT_IP/" && return 0
+  dev=$(ip -o -4 addr show | awk -v ip="$CLIENT_IP" 'index($4, ip "/") == 1 {print $2; exit}')
+  [ -n "$dev" ] && ip addr add "$ALT_CLIENT_IP/24" dev "$dev"
+}
+
+# ── Server actions ──────────────────────────────────────────────────────────
+#
+# server_action PAGE ACTION [--form] [key=value...] -> ACTION_RESULT (JSON), non-zero on a throw.
+# For dashboard flows with no REST route, as the admin's session; see helpers/server_action.py.
+
+ACTION_RESULT=
+
+server_action() {
+  ACTION_RESULT=$(python3 "$(dirname "${BASH_SOURCE[0]}")/helpers/server_action.py" \
+    "$CPM_API" "$STATE_DIR/cookies.txt" "$@" 2>&1)
+}
+
 # ── Misc ────────────────────────────────────────────────────────────────────
 
 # Per test file, so leftovers from an aborted run cannot collide.

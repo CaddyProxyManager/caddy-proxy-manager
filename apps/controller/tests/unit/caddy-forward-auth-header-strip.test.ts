@@ -363,6 +363,41 @@ describe('identity-header strip leaves client credentials alone', () => {
     );
   });
 
+  it("withholds the client's Authorization from the outpost route, keeping its cookies", async () => {
+    for (const setOutpostHostHeader of [false, true]) {
+      await ctx.db.delete(schema.proxyHosts);
+      await createProxyHost(
+        {
+          name: 'ak-outpost',
+          domains: ['ak-outpost.example.com'],
+          upstreams: [UPSTREAM],
+          authentik: { ...authentikBase, setOutpostHostHeader },
+        },
+        1,
+      );
+      const outpostRoutes: Handler[] = [];
+      (function walk(node: unknown) {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== 'object') return;
+        const obj = node as Handler;
+        if (JSON.stringify(obj.match ?? null).includes('/outpost.goauthentik.io/*')) {
+          outpostRoutes.push(obj);
+        }
+        Object.values(obj).forEach(walk);
+      })(await buildCaddyDocument());
+
+      expect(outpostRoutes.length).toBeGreaterThan(0);
+      for (const route of outpostRoutes) {
+        const [proxy] = route.handle as Handler[];
+        const request = (proxy.headers as { request: Record<string, unknown> }).request;
+        expect(request.delete).toEqual(['Authorization']);
+        expect(request.set).toEqual(
+          setOutpostHostHeader ? { Host: ['{http.reverse_proxy.upstream.host}'] } : undefined,
+        );
+      }
+    }
+  });
+
   it('keeps Authorization/Cookie on every generic forward-auth route but still copies them', async () => {
     await createProxyHost(
       {

@@ -5,6 +5,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
 import { signInWithCredentials } from '../../helpers/sign-in';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-fwd-oauth.test';
 const ECHO_BODY = 'echo-ok';
@@ -363,6 +364,7 @@ test.describe
       try {
         await p.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/`);
         await expect(p.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
+        await waitForHydration(p);
 
         let capturedRedirect: string | null = null;
         await p.route('**/api/forward-auth/login', async (route) => {

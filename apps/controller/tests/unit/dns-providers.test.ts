@@ -38,6 +38,8 @@ describe('DNS provider registry', () => {
         },
       },
       default: 'acmedns',
+      delegations: [],
+      acmeDnsAccounts: {},
     });
     expect(serialized).not.toContain('credential-username');
     expect(serialized).not.toContain('credential-password');
@@ -215,14 +217,14 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/acmedns',
     });
     expect(provider?.fields).toEqual([
-      { key: 'username', label: 'Username', type: 'string', required: true },
-      { key: 'password', label: 'Password', type: 'password', required: true },
-      { key: 'subdomain', label: 'Subdomain', type: 'string', required: true },
+      { key: 'username', label: 'Username', type: 'string', required: false },
+      { key: 'password', label: 'Password', type: 'password', required: false },
+      { key: 'subdomain', label: 'Subdomain', type: 'string', required: false },
       {
         key: 'server_url',
         label: 'Server URL',
         type: 'string',
-        required: true,
+        required: false,
         placeholder: 'https://auth.acme-dns.io',
       },
       ...challengeOptionFields(),

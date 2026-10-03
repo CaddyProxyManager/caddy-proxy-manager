@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
+import { normalizeCidr } from "@/src/lib/access-list-rules";
 import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { getTranslations } from "next-intl/server";
 import {
   addAccessListEntry,
   createAccessList,
   deleteAccessList,
   getAccessList,
+  removeAccessListEntries,
   removeAccessListEntry,
   setAccessListIpRules,
   updateAccessList,
@@ -43,24 +46,36 @@ export async function updateAccessListAction(id: number, input: AccessListSettin
   });
 }
 
-/** The whole ordered set, replacing what was there. */
+/** The whole ordered set, replacing what was there. A target that is no address is a hostname. */
 export async function setAccessListIpRulesAction(
   id: number,
-  rules: { action: string; cidr: string; note?: string | null }[],
+  rules: { action: string; target: string; note?: string | null }[],
 ) {
   return withTranslatedErrors(async () => {
     const session = await requireAdmin();
-    const list = await setAccessListIpRules(id, rules, Number(session.user.id));
+    const typed = rules.map(({ target, ...rule }) =>
+      normalizeCidr(target) ? { ...rule, cidr: target } : { ...rule, hostname: target },
+    );
+    const list = await setAccessListIpRules(id, typed, Number(session.user.id));
     revalidatePath("/access-lists");
     return list;
   });
 }
 
-export async function deleteAccessListAction(id: number) {
+export async function deleteAccessListAction(
+  id: number,
+): Promise<{ success: boolean; error?: string }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
-  await deleteAccessList(id, userId);
-  revalidatePath("/access-lists");
+  try {
+    // A refusal names the hosts still using it, which only the server can list-format.
+    await withTranslatedErrors(() => deleteAccessList(id, userId));
+    revalidatePath("/access-lists");
+    return { success: true };
+  } catch (e) {
+    const t = await getTranslations("accessLists");
+    return { success: false, error: e instanceof Error ? e.message : t("deleteFailed") };
+  }
 }
 
 export async function addAccessEntryAction(
@@ -85,10 +100,7 @@ export async function deleteAccessEntryAction(accessListId: number, entryId: num
 export async function bulkDeleteEntriesAction(accessListId: number, entryIds: number[]) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
-  let list: Awaited<ReturnType<typeof removeAccessListEntry>> | undefined;
-  for (const entryId of entryIds) {
-    list = await removeAccessListEntry(accessListId, entryId, userId);
-  }
+  const list = await removeAccessListEntries(accessListId, entryIds, userId);
   revalidatePath("/access-lists");
   return list;
 }

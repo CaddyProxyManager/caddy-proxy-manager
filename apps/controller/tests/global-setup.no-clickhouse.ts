@@ -83,7 +83,9 @@ async function seedAuthState(): Promise<void> {
   mkdirSync(AUTH_DIR, { recursive: true });
 
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  // As playwright.config's timezoneId: a zone cookie left in the saved state would refresh every
+  // spec's first page after hydration.
+  const page = await browser.newPage({ timezoneId: 'UTC' });
 
   try {
     await page.goto('http://localhost:3000/login');

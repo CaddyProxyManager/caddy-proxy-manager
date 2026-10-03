@@ -60,6 +60,30 @@ describe('encryptDnsProviderSettingCredentials', () => {
     expect(next.default).toBe('route53');
   });
 
+  it('encrypts acme-dns account passwords and keeps delegations', () => {
+    const next = encryptDnsProviderSettingCredentials({
+      providers: { acmedns: {} },
+      default: 'acmedns',
+      delegations: [{ domain: 'example.com', provider: 'acmedns' }],
+      acmeDnsAccounts: {
+        'example.com': {
+          username: 'user',
+          password: 'plain-acmedns',
+          subdomain: 'sub',
+          fulldomain: 'sub.auth.example.net',
+          server_url: 'https://auth.example.net',
+        },
+      },
+    });
+    const account = next.acmeDnsAccounts!['example.com'];
+    expect(isEncryptedSecret(account.password)).toBe(true);
+    expect(decryptSecret(account.password)).toBe('plain-acmedns');
+    expect(account).toMatchObject({ username: 'user', subdomain: 'sub' });
+    expect(next.delegations).toEqual([{ domain: 'example.com', provider: 'acmedns' }]);
+    // Saved back as stored, nothing is encrypted twice.
+    expect(encryptDnsProviderSettingCredentials(next)).toEqual(next);
+  });
+
   it('encrypts the legacy single-provider shape', () => {
     const next = encryptDnsProviderSettingCredentials({
       provider: 'cloudflare',
@@ -94,6 +118,27 @@ describe('saveDnsProviderSettings', () => {
     const value = await stored('dns_provider');
     expect(JSON.stringify(value)).not.toContain('rest-plaintext-token');
     expect(decryptSecret(value.providers.cloudflare.api_token)).toBe('rest-plaintext-token');
+  });
+
+  it('stores acme-dns account passwords encrypted', async () => {
+    await saveDnsProviderSettings({
+      providers: { acmedns: {} },
+      default: 'acmedns',
+      acmeDnsAccounts: {
+        'example.com': {
+          username: 'user',
+          password: 'rest-acmedns-password',
+          subdomain: 'sub',
+          fulldomain: 'sub.auth.example.net',
+          server_url: 'https://auth.example.net',
+        },
+      },
+    });
+    const value = await stored('dns_provider');
+    expect(JSON.stringify(value)).not.toContain('rest-acmedns-password');
+    expect(decryptSecret(value.acmeDnsAccounts['example.com'].password)).toBe(
+      'rest-acmedns-password',
+    );
   });
 
   it('does not encrypt twice when the stored value is saved back', async () => {

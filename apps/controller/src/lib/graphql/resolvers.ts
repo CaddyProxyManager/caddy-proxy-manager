@@ -14,7 +14,8 @@ import {
   updateAccessList,
   deleteAccessList,
 } from "../models/access-lists";
-import { listAgents } from "../models/agents";
+import { isConnected } from "../agent/registry";
+import { type PairedAgent, listAgents } from "../models/agents";
 import { createApiToken, deleteApiToken, listApiTokens } from "../models/api-tokens";
 import { countAuditEvents, listAuditEvents } from "../models/audit";
 import { listCaCertificates } from "../models/ca-certificates";
@@ -45,6 +46,12 @@ import {
   listProxyHosts,
   updateProxyHost,
 } from "../models/proxy-hosts";
+import {
+  bulkUpdateL4ProxyHosts,
+  bulkUpdateProxyHosts,
+  parseL4HostBulkRequest,
+  parseProxyHostBulkRequest,
+} from "../models/bulk-hosts";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
 import { ApiAuthError, NotFoundError } from "../api-auth";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings-api";
@@ -84,6 +91,7 @@ const L4_SCALAR_FIELDS = new Set([
   "tlsTermination",
   "proxyProtocolVersion",
   "proxyProtocolReceive",
+  "accessListId",
   "enabled",
   "createdAt",
   "updatedAt",
@@ -109,6 +117,12 @@ function projectCertificate(row: CertificateRow) {
     autoRenew: row.autoRenew,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    source: row.source,
+    sourceAgentId: row.sourceAgentId,
+    sourceCertPath: row.sourceCertPath,
+    sourceKeyPath: row.sourceKeyPath,
+    sourceReadAt: row.sourceReadAt,
+    sourceError: row.sourceError,
   };
 }
 
@@ -136,6 +150,10 @@ export const resolvers = {
   },
   L4ProxyHost: {
     config: (host: Record<string, unknown>) => remainder(host, L4_SCALAR_FIELDS),
+  },
+  Agent: {
+    // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
+    connected: (agent: PairedAgent) => isConnected(agent.agentId),
   },
 
   Query: {
@@ -268,6 +286,10 @@ export const resolvers = {
       await deleteProxyHost(args.id, userId);
       return true;
     },
+    bulkProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
+      const { userId } = await requireAdmin(context);
+      return (await bulkUpdateProxyHosts(parseProxyHostBulkRequest(args.input), userId)).count;
+    },
 
     createL4ProxyHost: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
       const { userId } = await requireAdmin(context);
@@ -285,6 +307,10 @@ export const resolvers = {
       const { userId } = await requireAdmin(context);
       await deleteL4ProxyHost(args.id, userId);
       return true;
+    },
+    bulkL4ProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
+      const { userId } = await requireAdmin(context);
+      return (await bulkUpdateL4ProxyHosts(parseL4HostBulkRequest(args.input), userId)).count;
     },
 
     createAccessList: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {

@@ -2,7 +2,7 @@
  * Which server a Tailscale host lands in (handler shapes are in the unit test). A tailnet-only
  * host must disappear without the plugin, never fall back to the public listener.
  */
-import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
+import { describe, it, expect, afterEach, beforeEach, spyOn } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
@@ -323,6 +323,27 @@ describe('reaching an upstream over the tailnet', () => {
     expect(JSON.stringify(await buildCaddyDocument())).toContain(
       '"transport":{"protocol":"tailscale","name":"edge","tls":{"insecure_skip_verify":true}}',
     );
+  });
+
+  it('drops the transport timeouts but keeps the stream ones', async () => {
+    await enableTailscale();
+    await createHost({
+      tailscale: { upstreamNode: 'edge' },
+      upstreamTimeouts: { dialTimeout: '5s', readTimeout: '1m', streamTimeout: '1h' },
+    });
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const json = JSON.stringify(await buildCaddyDocument());
+      expect(json).toContain('"transport":{"protocol":"tailscale","name":"edge"}');
+      expect(json).not.toContain('dial_timeout');
+      expect(json).not.toContain('read_timeout');
+      expect(json).toContain('"stream_timeout":"1h"');
+      expect(warn.mock.calls.some((call) => String(call[0]).includes('upstream timeouts'))).toBe(
+        true,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('serves nothing on a node it only dials through', async () => {

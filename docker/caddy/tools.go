@@ -36,6 +36,8 @@ import (
 	_ "github.com/darkweak/storages/redis/caddy"
 	_ "github.com/darkweak/storages/simplefs/caddy"
 	_ "github.com/fuomag9/caddy-blocker-plugin"
+	_ "github.com/hslatman/caddy-crowdsec-bouncer"
 	_ "github.com/mholt/caddy-l4"
+	_ "github.com/mholt/caddy-ratelimit"
 	_ "github.com/tailscale/caddy-tailscale"
 )

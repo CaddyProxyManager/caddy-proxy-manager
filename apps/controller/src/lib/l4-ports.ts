@@ -3,11 +3,10 @@
  * admin API: the controller works out what the enabled hosts need and the agent recreates Caddy.
  */
 
-import crypto from "node:crypto";
-import type { L4PortsStatus } from "@cpm/shared";
+import { type L4PortsStatus, sameL4PortSet } from "@cpm/shared";
 import { eq } from "drizzle-orm";
 import db from "./db";
-import { isReservedL4ListenAddress, splitHostPort } from "./caddy-utils";
+import { isReservedL4ListenAddress, reservedL4Port, splitHostPortRange } from "./caddy-utils";
 import { getMetricsSettings } from "./settings";
 import { l4ProxyHosts } from "./db/schema";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
@@ -43,27 +42,41 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
 
   const metrics = await getMetricsSettings();
   const metricsPort = metrics?.enabled ? (metrics.port ?? 9090) : null;
-  const portSet = new Set<string>();
+  const ports = { tcp: new Set<number>(), udp: new Set<number>() };
   for (const host of hosts) {
-    // splitHostPort, not a trailing-colon match: an unbracketed IPv6 literal ends in something
-    // that looks like a port, and publishing that number would open a port nobody asked for.
-    const parsed = splitHostPort(host.listenAddress);
+    // Not a trailing-colon match: an unbracketed IPv6 literal ends in something that looks like a
+    // port, and publishing that number would open a port nobody asked for.
+    const parsed = splitHostPortRange(host.listenAddress);
     if (!parsed) continue;
     // validateL4Input refuses these; a row that predates the check must still not publish one.
     // buildL4Servers leaves the same rows out of the document.
     if (isReservedL4ListenAddress(host.listenAddress, metricsPort)) {
       console.warn(
-        `Not publishing reserved port ${parsed.port} for L4 proxy host ${host.id}; change its listen address.`,
+        `Not publishing reserved port ${reservedL4Port(parsed, metricsPort)} for L4 proxy host ${host.id}; change its listen address.`,
       );
       continue;
     }
-    const proto = host.protocol === "udp" ? "/udp" : "";
     // Docker publishes a port on every address family the network has; the listen address's own
     // host part is Caddy's business, inside the container.
-    portSet.add(`${parsed.port}:${parsed.port}${proto}`);
+    const set = host.protocol === "udp" ? ports.udp : ports.tcp;
+    for (let port = parsed.start; port <= parsed.end; port++) set.add(port);
   }
 
-  return Array.from(portSet).sort();
+  // Merged into runs: two hosts on overlapping ranges must not publish a port twice.
+  return [...portRuns(ports.tcp, ""), ...portRuns(ports.udp, "/udp")].sort();
+}
+
+function portRuns(ports: Set<number>, suffix: string): string[] {
+  const sorted = [...ports].sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    const span = sorted[i] === sorted[j] ? `${sorted[i]}` : `${sorted[i]}-${sorted[j]}`;
+    runs.push(`${span}:${span}${suffix}`);
+    i = j + 1;
+  }
+  return runs;
 }
 
 /**
@@ -75,11 +88,6 @@ export async function getAppliedL4Ports(): Promise<string[]> {
   return status?.l4Ports.applied ?? [];
 }
 
-/** Hash of a port list, for change detection. */
-function hashPorts(ports: string[]): string {
-  return crypto.createHash("sha256").update(ports.join(",")).digest("hex").slice(0, 16);
-}
-
 /** Whether the current L4 proxy host config differs from what is published. */
 export async function getL4PortsDiff(): Promise<L4PortsDiff> {
   const [requiredPorts, currentPorts] = await Promise.all([
@@ -89,7 +97,8 @@ export async function getL4PortsDiff(): Promise<L4PortsDiff> {
   return {
     currentPorts,
     requiredPorts,
-    needsApply: hashPorts(requiredPorts) !== hashPorts(currentPorts),
+    // An older agent reports ranges port by port.
+    needsApply: !sameL4PortSet(requiredPorts, currentPorts),
   };
 }
 

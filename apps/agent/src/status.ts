@@ -62,6 +62,8 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
     },
     // The files matter only while parsed; the directory is Caddy's either way.
     logAccess: checkLogAccess(config.caddyContainerName, analyticsEnabled()),
-    capabilities: [...AGENT_CAPABILITIES],
+    capabilities: AGENT_CAPABILITIES.filter(
+      (capability) => capability !== "certificate-files" || config.certFilesHostDir !== null,
+    ),
   };
 }

@@ -46,7 +46,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByLabel('Name')).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Protocol' }).first()).toBeVisible();
     await expect(page.getByLabel('Listen Address')).toBeVisible();
-    await expect(page.getByLabel('Upstreams')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /^Upstreams/ })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Matcher' }).first()).toBeVisible();
   });
 
@@ -106,7 +106,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByLabel('Name').fill('E2E Test Host');
     await page.getByLabel('Listen Address').fill(':19999');
-    await page.getByLabel('Upstreams').fill('10.0.0.1:5432');
+    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
     await page.getByRole('button', { name: /^create$/i }).click();
 
@@ -124,7 +124,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByLabel('Name').fill('E2E Reserved Port Host');
     await page.getByLabel('Listen Address').fill(':443');
-    await page.getByLabel('Upstreams').fill('10.0.0.1:8443');
+    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:8443');
 
     await page.getByRole('button', { name: /^create$/i }).click();
 
@@ -172,7 +172,7 @@ test.describe('L4 Proxy Hosts page', () => {
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByLabel('Name').fill(`E2E Rapid Host ${i}`);
       await page.getByLabel('Listen Address').fill(`:2000${i}`);
-      await page.getByLabel('Upstreams').fill('10.0.0.1:5432');
+      await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
       await page.getByRole('button', { name: /^create$/i }).click();
 
@@ -191,7 +191,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByRole('button', { name: /create l4 host/i }).click();
     await page.getByLabel('Name').fill('E2E Toggle Host');
     await page.getByLabel('Listen Address').fill(':20010');
-    await page.getByLabel('Upstreams').fill('10.0.0.1:5432');
+    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 

@@ -10,8 +10,9 @@ Caddy is a single static binary. A plugin either was compiled in with
 [xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime - there is no
 loading one later. **Settings → Caddy Build** makes that list editable from the dashboard.
 
-The default image ships with every supported module except the opt-in HTTP caching ones, so an
-existing install behaves exactly as it did before this page existed.
+The default image ships with every supported module except the opt-in ones - Rate Limit, CrowdSec
+and the HTTP caching modules - so an existing install behaves exactly as it did before this page
+existed.
 
 ## Choosing modules
 
@@ -26,8 +27,14 @@ provider. Turning one off does two things:
   follow caddy-tailscale, and each DNS provider follows its own module - so disabling Cloudflare
   leaves Route 53 alone.
 
-The **HTTP caching** modules are the ones the shipped image leaves out: each is off until you turn
-it on and rebuild. **HTTP Cache** unlocks the **Caddy cache** mode of a host's
+**Rate Limit** ([caddy-ratelimit](https://github.com/mholt/caddy-ratelimit)), **CrowdSec**
+([caddy-crowdsec-bouncer](https://github.com/hslatman/caddy-crowdsec-bouncer)) and the **HTTP
+caching** modules are the ones the shipped image leaves out: each is off until you turn it on and
+rebuild. Rate Limit unlocks a host's [Rate limiting](/features/reverse-proxy/#rate-limiting).
+CrowdSec unlocks [CrowdSec](/features/crowdsec/); it is one module for proxy hosts, AppSec and L4
+hosts alike, and because its L4 part is built on caddy-l4, selecting it compiles caddy-l4 in even
+with Layer 4 Proxy switched off.
+**HTTP Cache** unlocks the **Caddy cache** mode of a host's
 [Cache assets](/features/reverse-proxy/#cache-assets); the storage modules beside it give that
 cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-storage)).
 
@@ -39,12 +46,13 @@ cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-
 
 A module still being used cannot be switched off. The save is refused and names what is using it -
 "3 enabled L4 proxy hosts need the Layer 4 Proxy module". That check covers global and per-host WAF
-and geo blocking, enabled L4 hosts, hosts served on the tailnet, and every DNS provider with
-credentials on file. Turn the
+and geo blocking, CrowdSec while it is switched on, enabled L4 hosts, hosts served on the tailnet,
+and every DNS provider with credentials on file. Turn the
 feature off first.
 
-The HTTP caching modules are the exception: nothing is lost without them, so turning one off is
-allowed. Hosts in Caddy cache mode fall back to browser caching, and a storage falls back to memory.
+Rate Limit and the HTTP caching modules are the exception: turning one off is allowed. Hosts with
+rate limiting are served without limits, hosts in Caddy cache mode fall back to browser caching, and
+a storage falls back to memory.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
 only Caddy's adapter knows what a directive resolves to - for the binary running *now* rather than

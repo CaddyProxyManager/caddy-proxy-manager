@@ -65,6 +65,18 @@ async function seed() {
     backupCodes: await symmetricEncrypt({ key: config.sessionSecret, data: '["aaaaa-11111"]' }),
     verified: true,
   });
+  // Not a secret, but lost with the users it belongs to unless backed up alongside them.
+  await ctx.db.insert(schema.passkeys).values({
+    userId: 1,
+    name: 'Laptop',
+    publicKey: 'pQECAyYgASFYIA',
+    credentialID: 'credential-1',
+    counter: 4,
+    deviceType: 'multiDevice',
+    backedUp: true,
+    transports: 'internal,hybrid',
+    createdAt: NOW,
+  });
   await ctx.db.insert(schema.settings).values({
     key: 'dns_provider',
     value: JSON.stringify({ providers: { cloudflare: { api_token: encryptSecret('cf-token') } } }),
@@ -99,6 +111,8 @@ beforeEach(async () => {
   for (const table of [
     schema.sessions,
     schema.twoFactors,
+    schema.passkeys,
+    schema.certificates,
     schema.agents,
     schema.proxyHosts,
     schema.settings,
@@ -137,6 +151,7 @@ describe('restore', () => {
   it('puts everything back, re-encrypted, and signs everyone out', async () => {
     const file = await createBackup(PASSPHRASE);
     await ctx.db.delete(schema.proxyHosts);
+    await ctx.db.delete(schema.passkeys);
     await ctx.db
       .update(schema.settings)
       .set({ value: '{}' })
@@ -162,6 +177,9 @@ describe('restore', () => {
     expect(await symmetricDecrypt({ key: config.sessionSecret, data: factor.secret })).toBe(
       'TOTPSECRET',
     );
+
+    const [passkey] = await ctx.db.select().from(schema.passkeys);
+    expect(passkey).toMatchObject({ userId: 1, credentialID: 'credential-1', counter: 4 });
 
     // The state it replaced was saved first.
     expect(readdirSync(join(dataDir, 'backups')).some((f) => f.endsWith('.cpmbak'))).toBe(true);
@@ -240,6 +258,25 @@ describe('restore', () => {
     await restoreBackup(file, PASSPHRASE, { keepAgents: false });
     // Left as they are here, rather than replaced by the backup's.
     expect(await ctx.db.select().from(schema.agents)).toHaveLength(1);
+  });
+
+  it("keeps a certificate read from an agent's files, unlinked, when pairings are dropped", async () => {
+    await ctx.db.insert(schema.certificates).values({
+      name: 'from-files',
+      type: 'imported',
+      domainNames: '["app.example.com"]',
+      source: 'agent-file',
+      sourceAgentId: 3,
+      sourceCertPath: 'live/app/fullchain.pem',
+      sourceKeyPath: 'live/app/privkey.pem',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const file = await createBackup(PASSPHRASE);
+    await restoreBackup(file, PASSPHRASE, { keepAgents: false });
+    // The agent id is the old machine's; here it could name a different agent.
+    const [cert] = await ctx.db.select().from(schema.certificates);
+    expect(cert).toMatchObject({ name: 'from-files', source: 'agent-file', sourceAgentId: null });
   });
 
   it('changes nothing on a wrong passphrase or a tampered file', async () => {

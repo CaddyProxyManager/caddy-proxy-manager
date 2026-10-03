@@ -33,6 +33,7 @@ import type {
   ErrorPagesSettings,
   TrustedProxiesSettings,
   HttpProtocolsSettings,
+  CompressionSettings,
   GlobalCaddyConfigSettings,
   TwoFactorPolicySettings,
   DefaultResponseSettings,
@@ -56,6 +57,8 @@ import {
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import OAuthProvidersSection from "./OAuthProvidersSection";
+import LdapDirectoriesSection from "./LdapDirectoriesSection";
+import type { LdapDirectoryView } from "@/src/lib/models/ldap-directories";
 import SettingsFrame from "./SettingsFrame";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
@@ -91,6 +94,7 @@ import {
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
+  updateCompressionSettingsAction,
   updateGlobalCaddyConfigAction,
   updateHttpCacheSettingsAction,
   updateTwoFactorPolicySettingsAction,
@@ -99,6 +103,7 @@ import {
   updateDashboardSettingsAction,
   checkDashboardDnsAction,
   updateTailscaleSettingsAction,
+  updateCrowdSecSettingsAction,
   updateCaptchaSettingsAction,
   pairingCodeAction,
   unpairAgentAction,
@@ -120,11 +125,15 @@ import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlo
 import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
+import { CrowdSecSection } from "./CrowdSecSection";
+import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
 import { CertificateAlertsSection, EmailServerSection } from "./EmailSection";
 import type { EmailSettingsView } from "@/src/lib/email/view";
 import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
+import type { CrowdSecSettingsView } from "@/src/lib/crowdsec";
+import type { ManagedServiceView } from "@/src/lib/agent/managed-services";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -144,6 +153,7 @@ type Props = {
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
   httpProtocols: HttpProtocolsSettings;
+  compression: CompressionSettings;
   globalCaddyConfig: GlobalCaddyConfigSettings;
   httpCache: HttpCacheSettingsView;
   twoFactorPolicy: TwoFactorPolicySettings;
@@ -151,6 +161,7 @@ type Props = {
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProviderView[];
+  ldapDirectories: LdapDirectoryView[];
   /** The provider offered first on the sign-in screen, or null for alphabetical order. */
   primaryProviderId: string | null;
   localUsersDisabled: boolean;
@@ -158,6 +169,10 @@ type Props = {
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   /** The sign-in CAPTCHA, with the secret replaced by whether one is stored. */
   captcha: CaptchaSettingsView;
+  /** The bouncer key replaced by whether one is stored. */
+  crowdsec: CrowdSecSettingsView;
+  /** The managed container as its agent reports it; null elsewhere, or with no such agent. */
+  crowdsecManaged: ManagedServiceView | null;
   caddyBuild: CaddyBuildSettings | null;
   agentBuildTargets?: { id: number; name: string; connected: boolean }[];
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
@@ -180,6 +195,8 @@ type Props = {
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
   canManageServices: boolean;
   baseUrl: string;
+  /** Whether anyone has a passkey, which a new Public URL hostname would orphan. */
+  passkeysRegistered?: boolean;
   agents: {
     /** Agents paired over the network. Empty on a single-host deployment, which uses the socket. */
     paired: PairedAgent[];
@@ -189,6 +206,15 @@ type Props = {
     autoPairingDisabled: boolean;
   };
 };
+
+/** A passkey's rpID is the bare hostname, not the origin. */
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -207,6 +233,7 @@ export default function SettingsClient({
   upstreamDnsResolution,
   trustedProxies,
   httpProtocols,
+  compression,
   globalCaddyConfig,
   httpCache,
   twoFactorPolicy,
@@ -214,11 +241,14 @@ export default function SettingsClient({
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
+  ldapDirectories,
   primaryProviderId,
   localUsersDisabled,
   avatars,
   passwordPolicy,
   captcha,
+  crowdsec,
+  crowdsecManaged,
   caddyBuild,
   agentBuildTargets,
   agentBuildSelections,
@@ -234,6 +264,7 @@ export default function SettingsClient({
   email,
   canManageServices,
   baseUrl,
+  passkeysRegistered = false,
   agents,
 }: Props) {
   // Falls back rather than 404s, so a stale bookmark to a renamed section still lands somewhere.
@@ -285,6 +316,7 @@ export default function SettingsClient({
     null,
   );
   const [captchaState, captchaFormAction] = useActionState(updateCaptchaSettingsAction, null);
+  const [crowdsecState, crowdsecFormAction] = useActionState(updateCrowdSecSettingsAction, null);
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
   const [upstreamDnsResolutionState, upstreamDnsResolutionFormAction] = useActionState(
@@ -307,6 +339,10 @@ export default function SettingsClient({
   const [httpCacheState, httpCacheFormAction] = useActionState(updateHttpCacheSettingsAction, null);
   const [httpProtocolsState, httpProtocolsFormAction] = useActionState(
     updateHttpProtocolsSettingsAction,
+    null,
+  );
+  const [compressionState, compressionFormAction] = useActionState(
+    updateCompressionSettingsAction,
     null,
   );
   const [twoFactorPolicyState, twoFactorPolicyFormAction] = useActionState(
@@ -408,12 +444,19 @@ export default function SettingsClient({
       </>
     ),
     instance: (
-      <RegistrySettingsBlock
-        block="instance"
-        fields={registry.instance ?? []}
-        state={instanceState}
-        formAction={instanceFormAction}
-      />
+      <VStack gap={4}>
+        {passkeysRegistered && (
+          <WarnAlert title={t("passkeyHostnameWarningTitle")}>
+            {t("passkeyHostnameWarningDescription", { host: hostnameOf(baseUrl) })}
+          </WarnAlert>
+        )}
+        <RegistrySettingsBlock
+          block="instance"
+          fields={registry.instance ?? []}
+          state={instanceState}
+          formAction={instanceFormAction}
+        />
+      </VStack>
     ),
     "sign-in": (
       <RegistrySettingsBlock
@@ -458,6 +501,13 @@ export default function SettingsClient({
         formAction={httpProtocolsFormAction}
       />
     ),
+    compression: (
+      <CompressionSection
+        compression={compression}
+        state={compressionState}
+        formAction={compressionFormAction}
+      />
+    ),
     tailscale: (
       <TailscaleSection
         tailscale={tailscale}
@@ -473,12 +523,25 @@ export default function SettingsClient({
         baseUrl={baseUrl}
       />
     ),
+    ldap: (
+      <FormCard>
+        <LdapDirectoriesSection initialDirectories={ldapDirectories} />
+      </FormCard>
+    ),
     captcha: (
       <CaptchaSection
         captcha={captcha}
         localUsersDisabled={localUsersDisabled}
         captchaState={captchaState}
         captchaFormAction={captchaFormAction}
+      />
+    ),
+    crowdsec: (
+      <CrowdSecSection
+        crowdsec={crowdsec}
+        managed={crowdsecManaged}
+        state={crowdsecState}
+        formAction={crowdsecFormAction}
       />
     ),
     "two-factor": (
@@ -1044,6 +1107,14 @@ function DnsProvidersSection({
           </VStack>
         </form>
       </FormCard>
+
+      <DnsDelegationSection
+        dnsProvider={dnsProvider}
+        dnsProviderDefinitions={dnsProviderDefinitions}
+        configuredProviders={configuredProviders}
+        formAction={dnsProviderFormAction}
+        isProviderAvailable={isProviderAvailable}
+      />
     </>
   );
 }
@@ -1308,6 +1379,36 @@ function HttpProtocolsSection({
             htmlName="http3"
             value={http3}
             onChange={setHttp3}
+          />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+function CompressionSection({
+  compression,
+  state,
+  formAction,
+}: {
+  compression: CompressionSettings;
+  state: { success: boolean; message?: string } | null;
+  formAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [enabled, setEnabled] = useState(compression.enabled);
+
+  return (
+    <FormCard>
+      <form action={formAction}>
+        <VStack gap={3}>
+          {state?.message && <StatusAlert message={state.message} success={state.success} />}
+          <Switch
+            label={t("compressionEnabled")}
+            description={t("compressionEnabledHelp")}
+            htmlName="enabled"
+            value={enabled}
+            onChange={setEnabled}
           />
         </VStack>
       </form>

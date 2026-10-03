@@ -15,6 +15,7 @@ import { hashPassword, verifyPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
 import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { hasDirectoryAccount } from "@/src/lib/models/ldap-directories";
 
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -78,6 +79,11 @@ export async function POST(request: NextRequest) {
     const currentSession = await getCurrentSessionInfo(request);
     // Self-registration keeps the hash on the credential account only.
     const currentHash = await getUserPasswordHash(user);
+
+    // A first password for a directory account would outlive the directory disabling it.
+    if (!currentHash && (await hasDirectoryAccount(userId))) {
+      return NextResponse.json({ error: t("errors.passwordManagedByDirectory") }, { status: 403 });
+    }
 
     if (currentHash) {
       if (!currentPassword) {

@@ -20,6 +20,7 @@ import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import { AuthentikFields } from "./AuthentikFields";
 import { ForwardAuthFields } from "./ForwardAuthFields";
 import { DnsResolverFields } from "./DnsResolverFields";
+import { UpstreamTimeoutsFields } from "./UpstreamTimeoutsFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
 import { GeoBlockFields } from "./GeoBlockFields";
 import { accessListOptions, accessListStatus, NONE_VALUE, toOptions } from "./HostDialogs";
@@ -35,6 +36,8 @@ import { SettingsToggles } from "./SettingsToggles";
 import { TailscaleFields, type TailscaleHostDefaults } from "./TailscaleFields";
 import { UpstreamDnsResolutionFields } from "./UpstreamDnsResolutionFields";
 import { WafFields } from "./WafFields";
+import { RateLimitFields } from "./RateLimitFields";
+import { CrowdSecFields } from "./CrowdSecFields";
 import {
   type WafPluginOption,
   type WafPresetOption,
@@ -101,13 +104,16 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
       <TailscaleFields tailscale={view.tailscale} defaults={data.tailscaleDefaults} />
       <LoadBalancerFields loadBalancer={view.loadBalancer} />
       <DnsResolverFields dnsResolver={view.dnsResolver} />
+      <UpstreamTimeoutsFields upstreamTimeouts={view.upstreamTimeouts} />
       <UpstreamDnsResolutionFields upstreamDnsResolution={view.upstreamDnsResolution} />
+      <RateLimitFields rateLimit={view.rateLimit} />
       <GeoBlockFields
         initialValues={{
           geoblock: view.geoblock,
           geoblock_mode: view.geoblockMode,
         }}
       />
+      <CrowdSecFields enabled={view.crowdsec} />
       <WafPresetOptionsProvider presets={data.wafPresets} plugins={data.wafPlugins}>
         <WafFields value={view.waf} />
       </WafPresetOptionsProvider>

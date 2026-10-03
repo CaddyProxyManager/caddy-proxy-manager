@@ -24,8 +24,26 @@ export type ModuleGateState = {
 // Defaulting to "everything on" keeps components usable outside the provider - tests, storybook
 // and the login shell - instead of silently disabling every control.
 const FALLBACK: ModuleGateState = {
-  features: { l4: true, geoblock: true, waf: true, tailscale: true, dns01: true, cache: true },
-  moduleNames: { l4: "", geoblock: "", waf: "", tailscale: "", dns01: "", cache: "" },
+  features: {
+    l4: true,
+    geoblock: true,
+    waf: true,
+    tailscale: true,
+    dns01: true,
+    cache: true,
+    ratelimit: true,
+    crowdsec: true,
+  },
+  moduleNames: {
+    l4: "",
+    geoblock: "",
+    waf: "",
+    tailscale: "",
+    dns01: "",
+    cache: "",
+    ratelimit: "",
+    crowdsec: "",
+  },
   enabledModuleIds: null,
   pendingRebuild: false,
 };

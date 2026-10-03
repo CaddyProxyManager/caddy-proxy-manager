@@ -1,6 +1,6 @@
 ---
 title: Reverse proxy
-description: Proxy hosts - upstreams, load balancing, health checks, location rules, redirects and DNS controls.
+description: Proxy hosts - upstreams, load balancing, health checks, timeouts, rate limits, location rules, redirects and DNS controls.
 ---
 
 import HostEditorDemo from "../../../demos/samples/HostEditorDemo";
@@ -12,6 +12,8 @@ import LoadBalancerDemo from "../../../demos/samples/LoadBalancerDemo";
 import LocationRulesDemo from "../../../demos/samples/LocationRulesDemo";
 import RedirectsDemo from "../../../demos/samples/RedirectsDemo";
 import UpstreamDnsDemo from "../../../demos/samples/UpstreamDnsDemo";
+import UpstreamTimeoutsDemo from "../../../demos/samples/UpstreamTimeoutsDemo";
+import RateLimitDemo from "../../../demos/samples/RateLimitDemo";
 import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
@@ -21,9 +23,23 @@ Every host, HTTP or L4, can carry **notes**: free text for whatever the next per
 up to 2000 characters. They show as an icon beside the host's name in the list, with the text on
 hover, and the search box finds them. Anyone who can see the host can read them.
 
-<Demo title="The proxy host list" note="Sort by domain or status, switch to the enabled or disabled hosts, or hover the note on staging.">
+<Demo title="The proxy host list" note="Sort by domain or status, switch to the enabled or disabled hosts, or hover the note on staging. Grafana is in maintenance mode. Tick a few rows to disable them together.">
   <ProxyHostsTableDemo client:visible />
 </Demo>
+
+### Changing many hosts at once
+
+Tick hosts in the list and a bar replaces the filters: enable, disable or delete them, turn
+maintenance mode on or off, or give them all one certificate (automatic included) or one access
+list (none included). Every action confirms with the names of the hosts it will touch.
+
+A batch is all or nothing. If one host could not take the change - a wildcard domain asked to use
+automatic certificates with no DNS provider, say - nothing is written and the dialog says why.
+Each host gets its own row in the [audit log](../audit-log/), and Caddy is reloaded once for the
+lot. Selection covers the page you are looking at and clears when you page, filter, search or
+sort; it is not offered on a phone. An operator can tick only the hosts their groups let them
+manage. The [API](../api/#changing-many-hosts) has the same actions as the `bulkProxyHosts`
+mutation.
 
 ## HTTPS and connection options
 
@@ -36,6 +52,10 @@ Each host has switches at the top of its editor:
   any other request, but not the messages after it. With it off, an upgrade is refused with a 403.
 - **Preserve Host header** sends the domain the client asked for rather than the upstream's
   own address.
+- **Discourage search engines** adds `X-Robots-Tag: noindex, nofollow` to every response,
+  replacing any the upstream sent, and answers `/robots.txt` with a file that disallows
+  everything. Both come before access lists and sign-in, so a crawler sees them on a protected
+  host too. Crawlers that follow the rules stay away; it keeps nobody out.
 
 <Demo title="Host options" note="Turn off Force HTTPS and HSTS follows.">
   <HostTogglesDemo client:visible />
@@ -44,6 +64,13 @@ Each host has switches at the top of its editor:
 HTTP/2 and HTTP/3 are offered on every host. **Settings → Network → HTTP Versions** turns either
 off, for all hosts at once: Caddy decides this per listening port, and every host shares one.
 HTTP/1.1 always stays on.
+
+Responses are compressed with zstd or gzip, whichever the browser prefers, and turned off for
+every host in **Settings → Network → Compression**. Only text formats are compressed - HTML, CSS,
+JavaScript, JSON, XML, SVG and fonts - and only above 512 bytes; images, video, archives and
+anything the upstream already compressed pass through unchanged. A host's **Compression** option
+can follow that setting (**Default**) or force it **On** or **Off** for that host alone, say for an
+upstream that compresses better itself. Server-sent events and WebSockets keep streaming.
 
 ## Upstreams and load balancing
 
@@ -64,6 +91,28 @@ Retries let a failed request try another upstream rather than surfacing the erro
 
 <Demo title="Load balancing and health checks" note="Change the policy to see what each one asks for.">
   <LoadBalancerDemo client:visible />
+</Demo>
+
+## Timeouts
+
+Caddy's defaults suit most upstreams: three seconds to connect and no limit on anything after
+that. **Upstream timeouts** change them per host, as durations such as `30s`, `1m30s`, `2h` or
+`1d`, and an empty field keeps the default:
+
+- **Connect** - opening a connection, name lookup included.
+- **Response headers** - from sending the request to the upstream answering.
+- **Read** and **Write** - the longest wait for a single read from, or write to, the upstream.
+- **Idle connection** - how long an unused connection is kept for reuse (two minutes by default).
+- **Stream lifetime** - closes WebSockets and other upgraded connections after this long.
+- **Stream close delay** - how long upgraded connections survive a configuration reload, rather
+  than being closed at once.
+
+Location rules use their host's timeouts. A host that reaches its upstream through a
+[Tailscale](../tailscale/) node keeps only the two stream settings, since that transport takes no
+others. The server-side read, write and idle timeouts belong to the listener rather than a host.
+
+<Demo title="Upstream timeouts" note="Type something that is not a duration to see it refused.">
+  <UpstreamTimeoutsDemo client:visible />
 </Demo>
 
 ## Location rules
@@ -114,11 +163,61 @@ anything stricter the upstream sent, and nothing marked `private` or `no-store` 
 cache sits after any forward auth or access check, just before the upstream, so an asset is never
 served to a caller who could not fetch it.
 
+## Maintenance mode
+
+**Maintenance mode** answers every request to a host with a `503 Service Unavailable` while its
+upstream is being worked on. It is not the same as disabling the host: a disabled host stops
+existing as far as Caddy is concerned and falls through to the default response, while a host in
+maintenance keeps its certificate and tells visitors, and crawlers, that it will be back.
+
+- **Bypass addresses** - IP addresses or CIDR ranges, one per line, that still reach the upstream,
+  so you can check the site before reopening it. The client address is the one Caddy resolves
+  through **Settings → Network → Trusted Proxies**. Access lists, sign-in and the WAF still apply
+  to a bypassing request.
+- **Retry-After** - seconds, sent as the `Retry-After` header when set.
+- **Page** - the HTML visitors see. Left empty, the host's own custom error page for a 503 is used,
+  then the global one from **Settings → Responses → Error Pages**, then a short built-in page.
+
+The 503 comes before anything else in the host's configuration - geo blocking, the WAF, forward
+auth and location rules included - and is sent with `Cache-Control: no-store`, so no cache keeps it
+past the maintenance window. Its settings are kept while it is off. The host list shows a
+**Maintenance** status, and the row's menu turns it on or off in one click; either way the change is
+recorded in the [audit log](../audit-log/).
+
+## Rate limiting
+
+**Rate limiting** answers a client that sends too many requests with `429 Too Many Requests` and a
+`Retry-After` header saying when to try again. It needs the opt-in Rate Limit module (see
+[Caddy build](/features/caddy-build/)); until that is compiled in, the host is served without
+limits and Caddy's log says so.
+
+A host has one or more zones, and each counts on its own:
+
+- **Paths** - Caddy path patterns such as `/login` or `/api/*`. Empty covers every request.
+- **Requests** and **Per** - how many requests one client may make within a sliding window, such
+  as 100 per `1m`.
+- **Count per** - the client IP, or the client IP and path together, so each path gets its own
+  allowance.
+- **IPv6 prefix** - counts a whole IPv6 network, such as a `/64`, as one client, since one
+  household or server usually holds far more addresses than it needs. Only with the client IP.
+
+The client IP is the one Caddy resolves through **Settings → Network → Trusted Proxies**, so a
+load balancer in front does not make every visitor look like one client. The limit is checked
+before geo blocking and the WAF, so a flood never costs a WAF inspection. The 429 is rendered by
+the host's custom error page for it, or the global one from **Settings → Responses → Error Pages**.
+Counters are kept per Caddy and survive a configuration reload; each agent counts on its own.
+
+<Demo title="Rate limiting" note="Switch a zone to client IP and path to see the IPv6 prefix step aside.">
+  <RateLimitDemo client:visible />
+</Demo>
+
 ## DNS controls
 
 **Upstream DNS pinning** resolves upstream hostnames when the configuration is applied and writes
 the addresses into Caddy's config, rather than leaving Caddy to resolve them per request. You can
-choose IPv4, IPv6 or both. **Custom resolvers** can be set per host.
+choose IPv4, IPv6 or both. **Custom resolvers** can be set per host; their connect timeout bounds
+the lookup and the connection together, and a **Connect** timeout under Upstream timeouts wins
+over it.
 
 <Demo title="Upstream DNS pinning" note="Open it to override the global default.">
   <UpstreamDnsDemo client:visible />

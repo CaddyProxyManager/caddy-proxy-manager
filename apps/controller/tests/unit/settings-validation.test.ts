@@ -202,6 +202,92 @@ describe('REST settings runtime validation', () => {
     ).toThrow(/propagation_timeout must be a duration/);
   });
 
+  it('validates challenge delegations and acme-dns accounts', () => {
+    const account = {
+      username: 'user',
+      password: 'secret',
+      subdomain: 'sub',
+      fulldomain: 'sub.auth.example.net',
+      server_url: 'https://auth.example.net',
+    };
+    const settings = (extra: Record<string, unknown>) => ({
+      providers: { cloudflare: { api_token: 'secret' }, acmedns: {} },
+      default: 'cloudflare',
+      ...extra,
+    });
+
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({
+          delegations: [
+            { domain: 'example.com', target: '_acme-challenge.example.com.zone.example.net' },
+            { domain: 'other.example', provider: 'acmedns' },
+          ],
+          acmeDnsAccounts: { 'other.example': account },
+        }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ delegations: [{ domain: '*.example.com', provider: 'cloudflare' }] }),
+      ),
+    ).toThrow(/without a wildcard/);
+    expect(() =>
+      validateSettingsGroup('dns-provider', settings({ delegations: [{ domain: 'example.com' }] })),
+    ).toThrow(/needs a target, a provider or both/);
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ delegations: [{ domain: 'example.com', provider: 'route53' }] }),
+      ),
+    ).toThrow(/configured provider/);
+    // A placeholder would be expanded by Caddy's replacer.
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ delegations: [{ domain: 'example.com', target: '{env.SECRET}.example.net' }] }),
+      ),
+    ).toThrow(/target must be a domain name/);
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({
+          delegations: [
+            { domain: 'example.com', provider: 'cloudflare' },
+            { domain: 'EXAMPLE.com', provider: 'cloudflare' },
+          ],
+        }),
+      ),
+    ).toThrow(/listed twice/);
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ acmeDnsAccounts: { 'example.com': { ...account, server_url: 'ftp://x' } } }),
+      ),
+    ).toThrow(/server_url/);
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ acmeDnsAccounts: { 'example.com': { ...account, extra: 'x' } } }),
+      ),
+    ).toThrow(/unknown field/);
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ acmeDnsAccounts: { 'Example.com': account } }),
+      ),
+    ).toThrow(/lowercase/);
+    // The single acme-dns account is all or nothing.
+    expect(() =>
+      validateSettingsGroup('dns-provider', {
+        providers: { acmedns: { username: 'user' } },
+        default: 'acmedns',
+      }),
+    ).toThrow(/or none/);
+  });
+
   it('caps total payload size', () => {
     expect(() => validateSettingsGroup('acme', { caRootPem: 'x'.repeat(1024 * 1024 + 1) })).toThrow(
       /must not exceed/,

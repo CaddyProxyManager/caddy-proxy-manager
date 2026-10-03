@@ -334,7 +334,16 @@ export function sanitizeCaddyBuildSettings(input: {
 
 // ─── UI gate ─────────────────────────────────────────────────────────────────
 
-const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01", "cache"];
+const GATED_FEATURES: CaddyFeatureId[] = [
+  "l4",
+  "geoblock",
+  "waf",
+  "tailscale",
+  "dns01",
+  "cache",
+  "ratelimit",
+  "crowdsec",
+];
 
 /** Gates on *desired*: following applied, a control stays greyed out right after it is enabled. */
 export async function getModuleGateState(

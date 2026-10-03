@@ -178,3 +178,38 @@ export function resetTwoFactor(email: string): void {
     await sql.close();
   `);
 }
+
+/** A passkey spec starts and ends with none, whatever a failed run left behind. */
+export function clearPasskeys(email: string): void {
+  runSeedScript(`
+    const [user] = await sql\`SELECT id FROM users WHERE email = \${${JSON.stringify(email)}}\`;
+    if (user) await sql\`DELETE FROM passkeys WHERE "userId" = \${user.id}\`;
+    await sql.close();
+  `);
+}
+
+export function getUserId(email: string): number {
+  const output = runSeedScript(`
+    const [user] = await sql\`SELECT id FROM users WHERE email = \${${JSON.stringify(email)}}\`;
+    console.log(JSON.stringify({ id: user?.id ?? null }));
+    await sql.close();
+  `).trim();
+  const json = output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1);
+  return JSON.parse(json).id as number;
+}
+
+/** Directories are `oauth_providers` rows; the ldap spec leaves none behind for the specs after it. */
+export function clearLdapDirectories(): void {
+  runSeedScript(`
+    await sql\`DELETE FROM oauth_providers WHERE type = 'ldap'\`;
+    await sql.close();
+  `);
+}
+
+/** A directory-provisioned account, so a rerun signs in as a first-time user again. */
+export function deleteUserByEmail(email: string): void {
+  runSeedScript(`
+    await sql\`DELETE FROM users WHERE email = \${${JSON.stringify(email)}}\`;
+    await sql.close();
+  `);
+}

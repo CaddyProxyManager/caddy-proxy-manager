@@ -24,14 +24,21 @@ import {
   type L4UpstreamDnsResolutionConfig,
   type L4GeoBlockConfig,
   type L4GeoBlockMode,
+  type L4UpstreamPortMode,
 } from "@/src/lib/models/l4-proxy-hosts";
 import { parseAgentIds } from "@/src/lib/models/host-agents";
+import {
+  type L4HostBulkRequest,
+  bulkUpdateL4ProxyHosts,
+  parseL4HostBulkRequest,
+} from "@/src/lib/models/bulk-hosts";
 import {
   parseCheckbox,
   parseCsv,
   parseUpstreams,
   parseOptionalText,
   parseOptionalNumber,
+  parseAccessListId,
 } from "@/src/lib/form-parse";
 
 const VALID_PROTOCOLS: L4Protocol[] = ["tcp", "udp"];
@@ -223,6 +230,11 @@ function parseMatcherType(formData: FormData): L4MatcherType {
   return "none";
 }
 
+function parseUpstreamPortMode(formData: FormData): L4UpstreamPortMode | undefined {
+  if (!formData.has("upstreamPortMode")) return undefined;
+  return formData.get("upstreamPortMode") === "same" ? "same" : "fixed";
+}
+
 function parseProxyProtocolVersion(formData: FormData): L4ProxyProtocolVersion | null {
   const raw = parseOptionalText(formData.get("proxyProtocolVersion"));
   if (raw && VALID_PP_VERSIONS.includes(raw as L4ProxyProtocolVersion))
@@ -251,17 +263,22 @@ export async function createL4ProxyHostAction(
       protocol: parseProtocol(formData),
       listenAddress: String(formData.get("listenAddress") ?? "").trim(),
       upstreams: parseUpstreams(formData.get("upstreams")),
+      upstreamPortMode: parseUpstreamPortMode(formData),
       matcherType: matcherType,
       matcherValue: matcherValue,
       tlsTermination: parseCheckbox(formData.get("tlsTermination")),
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
+      accessListId: parseAccessListId(formData.get("accessListId")),
       enabled: parseCheckbox(formData.get("enabled")),
       agentIds: parseAgentIds(formData.getAll("agentId")),
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
       ...parseL4GeoBlockConfig(formData),
+      crowdsec: formData.has("crowdsecPresent")
+        ? parseCheckbox(formData.get("crowdsecEnabled"))
+        : undefined,
     };
 
     await createL4ProxyHost(input, userId);
@@ -302,11 +319,15 @@ export async function updateL4ProxyHostAction(
         ? String(formData.get("listenAddress")).trim()
         : undefined,
       upstreams: formData.get("upstreams") ? parseUpstreams(formData.get("upstreams")) : undefined,
+      upstreamPortMode: parseUpstreamPortMode(formData),
       matcherType: matcherType,
       matcherValue: matcherValue,
       tlsTermination: parseCheckbox(formData.get("tlsTermination")),
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
+      accessListId: formData.has("accessListId")
+        ? parseAccessListId(formData.get("accessListId"))
+        : undefined,
       enabled: formData.has("enabledPresent") ? parseCheckbox(formData.get("enabled")) : undefined,
       agentIds: formData.has("agentAssignmentPresent")
         ? parseAgentIds(formData.getAll("agentId"))
@@ -315,6 +336,9 @@ export async function updateL4ProxyHostAction(
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
       ...parseL4GeoBlockConfig(formData),
+      crowdsec: formData.has("crowdsecPresent")
+        ? parseCheckbox(formData.get("crowdsecEnabled"))
+        : undefined,
     };
 
     await updateL4ProxyHost(id, input, userId);
@@ -359,5 +383,26 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
     const t = await getTranslations();
     console.error("Failed to toggle L4 proxy host:", id, error);
     return actionError(t, error, t("errors.toggleL4HostFailed"));
+  }
+}
+
+/** All or nothing, as for proxy hosts. */
+export async function bulkL4ProxyHostsAction(request: L4HostBulkRequest): Promise<ActionState> {
+  try {
+    const access = await requireAccess();
+    const parsed = parseL4HostBulkRequest(request);
+    for (const id of parsed.ids) assertCanManage(access, "l4ProxyHost", id);
+    const { count } = await bulkUpdateL4ProxyHosts(parsed, access.userId);
+    revalidatePath("/l4-proxy-hosts");
+    const t = await getTranslations("ui");
+    return actionSuccess(
+      parsed.action === "delete"
+        ? t("bulk.deletedResult", { count })
+        : t("bulk.updatedResult", { count }),
+    );
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to change L4 proxy hosts in bulk:", error);
+    return actionError(t, error, t("errors.bulkHostsFailed"));
   }
 }

@@ -77,6 +77,7 @@ const CADDY_IMAGE_KEY = "caddy_image";
 const FLEET_CONFIG_KEY = "fleet_config";
 const SERVICES_STATUS_KEY = "managed_services_status";
 const APPLIED_SERVICES_KEY = "applied_managed_services";
+const APPLIED_SERVICES_ENV_KEY = "applied_managed_services_env";
 const CADDY_STOPPED_FOR_SHUTDOWN_KEY = "caddy_stopped_for_shutdown";
 
 export class AgentStore {
@@ -200,8 +201,18 @@ export class AgentStore {
     return this.readJson<Record<ManagedServiceName, boolean>>(APPLIED_SERVICES_KEY);
   }
 
-  setAppliedManagedServices(services: Record<ManagedServiceName, boolean>): void {
+  /** `envFingerprint` is `managedServicesEnvFingerprint` of what the apply was given. */
+  setAppliedManagedServices(
+    services: Record<ManagedServiceName, boolean>,
+    envFingerprint?: string,
+  ): void {
     this.writeState(APPLIED_SERVICES_KEY, JSON.stringify(services));
+    if (envFingerprint !== undefined) this.writeState(APPLIED_SERVICES_ENV_KEY, envFingerprint);
+  }
+
+  /** Null before the first apply that recorded one, which reads as changed. */
+  appliedManagedServicesEnv(): string | null {
+    return this.readState(APPLIED_SERVICES_ENV_KEY);
   }
 
   /**
