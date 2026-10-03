@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
 import { signInWithCredentials } from '../../helpers/sign-in';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-fwd-auth-excl.test';
 const ECHO_BODY = 'echo-ok';
@@ -84,6 +85,7 @@ test.describe
       try {
         await freshPage.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/protected-page`);
         await expect(freshPage.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
+        await waitForHydration(freshPage);
 
         let capturedRedirect: string | null = null;
         await freshPage.route('**/api/forward-auth/login', async (route) => {

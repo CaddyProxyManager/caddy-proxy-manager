@@ -6,7 +6,14 @@
 import { describe, expect, it } from 'bun:test';
 import { USERNAME_ERROR_CODES } from 'better-auth/plugins/username';
 import messages from '../../messages/en.json';
-import { SIGN_IN_ERROR_KEYS, signInErrorMessage } from '@/src/lib/sign-in-error';
+import { createFormatter, createTranslator } from 'next-intl';
+import {
+  ACCOUNT_LOCKED,
+  SIGN_IN_ERROR_KEYS,
+  accountLockSeconds,
+  lockLiftsIn,
+  signInErrorMessage,
+} from '@/src/lib/sign-in-error';
 
 const errors = messages.auth.errors as Record<string, string | undefined>;
 const t = (key: string) => key;
@@ -31,6 +38,29 @@ describe('signInErrorMessage', () => {
   });
 });
 
+describe('an account lock', () => {
+  it('is read from its own code and wait, never from a plain 429', () => {
+    expect(accountLockSeconds({ status: 429, code: ACCOUNT_LOCKED, retryAfter: 8 })).toBe(8);
+    expect(accountLockSeconds({ status: 429, code: ACCOUNT_LOCKED, retryAfter: '2.5' })).toBe(3);
+    expect(accountLockSeconds({ status: 429 })).toBeNull();
+    expect(
+      accountLockSeconds({ status: 429, code: 'TOO_MANY_REQUESTS', retryAfter: 8 }),
+    ).toBeNull();
+    // No usable wait falls back to the generic message rather than "try again in NaN seconds".
+    expect(accountLockSeconds({ status: 429, code: ACCOUNT_LOCKED })).toBeNull();
+    expect(accountLockSeconds({ status: 429, code: ACCOUNT_LOCKED, retryAfter: -1 })).toBeNull();
+  });
+
+  it('says when the lock lifts, formatted by next-intl', () => {
+    const format = createFormatter({ locale: 'en', timeZone: 'UTC' });
+    const t = createTranslator({ locale: 'en', messages, namespace: 'auth.errors' });
+    expect(t('accountLocked', { retry: lockLiftsIn(format, 8) })).toBe(
+      'Too many login attempts for this account. Try again in 8 seconds.',
+    );
+    expect(lockLiftsIn(format, 120)).toBe('in 2 minutes');
+  });
+});
+
 describe('auth.errors messages', () => {
   it("keeps Better Auth's English for every code", () => {
     const codes = USERNAME_ERROR_CODES as Record<string, { message: string } | undefined>;
@@ -48,6 +78,7 @@ describe('auth.errors messages', () => {
   it('has no message nothing maps to', () => {
     const used = new Set<string>([
       ...Object.values(SIGN_IN_ERROR_KEYS),
+      'accountLocked',
       'tooManyRequests',
       'unknown',
     ]);

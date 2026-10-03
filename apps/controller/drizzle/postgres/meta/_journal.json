@@ -120,6 +120,41 @@
       "when": 1790300000000,
       "tag": "0016_user_uuid",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790400000000,
+      "tag": "0017_l4_access_list",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790500000000,
+      "tag": "0018_access_list_hostnames",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790600000000,
+      "tag": "0019_passkeys",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790700000000,
+      "tag": "0020_certificate_files",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790800000000,
+      "tag": "0021_ldap_directories",
+      "breakpoints": true
     }
   ]
 }

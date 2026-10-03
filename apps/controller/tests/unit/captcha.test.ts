@@ -144,6 +144,28 @@ describe('verifyCaptchaToken', () => {
     expect(await verifyCaptchaToken(check('turnstile'), 'tok', null, impl)).toBe('failed');
   });
 
+  it('fails a token Cap refuses with a 4xx, as Cap Standalone answers them', async () => {
+    for (const [status, error] of [
+      [400, 'Missing required parameters'],
+      [404, 'Token not found'],
+      [403, 'Token expired'],
+    ] as const) {
+      const { impl } = fakeFetch(() => Response.json({ success: false, error }, { status }));
+      expect(await verifyCaptchaToken(check('cap'), 'tok', null, impl), error).toBe('failed');
+    }
+  });
+
+  it("reports Cap's refusal of the site key or secret as unavailable", async () => {
+    for (const status of [403, 404]) {
+      const { impl } = fakeFetch(() =>
+        Response.json({ success: false, error: 'Invalid site key or secret' }, { status }),
+      );
+      expect(await verifyCaptchaToken(check('cap'), 'tok', null, impl)).toBe('unavailable');
+    }
+    const down = fakeFetch(() => new Response('bad gateway', { status: 502 }));
+    expect(await verifyCaptchaToken(check('cap'), 'tok', null, down.impl)).toBe('unavailable');
+  });
+
   it('treats success as a boolean, not a truthy value', async () => {
     const { impl } = fakeFetch(Response.json({ success: 'true' }));
     expect(await verifyCaptchaToken(check('recaptcha'), 'tok', null, impl)).toBe('failed');

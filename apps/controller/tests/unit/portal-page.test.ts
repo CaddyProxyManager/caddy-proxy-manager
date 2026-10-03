@@ -5,6 +5,12 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+
+// Settings resolve through the database: its own, not the app's connection every file shares.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 
 const { testTranslator } = await import('../helpers/next-intl');
 

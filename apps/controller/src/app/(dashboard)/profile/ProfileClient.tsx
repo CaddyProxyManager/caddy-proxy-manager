@@ -31,6 +31,7 @@ import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
 import {
   Key,
+  KeyRound,
   Link,
   LogIn,
   Lock,
@@ -45,6 +46,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { TwoFactorSection } from "./TwoFactorSection";
+import { PasskeySection } from "./PasskeySection";
+import type { PasskeySummary } from "@/src/lib/passkeys";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
@@ -126,6 +129,13 @@ interface ProfileClientProps {
   passwordLocked?: boolean;
   /** Resolved on the server, including the Gravatar fallback. */
   avatar: ResolvedAvatar;
+  passkeys?: PasskeySummary[];
+  /** The Public URL's hostname; null when it does not parse. */
+  passkeyRpId?: string | null;
+  /** Every LDAP directory, for naming an account linked to one. */
+  directories?: Array<{ id: string; name: string }>;
+  /** The directory whose password this account signs in with, when it has none of its own. */
+  managedByDirectory?: string | null;
 }
 
 function ProfileSection({
@@ -216,6 +226,10 @@ export default function ProfileClient({
   localPasswordsEnabled = true,
   passwordLocked = false,
   avatar,
+  passkeys = [],
+  passkeyRpId = null,
+  directories = [],
+  managedByDirectory = null,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
@@ -248,7 +262,7 @@ export default function ProfileClient({
     if (provider === "credentials") return t("providerCredentials");
     if (provider === "oauth2") return "OAuth2";
     if (provider === "authentik") return "Authentik";
-    return provider;
+    return directories.find((d) => d.id === provider)?.name ?? provider;
   };
 
   const hasPassword = user.hasPassword;
@@ -259,6 +273,9 @@ export default function ProfileClient({
       getProviderName(link.providerId),
   );
   const hasOAuth = linkedNames.length > 0;
+  // What is left once the password goes: the remove-password route refuses when it is nothing.
+  const otherSignInMethods =
+    passkeys.length > 0 ? [...linkedNames, t("passkeys.signInMethod")] : linkedNames;
 
   const handlePasswordChange = async () => {
     setError(null);
@@ -601,17 +618,31 @@ export default function ProfileClient({
               <Text type="body" size="sm" color="secondary">
                 {t("demoPasswordLocked")}
               </Text>
+            ) : managedByDirectory ? (
+              // No local password for a directory account: it would outlive the directory's.
+              <Text type="body" size="sm" color="secondary">
+                {t("passwordManagedBy", { directory: managedByDirectory })}
+              </Text>
             ) : hasPassword ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
                   {t("passwordManagementDescription")}
                 </Text>
-                <HStack>
+                <HStack gap={2} wrap="wrap">
                   <Button
                     variant="secondary"
                     label={t("changePassword")}
                     onClick={() => setPasswordDialogOpen(true)}
                   />
+                  {/* With a provider it sits beside the link, under single sign-on instead. */}
+                  {!hasOAuth && passkeys.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      icon={<Lock />}
+                      label={t("removePassword")}
+                      onClick={() => setRemovePasswordDialogOpen(true)}
+                    />
+                  )}
                 </HStack>
               </VStack>
             ) : (
@@ -636,6 +667,12 @@ export default function ProfileClient({
               hasPassword={hasPassword}
               locked={passwordLocked}
             />
+          </ProfileSection>
+        )}
+
+        {localPasswordsEnabled && (
+          <ProfileSection icon={KeyRound} title={t("passkeys.title")}>
+            <PasskeySection passkeys={passkeys} rpId={passkeyRpId} locked={passwordLocked} />
           </ProfileSection>
         )}
 
@@ -988,7 +1025,7 @@ export default function ProfileClient({
       >
         <VStack gap={3}>
           <Text type="body" size="sm" color="secondary">
-            {t("removePasswordDescription", { providers: linkedNames.join(", ") })}
+            {t("removePasswordDescription", { providers: otherSignInMethods.join(", ") })}
           </Text>
           <TextInput
             {...AUTOFILL_CURRENT_PASSWORD}

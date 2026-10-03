@@ -1,0 +1,21 @@
+# The stack ./mixed-agent.ts runs: this checkout's controller with an older agent, then this
+# checkout's agent in its place. The agent reads this file too (COMPOSE_EXTRA_FILE), which is why it
+# lives in the repository: the agent sees the checkout at /compose.
+services:
+  web:
+    image: ${CPM_UPGRADE_WEB_IMAGE:-cpm-upgrade/web:current}
+    environment:
+      SESSION_SECRET: "upgrade-mixed-agent-session-secret-32chars"
+      ADMIN_USERNAME: upgradeadmin
+      ADMIN_PASSWORD: "Upgrade-Admin-Password-2026!"
+      BASE_URL: http://localhost:3000
+      AUTH_RATE_LIMIT_ENABLED: "false"
+  agent:
+    image: ${CPM_UPGRADE_AGENT_IMAGE:-cpm-upgrade/agent:previous}
+    environment:
+      COMPOSE_SKIP_OVERRIDE: "1"
+      COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/upgrade/mixed-agent.compose.yml
+      # Never a rebuild: which modules Caddy has is read off the image, so both agents agree.
+      CADDY_BUILD_MODE: external
+  caddy:
+    image: ${CADDY_IMAGE:-ghcr.io/silentspud/caddy-proxy-manager/caddy:latest}

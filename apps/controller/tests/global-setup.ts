@@ -89,7 +89,9 @@ async function seedAuthState(): Promise<void> {
   mkdirSync(AUTH_DIR, { recursive: true });
 
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  // As playwright.config's timezoneId: a zone cookie left in the saved state would refresh every
+  // spec's first page after hydration.
+  const page = await browser.newPage({ timezoneId: 'UTC' });
 
   try {
     await page.goto('http://localhost:3000/login');
@@ -109,9 +111,10 @@ async function seedAuthState(): Promise<void> {
 
 export default async function globalSetup() {
   console.log('[global-setup] Starting Docker Compose test stack...');
+  // Keycloak's first start, which imports its realm, is the slowest to turn healthy.
   execFileSync(
     'docker',
-    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '120'],
+    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '240'],
     {
       stdio: 'inherit',
       cwd: COMPOSE_CWD,

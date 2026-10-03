@@ -14,10 +14,10 @@ and no change to your compose file.
 
 ## Setting it up
 
-Turn it on in **Settings → Network → Tailscale**. The one thing it needs is a reusable auth key from the
-Tailscale admin console. If you would rather not store the key in the database, put a Caddy
-placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through untouched and resolved from
-the container's environment.
+Turn it on in **Settings → Network → Tailscale**, on the **Node defaults** card. The one thing it
+needs is a reusable auth key from the Tailscale admin console. If you would rather not store the
+key in the database, put a Caddy placeholder in the field instead - `{env.TS_AUTHKEY}` is passed
+through untouched and resolved from the container's environment.
 
 | Setting | What it does |
 | ------- | ------------ |
@@ -27,6 +27,18 @@ the container's environment.
 | **Control server URL** | Point at Headscale or another coordination server. Empty uses Tailscale's own |
 | **State directory** | Where each node keeps its identity. Keep it on a volume, or every restart registers a new machine |
 | **Register nodes as ephemeral** | Nodes leave the tailnet when Caddy stops rather than lingering as offline machines |
+| **Serve HTTP/3 on tailnet listeners** | Off by default. Adds QUIC to the tailnet listeners, if HTTP/3 is also on globally |
+
+:::caution[HTTP/3 on the tailnet]
+An HTTP/3 listener makes Caddy bring the node up while it loads a configuration. Whenever the
+control server - Tailscale's or your Headscale - is unreachable, that load hangs and holds Caddy's
+admin API, so no host on that agent can be updated until the control server is back. Without
+HTTP/3 the node connects in the background and a load finishes at once. Leave it off unless your
+tailnet clients need QUIC.
+:::
+
+HTTP/2 on the tailnet listeners follows the global switch in **Settings → Network → HTTP Versions**,
+with no opt-in of its own.
 
 ## Per host
 

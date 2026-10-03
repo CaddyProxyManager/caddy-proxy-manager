@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+
+// Settings resolve through the database: its own, not the app's connection every file shares.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 
 // updateGeneralSettingsAction reads its messages from the catalog; there is no request scope here.
@@ -238,6 +244,16 @@ describe('GET /api/v1/settings/[group]', () => {
         },
       },
       default: 'cloudflare',
+      delegations: [{ domain: 'example.com', target: null, provider: 'acmedns' }],
+      acmeDnsAccounts: {
+        'example.com': {
+          username: 'acmedns-user-sentinel',
+          password: 'enc:v1:acmedns-password-sentinel',
+          subdomain: 'acmedns-subdomain',
+          fulldomain: 'acmedns-subdomain.auth.example.net',
+          server_url: 'https://acmedns-server-sentinel.example.net',
+        },
+      },
     });
 
     const response = await GET(createMockRequest(), {
@@ -256,8 +272,13 @@ describe('GET /api/v1/settings/[group]', () => {
         },
       },
       default: 'cloudflare',
+      delegations: [{ domain: 'example.com', target: null, provider: 'acmedns' }],
+      acmeDnsAccounts: { 'example.com': { fulldomain: 'acmedns-subdomain.auth.example.net' } },
     });
     expect(bodyText).not.toContain(plaintextSecret);
+    expect(bodyText).not.toContain('acmedns-user-sentinel');
+    expect(bodyText).not.toContain('acmedns-password-sentinel');
+    expect(bodyText).not.toContain('acmedns-server-sentinel');
     expect(bodyText).not.toContain(encryptedSecret);
     expect(bodyText).not.toContain('access-key-sentinel');
     expect(bodyText).not.toContain('eu-test-1');

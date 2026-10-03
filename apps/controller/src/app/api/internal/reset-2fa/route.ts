@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { eq, or } from "drizzle-orm";
-import db from "@/src/lib/db";
-import { users } from "@/src/lib/db/schema";
 import { config } from "@/src/lib/config";
 import { logAuditEvent } from "@/src/lib/audit";
 import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/console-command";
+import { findUserByConsoleName } from "@/src/lib/console-user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/peer-address";
 import { resetTwoFactor } from "@/src/lib/two-factor";
+import { deleteUserPasskeys } from "@/src/lib/passkeys";
 
 /**
- * `cpm-server --reset-2fa <username>`: only a signed loopback request from the compiled server is
+ * `cpm-server --reset-2fa <username>`: turns off 2FA and removes the passkeys, the recovery for a
+ * lost or stolen authenticator. Only a signed loopback request from the compiled server is
  * answered; anything else, `vinext dev` included, gets a missing path's 404.
  */
 export async function POST(request: NextRequest) {
@@ -24,20 +24,13 @@ export async function POST(request: NextRequest) {
   );
   if (!username) return notFound;
 
-  // The names a person types at a prompt: the sign-in name, or the full address.
-  const name = username.trim().toLowerCase();
-  const user = await db.query.users.findFirst({
-    where: or(
-      eq(users.email, `${name}@localhost`),
-      eq(users.email, name),
-      eq(users.username, name),
-    ),
-  });
+  const user = await findUserByConsoleName(username);
   if (!user) {
     return NextResponse.json({ error: `No user named ${username}` }, { status: 404 });
   }
 
   const hadTwoFactor = await resetTwoFactor(user.id);
+  const passkeysRemoved = await deleteUserPasskeys(user.id);
   await revokeSessionsAfterPasswordChange(user.id, null);
   await logAuditEvent({
     userId: null,
@@ -46,5 +39,14 @@ export async function POST(request: NextRequest) {
     entityId: user.id,
     summary: `Two-factor sign-in reset for user ${user.email} from the server console`,
   });
-  return NextResponse.json({ email: user.email, hadTwoFactor });
+  if (passkeysRemoved > 0) {
+    await logAuditEvent({
+      userId: null,
+      action: "passkey_removed",
+      entityType: "user",
+      entityId: user.id,
+      summary: `Passkeys removed for user ${user.email} from the server console`,
+    });
+  }
+  return NextResponse.json({ email: user.email, hadTwoFactor, passkeysRemoved });
 }

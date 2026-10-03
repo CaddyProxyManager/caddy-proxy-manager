@@ -13,6 +13,8 @@ import {
   type AgentAnalyticsKind,
   type AgentAnalyticsResult,
   type AgentCommandResult,
+  type CertificateFileResult,
+  type CertificateFilesAck,
   type AgentPairRequest,
   type AgentPairResponse,
   type AgentServerEvent,
@@ -180,6 +182,19 @@ export class ControllerClient {
   async postResults(secret: string, results: AgentCommandResult[]): Promise<void> {
     if (results.length === 0) return;
     await this.operation(secret, AGENT_OPERATIONS.commandResults, { results });
+  }
+
+  async postCertificateFiles(
+    secret: string,
+    results: CertificateFileResult[],
+  ): Promise<CertificateFilesAck> {
+    const data = await this.operation<{ agentCertificateFiles: CertificateFilesAck }>(
+      secret,
+      AGENT_OPERATIONS.certificateFiles,
+      { results },
+    );
+    const resend = data.agentCertificateFiles?.resend;
+    return { resend: Array.isArray(resend) ? resend.filter(Number.isInteger) : [] };
   }
 
   async postAnalytics(

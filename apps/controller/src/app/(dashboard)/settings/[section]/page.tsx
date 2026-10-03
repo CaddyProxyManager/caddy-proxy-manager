@@ -18,6 +18,7 @@ import {
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
+  getCompressionSettings,
   getGlobalCaddyConfigSettings,
   getHttpCacheSettings,
   getTwoFactorPolicySettings,
@@ -28,8 +29,11 @@ import {
   getDashboardSettings,
   getTailscaleSettings,
   defaultTailscaleSettings,
+  getCrowdSecSettings,
 } from "@/src/lib/settings";
+import { redactCrowdSecSettings } from "@/src/lib/crowdsec";
 import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { listLdapDirectories } from "@/src/lib/models/ldap-directories";
 import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { autoPairingDisabled } from "@/src/lib/agent/bootstrap";
@@ -41,6 +45,7 @@ import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import { config } from "@/src/lib/config";
 import { getPublicBaseUrl } from "@/src/lib/public-url";
+import { anyPasskeysExist } from "@/src/lib/passkeys";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { registryFields } from "../registry-fields";
@@ -62,6 +67,7 @@ import { toCertificatePickerOption } from "@/src/lib/certificate-api";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
+import { managedServiceView } from "@/src/lib/agent/managed-services";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -107,6 +113,7 @@ export default async function SettingsSectionPage({
       globalErrorPages,
       trustedProxies,
       httpProtocols,
+      compression,
       globalCaddyConfig,
       httpCache,
       twoFactorPolicy,
@@ -116,6 +123,7 @@ export default async function SettingsSectionPage({
       avatarSettings,
       passwordPolicySettings,
       captchaSettings,
+      crowdsecSettings,
       caddyBuild,
       tailscale,
       dashboard,
@@ -132,6 +140,7 @@ export default async function SettingsSectionPage({
     autoPairingOff,
     publicBaseUrl,
     email,
+    ldapDirectories,
   ] = await Promise.all([
     withStagedReads(overlay, () =>
       Promise.all([
@@ -148,6 +157,7 @@ export default async function SettingsSectionPage({
         getErrorPagesSettings(),
         getTrustedProxiesSettings(),
         getHttpProtocolsSettings(),
+        getCompressionSettings(),
         getGlobalCaddyConfigSettings(),
         getHttpCacheSettings(),
         getTwoFactorPolicySettings(),
@@ -157,6 +167,7 @@ export default async function SettingsSectionPage({
         getAvatarSettings(),
         getPasswordPolicySettings(),
         getCaptchaSettings(),
+        getCrowdSecSettings(),
         getCaddyBuildSettings(),
         getTailscaleSettings(),
         getDashboardSettings(),
@@ -176,8 +187,11 @@ export default async function SettingsSectionPage({
     getPublicBaseUrl(),
     // Never staged either: its actions write straight through.
     emailSettingsView(),
+    // Nor these: a directory is a row, saved by its own actions.
+    listLdapDirectories(),
   ]);
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
+  const crowdsecManaged = section === "crowdsec" ? await managedServiceView("crowdsec") : null;
 
   // Only on the dashboard section, so other sections don't pay for the host form's pickers.
   let dashboardOptions: DashboardHostOptionsData | null = null;
@@ -237,6 +251,7 @@ export default async function SettingsSectionPage({
       upstreamDnsResolution={upstreamDnsResolution}
       trustedProxies={trustedProxies}
       httpProtocols={httpProtocols}
+      compression={compression}
       globalCaddyConfig={globalCaddyConfig}
       httpCache={redactHttpCacheSettings(httpCache)}
       twoFactorPolicy={twoFactorPolicy}
@@ -244,6 +259,7 @@ export default async function SettingsSectionPage({
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
+      ldapDirectories={ldapDirectories}
       primaryProviderId={primaryProviderId}
       localUsersDisabled={await localUsersDisabled()}
       avatars={{
@@ -261,6 +277,8 @@ export default async function SettingsSectionPage({
       }}
       // The secret never leaves the server, as with Tailscale's auth key below.
       captcha={captchaSettingsView(captchaSettings)}
+      crowdsec={redactCrowdSecSettings(crowdsecSettings)}
+      crowdsecManaged={crowdsecManaged}
       caddyBuild={caddyBuild}
       agentBuildTargets={pairedAgents.map((agent) => ({
         id: agent.id,
@@ -290,6 +308,7 @@ export default async function SettingsSectionPage({
       // Container management needs an agent to run compose; the settings still save without one.
       canManageServices={agentStatuses.some((result) => result.ok)}
       baseUrl={publicBaseUrl}
+      passkeysRegistered={section === "instance" && (await anyPasskeysExist())}
       agents={{
         paired: pairedAgents,
         // A failure worded here (e.g. an agent not reported yet) carries a code.

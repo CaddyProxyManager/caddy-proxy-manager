@@ -87,7 +87,7 @@ consequences worth knowing before touching either side:
   for that agent (the Re-pair action), never the shared code.
 - **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
-  Four are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
+  Six are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
   Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
   Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
@@ -95,6 +95,10 @@ consequences worth knowing before touching either side:
   throwaway container mounting its volumes read-only (`apps/agent/src/certificates.ts`).
   `caddy-image`: `caddy-image-load` starts loading an operator-built image and answers at once,
   since a recreate outlasts the timeout; only an agent reporting `caddyBuild.external` gets it.
+  `certificate-files`: `certificate-files-list` and `certificate-files-read` browse and read PEM
+  files under `CERT_FILES_HOST_DIR`, and only an agent with it set lists the capability
+  (`apps/agent/src/certificate-files.ts`). `l4-port-ranges` is no command: it says `l4Ports` may
+  hold ranges, which an older agent's pattern refuses, so `desired-state.ts` expands them for it.
 - **With `CADDY_BUILD_MODE=external` the agent never builds Caddy's image.** A module diff is
   not acted on; the applied set is read from `/etc/caddy/caddy-modules.txt` in the image Caddy
   runs, on every start and on each load. An image without that file counts as no plugins. A load
@@ -106,6 +110,10 @@ consequences worth knowing before touching either side:
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
   is for answers that stay on the controller.
+- **A new analytics kind goes the other way round from a command.** The agent relays
+  `upstream-errors` only while `FleetConfig.upstreamErrors` says so, since an older controller
+  refuses a kind it does not know. Those counts feed `lib/notifications`, which is also where
+  anything else the administrators should be emailed about gets reported.
 - **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately
   does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
   not answer on 80 and 443. Never add a `depends_on: caddy` - the agent is what starts it, so
@@ -150,12 +158,13 @@ development, silently ignored in production.
 Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
 - `??` does not catch the empty string that form produces, so the fallback lands as 0.
 
-### The optional container
+### The optional containers
 
-`clickhouse` sits behind a Compose profile, so whether it exists is decided on the host before
-anything in the stack runs. The agent gets around that: it runs the Compose CLI, and `--profile
-<name>` on one invocation enables that profile for that invocation. `Settings → Analytics` drives it
-through `lib/agent/managed-services.ts`. GeoIP has no container: the controller downloads the
+`clickhouse` and `crowdsec` sit behind Compose profiles, so whether they exist is decided on the
+host before anything in the stack runs. The agent gets around that: it runs the Compose CLI, and
+`--profile <name>` on one invocation enables that profile for that invocation. `Settings →
+Analytics` and `Settings → CrowdSec` (managed mode) drive them through
+`lib/agent/managed-services.ts`, for the bundled agent only. GeoIP has no container: the controller downloads the
 MaxMind databases onto its data volume itself (`lib/geoip/updater.ts`), and agents fetch them from
 it.
 
@@ -172,7 +181,8 @@ Keep in mind when touching it:
 - **The agent never reads `.env`.** It passes `--env-file /dev/null` and its own placeholders for the
   two `:?` variables, so a variable the `caddy` or `clickhouse` definitions
   interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
-  default.
+  default. `crowdsec`'s are not: the controller generates the bouncer key and sends both on every
+  invocation that touches that service, so `.env` has nothing to add.
 
 ### Adding a DNS provider
 
@@ -259,11 +269,15 @@ the same app code:
 `bun run test` from the root runs everything. It starts a throwaway PostgreSQL container, gives
 each test its own schema, and removes it afterwards; `TEST_POSTGRES_URL` points at a server of your
 own instead. `bun run test:sqlite` runs the same suite on an in-memory SQLite database per test.
-Two constraints are not obvious from reading the suites:
+Three constraints are not obvious from reading the suites:
 
 - **`mock.module` is global and leaks across files sharing a process.** The agent's tests run with
   `--parallel` for that reason - a `node:fs` mock in one file was reaching every file that ran
   after it. A test that passes alone and fails in the suite is this, not flake.
+- **Mock `src/lib/db` with `dbModuleMock` (`tests/helpers/db-module.ts`), never inline.** The
+  preload has already loaded the real module, so Bun patches its exports in place and a name a
+  factory leaves out stays real - a `runInTransaction` left out wrote to the app's own connection.
+  That connection is never migrated under test, so such a miss fails loudly instead of sharing data.
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
   unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
   `bun` - see `tests/helpers/build-legacy-db.ts`.

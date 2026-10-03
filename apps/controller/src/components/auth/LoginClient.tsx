@@ -1,8 +1,9 @@
 "use client";
 
+import { KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -14,18 +15,25 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
+import {
+  type DirectoryChoice,
+  DirectorySelector,
+  signInSource,
+  useDirectoryChoice,
+} from "@/src/components/auth/DirectorySelector";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
 import {
   AUTOFILL_CURRENT_PASSWORD,
-  AUTOFILL_USERNAME,
+  AUTOFILL_USERNAME_WEBAUTHN,
   NO_SPELLCHECK,
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
-import { signInErrorMessage } from "@/src/lib/sign-in-error";
+import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/sign-in-error";
 import { twoFactorError } from "@/src/lib/two-factor-error";
 
 interface LoginClientProps {
@@ -41,6 +49,8 @@ interface LoginClientProps {
   cspNonce?: string;
   /** Email is set up, so a forgotten password can be reset from here. */
   passwordResetEnabled?: boolean;
+  /** Enabled LDAP directories: one is a silent fallback, several get a selector. */
+  directories?: DirectoryChoice[];
 }
 
 export default function LoginClient({
@@ -51,10 +61,13 @@ export default function LoginClient({
   captcha = null,
   cspNonce,
   passwordResetEnabled = false,
+  directories = [],
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
+  const tPasskey = useTranslations("auth.passkey");
   const tErrors = useTranslations("auth.errors");
   const tApi = useTranslations("auth.apiErrors");
+  const format = useFormatter();
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
@@ -65,7 +78,19 @@ export default function LoginClient({
   // The 2FA challenge lives in Better Auth's cookie; this only remembers it was asked for.
   const [onCodeStep, setOnCodeStep] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const [directoryChoice, setDirectoryChoice] = useDirectoryChoice(directories, localLoginEnabled);
+  // A directory takes passwords even when local accounts are off.
+  const passwordFormEnabled = localLoginEnabled || directories.length > 0;
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setLoginError });
+  // No CAPTCHA or second step: a passkey is both factors, and there is no name to guess against.
+  const passkey = usePasskeySignIn({
+    enabled: localLoginEnabled,
+    onSignedIn: () => {
+      router.replace("/");
+      router.refresh();
+    },
+    onError: setLoginError,
+  });
 
   // After the commit that unhides the field: focus() inside a `hidden` subtree is a no-op, and a
   // handler (or its rAF) can run before React removes the attribute.
@@ -78,13 +103,25 @@ export default function LoginClient({
   const signIn = async (trimmedUsername: string) => {
     setLoginPending(true);
 
-    // usernameClient's inferred types fail to merge in some environments, so cast a stable shape.
-    type SignInUsername = (input: { username: string; password: string }) => Promise<{
+    // usernameClient's inferred types fail to merge in some environments, and /sign-in/ldap is
+    // reached through the client's path proxy, so cast a stable shape.
+    type SignInResult = Promise<{
       data: { twoFactorRedirect?: boolean } | null;
-      error: { status?: number; code?: string; message?: string } | null;
+      error: { status?: number; code?: string; message?: string; retryAfter?: unknown } | null;
     }>;
-    const signInUsername = (authClient.signIn as unknown as { username: SignInUsername }).username;
-    const { data, error } = await signInUsername({ username: trimmedUsername, password });
+    const client = authClient.signIn as unknown as {
+      username: (input: { username: string; password: string }) => SignInResult;
+      ldap: (input: { username: string; password: string; directoryId?: string }) => SignInResult;
+    };
+    const source = signInSource(directories, directoryChoice);
+    const { data, error } =
+      source.kind === "local"
+        ? await client.username({ username: trimmedUsername, password })
+        : await client.ldap({
+            username: trimmedUsername,
+            password,
+            ...(source.directoryId ? { directoryId: source.directoryId } : {}),
+          });
 
     if (error?.code === "CAPTCHA_REQUIRED") {
       // The pass lapsed while typing; the widget returns on this step with the password kept.
@@ -97,7 +134,12 @@ export default function LoginClient({
       // Any attempt spends the pass.
       captchaStep.spent();
       // By code: Better Auth's `message` is always English.
-      setLoginError(signInErrorMessage(error, (key) => tErrors(key)));
+      const lockSeconds = accountLockSeconds(error);
+      setLoginError(
+        lockSeconds === null
+          ? signInErrorMessage(error, (key) => tErrors(key))
+          : tErrors("accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
+      );
       setLoginPending(false);
       // Keep the name on screen so a typo in it can be told from a wrong password.
       setOnPasswordStep(true);
@@ -187,10 +229,10 @@ export default function LoginClient({
     }
   };
 
-  const disabled = loginPending || captchaStep.pending || !!oauthPending;
+  const disabled = loginPending || captchaStep.pending || !!oauthPending || passkey.pending;
   const hasProviders = enabledProviders.length > 0;
 
-  const subtitle = !localLoginEnabled
+  const subtitle = !passwordFormEnabled
     ? t("subtitleSsoOnly")
     : onCodeStep
       ? t("subtitleCode")
@@ -220,7 +262,7 @@ export default function LoginClient({
 
           {loginError && <Banner status="error" title={t("errorTitle")} description={loginError} />}
 
-          {!localLoginEnabled && !hasProviders && (
+          {!passwordFormEnabled && !hasProviders && (
             <Banner
               status="error"
               title={t("noMethodTitle")}
@@ -229,13 +271,13 @@ export default function LoginClient({
           )}
 
           {/* SSO only: the providers are the whole form. */}
-          {!localLoginEnabled && hasProviders && providerList}
+          {!passwordFormEnabled && hasProviders && providerList}
 
-          {localLoginEnabled && onCodeStep && (
+          {passwordFormEnabled && onCodeStep && (
             <TwoFactorStep pending={loginPending} onSubmit={verifyCode} onCancel={startOver} />
           )}
 
-          {localLoginEnabled && !onCodeStep && (
+          {passwordFormEnabled && !onCodeStep && (
             <>
               {/*
                 One form with the password always mounted: password managers fill both fields at
@@ -257,7 +299,7 @@ export default function LoginClient({
                   ) : (
                     <>
                       <TextInput
-                        {...AUTOFILL_USERNAME}
+                        {...AUTOFILL_USERNAME_WEBAUTHN}
                         {...NO_SPELLCHECK}
                         label={t("username")}
                         htmlName="username"
@@ -267,6 +309,13 @@ export default function LoginClient({
                         hasAutoFocus
                         isDisabled={disabled}
                         width="100%"
+                      />
+                      <DirectorySelector
+                        directories={directories}
+                        localLoginEnabled={localLoginEnabled}
+                        value={directoryChoice}
+                        onChange={setDirectoryChoice}
+                        isDisabled={disabled}
                       />
                       {/* A pass is for one name only, so going back for another means a new solve. */}
                       {captchaStep.widget}
@@ -286,11 +335,13 @@ export default function LoginClient({
                       width="100%"
                     />
                   </div>
-                  {onPasswordStep && passwordResetEnabled && (
-                    <Link href="/login/forgot-password" size="sm">
-                      {t("forgotPassword")}
-                    </Link>
-                  )}
+                  {onPasswordStep &&
+                    passwordResetEnabled &&
+                    !signInSource(directories, directoryChoice).directoryId && (
+                      <Link href="/login/forgot-password" size="sm">
+                        {t("forgotPassword")}
+                      </Link>
+                    )}
                   {/* Back after a failed attempt, which spent the last solve. */}
                   {onPasswordStep && captchaStep.widget}
                   <Button
@@ -309,6 +360,21 @@ export default function LoginClient({
                   />
                 </VStack>
               </form>
+
+              {passkey.supported && (
+                <Button
+                  variant="secondary"
+                  width="100%"
+                  icon={<KeyRound />}
+                  label={passkey.pending ? tPasskey("signingIn") : tPasskey("signIn")}
+                  isLoading={passkey.pending}
+                  isDisabled={disabled}
+                  onClick={() => {
+                    setLoginError(null);
+                    void passkey.start();
+                  }}
+                />
+              )}
 
               {hasProviders && (
                 <>

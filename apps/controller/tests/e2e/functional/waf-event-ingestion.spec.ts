@@ -4,6 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';
+import { ANALYTICS_OFF } from '../../helpers/compose';
 import { httpGet, waitForRoute } from '../../helpers/http';
 
 const DOMAIN = 'func-waf-ingest.test';
@@ -53,6 +54,8 @@ async function waitForWafEvent(
 
 test.describe
   .serial('WAF event ingestion', () => {
+    // WAF events are stored in ClickHouse.
+    test.skip(ANALYTICS_OFF, 'no ClickHouse in the analytics-off run');
     test('setup: create proxy host with WAF enabled', async ({ page }) => {
       test.setTimeout(120_000);
 

@@ -15,6 +15,7 @@ import {
 } from "@/src/lib/models/user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { resetTwoFactor } from "@/src/lib/two-factor";
+import { deleteUserPasskeys } from "@/src/lib/passkeys";
 import { logAuditEvent } from "@/src/lib/audit";
 import { hashPassword } from "@/src/lib/password";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -283,6 +284,39 @@ export async function resetUserTwoFactorAction(userId: number): Promise<ActionSt
     const t = await getTranslations();
     console.error("resetUserTwoFactorAction failed:", error);
     return actionError(t, error, t("errors.resetTwoFactorFailed"));
+  }
+}
+
+/** As the 2FA reset: sessions go too, since a lost device may have signed in with its passkey. */
+async function removeUserPasskeysActionUntranslated(userId: number) {
+  const session = await requireAdmin();
+  const actorId = Number(session.user.id);
+  // Your own are removed one at a time from the Profile page, behind its lock-out check.
+  assertNotSelf(actorId, userId, "cannotRemoveOwnPasskeys");
+  const target = await getUserById(userId);
+  if (!target) throw domainError("userNotFound");
+
+  await deleteUserPasskeys(userId);
+  await revokeSessionsAfterPasswordChange(userId, null);
+  await logAuditEvent({
+    userId: actorId,
+    action: "passkey_removed",
+    entityType: "user",
+    entityId: userId,
+    summary: `Passkeys removed for user ${target.email} by an administrator`,
+  });
+  revalidatePath("/users");
+}
+
+export async function removeUserPasskeysAction(userId: number): Promise<ActionState> {
+  try {
+    await removeUserPasskeysActionUntranslated(userId);
+    const t = await getTranslations("users");
+    return actionSuccess(t("passkeysRemovedDone"));
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("removeUserPasskeysAction failed:", error);
+    return actionError(t, error, t("errors.removePasskeysFailed"));
   }
 }
 

@@ -11,8 +11,13 @@ import {
   type CaddyAdminProxyResponse,
   type CaddyBuildStatus,
   type CaddyCertificate,
+  type CertificateFileEntry,
   type CertificateFileRequest,
+  type CertificateFileResult,
+  type CertificateFileSource,
   type CertificateFiles,
+  decodeCertificateFileListing,
+  decodeCertificateFileResults,
   decodeCertificateFiles,
   type ExternalCaddyImage,
   decodeCertificateList,
@@ -34,6 +39,8 @@ import {
   dispatchLogRead,
   dispatchCertificateList,
   dispatchCertificateRead,
+  dispatchCertificateFilesList,
+  dispatchCertificateFilesRead,
 } from "./registry";
 
 export class AgentUnavailableError extends Error {
@@ -272,6 +279,63 @@ export async function readAgentCertificate(
   if (!agentsWith("certificates").some((agent) => agent.agentId === agentId)) return null;
   const response = await dispatchCertificateRead(agentId, request);
   return response.status === 200 ? decodeCertificateFiles(response.text) : null;
+}
+
+/** Connected agents with a certificate directory, for the "From a file on an agent" picker. */
+export function certificateFileAgents(): { agentRowId: number; agentId: string; name: string }[] {
+  return connectedAgents()
+    .filter((agent) => agent.status?.capabilities?.includes("certificate-files"))
+    .map(({ agentRowId, agentId, name }) => ({ agentRowId, agentId, name }));
+}
+
+function certificateFileAgent(agentRowId: number) {
+  const agent = certificateFileAgents().find((candidate) => candidate.agentRowId === agentRowId);
+  if (!agent)
+    throw new AgentUnavailableError("That agent is not connected or has no certificate directory.");
+  return agent;
+}
+
+function agentFailure(error: unknown): never {
+  if (error instanceof AgentNotConnectedError) throw noAgentError();
+  if (error instanceof AgentDecodeError) throw new AgentRequestError(error.message, 502);
+  if (error instanceof AgentCommandError) throw new AgentRequestError(error.message, error.status);
+  throw error;
+}
+
+/** Throws AgentUnavailableError for an agent that cannot list, and AgentRequestError on a failure. */
+export async function listAgentCertificateFiles(
+  agentRowId: number,
+): Promise<CertificateFileEntry[]> {
+  const agent = certificateFileAgent(agentRowId);
+  try {
+    return decodeCertificateFileListing((await dispatchCertificateFilesList(agent.agentId)).text);
+  } catch (error) {
+    agentFailure(error);
+  }
+}
+
+/** Every PEM, straight from the files; one result per source, in order. */
+export async function readAgentCertificateFiles(
+  agentRowId: number,
+  files: CertificateFileSource[],
+): Promise<CertificateFileResult[]> {
+  const agent = certificateFileAgent(agentRowId);
+  try {
+    const response = await dispatchCertificateFilesRead(agent.agentId, { files });
+    const results = decodeCertificateFileResults(JSON.parse(response.text));
+    // Matched by id, so an agent cannot answer for a certificate it was not asked about.
+    return files.map(
+      (file) =>
+        results.find((result) => result.id === file.id) ?? {
+          id: file.id,
+          ok: false,
+          error: "unavailable",
+        },
+    );
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new AgentRequestError(error.message, 502);
+    agentFailure(error);
+  }
 }
 
 export function logReadableAgents(): { agentId: string; name: string }[] {

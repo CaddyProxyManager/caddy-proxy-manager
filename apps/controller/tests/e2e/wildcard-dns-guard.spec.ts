@@ -57,6 +57,8 @@ test.describe('Wildcard host DNS-provider guard', () => {
       expect(JSON.parse(statusBody)).toEqual({
         providers: { duckdns: { configuredFields: ['api_token'] } },
         default: 'duckdns',
+        delegations: [],
+        acmeDnsAccounts: {},
       });
       expect(statusBody).not.toContain('e2e-fake-token');
 

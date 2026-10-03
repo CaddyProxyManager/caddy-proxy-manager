@@ -47,8 +47,9 @@ old host is then left as it was, shadowed on that domain.
 **Settings → Dashboard Host → Proxy options** has the same options as an ordinary proxy host:
 certificate, access list, agent assignment, redirects, rewrites and location rules, path rules,
 error pages, raw Caddy config, external forward auth, Authentik, Tailscale, load balancing, DNS
-resolution, geo-blocking, WAF, mTLS trust and the HSTS subdomains and hostname-validation toggles. Pinning it to agents works the way it does for a stored host - nothing ticked means every
-agent.
+resolution, upstream timeouts, rate limiting, geo-blocking, CrowdSec, WAF, mTLS trust and the HSTS
+subdomains and hostname-validation toggles. Pinning it to agents works the way it does for a stored
+host - nothing ticked means every agent.
 
 A few things stay fixed, because the dashboard needs them to work at all or because they belong to
 a stored host:
@@ -60,6 +61,10 @@ a stored host:
 | HTTPS and HSTS | Follow the **Serve it over HTTPS** switch |
 | CPM forward auth | Its grants are stored against a proxy host, and the dashboard is the sign-in it would redirect to |
 | mTLS access rules | Also stored against a proxy host; the mTLS trust settings themselves are available |
+| Maintenance mode | It would lock out the administrator who has to turn it off |
+| Bot challenge | Every agent and API client reaching the dashboard would be sent the challenge |
+| Discourage search engines | Always off |
+| Compression override | Follows the global switch in **Settings → Network → Compression** |
 
 ## HTTPS is checked, not assumed
 

@@ -18,6 +18,7 @@ import {
   type CaddyValidateRequest,
   type LogReadRequest,
   type CertificateFileRequest,
+  type CertificateFilesReadRequest,
 } from "@cpm/shared";
 
 type Connection = {
@@ -257,6 +258,15 @@ export async function broadcastDesiredState(
   }
 }
 
+/** One agent's state, for a change only it cares about. False when it is not connected. */
+export function sendDesiredState(agentId: string, state: AgentDesiredState): boolean {
+  const connection = connections.get(agentId);
+  if (!connection) return false;
+  if (connection.send({ type: "desired-state", state })) return true;
+  detach(agentId);
+  return false;
+}
+
 /** Returns how many were asked. Not awaited: the caller is about to exit too. */
 export function broadcastRestart(reason: string): number {
   let asked = 0;
@@ -312,13 +322,27 @@ export function dispatchCaddyImageLoad(agentId: string): Promise<CaddyAdminProxy
   return dispatch(agentId, { kind: "caddy-image-load", request: {} });
 }
 
+/** Only for an agent listing `certificate-files`. */
+export function dispatchCertificateFilesList(agentId: string): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "certificate-files-list", request: {} });
+}
+
+export function dispatchCertificateFilesRead(
+  agentId: string,
+  request: CertificateFilesReadRequest,
+): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "certificate-files-read", request });
+}
+
 type CommandBody =
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
   | { kind: "log-read"; request: LogReadRequest }
   | { kind: "certificate-list"; request: Record<string, never> }
   | { kind: "certificate-read"; request: CertificateFileRequest }
-  | { kind: "caddy-image-load"; request: Record<string, never> };
+  | { kind: "caddy-image-load"; request: Record<string, never> }
+  | { kind: "certificate-files-list"; request: Record<string, never> }
+  | { kind: "certificate-files-read"; request: CertificateFilesReadRequest };
 
 function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyResponse> {
   const connection = connections.get(agentId);

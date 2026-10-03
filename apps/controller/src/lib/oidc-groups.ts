@@ -57,6 +57,31 @@ export function toGroupMappingConfig(provider: {
   };
 }
 
+/** The env-configured provider's mapping columns, as its startup sync stores them. */
+export function envGroupMapping(oauth: {
+  groupsClaim: string | null;
+  groupPrefix: string | null;
+  roleMappingEnabled: boolean;
+  adminGroup: string | null;
+  operatorGroup: string | null;
+  userGroup: string | null;
+  viewerGroup: string | null;
+  defaultRole: string | null;
+  syncGroups: boolean;
+}) {
+  return {
+    groupsClaim: oauth.groupsClaim ?? "groups",
+    groupPrefix: oauth.groupPrefix ?? null,
+    roleMappingEnabled: oauth.roleMappingEnabled,
+    adminGroup: oauth.adminGroup ?? null,
+    operatorGroup: oauth.operatorGroup ?? null,
+    userGroup: oauth.userGroup ?? null,
+    viewerGroup: oauth.viewerGroup ?? null,
+    defaultRole: isAppRole(oauth.defaultRole) ? oauth.defaultRole : ("user" as AppRole),
+    syncGroups: oauth.syncGroups,
+  };
+}
+
 export function needsGroupClaims(cfg: GroupMappingConfig): boolean {
   return cfg.roleMappingEnabled || cfg.syncGroups;
 }

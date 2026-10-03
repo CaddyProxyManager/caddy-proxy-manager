@@ -7,8 +7,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createTestDatabase } from '@/tests/helpers/db';
 import { TEST_ENV } from '@/tests/helpers/env';
-import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadConfig } from '@/tests/helpers/config';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import {
   MOCK_IDP_CLAIMS,
@@ -67,17 +66,15 @@ async function bootWithMockProvider() {
 
   // config.ts reads OAUTH_* once at module load, and db.ts's runEnvProviderSync() asks it whether
   // OAuth is configured. A cached copy evaluated before these variables were set reports disabled,
-  // no provider row is written, and sign-in fails with PROVIDER_NOT_FOUND. Re-evaluate it first.
-  const config = await import(`@/src/lib/config${fresh()}`);
-  vi.mock('@/src/lib/config', () => ({ ...config }));
+  // no provider row is written, and sign-in fails with PROVIDER_NOT_FOUND. Re-read it first.
+  await reloadConfig();
 
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
 
-  // fresh() and not Date.now(): two boots inside the same millisecond would resolve to the same
-  // specifier, so auth-server would not be re-evaluated and getAuth() would hand back an instance
-  // still bound to the previous test's database.
-  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
+  const authServer = await import('@/src/lib/auth-server');
+  // Or getAuth() hands back the instance built on the previous test's database.
+  authServer.invalidateProviderCache();
   const auth = (await authServer.getAuth()) as any;
   return { auth, db: dbModule.default, schema };
 }

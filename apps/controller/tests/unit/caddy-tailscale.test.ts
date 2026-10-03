@@ -61,6 +61,12 @@ describe('normalizeTailscaleSettings', () => {
     // Off by default: it is the only thing here that reaches Tailscale on its own.
     expect(result.validateAuthKey).toBe(false);
     expect(result.apiTailnet).toBe('-');
+    // Off by default: an h3 listener wedges Caddy's config load while the control server is down.
+    expect(result.http3).toBe(false);
+  });
+
+  it('keeps an opted-in HTTP/3 flag', () => {
+    expect(normalizeTailscaleSettings({ http3: true }).http3).toBe(true);
   });
 
   it('defaults the tailnet to the token own', () => {

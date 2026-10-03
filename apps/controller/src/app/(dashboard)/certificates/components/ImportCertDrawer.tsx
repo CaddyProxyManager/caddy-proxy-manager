@@ -2,36 +2,83 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import type { CertificateFileEntry } from "@cpm/shared";
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
-import { createCertificateAction, updateCertificateAction } from "../actions";
-import type { ImportedCertView } from "../page";
-import { useTranslations } from "next-intl";
+import {
+  createCertificateAction,
+  createCertificateFromFilesAction,
+  listCertificateFilesAction,
+  updateCertificateAction,
+} from "../actions";
+import type { CertificateFileAgent, ImportedCertView } from "../page";
+import { useFormatter, useTranslations } from "next-intl";
 
 type Props = {
   open: boolean;
   cert: ImportedCertView | null;
+  fileAgents: CertificateFileAgent[];
   onClose: () => void;
 };
 
+type Source = "upload" | "agent-file";
+
 const FORM_ID = "import-cert-form";
 
-export function ImportCertDrawer({ open, cert, onClose }: Props) {
+/** certbot's pair first, then the usual names beside the certificate. Empty when unsure. */
+export function pairedKeyPath(certPath: string, entries: CertificateFileEntry[]): string {
+  const keys = entries.filter((entry) => entry.kind === "key").map((entry) => entry.path);
+  const slash = certPath.lastIndexOf("/");
+  const dir = slash === -1 ? "" : certPath.slice(0, slash + 1);
+  const stem = certPath.replace(/\.[^./]+$/, "");
+  const guesses = [`${dir}privkey.pem`, `${dir}key.pem`, `${stem}.key`, `${stem}-key.pem`];
+  const guess = guesses.find((candidate) => keys.includes(candidate));
+  if (guess) return guess;
+  const beside = keys.filter((key) => key.startsWith(dir) && !key.slice(dir.length).includes("/"));
+  return beside.length === 1 ? (beside[0] ?? "") : "";
+}
+
+/** certbot's `live/<name>/fullchain.pem` when there is one, else the first certificate. */
+export function defaultCertificatePath(entries: CertificateFileEntry[]): string {
+  const certs = entries.filter((entry) => entry.kind === "certificate");
+  const preferred =
+    certs.find(
+      (entry) => entry.path.startsWith("live/") && entry.path.endsWith("/fullchain.pem"),
+    ) ??
+    certs.find((entry) => entry.path.endsWith("fullchain.pem")) ??
+    certs[0];
+  return preferred?.path ?? "";
+}
+
+export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
   const t = useTranslations("certificates");
+  const format = useFormatter();
   const isEdit = cert !== null;
+  const isFileCert = cert?.file != null;
   const [isPending, startTransition] = useTransition();
+  const [source, setSource] = useState<Source>("upload");
+  const [error, setError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [name, setName] = useState("");
   const [domains, setDomains] = useState("");
   const [certPem, setCertPem] = useState("");
   const [keyPem, setKeyPem] = useState("");
+  const [agentId, setAgentId] = useState("");
+  const [entries, setEntries] = useState<CertificateFileEntry[] | null>(null);
+  const [isListing, startListing] = useTransition();
+  const [certPath, setCertPath] = useState("");
+  const [keyPath, setKeyPath] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   // The inputs are controlled, so opening the dialog has to seed them.
@@ -42,6 +89,12 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
     setCertPem("");
     setKeyPem("");
     setShowKey(false);
+    setSource("upload");
+    setError(null);
+    setAgentId("");
+    setEntries(null);
+    setCertPath("");
+    setKeyPath("");
   }, [open, cert]);
 
   function handleClose() {
@@ -49,12 +102,52 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
     onClose();
   }
 
+  function chooseCertificate(path: string, list: CertificateFileEntry[]) {
+    setCertPath(path);
+    setKeyPath(pairedKeyPath(path, list));
+    const chosen = list.find((entry) => entry.path === path);
+    if (chosen?.kind === "certificate" && chosen.names[0]) {
+      setName((current) => current || (chosen.names[0] ?? ""));
+    }
+  }
+
+  function chooseAgent(next: string) {
+    setAgentId(next);
+    setEntries(null);
+    setCertPath("");
+    setKeyPath("");
+    setError(null);
+    startListing(async () => {
+      const result = await listCertificateFilesAction(Number(next));
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      const list = result.value ?? [];
+      setEntries(list);
+      const first = defaultCertificatePath(list);
+      if (first) chooseCertificate(first, list);
+    });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const formData = new FormData(formRef.current!);
+    setError(null);
     startTransition(async () => {
       if (isEdit) {
         await updateCertificateAction(cert.id, formData);
+      } else if (source === "agent-file") {
+        const result = await createCertificateFromFilesAction({
+          name,
+          agentRowId: Number(agentId),
+          certPath,
+          keyPath,
+        });
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
       } else {
         await createCertificateAction(formData);
       }
@@ -69,6 +162,148 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
     reader.onload = (e) => setter(e.target?.result as string);
     reader.readAsText(single);
   }
+
+  const certificateOptions = (entries ?? []).flatMap((entry) =>
+    entry.kind === "certificate"
+      ? [
+          {
+            value: entry.path,
+            label: entry.path,
+            description: t("fileNamesExpire", {
+              names: entry.names.join(", "),
+              date: format.dateTime(new Date(entry.notAfter), { dateStyle: "medium" }),
+            }),
+          },
+        ]
+      : [],
+  );
+  const keyOptions = (entries ?? []).flatMap((entry) =>
+    entry.kind === "key" ? [{ value: entry.path, label: entry.path }] : [],
+  );
+  const fromFiles = !isEdit && source === "agent-file";
+  const canSubmit = !fromFiles || (agentId !== "" && certPath !== "" && keyPath !== "");
+
+  const uploadFields = (
+    <>
+      <TextArea
+        {...NO_SPELLCHECK}
+        label={t("domainsOnePerLine")}
+        htmlName="domain_names"
+        value={domains}
+        onChange={setDomains}
+        rows={3}
+        description={t("certificateDomainsHelp")}
+      />
+
+      <VStack gap={2}>
+        <TextArea
+          label={t("certificatePem")}
+          htmlName="certificate_pem"
+          placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+          rows={6}
+          value={certPem}
+          onChange={setCertPem}
+          description={t("certificateChainHelp")}
+        />
+        <FileInput
+          label={t("loadCertificateFromFile")}
+          isLabelHidden
+          accept=".pem,.crt,.cer,.txt"
+          value={null}
+          onChange={(f) => readFile(f, setCertPem)}
+        />
+      </VStack>
+
+      <VStack gap={2}>
+        <HStack gap={2} vAlign="start">
+          {/* The mask is a CSS wrapper, not input type=password: a password
+              input strips newlines on paste and would corrupt the PEM. */}
+          <div data-masked-input={showKey ? "false" : "true"} style={{ flex: 1 }}>
+            <TextArea
+              label={t("privateKeyPem")}
+              htmlName="private_key_pem"
+              placeholder={
+                showKey ? "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----" : "••••••••"
+              }
+              rows={6}
+              value={keyPem}
+              onChange={setKeyPem}
+              hasSpellCheck={false}
+              width="100%"
+              description={t("privateKeyWarning")}
+            />
+          </div>
+          <IconButton
+            variant="ghost"
+            label={showKey ? t("hidePrivateKey") : t("showPrivateKey")}
+            tooltip={showKey ? t("hide") : t("show")}
+            icon={showKey ? <EyeOff /> : <Eye />}
+            onClick={() => setShowKey((v) => !v)}
+          />
+        </HStack>
+        <FileInput
+          label={t("loadPrivateKeyLabel")}
+          isLabelHidden
+          accept=".pem,.key,.txt"
+          value={null}
+          onChange={(f) => readFile(f, setKeyPem)}
+        />
+      </VStack>
+    </>
+  );
+
+  const fileFields =
+    fileAgents.length === 0 ? (
+      <Text type="body" size="sm" color="secondary">
+        {t("noFileAgents")}
+      </Text>
+    ) : (
+      <>
+        <Selector
+          label={t("fileAgent")}
+          description={t("fileAgentHelp")}
+          placeholder={t("fileAgentPlaceholder")}
+          options={fileAgents.map((agent) => ({ value: String(agent.id), label: agent.name }))}
+          value={agentId}
+          onChange={chooseAgent}
+        />
+        {isListing && (
+          <Text type="body" size="sm" color="secondary">
+            {t("filesLoading")}
+          </Text>
+        )}
+        {entries !== null && certificateOptions.length === 0 && (
+          <Text type="body" size="sm" color="secondary">
+            {t("filesEmpty")}
+          </Text>
+        )}
+        {certificateOptions.length > 0 && (
+          <>
+            <Selector
+              label={t("fileCertificate")}
+              description={t("fileCertificateHelp")}
+              placeholder={t("filePlaceholder")}
+              options={certificateOptions}
+              value={certPath}
+              onChange={(next) => chooseCertificate(next, entries ?? [])}
+              hasSearch={certificateOptions.length > 8}
+            />
+            <Selector
+              label={t("fileKey")}
+              description={t("fileKeyHelp")}
+              placeholder={t("filePlaceholder")}
+              options={keyOptions}
+              value={keyPath}
+              onChange={setKeyPath}
+              hasSearch={keyOptions.length > 8}
+            />
+            <Text type="body" size="sm" color="secondary">
+              {t("fileNamesFromCertificate")}
+            </Text>
+          </>
+        )}
+      </>
+    );
 
   return (
     <AppDialog
@@ -91,7 +326,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
             form={FORM_ID}
             label={isEdit ? t("saveChanges") : t("importCertificate")}
             isLoading={isPending}
-            isDisabled={isPending}
+            isDisabled={isPending || !canSubmit}
           />
         </>
       }
@@ -99,6 +334,25 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
       <form id={FORM_ID} ref={formRef} onSubmit={handleSubmit}>
         <VStack gap={4}>
           <input type="hidden" name="type" value="imported" />
+
+          {!isEdit && (
+            <SegmentedControl
+              label={t("sourceLabel")}
+              layout="fill"
+              value={source}
+              onChange={(next) => {
+                setSource(next as Source);
+                setError(null);
+              }}
+            >
+              <SegmentedControlItem value="upload" label={t("sourceUpload")} />
+              <SegmentedControlItem value="agent-file" label={t("sourceAgentFile")} />
+            </SegmentedControl>
+          )}
+
+          {error && <Banner status="error" title={error} />}
+
+          {fromFiles && fileFields}
 
           <TextInput
             {...NATIVE_REQUIRED}
@@ -111,72 +365,17 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
             description={t("importedCertificateNameHelp")}
           />
 
-          <TextArea
-            {...NO_SPELLCHECK}
-            label={t("domainsOnePerLine")}
-            htmlName="domain_names"
-            value={domains}
-            onChange={setDomains}
-            rows={3}
-            description={t("certificateDomainsHelp")}
-          />
+          {isFileCert && cert.file && (
+            <Text type="body" size="sm" color="secondary">
+              {t("fileSourcePaths", {
+                agent: cert.file.agentName ?? t("sourceDeletedAgent"),
+                certPath: cert.file.certPath ?? "",
+                keyPath: cert.file.keyPath ?? "",
+              })}
+            </Text>
+          )}
 
-          <VStack gap={2}>
-            <TextArea
-              label={t("certificatePem")}
-              htmlName="certificate_pem"
-              placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-              rows={6}
-              value={certPem}
-              onChange={setCertPem}
-              description={t("certificateChainHelp")}
-            />
-            <FileInput
-              label={t("loadCertificateFromFile")}
-              isLabelHidden
-              accept=".pem,.crt,.cer,.txt"
-              value={null}
-              onChange={(f) => readFile(f, setCertPem)}
-            />
-          </VStack>
-
-          <VStack gap={2}>
-            <HStack gap={2} vAlign="start">
-              {/* The mask is a CSS wrapper, not input type=password: a password
-                  input strips newlines on paste and would corrupt the PEM. */}
-              <div data-masked-input={showKey ? "false" : "true"} style={{ flex: 1 }}>
-                <TextArea
-                  label={t("privateKeyPem")}
-                  htmlName="private_key_pem"
-                  placeholder={
-                    showKey
-                      ? "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-                      : "••••••••"
-                  }
-                  rows={6}
-                  value={keyPem}
-                  onChange={setKeyPem}
-                  hasSpellCheck={false}
-                  width="100%"
-                  description={t("privateKeyWarning")}
-                />
-              </div>
-              <IconButton
-                variant="ghost"
-                label={showKey ? t("hidePrivateKey") : t("showPrivateKey")}
-                tooltip={showKey ? t("hide") : t("show")}
-                icon={showKey ? <EyeOff /> : <Eye />}
-                onClick={() => setShowKey((v) => !v)}
-              />
-            </HStack>
-            <FileInput
-              label={t("loadPrivateKeyLabel")}
-              isLabelHidden
-              accept=".pem,.key,.txt"
-              value={null}
-              onChange={(f) => readFile(f, setKeyPem)}
-            />
-          </VStack>
+          {!fromFiles && !isFileCert && uploadFields}
         </VStack>
       </form>
     </AppDialog>

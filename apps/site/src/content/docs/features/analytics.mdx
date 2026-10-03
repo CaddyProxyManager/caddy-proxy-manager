@@ -50,8 +50,8 @@ CLICKHOUSE_PASSWORD=your-clickhouse-password   # openssl rand -base64 32
 ## Retention
 
 30 days by default, enforced by ClickHouse's own TTL. Change it under **Settings → Observability →
-Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored); on the next startup the
-existing tables' TTL is migrated and expired data is purged.
+Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored). Saving it re-checks the schema
+on the next write, which migrates the existing tables' TTL and purges expired data - no restart.
 
 ## Disk writes
 

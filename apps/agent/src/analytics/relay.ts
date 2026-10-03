@@ -7,6 +7,7 @@ import {
   type AgentAnalyticsKind,
   MAX_ANALYTICS_REQUEST_BYTES,
   type TrafficEventRow,
+  type UpstreamErrorRow,
   type WafEventRow,
 } from "@cpm/shared";
 import type { ControllerClient } from "../controller-client";
@@ -17,16 +18,35 @@ export type AnalyticsSink = { client: ControllerClient; secret: string };
 const ENVELOPE_BYTES = 4 * 1024;
 
 let sink: AnalyticsSink | null = null;
+let analyticsOn = false;
+let upstreamErrorsOn = false;
 
-/** Everything below is a no-op when it is off. */
+/** Traffic and WAF events: everything below is a no-op for them when it is off. */
 export function analyticsEnabled(): boolean {
-  return sink !== null;
+  return sink !== null && analyticsOn;
 }
 
-export function configureAnalytics(next: AnalyticsSink | null): void {
-  if (next && !sink) console.log(`[analytics] relaying events to ${next.client.controllerUrl}`);
-  if (!next && sink) console.log("[analytics] disabled by the controller");
+/** The upstream error counts, which the controller may want with analytics off. */
+export function upstreamErrorsEnabled(): boolean {
+  return sink !== null && upstreamErrorsOn;
+}
+
+/** A sink alone is analytics, as before upstream error counts existed. */
+export function configureAnalytics(
+  next: AnalyticsSink | null,
+  wanted: { analytics: boolean; upstreamErrors: boolean } = {
+    analytics: next !== null,
+    upstreamErrors: false,
+  },
+): void {
+  const analytics = next !== null && wanted.analytics;
+  if (next && analytics && !analyticsEnabled()) {
+    console.log(`[analytics] relaying events to ${next.client.controllerUrl}`);
+  }
+  if (!analytics && analyticsEnabled()) console.log("[analytics] disabled by the controller");
   sink = next;
+  analyticsOn = analytics;
+  upstreamErrorsOn = next !== null && wanted.upstreamErrors;
 }
 
 /** A row that can never fit is dropped and counted, or the parser would never get past it. */
@@ -61,6 +81,7 @@ export function chunkBySize<T>(
 async function relay(kind: AgentAnalyticsKind, rows: readonly unknown[]): Promise<void> {
   const target = sink;
   if (!target || rows.length === 0) return;
+  if (kind === "upstream-errors" ? !upstreamErrorsOn : !analyticsOn) return;
 
   const { chunks, oversized } = chunkBySize(rows, MAX_ANALYTICS_REQUEST_BYTES - ENVELOPE_BYTES);
   if (oversized > 0) {
@@ -80,4 +101,8 @@ export function relayTrafficEvents(rows: TrafficEventRow[]): Promise<void> {
 
 export function relayWafEvents(rows: WafEventRow[]): Promise<void> {
   return relay("waf", rows);
+}
+
+export function relayUpstreamErrors(rows: UpstreamErrorRow[]): Promise<void> {
+  return relay("upstream-errors", rows);
 }

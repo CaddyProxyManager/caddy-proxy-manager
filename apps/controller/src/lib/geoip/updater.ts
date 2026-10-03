@@ -192,6 +192,11 @@ export function updateGeoipDatabases(fetchImpl: typeof fetch = fetch): Promise<G
       console.error("[geoip] update failed:", error);
       return { downloaded: [], error: error instanceof Error ? error.message : String(error) };
     })
+    .then(async (result) => {
+      const { reportGeoipRun } = await import("../notifications/jobs");
+      await reportGeoipRun(result);
+      return result;
+    })
     .finally(() => {
       inFlight = null;
     });

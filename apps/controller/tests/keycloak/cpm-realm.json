@@ -1,0 +1,37 @@
+{
+  "realm": "cpm",
+  "enabled": true,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "cpm",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "cpm-keycloak-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "frontchannelLogout": false,
+      "attributes": {
+        "backchannel.logout.url": "http://web:3000/api/auth/oidc/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "kc-alice",
+      "enabled": true,
+      "email": "kc-alice@idp.example",
+      "emailVerified": true,
+      "firstName": "Keycloak",
+      "lastName": "Alice",
+      "credentials": [{ "type": "password", "value": "KcAlicePassword2026!", "temporary": false }]
+    }
+  ]
+}

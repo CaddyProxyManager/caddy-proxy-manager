@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
 import { signInWithCredentials } from '../../helpers/sign-in';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-fwd-auth.test';
 const ECHO_BODY = 'echo-ok';
@@ -131,6 +132,7 @@ test.describe
       try {
         await freshPage.goto(`${BASE_URL}/portal?rd=http://${DOMAIN}/test-path`);
         await expect(freshPage.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
+        await waitForHydration(freshPage);
 
         // Intercept the login API response before the page navigates away
         let capturedRedirect: string | null = null;

@@ -109,6 +109,11 @@ export type TailscaleSettings = {
   apiAccessToken: string;
   /** "-" means the token's own tailnet. */
   apiTailnet: string;
+  /**
+   * Off by default: an h3 listener makes Caddy bring the node up during config load, which blocks
+   * - and wedges the admin API - for as long as the control server is unreachable.
+   */
+  http3: boolean;
 };
 
 export const DEFAULT_TAILSCALE_SETTINGS: TailscaleSettings = {
@@ -122,6 +127,7 @@ export const DEFAULT_TAILSCALE_SETTINGS: TailscaleSettings = {
   validateAuthKey: false,
   apiAccessToken: "",
   apiTailnet: "-",
+  http3: false,
 };
 
 /** Everything but the two secrets. */
@@ -227,6 +233,7 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
     validateAuthKey: Boolean(input.validateAuthKey),
     apiAccessToken,
     apiTailnet,
+    http3: Boolean(input.http3),
   };
 }
 

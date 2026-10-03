@@ -5,28 +5,17 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
@@ -361,6 +350,41 @@ describe('identity-header strip leaves client credentials alone', () => {
     expect(copiedNames(outpost)).toEqual(
       expect.arrayContaining([...AUTHENTIK_HEADERS, ...CREDENTIAL_HEADERS]),
     );
+  });
+
+  it("withholds the client's Authorization from the outpost route, keeping its cookies", async () => {
+    for (const setOutpostHostHeader of [false, true]) {
+      await ctx.db.delete(schema.proxyHosts);
+      await createProxyHost(
+        {
+          name: 'ak-outpost',
+          domains: ['ak-outpost.example.com'],
+          upstreams: [UPSTREAM],
+          authentik: { ...authentikBase, setOutpostHostHeader },
+        },
+        1,
+      );
+      const outpostRoutes: Handler[] = [];
+      (function walk(node: unknown) {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== 'object') return;
+        const obj = node as Handler;
+        if (JSON.stringify(obj.match ?? null).includes('/outpost.goauthentik.io/*')) {
+          outpostRoutes.push(obj);
+        }
+        Object.values(obj).forEach(walk);
+      })(await buildCaddyDocument());
+
+      expect(outpostRoutes.length).toBeGreaterThan(0);
+      for (const route of outpostRoutes) {
+        const [proxy] = route.handle as Handler[];
+        const request = (proxy.headers as { request: Record<string, unknown> }).request;
+        expect(request.delete).toEqual(['Authorization']);
+        expect(request.set).toEqual(
+          setOutpostHostHeader ? { Host: ['{http.reverse_proxy.upstream.host}'] } : undefined,
+        );
+      }
+    }
   });
 
   it('keeps Authorization/Cookie on every generic forward-auth route but still copies them', async () => {

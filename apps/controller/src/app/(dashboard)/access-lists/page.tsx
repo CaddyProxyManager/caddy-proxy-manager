@@ -1,5 +1,9 @@
 import AccessListsClient from "./AccessListsClient";
-import { listAccessLists, getAccessListUsageMap } from "@/src/lib/models/access-lists";
+import {
+  listAccessLists,
+  getAccessListUsageMap,
+  type AccessListUsage,
+} from "@/src/lib/models/access-lists";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -14,8 +18,7 @@ export default async function AccessListsPage() {
 
   const [lists, usageMap] = await Promise.all([listAccessLists(), getAccessListUsageMap()]);
 
-  const usage: Record<number, { id: number; name: string; domains: string[]; enabled: boolean }[]> =
-    {};
+  const usage: Record<number, AccessListUsage[]> = {};
   for (const [listId, hosts] of usageMap) {
     usage[listId] = hosts;
   }

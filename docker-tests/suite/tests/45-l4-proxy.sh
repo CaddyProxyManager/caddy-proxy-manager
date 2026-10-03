@@ -9,6 +9,9 @@ TCP_PORT=19001
 UDP_PORT=19002
 HOSTMATCH_PORT=19003
 DISABLED_PORT=19004
+RANGE_FIRST=19010
+RANGE_MIDDLE=19011
+RANGE_LAST=19012
 
 tcp_probe() {  # tcp_probe HOST PORT MESSAGE
   printf '%s\nQUIT\n' "$3" | timeout 12 socat -t3 - "TCP:$1:$2" 2>/dev/null
@@ -143,6 +146,52 @@ if wait_for "the TCP listener to close" 30 \
 else
   fail "disabling a stream host closes its listener" "caddy:$TCP_PORT still accepts connections"
 fi
+
+# ── Port ranges ─────────────────────────────────────────────────────────────
+
+# One listener per port in the range, all to one fixed upstream.
+if create_l4_host "$(jq -nc --arg l ":$RANGE_FIRST-$RANGE_LAST" '{
+  name: "docker-test l4 range", protocol: "tcp", listenAddress: $l,
+  upstreams: ["origin-tcp:9000"], matcherType: "none"
+}')"; then
+  pass "a TCP host can listen on a port range"
+  if wait_for "Caddy to open the range" 60 \
+       bash -c "printf 'QUIT\n' | timeout 5 socat -t2 - TCP:caddy:$RANGE_LAST >/dev/null 2>&1"; then
+    for port in "$RANGE_FIRST" "$RANGE_MIDDLE" "$RANGE_LAST"; do
+      t_contains "port $port of the range reaches the upstream" "ECHO origin-tcp range-$port" \
+        "$(tcp_probe caddy "$port" "range-$port")"
+    done
+  else
+    fail "Caddy opens every port of the range" "nothing accepted a connection on caddy:$RANGE_LAST"
+  fi
+else
+  fail "a TCP host can listen on a port range" "HTTP $API_STATUS: $(printf '%.300s' "$API_BODY")"
+fi
+
+# "same": each connection dials the port it arrived on, captured from the listener's address.
+# origin-tcp answers on 9000 only, so 9001 proves the port is not simply the first one's.
+if create_l4_host "$(jq -nc '{
+  name: "docker-test l4 same port", protocol: "tcp", listenAddress: ":9000-9001",
+  upstreams: ["origin-tcp"], upstreamPortMode: "same", matcherType: "none"
+}')"; then
+  pass "a range can send each connection to the port it arrived on"
+  if wait_for "Caddy to open the same-port range" 60 \
+       bash -c "printf 'QUIT\n' | timeout 5 socat -t2 - TCP:caddy:9000 >/dev/null 2>&1"; then
+    t_contains "port 9000 reaches origin-tcp:9000" "ECHO origin-tcp same-port" \
+      "$(tcp_probe caddy 9000 "same-port")"
+    t_not_contains "port 9001 dials origin-tcp:9001, where nothing listens" "ECHO" \
+      "$(tcp_probe caddy 9001 "same-port")"
+  else
+    fail "Caddy opens the same-port range" "nothing accepted a connection on caddy:9000"
+  fi
+else
+  fail "a range can send each connection to the port it arrived on" \
+    "HTTP $API_STATUS: $(printf '%.300s' "$API_BODY")"
+fi
+
+api POST /api/v1/l4-proxy-hosts '{"name":"range over reserved","protocol":"tcp",
+  "listenAddress":":2010-2030","upstreams":["origin-tcp:9000"]}'
+t_eq "a range covering Caddy's admin port is refused" "400" "$API_STATUS"
 
 api POST /api/v1/l4-proxy-hosts \
   '{"name":"bad listen","protocol":"tcp","listenAddress":"not-a-port","upstreams":["origin-tcp:9000"]}'

@@ -5,27 +5,16 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
@@ -127,6 +116,38 @@ describe('reading through GraphQL', () => {
     const viaModel = await listProxyHosts();
     expect(viaModel).toHaveLength(1);
     expect(viaModel[0].name).toBe(hosts[0].name);
+  });
+
+  it('says whether an agent is connected, which no column holds', async () => {
+    const { attach, resetRegistry } = await import('../../src/lib/agent/registry');
+    const now = new Date().toISOString();
+    const agentId = 'c'.repeat(32);
+    const [row] = await ctx.db
+      .insert(dbSchema.agents)
+      .values({ name: 'edge', agentId, secret: 'unused', createdAt: now, updatedAt: now })
+      .returning();
+    try {
+      const query = '{ agents { id name connected } }';
+      const before = await run(query, 'admin');
+      expect(before.errors).toBeUndefined();
+      expect(before.data).toEqual({ agents: [{ id: row.id, name: 'edge', connected: false }] });
+
+      resetRegistry();
+      attach({
+        agentId,
+        agentRowId: row.id,
+        name: 'edge',
+        controllerId: 'controller',
+        controllerName: 'CPM',
+        initialState: {} as Parameters<typeof attach>[0]['initialState'],
+      });
+      const after = await run(query, 'admin');
+      expect(after.errors).toBeUndefined();
+      expect(after.data).toEqual({ agents: [{ id: row.id, name: 'edge', connected: true }] });
+    } finally {
+      resetRegistry();
+      await ctx.db.delete(dbSchema.agents);
+    }
   });
 
   it('puts the configuration the models validate into config', async () => {

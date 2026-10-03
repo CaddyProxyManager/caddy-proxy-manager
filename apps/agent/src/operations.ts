@@ -8,6 +8,7 @@ import {
   type ManagedServiceName,
   type ManagedServicesRequest,
   SHIPPED_CADDY_MODULES,
+  expandL4PortMappings,
 } from "@cpm/shared";
 import {
   BUILD_OVERRIDE_FILE,
@@ -17,7 +18,9 @@ import {
   type DockerHost,
   invalidCaddyModule,
   invalidL4Port,
+  isMissingComposeService,
   L4_OVERRIDE_FILE,
+  managedServicesEnvFingerprint,
   renderCaddyBuildOverride,
   renderL4PortsOverride,
   tail,
@@ -37,6 +40,7 @@ export class OperationBusyError extends Error {
 
 export class Operations {
   private running: OperationKind | null = null;
+  private idleListeners: Array<() => void> = [];
 
   constructor(
     private readonly config: AgentConfig,
@@ -76,25 +80,23 @@ export class Operations {
 
   /**
    * The only thing keeping L4 routing alive across a reboot: a plain `docker compose up` omits the
-   * port override. With nothing recorded Docker is adopted instead, or an empty list would
-   * unpublish ports the agent never published.
+   * port override. Nothing recorded is nothing to restore. Adopting what Docker publishes instead
+   * recorded 80 and 443 as applied, and the first desired state then recreated Caddy to drop them.
    */
   async restorePublishedPorts(): Promise<void> {
     const recorded = this.store.appliedL4Ports();
+    if (recorded.length === 0) return;
     const published = await this.docker.publishedCaddyPorts();
 
-    if (recorded.length === 0) {
-      if (published.length > 0) this.store.setAppliedL4Ports(published);
-      return;
-    }
-
-    // Compose's spelling on both sides, both sorted, so this compares sets.
-    const same =
-      recorded.length === published.length && recorded.every((port, i) => port === published[i]);
-    if (same) return;
+    // Docker lists a published range port by port, so the recorded ranges are expanded to match.
+    // Contained, not equal: Caddy also publishes 80 and 443 from the base file, which no apply
+    // records, so an equal set never matched and every agent start recreated Caddy.
+    const live = new Set(expandL4PortMappings(published));
+    const missing = expandL4PortMappings(recorded).filter((port) => !live.has(port));
+    if (missing.length === 0) return;
 
     console.log(
-      `[agent] Caddy is publishing ${published.length} port(s) but ${recorded.length} were applied; republishing`,
+      `[agent] Caddy is not publishing ${missing.length} of the port(s) applied; republishing`,
     );
     this.applyL4Ports(recorded);
   }
@@ -102,6 +104,17 @@ export class Operations {
   private begin(kind: OperationKind): void {
     if (this.running) throw new OperationBusyError(this.running);
     this.running = kind;
+  }
+
+  private end(): void {
+    this.running = null;
+    for (const listener of this.idleListeners.splice(0)) listener();
+  }
+
+  /** Called once nothing runs: at once if nothing does, else when the running operation ends. */
+  whenIdle(listener: () => void): void {
+    if (this.running) this.idleListeners.push(listener);
+    else listener();
   }
 
   // ─── L4 ports ──────────────────────────────────────────────────────────────
@@ -115,7 +128,7 @@ export class Operations {
       console.warn(`[agent] refusing port change: ${error}`);
       this.store.setL4PortsStatus({
         state: "failed",
-        message: `The port change was refused: ${error}. Expected HOST:CONTAINER[/tcp|/udp].`,
+        message: `The port change was refused: ${error}. Expected HOST:CONTAINER[/tcp|/udp], each side a port or an A-B range.`,
         triggeredAt: new Date().toISOString(),
         error,
       });
@@ -125,13 +138,11 @@ export class Operations {
     const triggeredAt = new Date().toISOString();
     this.store.setL4PortsStatus({
       state: "applying",
-      message: `Recreating Caddy with ${ports.length} published port(s).`,
+      message: `Recreating Caddy with ${expandL4PortMappings(ports).length} published port(s).`,
       triggeredAt,
     });
 
-    void this.runL4Ports(ports, triggeredAt).finally(() => {
-      this.running = null;
-    });
+    void this.runL4Ports(ports, triggeredAt).finally(() => this.end());
   }
 
   private async runL4Ports(ports: string[], triggeredAt: string): Promise<void> {
@@ -156,7 +167,7 @@ export class Operations {
         state: "applied",
         message:
           health === "healthy"
-            ? `Caddy recreated and healthy with ${ports.length} published port(s).`
+            ? `Caddy recreated and healthy with ${expandL4PortMappings(ports).length} published port(s).`
             : `Caddy recreated; its health check reports "${health}" and may still be starting.`,
         triggeredAt,
         appliedAt: new Date().toISOString(),
@@ -201,9 +212,7 @@ export class Operations {
       message: "Loading the Caddy image you built.",
       triggeredAt,
     });
-    return this.runCaddyImageLoad(triggeredAt, narrowed).finally(() => {
-      this.running = null;
-    });
+    return this.runCaddyImageLoad(triggeredAt, narrowed).finally(() => this.end());
   }
 
   private async runCaddyImageLoad(
@@ -302,9 +311,7 @@ export class Operations {
       triggeredAt,
     });
 
-    void this.runCaddyBuild(modules, triggeredAt).finally(() => {
-      this.running = null;
-    });
+    void this.runCaddyBuild(modules, triggeredAt).finally(() => this.end());
   }
 
   private async runCaddyBuild(modules: string[], triggeredAt: string): Promise<void> {
@@ -392,9 +399,7 @@ export class Operations {
       triggeredAt,
     });
 
-    void this.runManagedServices(request, triggeredAt).finally(() => {
-      this.running = null;
-    });
+    void this.runManagedServices(request, triggeredAt).finally(() => this.end());
   }
 
   private async runManagedServices(
@@ -407,7 +412,10 @@ export class Operations {
       const env = composeEnv(request.env);
 
       const failures: string[] = [];
-      const applied: Record<ManagedServiceName, boolean> = { clickhouse: false };
+      const applied = Object.fromEntries(MANAGED_SERVICES.map((name) => [name, false])) as Record<
+        ManagedServiceName,
+        boolean
+      >;
 
       for (const name of MANAGED_SERVICES) {
         const enable = request.services[name] === true;
@@ -415,7 +423,7 @@ export class Operations {
           ? await this.docker.startService(name, env)
           : await this.docker.stopService(name, env);
 
-        if (result.ok) {
+        if (result.ok || (!enable && isMissingComposeService(result.output))) {
           applied[name] = enable;
           continue;
         }
@@ -425,7 +433,7 @@ export class Operations {
         failures.push(`${name}: ${detail}`);
       }
 
-      this.store.setAppliedManagedServices(applied);
+      this.store.setAppliedManagedServices(applied, managedServicesEnvFingerprint(request.env));
 
       if (failures.length > 0) {
         const detail = failures.join("; ");

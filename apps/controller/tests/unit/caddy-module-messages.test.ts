@@ -26,6 +26,7 @@ const CONFLICTS: ModuleConflict[] = [
   { kind: 'l4Hosts', count: 3 },
   { kind: 'globalWaf' },
   { kind: 'globalGeoblock' },
+  { kind: 'globalCrowdsec' },
   { kind: 'hostWaf', count: 1 },
   { kind: 'hostWaf', count: 2 },
   { kind: 'hostGeoblock', count: 1 },

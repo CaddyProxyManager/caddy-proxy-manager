@@ -7,6 +7,7 @@ import {
   listUserOAuthProviders,
 } from "@/src/lib/models/user";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
+import { ldapDirectoryNames } from "@/src/lib/models/ldap-directories";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
 import { resolveAvatar } from "@/src/lib/avatar";
@@ -16,6 +17,9 @@ import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { listUserPasskeys } from "@/src/lib/passkeys";
+import { passkeyRpId } from "@/src/lib/passkey-relying-party";
+import { getPublicBaseUrl } from "@/src/lib/public-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -35,6 +39,9 @@ export default async function ProfilePage() {
     userSessions,
     currentSessionId,
     gravatarEnabled,
+    passkeys,
+    publicBaseUrl,
+    directoryNames,
   ] = await Promise.all([
     getUserById(userId),
     // The accounts table is authoritative; users.provider/subject are a projection (#261).
@@ -44,6 +51,9 @@ export default async function ProfilePage() {
     listUserSessions(userId),
     getCurrentSessionId(),
     isGravatarEnabled(),
+    listUserPasskeys(userId),
+    getPublicBaseUrl(),
+    ldapDirectoryNames(),
   ]);
   if (!user) {
     redirect("/login");
@@ -54,6 +64,10 @@ export default async function ProfilePage() {
     getUserPasswordHash(user),
     getPasswordSignInUsername(userId),
   ]);
+  // A directory account without a local password: the directory owns that password.
+  const directoryLink = linkedProviders.find((link) => directoryNames.has(link.providerId));
+  const managedByDirectory =
+    !passwordHash && directoryLink ? (directoryNames.get(directoryLink.providerId) ?? null) : null;
   const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
 
   return (
@@ -72,9 +86,13 @@ export default async function ProfilePage() {
       }}
       linkedProviders={linkedProviders}
       enabledProviders={enabledProviders}
+      directories={[...directoryNames].map(([id, name]) => ({ id, name }))}
+      managedByDirectory={managedByDirectory}
       apiTokens={apiTokens}
       sessions={sessions}
       localPasswordsEnabled={!(await localUsersDisabled())}
+      passkeys={passkeys}
+      passkeyRpId={passkeyRpId(publicBaseUrl)}
       passwordLocked={isDemoAdmin(userId)}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
     />

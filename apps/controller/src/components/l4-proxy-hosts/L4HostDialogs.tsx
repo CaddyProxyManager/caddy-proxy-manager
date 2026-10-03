@@ -8,6 +8,7 @@ import {
 } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
 import { INITIAL_ACTION_STATE } from "@/lib/actions";
 import type { L4ProxyHost } from "@/lib/models/l4-proxy-hosts";
+import type { L4AccessListOption } from "@/lib/models/access-lists";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -21,7 +22,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
-import { Globe, Layers, MapPin, Pin } from "lucide-react";
+import { Globe, Layers, MapPin, Pin, ShieldBan } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
@@ -81,6 +82,21 @@ function lbPolicyOptions(t: ReturnType<typeof useTranslations<"l4ProxyHosts">>) 
     { value: "least_conn", label: t("lbPolicyLeastConn") },
     { value: "ip_hash", label: t("lbPolicyIpHash") },
     { value: "first", label: t("lbPolicyFirst") },
+  ];
+}
+
+const NO_ACCESS_LIST = "__none__";
+
+/** A list with no IP rules has nothing that applies here; the host's own stays so it can be seen. */
+function accessListOptions(t: Translator, lists: L4AccessListOption[], currentId: number | null) {
+  return [
+    { value: NO_ACCESS_LIST, label: t("accessListNone") },
+    ...lists
+      .filter((list) => list.ipRuleCount > 0 || list.id === currentId)
+      .map((list) => ({
+        value: String(list.id),
+        label: t("accessListOption", { name: list.name, count: list.ipRuleCount }),
+      })),
   ];
 }
 
@@ -147,6 +163,8 @@ type TextFields = {
   matcherValue: string;
   lbPolicyChoose: string;
   lbPolicyWeights: string;
+  lbTryDuration: string;
+  lbTryInterval: string;
   lbActiveHealthPort: string;
   lbActiveHealthInterval: string;
   lbActiveHealthTimeout: string;
@@ -178,6 +196,8 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
     lbPolicyChoose: lb?.policyChoose != null ? String(lb.policyChoose) : "",
     lbPolicyWeights: lb?.policyWeights?.join(", ") ?? "",
+    lbTryDuration: lb?.tryDuration ?? "",
+    lbTryInterval: lb?.tryInterval ?? "",
     lbActiveHealthPort:
       lb?.activeHealthCheck?.port != null ? String(lb.activeHealthCheck.port) : "",
     lbActiveHealthInterval: lb?.activeHealthCheck?.interval ?? "",
@@ -207,6 +227,7 @@ function L4HostForm({
   state,
   initialData,
   agents = [],
+  accessLists = [],
   assignedAgentIds = [],
 }: {
   formId: string;
@@ -214,12 +235,14 @@ function L4HostForm({
   state: { status: string; message?: string };
   initialData?: L4ProxyHost | null;
   agents?: AgentOption[];
+  accessLists?: L4AccessListOption[];
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
+  const [samePort, setSamePort] = useState(initialData?.upstreamPortMode === "same");
 
   // Astryx inputs are controlled; one object rather than dozens of useStates.
   const [text, setText] = useState<TextFields>(() => initialText(initialData));
@@ -235,6 +258,9 @@ function L4HostForm({
   const [proxyProtocolVersion, setProxyProtocolVersion] = useState<string>(
     initialData?.proxyProtocolVersion ?? "__none__",
   );
+  const [accessListId, setAccessListId] = useState<string>(
+    initialData?.accessListId != null ? String(initialData.accessListId) : NO_ACCESS_LIST,
+  );
   const [lbEnabled, setLbEnabled] = useState(initialData?.loadBalancer?.enabled ?? false);
   const [lbPolicy, setLbPolicy] = useState<string>(initialData?.loadBalancer?.policy ?? "random");
   const [lbActiveHealthEnabled, setLbActiveHealthEnabled] = useState(
@@ -245,6 +271,7 @@ function L4HostForm({
   );
   const [dnsEnabled, setDnsEnabled] = useState(initialData?.dnsResolver?.enabled ?? false);
   const [geoblockEnabled, setGeoblockEnabled] = useState(initialData?.geoblock?.enabled ?? false);
+  const [crowdsecEnabled, setCrowdsecEnabled] = useState(initialData?.crowdsec ?? true);
   const [geoblockMode, setGeoblockMode] = useState<string>(initialData?.geoblockMode ?? "merge");
   const [upstreamDnsMode, setUpstreamDnsMode] = useState(
     initialData?.upstreamDnsResolution?.enabled === true
@@ -320,17 +347,25 @@ function L4HostForm({
 
         <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
 
+        <input type="hidden" name="upstreamPortMode" value={samePort ? "same" : "fixed"} />
+        <Switch
+          label={t("samePortUpstream")}
+          description={t("samePortUpstreamHelp")}
+          value={samePort}
+          onChange={setSamePort}
+        />
+
         <TextArea
           {...NATIVE_REQUIRED}
           {...NO_SPELLCHECK}
           label={t("upstreams")}
           htmlName="upstreams"
-          placeholder={"10.0.0.1:5432\n10.0.0.2:5432"}
+          placeholder={samePort ? "10.0.0.1\n10.0.0.2" : "10.0.0.1:5432\n10.0.0.2:5432"}
           value={text.upstreams}
           onChange={set("upstreams")}
           rows={2}
           isRequired
-          description={t("upstreamsHelp")}
+          description={samePort ? t("upstreamsSamePortHelp") : t("upstreamsHelp")}
         />
 
         <Selector
@@ -355,6 +390,8 @@ function L4HostForm({
           />
         )}
 
+        {/* Unconditional: over UDP the switch is gone and the update must read that as off. */}
+        <input type="hidden" name="tlsTerminationPresent" value="1" />
         {protocol === "tcp" && (
           <Switch
             label={t("tlsTermination")}
@@ -364,6 +401,7 @@ function L4HostForm({
           />
         )}
 
+        <input type="hidden" name="proxyProtocolReceivePresent" value="1" />
         <Switch
           label={t("acceptInboundProxyProtocol")}
           htmlName="proxyProtocolReceive"
@@ -377,6 +415,15 @@ function L4HostForm({
           options={proxyProtocolOptions(t)}
           value={proxyProtocolVersion}
           onChange={setProxyProtocolVersion}
+        />
+
+        <Selector
+          label={t("accessList")}
+          htmlName="accessListId"
+          options={accessListOptions(t, accessLists, initialData?.accessListId ?? null)}
+          value={accessListId}
+          onChange={setAccessListId}
+          description={t("accessListHelp")}
         />
 
         <Section
@@ -419,16 +466,35 @@ function L4HostForm({
               onChange={set("lbPolicyWeights")}
             />
           )}
+          <TextInput
+            label={t("tryDuration")}
+            isOptional
+            htmlName="lbTryDuration"
+            placeholder="5s"
+            value={text.lbTryDuration}
+            onChange={set("lbTryDuration")}
+          />
+          <TextInput
+            label={t("tryInterval")}
+            isOptional
+            htmlName="lbTryInterval"
+            placeholder="250ms"
+            value={text.lbTryInterval}
+            onChange={set("lbTryInterval")}
+          />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("activeHealthCheck")}
           </Text>
           <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
+          {/* Disabled, it posts nothing and saves as off. */}
           <Switch
             label={t("enableActiveHealthCheck")}
             htmlName="lbActiveHealthEnabled"
-            value={lbActiveHealthEnabled}
+            value={lbActiveHealthEnabled && !samePort}
             onChange={setLbActiveHealthEnabled}
+            isDisabled={samePort}
+            description={samePort ? t("activeHealthCheckSamePort") : undefined}
           />
           <TextInput
             label={t("healthCheckPort")}
@@ -521,6 +587,18 @@ function L4HostForm({
             placeholder="5s"
             value={text.dnsTimeout}
             onChange={set("dnsTimeout")}
+          />
+        </Section>
+
+        {/* Open when the host has opted out, so that choice is visible without a click. */}
+        <Section icon={ShieldBan} title={t("crowdsec")} defaultIsOpen={!crowdsecEnabled}>
+          <input type="hidden" name="crowdsecPresent" value="1" />
+          <Switch
+            label={t("enableCrowdsec")}
+            description={t("crowdsecHelp")}
+            htmlName="crowdsecEnabled"
+            value={crowdsecEnabled}
+            onChange={setCrowdsecEnabled}
           />
         </Section>
 
@@ -675,11 +753,13 @@ export function CreateL4HostDialog({
   onClose,
   initialData,
   agents = [],
+  accessLists = [],
 }: {
   open: boolean;
   onClose: () => void;
   initialData?: L4ProxyHost | null;
   agents?: AgentOption[];
+  accessLists?: L4AccessListOption[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
@@ -707,6 +787,7 @@ export function CreateL4HostDialog({
             : null
         }
         agents={agents}
+        accessLists={accessLists}
       />
     </AppDialog>
   );
@@ -717,12 +798,14 @@ export function EditL4HostDialog({
   host,
   onClose,
   agents = [],
+  accessLists = [],
   assignedAgentIds = [],
 }: {
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
   agents?: AgentOption[];
+  accessLists?: L4AccessListOption[];
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
@@ -750,6 +833,7 @@ export function EditL4HostDialog({
         state={state}
         initialData={host}
         agents={agents}
+        accessLists={accessLists}
         assignedAgentIds={assignedAgentIds}
       />
     </AppDialog>

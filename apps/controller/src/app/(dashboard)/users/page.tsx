@@ -9,6 +9,8 @@ import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { emailReady } from "@/src/lib/email/config";
+import { passkeyCountsByUser } from "@/src/lib/passkeys";
+import { disabledByFailedSignIns } from "@/src/lib/account-failures";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -25,12 +27,20 @@ export default async function UsersPage() {
     listGroups().catch(() => []),
     usersWithPassword().catch(() => new Set<number>()),
   ]);
+  const passkeyCounts = await passkeyCountsByUser(allUsers.map((user) => user.id)).catch(
+    () => new Map<number, number>(),
+  );
+  const autoDisabled = await disabledByFailedSignIns(
+    allUsers.filter((user) => user.status !== "active").map((user) => user.id),
+  ).catch(() => new Set<number>());
   // Icons resolve here: Gravatar hashing needs node:crypto.
   const safeUsers = allUsers.map(({ passwordHash, ...rest }) => ({
     ...rest,
     avatar: resolveAvatar(rest, 72, { gravatar: gravatarEnabled }),
     lastSessionAt: lastSessions.get(rest.id) ?? null,
     hasPassword: passwordHash !== null || withPassword.has(rest.id),
+    passkeyCount: passkeyCounts.get(rest.id) ?? 0,
+    disabledByFailedSignIns: autoDisabled.has(rest.id),
     isDemoAdmin: isDemoAdmin(rest.id),
     isSelf: rest.id === Number(session.user.id),
   }));

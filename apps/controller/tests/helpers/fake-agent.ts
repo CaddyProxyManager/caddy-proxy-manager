@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type {
+  AgentCapability,
   AgentCommand,
   AgentDesiredState,
   AgentStatus,
@@ -63,9 +64,18 @@ function defaultState(overrides: Partial<FakeAgent['state']>): FakeAgent['state'
   };
 }
 
+export type FakeAgentOptions = {
+  /** The `agents` row it authenticated as; 1 unless a test needs several. */
+  agentRowId?: number;
+  capabilities?: AgentCapability[];
+  /** Answers a command itself; undefined falls back to `state.caddyAdmin`. */
+  answer?: (command: AgentCommand) => { status: number; text: string } | undefined;
+};
+
 /** Drains the stream in the background; commands are answered at once from `state.caddyAdmin`. */
 export async function startFakeAgent(
   overrides: Partial<FakeAgent['state']> = {},
+  options: FakeAgentOptions = {},
 ): Promise<FakeAgent> {
   const agentId = randomBytes(16).toString('hex');
   const name = 'fake-agent';
@@ -113,12 +123,13 @@ export async function startFakeAgent(
       caddyBuild: { applied: raw.appliedModules, status: raw.buildStatus },
       services: { applied: raw.appliedServices, status: raw.servicesStatus },
       analytics: raw.analytics,
+      ...(options.capabilities ? { capabilities: options.capabilities } : {}),
     };
   }
 
   const { events } = attach({
     agentId,
-    agentRowId: 1,
+    agentRowId: options.agentRowId ?? 1,
     name,
     controllerId: 'test-controller',
     controllerName: 'Test',
@@ -169,13 +180,14 @@ export async function startFakeAgent(
     }
 
     requests.push({ kind: 'command', command: event.command });
+    const answer = options.answer?.(event.command) ?? raw.caddyAdmin;
     settleResults(agentId, [
       {
         id: event.command.id,
         ok: true,
         response: {
-          status: raw.caddyAdmin.status,
-          text: raw.caddyAdmin.text,
+          status: answer.status,
+          text: answer.text,
           headers: { 'content-type': 'application/json' },
         },
       },

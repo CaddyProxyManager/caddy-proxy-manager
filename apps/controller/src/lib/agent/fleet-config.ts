@@ -6,9 +6,14 @@ import { geoipFleetConfig } from "./geoip";
 import { pushDesiredState } from "./desired-state";
 
 export async function currentFleetConfig(): Promise<FleetConfig> {
-  const [analytics, geoip] = await Promise.all([isAnalyticsEnabled(), geoipFleetConfig()]);
+  const { upstreamErrorsWanted } = await import("../notifications/upstream-errors");
+  const [analytics, geoip, upstreamErrors] = await Promise.all([
+    isAnalyticsEnabled(),
+    geoipFleetConfig(),
+    upstreamErrorsWanted().catch(() => false),
+  ]);
   // Agents relay analytics rather than writing to ClickHouse, so no credential goes out here.
-  return { clickhouse: null, analytics, geoip };
+  return { clickhouse: null, analytics, geoip, upstreamErrors };
 }
 
 /**

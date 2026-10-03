@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, afterAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { reloadConfig } from '@/tests/helpers/config';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => {
@@ -17,23 +18,11 @@ afterAll(async () => {
 });
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Outside the factory: an async Bun mock factory never resolves and the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    get sqlite() {
-      return undefined;
-    },
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (v: string | Date | null | undefined): string | null =>
-      !v ? null : v instanceof Date ? v.toISOString() : new Date(v).toISOString(),
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
@@ -43,9 +32,8 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
-// config snapshots process.env on first evaluation, already past; a fresh copy sees the flag.
-const freshConfig = await import(`../../src/lib/config${fresh()}`);
-vi.mock('../../src/lib/config', () => ({ ...freshConfig }));
+// config snapshots process.env on first evaluation, already past; re-read, it sees the flag.
+await reloadConfig();
 
 import { getAuth } from '../../src/lib/auth-server';
 import { DISABLED_AUTH_PATHS } from '../../src/lib/auth-disabled-paths';

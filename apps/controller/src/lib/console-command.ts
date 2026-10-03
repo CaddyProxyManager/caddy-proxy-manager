@@ -1,11 +1,17 @@
 /**
- * For when the only admin has lost their second factor. Signed from SESSION_SECRET, which
- * `docker compose exec` also hands the command. Dependency-free: `cpm-server` imports it apart
- * from the app, whose config would validate the whole environment first.
+ * For when the only admin cannot sign in: a lost second factor, or an account disabled after
+ * failed sign-ins. Signed from SESSION_SECRET, which `docker compose exec` also hands the command.
+ * Dependency-free: `cpm-server` imports it apart from the app, whose config would validate the
+ * whole environment first.
  */
 import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 
 export const CONSOLE_RESET_TWO_FACTOR_PATH = "/api/internal/reset-2fa";
+export const CONSOLE_ENABLE_USER_PATH = "/api/internal/enable-user";
+
+/** Signed in, so one command's signature is refused by the other's route. */
+export type ConsoleCommandPurpose = "reset-2fa" | "enable-user";
+
 /** Short: the command and the server share one machine. */
 export const CONSOLE_COMMAND_MAX_AGE_MS = 60_000;
 
@@ -15,9 +21,14 @@ function key(secret: string): Buffer {
   );
 }
 
-export function signConsoleCommand(secret: string, username: string, timestamp: number): string {
+export function signConsoleCommand(
+  secret: string,
+  username: string,
+  timestamp: number,
+  purpose: ConsoleCommandPurpose = "reset-2fa",
+): string {
   return createHmac("sha256", key(secret))
-    .update(`reset-2fa\n${timestamp}\n${username}`)
+    .update(`${purpose}\n${timestamp}\n${username}`)
     .digest("base64url");
 }
 
@@ -25,13 +36,14 @@ export function verifyConsoleCommand(
   secret: string,
   body: { username?: unknown; timestamp?: unknown; signature?: unknown },
   now = Date.now(),
+  purpose: ConsoleCommandPurpose = "reset-2fa",
 ): string | null {
   const { username, timestamp, signature } = body;
   if (typeof username !== "string" || !username.trim()) return null;
   if (typeof timestamp !== "number" || !Number.isInteger(timestamp)) return null;
   if (typeof signature !== "string") return null;
   if (Math.abs(now - timestamp) > CONSOLE_COMMAND_MAX_AGE_MS) return null;
-  const expected = Buffer.from(signConsoleCommand(secret, username, timestamp));
+  const expected = Buffer.from(signConsoleCommand(secret, username, timestamp, purpose));
   const given = Buffer.from(signature);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
   return username;

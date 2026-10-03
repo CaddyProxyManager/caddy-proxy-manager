@@ -51,6 +51,7 @@ beforeEach(() => {
     docker: { caddyRunning: async () => false } as unknown as DockerHost,
     operations: {
       applyL4Ports: () => {},
+      whenIdle: (listener: () => void) => listener(),
       applyManagedServices: () => {},
       applyCaddyBuild: (modules: string[]) => builds.push(modules),
     } as unknown as Operations,

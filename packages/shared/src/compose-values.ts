@@ -26,14 +26,60 @@ export function isValidModuleSpec(spec: string): boolean {
   return isValidModulePath(spec.slice(0, at)) && MODULE_VERSION_PATTERN.test(spec.slice(at + 1));
 }
 
-/** `HOST:CONTAINER[/proto]`, the compose short form the controller and `docker inspect` produce. */
-const L4_PORT_PATTERN = /^(\d{1,5}):(\d{1,5})(?:\/(?:tcp|udp))?$/;
+/**
+ * `HOST:CONTAINER[/proto]`, the compose short form the controller and `docker inspect` produce.
+ * Either side may be a range `A-B`, which compose requires to be the same size on both.
+ */
+const L4_PORT_PATTERN = /^(\d{1,5})(?:-(\d{1,5}))?:(\d{1,5})(?:-(\d{1,5}))?(?:\/(tcp|udp))?$/;
+
+type ParsedL4PortMapping = {
+  hostStart: number;
+  containerStart: number;
+  count: number;
+  udp: boolean;
+};
+
+function parseL4PortMapping(mapping: string): ParsedL4PortMapping | null {
+  const match = L4_PORT_PATTERN.exec(mapping);
+  if (!match) return null;
+  const hostStart = Number(match[1]);
+  const hostEnd = match[2] === undefined ? hostStart : Number(match[2]);
+  const containerStart = Number(match[3]);
+  const containerEnd = match[4] === undefined ? containerStart : Number(match[4]);
+  const ports = [hostStart, hostEnd, containerStart, containerEnd];
+  if (!ports.every((port) => port >= 1 && port <= 65535)) return null;
+  if (hostEnd < hostStart || containerEnd - containerStart !== hostEnd - hostStart) return null;
+  return { hostStart, containerStart, count: hostEnd - hostStart + 1, udp: match[5] === "udp" };
+}
 
 export function isValidL4PortMapping(mapping: string): boolean {
-  const match = L4_PORT_PATTERN.exec(mapping);
-  if (!match) return false;
-  return [match[1], match[2]].every((part) => {
-    const port = Number(part);
-    return port >= 1 && port <= 65535;
-  });
+  return parseL4PortMapping(mapping) !== null;
+}
+
+/**
+ * One entry per port, as `docker inspect` lists a published range, with `/tcp` dropped as compose
+ * does. Sorted and deduplicated. An invalid entry is kept as it is, so a comparison still sees it
+ * and the apply that refuses it runs.
+ */
+export function expandL4PortMappings(mappings: readonly string[]): string[] {
+  const expanded = new Set<string>();
+  for (const mapping of mappings) {
+    const parsed = parseL4PortMapping(mapping);
+    if (!parsed) {
+      expanded.add(mapping);
+      continue;
+    }
+    const suffix = parsed.udp ? "/udp" : "";
+    for (let i = 0; i < parsed.count; i++) {
+      expanded.add(`${parsed.hostStart + i}:${parsed.containerStart + i}${suffix}`);
+    }
+  }
+  return Array.from(expanded).sort();
+}
+
+/** A range and its ports one by one publish the same thing; recreating Caddy over it would not. */
+export function sameL4PortSet(a: readonly string[], b: readonly string[]): boolean {
+  const left = expandL4PortMappings(a);
+  const right = expandL4PortMappings(b);
+  return left.length === right.length && left.every((port, i) => port === right[i]);
 }

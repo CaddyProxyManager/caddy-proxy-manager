@@ -1,0 +1,9 @@
+# Password: Rig-Authelia-Passw0rd (suite/tests/61-forward-auth-authelia.sh)
+users:
+  rigalice:
+    displayname: Rig Alice
+    password: $argon2id$v=19$m=65536,t=3,p=4$efzB3dsWxhv2ojn83broOg$A88FU9CynNhRl6TyRZk4HDBZCUYcM3AoDdVTgdpXQyc
+    email: rigalice@cpm.test
+    groups:
+      - admins
+      - rig

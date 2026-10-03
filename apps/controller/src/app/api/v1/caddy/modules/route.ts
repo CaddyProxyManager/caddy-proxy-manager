@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { pushDesiredState } from "@/src/lib/agent/desired-state";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { getCaddyBuildDiff, sanitizeCaddyBuildSettings } from "@/src/lib/caddy-build";
 import { describeModuleConflicts } from "@/src/lib/caddy-build-conflicts";
@@ -34,7 +35,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** PUT /api/v1/caddy/modules - no rebuild until POST /api/caddy-build. */
+/**
+ * PUT /api/v1/caddy/modules - as Settings: the selection is desired state, so an agent that builds
+ * its own image starts rebuilding on save.
+ */
 export async function PUT(request: NextRequest) {
   try {
     await requireApiAdmin(request);
@@ -52,8 +56,10 @@ export async function PUT(request: NextRequest) {
 
     await saveCaddyBuildSettings(settings);
 
-    // As Settings does: a stale config would name a module the next rebuild cannot load.
+    // Before the push: a Caddy the rebuild recreates resumes its autosave, which must not name a
+    // module the new binary lacks.
     await applyCaddyConfig();
+    await pushDesiredState();
 
     return NextResponse.json({ selection: settings, diff: await getCaddyBuildDiff() });
   } catch (error) {

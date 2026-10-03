@@ -1,7 +1,8 @@
 /**
  * The docs site has no `/api/auth/*`, so this never makes a request: every sign-in fails as a wrong
- * password does, except in the setup demo, which has accounts of its own. Two-factor setup takes
- * any password and any six digits, since there is no account or authenticator to check them on.
+ * password does, except in the setup demo, which has accounts of its own, and no passkey is known.
+ * Two-factor setup takes any password and any six digits, since there is no account or
+ * authenticator to check them on.
  */
 import { currentSimulation } from "../setup-simulation";
 
@@ -27,11 +28,22 @@ export const authClient = {
       // No message, so the form uses its own wording.
       return { error: { status: 401 } };
     },
+    /** A directory sign-in, which /login uses once a directory is set up: the same wrong password. */
+    async ldap(_input: { username: string; password: string; directoryId?: string }) {
+      await pause();
+      return { error: { status: 401, code: "INVALID_USERNAME_OR_PASSWORD" } };
+    },
     async social(input: { provider: string; callbackURL?: string; errorCallbackURL?: string }) {
       const simulation = currentSimulation();
       if (simulation) return simulation.signInSocial(input.callbackURL);
       await pause();
       throw new Error("There is no identity provider behind the documentation site");
+    },
+    /** Autofill waits quietly, as it does in a browser with no passkey for the site. */
+    async passkey(options?: { autoFill?: boolean }) {
+      if (options?.autoFill) return new Promise<never>(() => {});
+      await pause();
+      return { data: null, error: { status: 401, code: "PASSKEY_NOT_FOUND" } };
     },
   },
   twoFactor: {

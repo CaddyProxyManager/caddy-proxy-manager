@@ -1,6 +1,8 @@
 /**
  * #117: NETWORKS: 0 in the socket proxy blocked compose's GET /networks/{id}, so applies and the
  * startup republish failed. Creates its own L4 host: file order must not decide the port exists.
+ * The republish itself, for ports a plain `docker compose up` dropped, is the agent's unit tests':
+ * this stack publishes the L4 test ports from its own compose file.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -20,6 +22,7 @@ const ENV = { ...process.env, CLICKHOUSE_PASSWORD: 'test-clickhouse-password-202
 const SESSION_HEADERS = { Origin: BASE_URL };
 
 type L4StatusResponse = {
+  diff: { needsApply: boolean };
   status: {
     state: string;
     appliedAt?: string;
@@ -27,6 +30,13 @@ type L4StatusResponse = {
     error?: string;
   };
 };
+
+function caddyContainerId(): string {
+  return execFileSync('docker', ['inspect', '-f', '{{.Id}}', 'caddy-proxy-manager-caddy'], {
+    cwd: COMPOSE_CWD,
+    encoding: 'utf8',
+  }).trim();
+}
 
 async function fetchL4Status(page: Page): Promise<L4StatusResponse> {
   const res = await page.request.get('/api/l4-ports');
@@ -70,11 +80,18 @@ test.describe
       // The poll below outlasts the global 60 s timeout.
       test.setTimeout(180_000);
 
-      // The agent republishes unconditionally, so this completes with an unchanged port set.
+      // An earlier spec's L4 host can leave a port unpublished, so this apply may recreate Caddy.
+      // Then the "applied" already showing is the last apply's, and the traffic test below would
+      // race the recreate: wait for this one. An unchanged port set is not reapplied at all.
+      const before = await fetchL4Status(page);
       const res = await page.request.post('/api/l4-ports', { headers: SESSION_HEADERS });
       expect(res.ok(), `POST /api/l4-ports failed: ${await res.text()}`).toBe(true);
 
-      const state = await waitForL4Terminal(page, 90_000);
+      const state = await waitForL4Terminal(
+        page,
+        90_000,
+        before.diff.needsApply ? (before.status.appliedAt ?? '0') : undefined,
+      );
       expect(
         state,
         'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-agent',
@@ -88,33 +105,30 @@ test.describe
       expect(res.data).toContain('agent-apply-check');
     });
 
-    test('auto-applies on agent container restart - regression #117', async ({ page }) => {
-      // Restart, republish and Caddy's health check outlast the global 60 s timeout.
+    test('an agent restart starts Caddy again without recreating it - regression #117', async ({
+      page,
+    }) => {
+      // Restart, Caddy's start and the settle below outlast the global 60 s timeout.
       test.setTimeout(180_000);
+      const before = caddyContainerId();
 
-      // Sleep so the new timestamp is strictly greater whatever the clock's precision.
-      const { status: before } = await fetchL4Status(page);
-      const prevAppliedAt = before?.appliedAt ?? '';
-      await page.waitForTimeout(1_500);
-
-      // The startup republish is what keeps L4 routing alive across a host reboot.
       execFileSync('docker', ['restart', AGENT_CONTAINER], {
         stdio: 'inherit',
         cwd: COMPOSE_CWD,
         env: ENV,
       });
 
-      const state = await waitForL4Terminal(page, 90_000, prevAppliedAt);
-      expect(
-        state,
-        'Agent returned "failed" after restart. ' +
-          'Likely cause: docker-socket-proxy is missing NETWORKS: 1. ' +
-          'Run: docker logs caddy-proxy-manager-agent',
-      ).toBe('applied');
+      // The agent stops Caddy on its way down and starts the same container on its way up. Its
+      // startup restore runs within seconds; a needless republish would recreate the container.
+      await waitForTcpEcho('127.0.0.1', TCP_PORT, 'ready-probe', 60_000);
+      await page.waitForTimeout(15_000);
+      expect(caddyContainerId(), 'Run: docker logs caddy-proxy-manager-agent').toBe(before);
+      const { status } = await fetchL4Status(page);
+      expect(status.state).toBe('applied');
     });
 
-    test('TCP traffic still works after agent restart and auto-apply', async () => {
-      // Caddy was briefly recreated; this retries until the route carries data again.
+    test('TCP traffic still works after agent restart', async () => {
+      // Caddy was briefly stopped; this retries until the route carries data again.
       await waitForTcpEcho('127.0.0.1', TCP_PORT, 'ready-probe', 30_000);
       const res = await tcpSend('127.0.0.1', TCP_PORT, 'after-restart-check\n');
       expect(res.connected).toBe(true);

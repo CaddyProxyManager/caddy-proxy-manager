@@ -34,3 +34,10 @@ export async function deleteProxyHostAction(
 export async function toggleProxyHostAction(_id: number, _enabled: boolean): Promise<ActionState> {
   return refused;
 }
+
+export async function setProxyHostMaintenanceAction(
+  _id: number,
+  _enabled: boolean,
+): Promise<ActionState> {
+  return refused;
+}

@@ -1,8 +1,9 @@
 ---
 title: Certificates & HTTPS
-description: Automatic ACME certificates, DNS-01 providers, manual imports, and the built-in CA.
+description: Automatic ACME certificates, DNS-01 providers, manual imports, certificates read from files, and the built-in CA.
 ---
 
+import { Steps } from "@astrojs/starlight/components";
 import Demo from "../../../components/Demo.astro";
 import CertificatesTableDemo from "../../../demos/samples/CertificatesTableDemo";
 import AcmeCertificatesDemo from "../../../demos/samples/AcmeCertificatesDemo";
@@ -51,13 +52,66 @@ so Caddy trusts it.
 HTTP-01 needs port 80 reachable from the internet. DNS-01 does not, which is what makes wildcard
 certificates and internal-only hosts possible.
 
-Twenty-one providers are supported, including Cloudflare, Route 53, DigitalOcean, Hetzner, Vultr,
-Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns, ClouDNS and RFC2136 (BIND/TSIG).
+Twenty-two providers are supported, including Cloudflare, Route 53, DigitalOcean, Hetzner, Vultr,
+Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns, INWX, ClouDNS and RFC2136 (BIND/TSIG).
 Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider
 - netcup ships with slow-propagation defaults because it needs them.
 
 A provider can be overridden per certificate when one domain lives somewhere else - through the
-[API](../api/) only; the dashboard uses the global provider.
+REST [API](../api/) only (`providerOptions.provider`); the dashboard uses the global provider. The
+override needs that provider's credentials saved in Settings, or the global provider is used.
+
+### Challenge delegation
+
+A domain whose DNS host has no API can still use DNS-01. Create a CNAME from its
+`_acme-challenge` name to a record in a zone you *can* write through a supported provider, and add
+a delegation under **Settings → DNS → DNS Providers → Challenge delegation**:
+
+- **Domain** - covers itself and every name under it; the longest matching domain wins. A
+  wildcard `*.example.com` answers at `_acme-challenge.example.com`, so it shares the apex's record.
+  Every other name needs its own CNAME, all pointing at the same target.
+- **CNAME target** - where the challenge record is written. Caddy does not follow the CNAME
+  itself, so CPM gives it the target directly (`override_domain`) and puts delegated names in an
+  automation policy of their own.
+- **Provider** - optional; writes the record at the target. It beats a certificate's own
+  provider, because it is the one that can write that zone. Without one, the certificate's or the
+  default provider is used.
+
+The table looks each CNAME up from the controller and warns when one is missing or points
+elsewhere. It is a warning, not a refusal: the controller's resolver may not see what the
+certificate authority sees. A delegated name whose provider is missing or not compiled into Caddy
+falls back to HTTP-01, and the controller log says so.
+
+For a self-hosted BIND server, you do not need delegation - use the RFC2136 provider with a TSIG
+key.
+
+### acme-dns
+
+[acme-dns](https://github.com/acme-dns/acme-dns) is a tiny DNS server that holds only challenge
+records, so the credential CPM keeps can change nothing else.
+
+<Steps>
+
+1. Run acme-dns somewhere the certificate authority can query it, or pick a server you trust.
+2. Under **Register with acme-dns**, enter the domain and the server's URL, and click
+   **Register**. The controller creates an account there, stores its password encrypted, and adds
+   a delegation for the domain.
+3. Create the one record it shows, `_acme-challenge.<domain> CNAME <account>.<server>`, at your DNS
+   host, and apply the change.
+
+</Steps>
+
+Each domain gets its own account, because one account holds only the two newest challenge
+records - enough for a name and its wildcard, not for more. A name under a registered domain uses
+that domain's account; its own CNAME points at the same target. The server URL must be HTTPS
+unless the server is on a private address or a single-label name such as a Compose service. The
+public `auth.acme-dns.io` is only a placeholder - CPM never registers anywhere you did not type.
+
+### Why there is no manual mode
+
+Some tools let you type the challenge TXT record by hand. Caddy has no such solver, and a record
+typed by hand would have to be typed again at every renewal, every 60 to 90 days, by someone who is
+awake when it runs. A CNAME is created once. Delegation covers every case the manual mode would.
 
 :::note
 A DNS provider is a compiled-in Caddy module. If the one you want is greyed out, turn it on in
@@ -66,10 +120,58 @@ A DNS provider is a compiled-in Caddy module. If the one you want is greyed out,
 
 ## Manual imports
 
-Bring your own certificate and key. Expiry is tracked, and the page counts down to the next import
-to lapse, so one that is about to expire is visible rather than a surprise. With
-[email](../email/#certificate-alerts) set up, the administrators are also told by mail - about an
-imported certificate nearing expiry, and about a managed one Caddy has failed to renew.
+Bring your own certificate and key. A pair is refused on save if the certificate is not PEM X.509,
+the key is not an unencrypted PEM key, or the key does not match the certificate - Caddy would
+refuse to load it, and every host would stop updating with it. Expiry is tracked, and the page
+counts down to the next import to lapse, so one that is about to expire is visible rather than a
+surprise. With [email](../email/#certificate-alerts) set up, the administrators are also told by
+mail - about an imported certificate nearing expiry, and about a managed one Caddy has failed to
+renew.
+
+A certificate a host still uses cannot be deleted - the dialog names the hosts, and the REST API
+answers 409. Choose another certificate on them first, so no host quietly falls back to automatic
+issuance. **Delete unused** removes every imported certificate in the list that no host uses, after
+naming them; usage is checked again as it runs.
+
+## Certificates from files
+
+A certificate something else keeps renewing on an agent's host - certbot, acme.sh, a corporate
+tool dropping files on a share - can be read from its files instead of pasted in again every 90
+days. Give the agent one directory to read, as the Docker daemon on that host sees it:
+
+```yaml
+# docker-compose.yml, or the agent's own environment on a remote host
+agent:
+  environment:
+    CERT_FILES_HOST_DIR: /etc/letsencrypt
+```
+
+Restart the agent, then choose **Certificates → Import → From a file on an agent**. Pick the
+agent, and the dialog lists the certificates in that directory with their names and expiry; for
+certbot's `live/<name>/fullchain.pem` it picks the matching `privkey.pem` itself. The certificate is
+read once before it is saved, so a wrong path or a key that does not match is refused there and
+then.
+
+From then on the agent reads the files every six hours, when it starts, and when you choose
+**Re-read now** in the row's menu. A renewed certificate is loaded into that agent's Caddy; an
+unchanged one changes nothing. The domains come from the certificate's own names, and a change
+to them is recorded in the audit log. If a read fails - a file gone, a key that no longer matches -
+the row says why and the last good certificate keeps serving.
+
+- **Caddy is never pointed at the files.** Caddy caches a certificate it loaded from a file and
+  never notices a renewal, and a missing file fails the whole configuration. So the agent reads the
+  files and sends the PEM to the controller, which checks it and hands it to Caddy inline, as it
+  does a pasted certificate.
+- **The key travels to the controller**, over the agent's signed connection, and is stored
+  encrypted like a pasted key. Use this for certificates you would be willing to paste in.
+- **One agent serves it.** The certificate goes only into its own agent's configuration, so only a
+  host pinned to that agent alone can use it; the editor and the bulk action refuse anything else.
+- **Only that directory.** The controller names paths inside it and nothing else: no `..`, no
+  absolute path. The agent reads in a throwaway container with no network that mounts only this
+  directory, read-only, so a symbolic link cannot reach anything else on the host - certbot's
+  `live/` links into its `archive/` still work, as both are inside the directory.
+- **Permissions.** That container reads as root, because certbot keeps `archive/` readable only by
+  root; nothing needs changing on the host. Files over 1 MiB and encrypted keys are refused.
 
 ## The built-in CA
 

@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import {
   encryptUnderOtherSecret,
   OTHER_SESSION_SECRET,
@@ -15,19 +16,11 @@ import type { TestDb } from '../helpers/db';
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  sqlite: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import * as schema from '../../src/lib/db/schema';
 import { config } from '../../src/lib/config';

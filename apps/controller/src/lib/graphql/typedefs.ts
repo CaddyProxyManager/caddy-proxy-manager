@@ -48,6 +48,8 @@ export const typeDefs = /* GraphQL */ `
     tlsTermination: Boolean!
     proxyProtocolVersion: String
     proxyProtocolReceive: Boolean!
+    """An access list whose IP rules apply; its passwords do not at layer 4."""
+    accessListId: Int
     enabled: Boolean!
     createdAt: DateTime!
     updatedAt: DateTime!
@@ -67,6 +69,14 @@ export const typeDefs = /* GraphQL */ `
     autoRenew: Boolean!
     createdAt: DateTime!
     updatedAt: DateTime!
+    """upload, or agent-file: read from files on one agent's host."""
+    source: String!
+    sourceAgentId: Int
+    sourceCertPath: String
+    sourceKeyPath: String
+    sourceReadAt: DateTime
+    """Why the last read failed, as a code; the last good certificate keeps serving."""
+    sourceError: String
   }
 
   type CaCertificate {
@@ -225,10 +235,17 @@ export const typeDefs = /* GraphQL */ `
     createProxyHost(input: JSON!): ProxyHost!
     updateProxyHost(id: Int!, input: JSON!): ProxyHost!
     deleteProxyHost(id: Int!): Boolean!
+    """
+    As POST /api/v1/proxy-hosts/bulk: { action, ids, certificateId?, accessListId? }, all or
+    nothing. Returns how many hosts changed.
+    """
+    bulkProxyHosts(input: JSON!): Int!
 
     createL4ProxyHost(input: JSON!): L4ProxyHost!
     updateL4ProxyHost(id: Int!, input: JSON!): L4ProxyHost!
     deleteL4ProxyHost(id: Int!): Boolean!
+    """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids }, all or nothing."""
+    bulkL4ProxyHosts(input: JSON!): Int!
 
     createAccessList(input: JSON!): AccessList!
     updateAccessList(id: Int!, input: JSON!): AccessList!
@@ -266,6 +283,13 @@ export const typeDefs = /* GraphQL */ `
     rows are dropped and counted: the answer is { accepted, rejected }.
     """
     agentAnalytics(kind: String!, rows: [JSON!]!): JSON!
+
+    """
+    What this agent read from the certificate files it was asked to watch. Signed agents only, and
+    only for certificates whose source is this agent. Answers { resend }: the ids sent without PEM
+    whose fingerprint the controller does not hold.
+    """
+    agentCertificateFiles(results: [JSON!]!): JSON!
   }
 
   """

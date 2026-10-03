@@ -1,21 +1,25 @@
 /**
- * Starting and stopping the optional ClickHouse container from the Settings page, through the
- * agent's `docker compose --profile clickhouse`. Credentials travel with the request so they
- * live in the database, not a host `.env` the controller cannot read. Only the bundled agent is
- * asked: every other agent relays its events to the controller's ClickHouse.
+ * Starting and stopping the optional ClickHouse and CrowdSec containers from the Settings page,
+ * through the agent's `docker compose --profile <name>`. Credentials travel with the request so
+ * they live in the database, not a host `.env` the controller cannot read. Only the bundled agent
+ * is asked: every other agent relays its events to the controller's ClickHouse, and bounces
+ * against an external CrowdSec or none.
  */
 
-import type { ManagedServicesRequest } from "@cpm/shared";
+import type { ManagedServiceName, ManagedServicesRequest, ManagedServicesState } from "@cpm/shared";
 import { findAgentRowByAgentId } from "../models/agents";
 import { isAnalyticsEnabled } from "../clickhouse/client";
+import { wantsManagedCrowdSec } from "../crowdsec";
+import { decryptSecret } from "../secret";
 import { bundledAgentId } from "./bootstrap";
 import { pushDesiredState } from "./desired-state";
+import { connectedAgents } from "./registry";
 
 /**
  * Whether this agent runs the controller's services. With no bundled agent recorded, every agent
  * is asked rather than a deployment losing its ClickHouse.
  */
-async function runsControllerServices(agentRowId: number): Promise<boolean> {
+export async function runsControllerServices(agentRowId: number): Promise<boolean> {
   const bundled = await bundledAgentId();
   const row = bundled ? await findAgentRowByAgentId(bundled) : null;
   return row === null || row.id === agentRowId;
@@ -27,29 +31,63 @@ async function runsControllerServices(agentRowId: number): Promise<boolean> {
  */
 export async function desiredManagedServices(agentRowId?: number): Promise<ManagedServicesRequest> {
   if (agentRowId !== undefined && !(await runsControllerServices(agentRowId))) {
-    return { services: { clickhouse: false }, env: {} };
+    return { services: { clickhouse: false, crowdsec: false }, env: {} };
   }
 
-  const [registry, { getSetting }] = await Promise.all([
+  const [registry, { getSetting }, { getCrowdSecSettings }] = await Promise.all([
     import("../settings/registry"),
     import("../settings/resolve"),
+    import("../settings"),
   ]);
 
-  const [analytics, user, password, database] = await Promise.all([
+  const [analytics, user, password, database, crowdsec] = await Promise.all([
     isAnalyticsEnabled(),
     getSetting(registry.clickhouseUser),
     getSetting(registry.clickhousePassword),
     getSetting(registry.clickhouseDb),
+    getCrowdSecSettings(),
   ]);
 
   return {
-    services: { clickhouse: analytics },
+    services: { clickhouse: analytics, crowdsec: wantsManagedCrowdSec(crowdsec) },
     env: {
       CLICKHOUSE_USER: user,
       CLICKHOUSE_PASSWORD: password,
       CLICKHOUSE_DB: database,
+      // Sent while off too, so a stop interpolates the file as the last start did.
+      ...(crowdsec.managedApiKey
+        ? {
+            CROWDSEC_BOUNCER_KEY: decryptSecret(crowdsec.managedApiKey, "CrowdSec bouncer key"),
+          }
+        : {}),
+      CROWDSEC_DISABLE_ONLINE_API: crowdsec.onlineApi ? "false" : "true",
     },
   };
+}
+
+/** One managed service as the agent running it last reported; null with no such agent connected. */
+export type ManagedServiceView = {
+  agent: string;
+  running: boolean;
+  state: ManagedServicesState;
+  /** The agent's own words, in English like the rest of its status. */
+  message: string | null;
+};
+
+export async function managedServiceView(
+  name: ManagedServiceName,
+): Promise<ManagedServiceView | null> {
+  for (const agent of connectedAgents()) {
+    if (!agent.status || !(await runsControllerServices(agent.agentRowId))) continue;
+    const { applied, status } = agent.status.services;
+    return {
+      agent: agent.name,
+      running: applied?.[name] === true,
+      state: status.state,
+      message: status.error ?? status.message ?? null,
+    };
+  }
+  return null;
 }
 
 /**

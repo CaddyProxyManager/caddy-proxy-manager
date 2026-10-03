@@ -1,6 +1,6 @@
 ---
 title: Caddy Proxy Manager
-description: A modern web interface for Caddy Server - reverse proxy, WAF, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.
+description: A modern web interface for Caddy Server - reverse proxy, WAF, CrowdSec, bot challenge, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.
 template: splash
 # A splash page is a landing page, not a document someone is going to correct a typo in, so it
 # does not carry the edit link the rest of the site does.
@@ -40,16 +40,18 @@ configure and watch rather than things you write into a config file and hope abo
 
 <CardGrid>
   <Card title="Reverse proxy" icon="random">
-    Multiple upstreams, twelve load-balancing policies, health checks, custom headers, location
-    rules, redirects, rewrites, asset caching, Force HTTPS and HSTS, and upstream DNS pinning.
+    Multiple upstreams, twelve load-balancing policies, health checks, upstream timeouts, custom
+    headers, location rules, redirects, rewrites, asset caching, compression, rate limiting,
+    maintenance mode, Force HTTPS and HSTS, upstream DNS pinning, and bulk actions across hosts.
   </Card>
   <Card title="L4 TCP/UDP proxy" icon="puzzle">
-    Layer 4 stream proxying. TLS SNI matching, PROXY protocol, health checks and geo blocking below
-    HTTP.
+    Layer 4 stream proxying. Port ranges, TLS SNI matching, PROXY protocol, health checks, geo
+    blocking and access-list IP rules below HTTP.
   </Card>
   <Card title="Automatic HTTPS" icon="approve-check">
-    ACME through Let's Encrypt or any directory you point it at, DNS-01 across twenty-one providers,
-    plus a built-in CA for mutual TLS.
+    ACME through Let's Encrypt or any directory you point it at, DNS-01 across twenty-two providers
+    with challenge delegation, certificates read from files on an agent's host, plus a built-in CA
+    for mutual TLS.
   </Card>
   <Card title="WAF" icon="warning">
     Coraza with the OWASP Core Rule Set. Per-host control, rule suppression, and a searchable event
@@ -59,9 +61,10 @@ configure and watch rather than things you write into a config file and hope abo
     Live request charts, protocol breakdown, a country map, top user agents and blocked requests,
     backed by ClickHouse - plus a live view of the raw access, WAF and Caddy logs.
   </Card>
-  <Card title="Everything audited" icon="list-format">
-    Every configuration change is recorded with the account that made it, and searchable. The
-    whole configuration backs up to one encrypted file.
+  <Card title="Accounts, audited" icon="list-format">
+    Sign in with a password, a passkey, SSO or LDAP/Active Directory. Every configuration change is
+    recorded with the account that made it, and searchable. The whole configuration backs up to one
+    encrypted file.
   </Card>
 </CardGrid>
 
@@ -82,6 +85,8 @@ configure and watch rather than things you write into a config file and hope abo
   <LinkCard title="Dashboard host" href="features/dashboard-host/" />
   <LinkCard title="WAF" href="features/waf/" />
   <LinkCard title="Geo blocking" href="features/geo-blocking/" />
+  <LinkCard title="CrowdSec" href="features/crowdsec/" />
+  <LinkCard title="Bot challenge" href="features/bot-challenge/" />
   <LinkCard title="Access lists & mTLS" href="features/access-control/" />
   <LinkCard title="Forward auth" href="features/forward-auth/" />
   <LinkCard title="Analytics" href="features/analytics/" />

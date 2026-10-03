@@ -1,18 +1,12 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { issuedClientCertificates, caCertificates, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', () => {
-  // This gets re-evaluated per test via beforeEach
-  return {
-    default: currentDb(() => db),
-    nowIso: () => new Date().toISOString(),
-    toIso: (v: string | null) => v,
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 let userId: number;

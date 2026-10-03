@@ -17,7 +17,9 @@ export type CaddyFeatureId =
   | "tailscale"
   /** Satisfied by *any* enabled DNS module. */
   | "dns01"
-  | "cache";
+  | "cache"
+  | "ratelimit"
+  | "crowdsec";
 
 export type CaddyModuleCategory = "dns" | "proxy" | "cache" | "security";
 
@@ -41,6 +43,9 @@ export type CaddyModuleDefinition = {
    */
   defaultEnabled?: boolean;
 };
+
+/** Named by the build-conflict check, which refuses dropping it while CrowdSec is on. */
+export const CROWDSEC_MODULE_ID = "caddy-crowdsec";
 
 const CORE_MODULES: CaddyModuleDefinition[] = [
   {
@@ -82,6 +87,30 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     docsUrl: "https://github.com/corazawaf/coraza-caddy",
     category: "security",
     features: ["waf"],
+  },
+  {
+    id: "caddy-ratelimit",
+    name: "Rate Limit",
+    modulePath: "github.com/mholt/caddy-ratelimit",
+    description:
+      "Sliding-window request limits per client. Required by a proxy host's Rate limiting option. Not in the default image: enable it here and rebuild.",
+    docsUrl: "https://github.com/mholt/caddy-ratelimit",
+    category: "security",
+    features: ["ratelimit"],
+    defaultEnabled: false,
+  },
+  {
+    // The module root, whose package imports the HTTP handler, AppSec and the L4 matcher alike:
+    // one entry, one pin. The L4 matcher compiles caddy-l4 in, whatever its own toggle says.
+    id: CROWDSEC_MODULE_ID,
+    name: "CrowdSec",
+    modulePath: "github.com/hslatman/caddy-crowdsec-bouncer",
+    description:
+      "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings. Not in the default image: enable it here and rebuild.",
+    docsUrl: "https://github.com/hslatman/caddy-crowdsec-bouncer",
+    category: "security",
+    features: ["crowdsec"],
+    defaultEnabled: false,
   },
   {
     id: "cache-handler",

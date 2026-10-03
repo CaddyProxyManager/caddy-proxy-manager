@@ -4,24 +4,17 @@
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 

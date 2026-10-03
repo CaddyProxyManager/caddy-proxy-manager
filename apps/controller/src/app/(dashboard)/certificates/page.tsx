@@ -12,6 +12,8 @@ import {
 import { listMtlsRoles, type MtlsRole } from "@/src/lib/models/mtls-roles";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
 import { countHealthyAcmeHosts } from "./certificate-summary";
+import { listAgents } from "@/src/lib/models/agents";
+import { certificateFileAgentOptions } from "@/src/lib/models/certificate-files";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -42,7 +44,21 @@ export type ImportedCertView = {
   issuer: string | null;
   expiryStatus: CertExpiryStatus | null;
   usedBy: { id: number; name: string; domains: string[] }[];
+  /** Set for a certificate read from files on an agent; null for an upload. */
+  file: {
+    agentId: number | null;
+    /** Null once the agent is deleted. */
+    agentName: string | null;
+    certPath: string | null;
+    keyPath: string | null;
+    readAt: string | null;
+    /** A `CertificateFileError` code. */
+    error: string | null;
+  } | null;
 };
+
+/** Connected agents with a certificate directory, for "From a file on an agent". */
+export type CertificateFileAgent = { id: number; name: string };
 
 export type ManagedCertView = { id: number; name: string; domainNames: string[] };
 
@@ -97,7 +113,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PER_PAGE;
-  const [caCerts, issuedClientCerts, mtlsRoles, allAcmeRows, certRows, usageRows] =
+  const [caCerts, issuedClientCerts, mtlsRoles, allAcmeRows, certRows, usageRows, agentRows] =
     await Promise.all([
       listCaCertificates(),
       listIssuedClientCertificates(),
@@ -123,7 +139,9 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
         })
         .from(proxyHosts)
         .where(isNotNull(proxyHosts.certificateId)),
+      listAgents(),
     ]);
+  const agentNames = new Map(agentRows.map((agent) => [agent.id, agent.name]));
 
   const allAcmeHosts: AcmeHost[] = allAcmeRows.map((r) => ({
     id: r.id,
@@ -233,6 +251,18 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
         issuer: pemInfo?.issuer ?? null,
         expiryStatus: pemInfo?.validTo ? getExpiryStatus(pemInfo.validTo) : null,
         usedBy: usageMap.get(cert.id) ?? [],
+        file:
+          cert.source === "agent-file"
+            ? {
+                agentId: cert.sourceAgentId,
+                agentName:
+                  cert.sourceAgentId === null ? null : (agentNames.get(cert.sourceAgentId) ?? null),
+                certPath: cert.sourceCertPath,
+                keyPath: cert.sourceKeyPath,
+                readAt: cert.sourceReadAt,
+                error: cert.sourceError,
+              }
+            : null,
       });
     } else {
       managedCerts.push({ id: cert.id, name: cert.name, domainNames: domainNames });
@@ -249,6 +279,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       healthyAcmeTotal={healthyAcmeTotal}
       mtlsRoles={mtlsRoles}
       issuedClientCerts={issuedClientCerts}
+      fileAgents={certificateFileAgentOptions()}
     />
   );
 }

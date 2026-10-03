@@ -1,22 +1,15 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  sqlite: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { buildCaddyDocument } from '../../src/lib/caddy';
@@ -44,7 +37,12 @@ function routesFor(doc: unknown, domain: string): Route[] {
 
 async function seedList(
   id: number,
-  opts: { users?: string[]; cidrs?: string[]; satisfy?: string },
+  opts: {
+    users?: string[];
+    cidrs?: string[];
+    rules?: { action: string; cidr?: string; hostname?: string }[];
+    satisfy?: string;
+  },
 ) {
   await ctx.db.insert(schema.accessLists).values({
     id,
@@ -58,6 +56,15 @@ async function seedList(
       accessListId: id,
       username,
       passwordHash: HASH,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+  }
+  for (const [index, rule] of (opts.rules ?? []).entries()) {
+    await ctx.db.insert(schema.accessListIpRules).values({
+      accessListId: id,
+      ...rule,
+      sortOrder: index,
       createdAt: NOW,
       updatedAt: NOW,
     });
@@ -93,6 +100,7 @@ async function seedHost(
 beforeEach(async () => {
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.accessListIpRules);
+  await ctx.db.delete(schema.accessListDnsCache);
   await ctx.db.delete(schema.accessListEntries);
   await ctx.db.delete(schema.accessLists);
 });
@@ -104,6 +112,36 @@ describe('access lists in the config', () => {
     const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'ip.example.com'));
     expect(json).toContain('"client_ip":{"ranges":["10.0.0.0/8"]}');
     expect(json).not.toContain('"handler":"authentication"');
+  });
+
+  it('expands a hostname rule where it stands, widening IPv6 to its prefix', async () => {
+    await ctx.db.insert(schema.accessListDnsCache).values({
+      hostname: 'home.example.net',
+      addresses: JSON.stringify(['198.51.100.4', '2001:db8:aa:bb::1']),
+      resolvedAt: NOW,
+      expiresAt: NOW,
+    });
+    await seedList(1, {
+      rules: [
+        { action: 'deny', cidr: '198.51.100.0/24' },
+        { action: 'allow', hostname: 'home.example.net/56' },
+        { action: 'allow', cidr: '10.0.0.0/8' },
+      ],
+    });
+    await seedHost('dyn.example.com', 1);
+    const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'dyn.example.com'));
+    // The default's exclusion lists every range in rule order, the name's where the name was.
+    expect(json).toContain(
+      '"client_ip":{"ranges":["198.51.100.0/24","198.51.100.4/32","2001:db8:aa::/56","10.0.0.0/8"]}',
+    );
+  });
+
+  it('fails closed on an allow rule whose name has not resolved', async () => {
+    await seedList(1, { rules: [{ action: 'allow', hostname: 'unknown.example.net' }] });
+    await seedHost('closed.example.com', 1);
+    const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'closed.example.com'));
+    expect(json).toContain('"client_ip":{"ranges":["0.0.0.0/0","::/0"]}');
+    expect(json).toContain('"status_code":403');
   });
 
   it("gives a location rule its own list, and none, without touching the host's", async () => {

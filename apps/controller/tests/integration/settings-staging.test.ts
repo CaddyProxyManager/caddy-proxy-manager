@@ -4,26 +4,17 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // A Bun mock factory must be synchronous; an async one never resolves and hangs the file.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null =>
-      !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import { settings, settingsStaged, users } from '../../src/lib/db/schema';
 import { eq } from 'drizzle-orm';

@@ -24,7 +24,7 @@ import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins"
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
+import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
 import { getTranslations } from "next-intl/server";
@@ -182,6 +182,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         hostTraffic={hostTraffic}
         trafficAvailable={traffic.available}
         canCreate={canCreate(access)}
+        manageableIds={hosts.filter((h) => canManage(access, "proxyHost", h.id)).map((h) => h.id)}
         canEditRawConfig={access.isAdmin}
       />
     </WafPresetOptionsProvider>

@@ -109,15 +109,8 @@ export async function getCurrentSessionInfo(
   }
 }
 
-/**
- * A sign-in this recent stands in for re-auth where there is no password to ask for. Short: a
- * borrowed or stolen session is usually an old one.
- */
-export const FRESH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
-
-export function isFreshSession(session: { createdAt: Date } | null, now = Date.now()): boolean {
-  return !!session && now - session.createdAt.getTime() <= FRESH_SESSION_MAX_AGE_MS;
-}
+// Its own module so auth-server.ts can gate passkey registration on it without an import cycle.
+export { FRESH_SESSION_MAX_AGE_MS, isFreshSession } from "./auth-session-age";
 
 export async function requireUser(): Promise<Session> {
   const session = await auth();

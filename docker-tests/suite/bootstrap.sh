@@ -29,6 +29,14 @@ wait_for "Pebble's directory" 120 \
   || die "pebble never served $PEBBLE_DIRECTORY"
 info "Pebble ACME directory is up"
 
+# An empty dyn.cpm.test: CoreDNS serves nothing for it until the file exists.
+: >"$RIG_ZONE_DIR/records"
+rig_zone_write
+wait_for "CoreDNS to load dyn.cpm.test" 30 \
+  bash -c "dig +norec @$COREDNS '$DYN_DOMAIN' SOA | grep -q 'status: NOERROR'" \
+  || die "CoreDNS never loaded $RIG_ZONE_DIR/db.$DYN_DOMAIN"
+info "rig DNS zone $DYN_DOMAIN is up"
+
 # ── 2. Sign in and mint an API token ────────────────────────────────────────
 
 rm -f "$COOKIE_JAR"
@@ -36,6 +44,12 @@ rm -f "$COOKIE_JAR"
 status=$(cpm_sign_in "$CPM_API" "$COOKIE_JAR" "$CPM_ADMIN_USER" "$CPM_ADMIN_PASSWORD")
 [ "$status" = "200" ] || die "admin sign-in failed (HTTP $status): $SIGN_IN_BODY"
 info "signed in as $CPM_ADMIN_USER"
+
+# A user holds at most ten tokens, and every run mints one: a rig kept up would run out.
+api_session GET /api/v1/tokens
+for stale in $(jqr '.[]? | select(.name == "docker-test-suite") | .id'); do
+  api_session DELETE "/api/v1/tokens/$stale"
+done
 
 cpm_mint_token "$CPM_API" "$COOKIE_JAR" "docker-test-suite" >"$TOKEN_FILE"
 [ -s "$TOKEN_FILE" ] || die "could not mint an API token - the response carried no raw_token"

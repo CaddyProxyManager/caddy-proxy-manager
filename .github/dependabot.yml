@@ -62,6 +62,7 @@ updates:
           - "github.com/fuomag9/caddy-blocker-plugin"
           - "github.com/corazawaf/coraza-caddy/v2"
           - "github.com/google/cel-go"
+          - "cel.dev/cel-go"
 
   - package-ecosystem: "docker"
     directory: "/docker/web"

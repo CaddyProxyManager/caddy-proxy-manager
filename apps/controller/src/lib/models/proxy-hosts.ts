@@ -12,7 +12,7 @@ import {
   getWafSettings,
 } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
-import { stripCaddyPlaceholders } from "../caddy-utils";
+import { isPlainObject, stripCaddyPlaceholders } from "../caddy-utils";
 import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
 import {
   CORAZA_MAX_BODY_LIMIT,
@@ -26,6 +26,7 @@ import {
 } from "../caddy-waf";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
+import { assertCertificateServable } from "../certificate-placement";
 import { seclangErrors } from "../seclang";
 import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf-dry-run";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
@@ -38,6 +39,43 @@ import {
   hydrateHostCache,
   sanitizeHostCache,
 } from "../host-cache";
+import { type HostCompressionMode, sanitizeHostCompression } from "../host-compression";
+import {
+  type HostMaintenanceConfig,
+  type HostMaintenanceMeta,
+  hydrateHostMaintenance,
+  normalizeHostMaintenanceInput,
+  sanitizeHostMaintenance,
+} from "../host-maintenance";
+import { isCaddyDuration } from "../caddy-duration";
+import {
+  type HostUpstreamTimeoutsConfig,
+  type HostUpstreamTimeoutsMeta,
+  hydrateHostUpstreamTimeouts,
+  normalizeHostUpstreamTimeoutsInput,
+  sanitizeHostUpstreamTimeouts,
+} from "../host-upstream-timeouts";
+import { hasDnsChallengeFor } from "../dns-challenge-delegation";
+import {
+  type HostRateLimitConfig,
+  type HostRateLimitMeta,
+  hydrateHostRateLimit,
+  normalizeHostRateLimitInput,
+  sanitizeHostRateLimit,
+} from "../host-rate-limit";
+import {
+  type HostAnubisConfig,
+  type HostAnubisMeta,
+  hydrateHostAnubis,
+  normalizeHostAnubisInput,
+  sanitizeHostAnubis,
+} from "../host-anubis";
+import {
+  type HostCrowdSecMeta,
+  hostCrowdSecEnabled,
+  sanitizeHostCrowdSec,
+  storedHostCrowdSec,
+} from "../crowdsec";
 
 /** A wildcard needs DNS-01: without a DNS provider, auto-managed TLS silently gets no cert. */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
@@ -51,15 +89,10 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
     return;
   }
   const dnsSettings = await getDnsProviderSettings();
-  const hasDnsProvider = Boolean(
-    dnsSettings?.default && dnsSettings.providers[dnsSettings.default],
-  );
-  if (!hasDnsProvider) {
-    throw domainError(
-      "wildcardDomainNeedsDnsProvider",
-      { domain: wildcardDomains[0] },
-      { status: 400 },
-    );
+  // A delegation naming a provider covers its names even with no default.
+  const uncovered = wildcardDomains.find((domain) => !hasDnsChallengeFor(domain, dnsSettings));
+  if (uncovered) {
+    throw domainError("wildcardDomainNeedsDnsProvider", { domain: uncovered }, { status: 400 });
   }
 }
 
@@ -135,7 +168,7 @@ export type LocationRuleMeta = {
   path: string;
   upstreams: string[];
   load_balancer?: LoadBalancerMeta;
-  /** No FK behind it: deleting a list scrubs it from here (see access-lists.ts). */
+  /** No FK behind it: a list named here cannot be deleted (see access-lists.ts). */
   access_list_id?: number | null;
 };
 
@@ -707,7 +740,7 @@ function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta |
  * the apply for every host on every agent. Reads the serialized meta to see the merged result; a
  * stored Caddy placeholder counts as a key, since only the Caddy container can resolve it.
  */
-async function assertTailscaleServable(meta: string | null): Promise<void> {
+export async function assertTailscaleServable(meta: string | null): Promise<void> {
   if (!meta) return;
   let parsed: ProxyHostMeta;
   try {
@@ -918,6 +951,14 @@ type ProxyHostMeta = {
   path_rewrites?: PathRewriteRule[];
   error_pages?: ErrorPageRule[];
   cache?: HostCacheMeta;
+  /** Absent follows the global setting. */
+  compression?: "on" | "off";
+  discourage_indexing?: boolean;
+  maintenance?: HostMaintenanceMeta;
+  upstream_timeouts?: HostUpstreamTimeoutsMeta;
+  rate_limit?: HostRateLimitMeta;
+  crowdsec?: HostCrowdSecMeta;
+  anubis?: HostAnubisMeta;
 };
 
 export type ProxyHost = {
@@ -960,6 +1001,19 @@ export type ProxyHost = {
   errorPages: ErrorPageRule[];
   /** Cache assets; null when off. */
   cache: HostCacheConfig | null;
+  compression: HostCompressionMode;
+  /** X-Robots-Tag on every response, and a robots.txt that disallows everything. */
+  discourageIndexing: boolean;
+  /** Null when never configured; kept while off so turning it back on restores the rest. */
+  maintenance: HostMaintenanceConfig | null;
+  /** Null keeps Caddy's defaults. Location rules inherit them. */
+  upstreamTimeouts: HostUpstreamTimeoutsConfig | null;
+  /** Null when never configured; zones are kept while it is off. */
+  rateLimit: HostRateLimitConfig | null;
+  /** Checked against CrowdSec's decisions when CrowdSec is set up; on unless the host opts out. */
+  crowdsec: boolean;
+  /** Null when never configured; kept while off. */
+  anubis: HostAnubisConfig | null;
 };
 
 export type ProxyHostInput = {
@@ -1005,6 +1059,19 @@ export type ProxyHostInput = {
   errorPages?: ErrorPageRule[] | null;
   /** Null turns it off. */
   cache?: HostCacheConfig | null;
+  /** Null follows the global setting, as "inherit" does. */
+  compression?: HostCompressionMode | null;
+  discourageIndexing?: boolean;
+  /** Null forgets it; a bad bypass range is refused. */
+  maintenance?: Partial<HostMaintenanceConfig> | null;
+  /** The whole set: a field left out keeps Caddy's default. Null clears them all. */
+  upstreamTimeouts?: Partial<HostUpstreamTimeoutsConfig> | null;
+  /** The whole set of zones. Null forgets them; a zone Caddy would reject is refused. */
+  rateLimit?: HostRateLimitConfig | null;
+  /** False opts the host out of CrowdSec; true or null follows the global setting. */
+  crowdsec?: boolean | null;
+  /** Null forgets it. Enabling needs the upstream; a bad upstream or exempt path is refused. */
+  anubis?: Partial<HostAnubisConfig> | null;
 };
 
 type ProxyHostRow = typeof proxyHosts.$inferSelect;
@@ -1324,7 +1391,7 @@ function sanitizeDnsResolverMeta(meta: DnsResolverMeta | undefined): DnsResolver
   }
 
   const timeout = normalizeMetaValue(meta.timeout ?? null);
-  if (timeout) {
+  if (timeout && isCaddyDuration(timeout)) {
     normalized.timeout = timeout;
   }
 
@@ -1546,6 +1613,26 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
 
   const cache = sanitizeHostCache(meta.cache);
   if (cache) normalized.cache = cache;
+
+  const compression = sanitizeHostCompression(meta.compression);
+  if (compression !== "inherit") normalized.compression = compression;
+
+  if (meta.discourage_indexing === true) normalized.discourage_indexing = true;
+
+  const maintenance = sanitizeHostMaintenance(meta.maintenance);
+  if (maintenance) normalized.maintenance = maintenance;
+
+  const upstreamTimeouts = sanitizeHostUpstreamTimeouts(meta.upstream_timeouts);
+  if (upstreamTimeouts) normalized.upstream_timeouts = upstreamTimeouts;
+
+  const rateLimit = sanitizeHostRateLimit(meta.rate_limit);
+  if (rateLimit) normalized.rate_limit = rateLimit;
+
+  const crowdsec = sanitizeHostCrowdSec(meta.crowdsec);
+  if (crowdsec) normalized.crowdsec = crowdsec;
+
+  const anubis = sanitizeHostAnubis(meta.anubis);
+  if (anubis) normalized.anubis = anubis;
 
   if (meta.error_pages && meta.error_pages.length > 0) {
     const errorPages = sanitizeErrorPageRules(meta.error_pages);
@@ -1787,6 +1874,11 @@ async function assertLocationAccessListsExist(rules: LocationRuleMeta[] | undefi
   if (found.length !== ids.length) throw domainError("accessListNotFound", {}, { status: 400 });
 }
 
+function storedCompression(value: unknown): ProxyHostMeta["compression"] {
+  const mode = sanitizeHostCompression(value);
+  return mode === "inherit" ? undefined : mode;
+}
+
 function parseMeta(value: string | null): ProxyHostMeta {
   if (!value) {
     return {};
@@ -1818,6 +1910,13 @@ function parseMeta(value: string | null): ProxyHostMeta {
       path_rewrites: sanitizePathRewrites(parsed.path_rewrites),
       error_pages: sanitizeErrorPageRules(parsed.error_pages),
       cache: sanitizeHostCache(parsed.cache),
+      compression: storedCompression(parsed.compression),
+      discourage_indexing: parsed.discourage_indexing === true || undefined,
+      maintenance: sanitizeHostMaintenance(parsed.maintenance),
+      upstream_timeouts: sanitizeHostUpstreamTimeouts(parsed.upstream_timeouts),
+      rate_limit: sanitizeHostRateLimit(parsed.rate_limit),
+      crowdsec: sanitizeHostCrowdSec(parsed.crowdsec),
+      anubis: sanitizeHostAnubis(parsed.anubis),
     };
   } catch (error) {
     console.warn("Failed to parse proxy host meta", error);
@@ -2368,6 +2467,9 @@ function normalizeDnsResolverInput(
 
   if (input.timeout !== undefined) {
     const val = normalizeMetaValue(input.timeout ?? null);
+    if (val && !isCaddyDuration(val)) {
+      throw domainError("hostDnsResolverTimeoutInvalid", { value: val }, { status: 400 });
+    }
     if (val) {
       next.timeout = val;
     } else {
@@ -2410,6 +2512,35 @@ function normalizeUpstreamDnsResolutionInput(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+/**
+ * The builder drops raw JSON it cannot use, so a typo would quietly remove the handlers it replaced.
+ * A stored value resubmitted unchanged passes, so an older host can still be saved.
+ */
+function assertRawJsonUsable(
+  value: string | null,
+  stored: string | undefined,
+  kind: "preHandlers" | "reverseProxy",
+): void {
+  if (!value || value === stored) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    parsed = undefined;
+  }
+  const usable =
+    kind === "reverseProxy"
+      ? isPlainObject(parsed)
+      : isPlainObject(parsed) || (Array.isArray(parsed) && parsed.every(isPlainObject));
+  if (!usable) {
+    throw domainError(
+      kind === "reverseProxy" ? "customReverseProxyJsonInvalid" : "customPreHandlersJsonInvalid",
+      {},
+      { status: 400 },
+    );
+  }
+}
+
 function buildMeta(
   existing: ProxyHostMeta,
   input: Partial<ProxyHostInput>,
@@ -2419,6 +2550,7 @@ function buildMeta(
 
   if (input.customReverseProxyJson !== undefined) {
     const reverse = normalizeMetaValue(input.customReverseProxyJson ?? null);
+    assertRawJsonUsable(reverse, existing.custom_reverse_proxy_json, "reverseProxy");
     if (reverse) {
       next.custom_reverse_proxy_json = reverse;
     } else {
@@ -2428,6 +2560,7 @@ function buildMeta(
 
   if (input.customPreHandlersJson !== undefined) {
     const pre = normalizeMetaValue(input.customPreHandlersJson ?? null);
+    assertRawJsonUsable(pre, existing.custom_pre_handlers_json, "preHandlers");
     if (pre) {
       next.custom_pre_handlers_json = pre;
     } else {
@@ -2624,6 +2757,51 @@ function buildMeta(
     const cache = sanitizeHostCache(input.cache);
     if (cache) next.cache = cache;
     else delete next.cache;
+  }
+
+  if (input.compression !== undefined) {
+    const compression = storedCompression(input.compression);
+    if (compression) next.compression = compression;
+    else delete next.compression;
+  }
+
+  if (input.discourageIndexing !== undefined) {
+    if (input.discourageIndexing) next.discourage_indexing = true;
+    else delete next.discourage_indexing;
+  }
+
+  if (input.maintenance !== undefined) {
+    const maintenance = input.maintenance
+      ? normalizeHostMaintenanceInput(input.maintenance)
+      : undefined;
+    if (maintenance) next.maintenance = maintenance;
+    else delete next.maintenance;
+  }
+
+  if (input.upstreamTimeouts !== undefined) {
+    const timeouts = input.upstreamTimeouts
+      ? normalizeHostUpstreamTimeoutsInput(input.upstreamTimeouts)
+      : undefined;
+    if (timeouts) next.upstream_timeouts = timeouts;
+    else delete next.upstream_timeouts;
+  }
+
+  if (input.rateLimit !== undefined) {
+    const rateLimit = input.rateLimit ? normalizeHostRateLimitInput(input.rateLimit) : undefined;
+    if (rateLimit) next.rate_limit = rateLimit;
+    else delete next.rate_limit;
+  }
+
+  if (input.crowdsec !== undefined) {
+    const crowdsec = storedHostCrowdSec(input.crowdsec !== false);
+    if (crowdsec) next.crowdsec = crowdsec;
+    else delete next.crowdsec;
+  }
+
+  if (input.anubis !== undefined) {
+    const anubis = input.anubis ? normalizeHostAnubisInput(input.anubis) : undefined;
+    if (anubis) next.anubis = anubis;
+    else delete next.anubis;
   }
 
   return serializeMeta(next);
@@ -3009,6 +3187,13 @@ export type ProxyHostMetaView = Pick<
   | "pathRewrites"
   | "errorPages"
   | "cache"
+  | "compression"
+  | "discourageIndexing"
+  | "maintenance"
+  | "upstreamTimeouts"
+  | "rateLimit"
+  | "crowdsec"
+  | "anubis"
 >;
 
 /**
@@ -3047,6 +3232,13 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
     pathRewrites: meta.path_rewrites ?? [],
     errorPages: meta.error_pages ?? [],
     cache: hydrateHostCache(meta.cache),
+    compression: sanitizeHostCompression(meta.compression),
+    discourageIndexing: meta.discourage_indexing === true,
+    maintenance: hydrateHostMaintenance(meta.maintenance),
+    upstreamTimeouts: hydrateHostUpstreamTimeouts(meta.upstream_timeouts),
+    rateLimit: hydrateHostRateLimit(meta.rate_limit),
+    crowdsec: hostCrowdSecEnabled(sanitizeHostCrowdSec(meta.crowdsec)),
+    anubis: hydrateHostAnubis(meta.anubis),
   };
 }
 
@@ -3077,6 +3269,7 @@ export async function assertProxyHostOptionsStorable(options: {
   target?: WafDryRunTarget;
 }): Promise<void> {
   await assertWildcardIssuable(options.domains, options.certificateId);
+  await assertCertificateServable(options.certificateId, options.agentIds);
   if (options.customCaddyfileChanged) {
     await assertCaddyfileAdapts(parseMeta(options.meta).custom_caddyfile, options.agentIds);
   }
@@ -3265,15 +3458,33 @@ async function assertRawConfigChangeAllowed(
   }
 }
 
-/** The raw-config guard's twin for ordinary upstreams and the Authentik outpost upstream. */
+/**
+ * The raw-config guard's twin for every address a host makes Caddy dial: its upstreams, each
+ * location rule's, and the Authentik, Anubis and forward-auth servers.
+ */
 async function assertDialTargetsAllowed(
-  existing: Pick<ProxyHost, "upstreams" | "authentik"> | null,
+  existing: Pick<
+    ProxyHost,
+    "upstreams" | "authentik" | "anubis" | "locationRules" | "forwardAuth"
+  > | null,
   input: Partial<ProxyHostInput>,
   actorUserId: number,
 ): Promise<void> {
   await assertNoNewAdminDialTargets(
-    [...(existing?.upstreams ?? []), existing?.authentik?.outpostUpstream ?? ""],
-    [...(input.upstreams ?? []), input.authentik?.outpostUpstream ?? ""],
+    [
+      ...(existing?.upstreams ?? []),
+      ...(existing?.locationRules ?? []).flatMap((rule) => rule.upstreams),
+      existing?.authentik?.outpostUpstream ?? "",
+      existing?.anubis?.upstream ?? "",
+      existing?.forwardAuth?.authUpstream ?? "",
+    ],
+    [
+      ...(input.upstreams ?? []),
+      ...(input.locationRules ?? []).flatMap((rule) => rule.upstreams ?? []),
+      input.authentik?.outpostUpstream ?? "",
+      input.anubis?.upstream ?? "",
+      input.forwardAuth?.authUpstream ?? "",
+    ],
     actorUserId,
   );
 }
@@ -3288,6 +3499,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   await assertRawConfigChangeAllowed(null, input, actorUserId);
   await assertDialTargetsAllowed(null, input, actorUserId);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
+  await assertCertificateServable(input.certificateId ?? null, input.agentIds ?? []);
   await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
   const now = nowIso();
@@ -3383,6 +3595,12 @@ export async function updateProxyHost(
   const effectiveCertificateId =
     input.certificateId !== undefined ? input.certificateId : existing.certificateId;
   await assertWildcardIssuable(domainList, effectiveCertificateId);
+  if (input.certificateId !== undefined || input.agentIds !== undefined) {
+    await assertCertificateServable(
+      effectiveCertificateId,
+      input.agentIds ?? (await agentIdsForHost("http", id)),
+    );
+  }
   if (input.customCaddyfile !== undefined) {
     await assertCaddyfileAdapts(
       input.customCaddyfile,
@@ -3442,6 +3660,13 @@ export async function updateProxyHost(
       ? { error_pages: existing.errorPages }
       : {}),
     ...(existing.cache ? { cache: sanitizeHostCache(existing.cache) } : {}),
+    compression: storedCompression(existing.compression),
+    ...(existing.discourageIndexing ? { discourage_indexing: true } : {}),
+    maintenance: sanitizeHostMaintenance(existing.maintenance),
+    upstream_timeouts: sanitizeHostUpstreamTimeouts(existing.upstreamTimeouts),
+    rate_limit: sanitizeHostRateLimit(existing.rateLimit),
+    crowdsec: storedHostCrowdSec(existing.crowdsec),
+    anubis: sanitizeHostAnubis(existing.anubis),
   };
   const meta = buildMeta(existingMeta, input, input.waf ? await getWafSettings() : null);
   await assertTailscaleServable(meta);
@@ -3493,6 +3718,42 @@ export async function updateProxyHost(
     data: input,
   });
 
+  await applyCaddyConfig();
+  return (await getProxyHost(id))!;
+}
+
+/** A stored `meta` with maintenance switched, keeping the host's bypass ranges and page. */
+export function withMaintenance(meta: string | null, enabled: boolean): string | null {
+  const parsed = parseMeta(meta);
+  parsed.maintenance = { ...(parsed.maintenance ?? { enabled }), enabled };
+  return serializeMeta(parsed);
+}
+
+/**
+ * The row menu's quick toggle: flips only `enabled`, keeping the host's bypass ranges and page, and
+ * audits the switch itself rather than a generic update.
+ */
+export async function setProxyHostMaintenance(
+  id: number,
+  enabled: boolean,
+  actorUserId: number,
+): Promise<ProxyHost> {
+  const existing = await getProxyHost(id);
+  if (!existing) {
+    throw domainError("proxyHostNotFound");
+  }
+  await db
+    .update(proxyHosts)
+    .set({ meta: withMaintenance(await getProxyHostMeta(id), enabled), updatedAt: nowIso() })
+    .where(eq(proxyHosts.id, id));
+  await logAuditEvent({
+    userId: actorUserId,
+    action: "update",
+    entityType: "proxy_host",
+    entityId: id,
+    summary: `${enabled ? "Turned on" : "Turned off"} maintenance mode for proxy host ${existing.name}`,
+    data: { maintenance: { enabled } },
+  });
   await applyCaddyConfig();
   return (await getProxyHost(id))!;
 }

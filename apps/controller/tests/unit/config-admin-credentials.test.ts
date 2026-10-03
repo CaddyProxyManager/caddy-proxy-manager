@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { readConfig } from '@/src/lib/config';
 
 const productionEnv = {
   NODE_ENV: 'production',
@@ -17,7 +17,7 @@ const productionEnv = {
 
 async function loadConfigModule(env: Record<string, string | undefined>) {
   for (const [key, value] of Object.entries({ ...productionEnv, ...env })) vi.stubEnv(key, value);
-  return import(`../../src/lib/config${fresh()}`);
+  return readConfig();
 }
 
 afterEach(() => {

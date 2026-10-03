@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   AgentDecodeError,
   decodeAgentStatus,
+  decodeCertificateFileListing,
+  decodeCertificateFileResults,
+  decodeCertificateFileSources,
   decodeCertificateFiles,
   decodeCertificateList,
   decodeCommandResults,
@@ -42,7 +45,16 @@ describe('agent status', () => {
     const decoded = decodeAgentStatus({ ...status, injected: { a: 1 } });
     expect(decoded).not.toHaveProperty('injected');
     expect(decoded.capabilities).toEqual(['caddy-validate', 'certificates']);
-    expect(decoded.services.applied).toEqual({ clickhouse: true });
+    // An older agent knows no crowdsec, which reads as not running rather than as a bad status.
+    expect(decoded.services.applied).toEqual({ clickhouse: true, crowdsec: false });
+  });
+
+  it('keeps crowdsec from an agent that runs it', () => {
+    const decoded = decodeAgentStatus({
+      ...status,
+      services: { applied: { clickhouse: false, crowdsec: true }, status: { state: 'applied' } },
+    });
+    expect(decoded.services.applied).toEqual({ clickhouse: false, crowdsec: true });
   });
 
   it.each([
@@ -145,5 +157,61 @@ describe('certificate and log replies', () => {
     const tooMany = JSON.stringify({ lines: Array(1001).fill('x'), cursor: null });
     expect(() => decodeLogReadResponse(tooMany)).toThrow(AgentDecodeError);
     expect(() => decodeLogReadResponse('{"lines":"a","cursor":null}')).toThrow(AgentDecodeError);
+  });
+});
+
+describe('certificates from files', () => {
+  const fingerprint = 'a'.repeat(64);
+
+  it('reads results, full or fingerprint-only, and refuses a chain without its key', () => {
+    const results = [
+      { id: 3, ok: true, fingerprint, certificatePem: 'CERT', keyPem: 'KEY', extra: 1 },
+      { id: 4, ok: true, fingerprint },
+      { id: 5, ok: false, error: 'key-mismatch' },
+    ];
+    expect(decodeCertificateFileResults(results)).toEqual([
+      { id: 3, ok: true, fingerprint, certificatePem: 'CERT', keyPem: 'KEY' },
+      { id: 4, ok: true, fingerprint },
+      { id: 5, ok: false, error: 'key-mismatch' },
+    ]);
+    for (const bad of [
+      [{ id: 3, ok: true, fingerprint, certificatePem: 'CERT' }],
+      [{ id: 3, ok: true, fingerprint: 'not-hex' }],
+      [{ id: -1, ok: true, fingerprint }],
+      [{ id: 3, ok: false, error: 'a sentence an agent made up' }],
+      [{ id: 3, ok: 'yes' }],
+      [{ id: 3, ok: true, fingerprint, certificatePem: 'x'.repeat(1024 * 1024 + 1), keyPem: 'K' }],
+      Array.from({ length: 501 }, (_, id) => ({ id, ok: true, fingerprint })),
+      { results: [] },
+    ]) {
+      expect(() => decodeCertificateFileResults(bad)).toThrow(AgentDecodeError);
+    }
+  });
+
+  it('reads a listing, and refuses a path outside the directory or a key with content', () => {
+    const certificate = {
+      path: 'live/example.com/fullchain.pem',
+      kind: 'certificate' as const,
+      names: ['example.com'],
+      notAfter: '2026-12-01T00:00:00.000Z',
+      fingerprint: 'AB:CD',
+    };
+    const key = { path: 'live/example.com/privkey.pem', kind: 'key', keyPem: 'never forwarded' };
+    expect(decodeCertificateFileListing(JSON.stringify([certificate, key]))).toEqual([
+      certificate,
+      { path: 'live/example.com/privkey.pem', kind: 'key' },
+    ]);
+    for (const path of ['../etc/shadow', '/etc/shadow', 'a/../b']) {
+      expect(() => decodeCertificateFileListing(JSON.stringify([{ path, kind: 'key' }]))).toThrow(
+        AgentDecodeError,
+      );
+    }
+  });
+
+  it('checks the shape of what the controller asks an agent to read', () => {
+    const source = { id: 1, certPath: 'a/cert.pem', keyPath: 'a/key.pem' };
+    expect(decodeCertificateFileSources([{ ...source, extra: true }])).toEqual([source]);
+    expect(() => decodeCertificateFileSources([{ ...source, id: '1' }])).toThrow(AgentDecodeError);
+    expect(() => decodeCertificateFileSources({})).toThrow(AgentDecodeError);
   });
 });

@@ -4,27 +4,16 @@
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
@@ -91,6 +80,7 @@ async function createDashboardLikeHost(domains: string[]) {
       hstsSubdomains: true,
       redirects,
       cpmForwardAuth: { enabled: true },
+      anubis: { enabled: true, upstream: 'http://anubis:8923' },
     } as never,
     1,
   );
@@ -117,6 +107,8 @@ describe('copying a stored host into the dashboard host', () => {
     expect(view.redirects).toEqual(redirects);
     // Its grants are keyed by a host id the managed host does not have.
     expect(view.cpmForwardAuth).toBeNull();
+    // Agents and API clients reach the dashboard; none of them can solve a challenge.
+    expect(view.anubis).toBeNull();
   });
 
   it('refuses a host that does not claim the domain', async () => {
@@ -163,6 +155,9 @@ describe('reading the dashboard host options from the form', () => {
     form.set('cpmForwardAuthPresent', '1');
     form.set('cpmForwardAuthEnabledPresent', '1');
     form.set('cpmForwardAuthEnabled', 'on');
+    form.set('anubisPresent', '1');
+    form.set('anubisEnabled', 'on');
+    form.set('anubisUpstream', 'http://anubis:8923');
     const existing = stored();
 
     const options = await readDashboardHostOptions(form, existing, 'cpm.example.com');
@@ -173,6 +168,7 @@ describe('reading the dashboard host options from the form', () => {
     expect(options.hstsSubdomains).toBe(true);
     expect(options.agentIds).toEqual(existing.agentIds);
     expect(view.cpmForwardAuth).toBeNull();
+    expect(view.anubis).toBeNull();
   });
 
   it('clears the agent pinning when the field is sent empty', async () => {

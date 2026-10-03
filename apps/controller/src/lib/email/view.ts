@@ -17,18 +17,44 @@ export type EmailSettingsView = {
   alertDays: number;
   alertsCheckedAt: string | null;
   alertsError: string | null;
+  notifications: {
+    lastSentAt: string | null;
+    /** English, as the SMTP server said it. */
+    lastError: string | null;
+    lastErrorAt: string | null;
+    lastErrorCode: "noRecipients" | null;
+    pending: number;
+    /** Upstream errors are read from the access log, which Caddy writes only while this holds. */
+    accessLogOn: boolean;
+    upstreamErrorsOn: boolean;
+  };
 };
 
 export async function emailSettingsView(): Promise<EmailSettingsView> {
-  const [registry, { getSetting }] = await Promise.all([
+  const [registry, { getSetting }, { getNotificationStatus }, stored] = await Promise.all([
     import("../settings/registry"),
     import("../settings/resolve"),
+    import("../notifications"),
+    import("../settings"),
   ]);
-  const [{ status, config }, alertRecipients, alertDays, alerts] = await Promise.all([
+  const [
+    { status, config },
+    alertRecipients,
+    alertDays,
+    alerts,
+    notifications,
+    logging,
+    crowdsec,
+    upstreamErrorsOn,
+  ] = await Promise.all([
     readSmtpConfig(),
     getSetting(registry.emailAlertRecipients),
     getSetting(registry.certificateExpiryAlertDays),
     getCertificateAlertState(),
+    getNotificationStatus(),
+    stored.getLoggingSettings(),
+    stored.getCrowdSecSettings(),
+    getSetting(registry.notifyUpstreamErrors),
   ]);
   return {
     status,
@@ -43,5 +69,13 @@ export async function emailSettingsView(): Promise<EmailSettingsView> {
     alertDays,
     alertsCheckedAt: alerts.checkedAt,
     alertsError: alerts.error,
+    notifications: {
+      ...notifications,
+      // As lib/caddy.ts decides it: managed CrowdSec forces the log on, in JSON.
+      accessLogOn:
+        (crowdsec.enabled && crowdsec.mode === "managed") ||
+        (logging?.enabled === true && (logging.format ?? "json") === "json"),
+      upstreamErrorsOn,
+    },
   };
 }

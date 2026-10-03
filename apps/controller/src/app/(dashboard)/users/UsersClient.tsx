@@ -52,6 +52,7 @@ import {
   updateUserInfoAction,
   deleteUserAction,
   resetUserTwoFactorAction,
+  removeUserPasskeysAction,
   sendEmailedLinkAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
@@ -79,10 +80,13 @@ type UserEntry = {
   lastSessionAt: string | null;
   /** Whether they have a login password at all - an SSO-only user does not. */
   hasPassword: boolean;
+  passkeyCount: number;
   /** When it was last set; null when there is none, or it predates the record. */
   passwordChangedAt: string | null;
   /** The shared demo account, which cannot be disabled, deleted or demoted. */
   isDemoAdmin: boolean;
+  /** Disabled by the auto-disable after failed sign-ins, not by an administrator. */
+  disabledByFailedSignIns?: boolean;
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
@@ -342,7 +346,9 @@ function UserDetail({
 }) {
   const t = useTranslations("users");
   const isDisabled = user.status !== "active";
-  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | "reset2fa" | null>(null);
+  const [confirmKind, setConfirmKind] = useState<
+    "disable" | "delete" | "reset2fa" | "removePasskeys" | null
+  >(null);
   const [editOpen, setEditOpen] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const name = userLabel(user);
@@ -412,7 +418,11 @@ function UserDetail({
         <Banner
           status="warning"
           title={t("disabledBannerTitle")}
-          description={t("disabledBannerDescription")}
+          description={
+            user.disabledByFailedSignIns
+              ? t("disabledByFailedSignInsDescription")
+              : t("disabledBannerDescription")
+          }
         />
       )}
 
@@ -497,6 +507,21 @@ function UserDetail({
                 </HStack>
               </MetadataListItem>
             )}
+            <MetadataListItem label={t("passkeys")}>
+              <HStack gap={2} vAlign="center">
+                <Text type="body" size="sm">
+                  {t("passkeyCount", { count: user.passkeyCount })}
+                </Text>
+                {user.passkeyCount > 0 && !user.isSelf && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    label={t("removePasskeys")}
+                    onClick={() => setConfirmKind("removePasskeys")}
+                  />
+                )}
+              </HStack>
+            </MetadataListItem>
             <MetadataListItem label={t("created")}>
               <Timestamp value={user.createdAt} style="date" />
             </MetadataListItem>
@@ -525,21 +550,27 @@ function UserDetail({
             ? t("deleteUser")
             : confirmKind === "reset2fa"
               ? t("resetTwoFactor")
-              : t("disableUser")
+              : confirmKind === "removePasskeys"
+                ? t("removePasskeys")
+                : t("disableUser")
         }
         description={
           confirmKind === "delete"
             ? t("deleteUserConfirm", { name: user.name ?? user.email })
             : confirmKind === "reset2fa"
               ? t("resetTwoFactorConfirm", { name: user.name ?? user.email })
-              : t("disableUserConfirm", { name: user.name ?? user.email })
+              : confirmKind === "removePasskeys"
+                ? t("removePasskeysConfirm", { name: user.name ?? user.email })
+                : t("disableUserConfirm", { name: user.name ?? user.email })
         }
         actionLabel={
           confirmKind === "delete"
             ? t("deleteUser")
             : confirmKind === "reset2fa"
               ? t("resetTwoFactor")
-              : t("disableUser")
+              : confirmKind === "removePasskeys"
+                ? t("removePasskeys")
+                : t("disableUser")
         }
         onAction={async () => {
           const result =
@@ -547,7 +578,9 @@ function UserDetail({
               ? await deleteUserAction(user.id)
               : confirmKind === "reset2fa"
                 ? await resetUserTwoFactorAction(user.id)
-                : await updateUserStatusAction(user.id, "disabled");
+                : confirmKind === "removePasskeys"
+                  ? await removeUserPasskeysAction(user.id)
+                  : await updateUserStatusAction(user.id, "disabled");
           setConfirmKind(null);
           onDone(result.status === "error" ? (result.message ?? null) : null);
         }}

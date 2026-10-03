@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { ANALYTICS_OFF } from '../helpers/compose';
 
 // The test stack leaves it unset, so this and the web container's tables both default to 30.
 const RETENTION_DAYS = Number(process.env.CLICKHOUSE_RETENTION_DAYS ?? 30);
@@ -50,6 +51,7 @@ async function forceTtl(
 }
 
 test.describe('ClickHouse retention TTL', () => {
+  test.skip(ANALYTICS_OFF, 'no ClickHouse in the analytics-off run');
   test('tables carry the configured retention TTL', async () => {
     const ch = makeClient();
     try {

@@ -113,5 +113,8 @@ async function report(disabled: readonly Candidate[]): Promise<void> {
       entityId: plugin.id,
       summary: `Disabled CRS plugin ${plugin.name}: Caddy refused to load it`,
     });
+    // Imported here, like the model above: the notifications reach the settings.
+    const { reportCrsPluginDisabled } = await import("../notifications/jobs");
+    await reportCrsPluginDisabled(plugin);
   }
 }

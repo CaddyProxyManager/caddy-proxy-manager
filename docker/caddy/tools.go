@@ -16,6 +16,7 @@ import (
 	_ "github.com/caddy-dns/godaddy"
 	_ "github.com/caddy-dns/hetzner"
 	_ "github.com/caddy-dns/infomaniak"
+	_ "github.com/caddy-dns/inwx"
 	_ "github.com/caddy-dns/ionos"
 	_ "github.com/caddy-dns/linode"
 	_ "github.com/caddy-dns/namecheap"
@@ -36,6 +37,8 @@ import (
 	_ "github.com/darkweak/storages/redis/caddy"
 	_ "github.com/darkweak/storages/simplefs/caddy"
 	_ "github.com/fuomag9/caddy-blocker-plugin"
+	_ "github.com/hslatman/caddy-crowdsec-bouncer"
 	_ "github.com/mholt/caddy-l4"
+	_ "github.com/mholt/caddy-ratelimit"
 	_ "github.com/tailscale/caddy-tailscale"
 )

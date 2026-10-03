@@ -4,15 +4,16 @@ import { genericOAuth, twoFactor, username } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import db from "./db";
 import * as schema from "./db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { config } from "./config";
 import { extraTrustedOrigins } from "./auth-trusted-origins";
-import { getPublicBaseUrl } from "./public-url";
+import { getPublicBaseUrl, publicOrigins } from "./public-url";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
 import {
   extractGroups,
+  isAppRole,
   mapGroupsToLocalGroups,
   mapGroupsToRole,
   needsGroupClaims,
@@ -21,7 +22,10 @@ import {
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
-import { APIError, createAuthMiddleware, getOAuthState } from "better-auth/api";
+import { APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx } from "better-auth/api";
+import { passkey } from "@better-auth/passkey";
+// The class the passkey plugin re-throws as is; better-auth's own copy it wraps as a generic 400.
+import { APIError as PluginAPIError } from "@better-auth/core/error";
 import { hashPassword, verifyPassword } from "./password";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
@@ -32,8 +36,20 @@ import { isValidLoginUsername, LOGIN_USERNAME_MAX_LENGTH } from "./login-usernam
 import {
   hasTwoFactorChallengeCookie,
   isCredentialSignInPath,
+  isPasskeyRegisterPath,
+  LDAP_SIGN_IN_PATH,
+  isPasskeySignInPath,
   isTwoFactorVerifyPath,
 } from "./auth-sign-in-paths";
+import { FRESH_SESSION_MAX_AGE_MS, isFreshSession } from "./auth-session-age";
+import { LDAP_PROVIDER_TYPE } from "./ldap/defaults";
+import { findTwoFactorAfterHook, ldapSignIn } from "./ldap/plugin";
+import {
+  PASSKEY_NAME_MAX_LENGTH,
+  isUserVerified,
+  passkeyOrigins,
+  passkeyRpId,
+} from "./passkey-relying-party";
 
 // biome-ignore lint/suspicious/noExplicitAny: the type depends on a plugin list built at runtime
 let cachedAuth: any = null;
@@ -156,7 +172,13 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
     const rows = await db
       .select()
       .from(schema.oauthProviders)
-      .where(eq(schema.oauthProviders.enabled, true));
+      .where(
+        and(
+          eq(schema.oauthProviders.enabled, true),
+          // Directories share the table; they are the ldap plugin's, not generic OAuth's.
+          ne(schema.oauthProviders.type, LDAP_PROVIDER_TYPE),
+        ),
+      );
     const providers: OAuthProvider[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -178,8 +200,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       operatorGroup: row.operatorGroup,
       userGroup: row.userGroup,
       viewerGroup: row.viewerGroup,
-      defaultRole:
-        row.defaultRole === "admin" || row.defaultRole === "viewer" ? row.defaultRole : "user",
+      defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
       syncGroups: row.syncGroups,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -210,6 +231,76 @@ export function enforceSafeUserDefaults<T extends object>(
   return { ...user, role: "user", status: "active" };
 }
 
+type AuthHookContext = Parameters<typeof getSessionFromCtx>[0];
+
+async function refusePasskey(
+  status: "BAD_REQUEST" | "FORBIDDEN",
+  code: string,
+  key:
+    | "passkeysDisabled"
+    | "passkeyNameTooLong"
+    | "passkeyReauthRequired"
+    | "passkeyLastSignInMethod"
+    | "passkeyNotVerified",
+): Promise<never> {
+  const { getTranslations } = await import("next-intl/server");
+  const t = await getTranslations("auth.apiErrors");
+  const message = t(key, {
+    max: PASSKEY_NAME_MAX_LENGTH,
+    minutes: FRESH_SESSION_MAX_AGE_MS / 60_000,
+  });
+  throw new PluginAPIError(status, { code, message });
+}
+
+/** The plugin checks each ceremony; this adds what CPM asks of an account on top. */
+export async function guardPasskeyRequest(
+  ctx: AuthHookContext,
+  localUsersDisabled: boolean,
+): Promise<void> {
+  const path = ctx.path;
+  // OIDC-only mode: the identity provider is the only way in, and a passkey is a local credential.
+  if (localUsersDisabled && (isPasskeySignInPath(path) || isPasskeyRegisterPath(path))) {
+    await refusePasskey("FORBIDDEN", "PASSKEYS_DISABLED", "passkeysDisabled");
+  }
+  const body =
+    ctx.body && typeof ctx.body === "object" ? (ctx.body as Record<string, unknown>) : null;
+  if (typeof body?.name === "string" && body.name.trim().length > PASSKEY_NAME_MAX_LENGTH) {
+    await refusePasskey("BAD_REQUEST", "PASSKEY_NAME_TOO_LONG", "passkeyNameTooLong");
+  }
+
+  if (isPasskeyRegisterPath(path)) {
+    // Never a sign-in: a session minted here would restart the freshness clock below.
+    if (body) delete body.createSession;
+    // Better Auth's own freshness check allows a day; a stolen session must not add a way in.
+    const session = await getSessionFromCtx(ctx);
+    if (session && !isFreshSession({ createdAt: new Date(session.session.createdAt) })) {
+      await refusePasskey("FORBIDDEN", "SESSION_NOT_FRESH", "passkeyReauthRequired");
+    }
+    return;
+  }
+
+  if (path === "/passkey/delete-passkey") {
+    const session = await getSessionFromCtx(ctx);
+    if (!session) return;
+    const userId = Number(session.user.id);
+    const { countUserPasskeys, keepsSignInMethod } = await import("./passkeys");
+    // Ownership is the plugin's check, after this one.
+    const left = Math.max(0, (await countUserPasskeys(userId)) - 1);
+    if (!(await keepsSignInMethod(userId, left))) {
+      await refusePasskey("BAD_REQUEST", "LAST_SIGN_IN_METHOD", "passkeyLastSignInMethod");
+    }
+  }
+}
+
+/** Called after the signature checks out: the plugin verifies without requiring UV. */
+async function requireUserVerification(args: {
+  verification: Parameters<typeof isUserVerified>[0];
+}): Promise<void> {
+  if (!isUserVerified(args.verification)) {
+    await refusePasskey("BAD_REQUEST", "USER_NOT_VERIFIED", "passkeyNotVerified");
+  }
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above
 async function createAuth(baseURL: string): Promise<any> {
   // Once per build; the settings action rebuilds via invalidateProviderCache after saving.
@@ -217,6 +308,16 @@ async function createAuth(baseURL: string): Promise<any> {
   const oauthConfigs = await loadProviders();
   const appName = await getAppName();
   const trustedProviderIds = [...cachedTrustedProviderIds];
+  // getAuth() rebuilds when the Public URL changes, so both follow it.
+  const rpId = passkeyRpId(baseURL);
+  // Empty fails every ceremony closed; null would let the plugin trust the request's Origin.
+  const passkeyOriginList = rpId ? passkeyOrigins(rpId, await publicOrigins()) : [];
+  // TOTP and backup codes only: a code by mail would come from the inbox a reset link opens.
+  const twoFactorPlugin = twoFactor({
+    issuer: appName,
+    twoFactorTable: "twoFactors",
+    backupCodeOptions: { storeBackupCodes: "encrypted" },
+  });
 
   return betterAuth({
     // Keyed by export name, which matches each `modelName` below.
@@ -293,6 +394,10 @@ async function createAuth(baseURL: string): Promise<any> {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path.startsWith("/passkey/")) {
+          await guardPasskeyRequest(ctx, policy.disableLocalUsers);
+          return;
+        }
         // Checked first so every other auth request skips loading the translator.
         if (ctx.path !== SIGN_UP_EMAIL_PATH) return;
         // A registrant cannot choose a username (applySignInNameRules). Dropped before the
@@ -421,10 +526,15 @@ async function createAuth(baseURL: string): Promise<any> {
               .from(schema.users)
               .where(eq(schema.users.id, Number(session.userId)))
               .limit(1);
-            if (user?.status === "active") return;
+            if (user?.status === "active") {
+              if (!isPasskeySignInPath(context?.path)) return;
+              // A directory user's passkey: only while a directory still vouches for them.
+              const { directoryAccessWithdrawn } = await import("./models/ldap-directories");
+              if (!(await directoryAccessWithdrawn(Number(session.userId)))) return;
+            }
             throw new APIError(
               "UNAUTHORIZED",
-              context?.path === "/sign-in/username"
+              context?.path === "/sign-in/username" || context?.path === LDAP_SIGN_IN_PATH
                 ? { message: "Invalid username or password", code: "INVALID_USERNAME_OR_PASSWORD" }
                 : { message: "Invalid email or password", code: "INVALID_EMAIL_OR_PASSWORD" },
             );
@@ -482,11 +592,23 @@ async function createAuth(baseURL: string): Promise<any> {
         usernameValidator: isValidLoginUsername,
       }) as unknown as BetterAuthPlugin,
       genericOAuth({ config: oauthConfigs }),
-      // TOTP and backup codes only: a code by mail would come from the inbox a reset link opens.
-      twoFactor({
-        issuer: appName,
-        twoFactorTable: "twoFactors",
-        backupCodeOptions: { storeBackupCodes: "encrypted" },
+      twoFactorPlugin as unknown as BetterAuthPlugin,
+      // Its path is the plugin's own, so the TOTP step has to be wired to it by hand.
+      ldapSignIn({
+        twoFactorAfterHook: findTwoFactorAfterHook(twoFactorPlugin),
+        localUsersEnabled: !policy.disableLocalUsers,
+        allowRegistration: policy.allowOauthRegistration,
+      }),
+      passkey({
+        // An unparseable Public URL: a hostname no browser will sign for, never "localhost".
+        rpID: rpId ?? "invalid.",
+        rpName: appName,
+        origin: passkeyOriginList,
+        // Discoverable, so the sign-in form needs no username; UV, so it stands for both factors.
+        authenticatorSelection: { residentKey: "required", userVerification: "required" },
+        schema: { passkey: { modelName: "passkeys" } },
+        registration: { afterVerification: requireUserVerification },
+        authentication: { afterVerification: requireUserVerification },
       }) as unknown as BetterAuthPlugin,
     ],
   });

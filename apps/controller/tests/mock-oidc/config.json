@@ -19,6 +19,38 @@
       ]
     },
     {
+      "issuerId": "groups-prefixed",
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "groups-prefixed-user",
+            "email": "groups-prefixed@idp.example",
+            "email_verified": true,
+            "name": "Groups Prefixed User",
+            "groups": ["/Org/cpm-Operator", "cpm-Team Alpha", "unrelated"]
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "groups-unmatched",
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "groups-unmatched-user",
+            "email": "groups-unmatched@idp.example",
+            "email_verified": true,
+            "name": "Groups Unmatched User",
+            "roles": { "cpm": ["Team Beta"] }
+          }
+        }
+      ]
+    },
+    {
       "issuerId": "linker-a",
       "requestMappings": [
         {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
+import { internalCaSubject } from "@/src/lib/ca-subject";
 import { withTranslatedErrors } from "@/src/lib/translated-action";
 import {
   createCaCertificate,
@@ -14,11 +15,21 @@ import {
   createIssuedClientCertificate,
   revokeIssuedClientCertificate,
 } from "@/src/lib/models/issued-client-certificates";
-import { generateKeyPair as generateKeyPairCb, X509Certificate } from "node:crypto";
+import { generateKeyPair as generateKeyPairCb, randomBytes, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
 import { getTranslations } from "next-intl/server";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import forge from "node-forge";
+
+/**
+ * RFC 5280: unique per CA, at most 20 bytes, positive. A timestamp repeated within a millisecond,
+ * and every CA was "01"; 16 random bytes with the top bit clear cannot collide in practice.
+ */
+function randomSerialNumber(): string {
+  const bytes = randomBytes(16);
+  bytes[0] = (bytes[0] & 0x7f) | 0x01;
+  return bytes.toString("hex");
+}
 
 const generateKeyPairAsync = promisify(generateKeyPairCb);
 
@@ -125,15 +136,12 @@ async function generateCaCertificateActionUntranslated(
   const keypair = await generateForgeKeyPair(4096);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keypair.publicKey;
-  cert.serialNumber = "01";
+  cert.serialNumber = randomSerialNumber();
   cert.validity.notBefore = new Date();
   cert.validity.notAfter = new Date();
   cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
 
-  const attrs = [
-    { name: "commonName", value: commonName },
-    { name: "organizationName", value: "Caddy Proxy Manager" },
-  ];
+  const attrs = await internalCaSubject(commonName);
   cert.setSubject(attrs);
   cert.setIssuer(attrs);
   cert.setExtensions([
@@ -201,7 +209,7 @@ async function issueClientCertificateActionUntranslated(
   const keypair = await generateForgeKeyPair(2048);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keypair.publicKey;
-  cert.serialNumber = Date.now().toString(16);
+  cert.serialNumber = randomSerialNumber();
   cert.validity.notBefore = new Date();
   cert.validity.notAfter = new Date();
   cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
@@ -222,7 +230,7 @@ async function issueClientCertificateActionUntranslated(
     {
       caCertificateId: caCertId,
       commonName: commonName,
-      serialNumber: cert.serialNumber.toUpperCase(),
+      serialNumber: certificate.serialNumber,
       fingerprintSha256: certificate.fingerprint256,
       certificatePem: certificatePem,
       validFrom: new Date(certificate.validFrom).toISOString(),

@@ -735,6 +735,16 @@ test.describe('Access Lists - used-by tab', () => {
       await page.getByRole('button', { name: /^Used by/ }).click();
       await expect(page.getByText('usage-test.local')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('active')).toBeVisible();
+
+      // Deleting it now would leave the host unprotected, so it is refused.
+      const refused = await page.request.delete(
+        `http://localhost:3000/api/v1/access-lists/${list.id}`,
+        {
+          headers: { Origin: 'http://localhost:3000' },
+        },
+      );
+      expect(refused.status()).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toContain('E2E Usage Host');
     } finally {
       await page.request.delete(`${proxyApi}/${host.id}`, {
         headers: { Origin: 'http://localhost:3000' },

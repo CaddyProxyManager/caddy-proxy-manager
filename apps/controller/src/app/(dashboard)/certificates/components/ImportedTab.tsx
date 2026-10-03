@@ -16,8 +16,20 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable } from "@/components/ui/DataTable";
 import { useEmptyValue } from "@/components/ui/empty-value";
-import { deleteCertificateAction } from "../actions";
-import type { CertExpiryStatus, ImportedCertView, ManagedCertView } from "../page";
+import {
+  deleteCertificateAction,
+  deleteUnusedCertificatesAction,
+  rereadCertificateFileAction,
+} from "../actions";
+import { Timestamp } from "@/components/ui/Timestamp";
+import { certificateFileErrorMessage } from "@/src/lib/certificate-file-errors";
+import { BulkConfirmDialog } from "@/components/ui/BulkActionBar";
+import type {
+  CertExpiryStatus,
+  CertificateFileAgent,
+  ImportedCertView,
+  ManagedCertView,
+} from "../page";
 import { RelativeTime } from "./RelativeTime";
 import { ImportCertDrawer } from "./ImportCertDrawer";
 import { useTranslations } from "next-intl";
@@ -28,6 +40,7 @@ type Props = {
   managedCerts: ManagedCertView[];
   search: string;
   statusFilter: string | null;
+  fileAgents: CertificateFileAgent[];
 };
 
 /** Icon tint tracks expiry, matching the badge shown in the Expires column. */
@@ -54,6 +67,44 @@ function DomainsCell({ domains }: { domains: string[] }) {
   );
 }
 
+/** Where a file certificate comes from, when it was last read, and why the last read failed. */
+function SourceCell({ cert }: { cert: ImportedCertView }) {
+  const t = useTranslations("certificates");
+  const tErrors = useTranslations("errors");
+  const emptyValue = useEmptyValue();
+  const file = cert.file;
+  if (!file) {
+    return (
+      <Text type="body" size="sm" color="secondary">
+        {emptyValue}
+      </Text>
+    );
+  }
+  return (
+    <VStack gap={1}>
+      <Badge
+        variant="info"
+        label={
+          file.agentName ? t("sourceAgentBadge", { agent: file.agentName }) : t("sourceAgentGone")
+        }
+      />
+      <Text type="body" size="xsm" color="secondary">
+        {file.readAt
+          ? t.rich("sourceReadAt", { time: () => <Timestamp value={file.readAt!} /> })
+          : t("sourceNeverRead")}
+      </Text>
+      {file.error && (
+        <HStack gap={1} vAlign="center">
+          <Icon icon={AlertTriangle} size="sm" color="warning" />
+          <Text type="body" size="xsm" color="secondary">
+            {tErrors(certificateFileErrorMessage(file.error))}
+          </Text>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
 function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => void }) {
   const t = useTranslations("certificates");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -77,12 +128,21 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
     else if (body.certificatePem) downloadText(`${cert.name}.crt`, `${body.certificatePem}\n`);
   }
 
+  function reread() {
+    startTransition(async () => {
+      const result = await rereadCertificateFileAction(cert.id);
+      if (result.success) toast.success(t("rereadDone"));
+      else toast.error(result.error);
+    });
+  }
+
   function handleDelete() {
     setError(null);
     startTransition(async () => {
       try {
-        await deleteCertificateAction(cert.id);
-        setDeleteOpen(false);
+        const result = await deleteCertificateAction(cert.id);
+        if (result.success) setDeleteOpen(false);
+        else setError(result.error ?? t("deleteFailed"));
       } catch (err) {
         setError(err instanceof Error ? err.message : t("deleteFailed"));
       }
@@ -97,6 +157,7 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         alignment="end"
         items={[
           { label: t("edit"), onClick: onEdit },
+          ...(cert.file ? [{ label: t("rereadNow"), onClick: reread }] : []),
           { label: t("downloadCertificate"), onClick: () => download(false) },
           { label: t("downloadKey"), onClick: () => download(true) },
           { type: "divider" },
@@ -152,12 +213,19 @@ function importedMobileCard(c: ImportedCertView, onEdit: () => void) {
           {c.domains.length > 2 ? ` +${c.domains.length - 2}` : ""}
         </Text>
         <RelativeTime validTo={c.validTo} status={c.expiryStatus} />
+        {c.file && <SourceCell cert={c} />}
       </VStack>
     </Card>
   );
 }
 
-export function ImportedTab({ importedCerts, managedCerts, search, statusFilter }: Props) {
+export function ImportedTab({
+  importedCerts,
+  managedCerts,
+  search,
+  statusFilter,
+  fileAgents,
+}: Props) {
   const t = useTranslations("certificates");
   const emptyValue = useEmptyValue();
   const [drawerCert, setDrawerCert] = useState<ImportedCertView | null | false>(false);
@@ -171,6 +239,24 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
     }
     return true;
   });
+  // What the table shows: a search that hides a certificate also keeps it out of the batch.
+  const unused = filtered.filter((c) => c.usedBy.length === 0);
+  const [unusedOpen, setUnusedOpen] = useState(false);
+  const [unusedError, setUnusedError] = useState<string | null>(null);
+  const [isDeletingUnused, startDeletingUnused] = useTransition();
+
+  function deleteUnused() {
+    setUnusedError(null);
+    startDeletingUnused(async () => {
+      const result = await deleteUnusedCertificatesAction(unused.map((c) => c.id));
+      if (!result.success) {
+        setUnusedError(result.error ?? t("deleteFailed"));
+        return;
+      }
+      toast.success(result.message);
+      setUnusedOpen(false);
+    });
+  }
 
   const columns = [
     {
@@ -189,6 +275,11 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
       id: "domains",
       label: t("domains"),
       render: (c: ImportedCertView) => <DomainsCell domains={c.domains} />,
+    },
+    {
+      id: "source",
+      label: t("sourceLabel"),
+      render: (c: ImportedCertView) => <SourceCell cert={c} />,
     },
     {
       id: "expiry",
@@ -221,7 +312,18 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
 
   return (
     <VStack gap={4}>
-      <HStack justify="end" className="cpm-desktop-only">
+      <HStack justify="end" gap={2} className="cpm-desktop-only">
+        {unused.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            label={t("deleteUnused")}
+            onClick={() => {
+              setUnusedError(null);
+              setUnusedOpen(true);
+            }}
+          />
+        )}
         <Button
           variant="primary"
           size="sm"
@@ -243,7 +345,9 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
             ? { color: "error", icon: "error", label: t("expired") }
             : c.expiryStatus === "expiring_soon"
               ? { color: "warning", icon: "warning", label: t("expiringSoon") }
-              : null
+              : c.file?.error
+                ? { color: "warning", icon: "warning", label: t("sourceReadFailed") }
+                : null
         }
       />
 
@@ -259,9 +363,23 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
         </VStack>
       )}
 
+      <BulkConfirmDialog
+        open={unusedOpen}
+        title={t("deleteUnusedTitle")}
+        items={unused}
+        summary={t("deleteUnusedSummary", { count: unused.length })}
+        isDestructive
+        confirmLabel={t("delete")}
+        isPending={isDeletingUnused}
+        error={unusedError}
+        onConfirm={deleteUnused}
+        onClose={() => setUnusedOpen(false)}
+      />
+
       <ImportCertDrawer
         open={drawerCert !== false}
         cert={drawerCert || null}
+        fileAgents={fileAgents}
         onClose={() => setDrawerCert(false)}
       />
     </VStack>
@@ -303,7 +421,8 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
           isDisabled={isPending}
           onClick={() =>
             startTransition(async () => {
-              await deleteCertificateAction(c.id);
+              const result = await deleteCertificateAction(c.id);
+              if (!result.success) toast.error(result.error ?? t("deleteFailed"));
             })
           }
         />

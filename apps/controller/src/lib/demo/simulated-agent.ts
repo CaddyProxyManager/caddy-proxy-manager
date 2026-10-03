@@ -7,6 +7,7 @@ import {
   type AgentCommand,
   type AgentDesiredState,
   type AgentStatus,
+  MANAGED_SERVICES,
   type ManagedServiceName,
   SHIPPED_CADDY_MODULES,
 } from "@cpm/shared";
@@ -35,9 +36,9 @@ const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
 
 const sameServices = (
-  a: Record<ManagedServiceName, boolean>,
+  a: Partial<Record<ManagedServiceName, boolean>>,
   b: Record<ManagedServiceName, boolean> | null,
-) => b !== null && Object.entries(a).every(([name, on]) => b[name as ManagedServiceName] === on);
+) => b !== null && MANAGED_SERVICES.every((name) => (a[name] ?? false) === (b[name] ?? false));
 
 /**
  * Null when an operator disabled its row. Unpaired, it stays gone until the next start re-creates
@@ -127,7 +128,9 @@ export async function startSimulatedAgent(
       status.services.status = { state: "applying", triggeredAt: now() };
       start("services", () => {
         status.services = {
-          applied: { ...state.services.services },
+          applied: Object.fromEntries(
+            MANAGED_SERVICES.map((name) => [name, state.services.services[name] === true]),
+          ) as Record<ManagedServiceName, boolean>,
           status: { state: "applied", appliedAt: now() },
         };
       });
@@ -160,6 +163,20 @@ export async function startSimulatedAgent(
         break;
       case "caddy-image-load":
         response = answer("");
+        break;
+      case "certificate-files-list":
+        response = answer("[]");
+        break;
+      case "certificate-files-read":
+        response = answer(
+          JSON.stringify(
+            command.request.files.map((file) => ({
+              id: file.id,
+              ok: false,
+              error: "not-configured",
+            })),
+          ),
+        );
         break;
       default:
         response = caddy(command.request);

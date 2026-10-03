@@ -8,6 +8,8 @@ type NativeAttrs = Record<string, string | number | boolean>;
 const autofill = (value: string): NativeAttrs => ({ autoComplete: value });
 
 export const AUTOFILL_USERNAME = autofill("username");
+/** Also offers saved passkeys in the field's autofill (WebAuthn conditional UI). */
+export const AUTOFILL_USERNAME_WEBAUTHN = autofill("username webauthn");
 export const AUTOFILL_CURRENT_PASSWORD = autofill("current-password");
 export const AUTOFILL_NEW_PASSWORD = autofill("new-password");
 export const AUTOFILL_ONE_TIME_CODE = autofill("one-time-code");

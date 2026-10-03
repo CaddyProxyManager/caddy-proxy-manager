@@ -6,6 +6,7 @@ import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./db/schema";
 import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
 import { encryptSecret, isEncryptedSecret } from "./secret";
+import { envGroupMapping } from "./oidc-groups";
 
 export { db, client, runInTransaction } from "./db/connection";
 export type { Db } from "./db/connection";
@@ -159,22 +160,7 @@ async function runEnvProviderSync() {
     .where(eq(oauthProviders.name, name))
     .limit(1);
 
-  const validRoles = new Set(["admin", "user", "viewer"]);
-  const defaultRole =
-    config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
-      ? config.oauth.defaultRole
-      : "user";
-  const groupMapping = {
-    groupsClaim: config.oauth.groupsClaim ?? "groups",
-    groupPrefix: config.oauth.groupPrefix ?? null,
-    roleMappingEnabled: config.oauth.roleMappingEnabled,
-    adminGroup: config.oauth.adminGroup ?? null,
-    operatorGroup: config.oauth.operatorGroup ?? null,
-    userGroup: config.oauth.userGroup ?? null,
-    viewerGroup: config.oauth.viewerGroup ?? null,
-    defaultRole,
-    syncGroups: config.oauth.syncGroups,
-  };
+  const groupMapping = envGroupMapping(config.oauth);
 
   const now = new Date().toISOString();
   if (existing && existing.source === "env") {

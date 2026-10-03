@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
@@ -62,19 +63,7 @@ await ctx.db.insert(schemaModule.oauthProviders).values([
   },
 ]);
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    db: ctx.db,
-    client: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 // `betterAuth(options)` returns the raw options, so getAuth().options is createAuth()'s config.
 vi.mock('better-auth', () => ({

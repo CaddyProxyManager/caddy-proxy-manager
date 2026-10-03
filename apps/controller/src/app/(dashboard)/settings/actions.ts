@@ -19,6 +19,7 @@ import {
   customDirectivesError,
   normalizeWafPluginIds,
   normalizeWafPresetIds,
+  parseWafIdListJson,
   parseBodyLimitMib,
 } from "@/src/lib/caddy-waf";
 import { parseDefaultResponseHeaders } from "@/src/lib/caddy-default-response";
@@ -43,6 +44,7 @@ import {
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
   saveHttpProtocolsSettings,
+  saveCompressionSettings,
   saveGlobalCaddyConfigSettings,
   saveHttpCacheSettings,
   saveTwoFactorPolicySettings,
@@ -54,7 +56,10 @@ import {
   getTailscaleSettings,
   saveTailscaleSettings,
   defaultTailscaleSettings,
+  getCrowdSecSettings,
+  saveCrowdSecSettings,
 } from "@/src/lib/settings";
+import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/crowdsec";
 import {
   listProxyHosts,
   updateProxyHost,
@@ -82,6 +87,15 @@ import type {
 } from "@/src/lib/settings";
 import { getProviderDefinition, isValidDnsDuration } from "@/src/lib/dns-providers";
 import { encryptProviderCredentials } from "@/src/lib/dns-provider-credentials";
+import {
+  ACMEDNS_PROVIDER,
+  MAX_DNS_DELEGATIONS,
+  challengeBaseName,
+  challengeRecordName,
+  normalizeDnsName,
+} from "@/src/lib/dns-challenge-delegation";
+import { registerAcmeDnsAccount } from "@/src/lib/acme-dns";
+import { type DelegationCheck, checkDelegations } from "@/src/lib/dns-delegation-check";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
 import { parseCheckbox, parseCsv } from "@/src/lib/form-parse";
 import { checkTailscaleAuthKey } from "@/src/lib/tailscale-api";
@@ -117,6 +131,7 @@ import {
 } from "@/src/lib/agent/bootstrap";
 import { detach } from "@/src/lib/agent/registry";
 import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/models/agents";
+import { caddyBuildAgents } from "@/src/lib/agent/client";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
 import type { AppRole } from "@/src/lib/oidc-groups";
 
@@ -149,9 +164,9 @@ function serializedSettingsAction<TArgs extends unknown[], TResult>(
  * Diverts the action's settings writes into the operator's change set; its `applyCaddyConfig()`
  * is suppressed. Still locked: two staged forms would race on the read-modify-write.
  */
-function stagedSettingsAction<TArgs extends unknown[]>(
-  action: (...args: TArgs) => Promise<ActionResult>,
-): (...args: TArgs) => Promise<ActionResult> {
+function stagedSettingsAction<TArgs extends unknown[], TResult extends ActionResult>(
+  action: (...args: TArgs) => Promise<TResult>,
+): (...args: TArgs) => Promise<TResult> {
   return async (...args: TArgs) =>
     withSettingsUpdateLock(async () => {
       const session = await requireAdmin();
@@ -316,9 +331,22 @@ async function updateDnsProviderSettingsActionUnlocked(
     const current = await getDnsProviderSettings();
     const settings: DnsProviderSettings = current ?? { providers: {}, default: null };
 
+    if (action === "delegation-save" || action === "delegation-remove") {
+      return await saveDnsDelegation(action, formData, settings);
+    }
+
     if (action === "remove") {
       if (!providerName || !settings.providers[providerName]) {
         return { success: false, message: t("results.dnsProviderNothingToRemove") };
+      }
+      const delegated = (settings.delegations ?? []).filter((d) => d.provider === providerName);
+      if (delegated.length > 0) {
+        return {
+          success: false,
+          message: t("results.dnsProviderUsedByDelegations", {
+            domains: delegated.map((d) => d.domain).join(", "),
+          }),
+        };
       }
       const def = getProviderDefinition(providerName);
       delete settings.providers[providerName];
@@ -453,6 +481,103 @@ async function updateDnsProviderSettingsActionUnlocked(
   }
 }
 
+/** Adds, replaces or removes one delegation row; the domain is its key. */
+async function saveDnsDelegation(
+  action: "delegation-save" | "delegation-remove",
+  formData: FormData,
+  settings: DnsProviderSettings,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  const domain = normalizeDnsName(challengeBaseName(String(formData.get("domain") ?? "")));
+  if (!domain) return { success: false, message: t("results.dnsDelegationDomainInvalid") };
+  const rest = (settings.delegations ?? []).filter((d) => challengeBaseName(d.domain) !== domain);
+
+  if (action === "delegation-remove") {
+    settings.delegations = rest;
+    // Its account answers only for this delegation's names.
+    if (settings.acmeDnsAccounts?.[domain]) delete settings.acmeDnsAccounts[domain];
+    await saveDnsProviderSettings(settings);
+    revalidatePath("/settings");
+    return { success: true, message: t("results.dnsDelegationRemoved", { domain }) };
+  }
+
+  const rawTarget = String(formData.get("target") ?? "").trim();
+  const target = rawTarget ? normalizeDnsName(rawTarget) : null;
+  if (rawTarget && !target) {
+    return { success: false, message: t("results.dnsDelegationTargetInvalid") };
+  }
+  const rawProvider = String(formData.get("delegationProvider") ?? "").trim();
+  const provider = rawProvider && rawProvider !== "default" ? rawProvider : null;
+  if (provider && !settings.providers[provider]) {
+    return { success: false, message: t("results.dnsProviderNotConfigured", { name: provider }) };
+  }
+  if (!target && !provider) {
+    return { success: false, message: t("results.dnsDelegationNeedsTarget") };
+  }
+  if (rest.length >= MAX_DNS_DELEGATIONS) {
+    return {
+      success: false,
+      message: t("results.dnsDelegationTooMany", { max: MAX_DNS_DELEGATIONS }),
+    };
+  }
+
+  settings.delegations = [...rest, { domain, target, provider }];
+  await saveDnsProviderSettings(settings);
+  revalidatePath("/settings");
+  return { success: true, message: t("results.dnsDelegationSaved", { domain }) };
+}
+
+export type AcmeDnsRegisterResult = ActionResult & {
+  /** The one record the operator creates; present on success. */
+  cname?: { name: string; target: string };
+};
+
+async function registerAcmeDnsAccountActionUnlocked(
+  _prevState: AcmeDnsRegisterResult | null,
+  formData: FormData,
+): Promise<AcmeDnsRegisterResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const domain = normalizeDnsName(challengeBaseName(String(formData.get("domain") ?? "")));
+    if (!domain) return { success: false, message: t("results.dnsDelegationDomainInvalid") };
+    const serverUrl = String(formData.get("serverUrl") ?? "").trim();
+    if (!serverUrl) return { success: false, message: t("results.acmeDnsServerUrlRequired") };
+
+    const account = await registerAcmeDnsAccount(serverUrl);
+
+    const settings: DnsProviderSettings = (await getDnsProviderSettings()) ?? {
+      providers: {},
+      default: null,
+    };
+    settings.providers[ACMEDNS_PROVIDER] ??= {};
+    settings.acmeDnsAccounts = { ...settings.acmeDnsAccounts, [domain]: account };
+    settings.delegations = [
+      ...(settings.delegations ?? []).filter((d) => challengeBaseName(d.domain) !== domain),
+      { domain, target: null, provider: ACMEDNS_PROVIDER },
+    ];
+    await saveDnsProviderSettings(settings);
+    revalidatePath("/settings");
+
+    const cname = { name: challengeRecordName(domain), target: account.fulldomain };
+    return {
+      success: true,
+      message: t("results.acmeDnsRegistered", { domain, ...cname }),
+      cname,
+    };
+  } catch (error) {
+    console.error("Failed to register an acme-dns account:", error);
+    return { success: false, message: await errorText(error, t("results.acmeDnsRegisterFailed")) };
+  }
+}
+
+/** Read-only lookups, so no lock; a warning on the screen, never a refusal. */
+export async function checkDnsDelegationsAction(): Promise<DelegationCheck[]> {
+  await requireAdmin();
+  const settings = await getDnsProviderSettings();
+  return await checkDelegations(settings?.delegations ?? [], settings?.acmeDnsAccounts);
+}
+
 async function updateAuthentikSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -574,6 +699,7 @@ async function updateTailscaleSettingsActionUnlocked(
       validateAuthKey,
       apiAccessToken,
       apiTailnet,
+      http3: parseCheckbox(formData.get("tailscaleHttp3")),
     });
 
     revalidatePath("/settings");
@@ -893,6 +1019,11 @@ async function updateRegistrySettingsActionUnlocked(
     // The auth instance caches these; drop it or the old policy stays live.
     const { invalidateProviderCache } = await import("@/src/lib/auth-server");
     invalidateProviderCache();
+    // The agents count upstream errors only while that notification is on.
+    if (keys.some((key) => key.startsWith("config:notify_upstream"))) {
+      const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
+      void pushFleetConfig().catch(() => {});
+    }
 
     // "layout" scope: the root layout and dashboard shell read the app name and sign-in policy.
     revalidatePath("/", "layout");
@@ -924,6 +1055,9 @@ async function saveEmailRegistryValues(
     }
     throw error;
   }
+  // Agents count upstream errors only while email can tell anyone about them.
+  const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
+  void pushFleetConfig().catch(() => {});
   // "layout" scope: the sign-in page and the Users screen offer mail only once it is set up.
   revalidatePath("/", "layout");
   return { success: true, message: t("email.saved") };
@@ -1272,6 +1406,110 @@ async function updateHttpProtocolsSettingsActionUnlocked(
       success: false,
       message: await errorText(error, t("results.httpProtocolsFailed")),
     };
+  }
+}
+
+async function updateCompressionSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    await saveCompressionSettings({ enabled: formData.get("enabled") === "on" });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.compressionSaved") };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      return {
+        success: true,
+        message: t("results.applyFailed", {
+          error: await errorText(error, t("results.unknownError")),
+        }),
+      };
+    }
+  } catch (error) {
+    console.error("Failed to save compression settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.compressionFailed")),
+    };
+  }
+}
+
+async function updateCrowdSecSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    // A blank key keeps the stored one while the addresses are unchanged; see saveCrowdSecSettings.
+    await saveCrowdSecSettings({
+      enabled: parseCheckbox(formData.get("crowdsecEnabled")),
+      mode: String(formData.get("crowdsecMode") ?? "external"),
+      onlineApi: parseCheckbox(formData.get("crowdsecOnlineApi")),
+      managedAppsec: parseCheckbox(formData.get("crowdsecManagedAppsec")),
+      apiUrl: String(formData.get("crowdsecApiUrl") ?? ""),
+      apiKey: String(formData.get("crowdsecApiKey") ?? ""),
+      appsecUrl: String(formData.get("crowdsecAppsecUrl") ?? ""),
+      appsecFailOpen: parseCheckbox(formData.get("crowdsecAppsecFailOpen")),
+      tickerInterval: String(formData.get("crowdsecTickerInterval") ?? ""),
+    });
+    revalidatePath("/settings");
+    await applyCaddyConfig();
+    return { success: true, message: t("results.crowdsecSaved") };
+  } catch (error) {
+    console.error("Failed to save CrowdSec settings:", error);
+    return { success: false, message: await errorText(error, t("results.crowdsecFailed")) };
+  }
+}
+
+/**
+ * Read-only, so neither staged nor locked. The stored key is only tried against the address it
+ * was saved for, as on save.
+ */
+export async function testCrowdSecConnectionAction(input: {
+  apiUrl: string;
+  apiKey: string;
+}): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const typed = normalizeCrowdSecSettings({ apiUrl: input.apiUrl, apiKey: input.apiKey });
+    if (!typed.apiUrl) return { success: false, message: t("results.crowdsecTestNoUrl") };
+    const stored = await getCrowdSecSettings();
+    const apiKey =
+      typed.apiKey ||
+      (stored.apiKey && stored.apiUrl === typed.apiUrl
+        ? decryptSecret(stored.apiKey, "CrowdSec bouncer key")
+        : "");
+    if (!apiKey) return { success: false, message: t("results.crowdsecTestNoKey") };
+
+    const result = await probeCrowdSecLapi(typed.apiUrl, apiKey);
+    switch (result.status) {
+      case "ok":
+        return { success: true, message: t("results.crowdsecTestOk") };
+      case "rejected":
+        return { success: false, message: t("results.crowdsecTestRejected") };
+      case "unexpected":
+        return {
+          success: false,
+          message: t("results.crowdsecTestStatus", { status: result.httpStatus }),
+        };
+      case "placeholder":
+        return { success: false, message: t("results.crowdsecTestPlaceholder") };
+      default:
+        return {
+          success: false,
+          message: t("results.crowdsecTestUnreachable", { url: typed.apiUrl }),
+        };
+    }
+  } catch (error) {
+    return { success: false, message: await errorText(error, t("results.crowdsecTestFailed")) };
   }
 }
 
@@ -1955,7 +2193,7 @@ async function updateWafSettingsActionUnlocked(
     const rawExcl = formData.get("wafExcludedRuleIds");
     let excluded_rule_ids: number[];
     if (rawExcl !== null) {
-      excluded_rule_ids = (JSON.parse(rawExcl as string) as unknown[]).filter(
+      excluded_rule_ids = parseWafIdListJson(rawExcl as string).filter(
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       );
     } else {
@@ -1964,13 +2202,13 @@ async function updateWafSettingsActionUnlocked(
     const rawPresets = formData.get("wafPresetIds");
     const preset_ids =
       typeof rawPresets === "string"
-        ? normalizeWafPresetIds(JSON.parse(rawPresets))
+        ? normalizeWafPresetIds(parseWafIdListJson(rawPresets))
         : (existing?.preset_ids ?? []);
     await assertWafPresetIdsExist(preset_ids);
     const rawPlugins = formData.get("wafPluginIds");
     const plugin_ids =
       typeof rawPlugins === "string"
-        ? normalizeWafPluginIds(JSON.parse(rawPlugins))
+        ? normalizeWafPluginIds(parseWafIdListJson(rawPlugins))
         : (existing?.plugin_ids ?? []);
     await assertCrsPluginIdsExist(plugin_ids);
 
@@ -2083,27 +2321,11 @@ async function updateCaddyBuildSettingsActionUnlocked(
     } else {
       await setAgentBuildSettings(agentRowId, settings);
     }
-    // The module set is part of desired state, so the agent learns what to build from this.
-    await pushDesiredState();
 
-    const diff = await getCaddyBuildDiff(agentRowId);
-    // Advisory, not a refusal. One message, so a translator decides how it follows the saved one.
-    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
-    const saved = snippetWarning
-      ? t("results.caddyBuildSavedSnippetWarning", {
-          rebuild: diff.needsRebuild ? "yes" : "no",
-          count: snippetWarning.count,
-          names: (await getFormatter()).list(snippetWarning.names, { type: "unit" }),
-          more: snippetWarning.more,
-        })
-      : diff.needsRebuild
-        ? t("results.caddyBuildSavedRebuild")
-        : t("results.caddyBuildSaved");
-
+    // Config before the push, as REST does: the module set is desired state, so the push starts
+    // the build, and the Caddy it recreates resumes an autosave that must not name a lost module.
     try {
       await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: saved };
     } catch (error) {
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
@@ -2113,6 +2335,36 @@ async function updateCaddyBuildSettingsActionUnlocked(
         message: t("results.caddyBuildApplyFailed", { error: errorMsg }),
       };
     }
+    await pushDesiredState();
+    revalidatePath("/settings");
+
+    const diff = await getCaddyBuildDiff(agentRowId);
+    const { builders, external } = caddyBuildAgents(agentRowId);
+    // What the save set off: a build, an image to load (external mode), or nothing until one connects.
+    const outcome = !diff.needsRebuild
+      ? "none"
+      : builders > 0
+        ? "building"
+        : external.length > 0
+          ? "loadImage"
+          : "noAgent";
+    // Advisory, not a refusal. One message, so a translator decides how it follows the saved one.
+    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
+    const message = snippetWarning
+      ? t("results.caddyBuildSavedSnippetWarning", {
+          outcome,
+          count: snippetWarning.count,
+          names: (await getFormatter()).list(snippetWarning.names, { type: "unit" }),
+          more: snippetWarning.more,
+        })
+      : outcome === "building"
+        ? t("results.caddyBuildSavedBuilding")
+        : outcome === "loadImage"
+          ? t("results.caddyBuildSavedLoadImage")
+          : outcome === "noAgent"
+            ? t("results.caddyBuildSavedNoAgent")
+            : t("results.caddyBuildSaved");
+    return { success: true, message };
   } catch (error) {
     console.error("Failed to save Caddy build settings:", error);
     return {
@@ -2162,6 +2414,9 @@ export const updateAcmeSettingsAction = stagedSettingsAction(updateAcmeSettingsA
 export const updateCloudflareSettingsAction = stagedSettingsAction(
   updateCloudflareSettingsActionUnlocked,
 );
+export const registerAcmeDnsAccountAction = stagedSettingsAction(
+  registerAcmeDnsAccountActionUnlocked,
+);
 export const updateDnsProviderSettingsAction = stagedSettingsAction(
   updateDnsProviderSettingsActionUnlocked,
 );
@@ -2182,6 +2437,9 @@ export const updateTrustedProxiesSettingsAction = stagedSettingsAction(
 );
 export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
   updateHttpProtocolsSettingsActionUnlocked,
+);
+export const updateCompressionSettingsAction = stagedSettingsAction(
+  updateCompressionSettingsActionUnlocked,
 );
 export const updateGlobalCaddyConfigAction = stagedSettingsAction(
   updateGlobalCaddyConfigActionUnlocked,
@@ -2210,6 +2468,9 @@ export const updateDefaultResponseSettingsAction = stagedSettingsAction(
 );
 export const updateTailscaleSettingsAction = stagedSettingsAction(
   updateTailscaleSettingsActionUnlocked,
+);
+export const updateCrowdSecSettingsAction = stagedSettingsAction(
+  updateCrowdSecSettingsActionUnlocked,
 );
 export const removeWafRuleGloballyAction = serializedSettingsAction(
   removeWafRuleGloballyActionUnlocked,
@@ -2249,6 +2510,29 @@ export const updateEmailSettingsAction = serializedSettingsAction(
 export const updateCertificateAlertSettingsAction = serializedSettingsAction(
   updateCertificateAlertSettingsActionUnlocked,
 );
+
+/** To whoever the notifications go to, so it proves the recipients as well as the server. */
+export async function sendTestNotificationAction(): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const { sendTestNotification } = await import("@/src/lib/notifications");
+    const recipients = await sendTestNotification();
+    if (recipients.length === 0) {
+      return { success: false, message: t("email.testNotificationNoRecipients") };
+    }
+    const format = await getFormatter();
+    return {
+      success: true,
+      message: t("email.testNotificationSent", {
+        recipients: format.list(recipients, { type: "conjunction" }),
+      }),
+    };
+  } catch (error) {
+    console.error("Failed to send a test notification:", error);
+    return { success: false, message: await errorText(error, t("email.testNotificationFailed")) };
+  }
+}
 
 /** Sends with the saved settings, to `recipient` or the signed-in administrator. */
 export async function sendTestEmailAction(recipient: string): Promise<ActionResult> {

@@ -1,0 +1,39 @@
+# Authelia for the rig's third-party forward auth: file users, a filesystem notifier, one factor.
+# Its portal is served through CPM at https://auth.cpm.test, the session cookie on cpm.test.
+server:
+  address: tcp://0.0.0.0:9091
+
+log:
+  level: info
+
+theme: light
+
+identity_validation:
+  reset_password:
+    jwt_secret: rig-authelia-jwt-secret-0123456789abcdef
+
+authentication_backend:
+  file:
+    path: /config/users.yml
+    watch: false
+
+access_control:
+  default_policy: one_factor
+
+session:
+  secret: rig-authelia-session-secret-0123456789abcdef
+  cookies:
+    - domain: cpm.test
+      authelia_url: https://auth.cpm.test
+
+regulation:
+  max_retries: 0
+
+storage:
+  encryption_key: rig-authelia-storage-key-0123456789abcdef
+  local:
+    path: /tmp/authelia.sqlite3
+
+notifier:
+  filesystem:
+    filename: /tmp/notification.txt

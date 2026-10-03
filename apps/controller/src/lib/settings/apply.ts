@@ -34,14 +34,19 @@ export type ApplyOutcome =
 /** The unmodified builder, with settings reads overlaid by the staged set. */
 export async function renderStagedDocument(userId: number): Promise<unknown> {
   const overlay = await stagedOverlay(userId);
-  return withStagedReads(overlay, () => buildCaddyDocument());
+  return withStagedReads(overlay, () =>
+    buildCaddyDocument(undefined, { includeAgentFileCertificates: true }),
+  );
 }
 
 /** The current config and the staged one, for the review sheet's diff. */
 export async function renderConfigComparison(
   userId: number,
 ): Promise<{ current: unknown; staged: unknown }> {
-  const [current, staged] = await Promise.all([buildCaddyDocument(), renderStagedDocument(userId)]);
+  const [current, staged] = await Promise.all([
+    buildCaddyDocument(undefined, { includeAgentFileCertificates: true }),
+    renderStagedDocument(userId),
+  ]);
   return { current, staged };
 }
 
@@ -79,6 +84,11 @@ export async function applyStagedSettings(
     } catch (cause) {
       // A non-Error, or caddy.ts's error with this very sentence: use the code so it translates.
       failure = cause instanceof Error && cause.message !== fallback.message ? cause : fallback;
+    }
+    // The managed crowdsec container is desired state, which no Caddy load carries.
+    if (keys.includes("crowdsec")) {
+      const { applyManagedServices } = await import("../agent/managed-services");
+      await applyManagedServices();
     }
     // English: the revision row is history, not a message for one reader.
     const error = failure?.message ?? null;

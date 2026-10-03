@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { readConfig } from '@/src/lib/config';
 
 async function loadAllowSelfRegistration(value?: string): Promise<boolean> {
   if (value === undefined) {
@@ -9,7 +9,7 @@ async function loadAllowSelfRegistration(value?: string): Promise<boolean> {
     vi.stubEnv('AUTH_ALLOW_SELF_REGISTRATION', value);
   }
 
-  const { config } = await import(`../../src/lib/config${fresh()}`);
+  const { config } = readConfig();
   return config.auth.allowSelfRegistration;
 }
 

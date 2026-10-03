@@ -1,0 +1,13 @@
+# A placeholder region: Headscale needs one, and no node ever gets an answer from it.
+regions:
+  900:
+    regionid: 900
+    regioncode: rig
+    regionname: Rig placeholder
+    nodes:
+      - name: 900a
+        regionid: 900
+        hostname: derp.invalid
+        ipv4: 127.0.0.1
+        stunport: -1
+        derpport: 1

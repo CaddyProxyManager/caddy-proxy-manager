@@ -1,0 +1,134 @@
+---
+title: Bot challenge (Anubis)
+description: Make browsers solve a proof-of-work challenge from your own Anubis instance before they reach a proxy host, to keep scrapers off it.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import Demo from "../../../components/Demo.astro";
+import AnubisDemo from "../../../demos/samples/AnubisDemo";
+
+[Anubis](https://anubis.techaro.lol/) makes a visitor's browser do a small proof-of-work
+computation before it lets them in, then remembers the pass in a cookie. A person barely notices;
+a scraper fetching thousands of pages, or one that cannot run JavaScript at all, stops.
+
+CPM does not run Anubis for you. You run one instance next to Caddy in Anubis's *subrequest* mode,
+and point any number of proxy hosts at it. Caddy then asks Anubis about every request, and sends a
+visitor without a pass to the challenge page on the same domain.
+
+## Running Anubis
+
+Anubis has to be on a network Caddy can reach: `caddy-network`, where your upstreams are.
+`docker network ls` shows its full name, which starts with the directory you run CPM from.
+
+```yaml
+# anubis/docker-compose.yml
+services:
+  anubis:
+    image: ghcr.io/techarohq/anubis:latest
+    restart: unless-stopped
+    environment:
+      # A single space: subrequest mode, with nothing behind Anubis to proxy to.
+      TARGET: " "
+      BIND: ":8923"
+      POLICY_FNAME: /data/policy.yaml
+      # The domains of every host you point at it. Wildcards work: *.example.com
+      REDIRECT_DOMAINS: "example.com,*.example.com"
+      # openssl rand -hex 32. Without it, every restart invalidates every pass.
+      ED25519_PRIVATE_KEY_HEX: "<64 hex characters>"
+    volumes:
+      - ./policy.yaml:/data/policy.yaml:ro
+    networks:
+      - caddy
+
+networks:
+  caddy:
+    external: true
+    name: caddy-proxy-manager_caddy-network
+```
+
+The policy has to change one thing from Anubis's default, the status codes:
+
+```yaml
+# anubis/policy.yaml
+bots:
+  - import: (data)/meta/default-config.yaml
+
+status_codes:
+  CHALLENGE: 200
+  DENY: 403
+```
+
+:::danger
+Anubis's default answers a denied bot with **200**. Caddy reads any 2xx from the check as "let it
+through", so without `DENY: 403` every bot your policy denies reaches the upstream.
+:::
+
+- **`REDIRECT_DOMAINS`**. After a challenge, Anubis sends the visitor back to where they were
+  going. CPM always hands it a relative path, but anyone can craft a challenge link with a full URL
+  in it, and without this list Anubis would follow one to any site.
+- **`COOKIE_DOMAIN`**. Unset, each host gets its own pass, and a visitor solves one challenge per
+  domain. Set it to your registered domain (`example.com`, never with a port) to share one pass
+  across all its subdomains.
+- **`PUBLIC_URL`**. Leave it unset. CPM serves the challenge page on each host itself; with it
+  set, Anubis redirects to its own domain instead, which then needs a proxy host of its own.
+
+## Turning it on for a host
+
+<Steps>
+
+1. Open the host's editor and switch on **Bot challenge (Anubis)**.
+
+2. Enter the **Anubis URL** as Caddy reaches it, such as `http://anubis:8923`. Like an upstream,
+   only an administrator can point it at Caddy's admin port, a unix socket or a placeholder.
+
+3. List any **Exempt paths**, one per line, and save.
+
+</Steps>
+
+<Demo title="The bot challenge on a proxy host">
+  <AnubisDemo client:visible />
+</Demo>
+
+What CPM adds to the host:
+
+- **`/.within.website/*`** is proxied to Anubis. That is where its challenge page, its scripts and
+  the endpoint that hands out the pass live, so the path is never passed to your upstream.
+- **Every other request** is checked with Anubis first, with the method, path, host and client
+  address it needs to apply its policy. A pass continues to the upstream; no pass is a `307` to
+  `/.within.website/?redir=<the original path and query, escaped>`; a denial is Anubis's own `403`.
+- **The client address** is the one Caddy resolved through **Settings → Network → Trusted
+  Proxies**, sent as `X-Real-Ip`. Behind a CDN, set that up first, or Anubis sees the CDN's
+  address and every visitor shares its challenges.
+- **The client's `Authorization` header is withheld** from Anubis. The check runs before an access
+  list strips it, and whoever edits the host picks the Anubis URL, so credentials never leave for
+  it. Cookies still go, since Anubis's pass cookie has a configurable name.
+
+The check runs after CrowdSec, rate limiting, geo blocking and the WAF, which refuse from memory or
+on their own, and before path rules, redirects, access lists and any
+[forward auth](/features/forward-auth/). That makes it combine with a sign-in: a bot is turned away
+before it ever reaches Authelia, Authentik or the built-in portal.
+
+## Exempt paths
+
+A challenge needs a browser. An API client, a mobile app, an RSS reader or a webhook sender gets
+a redirect to an HTML page it cannot solve, so list the paths they use - `/api/*`, `/feed.xml`,
+`/hooks/*` - under **Exempt paths**. They are Caddy path patterns, matched against the path the
+visitor sent.
+
+Anubis's own policy can also let requests through, by path, user agent or address, with an `ALLOW`
+rule; its default already allows `/robots.txt`, `/favicon.ico` and `/.well-known/*`. An exempt path
+is decided by Caddy and never reaches Anubis at all.
+
+## Things to know
+
+- **The dashboard host never gets it.** Agents and API clients talk to the controller there, and
+  none of them can solve a challenge.
+- **Serve the host over HTTPS.** Anubis marks its pass cookie `Secure`, which a browser refuses
+  over plain HTTP, so the visitor solves the challenge and lands straight back on it. For a host
+  with no certificate, set `COOKIE_SECURE: "false"` on Anubis.
+- **The first request of a visit should be a GET.** A form posted without a pass is redirected to
+  the challenge like any other request, and the post is lost.
+- **Search engines** are whatever your policy says. The default configuration lets well-behaved
+  crawlers through; check it before protecting a site you want indexed.
+- **Anubis being down** turns the check into a `502`, so the host goes down with it. Run it with a
+  restart policy, and keep it on the same host as Caddy.

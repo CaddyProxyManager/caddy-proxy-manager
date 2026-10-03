@@ -53,6 +53,21 @@ export async function verifyCaptchaToken(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {
+      // Cap Standalone refuses a bad or spent token with a 4xx and `success: false`, not a 200.
+      if (check.provider === "cap" && response.status >= 400 && response.status < 500) {
+        const refusal = (await response.json().catch(() => null)) as {
+          success?: unknown;
+          error?: unknown;
+        } | null;
+        if (refusal?.success === false) {
+          // Its wording for a wrong secret or site key: the operator's to fix, as below.
+          if (/site key or secret/i.test(String(refusal.error ?? ""))) {
+            console.warn(`[captcha] cap rejected the site key or secret: ${refusal.error}`);
+            return "unavailable";
+          }
+          return "failed";
+        }
+      }
       console.warn(`[captcha] ${check.provider} siteverify answered ${response.status}`);
       return "unavailable";
     }

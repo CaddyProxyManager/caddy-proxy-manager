@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { readConfig } from '@/src/lib/config';
 
 type AuthConfig = {
   disableLocalUsers: boolean;
@@ -14,7 +14,7 @@ type AuthConfig = {
 
 async function loadAuthConfig(env: Record<string, string | undefined>): Promise<AuthConfig> {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const { config } = await import(`../../src/lib/config${fresh()}`);
+  const { config } = readConfig();
   return config.auth;
 }
 
@@ -72,7 +72,7 @@ describe('admin credentials in OIDC-only mode', () => {
 
   async function loadConfigModule(env: Record<string, string | undefined>) {
     for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-    return import(`../../src/lib/config${fresh()}`);
+    return readConfig();
   }
 
   it('resolves to no credentials instead of demanding them', async () => {

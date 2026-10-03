@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listCertificates, createCertificate } from "@/src/lib/models/certificates";
 import { toCertificateApiResponse } from "@/src/lib/certificate-api";
+import { createCertificateFromAgentFiles } from "@/src/lib/models/certificate-files";
 
 const PRIVATE_RESPONSE_INIT = { headers: { "Cache-Control": "no-store" } };
 
@@ -19,7 +20,19 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await requireApiAdmin(request);
     const body = await request.json();
-    const cert = await createCertificate(body, userId);
+    // Read from the agent before anything is stored; see models/certificate-files.ts.
+    const cert =
+      body?.source === "agent-file"
+        ? await createCertificateFromAgentFiles(
+            {
+              name: String(body.name ?? ""),
+              agentRowId: Number(body.sourceAgentId),
+              certPath: String(body.sourceCertPath ?? ""),
+              keyPath: String(body.sourceKeyPath ?? ""),
+            },
+            userId,
+          )
+        : await createCertificate(body, userId);
     return NextResponse.json(toCertificateApiResponse(cert), {
       status: 201,
       headers: PRIVATE_RESPONSE_INIT.headers,

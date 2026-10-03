@@ -1,41 +1,28 @@
 /** AVATAR_GRAVATAR beats the Settings toggle, which defaults on. */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { reloadConfig } from '@/tests/helpers/config';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Out of the factory: an async Bun mock factory never resolves. Created once, so a re-run of the
 // factory keeps the setting the env-override cases saved a moment earlier.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    sqlite: undefined,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null =>
-      !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import { settings } from '../../src/lib/db/schema';
-// Static so the db mock has run before the first beforeEach; later imports are fresh per env stub.
+// Static so the db mock has run before the first beforeEach.
 import '../../src/lib/settings';
 
-/**
- * config snapshots process.env on first load, and a query suffix does not reach importers, so the
- * plain specifier is mocked to a fresh copy.
- */
+/** config snapshots process.env on first load, so it is re-read per env stub. */
 async function load(env: Record<string, string | undefined> = {}) {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const config = await import(`../../src/lib/config${fresh()}`);
-  vi.mock('../../src/lib/config', () => ({ ...config }));
+  await reloadConfig();
   return import('../../src/lib/settings');
 }
 

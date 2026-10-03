@@ -14,9 +14,9 @@ export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
 const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;
-// No COMPOSE_PROFILES - the clickhouse container never starts, which is what disables
-// analytics. The password in tests/e2e.env only satisfies interpolation; web's own value
-// comes from tests/docker-compose.test.yml either way.
+// ANALYTICS_ENABLED=false, from playwright.no-clickhouse.config.ts, is what keeps ClickHouse
+// down: without it web's password turns analytics on and the agent starts the container, profile
+// or not.
 const ENV = { ...process.env };
 
 async function waitForHealth(): Promise<void> {
@@ -83,7 +83,9 @@ async function seedAuthState(): Promise<void> {
   mkdirSync(AUTH_DIR, { recursive: true });
 
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  // As playwright.config's timezoneId: a zone cookie left in the saved state would refresh every
+  // spec's first page after hydration.
+  const page = await browser.newPage({ timezoneId: 'UTC' });
 
   try {
     await page.goto('http://localhost:3000/login');
@@ -104,10 +106,14 @@ async function seedAuthState(): Promise<void> {
 }
 
 export default async function globalSetup() {
+  if (process.env.ANALYTICS_ENABLED !== 'false') {
+    throw new Error('Run this setup through playwright.no-clickhouse.config.ts.');
+  }
   console.log('[global-setup-no-ch] Starting Docker Compose test stack (no ClickHouse)...');
+  // Keycloak's first start, which imports its realm, is the slowest to turn healthy.
   execFileSync(
     'docker',
-    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '120'],
+    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '240'],
     {
       stdio: 'inherit',
       cwd: COMPOSE_CWD,

@@ -28,6 +28,16 @@ describe('console commands', () => {
     ).toBeNull();
   });
 
+  it('refuses one command signed for the other', () => {
+    const timestamp = Date.now();
+    const reset = signConsoleCommand(secret, 'admin', timestamp);
+    const enable = signConsoleCommand(secret, 'admin', timestamp, 'enable-user');
+    const body = (signature: string) => ({ username: 'admin', timestamp, signature });
+    expect(verifyConsoleCommand(secret, body(enable), timestamp, 'enable-user')).toBe('admin');
+    expect(verifyConsoleCommand(secret, body(reset), timestamp, 'enable-user')).toBeNull();
+    expect(verifyConsoleCommand(secret, body(enable), timestamp)).toBeNull();
+  });
+
   it('refuses a stale command', () => {
     const timestamp = Date.now() - CONSOLE_COMMAND_MAX_AGE_MS - 1;
     const signature = signConsoleCommand(secret, 'admin', timestamp);

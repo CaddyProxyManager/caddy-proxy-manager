@@ -15,6 +15,7 @@ async function loginWithCredentials(
   const page = await context.newPage();
 
   await page.goto(`${BASE}/login`);
+  await waitForHydration(page);
   await signInWithCredentials(page, username, password);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { domainErrorMessage } from "@/src/lib/domain-error";
 import { TWO_FACTOR_SETUP_PATH, mustEnrollTwoFactor } from "@/src/lib/two-factor-policy";
-import { CONSOLE_RESET_TWO_FACTOR_PATH } from "@/src/lib/console-command";
+import { CONSOLE_ENABLE_USER_PATH, CONSOLE_RESET_TWO_FACTOR_PATH } from "@/src/lib/console-command";
 import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
@@ -96,8 +96,9 @@ export default async function proxy(req: NextRequest) {
     pathname === "/api/sign-in/captcha" ||
     // For someone who cannot sign in; each route is rate-limited and answers nothing about accounts.
     pathname.startsWith("/api/password-reset/") ||
-    // Signed by `cpm-server --reset-2fa` and answered only to loopback; see the route.
-    pathname === CONSOLE_RESET_TWO_FACTOR_PATH
+    // Signed by `cpm-server --reset-2fa` / `--enable-user`, answered only to loopback; see the routes.
+    pathname === CONSOLE_RESET_TWO_FACTOR_PATH ||
+    pathname === CONSOLE_ENABLE_USER_PATH
   ) {
     return publicResponse();
   }

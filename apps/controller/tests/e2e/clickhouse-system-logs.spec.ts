@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { ANALYTICS_OFF } from '../helpers/compose';
 
 // Stock ClickHouse writes several GB/day to these even idle. Keep in sync with
 // low-disk-write.yml and DISABLED_SYSTEM_LOGS in src/lib/clickhouse/client.ts.
@@ -31,6 +32,7 @@ function makeClient(): ClickHouseClient {
 }
 
 test.describe('ClickHouse internal system logs disabled', () => {
+  test.skip(ANALYTICS_OFF, 'no ClickHouse in the analytics-off run');
   test('none of the disabled diagnostic system-log tables exist', async () => {
     const ch = makeClient();
     // Hard-coded identifiers, so an inline IN list is safe.

@@ -38,7 +38,8 @@ export function assertNotSelf(
     | "cannotChangeOwnRole"
     | "cannotChangeOwnStatus"
     | "cannotDeleteOwnAccount"
-    | "cannotResetOwnTwoFactor",
+    | "cannotResetOwnTwoFactor"
+    | "cannotRemoveOwnPasskeys",
 ): void {
   if (actorId === targetId) throw domainError(code);
 }

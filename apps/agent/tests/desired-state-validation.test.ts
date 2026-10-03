@@ -6,7 +6,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { isValidL4PortMapping, isValidModuleSpec } from "@cpm/shared";
+import {
+  expandL4PortMappings,
+  isValidL4PortMapping,
+  isValidModuleSpec,
+  sameL4PortSet,
+} from "@cpm/shared";
 import { type AgentConfig, loadConfig } from "../src/config";
 import { AgentStore } from "../src/db";
 import {
@@ -70,9 +75,30 @@ afterEach(() => {
 
 describe("shared validators", () => {
   it("accepts the port mappings the controller and docker inspect produce", () => {
-    for (const port of ["80:80", "53:53/udp", "443:443/tcp", "1:1", "65535:65535"]) {
+    for (const port of [
+      "80:80",
+      "53:53/udp",
+      "443:443/tcp",
+      "1:1",
+      "65535:65535",
+      "5000-5010:5000-5010",
+      "5000-5010:6000-6010/udp",
+      "1-65535:1-65535",
+    ]) {
       expect(isValidL4PortMapping(port)).toBe(true);
     }
+  });
+
+  it("expands a range the way docker inspect lists it, for comparing sets", () => {
+    expect(expandL4PortMappings(["5001-5002:5001-5002/udp", "80:80/tcp", "80:80"])).toEqual([
+      "5001:5001/udp",
+      "5002:5002/udp",
+      "80:80",
+    ]);
+    expect(sameL4PortSet(["5000-5001:5000-5001"], ["5001:5001", "5000:5000"])).toBe(true);
+    expect(sameL4PortSet(["5000-5001:5000-5001"], ["5000:5000"])).toBe(false);
+    // Kept, so an entry the apply would refuse still reads as a change.
+    expect(sameL4PortSet([EVIL_PORT], [])).toBe(false);
   });
 
   it("rejects anything else", () => {
@@ -84,7 +110,12 @@ describe("shared validators", () => {
       "80:80/sctp",
       "127.0.0.1:80:80",
       "80:80 ",
-      "80-90:80-90",
+      "80-90:80-95",
+      "90-80:90-80",
+      "80-80-90:80-80-90",
+      "0-10:0-10",
+      "65535-65536:65535-65536",
+      "80-:80-",
       "",
     ]) {
       expect(isValidL4PortMapping(port)).toBe(false);
@@ -127,6 +158,17 @@ describe("rendered overrides", () => {
   it("keep a hostile module list inside one build arg", () => {
     expect(yaml.parse(renderCaddyBuildOverride([EVIL_MODULE, "github.com/x/y"]))).toEqual({
       services: { caddy: { build: { args: { CADDY_MODULES: `${EVIL_MODULE} github.com/x/y` } } } },
+    });
+  });
+
+  it("round-trip a range, so a port override with one is not removed as stale", async () => {
+    writeFileSync(join(dir, L4_OVERRIDE_FILE), renderL4PortsOverride(["5000-5010:5000-5010/udp"]));
+    await new DockerHost(config).recreateCaddy();
+
+    const argv = spawned.find((s) => s.argv[1] === "compose")?.argv.join(" ") ?? "";
+    expect(argv).toContain(L4_OVERRIDE_FILE);
+    expect(yaml.parse(readFileSync(join(dir, L4_OVERRIDE_FILE), "utf-8"))).toEqual({
+      services: { caddy: { ports: ["5000-5010:5000-5010/udp"] } },
     });
   });
 

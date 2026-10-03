@@ -105,6 +105,7 @@ t_fails() {  # t_fails NAME CMD... - passes when the command exits non-zero
 # ── CPM REST API ────────────────────────────────────────────────────────────
 #
 # api METHOD PATH [BODY] -> API_STATUS, API_BODY, with bootstrap.sh's token unless API_TOKEN is set.
+# API_MAX_TIME raises the 60s limit for a call that waits on something slow on purpose.
 
 API_STATUS=
 API_BODY=
@@ -120,7 +121,7 @@ api() {
   local token="${API_TOKEN-$(cat "$TOKEN_FILE" 2>/dev/null)}"
   local base="${API_BASE:-$CPM_API}"
   local out="$STATE_DIR/api-out.$$"
-  local args=(-sS -X "$method" --max-time 60 -o "$out" -w '%{http_code}')
+  local args=(-sS -X "$method" --max-time "${API_MAX_TIME:-60}" -o "$out" -w '%{http_code}')
   [ -n "$token" ] && args+=(-H "Authorization: Bearer $token")
   if [ -n "$body" ]; then
     args+=(-H 'Content-Type: application/json' --data-binary "$body")
@@ -174,6 +175,12 @@ cpm_mint_token() {
     -H 'Content-Type: application/json' -H "Origin: $1" \
     --data-binary "$(jq -nc --arg n "$3" '{name:$n}')" \
     "$1/api/v1/tokens" 2>/dev/null | jq -r '.raw_token // empty'
+}
+
+# A new admin session in bootstrap's jar. Key downloads and restores want a sign-in from the last
+# ten minutes, which bootstrap's is not by the time a full run reaches them.
+fresh_session() {
+  [ "$(cpm_sign_in "$CPM_API" "$STATE_DIR/cookies.txt" "$CPM_ADMIN_USER" "$CPM_ADMIN_PASSWORD")" = "200" ]
 }
 
 # Endpoints outside /api/v1 (waf-events, geoip-status, l4-ports) need a session cookie, not a token.
@@ -413,6 +420,115 @@ wait_for_https() {
 wait_for_http() {  # wait until an HTTP request to the domain returns a status
   local url="$1" timeout="${2:-30}"
   wait_for "$url to respond" "$timeout" curl -sS --max-time 5 -o /dev/null --cacert "$CA_BUNDLE" "$url"
+}
+
+# ── Rig DNS: dyn.cpm.test ───────────────────────────────────────────────────
+#
+# Records a test sets at run time, served by CoreDNS from a zone file on a volume the runner shares.
+# The zone is rewritten whole with a higher serial, which CoreDNS reloads within a second. A file
+# owns the names it sets and removes them itself.
+
+RIG_ZONE_DIR="${RIG_ZONE_DIR:-/zones}"
+RIG_DNS=172.28.0.5
+COREDNS=172.28.0.6
+DYN_DOMAIN="dyn.$TEST_DOMAIN"
+
+rig_zone_write() {
+  local serial now
+  now=$(date +%s)
+  serial=$(( $(cat "$RIG_ZONE_DIR/serial" 2>/dev/null || echo 0) + 1 ))
+  [ "$serial" -lt "$now" ] && serial=$now
+  printf '%s\n' "$serial" >"$RIG_ZONE_DIR/serial"
+  touch "$RIG_ZONE_DIR/records"
+  {
+    printf '$ORIGIN %s.\n$TTL 1\n' "$DYN_DOMAIN"
+    printf '@ IN SOA ns.%s. admin.%s. %s 60 60 60 1\n' "$DYN_DOMAIN" "$TEST_DOMAIN" "$serial"
+    printf '@ IN NS ns.%s.\nns IN A %s\n' "$DYN_DOMAIN" "$COREDNS"
+    cat "$RIG_ZONE_DIR/records"
+  } >"$RIG_ZONE_DIR/zone.tmp" && mv "$RIG_ZONE_DIR/zone.tmp" "$RIG_ZONE_DIR/db.$DYN_DOMAIN"
+}
+
+rig_dns_answer() { dig +short +norec @"$COREDNS" "$1" "$2" 2>/dev/null; }
+
+# rig_dns_set NAME TYPE VALUE - replaces NAME's records of TYPE; waits until CoreDNS answers.
+rig_dns_set() {
+  local name="${1%.}" type="$2" value="$3"
+  rig_dns_del "$name" "$type" --no-wait
+  printf '%s. IN %s %s\n' "$name" "$type" "$value" >>"$RIG_ZONE_DIR/records"
+  rig_zone_write
+  wait_for "$name $type $value in the rig DNS" 15 \
+    bash -c "dig +short +norec @$COREDNS '$name' '$type' | grep -qxF '$value'"
+}
+
+# rig_dns_del NAME [TYPE] - every record of NAME, or only those of TYPE.
+rig_dns_del() {
+  local name="${1%.}" type="${2:-}" records="$RIG_ZONE_DIR/records"
+  touch "$records"
+  awk -v n="$name." -v t="$type" '!($1 == n && (t == "" || $3 == t))' "$records" \
+    >"$records.tmp" && mv "$records.tmp" "$records"
+  [ "${3:-}" = "--no-wait" ] && return 0
+  rig_zone_write
+  wait_for "$name to leave the rig DNS" 15 \
+    bash -c "[ -z \"\$(dig +short +norec @$COREDNS '$name' '${type:-A}')\" ]"
+}
+
+# ── A second client address ─────────────────────────────────────────────────
+#
+# An alias on the runner's own interface, so an IP rule can be seen admitting one client and not
+# the other. Outside Docker's allocation range in practice: nothing else is given .200.
+
+ALT_CLIENT_IP="${ALT_CLIENT_IP:-172.28.0.200}"
+
+add_client_alias() {
+  local dev
+  ip -o -4 addr show | grep -q " inet $ALT_CLIENT_IP/" && return 0
+  dev=$(ip -o -4 addr show | awk -v ip="$CLIENT_IP" 'index($4, ip "/") == 1 {print $2; exit}')
+  [ -n "$dev" ] && ip addr add "$ALT_CLIENT_IP/24" dev "$dev"
+}
+
+# ── Server actions ──────────────────────────────────────────────────────────
+#
+# server_action PAGE ACTION [--form] [key=value...] -> ACTION_RESULT (JSON), non-zero on a throw.
+# For dashboard flows with no REST route, as the admin's session; see helpers/server_action.py.
+
+ACTION_RESULT=
+
+server_action() {
+  ACTION_RESULT=$(python3 "$(dirname "${BASH_SOURCE[0]}")/helpers/server_action.py" \
+    "$CPM_API" "$STATE_DIR/cookies.txt" "$@" 2>&1)
+}
+
+# ── Mail ────────────────────────────────────────────────────────────────────
+#
+# What mailpit received, through its API. BOX is a server's base URL: $MAILBOX or $MAILBOX_TLS.
+
+MAILBOX="${MAILBOX:-http://mailpit:8025}"
+MAILBOX_TLS="${MAILBOX_TLS:-http://mailpit-tls:8025}"
+
+mail_clear() { curl -sS --max-time 10 -X DELETE "${1:-$MAILBOX}/api/v1/messages" >/dev/null 2>&1; }
+
+# mail_find BOX TO SUBJECT_PART -> the newest matching message's id, empty when there is none
+mail_find() {
+  curl -sS --max-time 10 "$1/api/v1/messages?limit=200" 2>/dev/null | jq -r --arg to "$2" --arg s "$3" \
+    'first(.messages[]? | select(any(.To[]?; .Address == $to) and (.Subject | contains($s)))) | .ID // empty'
+}
+
+_mail_present() { [ -n "$(mail_find "$1" "$2" "$3")" ]; }
+
+# mail_wait BOX TO SUBJECT_PART [TIMEOUT] -> MAIL_ID, and the message as MAIL_JSON
+MAIL_ID=; MAIL_JSON=
+mail_wait() {
+  local box="$1" to="$2" subject="$3" timeout="${4:-30}"
+  MAIL_ID=; MAIL_JSON=
+  wait_for "mail to $to about '$subject'" "$timeout" _mail_present "$box" "$to" "$subject" || return 1
+  MAIL_ID=$(mail_find "$box" "$to" "$subject")
+  MAIL_JSON=$(curl -sS --max-time 10 "$box/api/v1/message/$MAIL_ID" 2>/dev/null)
+  [ -n "$MAIL_JSON" ]
+}
+
+mail_count() {  # mail_count BOX TO -> how many messages TO has received
+  curl -sS --max-time 10 "$1/api/v1/messages?limit=200" 2>/dev/null \
+    | jq -r --arg to "$2" '[.messages[]? | select(any(.To[]?; .Address == $to))] | length'
 }
 
 # ── Misc ────────────────────────────────────────────────────────────────────

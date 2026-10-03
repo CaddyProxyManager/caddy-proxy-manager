@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { l4ProxyHosts } from '../../src/lib/db/schema';
+import { buildL4LoadBalancerHandlerConfig } from '@/src/lib/caddy';
 
 let db: TestDb;
 
@@ -80,36 +81,12 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
       };
       if (host.proxyProtocolVersion) proxyHandler.proxy_protocol = host.proxyProtocolVersion;
 
+      // The real builder, so this cannot drift from what buildL4Servers() emits.
       if (host.meta) {
-        const meta = JSON.parse(host.meta);
-        if (meta.load_balancer?.enabled) {
-          const lb = meta.load_balancer;
-          proxyHandler.load_balancing = {
-            selection_policy: { policy: lb.policy ?? 'random' },
-            ...(lb.try_duration ? { try_duration: lb.try_duration } : {}),
-            ...(lb.try_interval ? { try_interval: lb.try_interval } : {}),
-            ...(lb.retries != null ? { retries: lb.retries } : {}),
-          };
-          const healthChecks: Record<string, unknown> = {};
-          if (lb.active_health_check?.enabled) {
-            const active: Record<string, unknown> = {};
-            if (lb.active_health_check.port != null) active.port = lb.active_health_check.port;
-            if (lb.active_health_check.interval) active.interval = lb.active_health_check.interval;
-            if (lb.active_health_check.timeout) active.timeout = lb.active_health_check.timeout;
-            if (Object.keys(active).length > 0) healthChecks.active = active;
-          }
-          if (lb.passive_health_check?.enabled) {
-            const passive: Record<string, unknown> = {};
-            if (lb.passive_health_check.fail_duration)
-              passive.fail_duration = lb.passive_health_check.fail_duration;
-            if (lb.passive_health_check.max_fails != null)
-              passive.max_fails = lb.passive_health_check.max_fails;
-            if (lb.passive_health_check.unhealthy_latency)
-              passive.unhealthy_latency = lb.passive_health_check.unhealthy_latency;
-            if (Object.keys(passive).length > 0) healthChecks.passive = passive;
-          }
-          if (Object.keys(healthChecks).length > 0) proxyHandler.health_checks = healthChecks;
-        }
+        Object.assign(
+          proxyHandler,
+          buildL4LoadBalancerHandlerConfig(JSON.parse(host.meta).load_balancer, upstreams.length),
+        );
       }
 
       handlers.push(proxyHandler);
@@ -403,10 +380,11 @@ describe('L4 Caddy config generation', () => {
     const config = buildExpectedL4Config(rows)!;
     const route = (config.l4_server_0 as any).routes[0];
     const proxyHandler = route.handle[0];
+    // caddy-l4 names the policy block `selection` and has no `retries`
+    // field (issue #301); a legacy stored `retries` must not be emitted.
     expect(proxyHandler.load_balancing).toEqual({
-      selection_policy: { policy: 'round_robin' },
+      selection: { policy: 'round_robin' },
       try_duration: '5s',
-      retries: 3,
     });
   });
 
@@ -465,11 +443,11 @@ describe('L4 Caddy config generation', () => {
     const config = buildExpectedL4Config(rows)!;
     const route = (config.l4_server_0 as any).routes[0];
     const proxyHandler = route.handle[0];
+    // caddy-l4 passive health checks have no unhealthy_latency (issue #301).
     expect(proxyHandler.health_checks).toEqual({
       passive: {
         fail_duration: '30s',
         max_fails: 5,
-        unhealthy_latency: '2s',
       },
     });
   });

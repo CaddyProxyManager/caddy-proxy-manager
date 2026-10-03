@@ -140,6 +140,17 @@ export async function ingestAnalytics(
   if (!isKind(kind)) {
     throw new AnalyticsIngestError("BAD_REQUEST", "Unknown analytics kind.");
   }
+  // Before the analytics check: the admin notification counts them without ClickHouse.
+  if (kind === "upstream-errors") {
+    const { parseUpstreamErrorRow, recordUpstreamErrors } = await import(
+      "../notifications/upstream-errors"
+    );
+    const valid = rows.map(parseUpstreamErrorRow).filter((row) => row !== null);
+    await recordUpstreamErrors(valid).catch((error: unknown) => {
+      console.error("[notifications] could not count upstream errors:", error);
+    });
+    return { accepted: valid.length, rejected: rows.length - valid.length };
+  }
   if (!(await isAnalyticsEnabled())) {
     throw new AnalyticsIngestError("ANALYTICS_DISABLED", "Analytics are switched off.");
   }

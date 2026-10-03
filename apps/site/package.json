@@ -14,20 +14,20 @@
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",
-    "@astrojs/starlight": "^0.42.4",
-    "@astryxdesign/core": "^0.6.3",
-    "@astryxdesign/theme-neutral": "^0.6.3",
+    "@astrojs/starlight": "^0.42.5",
+    "@astryxdesign/core": "^0.6.5",
+    "@astryxdesign/theme-neutral": "^0.6.5",
     "@catppuccin/starlight": "^2.1.0",
     "@cpm/controller": "workspace:*",
-    "apexcharts": "^7.6.0",
+    "apexcharts": "^7.8.0",
     "astro": "^7.3.5",
-    "lucide-react": "^1.48.0",
+    "lucide-react": "^1.50.0",
     "react": "^19.3.0",
     "react-apexcharts": "^2.1.1",
     "react-dom": "^19.3.0",
     "satteri": "^0.10.5",
-    "sharp": "^0.35.4",
-    "use-intl": "^4.14.7"
+    "sharp": "^0.35.5",
+    "use-intl": "^4.14.9"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -1,9 +1,10 @@
 /**
- * The inverse of unlink-oauth: never without a linked provider or the current password, and
+ * The inverse of unlink-oauth: never without a linked provider or passkey, or the current password, and
  * nothing changes when either check fails.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 import { nextIntlServerMock } from '../helpers/next-intl';
 
@@ -12,18 +13,11 @@ vi.mock('next-intl/server', () => nextIntlServerMock());
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
 
@@ -32,7 +26,7 @@ import { POST } from '@/src/app/api/user/remove-password/route';
 import { auth } from '@/src/lib/auth';
 import { createUser, getUserById } from '../../src/lib/models/user';
 import { hashPassword } from '../../src/lib/password';
-import { accounts } from '../../src/lib/db/schema';
+import { accounts, passkeys } from '../../src/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 const PASSWORD = 'CorrectHorse2026!';
@@ -110,6 +104,25 @@ describe('POST /api/user/remove-password', () => {
     expect(response.status).toBe(400);
     expect(await providersOf(user.id)).toEqual(['credential']);
     expect((await getUserById(user.id))?.passwordHash).not.toBeNull();
+  });
+
+  it('drops the password of an account that signs in with a passkey instead', async () => {
+    const user = await seedUser({ linkProvider: false });
+    await ctx.db.insert(passkeys).values({
+      userId: user.id,
+      publicKey: 'cose',
+      credentialID: `credential-${user.id}`,
+      counter: 0,
+      deviceType: 'multiDevice',
+      backedUp: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(await providersOf(user.id)).toEqual([]);
+    expect((await getUserById(user.id))?.passwordHash).toBeNull();
   });
 
   it('refuses a wrong current password and changes nothing', async () => {

@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createTestDatabase } from '@/tests/helpers/db';
 import { TEST_ENV } from '@/tests/helpers/env';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadConfig } from '@/tests/helpers/config';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { vi } from '@/tests/helpers/vi';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -53,8 +53,7 @@ async function bootWithSelfRegistration({ seedAdmin = false } = {}) {
   resetDbModuleState();
 
   // config.ts snapshots env at load; a stale copy leaves signup disabled.
-  const config = await import(`@/src/lib/config${fresh()}`);
-  vi.mock('@/src/lib/config', () => ({ ...config }));
+  await reloadConfig();
 
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
@@ -62,11 +61,13 @@ async function bootWithSelfRegistration({ seedAdmin = false } = {}) {
   if (seedAdmin) {
     process.env.ADMIN_USERNAME = 'testadmin';
     process.env.ADMIN_PASSWORD = 'TestPassword2026!';
-    const initDb = await import(`@/src/lib/init-db${fresh()}`);
+    const initDb = await import('@/src/lib/init-db');
     await initDb.ensureAdminUser();
   }
 
-  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
+  const authServer = await import('@/src/lib/auth-server');
+  // Or getAuth() hands back the instance built on the previous boot's database.
+  authServer.invalidateProviderCache();
   // betterAuth's instance type is generated from its config; the test tree allows `any`.
   const auth = (await authServer.getAuth()) as any;
   return { auth, db: dbModule.default, schema };

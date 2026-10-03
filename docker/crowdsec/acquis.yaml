@@ -1,0 +1,17 @@
+# What the managed crowdsec container reads, mounted read-only into acquis.d. Caddy's JSON access
+# log, which the controller keeps on while CrowdSec is managed; `caddy` picks the parser.
+filenames:
+  - /logs/access.log
+# Otherwise a log Caddy creates after this starts is never read: only a match at startup is watched.
+force_inotify: true
+labels:
+  type: caddy
+---
+# AppSec always listens, so switching it on in Settings needs no restart. Only the crowdsec
+# network reaches it: Caddy, never an upstream on caddy-network.
+source: appsec
+listen_addr: 0.0.0.0:7422
+appsec_configs:
+  - crowdsecurity/appsec-default
+labels:
+  type: appsec

@@ -30,9 +30,12 @@ const EXTRA_FILE = process.env.E2E_COMPOSE_EXTRA_FILE;
 
 export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE_ARGS;
 
+/** The no-ClickHouse suite's switch (playwright.no-clickhouse.config.ts), for specs that differ. */
+export const ANALYTICS_OFF = process.env.ANALYTICS_ENABLED === 'false';
+
 /**
  * Every profile the stack defines: `down` only touches active profiles, so Caddy (profile
  * `caddy`, started by the agent) would survive and hold its volumes, and the next run's agent
  * would resume a stale pairing and stop Caddy. A profile with no containers is a no-op.
  */
-export const TEARDOWN_PROFILES = 'caddy,clickhouse,tools';
+export const TEARDOWN_PROFILES = 'caddy,clickhouse,crowdsec,tools';

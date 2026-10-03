@@ -16,7 +16,7 @@ import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { FormCard, InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
 import type { EmailSettingsView } from "@/src/lib/email/view";
 import { SMTP_SECURITY_MODES, type SmtpSecurity } from "@/src/lib/email/security";
-import { sendTestEmailAction } from "./actions";
+import { sendTestEmailAction, sendTestNotificationAction } from "./actions";
 import { SKIP_PAGE_SAVE } from "./PageBlocks";
 
 type FormState = { success: boolean; message?: string } | null;
@@ -184,7 +184,11 @@ function TestEmailForm({ ready }: { ready: boolean }) {
   );
 }
 
-export function CertificateAlertsSection({
+/**
+ * Recipients and the certificate alerts, which keep their own form and action, then the delivery
+ * status; the per-event switches are a registry block the caller renders below.
+ */
+export function NotificationsSection({
   email,
   state,
   formAction,
@@ -197,27 +201,16 @@ export function CertificateAlertsSection({
   const format = useFormatter();
   const [days, setDays] = useState(email.alertDays);
   const [recipients, setRecipients] = useState(email.alertRecipients);
+  const { notifications } = email;
 
   return (
     <FormCard>
       <form action={formAction}>
         <VStack gap={3}>
           {state?.message && <StatusAlert message={state.message} success={state.success} />}
-          {email.status !== "ready" && days > 0 && (
+          {email.status !== "ready" && (
             <InfoAlert title={t("alertsNeedEmailTitle")}>{t("alertsNeedEmailBody")}</InfoAlert>
           )}
-          <EnvLabelledField label={t("alertDays")} env={["CERTIFICATE_EXPIRY_ALERT_DAYS"]}>
-            <NumberInput
-              label={t("alertDays")}
-              description={t("alertDaysHelp")}
-              htmlName="alertDays"
-              value={days}
-              onChange={setDays}
-              isIntegerOnly
-              min={0}
-              max={90}
-            />
-          </EnvLabelledField>
           <EnvLabelledField label={t("alertRecipients")} env={["EMAIL_ALERT_RECIPIENTS"]}>
             <TextInput
               {...AUTOFILL_OFF}
@@ -228,6 +221,18 @@ export function CertificateAlertsSection({
               value={recipients}
               onChange={setRecipients}
               placeholder={t("alertRecipientsPlaceholder")}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("alertDays")} env={["CERTIFICATE_EXPIRY_ALERT_DAYS"]}>
+            <NumberInput
+              label={t("alertDays")}
+              description={t("alertDaysHelp")}
+              htmlName="alertDays"
+              value={days}
+              onChange={setDays}
+              isIntegerOnly
+              min={0}
+              max={90}
             />
           </EnvLabelledField>
           {email.alertsCheckedAt ? (
@@ -246,8 +251,82 @@ export function CertificateAlertsSection({
           {email.alertsError && (
             <WarnAlert title={t("alertsFailed", { error: email.alertsError })} />
           )}
+          {notifications.lastSentAt ? (
+            <UtcTooltip value={notifications.lastSentAt}>
+              <Text size="sm" color="secondary">
+                {t("notificationsLastSent", {
+                  when: format.dateTime(
+                    new Date(notifications.lastSentAt),
+                    TIMESTAMP_STYLES.dateTime,
+                  ),
+                })}
+              </Text>
+            </UtcTooltip>
+          ) : (
+            <Text size="sm" color="secondary">
+              {t("notificationsNeverSent")}
+            </Text>
+          )}
+          {notifications.pending > 0 && (
+            <Text size="sm" color="secondary">
+              {t("notificationsPending", { count: notifications.pending })}
+            </Text>
+          )}
+          {notifications.lastError && (
+            <WarnAlert title={t("notificationsFailed", { error: notifications.lastError })} />
+          )}
+          {notifications.lastErrorCode === "noRecipients" && (
+            <WarnAlert title={t("notificationsNoRecipients")} />
+          )}
         </VStack>
       </form>
+      <TestNotificationForm ready={email.status === "ready"} />
     </FormCard>
+  );
+}
+
+/** A warning above the switches, while upstream errors are on with nothing to count them from. */
+export function UpstreamAccessLogWarning({ email }: { email: EmailSettingsView }) {
+  const t = useTranslations("settings.email");
+  const { notifications } = email;
+  if (!notifications.upstreamErrorsOn || notifications.accessLogOn) return null;
+  return (
+    <WarnAlert title={t("upstreamNeedsAccessLogTitle")}>
+      {t("upstreamNeedsAccessLogBody")}
+    </WarnAlert>
+  );
+}
+
+/** Its own form, left out of the page save, like the test email. */
+function TestNotificationForm({ ready }: { ready: boolean }) {
+  const t = useTranslations("settings.email");
+  const [result, setResult] = useState<FormState>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <form
+      {...SKIP_PAGE_SAVE}
+      onSubmit={(event) => {
+        event.preventDefault();
+        setResult(null);
+        startTransition(async () => setResult(await sendTestNotificationAction()));
+      }}
+    >
+      <VStack gap={2}>
+        <HStack gap={2} vAlign="center" wrap="wrap">
+          <Button
+            type="submit"
+            variant="secondary"
+            label={pending ? t("testSending") : t("testNotification")}
+            isLoading={pending}
+            isDisabled={!ready || pending}
+          />
+          <Text size="sm" color="secondary">
+            {ready ? t("testNotificationHelp") : t("testNeedsSave")}
+          </Text>
+        </HStack>
+        {result?.message && <StatusAlert message={result.message} success={result.success} />}
+      </VStack>
+    </form>
   );
 }

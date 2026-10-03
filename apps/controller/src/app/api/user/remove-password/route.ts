@@ -6,10 +6,11 @@ import { getUserById, listUserOAuthProviders, removeUserPassword } from "@/src/l
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { verifyPassword } from "@/src/lib/password";
+import { countUserPasskeys } from "@/src/lib/passkeys";
 
 /**
- * The inverse of unlink-oauth: refuses to leave the account without a provider. Asks for the
- * current password, so a borrowed session cannot lock the owner out.
+ * The inverse of unlink-oauth: refuses to leave the account without a provider or a passkey. Asks
+ * for the current password, so a borrowed session cannot lock the owner out.
  */
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -51,8 +52,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("profile.noPasswordToRemove") }, { status: 400 });
     }
 
-    const providers = await listUserOAuthProviders(userId);
-    if (providers.length === 0) {
+    const [providers, passkeyCount] = await Promise.all([
+      listUserOAuthProviders(userId),
+      countUserPasskeys(userId),
+    ]);
+    if (providers.length === 0 && passkeyCount === 0) {
       return NextResponse.json(
         { error: t("profile.linkProviderBeforeRemovingPassword") },
         { status: 400 },
@@ -72,13 +76,21 @@ export async function POST(request: NextRequest) {
 
     await removeUserPassword(userId);
 
+    // "passkey" reads as one more provider id in the summary the audit log parses back.
+    const methods = [
+      ...providers.map((p) => p.providerId),
+      ...(passkeyCount > 0 ? ["passkey"] : []),
+    ];
     await createAuditEvent({
       userId,
       action: "password_removed",
       entityType: "user",
       entityId: userId,
-      summary: `User removed their password; signs in with ${providers.map((p) => p.providerId).join(", ")}`,
-      data: JSON.stringify({ providers: providers.map((p) => p.providerId) }),
+      summary: `User removed their password; signs in with ${methods.join(", ")}`,
+      data: JSON.stringify({
+        providers: providers.map((p) => p.providerId),
+        passkeys: passkeyCount,
+      }),
     });
 
     return NextResponse.json({ success: true });

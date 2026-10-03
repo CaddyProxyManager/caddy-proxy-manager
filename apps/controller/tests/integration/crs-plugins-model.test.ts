@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '../helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '../helpers/db';
 import { crsPlugins, proxyHosts, users } from '../../src/lib/db/schema';
 import { DomainError } from '../../src/lib/domain-error';
 import { FAKE_BOT, WORDPRESS, fakeGithub } from '../helpers/fake-github';
@@ -15,11 +16,7 @@ let globalWaf: { plugin_ids?: number[] } | null = null;
 // The registry settings and the sync state are settings rows; a map stands in for the table.
 const settingsStore = new Map<string, unknown>();
 
-vi.mock('../../src/lib/db', () => ({
-  default: currentDb(() => db),
-  nowIso: () => new Date().toISOString(),
-  toIso: (v: string | null) => v,
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => db));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 const applyCaddyConfig = vi.fn(async () => {});
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));

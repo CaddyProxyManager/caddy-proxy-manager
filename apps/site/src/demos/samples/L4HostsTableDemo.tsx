@@ -20,7 +20,10 @@ type Row = {
   status: "active" | "inactive" | "warning";
 };
 
-/** One of each thing the page can show: a plain port, an SNI split, and a port pending a recreate. */
+/**
+ * One of each thing the page can show: a plain port, an SNI split, a port range, and a port
+ * pending a recreate.
+ */
 const HOSTS: Row[] = [
   {
     id: 1,
@@ -57,6 +60,15 @@ const HOSTS: Row[] = [
     upstream: "wg:51820",
     notes: null,
     status: "warning",
+  },
+  {
+    id: 5,
+    name: "game servers",
+    listen: "27015-27030/udp",
+    matcher: "-",
+    upstream: "srcds on the listen port",
+    notes: null,
+    status: "active",
   },
 ];
 

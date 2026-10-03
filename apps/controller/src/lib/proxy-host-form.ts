@@ -28,9 +28,18 @@ import {
 import {
   normalizeWafPluginIds,
   normalizeWafPresetIds,
+  parseWafIdListJson,
   parseBodyLimitMib,
 } from "@/src/lib/caddy-waf";
 import { type HostCacheConfig, hydrateHostCache, sanitizeHostCache } from "@/src/lib/host-cache";
+import { type HostCompressionMode, sanitizeHostCompression } from "@/src/lib/host-compression";
+import type { HostMaintenanceConfig } from "@/src/lib/host-maintenance";
+import {
+  type HostUpstreamTimeoutsConfig,
+  UPSTREAM_TIMEOUT_KEYS,
+} from "@/src/lib/host-upstream-timeouts";
+import type { HostRateLimitConfig } from "@/src/lib/host-rate-limit";
+import type { HostAnubisConfig } from "@/src/lib/host-anubis";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
@@ -493,14 +502,18 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
       : "";
   const rawExcl = formData.get("wafExcludedRuleIds");
   const excluded_rule_ids: number[] = rawExcl
-    ? (JSON.parse(rawExcl as string) as unknown[]).filter(
+    ? parseWafIdListJson(rawExcl as string).filter(
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       )
     : [];
   const rawPresets = formData.get("wafPresetIds");
-  const preset_ids = rawPresets ? normalizeWafPresetIds(JSON.parse(rawPresets as string)) : [];
+  const preset_ids = rawPresets
+    ? normalizeWafPresetIds(parseWafIdListJson(rawPresets as string))
+    : [];
   const rawPlugins = formData.get("wafPluginIds");
-  const plugin_ids = rawPlugins ? normalizeWafPluginIds(JSON.parse(rawPlugins as string)) : [];
+  const plugin_ids = rawPlugins
+    ? normalizeWafPluginIds(parseWafIdListJson(rawPlugins as string))
+    : [];
 
   if (!enabled) {
     return { waf: { enabled: false, waf_mode: wafMode } };
@@ -662,6 +675,84 @@ export function parseCacheConfig(formData: FormData): HostCacheConfig | null | u
   );
 }
 
+/** Undefined without the field, so a form that does not render it leaves the host's choice. */
+export function parseCompressionMode(formData: FormData): HostCompressionMode | undefined {
+  return formData.has("compression")
+    ? sanitizeHostCompression(formData.get("compression"))
+    : undefined;
+}
+
+/** Undefined without the card. Ranges are checked by the model, which names the bad one. */
+export function parseMaintenanceConfig(
+  formData: FormData,
+): Partial<HostMaintenanceConfig> | undefined {
+  if (!formData.has("maintenancePresent")) return undefined;
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : "";
+  };
+  return {
+    enabled: parseCheckbox(formData.get("maintenanceEnabled")),
+    retryAfter: text("maintenanceRetryAfter").trim() ? Number(text("maintenanceRetryAfter")) : null,
+    bypassCidrs: text("maintenanceBypass")
+      .split(/[\s,]+/)
+      .filter(Boolean),
+    body: text("maintenanceBody").replace(/\r\n?/g, "\n") || null,
+  };
+}
+
+/** Undefined without the card, null with it switched off. Durations are checked by the model. */
+export function parseUpstreamTimeoutsConfig(
+  formData: FormData,
+): Partial<HostUpstreamTimeoutsConfig> | null | undefined {
+  if (!formData.has("upstreamTimeoutsPresent")) return undefined;
+  if (!parseCheckbox(formData.get("upstreamTimeoutsEnabled"))) return null;
+  return Object.fromEntries(
+    UPSTREAM_TIMEOUT_KEYS.map((key) => [
+      key,
+      parseOptionalText(formData.get(`upstreamTimeouts.${key}`)),
+    ]),
+  );
+}
+
+/** Undefined without the card. Zones are kept while it is off, and checked by the model. */
+export function parseRateLimitConfig(formData: FormData): HostRateLimitConfig | undefined {
+  if (!formData.has("rateLimitPresent")) return undefined;
+  const raw = formData.get("rateLimitZonesJson");
+  let zones: unknown = [];
+  try {
+    zones = typeof raw === "string" && raw ? JSON.parse(raw) : [];
+  } catch {
+    zones = [];
+  }
+  return {
+    enabled: parseCheckbox(formData.get("rateLimitEnabled")),
+    zones: (Array.isArray(zones) ? zones : []) as HostRateLimitConfig["zones"],
+  };
+}
+
+/** Undefined without the card, so a form that does not render it leaves the host's choice. */
+/** Undefined without the card. Kept while off; the model checks the URL and the paths. */
+export function parseAnubisConfig(formData: FormData): Partial<HostAnubisConfig> | undefined {
+  if (!formData.has("anubisPresent")) return undefined;
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  return {
+    enabled: parseCheckbox(formData.get("anubisEnabled")),
+    upstream: text("anubisUpstream") || null,
+    exemptPaths: text("anubisExemptPaths")
+      .split(/[\s,]+/)
+      .filter(Boolean),
+  };
+}
+
+export function parseCrowdSecEnabled(formData: FormData): boolean | undefined {
+  if (!formData.has("crowdsecPresent")) return undefined;
+  return parseCheckbox(formData.get("crowdsecEnabled"));
+}
+
 export function parsePathAllowsConfig(formData: FormData): PathAllowRule[] | null {
   const raw = formData.get("pathAllowsJson");
   if (!raw || typeof raw !== "string") return null;
@@ -761,6 +852,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     allowWebsocket: boolField("allowWebsocket"),
     preserveHostHeader: boolField("preserveHostHeader"),
     skipHttpsHostnameValidation: boolField("skipHttpsHostnameValidation"),
+    discourageIndexing: boolField("discourageIndexing"),
     customPreHandlersJson: formData.has("customPreHandlersJson")
       ? parseOptionalText(formData.get("customPreHandlersJson"))
       : undefined,
@@ -777,12 +869,19 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     loadBalancer: parseLoadBalancerConfig(formData),
     dnsResolver: parseDnsResolverConfig(formData),
     upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),
-    ...parseGeoBlockConfig(formData),
+    // parseGeoBlockConfig reads no section as "no rules", which is creation's default, not an edit.
+    ...(formData.has("geoblockPresent") ? parseGeoBlockConfig(formData) : {}),
     ...parseWafConfig(formData),
     mtls: formData.has("mtlsPresent") ? parseMtlsConfig(formData) : undefined,
     redirects: formData.has("redirectsJson") ? parseRedirectsConfig(formData) : undefined,
     rewrite: formData.has("rewritePathPrefix") ? parseRewriteConfig(formData) : undefined,
     cache: parseCacheConfig(formData),
+    compression: parseCompressionMode(formData),
+    maintenance: parseMaintenanceConfig(formData),
+    upstreamTimeouts: parseUpstreamTimeoutsConfig(formData),
+    rateLimit: parseRateLimitConfig(formData),
+    crowdsec: parseCrowdSecEnabled(formData),
+    anubis: parseAnubisConfig(formData),
     locationRules: formData.has("locationRulesJson")
       ? parseLocationRulesConfig(formData)
       : undefined,

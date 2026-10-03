@@ -8,7 +8,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { type AgentConfig, loadConfig } from "../src/config";
 import { AgentStore } from "../src/db";
-import { DockerHost, renderCaddyBuildOverride, renderL4PortsOverride } from "../src/docker";
+import {
+  DockerHost,
+  managedServicesEnvFingerprint,
+  renderCaddyBuildOverride,
+  renderL4PortsOverride,
+} from "../src/docker";
 import { Operations } from "../src/operations";
 
 let dir: string;
@@ -350,6 +355,11 @@ describe("published ports", () => {
     expect(await new DockerHost(config).publishedCaddyPorts()).toEqual(["443:443", "53:53/udp"]);
   });
 
+  it("reads the container's configured bindings, which a stopped Caddy still has", async () => {
+    await new DockerHost(config).publishedCaddyPorts();
+    expect(spawned.at(-1)).toContain("{{json .HostConfig.PortBindings}}");
+  });
+
   it("reports nothing rather than throwing when the container is gone", async () => {
     results.push({ exitCode: 1, stdout: "" });
     expect(await new DockerHost(config).publishedCaddyPorts()).toEqual([]);
@@ -466,14 +476,71 @@ describe("operations", () => {
     expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
   });
 
-  it("adopts what Docker publishes when it has never applied anything", async () => {
-    // Re-applying an empty list would unpublish ports this agent never published.
+  it("does nothing at startup when Caddy publishes the base ports beside the applied ones", async () => {
+    // 80 and 443 come from docker-compose.yml, never from an apply.
+    store.setAppliedL4Ports(["15432:15432"]);
+    results.push({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        "80/tcp": [{ HostIp: "", HostPort: "80" }],
+        "443/udp": [{ HostIp: "", HostPort: "443" }],
+        "15432/tcp": [{ HostIp: "", HostPort: "15432" }],
+      }),
+    });
+
+    await operations.restorePublishedPorts();
+    await Bun.sleep(50);
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
+  });
+
+  it("matches a recorded range against Docker listing it port by port", async () => {
+    // Compared as written, every agent start would recreate Caddy and drop every connection.
+    store.setAppliedL4Ports(["5000-5002:5000-5002/udp", "80:80"]);
+    results.push({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        "80/tcp": [{ HostIp: "0.0.0.0", HostPort: "80" }],
+        "5000/udp": [
+          { HostIp: "0.0.0.0", HostPort: "5000" },
+          { HostIp: "::", HostPort: "5000" },
+        ],
+        "5001/udp": [{ HostPort: "5001" }],
+        "5002/udp": [{ HostPort: "5002" }],
+      }),
+    });
+
+    await operations.restorePublishedPorts();
+    await Bun.sleep(50);
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
+  });
+
+  it("republishes a range Docker publishes only part of", async () => {
+    store.setAppliedL4Ports(["5000-5002:5000-5002"]);
+    results.push({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        "5000/tcp": [{ HostPort: "5000" }],
+        "5001/tcp": [{ HostPort: "5001" }],
+      }),
+    });
+
+    await operations.restorePublishedPorts();
+    await Bun.sleep(100);
+
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(true);
+    expect(readFileSync(join(dir, "docker-compose.l4-ports.yml"), "utf-8")).toContain(
+      '"5000-5002:5000-5002"',
+    );
+  });
+
+  it("records nothing when it has never applied anything", async () => {
+    // Adopting Docker's 80 and 443 made the first desired state recreate Caddy to drop them.
     results.push({ exitCode: 0, stdout: JSON.stringify({ "443/tcp": [{ HostPort: "443" }] }) });
 
     await operations.restorePublishedPorts();
     await Bun.sleep(50);
 
-    expect(store.appliedL4Ports()).toEqual(["443:443"]);
+    expect(store.appliedL4Ports()).toEqual([]);
     expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
   });
 });
@@ -574,7 +641,7 @@ describe("optional services", () => {
     expect(composeCalls.some((c) => c.includes("--profile clickhouse") && c.includes(" up "))).toBe(
       true,
     );
-    expect(store.appliedManagedServices()).toEqual({ clickhouse: true });
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: true, crowdsec: false });
   });
 
   it("stops what was not asked for", async () => {
@@ -585,7 +652,7 @@ describe("optional services", () => {
     expect(
       composeCalls.some((c) => c.includes("--profile clickhouse") && c.includes(" stop ")),
     ).toBe(true);
-    expect(store.appliedManagedServices()).toEqual({ clickhouse: false });
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
   });
 
   it("leaves alone a service it no longer manages", async () => {
@@ -610,7 +677,72 @@ describe("optional services", () => {
     const status = store.managedServicesStatus();
     expect(status.state).toBe("failed");
     expect(status.message).toContain("clickhouse");
-    expect(store.appliedManagedServices()).toEqual({ clickhouse: false });
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
+  });
+
+  it("starts crowdsec under its own profile, with the bouncer key in the child's environment", async () => {
+    const calls: Array<{ argv: string[]; env?: Record<string, string> }> = [];
+    (Bun as { spawn: unknown }).spawn = ((
+      argv: string[],
+      opts: { env?: Record<string, string> },
+    ) => {
+      spawned.push(argv);
+      if (argv[1] === "compose") calls.push({ argv, env: opts.env });
+      return {
+        stdout: new Response("").body,
+        stderr: new Response("").body,
+        exited: Promise.resolve(0),
+      };
+    }) as unknown as typeof Bun.spawn;
+
+    operations.applyManagedServices({
+      services: { crowdsec: true },
+      env: { CROWDSEC_BOUNCER_KEY: "k".repeat(64), CROWDSEC_DISABLE_ONLINE_API: "true" },
+    });
+    await settle();
+
+    const up = calls.find((c) => c.argv.includes("up"));
+    expect(up?.argv[up.argv.indexOf("--profile") + 1]).toBe("crowdsec");
+    expect(up?.argv.at(-1)).toBe("crowdsec");
+    expect(up?.env?.CROWDSEC_BOUNCER_KEY).toBe("k".repeat(64));
+    expect(up?.env?.CROWDSEC_DISABLE_ONLINE_API).toBe("true");
+    // The key is never an argument, where `ps` would show it.
+    expect(calls.some((c) => c.argv.join(" ").includes("k".repeat(64)))).toBe(false);
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: true });
+  });
+
+  it("reads stopping a service an older compose file lacks as stopped", async () => {
+    results.push({ exitCode: 0, stdout: "proj" }); // project detection
+    results.push({ exitCode: 0 }); // clickhouse stop
+    results.push({ exitCode: 1, stdout: "no such service: crowdsec" }); // crowdsec stop
+
+    operations.applyManagedServices({ services: {}, env: {} });
+    await settle();
+
+    expect(store.managedServicesStatus().state).toBe("applied");
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
+  });
+
+  it("still fails starting a service an older compose file lacks", async () => {
+    results.push({ exitCode: 0, stdout: "proj" });
+    results.push({ exitCode: 0 });
+    results.push({ exitCode: 1, stdout: "no such service: crowdsec" });
+
+    operations.applyManagedServices({ services: { crowdsec: true }, env: {} });
+    await settle();
+
+    expect(store.managedServicesStatus().state).toBe("failed");
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
+  });
+
+  it("records a digest of what it was given, never the values", async () => {
+    const env = { CROWDSEC_BOUNCER_KEY: "secret-bouncer-key" };
+    operations.applyManagedServices({ services: {}, env });
+    await settle();
+
+    expect(store.appliedManagedServicesEnv()).toBe(managedServicesEnvFingerprint(env));
+    expect(store.appliedManagedServicesEnv()).not.toContain("secret-bouncer-key");
+    expect(managedServicesEnvFingerprint(env)).not.toBe(managedServicesEnvFingerprint({}));
   });
 
   it("refuses to run alongside a rebuild", async () => {

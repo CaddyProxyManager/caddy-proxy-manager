@@ -10,6 +10,7 @@ import { StatTiles } from "@/components/ui/StatTiles";
 import type {
   AcmeHost,
   CaCertificateView,
+  CertificateFileAgent,
   CertExpiryStatus,
   ImportedCertView,
   ManagedCertView,
@@ -35,6 +36,7 @@ type Props = {
   healthyAcmeTotal: number;
   mtlsRoles: MtlsRole[];
   issuedClientCerts: IssuedClientCertificate[];
+  fileAgents: CertificateFileAgent[];
 };
 
 export default function CertificatesClient({
@@ -46,6 +48,7 @@ export default function CertificatesClient({
   healthyAcmeTotal,
   mtlsRoles,
   issuedClientCerts,
+  fileAgents,
 }: Props) {
   const t = useTranslations("certificates");
   const [activeTab, setActiveTab] = useState<TabId>("acme");
@@ -197,6 +200,7 @@ export default function CertificatesClient({
             managedCerts={managedCerts}
             search={searchImported}
             statusFilter={statusFilter}
+            fileAgents={fileAgents}
           />
         )}
         {activeTab === "ca" && (

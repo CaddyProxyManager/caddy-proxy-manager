@@ -78,6 +78,8 @@ function chConfig(): Promise<ClickHouseConfig> {
  */
 export async function invalidateClickHouseConfig(): Promise<void> {
   configPromise = null;
+  // The database, retention or the server itself may have changed; the next insert re-checks.
+  schemaPromise = null;
   try {
     await closeClickHouse();
   } catch (error) {
@@ -296,7 +298,47 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
   }
 }
 
-export async function initClickHouse(): Promise<void> {
+/**
+ * Settled once per config, and forgotten on failure: the bundled agent starts ClickHouse after the
+ * controller has booted, so the first attempt usually finds nothing listening.
+ */
+let schemaPromise: Promise<void> | null = null;
+
+function ensureSchema(): Promise<void> {
+  if (!schemaPromise) {
+    const pending = createSchema();
+    schemaPromise = pending;
+    pending.catch(() => {
+      if (schemaPromise === pending) schemaPromise = null;
+    });
+  }
+  return schemaPromise;
+}
+
+/** Code 60 and 81: tables or database gone under a live controller, e.g. a wiped volume. */
+function isMissingSchema(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "60" || code === "81";
+}
+
+/** Runs `op`, and once more after recreating the schema if ClickHouse says it is missing. */
+async function withSchema<T>(op: (ch: ClickHouseClient) => Promise<T>): Promise<T> {
+  try {
+    return await op(await getClient());
+  } catch (error) {
+    if (!isMissingSchema(error)) throw error;
+    schemaPromise = null;
+    await ensureSchema();
+    return op(await getClient());
+  }
+}
+
+/** Called at startup; a failure there is retried by the next insert rather than a restart. */
+export function initClickHouse(): Promise<void> {
+  return ensureSchema();
+}
+
+async function createSchema(): Promise<void> {
   const { enabled, database, retentionDays, sqlite } = await chConfig();
   if (!enabled) {
     console.log("ClickHouse analytics disabled");
@@ -379,14 +421,14 @@ export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = "")
     );
     return;
   }
-  const ch = await getClient();
+  await ensureSchema();
   const values = rows.map((r) => ({
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     is_blocked: r.is_blocked ? 1 : 0,
     agent_id: agentId,
   }));
-  await ch.insert({ table: "traffic_events", values, format: "JSONEachRow" });
+  await withSchema((ch) => ch.insert({ table: "traffic_events", values, format: "JSONEachRow" }));
 }
 
 export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promise<void> {
@@ -398,14 +440,14 @@ export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promis
     );
     return;
   }
-  const ch = await getClient();
+  await ensureSchema();
   const values = rows.map((r) => ({
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     blocked: r.blocked ? 1 : 0,
     agent_id: agentId,
   }));
-  await ch.insert({ table: "waf_events", values, format: "JSONEachRow" });
+  await withSchema((ch) => ch.insert({ table: "waf_events", values, format: "JSONEachRow" }));
 }
 
 // ── Parameterized query helpers ─────────────────────────────────────────────
@@ -506,9 +548,10 @@ function safeUint(n: number): number {
 async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
   if (!(await isAnalyticsEnabled())) return [];
   if ((await chConfig()).sqlite) return sqliteStore.querySqliteStore<T>(query, query_params);
-  const ch = await getClient();
-  const result = await ch.query({ query, query_params, format: "JSONEachRow" });
-  return result.json<T>();
+  return withSchema(async (ch) => {
+    const result = await ch.query({ query, query_params, format: "JSONEachRow" });
+    return result.json<T>();
+  });
 }
 
 async function queryRow<T>(query: string, query_params?: QueryParams): Promise<T | null> {

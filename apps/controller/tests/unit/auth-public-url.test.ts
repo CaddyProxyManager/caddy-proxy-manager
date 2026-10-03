@@ -4,28 +4,18 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 // Imported above the mock factory, which Bun evaluates synchronously while linking.
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: a Bun mock factory must be synchronous.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  db: ctx.db,
-  client: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null => {
-    if (!value) return null;
-    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-  },
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 // `betterAuth` hands back its options, so getAuth().options is the config createAuth() built.
 vi.mock('better-auth', () => ({

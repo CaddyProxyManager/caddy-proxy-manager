@@ -4,27 +4,17 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
@@ -36,6 +26,7 @@ import {
   getProxyHost,
   type ProxyHostInput,
 } from '../../src/lib/models/proxy-hosts';
+import { parseProxyHostOptionUpdates } from '../../src/lib/proxy-host-form';
 import * as schema from '../../src/lib/db/schema';
 
 const baseGeoblock = {
@@ -142,5 +133,25 @@ describe('proxy host geoblockMode persistence', () => {
 
     await updateProxyHost(host.id, { geoblockMode: 'merge' }, 1);
     expect((await getProxyHost(host.id))?.geoblockMode).toBe('merge');
+  });
+
+  it('keeps the rules and mode through an update form without the geoblock section', async () => {
+    const host = await createProxyHost(
+      {
+        name: 'partial-host',
+        domains: ['partial.example.com'],
+        upstreams: ['10.0.0.5:8080'],
+        geoblock: baseGeoblock,
+        geoblockMode: 'override',
+      },
+      1,
+    );
+    const form = new FormData();
+    form.set('sslForcedPresent', '1');
+    await updateProxyHost(host.id, parseProxyHostOptionUpdates(form), 1);
+
+    const fetched = await getProxyHost(host.id);
+    expect(fetched?.geoblock).toEqual(baseGeoblock);
+    expect(fetched?.geoblockMode).toBe('override');
   });
 });

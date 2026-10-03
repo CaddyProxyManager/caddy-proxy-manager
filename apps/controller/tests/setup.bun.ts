@@ -36,6 +36,9 @@ afterEach(async () => {
  * Only `auth` is replaced: Bun links eagerly, so a missing name is a SyntaxError at import, and the
  * real same-origin and role guards stay under test.
  */
+// Loading auth loads the app's own db module. Left unmigrated, a query that misses a test's db
+// mock fails loudly instead of landing in a database the whole run shares.
+(globalThis as { __MIGRATIONS_RAN__?: boolean }).__MIGRATIONS_RAN__ = true;
 const actualAuth = await import('@/src/lib/auth');
 
 vi.mock('@/src/lib/auth', () => ({

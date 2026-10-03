@@ -21,12 +21,16 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { AuthentikFields } from "./AuthentikFields";
 import { ForwardAuthFields } from "./ForwardAuthFields";
 import { DnsResolverFields } from "./DnsResolverFields";
+import { UpstreamTimeoutsFields } from "./UpstreamTimeoutsFields";
 import { LoadBalancerFields } from "./LoadBalancerFields";
 import { SettingsToggles } from "./SettingsToggles";
 import { UpstreamDnsResolutionFields } from "./UpstreamDnsResolutionFields";
 import { UpstreamInput } from "./UpstreamInput";
 import { GeoBlockFields } from "./GeoBlockFields";
 import { WafFields } from "./WafFields";
+import { RateLimitFields } from "./RateLimitFields";
+import { AnubisFields } from "./AnubisFields";
+import { CrowdSecFields } from "./CrowdSecFields";
 import { MtlsFields } from "./MtlsConfig";
 import { CpmForwardAuthFields } from "./CpmForwardAuthFields";
 import { TailscaleFields, type TailscaleHostDefaults } from "./TailscaleFields";
@@ -39,6 +43,7 @@ import { PathRewritesFields } from "./PathRewritesFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
 import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import { CacheFields } from "./CacheFields";
+import { MaintenanceFields } from "./MaintenanceFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
@@ -176,6 +181,8 @@ export function CreateHostDialog({
             allowWebsocket={initialData?.allowWebsocket}
             preserveHostHeader={initialData?.preserveHostHeader}
             skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
+            compression={initialData?.compression}
+            discourageIndexing={initialData?.discourageIndexing}
             enabled={true}
           />
           <TextInput
@@ -223,6 +230,7 @@ export function CreateHostDialog({
           <PathRewritesFields initialData={initialData?.pathRewrites} />
           <ErrorPagesFields initialData={initialData?.errorPages} />
           <CacheFields cache={initialData?.cache} />
+          <MaintenanceFields maintenance={initialData?.maintenance} />
           <AdvancedConfigFields host={initialData} />
           <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
           <ForwardAuthFields
@@ -237,8 +245,12 @@ export function CreateHostDialog({
           <TailscaleFields tailscale={initialData?.tailscale} defaults={tailscaleDefaults} />
           <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
           <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
+          <UpstreamTimeoutsFields upstreamTimeouts={initialData?.upstreamTimeouts} />
           <UpstreamDnsResolutionFields upstreamDnsResolution={initialData?.upstreamDnsResolution} />
+          <RateLimitFields rateLimit={initialData?.rateLimit} />
           <GeoBlockFields />
+          <CrowdSecFields enabled={initialData?.crowdsec} />
+          <AnubisFields anubis={initialData?.anubis} />
           <WafFields value={initialData?.waf} />
           <MtlsFields
             value={initialData?.mtls}
@@ -326,6 +338,8 @@ export function EditHostDialog({
             allowWebsocket={host.allowWebsocket}
             preserveHostHeader={host.preserveHostHeader}
             skipHttpsValidation={host.skipHttpsHostnameValidation}
+            compression={host.compression}
+            discourageIndexing={host.discourageIndexing}
             enabled={host.enabled}
           />
           <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
@@ -364,6 +378,7 @@ export function EditHostDialog({
           <PathRewritesFields initialData={host.pathRewrites} />
           <ErrorPagesFields initialData={host.errorPages} />
           <CacheFields cache={host.cache} />
+          <MaintenanceFields maintenance={host.maintenance} />
           {canEditRawConfig && <AdvancedConfigFields host={host} />}
           <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
           <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />
@@ -376,13 +391,17 @@ export function EditHostDialog({
           <TailscaleFields tailscale={host.tailscale} defaults={tailscaleDefaults} />
           <LoadBalancerFields loadBalancer={host.loadBalancer} />
           <DnsResolverFields dnsResolver={host.dnsResolver} />
+          <UpstreamTimeoutsFields upstreamTimeouts={host.upstreamTimeouts} />
           <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
+          <RateLimitFields rateLimit={host.rateLimit} />
           <GeoBlockFields
             initialValues={{
               geoblock: host.geoblock,
               geoblock_mode: host.geoblockMode,
             }}
           />
+          <CrowdSecFields enabled={host.crowdsec} />
+          <AnubisFields anubis={host.anubis} />
           <WafFields value={host.waf} />
           <MtlsFields
             value={host.mtls}

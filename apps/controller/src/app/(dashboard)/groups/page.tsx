@@ -5,6 +5,7 @@ import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { listL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgents } from "@/src/lib/models/agents";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { listLdapDirectories } from "@/src/lib/models/ldap-directories";
 import { listAllGrants } from "@/src/lib/models/group-grants";
 import { listAllMappings } from "@/src/lib/models/group-idp-mappings";
 import type { GroupAccess } from "@/components/groups/GroupAccessDialog";
@@ -19,17 +20,28 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function GroupsPage() {
   await requireAdmin();
-  const [allGroups, allUsers, proxyHosts, l4Hosts, agents, providers, grants, mappings] =
-    await Promise.all([
-      listGroups(),
-      listUsers(),
-      listProxyHosts(),
-      listL4ProxyHosts(),
-      listAgents(),
-      listOAuthProviders(),
-      listAllGrants(),
-      listAllMappings(),
-    ]);
+  const [
+    allGroups,
+    allUsers,
+    proxyHosts,
+    l4Hosts,
+    agents,
+    providers,
+    directories,
+    grants,
+    mappings,
+  ] = await Promise.all([
+    listGroups(),
+    listUsers(),
+    listProxyHosts(),
+    listL4ProxyHosts(),
+    listAgents(),
+    listOAuthProviders(),
+    // A directory's groups map to CPM groups the same way a provider's claim does.
+    listLdapDirectories(),
+    listAllGrants(),
+    listAllMappings(),
+  ]);
 
   const userList = allUsers.map((u) => ({
     id: u.id,
@@ -65,7 +77,7 @@ export default async function GroupsPage() {
     <GroupsClient
       groups={allGroups}
       users={userList}
-      providers={providers.map((p) => ({ id: p.id, name: p.name }))}
+      providers={[...providers, ...directories].map((p) => ({ id: p.id, name: p.name }))}
       proxyHosts={proxyHosts.map((h) => ({ id: h.id, name: h.name }))}
       l4ProxyHosts={l4Hosts.map((h) => ({ id: h.id, name: h.name }))}
       agents={agents.map((a) => ({ id: a.id, name: a.name }))}

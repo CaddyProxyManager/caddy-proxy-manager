@@ -16,16 +16,8 @@ const DISALLOWED_ADMIN_PASSWORDS: ReadonlySet<string> = new Set([
   "YourStr0ng-P@ssw0rd!",
   "Your-Str0ng-P@ssw0rd!",
 ]);
-const DEFAULT_CADDY_URL =
-  process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
 const MIN_SESSION_SECRET_LENGTH = 32;
 const DEFAULT_APP_NAME = "Caddy Proxy Manager";
-
-/**
- * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out
- * with `title: { absolute: ... }` - see app/layout.tsx.
- */
-const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
 function resolveLegacyPasswordChangeEnv(): boolean | null {
   const raw = process.env.AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH?.trim().toLowerCase();
@@ -40,18 +32,36 @@ function resolveGravatarEnv(): boolean | null {
   return raw !== "false" && raw !== "0" && raw !== "no";
 }
 
-/** OIDC-only mode: no local accounts, no bootstrap admin, no credential sign-in. */
-const LOCAL_USERS_DISABLED = process.env.AUTH_DISABLE_LOCAL_USERS === "true";
+type Runtime = {
+  /** OIDC-only mode: no local accounts, no bootstrap admin, no credential sign-in. */
+  localUsersDisabled: boolean;
+  isProduction: boolean;
+  isNodeRuntime: boolean;
+  isDevelopment: boolean;
+  isRuntimeProduction: boolean;
+};
 
-const isProduction = process.env.NODE_ENV === "production";
-const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
-const isDevelopment = process.env.NODE_ENV === "development";
-const isBuildPhase =
-  process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
-// Any NODE_ENV but development, so "staging" or a typo does not skip the checks.
-const isRuntimeProduction = !isDevelopment && isNodeRuntime && !isBuildPhase;
+function readRuntime(): Runtime {
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
+  const isBuildPhase =
+    process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
+  return {
+    localUsersDisabled: process.env.AUTH_DISABLE_LOCAL_USERS === "true",
+    isProduction: process.env.NODE_ENV === "production",
+    isNodeRuntime,
+    isDevelopment,
+    // Any NODE_ENV but development, so "staging" or a typo does not skip the checks.
+    isRuntimeProduction: !isDevelopment && isNodeRuntime && !isBuildPhase,
+  };
+}
 
-function resolveSessionSecret(): string {
+function resolveSessionSecret({
+  isDevelopment,
+  isProduction,
+  isNodeRuntime,
+  isRuntimeProduction,
+}: Runtime): string {
   const rawSecret = process.env.SESSION_SECRET ?? null;
   const secret = rawSecret?.trim();
 
@@ -105,8 +115,11 @@ function resolveSessionSecret(): string {
  * rather than failing. Present ones must still be good: a weak ADMIN_PASSWORD silently produces a
  * reachable account, which is worse than no seed.
  */
-function resolveAdminCredentials(): { username: string | null; password: string | null } {
-  if (LOCAL_USERS_DISABLED) {
+function resolveAdminCredentials({ localUsersDisabled, isRuntimeProduction }: Runtime): {
+  username: string | null;
+  password: string | null;
+} {
+  if (localUsersDisabled) {
     return { username: null, password: null };
   }
 
@@ -145,23 +158,6 @@ function resolveAdminCredentials(): { username: string | null; password: string 
   return { username, password };
 }
 
-let _adminCredentials: { username: string | null; password: string | null } | null = null;
-let _sessionSecret: string | null = null;
-
-function getAdminCredentials() {
-  if (!_adminCredentials) {
-    _adminCredentials = resolveAdminCredentials();
-  }
-  return _adminCredentials;
-}
-
-function getSessionSecret() {
-  if (!_sessionSecret) {
-    _sessionSecret = resolveSessionSecret();
-  }
-  return _sessionSecret;
-}
-
 /**
  * Comma-separated; the whole value is kept as one entry too, in case a secret contains a comma.
  * Never checked like SESSION_SECRET: it only ever decrypts.
@@ -173,79 +169,101 @@ function resolvePreviousSessionSecrets(): string[] {
   return [...new Set(entries.filter(Boolean))];
 }
 
-export const config = {
-  get sessionSecret() {
-    return getSessionSecret();
-  },
-  /** Keys a rotation left behind, tried for decryption only. Read per access so tests can vary it. */
-  get previousSessionSecrets(): string[] {
-    return resolvePreviousSessionSecrets();
-  },
-  caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
-  baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
-  appName: APP_NAME,
-  /**
-   * Null rather than a default: it seeds the dashboard host once at setup, and "unset" must stay
-   * distinguishable so BASE_URL's hostname can be the fallback.
-   */
-  dashboardDomain: process.env.DASHBOARD_DOMAIN?.trim() || null,
-  avatars: {
-    /** true/false when AVATAR_GRAVATAR pins it, null when the setting decides. */
-    gravatarFromEnv: resolveGravatarEnv(),
-  },
-  get adminUsername() {
-    return getAdminCredentials().username;
-  },
-  get adminPassword() {
-    return getAdminCredentials().password;
-  },
-  auth: {
-    disableLocalUsers: LOCAL_USERS_DISABLED,
-    allowSelfRegistration:
-      !LOCAL_USERS_DISABLED && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
-    // Separate from credential self-registration. Closed by default, except in OIDC-only mode,
-    // where the IdP is the only way an account can exist.
-    allowOauthRegistration: LOCAL_USERS_DISABLED
-      ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
-      : process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
-    // Lets IdP claims set a new user's role/status; enable only if you control the IdP.
-    allowOauthRoleFromClaims: process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS === "true",
-    // For pre-argon2id bcrypt hashes; null when the stored setting decides.
-    requirePasswordChangeOnLegacyHashFromEnv: resolveLegacyPasswordChangeEnv(),
-  },
-  oauth: {
-    enabled: process.env.OAUTH_ENABLED === "true",
-    providerName: process.env.OAUTH_PROVIDER_NAME ?? "OAuth2",
-    clientId: process.env.OAUTH_CLIENT_ID ?? null,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET ?? null,
-    issuer: process.env.OAUTH_ISSUER ?? null,
-    authorizationUrl: process.env.OAUTH_AUTHORIZATION_URL ?? null,
-    tokenUrl: process.env.OAUTH_TOKEN_URL ?? null,
-    userinfoUrl: process.env.OAUTH_USERINFO_URL ?? null,
-    allowAutoLinking: process.env.OAUTH_ALLOW_AUTO_LINKING === "true",
-    // Group claims usually need an extra scope, e.g. "openid email profile groups".
-    scopes: process.env.OAUTH_SCOPES?.trim() || null,
-    // ── Group-based roles (env-configured provider) ─────────────────────────
-    groupsClaim: process.env.OAUTH_GROUPS_CLAIM?.trim() || null,
-    groupPrefix: process.env.OAUTH_GROUP_PREFIX?.trim() || null,
-    roleMappingEnabled: process.env.OAUTH_ROLE_MAPPING === "true",
-    adminGroup: process.env.OAUTH_ADMIN_GROUP?.trim() || null,
-    operatorGroup: process.env.OAUTH_OPERATOR_GROUP?.trim() || null,
-    userGroup: process.env.OAUTH_USER_GROUP?.trim() || null,
-    viewerGroup: process.env.OAUTH_VIEWER_GROUP?.trim() || null,
-    defaultRole: process.env.OAUTH_DEFAULT_ROLE?.trim() || null,
-    syncGroups: process.env.OAUTH_SYNC_GROUPS === "true",
-  },
-  forwardAuthInternalUrl: process.env.FORWARD_AUTH_INTERNAL_URL ?? null,
-};
+/**
+ * Reads the environment when called. The module reads it once, at import; a test stubs the
+ * environment and calls this again rather than evaluating a second copy of the module.
+ */
+export function readConfig() {
+  const runtime = readRuntime();
+  let _adminCredentials: { username: string | null; password: string | null } | null = null;
+  let _sessionSecret: string | null = null;
+  const adminCredentials = () => (_adminCredentials ??= resolveAdminCredentials(runtime));
+  const sessionSecret = () => (_sessionSecret ??= resolveSessionSecret(runtime));
 
-/** Validates config at production startup, throwing on insecure defaults. Safe during build. */
-export function validateProductionConfig() {
-  if (isRuntimeProduction) {
-    // Reading them forces validation, which throws on production defaults.
-    void config.sessionSecret;
-    // Short-circuits in OIDC-only mode.
-    void config.adminUsername;
-    void config.adminPassword;
+  const config = {
+    get sessionSecret() {
+      return sessionSecret();
+    },
+    /** Keys a rotation left behind, tried for decryption only. Read per access so tests can vary it. */
+    get previousSessionSecrets(): string[] {
+      return resolvePreviousSessionSecrets();
+    },
+    caddyApiUrl:
+      process.env.CADDY_API_URL ??
+      (process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019"),
+    baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
+    /**
+     * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out
+     * with `title: { absolute: ... }` - see app/layout.tsx.
+     */
+    appName: process.env.APP_NAME?.trim() || DEFAULT_APP_NAME,
+    /**
+     * Null rather than a default: it seeds the dashboard host once at setup, and "unset" must stay
+     * distinguishable so BASE_URL's hostname can be the fallback.
+     */
+    dashboardDomain: process.env.DASHBOARD_DOMAIN?.trim() || null,
+    avatars: {
+      /** true/false when AVATAR_GRAVATAR pins it, null when the setting decides. */
+      gravatarFromEnv: resolveGravatarEnv(),
+    },
+    get adminUsername() {
+      return adminCredentials().username;
+    },
+    get adminPassword() {
+      return adminCredentials().password;
+    },
+    auth: {
+      disableLocalUsers: runtime.localUsersDisabled,
+      allowSelfRegistration:
+        !runtime.localUsersDisabled && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
+      // Separate from credential self-registration. Closed by default, except in OIDC-only mode,
+      // where the IdP is the only way an account can exist.
+      allowOauthRegistration: runtime.localUsersDisabled
+        ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
+        : process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
+      // Lets IdP claims set a new user's role/status; enable only if you control the IdP.
+      allowOauthRoleFromClaims: process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS === "true",
+      // For pre-argon2id bcrypt hashes; null when the stored setting decides.
+      requirePasswordChangeOnLegacyHashFromEnv: resolveLegacyPasswordChangeEnv(),
+    },
+    oauth: {
+      enabled: process.env.OAUTH_ENABLED === "true",
+      providerName: process.env.OAUTH_PROVIDER_NAME ?? "OAuth2",
+      clientId: process.env.OAUTH_CLIENT_ID ?? null,
+      clientSecret: process.env.OAUTH_CLIENT_SECRET ?? null,
+      issuer: process.env.OAUTH_ISSUER ?? null,
+      authorizationUrl: process.env.OAUTH_AUTHORIZATION_URL ?? null,
+      tokenUrl: process.env.OAUTH_TOKEN_URL ?? null,
+      userinfoUrl: process.env.OAUTH_USERINFO_URL ?? null,
+      allowAutoLinking: process.env.OAUTH_ALLOW_AUTO_LINKING === "true",
+      // Group claims usually need an extra scope, e.g. "openid email profile groups".
+      scopes: process.env.OAUTH_SCOPES?.trim() || null,
+      // ── Group-based roles (env-configured provider) ─────────────────────────
+      groupsClaim: process.env.OAUTH_GROUPS_CLAIM?.trim() || null,
+      groupPrefix: process.env.OAUTH_GROUP_PREFIX?.trim() || null,
+      roleMappingEnabled: process.env.OAUTH_ROLE_MAPPING === "true",
+      adminGroup: process.env.OAUTH_ADMIN_GROUP?.trim() || null,
+      operatorGroup: process.env.OAUTH_OPERATOR_GROUP?.trim() || null,
+      userGroup: process.env.OAUTH_USER_GROUP?.trim() || null,
+      viewerGroup: process.env.OAUTH_VIEWER_GROUP?.trim() || null,
+      defaultRole: process.env.OAUTH_DEFAULT_ROLE?.trim() || null,
+      syncGroups: process.env.OAUTH_SYNC_GROUPS === "true",
+    },
+    forwardAuthInternalUrl: process.env.FORWARD_AUTH_INTERNAL_URL ?? null,
+  };
+
+  /** Validates config at production startup, throwing on insecure defaults. Safe during build. */
+  function validateProductionConfig() {
+    if (runtime.isRuntimeProduction) {
+      // Reading them forces validation, which throws on production defaults.
+      void config.sessionSecret;
+      // Short-circuits in OIDC-only mode.
+      void config.adminUsername;
+      void config.adminPassword;
+    }
   }
+
+  return { config, validateProductionConfig };
 }
+
+export const { config, validateProductionConfig } = readConfig();

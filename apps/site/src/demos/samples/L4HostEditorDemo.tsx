@@ -16,7 +16,17 @@ const AGENTS = [
   { id: 2, name: "edge-fra", connected: true, hasOwnBuildSettings: false },
 ];
 
-/** Two backends behind one port, health-checked, and a PROXY protocol header so they see clients. */
+/** "Contractors" has only passwords, so the editor leaves it out: nothing in it applies at layer 4. */
+const ACCESS_LISTS = [
+  { id: 1, name: "Office network", ipRuleCount: 2 },
+  { id: 2, name: "Contractors", ipRuleCount: 0 },
+  { id: 3, name: "VPN only", ipRuleCount: 1 },
+];
+
+/**
+ * Two backends behind one port, health-checked, a PROXY protocol header so they see clients, and
+ * the office network's IP rules in front.
+ */
 const POSTGRES: L4ProxyHost = {
   id: 1,
   name: "postgres",
@@ -29,6 +39,7 @@ const POSTGRES: L4ProxyHost = {
   tlsTermination: false,
   proxyProtocolVersion: "v2",
   proxyProtocolReceive: false,
+  accessListId: 1,
   enabled: true,
   meta: null,
   loadBalancer: {
@@ -38,21 +49,36 @@ const POSTGRES: L4ProxyHost = {
     policyWeights: null,
     tryDuration: null,
     tryInterval: null,
-    retries: null,
     activeHealthCheck: { enabled: true, port: null, interval: "10s", timeout: "2s" },
     passiveHealthCheck: {
       enabled: true,
       failDuration: "30s",
       maxFails: 3,
-      unhealthyLatency: null,
     },
   },
   dnsResolver: null,
   upstreamDnsResolution: null,
   geoblock: null,
   geoblockMode: "merge",
+  crowdsec: true,
+  upstreamPortMode: "fixed",
   createdAt: "2026-09-01T12:00:00Z",
   updatedAt: "2026-09-01T12:00:00Z",
+};
+
+/** A range, each connection sent to the port it arrived on - so no active health check. */
+const GAME_SERVERS: L4ProxyHost = {
+  ...POSTGRES,
+  id: 2,
+  name: "game servers",
+  description: null,
+  protocol: "udp",
+  listenAddress: ":27015-27030",
+  upstreams: ["srcds"],
+  proxyProtocolVersion: null,
+  accessListId: null,
+  loadBalancer: null,
+  upstreamPortMode: "same",
 };
 
 const SHOWN = [
@@ -62,7 +88,9 @@ const SHOWN = [
   "matcherType",
   "matcherValue",
   "upstreams",
+  "upstreamPortMode",
   "proxyProtocolVersion",
+  "accessListId",
   "lbEnabled",
   "lbPolicy",
   "geoblockEnabled",
@@ -70,7 +98,7 @@ const SHOWN = [
 
 /** Prints what the form posted: the matcher and PROXY protocol choices are only visible there. */
 export default function L4HostEditorDemo() {
-  const [open, setOpen] = useState<"create" | "edit" | null>(null);
+  const [open, setOpen] = useState<"create" | "postgres" | "games" | null>(null);
   const [posted, setPosted] = useState<string | null>(null);
 
   useEffect(
@@ -90,7 +118,8 @@ export default function L4HostEditorDemo() {
       <VStack gap={3}>
         <HStack gap={2} wrap="wrap">
           <Button variant="primary" label="New L4 host" onClick={() => setOpen("create")} />
-          <Button variant="secondary" label="Edit postgres" onClick={() => setOpen("edit")} />
+          <Button variant="secondary" label="Edit postgres" onClick={() => setOpen("postgres")} />
+          <Button variant="secondary" label="Edit game servers" onClick={() => setOpen("games")} />
         </HStack>
         {posted ? (
           <VStack gap={1}>
@@ -105,13 +134,20 @@ export default function L4HostEditorDemo() {
           </Text>
         )}
       </VStack>
-      <CreateL4HostDialog open={open === "create"} onClose={() => setOpen(null)} agents={AGENTS} />
-      {open === "edit" && (
+      <CreateL4HostDialog
+        open={open === "create"}
+        onClose={() => setOpen(null)}
+        agents={AGENTS}
+        accessLists={ACCESS_LISTS}
+      />
+      {(open === "postgres" || open === "games") && (
         <EditL4HostDialog
           open
-          host={POSTGRES}
+          key={open}
+          host={open === "postgres" ? POSTGRES : GAME_SERVERS}
           onClose={() => setOpen(null)}
           agents={AGENTS}
+          accessLists={ACCESS_LISTS}
           assignedAgentIds={[]}
         />
       )}

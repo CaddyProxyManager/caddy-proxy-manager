@@ -38,10 +38,12 @@ import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import type { TailscaleHostDefaults } from "@/components/proxy-hosts/TailscaleFields";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
-import { toggleProxyHostAction } from "./actions";
+import { setProxyHostMaintenanceAction, toggleProxyHostAction } from "./actions";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
-import { DataTable, type Column } from "@/components/ui/DataTable";
+import { DataTable, type Column, useRowSelection } from "@/components/ui/DataTable";
+import { ProxyHostBulkActions } from "@/components/proxy-hosts/ProxyHostBulkActions";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useFormatter, useTranslations } from "next-intl";
@@ -94,6 +96,8 @@ type Props = {
   canCreate?: boolean;
   /** Custom Caddyfile and raw JSON; admin-only, enforced by the proxy host model. */
   canEditRawConfig?: boolean;
+  /** This page's hosts the viewer may change; the rest get a disabled checkbox. */
+  manageableIds?: number[];
 };
 
 type FeatureLabelKey =
@@ -204,10 +208,20 @@ function summarize(values: string[]) {
   return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
 }
 
+/** Maintenance only reads as a status while the host is serving at all. */
+function HostStatus({ host }: { host: ProxyHost }) {
+  const t = useTranslations("proxyHosts");
+  if (host.enabled && host.maintenance?.enabled) {
+    return <StatusChip status="warning" label={t("maintenanceToken")} />;
+  }
+  return <StatusChip status={host.enabled ? "active" : "inactive"} />;
+}
+
 /** At module scope: nested, it would be a new type each render and remount the menu mid-use. */
 function HostActions({
   host,
   onToggle,
+  onMaintenance,
   onEdit,
   onDuplicate,
   onDelete,
@@ -216,6 +230,7 @@ function HostActions({
 }: {
   host: ProxyHost;
   onToggle: (enabled: boolean) => void;
+  onMaintenance: (enabled: boolean) => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -239,6 +254,9 @@ function HostActions({
         items={[
           { label: t("edit"), onClick: onEdit },
           ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
+          host.maintenance?.enabled
+            ? { label: t("turnOffMaintenance"), onClick: () => onMaintenance(false) }
+            : { label: t("turnOnMaintenance"), onClick: () => onMaintenance(true) },
           // Admins only: access logs carry every client's address.
           ...(canCreate
             ? [
@@ -285,6 +303,7 @@ export default function ProxyHostsClient({
   activeState,
   canCreate = true,
   canEditRawConfig = false,
+  manageableIds = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
   const format = useFormatter();
@@ -297,6 +316,11 @@ export default function ProxyHostsClient({
   // Remounts CreateHostDialog on each open, resetting useFormState.
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [selectedKeys, setSelectedKeys] = useRowSelection(hosts, "id");
+  const manageable = new Set(manageableIds);
+  const selectedHosts = hosts.filter((host) => selectedKeys.has(String(host.id)));
+  // Hidden on a phone in v1: the cards have no checkboxes to select with.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -332,6 +356,10 @@ export default function ProxyHostsClient({
 
   const handleToggleEnabled = async (id: number, enabled: boolean) => {
     await toggleProxyHostAction(id, enabled);
+  };
+
+  const handleMaintenance = async (id: number, enabled: boolean) => {
+    await setProxyHostMaintenanceAction(id, enabled);
   };
 
   function openDuplicate(host: ProxyHost) {
@@ -488,7 +516,7 @@ export default function ProxyHostsClient({
       label: t("status"),
       sortKey: "enabled",
       width: 110,
-      render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
+      render: (host) => <HostStatus host={host} />,
     },
     {
       id: "actions",
@@ -499,6 +527,7 @@ export default function ProxyHostsClient({
         <HostActions
           host={host}
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
+          onMaintenance={(enabled) => handleMaintenance(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
           onTestReachability={() => setCheckingHost(host)}
@@ -525,13 +554,14 @@ export default function ProxyHostsClient({
             </Text>
           )}
           <HStack gap={2} vAlign="center">
-            <StatusChip status={host.enabled ? "active" : "inactive"} />
+            <HostStatus host={host} />
             {host.certificateId && <Badge variant="info" label={t("tls")} />}
           </HStack>
         </VStack>
         <HostActions
           host={host}
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
+          onMaintenance={(enabled) => handleMaintenance(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
           onTestReachability={() => setCheckingHost(host)}
@@ -618,6 +648,16 @@ export default function ProxyHostsClient({
             placeholder={t("searchHosts")}
           />
         }
+        bulkBar={
+          selectedHosts.length > 0 && !isNarrow ? (
+            <ProxyHostBulkActions
+              hosts={selectedHosts}
+              certificates={certificates}
+              accessLists={accessLists}
+              onClear={() => setSelectedKeys(new Set())}
+            />
+          ) : undefined
+        }
       />
 
       <DataTable
@@ -629,6 +669,12 @@ export default function ProxyHostsClient({
         sort={initialSort}
         mobileCard={mobileCard}
         rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("filterDisabled") })}
+        selection={{
+          selectedKeys,
+          onChange: setSelectedKeys,
+          isRowSelectable: (host) => manageable.has(host.id),
+          rowLabel: (host) => host.name,
+        }}
       />
 
       <CreateHostDialog

@@ -221,6 +221,7 @@ describe("the lifecycle", () => {
       docker: fakeDocker(),
       operations: {
         applyL4Ports: () => {},
+        whenIdle: (listener: () => void) => listener(),
         applyManagedServices: () => {},
         applyCaddyBuild: (modules: string[]) => options.builds.push(modules),
         loadCaddyImage: () => {

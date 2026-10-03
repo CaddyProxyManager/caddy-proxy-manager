@@ -106,6 +106,8 @@ export default defineConfig({
           items: [
             { label: "WAF", slug: "features/waf" },
             { label: "Geo blocking", slug: "features/geo-blocking" },
+            { label: "CrowdSec", slug: "features/crowdsec" },
+            { label: "Bot challenge", slug: "features/bot-challenge" },
             { label: "Access lists & mTLS", slug: "features/access-control" },
             { label: "Forward auth", slug: "features/forward-auth" },
           ],

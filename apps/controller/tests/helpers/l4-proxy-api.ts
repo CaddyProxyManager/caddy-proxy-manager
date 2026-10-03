@@ -40,7 +40,7 @@ export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
   }
 
   await page.getByLabel('Listen Address').fill(config.listenAddress);
-  await page.getByLabel('Upstreams').fill(config.upstream);
+  await page.getByRole('textbox', { name: /^Upstreams/ }).fill(config.upstream);
 
   if (config.matcherType && config.matcherType !== 'none') {
     await page.getByLabel('Matcher').click();

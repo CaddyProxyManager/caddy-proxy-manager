@@ -1,11 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@astryxdesign/core/Button";
 import { Badge } from "@astryxdesign/core/Badge";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useFormatter, useTranslations } from "next-intl";
 import { HostNotesHint } from "@cpm/controller/src/components/proxy-hosts/HostNotesField";
-import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
+import { BulkActionBar } from "@cpm/controller/src/components/ui/BulkActionBar";
+import {
+  DataTable,
+  type Column,
+  useRowSelection,
+} from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
 import { useRouter, useSearchParams } from "../shims/next-navigation";
@@ -23,6 +29,7 @@ type Row = {
   protections: string[];
   notes: string | null;
   enabled: boolean;
+  maintenance?: boolean;
 };
 
 const HOSTS: Row[] = [
@@ -47,6 +54,7 @@ const HOSTS: Row[] = [
     protections: ["Authentik"],
     notes: null,
     enabled: true,
+    maintenance: true,
   },
   {
     id: 3,
@@ -74,9 +82,14 @@ const HOSTS: Row[] = [
 
 const AGENTS = { total: 3, connected: 2 };
 
-/** The real table and tiles; the server sorts and filters in the app, this component does here. */
+/**
+ * The real table, tiles and bulk bar; the server sorts, filters and saves in the app, this
+ * component does here. Enable and Disable act on the demo's own rows, without a confirmation.
+ */
 function ProxyHostsTableDemoContent() {
   const t = useTranslations("proxyHosts");
+  const tb = useTranslations("ui.bulk");
+  const [hosts, setHosts] = useState(HOSTS);
   const router = useRouter();
   const params = useSearchParams();
   const sortBy = params.get("sortBy") ?? "domain";
@@ -87,11 +100,11 @@ function ProxyHostsTableDemoContent() {
       : "all";
 
   const counts = {
-    total: HOSTS.length,
-    enabled: HOSTS.filter((h) => h.enabled).length,
-    disabled: HOSTS.filter((h) => !h.enabled).length,
+    total: hosts.length,
+    enabled: hosts.filter((h) => h.enabled).length,
+    disabled: hosts.filter((h) => !h.enabled).length,
   };
-  const traffic = HOSTS.reduce(
+  const traffic = hosts.reduce(
     (sum, h) => ({
       total: sum.total + (h.requests?.total ?? 0),
       blocked: sum.blocked + (h.requests?.blocked ?? 0),
@@ -102,14 +115,20 @@ function ProxyHostsTableDemoContent() {
 
   const rows = useMemo(() => {
     const filtered =
-      state === "all" ? HOSTS : HOSTS.filter((h) => h.enabled === (state === "enabled"));
+      state === "all" ? hosts : hosts.filter((h) => h.enabled === (state === "enabled"));
     const sorted = [...filtered].sort((a, b) =>
       sortBy === "status"
         ? Number(b.enabled) - Number(a.enabled)
         : a.domain.localeCompare(b.domain),
     );
     return sortDir === "desc" ? sorted.reverse() : sorted;
-  }, [sortBy, sortDir, state]);
+  }, [hosts, sortBy, sortDir, state]);
+
+  const [selectedKeys, setSelectedKeys] = useRowSelection(rows, "id");
+  const setEnabled = (enabled: boolean) => {
+    setHosts((all) => all.map((h) => (selectedKeys.has(String(h.id)) ? { ...h, enabled } : h)));
+    setSelectedKeys(new Set());
+  };
 
   function setState(value: string) {
     const next = new URLSearchParams(params.toString());
@@ -200,7 +219,12 @@ function ProxyHostsTableDemoContent() {
       label: "Status",
       sortKey: "status",
       width: 96,
-      render: (r) => <StatusChip status={r.enabled ? "active" : "inactive"} />,
+      render: (r) =>
+        r.enabled && r.maintenance ? (
+          <StatusChip status="warning" label={t("maintenanceToken")} />
+        ) : (
+          <StatusChip status={r.enabled ? "active" : "inactive"} />
+        ),
     },
   ];
 
@@ -230,8 +254,8 @@ function ProxyHostsTableDemoContent() {
             {
               id: "certificates",
               label: t("certificates"),
-              value: HOSTS.filter((h) => h.certificate).length,
-              note: t("certificatesNote", { count: HOSTS.filter((h) => h.certificate).length }),
+              value: hosts.filter((h) => h.certificate).length,
+              note: t("certificatesNote", { count: hosts.filter((h) => h.certificate).length }),
             },
             {
               id: "agents",
@@ -243,19 +267,26 @@ function ProxyHostsTableDemoContent() {
           ]}
         />
       </div>
-      <TabList value={state} onChange={setState}>
-        <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-        <Tab
-          value="enabled"
-          label={t("filterEnabled")}
-          endContent={<Badge label={counts.enabled} />}
-        />
-        <Tab
-          value="disabled"
-          label={t("filterDisabled")}
-          endContent={<Badge label={counts.disabled} />}
-        />
-      </TabList>
+      {selectedKeys.size > 0 ? (
+        <BulkActionBar count={selectedKeys.size} onClear={() => setSelectedKeys(new Set())}>
+          <Button variant="ghost" label={tb("enable")} onClick={() => setEnabled(true)} />
+          <Button variant="ghost" label={tb("disable")} onClick={() => setEnabled(false)} />
+        </BulkActionBar>
+      ) : (
+        <TabList value={state} onChange={setState}>
+          <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+          <Tab
+            value="enabled"
+            label={t("filterEnabled")}
+            endContent={<Badge label={counts.enabled} />}
+          />
+          <Tab
+            value="disabled"
+            label={t("filterDisabled")}
+            endContent={<Badge label={counts.disabled} />}
+          />
+        </TabList>
+      )}
       <DataTable
         columns={columns}
         data={rows}
@@ -263,6 +294,11 @@ function ProxyHostsTableDemoContent() {
         sort={{ sortBy, sortDir }}
         emptyMessage="No proxy hosts yet"
         rowStatus={(r) => (r.enabled ? null : { color: "gray", label: "Disabled" })}
+        selection={{
+          selectedKeys,
+          onChange: setSelectedKeys,
+          rowLabel: (r) => r.domain,
+        }}
       />
     </VStack>
   );

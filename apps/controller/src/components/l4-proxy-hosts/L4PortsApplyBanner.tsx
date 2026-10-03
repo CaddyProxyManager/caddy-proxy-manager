@@ -29,6 +29,12 @@ type PortsResponse = {
   error?: string;
 };
 
+/** `5000-5010:5000-5010/udp` as `5000-5010/udp`: the controller always publishes a port as itself. */
+function portLabel(mapping: string): string {
+  const match = /^([\d-]+):([\d-]+)(\/udp)?$/.exec(mapping);
+  return match && match[1] === match[2] ? `${match[1]}${match[3] ?? ""}` : mapping;
+}
+
 export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }) {
   const t = useTranslations("l4ProxyHosts");
   const [data, setData] = useState<PortsResponse | null>(null);
@@ -116,7 +122,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
                     {t("required")}
                   </Text>
                   {diff.requiredPorts.map((p) => (
-                    <Badge key={p} label={p} />
+                    <Badge key={p} label={portLabel(p)} />
                   ))}
                 </HStack>
               )}

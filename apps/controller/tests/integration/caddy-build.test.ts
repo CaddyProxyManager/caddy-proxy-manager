@@ -5,28 +5,17 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory: a Bun mock factory must be synchronous, or the file hangs.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => {
-  return {
-    default: ctx.db,
-    schema: schemaModule,
-    nowIso: () => new Date().toISOString(),
-    toIso: (value: string | Date | null | undefined): string | null => {
-      if (!value) return null;
-      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-    },
-  };
-});
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 const {
   applyCaddyBuild,
@@ -42,7 +31,7 @@ const {
   resolveEnabledModuleIds,
   resolveModuleSpecs,
   sanitizeCaddyBuildSettings,
-} = await import(`../../src/lib/caddy-build${fresh()}`);
+} = await import('../../src/lib/caddy-build');
 import { CADDY_MODULES, dnsModuleId } from '../../src/lib/caddy-modules';
 import { saveCaddyBuildSettings } from '../../src/lib/settings';
 import { installFakeCaddy, type FakeCaddy } from '../helpers/caddy-admin';

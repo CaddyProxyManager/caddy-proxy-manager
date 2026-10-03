@@ -11,6 +11,10 @@ import {
   type AgentStatus,
   type CaddyAdminProxyResponse,
   type CaddyCertificate,
+  CERTIFICATE_FILE_ERRORS,
+  type CertificateFileEntry,
+  type CertificateFileResult,
+  type CertificateFileSource,
   type ExternalCaddyImage,
   type CertificateFiles,
   type LogAccessProblemKind,
@@ -19,6 +23,11 @@ import {
   MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
 } from "./agent-protocol";
+import {
+  CERTIFICATE_FILE_MAX_BYTES,
+  CERTIFICATE_FILES_MAX,
+  isValidCertificateFilePath,
+} from "./certificate-files";
 
 export class AgentDecodeError extends Error {
   constructor(readonly path: string) {
@@ -313,4 +322,73 @@ export function decodeLogReadResponse(text: string): LogReadResponse {
   if (raw.truncated !== undefined) response.truncated = boolean(raw.truncated, "log.truncated");
   if (raw.missing !== undefined) response.missing = boolean(raw.missing, "log.missing");
   return response;
+}
+
+// ─── Certificates from files ─────────────────────────────────────────────────
+
+const FILE_PATH = 1024;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+function certificateId(value: unknown, path: string): number {
+  return integer(value, path, 0, 2 ** 31 - 1);
+}
+
+/**
+ * The agent's check of what the controller asks it to read. Shape only: a bad path is reported
+ * back per entry as `invalid-path`, so one entry cannot hide the rest.
+ */
+export function decodeCertificateFileSources(value: unknown): CertificateFileSource[] {
+  return array(value, "certificateFiles", CERTIFICATE_FILES_MAX, (entry, path) => {
+    const raw = object(entry, path);
+    return {
+      id: certificateId(raw.id, `${path}.id`),
+      certPath: string(raw.certPath, `${path}.certPath`, FILE_PATH),
+      keyPath: string(raw.keyPath, `${path}.keyPath`, FILE_PATH),
+    };
+  });
+}
+
+/** Throws only when `results` is not a bounded list of well-formed entries. */
+export function decodeCertificateFileResults(value: unknown): CertificateFileResult[] {
+  return array(value, "results", CERTIFICATE_FILES_MAX, (entry, path) => {
+    const raw = object(entry, path);
+    const id = certificateId(raw.id, `${path}.id`);
+    if (raw.ok === false) {
+      return { id, ok: false, error: oneOf(raw.error, `${path}.error`, CERTIFICATE_FILE_ERRORS) };
+    }
+    if (raw.ok !== true) throw new AgentDecodeError(`${path}.ok`);
+    const fingerprint = string(raw.fingerprint, `${path}.fingerprint`, 64);
+    if (!SHA256_HEX.test(fingerprint)) throw new AgentDecodeError(`${path}.fingerprint`);
+    const certificatePem = optionalString(
+      raw.certificatePem,
+      `${path}.certificatePem`,
+      CERTIFICATE_FILE_MAX_BYTES,
+    );
+    const keyPem = optionalString(raw.keyPem, `${path}.keyPem`, CERTIFICATE_FILE_MAX_BYTES);
+    // Both or neither: a chain without its key cannot be stored or checked.
+    if ((certificatePem === undefined) !== (keyPem === undefined)) {
+      throw new AgentDecodeError(`${path}.keyPem`);
+    }
+    return certificatePem === undefined
+      ? { id, ok: true, fingerprint }
+      : { id, ok: true, fingerprint, certificatePem, keyPem };
+  });
+}
+
+export function decodeCertificateFileListing(text: string): CertificateFileEntry[] {
+  return array(parse(text, "certificateFiles"), "certificateFiles", 5000, (entry, path) => {
+    const raw = object(entry, path);
+    if (!isValidCertificateFilePath(raw.path)) throw new AgentDecodeError(`${path}.path`);
+    const kind = oneOf(raw.kind, `${path}.kind`, ["certificate", "key"] as const);
+    if (kind === "key") return { path: raw.path, kind };
+    const notAfter = string(raw.notAfter, `${path}.notAfter`, SHORT);
+    if (Number.isNaN(Date.parse(notAfter))) throw new AgentDecodeError(`${path}.notAfter`);
+    return {
+      path: raw.path,
+      kind,
+      names: array(raw.names, `${path}.names`, 1000, (n, p) => string(n, p, DNS_NAME)),
+      notAfter,
+      fingerprint: string(raw.fingerprint, `${path}.fingerprint`, SHORT),
+    };
+  });
 }

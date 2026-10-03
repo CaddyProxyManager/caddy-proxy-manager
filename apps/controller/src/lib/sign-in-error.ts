@@ -24,6 +24,28 @@ export const SIGN_IN_ERROR_KEYS: Readonly<
   EMAIL_NOT_VERIFIED: "emailNotVerified",
 };
 
+import type { useFormatter } from "next-intl";
+
+/** A per-account lock, told apart from Better Auth's per-address limit, which has no code. */
+export const ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
+
+/** Seconds until an account lock lifts, from the refusal's `retryAfter`; null for anything else. */
+export function accountLockSeconds(error: {
+  status?: number;
+  code?: string;
+  retryAfter?: unknown;
+}): number | null {
+  if (error.status !== 429 || error.code !== ACCOUNT_LOCKED) return null;
+  const seconds = Number(error.retryAfter);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
+}
+
+/** "in 8 seconds", in the reader's language: the lock's end as the form tells it. */
+export function lockLiftsIn(format: ReturnType<typeof useFormatter>, seconds: number): string {
+  const now = new Date();
+  return format.relativeTime(new Date(now.getTime() + seconds * 1000), now);
+}
+
 export function signInErrorMessage(
   error: { status?: number; code?: string },
   t: (key: SignInErrorKey) => string,

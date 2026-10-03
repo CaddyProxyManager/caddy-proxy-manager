@@ -4,12 +4,13 @@
  */
 
 import { resolveEnabledModuleIds } from "./caddy-build";
-import { CADDY_MODULES, dnsModuleId } from "./caddy-modules";
+import { CADDY_MODULES, CROWDSEC_MODULE_ID, dnsModuleId } from "./caddy-modules";
 import { listEnabledL4ProxyHostIds } from "./models/l4-proxy-hosts";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { listProxyHosts } from "./models/proxy-hosts";
 import {
   type CaddyBuildSettings,
+  getCrowdSecSettings,
   getDnsProviderSettings,
   getGeoBlockSettings,
   getWafSettings,
@@ -21,7 +22,7 @@ import {
  */
 export type ModuleConflict =
   | { kind: "l4Hosts" | "hostWaf" | "hostGeoblock" | "tailnetHosts"; count: number }
-  | { kind: "globalWaf" | "globalGeoblock" }
+  | { kind: "globalWaf" | "globalGeoblock" | "globalCrowdsec" }
   | { kind: "defaultDnsProvider" | "dnsProviderCredentials"; provider: string };
 
 /** A conflict as `/api/v1` has always worded it. */
@@ -33,6 +34,8 @@ export function englishModuleConflict(conflict: ModuleConflict): string {
       return "global WAF is switched on and needs the Coraza WAF module";
     case "globalGeoblock":
       return "global geoblocking is switched on and needs the Request Blocker module";
+    case "globalCrowdsec":
+      return "CrowdSec is switched on and needs the CrowdSec module";
     case "hostWaf":
       return `${conflict.count} proxy host${conflict.count === 1 ? " has" : "s have"} per-host WAF enabled and ${conflict.count === 1 ? "needs" : "need"} the Coraza WAF module`;
     case "hostGeoblock":
@@ -69,18 +72,28 @@ export async function findModuleConflicts(
   const wafOff = !enabled.has("coraza-waf");
   const blockerOff = !enabled.has("caddy-blocker");
   const tailscaleOff = !enabled.has("caddy-tailscale");
+  const crowdsecOff = !enabled.has(CROWDSEC_MODULE_ID);
 
   // Scoped to this agent: a host pinned elsewhere would refuse with a reason nobody can act on.
-  const [httpAssignments, l4Assignments, l4HostIds, waf, geoblock, allHosts, dnsProviders] =
-    await Promise.all([
-      agentRowId === undefined ? null : listHostAssignments("http"),
-      agentRowId === undefined ? null : listHostAssignments("l4"),
-      l4Off ? listEnabledL4ProxyHostIds() : null,
-      wafOff ? getWafSettings() : null,
-      blockerOff ? getGeoBlockSettings() : null,
-      wafOff || blockerOff || tailscaleOff ? listProxyHosts() : null,
-      getDnsProviderSettings(),
-    ]);
+  const [
+    httpAssignments,
+    l4Assignments,
+    l4HostIds,
+    waf,
+    geoblock,
+    allHosts,
+    dnsProviders,
+    crowdsec,
+  ] = await Promise.all([
+    agentRowId === undefined ? null : listHostAssignments("http"),
+    agentRowId === undefined ? null : listHostAssignments("l4"),
+    l4Off ? listEnabledL4ProxyHostIds() : null,
+    wafOff ? getWafSettings() : null,
+    blockerOff ? getGeoBlockSettings() : null,
+    wafOff || blockerOff || tailscaleOff ? listProxyHosts() : null,
+    getDnsProviderSettings(),
+    crowdsecOff ? getCrowdSecSettings() : null,
+  ]);
   const servesHttp = (hostId: number) =>
     httpAssignments === null || servedByAgent(httpAssignments, hostId, agentRowId ?? null);
   const servesL4 = (hostId: number) =>
@@ -97,6 +110,11 @@ export async function findModuleConflicts(
 
   if (geoblock?.enabled) {
     problems.push({ kind: "globalGeoblock" });
+  }
+
+  // Refused rather than warned: every host would quietly stop checking decisions.
+  if (crowdsec?.enabled) {
+    problems.push({ kind: "globalCrowdsec" });
   }
 
   // WAF and geoblocking can be on per host with the global switch off.

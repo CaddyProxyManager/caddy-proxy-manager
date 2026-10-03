@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
+import { recordAccountFailure, type SignInSource } from "./account-failures";
 import {
   accountKey,
-  registerAccountFailure,
   registerFailedAttempt,
   reserveAccountAttempt,
   reserveAttempt,
@@ -12,7 +12,7 @@ import {
 /** Ended by the first call to any of these. */
 export type PortalLoginAttempt = {
   /** Counts against the client, the (account, client) pair and the account. */
-  fail(): Promise<void>;
+  fail(source: SignInSource): Promise<void>;
   succeed(): void;
   /** Ends it uncounted, e.g. when checking it threw. */
   release(): void;
@@ -48,7 +48,7 @@ export async function beginPortalLoginAttempt(
     }
     releases.push(release);
   }
-  const accountRelease = reserveAccountAttempt(account);
+  const accountRelease = await reserveAccountAttempt(account);
   if (!accountRelease) {
     releaseAll();
     return null;
@@ -62,13 +62,13 @@ export async function beginPortalLoginAttempt(
     return true;
   };
   return {
-    async fail() {
+    async fail(source) {
       if (!claim()) return;
       // Counted before the places are given back, so no request slips into the gap.
       try {
         await registerFailedAttempt(ip);
         await registerFailedAttempt(pairKey);
-        registerAccountFailure(account);
+        await recordAccountFailure(account, source);
       } finally {
         releaseAll();
       }

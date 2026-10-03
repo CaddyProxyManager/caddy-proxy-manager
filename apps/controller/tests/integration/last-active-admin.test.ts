@@ -5,21 +5,14 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { vi } from '@/tests/helpers/vi';
-import { createTestDb, currentDb, type TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { createTestDb, type TestDb } from '@/tests/helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const schemaModule = await import('@/src/lib/db/schema');
 ctx.db = await createTestDb();
 
-vi.mock('@/src/lib/db', () => ({
-  default: currentDb(() => ctx.db),
-  db: currentDb(() => ctx.db),
-  client: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('@/src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 const { deleteUser, updateUserRole, updateUserStatus } = await import('@/src/lib/models/user');

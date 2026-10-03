@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, type TestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const schemaModule = await import('@/src/lib/db/schema');
@@ -47,15 +48,7 @@ const gatedDb = new Proxy({} as TestDb, {
   },
 });
 
-vi.mock('@/src/lib/db', () => ({
-  default: gatedDb,
-  db: gatedDb,
-  client: undefined,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-  toIso: (value: string | Date | null | undefined): string | null =>
-    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
-}));
+vi.mock('@/src/lib/db', () => dbModuleMock(() => gatedDb));
 vi.mock('next-intl/server', () => ({
   getTranslations: async (namespace?: string) => testTranslator(namespace),
 }));

@@ -9,8 +9,8 @@ cd "$script_dir"
 caddy_version="$(go list -m -f '{{.Version}}' github.com/caddyserver/caddy/v2)"
 go mod download "github.com/caddyserver/caddy/v2@${caddy_version}"
 caddy_mod_file="$(go env GOMODCACHE)/cache/download/github.com/caddyserver/caddy/v2/@v/${caddy_version}.mod"
-# cel-go became cel.dev/cel-go at v0.32.0. Match either path on both sides, since Caddy and the
-# plugins migrate separately.
+# cel-go became cel.dev/cel-go at v0.32.0 (Caddy v2.11.6). Look under both paths, since Caddy
+# and the plugins migrate separately.
 cel_paths="github.com/google/cel-go cel.dev/cel-go"
 
 caddy_cel_path=""
@@ -28,20 +28,15 @@ if [ -z "$cel_go_version" ]; then
   exit 1
 fi
 
-# Under whichever path our graph requires; a replace may cross paths.
-replaced=""
+# Caddy's path only. The other is a separate module that cannot clash with Caddy's, and Go refuses
+# one version standing in for both paths, so a replace left on it from before the move is dropped.
 for path in $cel_paths; do
-  if go list -m "$path" >/dev/null 2>&1; then
-    go mod edit "-replace=${path}=${caddy_cel_path}@${cel_go_version}"
-    replaced="${replaced} ${path}"
+  if [ "$path" != "$caddy_cel_path" ]; then
+    go mod edit "-dropreplace=${path}"
   fi
 done
-
-if [ -z "$replaced" ]; then
-  echo "No cel-go in the module graph; nothing to pin." >&2
-else
-  echo "Pinned${replaced} to ${caddy_cel_path}@${cel_go_version}"
-fi
+go mod edit "-replace=${caddy_cel_path}=${caddy_cel_path}@${cel_go_version}"
+echo "Pinned ${caddy_cel_path} to ${cel_go_version}"
 
 # tidy, not `go mod download all`, which records the whole transitive closure in go.sum and made
 # the scheduled run open a PR of pure churn every week.

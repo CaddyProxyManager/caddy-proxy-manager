@@ -31,12 +31,25 @@ export type IssuedClientCertificateInput = {
 
 type IssuedClientCertificateRow = typeof issuedClientCertificates.$inferSelect;
 
+/**
+ * As openssl and X509Certificate print it: upper-case hex in whole bytes, no leading zero byte.
+ * Applied on read, since rows issued earlier hold forge's form ("1A0F…" for "01A0F…"); nothing
+ * matches on the serial (revocation goes by id, Caddy by the PEM), so no migration is needed.
+ */
+export function canonicalSerialNumber(serial: string): string {
+  const trimmed = serial.trim();
+  const hex = trimmed.replace(/:/g, "");
+  if (!/^[0-9a-fA-F]+$/.test(hex)) return trimmed;
+  const whole = hex.length % 2 === 1 ? `0${hex}` : hex;
+  return whole.replace(/^(?:00)+(?=..)/, "").toUpperCase();
+}
+
 function parseIssuedClientCertificate(row: IssuedClientCertificateRow): IssuedClientCertificate {
   return {
     id: row.id,
     caCertificateId: row.caCertificateId,
     commonName: row.commonName,
-    serialNumber: row.serialNumber,
+    serialNumber: canonicalSerialNumber(row.serialNumber),
     fingerprintSha256: row.fingerprintSha256,
     certificatePem: row.certificatePem,
     validFrom: toIso(row.validFrom)!,
@@ -69,12 +82,13 @@ export async function createIssuedClientCertificate(
   actorUserId: number,
 ): Promise<IssuedClientCertificate> {
   const now = nowIso();
+  const serialNumber = canonicalSerialNumber(input.serialNumber);
   const [record] = await db
     .insert(issuedClientCertificates)
     .values({
       caCertificateId: input.caCertificateId,
       commonName: input.commonName.trim(),
-      serialNumber: input.serialNumber.trim(),
+      serialNumber,
       fingerprintSha256: input.fingerprintSha256.trim(),
       certificatePem: input.certificatePem.trim(),
       validFrom: input.validFrom,
@@ -97,7 +111,7 @@ export async function createIssuedClientCertificate(
     summary: `Issued client certificate ${input.commonName}`,
     data: {
       caCertificateId: input.caCertificateId,
-      serialNumber: input.serialNumber,
+      serialNumber,
     },
   });
   await applyCaddyConfig();

@@ -10,6 +10,7 @@ import {
   AGENT_RECONNECT_MAX_MS,
   AGENT_RECONNECT_MIN_MS,
   AGENT_STATUS_HEARTBEAT_MS,
+  AGENT_STREAM_KEEPALIVE_MS,
   type AgentCommand,
   type AgentCommandResult,
   type AgentDesiredState,
@@ -24,7 +25,11 @@ import {
   MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
+  sameL4PortSet,
   type AgentLocalPairPreviewResponse,
+  AgentDecodeError,
+  type CertificateFilesReadRequest,
+  decodeCertificateFileSources,
 } from "@cpm/shared";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -45,8 +50,13 @@ import {
   normalizePairingCode,
 } from "./controller-url";
 import type { AgentStore } from "./db";
-import { type DockerHost, tail } from "./docker";
+import { type DockerHost, managedServicesEnvFingerprint, tail } from "./docker";
 import { listCaddyCertificates, readCaddyCertificate } from "./certificates";
+import {
+  CertificateFilePoller,
+  listCertificateFiles,
+  readCertificateFiles,
+} from "./certificate-files";
 import {
   CONTAINER_LOG_CURSOR,
   MAX_LOG_LINES,
@@ -64,12 +74,18 @@ export type LifecycleDeps = {
   operations: Operations;
   /** For a controller-requested restart; the entrypoint releases socket and store first. */
   exit?: (reason: string) => void;
+  /** Tests only: a minute of silence is too long to wait for. */
+  streamSilenceMs?: number;
 };
 
 /** Pairs a co-starting stack in seconds; cheap for remote agents that never get a token. */
 const BOOTSTRAP_POLL_MS = 3_000;
 /** How long an image load waits for the controller's narrowed config before recreating anyway. */
 const NARROWED_CONFIG_TIMEOUT_MS = 60_000;
+/** Three missed pings: a stream the controller closed can stay open under us, reading nothing. */
+const STREAM_SILENCE_MS = 3 * AGENT_STREAM_KEEPALIVE_MS;
+const FORGOTTEN_MESSAGE =
+  "The controller no longer recognises this agent. Pair it again with a fresh code.";
 
 export type PairOutcome = { ok: true } | { ok: false; error: string };
 
@@ -82,14 +98,28 @@ export class AgentLifecycle {
   private connection: AbortController | null = null;
   private stopped = false;
   private desired: AgentDesiredState | null = null;
+  /** Frames and deferred retries apply one at a time, each against the newest desired state. */
+  private reconciling: Promise<void> = Promise.resolve();
+  private retryQueued = false;
   /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
   private caddyRestore: Promise<void> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   /** Resolved by the next config load forwarded to Caddy; see `nextConfigLoad`. */
   private configLoadWaiters: (() => void)[] = [];
   private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
+  private readonly certificateFiles: CertificateFilePoller;
 
-  constructor(private readonly deps: LifecycleDeps) {}
+  constructor(private readonly deps: LifecycleDeps) {
+    this.certificateFiles = new CertificateFilePoller(deps.config, deps.docker, (results) => {
+      const client = this.client;
+      const secret = this.secret;
+      if (!client || !secret) return Promise.reject(new Error("Not paired."));
+      return client.postCertificateFiles(secret, results).catch((error: unknown) => {
+        if (isUnpaired(error)) void this.forget(secret);
+        throw error;
+      });
+    });
+  }
 
   // ─── Entry points ──────────────────────────────────────────────────────────
 
@@ -290,6 +320,7 @@ export class AgentLifecycle {
     this.connection = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
+    this.certificateFiles.stop();
     // An armed interval keeps the process alive after SIGTERM until the kill.
     this.clearBootstrapWatch();
   }
@@ -339,6 +370,18 @@ export class AgentLifecycle {
     this.message = null;
   }
 
+  /**
+   * Any signed call answered 401 means the controller dropped this agent, not only the stream:
+   * without this, a stream that never noticed the unpair kept an agent posting into 401s.
+   */
+  private async forget(secret: string): Promise<void> {
+    // A call signed before a re-pair must not discard the pairing that replaced it.
+    if (this.stopped || this.secret !== secret) return;
+    this.deps.store.clearPairing();
+    await this.goIdle(FORGOTTEN_MESSAGE);
+    this.rearmBootstrapWatch();
+  }
+
   /** Stops Caddy too: a revoked agent must not serve a config nobody can change any more. */
   private async goIdle(message: string): Promise<void> {
     this.lifecycle = "idle";
@@ -351,6 +394,7 @@ export class AgentLifecycle {
     this.connection = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
+    this.certificateFiles.stop();
     await this.stopCaddy("no controller is configured");
   }
 
@@ -371,26 +415,36 @@ export class AgentLifecycle {
 
       const connection = new AbortController();
       this.connection = connection;
+      // Paused while an event is handled, so a slow reconcile is not mistaken for silence.
+      let silent = false;
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
+      const watch = () => {
+        watchdog = setTimeout(() => {
+          silent = true;
+          connection.abort();
+        }, this.deps.streamSilenceMs ?? STREAM_SILENCE_MS);
+      };
 
       try {
+        watch();
         for await (const event of client.events(secret, connection.signal)) {
+          clearTimeout(watchdog);
           backoff = AGENT_RECONNECT_MIN_MS;
           await this.handle(event);
+          watch();
         }
       } catch (error) {
-        if (connection.signal.aborted) return;
-        if (error instanceof ControllerRejected && error.status === 401) {
-          this.deps.store.clearPairing();
-          await this.goIdle(
-            "The controller no longer recognises this agent. Pair it again with a fresh code.",
-          );
-          this.rearmBootstrapWatch();
+        if (connection.signal.aborted && !silent) return;
+        if (isUnpaired(error)) {
+          await this.forget(secret);
           return;
         }
         console.warn(`[agent] stream lost, retrying in ${Math.round(backoff / 1000)}s:`, error);
+      } finally {
+        clearTimeout(watchdog);
       }
 
-      if (this.stopped || connection.signal.aborted) return;
+      if (this.stopped || (connection.signal.aborted && !silent)) return;
       await Bun.sleep(backoff);
       backoff = Math.min(backoff * 2, AGENT_RECONNECT_MAX_MS);
     }
@@ -403,7 +457,7 @@ export class AgentLifecycle {
         void this.reportStatus();
         return;
       case "desired-state":
-        await this.reconcile(event.state);
+        await this.queueReconcile(() => event.state);
         return;
       case "command":
         await this.execute(event.command);
@@ -431,6 +485,37 @@ export class AgentLifecycle {
 
   // ─── Reconciliation ────────────────────────────────────────────────────────
 
+  private queueReconcile(state: () => AgentDesiredState | null): Promise<void> {
+    const next = this.reconciling.then(() => {
+      const latest = state();
+      return latest ? this.reconcile(latest) : undefined;
+    });
+    this.reconciling = next.catch(() => {});
+    return next;
+  }
+
+  /**
+   * When the recreate ends, not at the next heartbeat: the controller reloads the new Caddy on
+   * hearing of it, since a config sent while the old one was stopping never reached it.
+   */
+  private reportWhenRecreated(): void {
+    this.deps.operations.whenIdle(() => void this.reportStatus());
+  }
+
+  /** Once per busy spell, and against whatever frame is newest by then. */
+  private retryWhenIdle(): void {
+    if (this.retryQueued) return;
+    this.retryQueued = true;
+    this.deps.operations.whenIdle(() => {
+      this.retryQueued = false;
+      // Unpairing clears `desired`, so an agent gone idle meanwhile applies nothing.
+      if (this.stopped) return;
+      this.queueReconcile(() => this.desired).catch((error: unknown) => {
+        console.warn("[agent] could not apply a deferred desired state:", error);
+      });
+    });
+  }
+
   /** Diffs only: each reconnect resends full state, and a blind apply rebuilds Caddy's image. */
   private async reconcile(state: AgentDesiredState): Promise<void> {
     // Else a "Caddy off" finds nothing running yet and the restore brings it up anyway.
@@ -448,8 +533,10 @@ export class AgentLifecycle {
     }
 
     try {
-      if (!sameList(state.l4Ports, store.appliedL4Ports())) {
+      // As port sets: the same ports come as ranges or one by one, as the controller knew this agent.
+      if (!sameL4PortSet(state.l4Ports, store.appliedL4Ports())) {
         operations.applyL4Ports(state.l4Ports);
+        this.reportWhenRecreated();
       }
 
       // Null means never rebuilt (the shipped image), not "skip", or no first rebuild ever runs.
@@ -460,19 +547,36 @@ export class AgentLifecycle {
         !sameList(state.caddyModules, appliedModules)
       ) {
         operations.applyCaddyBuild(state.caddyModules);
+        this.reportWhenRecreated();
       }
 
       const appliedServices = store.appliedManagedServices();
-      if (!sameServices(state.services.services, appliedServices)) {
+      if (
+        !sameServices(state.services.services, appliedServices) ||
+        managedServicesEnvFingerprint(state.services.env) !== store.appliedManagedServicesEnv()
+      ) {
         operations.applyManagedServices(state.services);
       }
     } catch (busy) {
       if (busy instanceof OperationBusyError) {
-        // No queue: the next frame supersedes this one anyway.
+        // Retried when it ends: the controller sends no further frame until something changes.
         console.log(`[agent] deferring: ${busy.running} is already running`);
+        this.retryWhenIdle();
       } else {
         throw busy;
       }
+    }
+
+    // Absent from a controller that predates the field, or when this agent has no directory.
+    try {
+      this.certificateFiles.update(
+        state.certificateFiles === undefined
+          ? []
+          : decodeCertificateFileSources(state.certificateFiles),
+      );
+    } catch (error) {
+      if (!(error instanceof AgentDecodeError)) throw error;
+      console.warn(`[agent] ignoring the certificate files the controller sent: ${error.message}`);
     }
 
     if (this.controllerId) {
@@ -494,6 +598,7 @@ export class AgentLifecycle {
     const secret = this.secret;
     if (!client || !secret) return;
     await client.postResults(secret, [result]).catch((error: unknown) => {
+      if (isUnpaired(error)) return this.forget(secret);
       // No retry: the controller times the command out, and a late result finds no waiter.
       console.warn(`[agent] could not return the result of command ${command.id}:`, error);
     });
@@ -506,6 +611,10 @@ export class AgentLifecycle {
     if (command.kind === "caddy-image-load") return this.runCaddyImageLoad(command.id);
     if (command.kind === "certificate-read") {
       return this.runCertificateRead(command.id, command.request);
+    }
+    if (command.kind === "certificate-files-list") return this.runCertificateFilesList(command.id);
+    if (command.kind === "certificate-files-read") {
+      return this.runCertificateFilesRead(command.id, command.request);
     }
     if (!isAllowedAdminPath(command.request.path)) {
       return {
@@ -613,6 +722,33 @@ export class AgentLifecycle {
       : { id, ok: true, response: { status: 404, text: "", headers: {} } };
   }
 
+  private async runCertificateFilesList(id: string): Promise<AgentCommandResult> {
+    if (!this.deps.config.certFilesHostDir) {
+      return { id, ok: false, code: "BAD_REQUEST", error: "CERT_FILES_HOST_DIR is not set." };
+    }
+    const entries = await listCertificateFiles(this.deps.config, this.deps.docker);
+    if (!entries) {
+      return { id, ok: false, code: "BUSY", error: "The certificate directory is unreadable." };
+    }
+    return { id, ok: true, response: { status: 200, text: JSON.stringify(entries), headers: {} } };
+  }
+
+  /** Every PEM, for a new certificate or "Re-read now"; the poller keeps sending on its own. */
+  private async runCertificateFilesRead(
+    id: string,
+    request: CertificateFilesReadRequest,
+  ): Promise<AgentCommandResult> {
+    let files: ReturnType<typeof decodeCertificateFileSources>;
+    try {
+      files = decodeCertificateFileSources(request?.files);
+    } catch (error) {
+      if (!(error instanceof AgentDecodeError)) throw error;
+      return { id, ok: false, code: "BAD_REQUEST", error: error.message };
+    }
+    const results = await readCertificateFiles(this.deps.config, this.deps.docker, files);
+    return { id, ok: true, response: { status: 200, text: JSON.stringify(results), headers: {} } };
+  }
+
   /** The answer is JSON in a 200's text. */
   private async runLogRead(id: string, request: LogReadRequest): Promise<AgentCommandResult> {
     const answer = (page: LogReadResponse): AgentCommandResult => ({
@@ -703,10 +839,15 @@ export class AgentLifecycle {
       const status = await buildStatus(this.deps);
       await client.postStatus(secret, status);
     } catch (error) {
+      if (isUnpaired(error)) return this.forget(secret);
       // Status is advisory; the stream is what proves the agent is alive.
       console.warn("[agent] could not report status:", error);
     }
   }
+}
+
+function isUnpaired(error: unknown): boolean {
+  return error instanceof ControllerRejected && error.status === 401;
 }
 
 /** Order-insensitive comparison: the controller sorts, but a stored list may predate that. */
@@ -718,7 +859,7 @@ function sameList(a: string[], b: string[]): boolean {
 }
 
 function sameServices(
-  wanted: Record<string, boolean>,
+  wanted: Partial<Record<string, boolean>>,
   applied: Record<string, boolean> | null,
 ): boolean {
   if (applied === null) return false;

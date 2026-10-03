@@ -5,21 +5,17 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
-const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory: createTestDb is async, and a Bun mock factory must be synchronous.
 ctx.db = await createTestDb();
 
-vi.mock('../../src/lib/db', () => ({
-  default: ctx.db,
-  schema: schemaModule,
-  nowIso: () => new Date().toISOString(),
-}));
+vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 const registry = await import('../../src/lib/settings/registry');
 const { clearStoredSetting, invalidateSettingsCache, resolveSetting, saveSettings } = await import(

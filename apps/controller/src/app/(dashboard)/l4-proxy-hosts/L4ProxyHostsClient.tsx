@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Network, ArrowRight } from "lucide-react";
+import { Network, ArrowRight, Shield } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -13,11 +13,14 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
+import type { L4AccessListOption } from "@/src/lib/models/access-lists";
 import { toggleL4ProxyHostAction } from "./actions";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
-import { DataTable, type Column } from "@/components/ui/DataTable";
+import { DataTable, type Column, useRowSelection } from "@/components/ui/DataTable";
+import { L4HostBulkActions } from "@/components/l4-proxy-hosts/L4HostBulkActions";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { StatusChip } from "@/components/ui/StatusChip";
 import {
   CreateL4HostDialog,
@@ -40,10 +43,13 @@ type Props = {
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
+  accessLists?: L4AccessListOption[];
   /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
   canCreate?: boolean;
+  /** This page's hosts the viewer may change; the rest get a disabled checkbox. */
+  manageableIds?: number[];
 };
 
 function formatMatcher(
@@ -66,8 +72,32 @@ function ProtocolBadge({ protocol }: { protocol: string }) {
   return <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />;
 }
 
+/** Restricting traffic, like the proxy hosts' auth badge: named in the tooltip. */
+function AccessListBadge({
+  host,
+  accessLists,
+}: {
+  host: L4ProxyHost;
+  accessLists: L4AccessListOption[];
+}) {
+  const t = useTranslations("l4ProxyHosts");
+  if (host.accessListId === null) return null;
+  const name = accessLists.find((list) => list.id === host.accessListId)?.name;
+  return (
+    <Tooltip content={name ? t("ipRulesBadgeTooltip", { name }) : t("ipRulesBadge")}>
+      <Badge variant="warning" icon={<Shield />} label={t("ipRulesBadge")} />
+    </Tooltip>
+  );
+}
+
 function summarizeUpstreams(upstreams: string[]) {
   return upstreams.length > 1 ? `${upstreams[0]} +${upstreams.length - 1}` : upstreams[0];
+}
+
+/** Null for a single port. A regex, not caddy-utils: that module pulls in node:net. */
+function listenPortCount(listenAddress: string): number | null {
+  const match = /:(\d+)-(\d+)$/.exec(listenAddress.trim());
+  return match ? Number(match[2]) - Number(match[1]) + 1 : null;
 }
 
 /**
@@ -122,8 +152,10 @@ export default function L4ProxyHostsClient({
   initialSearch,
   initialSort,
   agents,
+  accessLists = [],
   agentAssignments,
   canCreate = true,
+  manageableIds = [],
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -143,6 +175,11 @@ export default function L4ProxyHostsClient({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const signalBannerRefresh = () => setBannerRefresh((n) => n + 1);
+  const [selectedKeys, setSelectedKeys] = useRowSelection(hosts, "id");
+  const manageable = new Set(manageableIds);
+  const selectedHosts = hosts.filter((host) => selectedKeys.has(String(host.id)));
+  // Hidden on a phone in v1: the cards have no checkboxes to select with.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
   useEffect(() => {
     setSearchTerm(initialSearch);
@@ -213,6 +250,7 @@ export default function L4ProxyHostsClient({
                 {host.name}
               </Text>
               <HostNotesHint notes={host.description} />
+              <AccessListBadge host={host} accessLists={accessLists} />
             </HStack>
             <Tooltip content={formatMatcher(host, t)}>
               <Text type="body" size="xsm" color="secondary" maxLines={1}>
@@ -234,11 +272,21 @@ export default function L4ProxyHostsClient({
       id: "listen",
       label: t("listen"),
       sortKey: "listenAddress",
-      render: (host) => (
-        <Text type="code" size="sm" weight="medium" hasTabularNumbers>
-          {host.listenAddress}
-        </Text>
-      ),
+      render: (host) => {
+        const count = listenPortCount(host.listenAddress);
+        return (
+          <VStack gap={0}>
+            <Text type="code" size="sm" weight="medium" hasTabularNumbers>
+              {host.listenAddress}
+            </Text>
+            {count !== null && (
+              <Text type="body" size="xsm" color="secondary">
+                {t("listenPortCount", { count })}
+              </Text>
+            )}
+          </VStack>
+        );
+      },
     },
     {
       id: "upstreams",
@@ -248,7 +296,9 @@ export default function L4ProxyHostsClient({
           <Icon icon={ArrowRight} size="xsm" color="secondary" />
           <Tooltip content={host.upstreams.join(", ")}>
             <Text type="code" size="sm" weight="medium" maxLines={1}>
-              {summarizeUpstreams(host.upstreams)}
+              {host.upstreamPortMode === "same"
+                ? t("upstreamOnListenPort", { upstream: summarizeUpstreams(host.upstreams) })
+                : summarizeUpstreams(host.upstreams)}
             </Text>
           </Tooltip>
         </HStack>
@@ -279,6 +329,7 @@ export default function L4ProxyHostsClient({
               {host.name}
             </Text>
             <ProtocolBadge protocol={host.protocol} />
+            <AccessListBadge host={host} accessLists={accessLists} />
           </HStack>
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
@@ -353,6 +404,18 @@ export default function L4ProxyHostsClient({
             placeholder={t("searchL4Hosts")}
           />
         }
+        bulkBar={
+          selectedHosts.length > 0 && !isNarrow ? (
+            <L4HostBulkActions
+              hosts={selectedHosts}
+              onClear={() => setSelectedKeys(new Set())}
+              onDone={() => {
+                signalBannerRefresh();
+                router.refresh();
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <DataTable
@@ -364,6 +427,12 @@ export default function L4ProxyHostsClient({
         sort={initialSort}
         mobileCard={mobileCard}
         rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("disabled") })}
+        selection={{
+          selectedKeys,
+          onChange: setSelectedKeys,
+          isRowSelectable: (host) => manageable.has(host.id),
+          rowLabel: (host) => host.name,
+        }}
       />
 
       <CreateL4HostDialog
@@ -377,6 +446,7 @@ export default function L4ProxyHostsClient({
         }}
         initialData={duplicateHost}
         agents={agents ?? []}
+        accessLists={accessLists}
       />
 
       {editHost && (
@@ -389,6 +459,7 @@ export default function L4ProxyHostsClient({
             router.refresh();
           }}
           agents={agents ?? []}
+          accessLists={accessLists}
           assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
         />
       )}

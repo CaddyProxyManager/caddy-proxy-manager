@@ -1,7 +1,7 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { Shield } from "lucide-react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { KeyRound, Shield } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -13,14 +13,25 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
+import {
+  type DirectoryChoice,
+  DirectorySelector,
+  signInSource,
+  useDirectoryChoice,
+} from "@/src/components/auth/DirectorySelector";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
+import { accountLockSeconds, lockLiftsIn } from "@/src/lib/sign-in-error";
 import { twoFactorError } from "@/src/lib/two-factor-error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
-import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
+import {
+  AUTOFILL_CURRENT_PASSWORD,
+  AUTOFILL_USERNAME_WEBAUTHN,
+} from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 interface PortalLoginFormProps {
   rid: string;
@@ -37,6 +48,8 @@ interface PortalLoginFormProps {
   captcha?: CaptchaWidgetConfig | null;
   /** Cap needs it for the scripts it injects. */
   cspNonce?: string;
+  /** As on /login: one is a silent fallback, several get a selector. */
+  directories?: DirectoryChoice[];
 }
 
 function PortalCard({
@@ -79,9 +92,12 @@ export default function PortalLoginForm({
   initialError = null,
   captcha = null,
   cspNonce,
+  directories = [],
 }: PortalLoginFormProps) {
   const t = useTranslations("auth");
   const tl = useTranslations("auth.login");
+  const tPasskey = useTranslations("auth.passkey");
+  const format = useFormatter();
   const [error, setError] = useState<string | null>(initialError);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
@@ -92,6 +108,8 @@ export default function PortalLoginForm({
   // Issued by the password step for an account with 2FA; the code step sends it back.
   const [challenge, setChallenge] = useState<string | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const [directoryChoice, setDirectoryChoice] = useDirectoryChoice(directories, localLoginEnabled);
+  const passwordFormEnabled = localLoginEnabled || directories.length > 0;
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setError });
 
   // Focusing from the handler races React's commit (see LoginClient).
@@ -101,31 +119,41 @@ export default function PortalLoginForm({
     }
   }, [onPasswordStep]);
 
-  // An existing session (e.g. from OAuth) gets a forward auth session without a form.
-  useEffect(() => {
-    if (existingSession && rid) {
-      setPending(true);
-      fetch("/api/forward-auth/session-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rid }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.redirectTo) {
-            window.location.href = data.redirectTo;
-          } else {
-            setError(data.error ?? t("authorizeFailed"));
-            setPending(false);
-          }
-        })
-        .catch(() => {
-          setError(t("unexpectedError"));
+  // A dashboard session (OAuth's, or a passkey's) is exchanged for a forward auth one.
+  const exchangeSession = useCallback(() => {
+    setPending(true);
+    fetch("/api/forward-auth/session-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rid }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.redirectTo) {
+          window.location.href = data.redirectTo;
+        } else {
+          setError(data.error ?? t("authorizeFailed"));
           setPending(false);
-        });
-    }
-    // `t` is stable per locale, so this does not re-run every render.
-  }, [existingSession, rid, t]);
+        }
+      })
+      .catch(() => {
+        setError(t("unexpectedError"));
+        setPending(false);
+      });
+    // `t` is stable per locale, so this does not change every render.
+  }, [rid, t]);
+
+  // An existing session gets a forward auth session without a form.
+  useEffect(() => {
+    if (existingSession && rid) exchangeSession();
+  }, [existingSession, rid, exchangeSession]);
+
+  // The portal is on the Public URL's origin, so the dashboard's passkeys work here too.
+  const passkey = usePasskeySignIn({
+    enabled: localLoginEnabled && hasRedirect && !errorMessage && !existingSession,
+    onSignedIn: exchangeSession,
+    onError: setError,
+  });
 
   const submitCredentials = async (trimmedUsername: string) => {
     setPending(true);
@@ -133,7 +161,12 @@ export default function PortalLoginForm({
       const response = await fetch("/api/forward-auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: trimmedUsername, password, rid }),
+        body: JSON.stringify({
+          username: trimmedUsername,
+          password,
+          rid,
+          directoryId: signInSource(directories, directoryChoice).directoryId,
+        }),
       });
 
       const data = await response.json();
@@ -147,7 +180,12 @@ export default function PortalLoginForm({
 
       if (!response.ok) {
         captchaStep.spent();
-        setError(data.error ?? t("login.failed"));
+        const lockSeconds = accountLockSeconds({ ...data, status: response.status });
+        setError(
+          lockSeconds === null
+            ? (data.error ?? t("login.failed"))
+            : t("errors.accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
+        );
         setPending(false);
         // So the name that failed is still readable.
         setOnPasswordStep(true);
@@ -244,7 +282,7 @@ export default function PortalLoginForm({
     });
   };
 
-  const disabled = pending || captchaStep.pending || !!oauthPending;
+  const disabled = pending || captchaStep.pending || !!oauthPending || passkey.pending;
   const hasProviders = enabledProviders.length > 0;
 
   if (!hasRedirect) {
@@ -309,7 +347,7 @@ export default function PortalLoginForm({
     >
       {error && <Banner status="error" title={t("couldNotSignIn")} description={error} />}
 
-      {!localLoginEnabled && !hasProviders && (
+      {!passwordFormEnabled && !hasProviders && (
         <Banner
           status="error"
           title={t("signInUnavailableTitle")}
@@ -317,9 +355,9 @@ export default function PortalLoginForm({
         />
       )}
 
-      {!localLoginEnabled && hasProviders && providerList}
+      {!passwordFormEnabled && hasProviders && providerList}
 
-      {localLoginEnabled && challenge && (
+      {passwordFormEnabled && challenge && (
         <TwoFactorStep
           pending={pending}
           allowTrustDevice={false}
@@ -328,7 +366,7 @@ export default function PortalLoginForm({
         />
       )}
 
-      {localLoginEnabled && !challenge && (
+      {passwordFormEnabled && !challenge && (
         <>
           {/* One form across both steps - see LoginClient for why the password field stays
               mounted while it is hidden. */}
@@ -348,7 +386,7 @@ export default function PortalLoginForm({
               ) : (
                 <>
                   <TextInput
-                    {...AUTOFILL_USERNAME}
+                    {...AUTOFILL_USERNAME_WEBAUTHN}
                     label={t("username")}
                     htmlName="username"
                     value={username}
@@ -357,6 +395,13 @@ export default function PortalLoginForm({
                     hasAutoFocus
                     isDisabled={disabled}
                     width="100%"
+                  />
+                  <DirectorySelector
+                    directories={directories}
+                    localLoginEnabled={localLoginEnabled}
+                    value={directoryChoice}
+                    onChange={setDirectoryChoice}
+                    isDisabled={disabled}
                   />
                   {/* Mounted with the step, as on /login: a new name means a new solve. */}
                   {captchaStep.widget}
@@ -394,6 +439,21 @@ export default function PortalLoginForm({
               />
             </VStack>
           </form>
+
+          {passkey.supported && (
+            <Button
+              variant="secondary"
+              width="100%"
+              icon={<KeyRound />}
+              label={passkey.pending ? tPasskey("signingIn") : tPasskey("signIn")}
+              isLoading={passkey.pending}
+              isDisabled={disabled}
+              onClick={() => {
+                setError(null);
+                void passkey.start();
+              }}
+            />
+          )}
 
           {hasProviders && (
             <>

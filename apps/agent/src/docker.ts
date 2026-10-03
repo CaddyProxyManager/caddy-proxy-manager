@@ -3,7 +3,7 @@
  * container recreated rather than reloaded - published ports, compiled-in plugins - happens here.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -434,13 +434,17 @@ export class DockerHost {
     return this.compose(["--profile", service, "stop", service], { timeoutSeconds: 120, env });
   }
 
-  /** The ports Docker reports published on the running Caddy container, as compose spells them. */
+  /**
+   * The ports Caddy's container is created to publish, as compose spells them. Its configuration,
+   * not NetworkSettings: a container this agent's own shutdown stopped reports no live bindings,
+   * and reading those at startup republished, and recreated Caddy, on every agent restart.
+   */
   async publishedCaddyPorts(): Promise<string[]> {
     const result = await run([
       "docker",
       "inspect",
       "--format",
-      "{{json .NetworkSettings.Ports}}",
+      "{{json .HostConfig.PortBindings}}",
       this.config.caddyContainerName,
     ]);
     if (!result.ok) return [];
@@ -518,6 +522,75 @@ export class DockerHost {
       return { ...logs, ok: logs.ok && wait.output.trim() === "0" };
     } finally {
       await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
+    }
+  }
+
+  /**
+   * A throwaway container of Caddy's image with nothing but `hostDir` mounted, read-only, at
+   * `/certs`. Root, since certbot's `archive/` is 0700; confined, since a symlink can then only
+   * resolve inside this container's own filesystem, which holds nothing but Caddy's image.
+   */
+  async runInCertificateDirectory(
+    hostDir: string,
+    argv: string[],
+    timeoutSeconds = 30,
+  ): Promise<CommandResult> {
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    const remaining = () => Math.max(1, Math.round((deadline - Date.now()) / 1000));
+    const image = await run(
+      ["docker", "inspect", "--format", "{{.Image}}", this.config.caddyContainerName],
+      { timeoutSeconds: 15 },
+    );
+    if (!image.ok || !image.output.trim().startsWith("sha256:")) {
+      return {
+        ok: false,
+        exitCode: -1,
+        output: "Caddy's container does not exist yet.",
+        timedOut: false,
+      };
+    }
+    const name = `cpm-cert-files-${randomUUID()}`;
+    try {
+      const create = await run(
+        [
+          "docker",
+          "create",
+          "--name",
+          name,
+          "--label",
+          "cpm.certificate-files=1",
+          "--network",
+          "none",
+          "--cap-drop",
+          "ALL",
+          "--security-opt",
+          "no-new-privileges",
+          "--user",
+          "0",
+          "--read-only",
+          "--memory",
+          "64m",
+          "--pids-limit",
+          "64",
+          // --mount, not -v: a missing source is an error, not a directory Docker creates as root.
+          "--mount",
+          `type=bind,source=${hostPathForDaemon(hostDir) || hostDir},target=/certs,readonly`,
+          "--entrypoint",
+          argv[0],
+          image.output.trim(),
+          ...argv.slice(1),
+        ],
+        { timeoutSeconds: remaining() },
+      );
+      if (!create.ok) return create;
+      const start = await run(["docker", "start", name], { timeoutSeconds: remaining() });
+      if (!start.ok) return start;
+      const wait = await run(["docker", "wait", name], { timeoutSeconds: remaining() });
+      if (!wait.ok) return wait;
+      const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
+      return { ...logs, ok: logs.ok && wait.output.trim() === "0" };
+    } finally {
+      await run(["docker", "rm", "--force", "--volumes", name], { timeoutSeconds: 15 });
     }
   }
 
@@ -767,4 +840,23 @@ export function composeEnv(env: ManagedServicesRequest["env"] | undefined): Reco
     result[key] = value;
   }
   return result;
+}
+
+/**
+ * What the last apply was given, so a changed credential or flag re-applies although the on/off
+ * set did not change. A digest, so the agent's database holds no copy of the values.
+ */
+export function managedServicesEnvFingerprint(
+  env: ManagedServicesRequest["env"] | undefined,
+): string {
+  const values = MANAGED_SERVICE_ENV_KEYS.map((key) => {
+    const value = env?.[key];
+    return typeof value === "string" ? value : "";
+  });
+  return createHash("sha256").update(JSON.stringify(values)).digest("hex");
+}
+
+/** Stopping a service an older compose file lacks is not a failure: it is not running either. */
+export function isMissingComposeService(output: string): boolean {
+  return /no such service/i.test(output);
 }
