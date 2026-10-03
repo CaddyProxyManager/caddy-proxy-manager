@@ -25,7 +25,8 @@ import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
 
 /** In the rail (the header on a phone), so the apply control has one address and covers no field. */
-export function StagedControls({ view }: { view: StagedView }) {
+/** `fill`: as wide as the rail, the buttons sharing it by the length of their labels. */
+export function StagedControls({ view, fill = false }: { view: StagedView; fill?: boolean }) {
   const t = useTranslations("settings");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -41,16 +42,24 @@ export function StagedControls({ view }: { view: StagedView }) {
   };
 
   return (
-    <HStack gap={2} vAlign="center" wrap="wrap" data-testid="staged-bar">
+    <HStack
+      gap={2}
+      vAlign="center"
+      wrap="wrap"
+      width={fill ? "100%" : undefined}
+      data-testid="staged-bar"
+    >
       <Button
         variant="ghost"
         size="sm"
         label={t("stagedDiscard")}
         onClick={discardAll}
         isDisabled={pending}
+        className={fill ? "grow" : undefined}
       />
       <Button
         size="sm"
+        className={fill ? "grow" : undefined}
         label={t("stagedReview")}
         endContent={<Badge variant="warning" label={String(view.changes.length)} />}
         onClick={() => setOpen(true)}

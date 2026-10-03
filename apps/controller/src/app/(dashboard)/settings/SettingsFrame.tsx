@@ -89,7 +89,7 @@ function StagedSummary({ staged }: { staged: StagedView }) {
   const controls = (
     <VStack gap={2} hAlign="start">
       <RevisionPill staged={staged} inRail />
-      <StagedControls view={staged} />
+      <StagedControls view={staged} fill />
     </VStack>
   );
   if (slot && !isNarrow) return createPortal(controls, slot);
