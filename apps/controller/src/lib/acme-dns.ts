@@ -15,6 +15,7 @@ const MAX_FIELD_LENGTH = 256;
 /** The base URL `/register` and the module's `/update` are resolved against. */
 export function parseAcmeDnsServerUrl(raw: string): string {
   const parsed = parseOutboundBaseUrl(raw);
+  if (parsed.problem === "metadata") throw domainError("outboundUrlMetadata", {}, { status: 400 });
   if (parsed.problem === "https") throw domainError("acmeDnsServerUrlHttps", {}, { status: 400 });
   if (parsed.problem) throw domainError("acmeDnsServerUrlInvalid", {}, { status: 400 });
   return parsed.url;

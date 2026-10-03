@@ -95,6 +95,15 @@ describe('selection policies', () => {
     expect(selectionPolicy(doc)).toEqual({ policy: 'round_robin' });
   });
 
+  it('falls back to round_robin when every weight is zero, which Caddy refuses', async () => {
+    const doc = await httpHostWithLb({
+      enabled: true,
+      policy: 'weighted_round_robin',
+      policyWeights: [0, 0, 0],
+    });
+    expect(selectionPolicy(doc)).toEqual({ policy: 'round_robin' });
+  });
+
   it('falls back to round_robin when weighted_round_robin has no weights at all', async () => {
     const doc = await httpHostWithLb({ enabled: true, policy: 'weighted_round_robin' });
     expect(selectionPolicy(doc)).toEqual({ policy: 'round_robin' });

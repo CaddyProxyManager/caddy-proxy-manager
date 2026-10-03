@@ -821,6 +821,9 @@ its agents then pair afresh.
   administrator enables it or `cpm-server --enable-user` does. Off by default: anyone who knows a
   username could then disable that account. The last active administrator is only ever locked, and
   the administrators are emailed either way
+- Addresses the controller itself requests (an acme-dns server, a CrowdSec Local API) may not be
+  a cloud metadata service (`169.254.169.254`, `fd00:ec2::254`, `metadata.google.internal` and
+  the rest of link-local), however the address is written
 - Optional two-factor sign-in (TOTP and backup codes) on the dashboard and the forward-auth portal,
   which can be required for administrators
 - Passkeys with user verification required; adding one needs a sign-in from the last ten minutes

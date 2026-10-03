@@ -277,6 +277,7 @@ def serve_http(port, certfile=None, keyfile=None):
     scheme = "http"
     if certfile:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(certfile, keyfile)
         httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
         scheme = "https"
@@ -378,9 +379,11 @@ class FilesHandler(BaseHTTPRequestHandler):
                 "authorization": self.headers.get("Authorization"),
             })
 
-        base = os.path.realpath(os.path.join(FILES_ROOT, host))
+        # The Host header picks the directory, so it must stay under the root as the path must.
+        root = os.path.realpath(FILES_ROOT)
+        base = os.path.realpath(os.path.join(root, host))
         target = os.path.realpath(os.path.join(base, path.lstrip("/")))
-        if not target.startswith(base + os.sep):
+        if not base.startswith(root + os.sep) or not target.startswith(base + os.sep):
             self._send(404, b"not found")
             return
         auth_file = os.path.join(base, ".auth")
@@ -416,6 +419,7 @@ def serve_files(port, certfile, keyfile, root):
     httpd = ThreadingHTTPServer(("0.0.0.0", port), FilesHandler)
     httpd.daemon_threads = True
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certfile, keyfile)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     print("files: serving %s over https on :%d" % (root, port), flush=True)

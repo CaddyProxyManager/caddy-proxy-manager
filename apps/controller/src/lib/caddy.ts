@@ -4416,11 +4416,15 @@ function buildLoadBalancingConfig(
     selectionPolicy.choose = config.policyChoose;
   } else if (config.policy === "weighted_round_robin") {
     const weights = config.policyWeights;
-    if (weights && (upstreamCount === undefined || weights.length === upstreamCount)) {
+    if (
+      weights &&
+      (upstreamCount === undefined || weights.length === upstreamCount) &&
+      weights.some((weight) => weight > 0)
+    ) {
       selectionPolicy.weights = weights;
     } else {
-      // Without usable weights this policy is not configurable at all, so fall back to the
-      // unweighted rotation rather than emitting a policy Caddy would reject outright.
+      // Unweighted rotation rather than a policy Caddy rejects, failing the whole /load. Since
+      // v2.11.6 that includes weights that are all zero.
       selectionPolicy.policy = "round_robin";
     }
   }

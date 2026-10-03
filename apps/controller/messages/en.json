@@ -929,6 +929,7 @@
     "crowdsecApiUrlHttps": "The CrowdSec Local API address must use HTTPS unless the server is on a private address, since the bouncer key is sent to it",
     "crowdsecAppsecUrlInvalid": "The CrowdSec AppSec address must be an http or https URL without a user name, query or fragment",
     "crowdsecAppsecUrlHttps": "The CrowdSec AppSec address must use HTTPS unless the server is on a private address, since the bouncer key is sent to it",
+    "outboundUrlMetadata": "That address belongs to a cloud metadata service, which holds this server's cloud credentials. CPM never sends requests there.",
     "crowdsecApiKeyRequired": "Enter the bouncer key from cscli bouncers add to switch CrowdSec on",
     "crowdsecApiKeyReenter": "Enter the bouncer key again: a stored key is kept only while the Local API and AppSec addresses stay the same",
     "crowdsecApiKeyInvalid": "The bouncer key must be at most 4096 characters, without spaces or control characters",

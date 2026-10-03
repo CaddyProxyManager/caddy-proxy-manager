@@ -121,6 +121,8 @@ export function normalizeCrowdSecSettings(value: unknown): CrowdSecSettings {
   let apiUrl = text(raw.apiUrl);
   if (apiUrl) {
     const parsed = parseOutboundBaseUrl(apiUrl);
+    if (parsed.problem === "metadata")
+      throw domainError("outboundUrlMetadata", {}, { status: 400 });
     if (parsed.problem === "https") throw domainError("crowdsecApiUrlHttps", {}, { status: 400 });
     if (parsed.problem) throw domainError("crowdsecApiUrlInvalid", {}, { status: 400 });
     apiUrl = parsed.url;
@@ -129,6 +131,8 @@ export function normalizeCrowdSecSettings(value: unknown): CrowdSecSettings {
   let appsecUrl = text(raw.appsecUrl);
   if (appsecUrl) {
     const parsed = parseOutboundBaseUrl(appsecUrl);
+    if (parsed.problem === "metadata")
+      throw domainError("outboundUrlMetadata", {}, { status: 400 });
     if (parsed.problem === "https") {
       throw domainError("crowdsecAppsecUrlHttps", {}, { status: 400 });
     }

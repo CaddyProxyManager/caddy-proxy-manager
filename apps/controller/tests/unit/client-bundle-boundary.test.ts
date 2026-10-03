@@ -20,11 +20,23 @@ function listSources(dir: string): string[] {
   });
 }
 
+/** A loop, not one regex: skipping the leading comments that way can backtrack exponentially. */
 function directive(code: string): string | null {
-  const match = code.match(
-    /^(?:\s*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/))*\s*(['"])(use (?:client|server))\1/,
-  );
-  return match?.[2] ?? null;
+  let rest = code;
+  for (;;) {
+    rest = rest.trimStart();
+    if (rest.startsWith('//')) {
+      const end = rest.indexOf('\n');
+      rest = end === -1 ? '' : rest.slice(end + 1);
+    } else if (rest.startsWith('/*')) {
+      const end = rest.indexOf('*/');
+      if (end === -1) return null;
+      rest = rest.slice(end + 2);
+    } else {
+      break;
+    }
+  }
+  return rest.match(/^(['"])(use (?:client|server))\1/)?.[2] ?? null;
 }
 
 function resolveFile(base: string): string | null {

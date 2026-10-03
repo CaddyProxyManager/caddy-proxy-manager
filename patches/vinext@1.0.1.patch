@@ -1,5 +1,5 @@
 diff --git a/dist/server/request-pipeline.js b/dist/server/request-pipeline.js
-index 5a3cade..a5cf5b1 100644
+index 806102a..d60004f 100644
 --- a/dist/server/request-pipeline.js
 +++ b/dist/server/request-pipeline.js
 @@ -361,6 +361,8 @@ function cloneRequestWithHeaders(request, headers) {
