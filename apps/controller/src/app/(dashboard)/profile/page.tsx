@@ -69,6 +69,13 @@ export default async function ProfilePage() {
   const managedByDirectory =
     !passwordHash && directoryLink ? (directoryNames.get(directoryLink.providerId) ?? null) : null;
   const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+  // Only administrators are notified, so only they have anything to choose.
+  const notifications =
+    user.role === "admin"
+      ? await import("@/src/lib/notifications/audience").then(({ notificationProfileView }) =>
+          notificationProfileView({ id: userId, email: user.email }),
+        )
+      : null;
 
   return (
     <ProfileClient
@@ -95,6 +102,7 @@ export default async function ProfilePage() {
       passkeyRpId={passkeyRpId(publicBaseUrl)}
       passwordLocked={isDemoAdmin(userId)}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
+      notifications={notifications}
     />
   );
 }

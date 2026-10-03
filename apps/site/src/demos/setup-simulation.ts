@@ -763,6 +763,13 @@ export const SETTING_FIELDS: Array<{
     value: true,
   },
   {
+    key: "config:notify_disabled_account_owner",
+    env: "NOTIFY_DISABLED_ACCOUNT_OWNER",
+    group: "email",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:analytics_enabled",
     env: "ANALYTICS_ENABLED",
     group: "analytics",

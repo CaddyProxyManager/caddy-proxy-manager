@@ -53,11 +53,9 @@ let releaseCheckedAt = 0;
 export async function watchReleases(now: number): Promise<void> {
   if (now - releaseCheckedAt < RELEASE_CHECK_MS) return;
   releaseCheckedAt = now;
-  const [{ notificationCategoryEnabled }, { emailReady }, { getUpdateStatus }] = await Promise.all([
-    import("./index"),
-    import("../email/config"),
-    import("../updates"),
-  ]);
-  if (!(await notificationCategoryEnabled("updateAvailable")) || !(await emailReady())) return;
+  const [{ notificationCategoryEnabled, notificationChannelReady }, { getUpdateStatus }] =
+    await Promise.all([import("./index"), import("../updates")]);
+  if (!(await notificationCategoryEnabled("updateAvailable"))) return;
+  if (!(await notificationChannelReady())) return;
   await getUpdateStatus();
 }

@@ -825,3 +825,26 @@ export const groupGrants = sqliteTable(
     agentUnique: uniqueIndex("group_grants_agent_unique").on(table.groupId, table.agentId),
   }),
 );
+
+/** A browser an administrator turned notifications on in. The keys encrypt each push for it. */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The push service's URL for this browser; what the browser itself identifies it by. */
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    /** The reader's locale when they subscribed; a push has no request to negotiate one from. */
+    locale: text("locale"),
+    userAgent: text("userAgent"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    endpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
+    userIdx: index("push_subscriptions_user_idx").on(table.userId),
+  }),
+);

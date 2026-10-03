@@ -8,6 +8,7 @@ import { isDemoAdmin } from "../demo-mode";
 import { domainError } from "../domain-error";
 import { withRowLock } from "../db-claim";
 import { resetAccountFailuresFor } from "../rate-limit";
+import type { AccountDisabledReason } from "../notifications/account-owner";
 import {
   isUsableSignInUsername,
   LOGIN_USERNAME_MAX_LENGTH,
@@ -614,10 +615,22 @@ export async function updateUserRole(userId: number, role: User["role"]): Promis
   return result;
 }
 
-export async function updateUserStatus(userId: number, status: string): Promise<User | null> {
+/** `reason` is only what the owner is told, if Settings says to tell them. */
+export async function updateUserStatus(
+  userId: number,
+  status: string,
+  reason: AccountDisabledReason = { by: "administrator" },
+): Promise<User | null> {
   if (status !== "active") assertNotDemoAdmin(userId);
+  let wasActive = false;
   const updated = await withAdminLock(async () => {
     if (status !== "active") await assertKeepsAnAdmin(userId);
+    const [previous] = await db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    wasActive = previous?.status === "active";
     const [row] = await db
       .update(users)
       .set({ status, updatedAt: nowIso() })
@@ -633,6 +646,12 @@ export async function updateUserStatus(userId: number, status: string): Promise<
   } else if (updated) {
     // Or an account auto-disabled for its failed sign-ins is disabled again by the next typo.
     resetAccountFailuresFor([updated.email, updated.username]);
+  }
+
+  // Once, on the change: disabling a disabled account tells nobody anything.
+  if (updated && wasActive && status !== "active") {
+    const { tellOwnerAccountDisabled } = await import("../notifications/account-owner");
+    await tellOwnerAccountDisabled(parseDbUser(updated), reason);
   }
 
   return updated ? parseDbUser(updated) : null;

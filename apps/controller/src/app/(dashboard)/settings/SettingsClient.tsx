@@ -129,7 +129,7 @@ import { CaptchaSection } from "./CaptchaSection";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
-import { EmailServerSection, NotificationsSection, UpstreamAccessLogWarning } from "./EmailSection";
+import { EmailServerSection, NotificationsSection } from "./EmailSection";
 import type { EmailSettingsView } from "@/src/lib/email/view";
 import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
@@ -596,10 +596,18 @@ export default function SettingsClient({
           formAction={certificateAlertsFormAction}
         />
         <Heading level={3}>{t("email.notificationsTitle")}</Heading>
-        <UpstreamAccessLogWarning email={email} />
+        <Text size="sm" color="secondary">
+          {t("email.notificationsPerUser")}
+        </Text>
         <RegistrySettingsBlock
           block="notifications"
           fields={registry.notifications ?? []}
+          unavailable={Object.fromEntries(
+            Object.entries(email.notifications.unavailable).map(([key, reason]) => [
+              key,
+              t(`email.unavailable.${reason}`),
+            ]),
+          )}
           state={notificationsRegistryState}
           formAction={notificationsRegistryFormAction}
         />

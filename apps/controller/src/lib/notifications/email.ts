@@ -78,24 +78,21 @@ function values(event: NotificationEvent): Record<string, string | number> {
   }
 }
 
-export async function notificationEmail(
-  input: { to: string[]; notices: readonly PendingNotice[] },
-  locale: Locale = DEFAULT_LOCALE,
-): Promise<EmailMessage> {
-  const { t, appName, url, footer } = await emailContext(locale);
+/** The subject and each notice's sentence, shared by every channel that sends a batch. */
+export async function notificationText(notices: readonly PendingNotice[], locale: Locale) {
+  const context = await emailContext(locale);
+  const { t, appName } = context;
   const translate = t as unknown as DynamicTranslate;
-  const format = createFormatter({ locale, timeZone: "UTC" });
 
-  const items = input.notices.map(({ event, at }) => {
-    let text = translate(`notifications.kinds.${event.kind}.item`, clean(values(event)));
-    if (event.kind === "agentProblem" && event.detail) {
-      text = t("notifications.withDetail", { text, detail: String(clean({ d: event.detail }).d) });
-    }
-    return t("notifications.item", { time: format.dateTime(new Date(at), TIME_FORMAT), text });
+  const texts = notices.map(({ event }) => {
+    const text = translate(`notifications.kinds.${event.kind}.item`, clean(values(event)));
+    return event.kind === "agentProblem" && event.detail
+      ? t("notifications.withDetail", { text, detail: String(clean({ d: event.detail }).d) })
+      : text;
   });
-  const [first] = input.notices;
+  const [first] = notices;
   const subject =
-    input.notices.length === 1
+    notices.length === 1
       ? t("notifications.subjectOne", {
           appName,
           title: translate(
@@ -103,7 +100,22 @@ export async function notificationEmail(
             clean(values(first.event)),
           ),
         })
-      : t("notifications.subjectMany", { appName, count: input.notices.length });
+      : t("notifications.subjectMany", { appName, count: notices.length });
+  return { ...context, subject, texts };
+}
+
+export async function notificationEmail(
+  input: { to: string[]; notices: readonly PendingNotice[] },
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<EmailMessage> {
+  const { t, appName, url, footer, subject, texts } = await notificationText(input.notices, locale);
+  const format = createFormatter({ locale, timeZone: "UTC" });
+  const items = input.notices.map(({ at }, index) =>
+    t("notifications.item", {
+      time: format.dateTime(new Date(at), TIME_FORMAT),
+      text: texts[index],
+    }),
+  );
 
   return {
     to: input.to,

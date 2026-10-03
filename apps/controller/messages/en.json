@@ -1259,6 +1259,7 @@
     "geoipDatabaseMissing": "the download has no {edition}.mmdb in it",
     "apiTokenNameTooLong": "Token name must be {max} characters or fewer",
     "apiTokenLimitReached": "Maximum of {max} API tokens per user",
+    "pushSubscriptionInvalid": "The browser sent a push subscription this server cannot use",
     "l4ListenAddressInvalid": "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535 or a range such as 5000-5010",
     "l4ListenRangeTooLarge": "A port range can hold at most {max} ports",
     "l4ListenPortInUse": "Port {port} is already used by another L4 host with a different listen address. Hosts share a port only when their listen addresses are exactly the same.",
@@ -1700,6 +1701,35 @@
     }
   },
   "profile": {
+    "notifications": {
+      "title": "Notifications",
+      "description": "What you are told about, and how. Only administrators are notified. An event turned off under Settings → Email → Notifications is off for everyone.",
+      "email": "Email",
+      "emailHelp": "To {address}.",
+      "emailOff": "Email is not set up on this server.",
+      "emailUndeliverable": "{address} cannot receive mail. Change your email address to get notifications by email.",
+      "push": "Browser notifications",
+      "pushHelp": "To every browser you turn them on in below.",
+      "events": "Events",
+      "eventOffForEveryone": "Turned off for everyone under Settings → Email → Notifications.",
+      "saveFailed": "Your notification settings could not be saved.",
+      "pushChecking": "Checking this browser…",
+      "pushOn": "On in this browser.",
+      "pushOff": "Off in this browser.",
+      "pushUnsupported": "This browser cannot receive them here. Browser notifications need HTTPS, or localhost, and a browser with Push support; on an iPhone or iPad, add the dashboard to the Home Screen first.",
+      "pushBlocked": "This browser blocks notifications from this site. Allow them in the site's settings, then turn them on here.",
+      "pushNoKey": "The server's push keys could not be read; see the controller's log.",
+      "pushEnable": "Turn on in this browser",
+      "pushDisable": "Turn off in this browser",
+      "pushTest": "Send a test",
+      "pushEnabled": "Browser notifications are on in this browser.",
+      "pushEnableFailed": "Browser notifications could not be turned on.",
+      "pushDisabled": "Browser notifications are off in this browser.",
+      "pushDisableFailed": "Browser notifications could not be turned off.",
+      "pushTestSent": "Test notification sent to this browser.",
+      "pushTestFailed": "The push service did not accept the test notification.",
+      "pushTestNotSubscribed": "This browser is not subscribed any more. Turn browser notifications on again."
+    },
     "passkeys": {
       "title": "Passkeys",
       "description": "Sign in with your fingerprint, face or device PIN instead of a password. A passkey stands in for both your password and a two-factor code.",
@@ -2898,7 +2928,7 @@
         "label": "Sender address"
       },
       "email_alert_recipients": {
-        "description": "Comma-separated addresses that certificate alerts and notifications go to. If left empty they go to every active administrator.",
+        "description": "Comma-separated addresses for certificate alerts, and extra recipients of every notification. If left empty, certificate alerts go to every active administrator.",
         "label": "Alert recipients"
       },
       "certificate_expiry_alert_days": {
@@ -2956,6 +2986,10 @@
       "notify_update_available": {
         "description": "Once per release, while the update check under General is on.",
         "label": "New release"
+      },
+      "notify_disabled_account_owner": {
+        "description": "Email one message to an account's own address when it is disabled, by an administrator or after failed sign-ins. A disabled account gets nothing else.",
+        "label": "Tell the owner of a disabled account"
       }
     },
     "releaseUpdates": "Release updates",
@@ -4103,21 +4137,27 @@
       "alertDays": "Alert threshold (days)",
       "alertDaysHelp": "Email once a certificate has fewer days than this left. Caddy renews managed certificates well before then, so an alert about one means its renewal is failing. 0 turns alerts off.",
       "alertRecipients": "Recipients",
-      "alertRecipientsHelp": "Comma-separated addresses, for certificate alerts and every notification below. If left empty, they go to every active administrator with a deliverable address.",
+      "alertRecipientsHelp": "Comma-separated addresses for certificate alerts, which go to every active administrator when this is empty. Notifications go to these too, besides each administrator's own choice under Profile → Notifications.",
       "alertRecipientsPlaceholder": "Every active administrator",
       "alertsNeedEmailTitle": "Alerts and notifications wait for email",
-      "alertsNeedEmailBody": "Nothing is sent until the SMTP server above is set up.",
+      "alertsNeedEmailBody": "Certificate alerts wait for the SMTP server above. Notifications go out once it is set up, or to the browsers administrators turn on under Profile → Notifications.",
       "alertsLastChecked": "Certificates last checked {when}",
       "alertsNeverChecked": "Certificates have not been checked yet. The first check runs a few minutes after the controller starts, then twice a day.",
       "alertsFailed": "The last check failed: {error}",
       "notificationsLastSent": "Last notification sent {when}",
-      "notificationsNeverSent": "No notification has been sent yet. Events raised within a minute go out together in one email.",
+      "notificationsNeverSent": "No notification has been sent yet. Events raised within a minute go out together, in one email and one browser notification.",
       "notificationsPending": "{count, plural, one {# notification is} other {# notifications are}} waiting to be sent.",
       "notificationsFailed": "The last notification could not be sent: {error}. It is tried again every five minutes, for a day.",
       "notificationsNoRecipients": "The last notifications were dropped: no recipients are set, and no active administrator has a deliverable address.",
-      "notificationsTitle": "Events to email about",
-      "upstreamNeedsAccessLogTitle": "Upstream errors need the access log",
-      "upstreamNeedsAccessLogBody": "They are counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+      "notificationsTitle": "Events to notify about",
+      "notificationsPerUser": "These turn an event off for everyone. Each administrator chooses their own events, and email or browser, under Profile → Notifications.",
+      "unavailable": {
+        "accessLogOff": "Counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+        "accountLockOff": "Needs accounts to lock after failed sign-ins, which is off under Authentication → Sign-in.",
+        "accountDisableOff": "Needs accounts to be disabled after repeated failed sign-ins, which is off under Authentication → Sign-in.",
+        "updateCheckOff": "Needs the update check, which is off under General → Updates.",
+        "geoipOff": "The controller downloads GeoIP databases only with GeoIP on and a MaxMind account ID and licence key set, under Geo-blocking → GeoIP Databases."
+      },
       "testNotification": "Send a test notification",
       "testNotificationHelp": "Sends one to the recipients above, or every active administrator, straight away.",
       "testNotificationSent": "Test notification sent to {recipients}.",
@@ -4946,6 +4986,13 @@
       "expiry": "The link works once, within {minutes} minutes.",
       "ignore": "If it was not you, ignore this message. Your password has not changed."
     },
+    "accountDisabled": {
+      "subject": "Your {appName} account has been disabled",
+      "intro": "The account {email} on {appName} has been disabled. You cannot sign in with it until an administrator enables it again.",
+      "byAdministrator": "An administrator disabled it.",
+      "byFailedSignIns": "It was disabled after {failures} failed sign-ins in a row. If those were not you, someone may be guessing your password; tell an administrator.",
+      "nothingElse": "This is the only message this account will receive while it is disabled."
+    },
     "invite": {
       "subject": "You have been invited to {appName}",
       "intro": "{inviter} created an account for {email} on {appName}.",
@@ -4969,6 +5016,7 @@
       "intro": "{count, plural, one {Something happened} other {# things happened}} on {appName} that an administrator should know about:",
       "item": "{time}: {text}",
       "withDetail": "{text} ({detail})",
+      "pushMore": "…and {count} more",
       "action": "Open the dashboard",
       "manage": "Sent to the notification recipients, or every active administrator when none are set. Choose what is sent under Settings → Email → Notifications.",
       "kinds": {

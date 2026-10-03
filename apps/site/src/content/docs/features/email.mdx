@@ -1,6 +1,6 @@
 ---
 title: Email
-description: Password resets, invitations, certificate alerts and admin notifications, sent through your own SMTP server.
+description: Password resets, invitations, certificate alerts and admin notifications, sent through your own SMTP server or as browser notifications.
 ---
 
 CPM sends four kinds of mail, all through an SMTP server you name under **Settings → Email**:
@@ -72,8 +72,29 @@ Caddy manages - and emails a digest of those that have fewer days left than the 
 
 ## Notifications
 
-**Settings → Email → Notifications** has a switch for each kind of event, all on by default. They
-go to the same recipients as the certificate alerts.
+**Settings → Email → Notifications** has a switch for each kind of event, all on by default. A
+switch turned off there is off for everyone. Within that, each administrator chooses for themselves
+under **Profile → Notifications**:
+
+- **Which events** they are told about.
+- **Email**, to their account's address. Until they choose, an administrator is emailed when the
+  Recipients list is empty or names them, which is who was emailed before the choice existed.
+- **Browser notifications**, to each browser they turn them on in. These work with or without email
+  set up. They need HTTPS (or localhost), and on an iPhone or iPad the dashboard added to the Home
+  Screen.
+
+Addresses in the Recipients list that are not an administrator's get every enabled event, so a team
+inbox can keep receiving them.
+
+An event the current settings rule out is greyed out on both pages, with what it needs instead: upstream
+errors without the access log in JSON, a locked administrator without account locking, a disabled
+account without disabling after failed sign-ins, a new release without the update check, and a
+failing GeoIP update without GeoIP downloads set up. Its stored choice is kept for when it applies
+again.
+
+A **disabled account receives nothing**, administrator or not. **Tell the owner of a disabled
+account** (off by default) sends that account's own address one email when it is disabled, by an
+administrator or after failed sign-ins, and nothing more while it stays disabled.
 
 | Event | What raises it | Told again when |
 | --- | --- | --- |
@@ -88,13 +109,15 @@ go to the same recipients as the certificate alerts.
 | CRS plugin switched off | A CRS plugin Caddy refused, switched off so the rest loads | - |
 | New release | A newer release, once per version, while the update check is on | - |
 
-- **One email a minute at most.** Whatever happens within a minute goes out together. A problem is
-  told once however long it lasts, and its recovery once; one that is over before its email goes out
-  costs no email at all.
-- **A failed send is retried** every five minutes for a day. The block shows when a notification
-  was last sent, how many are waiting, and the last error. **Send a test notification** sends one
-  to the real recipients straight away.
-- **Nothing is queued while email is off**, so setting it up later does not bring a backlog.
+- **One email and one browser notification a minute at most.** Whatever happens within a minute
+  goes out together. A problem is told once however long it lasts, and its recovery once; one that
+  is over before it goes out costs nothing at all.
+- **A failed email is retried** every five minutes for a day, to whoever did not get it; a browser
+  notification is sent once. The block shows when a notification was last sent, how many are
+  waiting, and the last error. **Send a test notification** emails everyone notifications are
+  emailed to, straight away; **Send a test** under Profile pushes to that browser alone.
+- **Nothing is queued while there is nowhere to send it** - no email and no browser turned on - so
+  setting one up later does not bring a backlog.
 - **Times are in UTC**, and say so: an email has no reader whose time zone could be asked.
 
 ### Agents going offline
@@ -107,7 +130,7 @@ never connected, is switched off or has been unpaired is no news.
 
 These are counted from Caddy's access log, so **access logging must be on**, in JSON, under
 **Settings → Observability → Access Logging**; the block says so when it is not. ClickHouse is not
-needed: while this notification is on and email is set up, each agent reads its access log and
+needed: while this notification is on and it can be sent somewhere, each agent reads its access log and
 sends the controller counts of 502, 503 and 504 answers per host and minute, analytics or not. A
 logged name that is not one of your proxy hosts is ignored. The access log does not record which
 upstream answered, so the email names the host.

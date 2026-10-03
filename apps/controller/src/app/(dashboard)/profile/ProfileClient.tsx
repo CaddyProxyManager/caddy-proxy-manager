@@ -30,6 +30,7 @@ import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
 import {
+  Bell,
   Key,
   KeyRound,
   Link,
@@ -47,6 +48,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { TwoFactorSection } from "./TwoFactorSection";
 import { PasskeySection } from "./PasskeySection";
+import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import type { PasskeySummary } from "@/src/lib/passkeys";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
@@ -136,6 +138,8 @@ interface ProfileClientProps {
   directories?: Array<{ id: string; name: string }>;
   /** The directory whose password this account signs in with, when it has none of its own. */
   managedByDirectory?: string | null;
+  /** An administrator's notification choices; null for everyone else, who is never notified. */
+  notifications?: NotificationsSectionProps | null;
 }
 
 function ProfileSection({
@@ -230,6 +234,7 @@ export default function ProfileClient({
   passkeyRpId = null,
   directories = [],
   managedByDirectory = null,
+  notifications = null,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
@@ -611,6 +616,12 @@ export default function ProfileClient({
         </ProfileSection>
 
         <DisplaySection onError={setError} />
+
+        {notifications && (
+          <ProfileSection icon={Bell} title={t("notifications.title")}>
+            <NotificationsSection {...notifications} />
+          </ProfileSection>
+        )}
 
         {localPasswordsEnabled && (
           <ProfileSection icon={Lock} title={t("passwordManagement")}>

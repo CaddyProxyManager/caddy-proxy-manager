@@ -34,6 +34,7 @@ import {
   notifyAgentProblems,
   notifyCaddyApply,
   notifyCrsPluginDisabled,
+  notifyDisabledAccountOwner,
   notifyGeoipFailed,
   notifyUpdateAvailable,
   notifyUpstreamErrorCount,
@@ -89,6 +90,7 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
     notifyGeoipFailed,
     notifyCrsPluginDisabled,
     notifyUpdateAvailable,
+    notifyDisabledAccountOwner,
   ] as AnySetting[],
 };
 

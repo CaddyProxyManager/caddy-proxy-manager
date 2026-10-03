@@ -53,6 +53,7 @@ export const {
   l4ProxyHostAgents,
   groupIdpMappings,
   groupGrants,
+  pushSubscriptions,
   wafPresets,
   crsPlugins,
 } = activeSchema;

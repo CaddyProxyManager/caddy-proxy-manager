@@ -201,6 +201,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "NOTIFY_GEOIP_FAILED",
               "NOTIFY_CRS_PLUGIN_DISABLED",
               "NOTIFY_UPDATE_AVAILABLE",
+              "NOTIFY_DISABLED_ACCOUNT_OWNER",
             ],
           },
         ],

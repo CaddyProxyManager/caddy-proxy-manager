@@ -285,18 +285,6 @@ export function NotificationsSection({
   );
 }
 
-/** A warning above the switches, while upstream errors are on with nothing to count them from. */
-export function UpstreamAccessLogWarning({ email }: { email: EmailSettingsView }) {
-  const t = useTranslations("settings.email");
-  const { notifications } = email;
-  if (!notifications.upstreamErrorsOn || notifications.accessLogOn) return null;
-  return (
-    <WarnAlert title={t("upstreamNeedsAccessLogTitle")}>
-      {t("upstreamNeedsAccessLogBody")}
-    </WarnAlert>
-  );
-}
-
 /** Its own form, left out of the page save, like the test email. */
 function TestNotificationForm({ ready }: { ready: boolean }) {
   const t = useTranslations("settings.email");

@@ -9,6 +9,7 @@ import db from "../db";
 import { hostMatchesPattern } from "../host-pattern-priority";
 import {
   notificationCategoryEnabled,
+  notificationChannelReady,
   openProblemKeys,
   raiseProblem,
   resolveProblem,
@@ -165,10 +166,9 @@ export function parseUpstreamErrorRow(value: unknown): UpstreamErrorRow | null {
 
 /** What the agents are told: counting costs a parse of the access log, so only when wanted. */
 export async function upstreamErrorsWanted(): Promise<boolean> {
-  const [{ emailReady }, { isDemoMode }] = await Promise.all([
-    import("../email/config"),
-    import("../demo-mode"),
-  ]);
+  const { isDemoMode } = await import("../demo-mode");
   if (isDemoMode()) return false;
-  return (await notificationCategoryEnabled("upstreamErrors")) && (await emailReady());
+  return (
+    (await notificationCategoryEnabled("upstreamErrors")) && (await notificationChannelReady())
+  );
 }

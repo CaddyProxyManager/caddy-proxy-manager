@@ -1,0 +1,120 @@
+"use server";
+
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
+import { extractErrorMessage } from "@/src/lib/actions";
+import { requireAdmin } from "@/src/lib/auth";
+import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
+import { setNotificationPreferences } from "@/src/lib/models/notification-preferences";
+import {
+  deletePushSubscription,
+  hasPushSubscription,
+  parsePushSubscription,
+  savePushSubscription,
+} from "@/src/lib/models/push-subscriptions";
+
+export type NotificationActionResult = { success: boolean; message?: string };
+
+async function errorText(error: unknown, fallback: string): Promise<string> {
+  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+  return extractErrorMessage(t, error, fallback, format);
+}
+
+/** The agents relay upstream errors only while some channel can carry them. */
+async function refreshFleetConfig(): Promise<void> {
+  const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
+  void pushFleetConfig().catch(() => {});
+}
+
+/** Administrators only: nobody else is notified, so there is nothing for anyone else to choose. */
+export async function saveNotificationPreferencesAction(input: {
+  email: boolean;
+  push: boolean;
+  muted: string[];
+}): Promise<NotificationActionResult> {
+  const t = await getTranslations("profile.notifications");
+  try {
+    const session = await requireAdmin();
+    // A server action is a public endpoint: the parameter's type is not a check on what arrives.
+    await setNotificationPreferences(Number(session.user.id), {
+      email: input?.email === true,
+      push: input?.push !== false,
+      muted: Array.isArray(input?.muted) ? input.muted.map(String) : [],
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save notification preferences:", error);
+    return { success: false, message: await errorText(error, t("saveFailed")) };
+  }
+}
+
+/** This browser's subscription, for the signed-in administrator. */
+export async function subscribePushAction(
+  subscription: unknown,
+): Promise<NotificationActionResult> {
+  const t = await getTranslations("profile.notifications");
+  try {
+    const session = await requireAdmin();
+    await savePushSubscription(
+      Number(session.user.id),
+      parsePushSubscription(subscription),
+      parseLocale(await getLocale()) ?? DEFAULT_LOCALE,
+      (await headers()).get("user-agent"),
+    );
+    await refreshFleetConfig();
+    return { success: true, message: t("pushEnabled") };
+  } catch (error) {
+    console.error("Failed to save a push subscription:", error);
+    return { success: false, message: await errorText(error, t("pushEnableFailed")) };
+  }
+}
+
+export async function unsubscribePushAction(endpoint: string): Promise<NotificationActionResult> {
+  const t = await getTranslations("profile.notifications");
+  try {
+    const session = await requireAdmin();
+    await deletePushSubscription(Number(session.user.id), String(endpoint));
+    await refreshFleetConfig();
+    return { success: true, message: t("pushDisabled") };
+  } catch (error) {
+    console.error("Failed to remove a push subscription:", error);
+    return { success: false, message: await errorText(error, t("pushDisableFailed")) };
+  }
+}
+
+/** Whether this server still sends to it: one a push service gave up on is dropped here. */
+export async function pushSubscriptionKnownAction(endpoint: string): Promise<boolean> {
+  try {
+    const session = await requireAdmin();
+    return await hasPushSubscription(Number(session.user.id), String(endpoint));
+  } catch {
+    return false;
+  }
+}
+
+/** To this browser alone, so it proves the subscription rather than whoever else has one. */
+export async function sendTestPushAction(endpoint: string): Promise<NotificationActionResult> {
+  const t = await getTranslations("profile.notifications");
+  try {
+    const session = await requireAdmin();
+    const [{ adminPushTargets }, { sendPush }] = await Promise.all([
+      import("@/src/lib/models/push-subscriptions"),
+      import("@/src/lib/notifications/push"),
+    ]);
+    const userId = Number(session.user.id);
+    const targets = (await adminPushTargets()).filter(
+      (target) => target.userId === userId && target.endpoint === endpoint,
+    );
+    if (targets.length === 0) return { success: false, message: t("pushTestNotSubscribed") };
+    const { delivered } = await sendPush(
+      [{ id: "test", key: "test", at: new Date().toISOString(), event: { kind: "test" } }],
+      targets,
+    );
+    return delivered > 0
+      ? { success: true, message: t("pushTestSent") }
+      : { success: false, message: t("pushTestFailed") };
+  } catch (error) {
+    console.error("Failed to send a test push:", error);
+    return { success: false, message: await errorText(error, t("pushTestFailed")) };
+  }
+}

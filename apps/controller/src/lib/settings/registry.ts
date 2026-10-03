@@ -785,6 +785,18 @@ export const notifyUpdateAvailable = notifySetting(
   "Once per release, while the update check under General is on.",
 );
 
+/** Off by default, unlike the rest: it mails someone who is not an administrator. */
+export const notifyDisabledAccountOwner = booleanSetting({
+  name: "notify_disabled_account_owner",
+  env: "NOTIFY_DISABLED_ACCOUNT_OWNER",
+  group: "email",
+  label: "Tell the owner of a disabled account",
+  description:
+    "Email one message to an account's own address when it is disabled, by an administrator or " +
+    "after failed sign-ins. A disabled account gets nothing else.",
+  default: false,
+});
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 /**
@@ -971,6 +983,7 @@ export const SETTING_DEFINITIONS = [
   notifyGeoipFailed,
   notifyCrsPluginDisabled,
   notifyUpdateAvailable,
+  notifyDisabledAccountOwner,
   analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,
