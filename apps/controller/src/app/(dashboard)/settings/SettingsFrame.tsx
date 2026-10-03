@@ -88,7 +88,7 @@ function StagedSummary({ staged }: { staged: StagedView }) {
 
   const controls = (
     <VStack gap={2} hAlign="start">
-      <RevisionPill staged={staged} />
+      <RevisionPill staged={staged} inRail />
       <StagedControls view={staged} />
     </VStack>
   );

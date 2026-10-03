@@ -36,18 +36,10 @@ export default function SettingsSideNav({
 
   return (
     <SideNav
-      // History sits with the account controls, apart from the sections it records changes to.
       footer={
         <VStack gap={2}>
           {/* The page fills this: the rail is the layout's, the staged change set the page's. */}
           <div id={STAGED_SLOT_ID} />
-          <SideNavItem
-            as={Link}
-            href="/settings/history"
-            label={t("history.navLabel")}
-            icon={<History className={ACCENTS.orange.text} />}
-            isSelected={pathname === "/settings/history"}
-          />
           {footer}
         </VStack>
       }
@@ -65,6 +57,13 @@ export default function SettingsSideNav({
           label={t("homeOverview")}
           icon={<LayoutGrid className={ACCENTS.gray.text} />}
           isSelected={pathname === "/settings"}
+        />
+        <SideNavItem
+          as={Link}
+          href="/settings/history"
+          label={t("history.navLabel")}
+          icon={<History className={ACCENTS.orange.text} />}
+          isSelected={pathname === "/settings/history"}
         />
         <SideNavItem
           as={Link}
