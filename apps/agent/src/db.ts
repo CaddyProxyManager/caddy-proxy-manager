@@ -79,6 +79,7 @@ const SERVICES_STATUS_KEY = "managed_services_status";
 const APPLIED_SERVICES_KEY = "applied_managed_services";
 const APPLIED_SERVICES_ENV_KEY = "applied_managed_services_env";
 const CADDY_STOPPED_FOR_SHUTDOWN_KEY = "caddy_stopped_for_shutdown";
+const SERVICES_STOPPED_FOR_SHUTDOWN_KEY = "services_stopped_for_shutdown";
 
 export class AgentStore {
   private readonly db: Database;
@@ -261,6 +262,19 @@ export class AgentStore {
       this.writeState(CADDY_STOPPED_FOR_SHUTDOWN_KEY, "true");
     } else {
       this.db.query("DELETE FROM state WHERE key = ?").run(CADDY_STOPPED_FOR_SHUTDOWN_KEY);
+    }
+  }
+
+  /** The same for the managed services, which `docker compose down` skips behind their profiles. */
+  servicesStoppedForShutdown(): ManagedServiceName[] {
+    return this.readJson<ManagedServiceName[]>(SERVICES_STOPPED_FOR_SHUTDOWN_KEY) ?? [];
+  }
+
+  setServicesStoppedForShutdown(services: ManagedServiceName[]): void {
+    if (services.length > 0) {
+      this.writeState(SERVICES_STOPPED_FOR_SHUTDOWN_KEY, JSON.stringify(services));
+    } else {
+      this.db.query("DELETE FROM state WHERE key = ?").run(SERVICES_STOPPED_FOR_SHUTDOWN_KEY);
     }
   }
 
