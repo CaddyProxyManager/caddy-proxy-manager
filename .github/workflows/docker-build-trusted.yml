@@ -11,7 +11,13 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # The images stay where every install pulls them from: the maintainer's
+  # personal namespace, also after the repository moved to the ingres-si
+  # organization. The repository's GITHUB_TOKEN cannot push there, so they
+  # are pushed with GHCR_PUSH_TOKEN, a classic personal access token of the
+  # maintainer with only the write:packages scope.
+  IMAGE_NAME: fuomag9/caddy-proxy-manager
+  GHCR_PUSH_USER: fuomag9
 
 jobs:
   build-and-push:
@@ -40,12 +46,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Check the push token
+        env:
+          GHCR_PUSH_TOKEN: ${{ secrets.GHCR_PUSH_TOKEN }}
+        run: |
+          if [ -z "$GHCR_PUSH_TOKEN" ]; then
+            echo "::error::Set the GHCR_PUSH_TOKEN secret: a classic personal access token of ${GHCR_PUSH_USER} with the write:packages scope."
+            exit 1
+          fi
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ env.GHCR_PUSH_USER }}
+          password: ${{ secrets.GHCR_PUSH_TOKEN }}
 
       - name: Extract metadata (tags, labels)
         id: meta
