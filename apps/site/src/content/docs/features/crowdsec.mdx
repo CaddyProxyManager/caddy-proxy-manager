@@ -24,6 +24,10 @@ opt-in module, not in the default image.
 
 ## Managed
 
+Managed mode needs the `crowdsec` service in your `docker-compose.yml`. The release's default
+`-deploy.tar.gz` leaves it out; deploy from `-deploy-crowdsec.tar.gz` instead, unpacked over the
+same directory.
+
 <Steps>
 
 1. Open **Settings → CrowdSec**, switch it on, and choose **Managed (bundled host only)** as the
@@ -72,23 +76,63 @@ docker exec caddy-proxy-manager-crowdsec cscli decisions delete --ip <address>
 
 ## External
 
-CPM does not feed an external CrowdSec its logs: point its `crowdsecurity/caddy` collection at
-Caddy's access log (on the `caddy-logs` volume, with **Settings → Observability → Access Logging**
-on) for it to have anything to decide on.
+CPM only makes Caddy a bouncer of an external CrowdSec. Feeding it Caddy's log and letting Caddy
+reach it are yours to set up, and either archive works.
 
 <Steps>
 
-1. On the machine running CrowdSec, create a bouncer key:
+1. Turn on **Settings → Observability → Access Logging**, then give CrowdSec Caddy's access log.
+   It is `access.log` on the `caddy-logs` volume, which Compose names `<project>_caddy-logs` - the
+   project is the directory you unpacked into, unless `COMPOSE_PROJECT_NAME` says otherwise. Mount
+   it read-only into your CrowdSec container, install the `crowdsecurity/caddy` collection, and add
+   an acquisition file such as `acquis.d/cpm.yaml`:
 
-   ```sh
-   cscli bouncers add caddy
+   ```yaml
+   filenames:
+     - /logs/caddy/access.log
+   # Caddy may create the log after CrowdSec starts; without this it is never read.
+   force_inotify: true
+   labels:
+     type: caddy
    ```
 
-2. Open **Settings → CrowdSec**, switch it on, choose **External**, and enter the **Local API URL**
-   Caddy reaches CrowdSec at (for example `http://crowdsec:8080`) and the bouncer key. **Test
-   connection** asks the LAPI whether it accepts the key.
+   A CrowdSec on another machine needs the log shipped there some other way - the bouncer works
+   without it, but then decides only on what CrowdSec learns elsewhere.
 
-3. Save and apply. Every proxy host and L4 host now checks its clients.
+2. Put Caddy and CrowdSec on a network they share. Attaching CrowdSec to
+   `<project>_caddy-network` works, but every upstream on it can then reach the Local API too.
+   A network of their own avoids that, the way managed mode does - create it, attach CrowdSec,
+   and add it to Caddy in a `docker-compose.override.yml` beside the compose file:
+
+   ```yaml
+   services:
+     caddy:
+       networks:
+         crowdsec-external: {}
+   networks:
+     crowdsec-external:
+       external: true
+       name: crowdsec-external   # the network you created
+   ```
+
+   Then `docker compose restart agent`: the agent starts Caddy as it comes up, and Compose
+   recreates it on the new network. Not `docker compose up caddy` by hand, which leaves out the
+   L4 ports and build the agent adds. A Local API on another machine needs no network, only an
+   address Caddy can route to.
+
+3. Create a bouncer key:
+
+   ```sh
+   docker exec <crowdsec-container> cscli bouncers add caddy
+   ```
+
+4. Open **Settings → CrowdSec**, switch it on, choose **External**, and enter the **Local API URL**
+   as Caddy reaches it (for example `http://crowdsec:8080`) and the bouncer key. For
+   [AppSec](#appsec), also enter its URL (for example `http://crowdsec:7422`); CrowdSec needs an
+   `appsec` acquisition listening there. **Test connection** asks the LAPI whether it accepts the
+   key.
+
+5. Save and apply. Every proxy host and L4 host now checks its clients.
 
 </Steps>
 

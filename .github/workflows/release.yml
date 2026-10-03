@@ -92,7 +92,7 @@ jobs:
           image_base="ghcr.io/$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
 
           # On disk, so `docker compose pull` cannot deliver a change to them.
-          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy)
+          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy docker/crowdsec)
 
           deploy_changed=""
           if [ -n "$PREVIOUS" ]; then
@@ -131,13 +131,18 @@ jobs:
             fi
             echo
             # Flag both differences from the repository so nobody diffs the two and files a bug.
-            echo "The archive holds every file at its top level and deploys as it unpacks -"
-            echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
-            echo "Its \`docker-compose.yml\` differs from the copy in the repository in exactly two"
-            echo "ways: it mounts the ClickHouse override and the socket proxy template from beside"
-            echo "itself rather than from \`./docker/\`, and it pins the three images to \`${VERSION}\` rather than"
-            echo "\`latest\`. The repository copy follows \`latest\` on purpose; this one is a snapshot"
-            echo "of one release and says so."
+            echo "Two archives, the same but for CrowdSec: \`caddy-proxy-manager-${TAG}-deploy.tar.gz\`"
+            echo "leaves out the managed CrowdSec container, its network and its volumes, and"
+            echo "\`caddy-proxy-manager-${TAG}-deploy-crowdsec.tar.gz\` adds them. Without them,"
+            echo "Settings -> CrowdSec works only in external mode."
+            echo
+            echo "Each holds every file at its top level and deploys as it unpacks - extract it"
+            echo "into one directory and \`docker compose up -d\` needs nothing moved. Its"
+            echo "\`docker-compose.yml\` differs from the copy in the repository in exactly two ways"
+            echo "(three without CrowdSec): it mounts its files from beside itself rather than from"
+            echo "\`./docker/\`, and it pins the three images to \`${VERSION}\` rather than \`latest\`."
+            echo "The repository copy follows \`latest\` on purpose; this one is a snapshot of one"
+            echo "release and says so."
             echo
             echo "## Changes"
             echo
@@ -167,77 +172,109 @@ jobs:
         run: |
           set -euo pipefail
 
+          # The service, Caddy's network to it, that network and its volumes. Cut as text so the
+          # comments survive; package checks the result against yq's `del` of the same paths.
+          crowdsec_paths='.services.crowdsec, .services.caddy.networks.crowdsec, .networks.crowdsec, .volumes.crowdsec-data, .volumes.crowdsec-config'
+          strip_crowdsec() {
+            awk '
+              BEGIN { skip = -1 }
+              skip >= 0 { match($0, /^ */); if ($0 !~ /^ *$/ && RLENGTH > skip) next; skip = -1 }
+              /^ *#/ { held[++n] = $0; next }
+              /^ *crowdsec(-[a-z]+)?:/ { match($0, /^ */); skip = RLENGTH; n = 0; next }
+              { for (i = 1; i <= n; i++) print held[i]; n = 0; print }
+              END { for (i = 1; i <= n; i++) print held[i] }
+            ' "$1" | cat -s
+          }
+
           # An archive, as GitHub renames a dotfile asset (`.env.example`); tar.gz opens on
           # Windows too. Flat, each directory a file prefix, and the staged compose file
           # rewritten to mount from beside itself so it deploys as it unpacks.
-          staging="$(mktemp -d)"
-          entries=(docker-compose.yml .env.example)
-          cp docker-compose.yml .env.example "$staging/"
-          # A missing bind source becomes an empty directory the proxy cannot render.
-          for dir in clickhouse socket-proxy; do
-            for f in "docker/${dir}"/*; do
-              entry="${dir}-$(basename "$f")"
-              cp "$f" "${staging}/${entry}"
-              entries+=("$entry")
+          # package <output> <name> <mounted docker/ dirs...>; crowdsec among them keeps the service.
+          package() {
+            local output="$1" name="$2"
+            shift 2
+            local dirs=("$@") staging base dir f entry want
+            local entries=(docker-compose.yml .env.example)
+            staging="$(mktemp -d)"
+            # What the rewrites below start from, and so what the image check compares against.
+            base="$(mktemp)"
+            cp .env.example "$staging/"
+            if [[ " ${dirs[*]} " == *" crowdsec "* ]]; then
+              cp docker-compose.yml "$base"
+            else
+              strip_crowdsec docker-compose.yml > "$base"
+              if ! diff <(yq -o=json "del(${crowdsec_paths})" docker-compose.yml) <(yq -o=json . "$base"); then
+                echo "::error::${name}: removing crowdsec changed more than the crowdsec entries"
+                exit 1
+              fi
+            fi
+            cp "$base" "$staging/docker-compose.yml"
+
+            # A missing bind source becomes an empty directory the proxy cannot render.
+            for dir in "${dirs[@]}"; do
+              for f in "docker/${dir}"/*; do
+                entry="${dir}-$(basename "$f")"
+                cp "$f" "${staging}/${entry}"
+                entries+=("$entry")
+              done
+              # Host side only.
+              sed -i "s#\./docker/${dir}/#./${dir}-#g" "$staging/docker-compose.yml"
             done
-            # Host side only.
-            sed -i "s#\./docker/${dir}/#./${dir}-#g" "$staging/docker-compose.yml"
-          done
 
-          # A snapshot with `:latest` would silently upgrade on a later redeploy. Only our three
-          # images: third-party ones are pinned already, and our version would name missing tags.
-          # Caddy's is the default inside `${CADDY_IMAGE:-...}`, so an own build can replace it.
-          sed -i -E \
-            "s#(image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
-            "$staging/docker-compose.yml"
+            # A snapshot with `:latest` would silently upgrade on a later redeploy. Only our three
+            # images: third-party ones are pinned already, and our version would name missing tags.
+            # Caddy's is the default inside `${CADDY_IMAGE:-...}`, so an own build can replace it.
+            sed -i -E \
+              "s#(image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
+              "$staging/docker-compose.yml"
 
-          for service in web caddy agent; do
-            if ! grep -qE "image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/.*/${service}:${VERSION}\\}?\$" "$staging/docker-compose.yml"; then
-              echo "::error::staged docker-compose.yml does not pin ${service} to ${VERSION}"
-              grep -n 'image:' "$staging/docker-compose.yml"
+            for service in web caddy agent; do
+              if ! grep -qE "image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/.*/${service}:${VERSION}\\}?\$" "$staging/docker-compose.yml"; then
+                echo "::error::${name}: docker-compose.yml does not pin ${service} to ${VERSION}"
+                grep -n 'image:' "$staging/docker-compose.yml"
+                exit 1
+              fi
+            done
+
+            # Nor too far. Compared, not listed, so a Dependabot bump cannot break the release.
+            if ! diff <(grep -E '^[[:space:]]*image:' "$base" | grep -vE '/(web|caddy|agent):') \
+                      <(grep -E '^[[:space:]]*image:' "$staging/docker-compose.yml" | grep -vE '/(web|caddy|agent):'); then
+              echo "::error::${name}: docker-compose.yml changed a third-party image reference"
               exit 1
             fi
-          done
 
-          # Nor too far. Compared, not listed, so a Dependabot bump cannot break the release.
-          if ! diff <(grep -E '^[[:space:]]*image:' docker-compose.yml | grep -vE '/(web|caddy|agent):') \
-                    <(grep -E '^[[:space:]]*image:' "$staging/docker-compose.yml" | grep -vE '/(web|caddy|agent):'); then
-            echo "::error::staged docker-compose.yml changed a third-party image reference"
-            exit 1
-          fi
-
-          # A sed that matched nothing would ship mounts of a directory the archive lacks.
-          if grep -qE '\./docker/' "$staging/docker-compose.yml"; then
-            echo "::error::staged docker-compose.yml still references ./docker/"
-            grep -nE '\./docker/' "$staging/docker-compose.yml"
-            exit 1
-          fi
-          for entry in "${entries[@]}"; do
-            case "$entry" in
-              clickhouse-*|socket-proxy-*)
-                if ! grep -q "\./${entry}:" "$staging/docker-compose.yml"; then
-                  echo "::error::staged docker-compose.yml does not mount ${entry}"
-                  exit 1
-                fi
-                ;;
-            esac
-          done
-
-          name="caddy-proxy-manager-${TAG}-deploy.tar.gz"
-          tar -czf "$name" -C "$staging" "${entries[@]}"
-
-          # Asserted: a misnamed `.env.example` would look fine until someone deployed.
-          for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
-            if ! tar -tzf "$name" | grep -qxF "$want"; then
-              echo "::error::${name} is missing ${want}"
-              tar -tzf "$name"
+            # A sed that matched nothing would ship mounts of a directory the archive lacks.
+            if grep -qE '\./docker/' "$staging/docker-compose.yml"; then
+              echo "::error::${name}: docker-compose.yml still references ./docker/"
+              grep -nE '\./docker/' "$staging/docker-compose.yml"
               exit 1
             fi
-          done
+            for entry in "${entries[@]:2}"; do
+              if ! grep -q "\./${entry}:" "$staging/docker-compose.yml"; then
+                echo "::error::${name}: docker-compose.yml does not mount ${entry}"
+                exit 1
+              fi
+            done
 
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-          echo "--- archive contents ---"
-          tar -tzvf "$name"
+            tar -czf "$name" -C "$staging" "${entries[@]}"
+
+            # Asserted: a misnamed `.env.example` would look fine until someone deployed.
+            for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
+              if ! tar -tzf "$name" | grep -qxF "$want"; then
+                echo "::error::${name} is missing ${want}"
+                tar -tzf "$name"
+                exit 1
+              fi
+            done
+
+            echo "${output}=${name}" >> "$GITHUB_OUTPUT"
+            echo "--- ${name} ---"
+            tar -tzvf "$name"
+          }
+
+          # CrowdSec is opt-in, so the plain name is the stack without it.
+          package name "caddy-proxy-manager-${TAG}-deploy.tar.gz" clickhouse socket-proxy
+          package name_crowdsec "caddy-proxy-manager-${TAG}-deploy-crowdsec.tar.gz" clickhouse socket-proxy crowdsec
 
       - name: Create the tag and release
         if: steps.version.outputs.release == 'true'
@@ -246,6 +283,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
           ARCHIVE: ${{ steps.archive.outputs.name }}
+          ARCHIVE_CROWDSEC: ${{ steps.archive.outputs.name_crowdsec }}
         run: |
           set -euo pipefail
 
@@ -260,7 +298,7 @@ jobs:
             args+=(--prerelease)
           fi
 
-          args+=( "$ARCHIVE" )
+          args+=( "$ARCHIVE" "$ARCHIVE_CROWDSEC" )
 
           gh release create "${args[@]}"
 

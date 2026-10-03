@@ -18,7 +18,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    it into a directory of its own:
 
    ```bash
-   VERSION=v3.5.0   # the release you downloaded
+   VERSION=v3.5.1   # the release you downloaded
    mkdir caddy-proxy-manager && cd caddy-proxy-manager
    tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
    ```
@@ -26,7 +26,9 @@ One compose file and two generated secrets. Everything else is entered in the br
    The archive is flat - `docker-compose.yml`, `.env.example` and the few files they mount, all
    at the top level - so it runs from where it lands. Its compose file pins the images to that
    release, so what you deploy stays on it until you choose to move. No clone of the repository is
-   needed.
+   needed. For [managed CrowdSec](/features/crowdsec/#managed), take
+   `caddy-proxy-manager-<version>-deploy-crowdsec.tar.gz` instead; it adds the CrowdSec container,
+   its network and its volumes, and is otherwise the same. An external CrowdSec works with either.
 
 2. Generate the two values Compose has no default for, straight into `.env`:
 
@@ -98,10 +100,11 @@ rest.
 
 Unpack the new release's archive over the old one, in the same directory, then restart. `.env` is
 not in the archive, so it is left alone; the compose file is replaced with one naming the new
-images.
+images. Take the same archive you installed from: the plain one unpacked over a
+`-deploy-crowdsec` install removes the CrowdSec service from the compose file.
 
 ```bash
-VERSION=v3.5.0   # the release you are moving to
+VERSION=v3.5.1   # the release you are moving to
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 docker compose pull
 docker compose up -d
