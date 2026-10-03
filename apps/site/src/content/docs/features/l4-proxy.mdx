@@ -57,7 +57,8 @@ breaks the connection outright.
 
 Seven selection policies, with active and passive health checks - a smaller set than the
 [HTTP hosts](../reverse-proxy/) have, since a stream has no URI or status to check: port, interval
-and timeout for active checks, fail duration and max fails for passive ones, and no retries.
+and timeout for active checks, fail duration and max fails for passive ones. There are no retries:
+a try duration and interval keep a new connection looking for a healthy upstream instead.
 
 ## Geo blocking below HTTP
 

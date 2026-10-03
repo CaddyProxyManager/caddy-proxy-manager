@@ -2926,57 +2926,6 @@ async function buildL4Servers(
         };
       }
 
-      const lbMeta = meta.load_balancer;
-      let lbConfig: LoadBalancerRouteConfig | null = null;
-      if (lbMeta?.enabled) {
-        lbConfig = {
-          enabled: true,
-          policy: lbMeta.policy ?? "random",
-          policyHeaderField: null,
-          policyCookieName: null,
-          policyCookieSecret: null,
-          // Layer 4 has no request to read: the HTTP-shaped policies (header, cookie, uri_hash,
-          // query) have nothing to hash, so only the connection-level ones are wired here.
-          policyQueryKey: null,
-          policyChoose: lbMeta.policy_choose ?? null,
-          policyWeights: lbMeta.policy_weights ?? null,
-          tryDuration: lbMeta.try_duration ?? null,
-          tryInterval: lbMeta.try_interval ?? null,
-          retries: lbMeta.retries ?? null,
-          // Refused on save in `same` mode: the probe would dial an unexpanded placeholder.
-          activeHealthCheck:
-            lbMeta.active_health_check?.enabled && !samePort
-              ? {
-                  enabled: true,
-                  uri: null,
-                  port: lbMeta.active_health_check.port ?? null,
-                  interval: lbMeta.active_health_check.interval ?? null,
-                  timeout: lbMeta.active_health_check.timeout ?? null,
-                  status: null,
-                  body: null,
-                  passes: lbMeta.active_health_check.passes ?? null,
-                  fails: lbMeta.active_health_check.fails ?? null,
-                  // No HTTP probe at layer 4 - the check is a dial, so there is no method, body,
-                  // redirect to follow or header to send.
-                  method: null,
-                  requestBody: null,
-                  followRedirects: false,
-                  headers: null,
-                }
-              : null,
-          passiveHealthCheck: lbMeta.passive_health_check?.enabled
-            ? {
-                enabled: true,
-                failDuration: lbMeta.passive_health_check.fail_duration ?? null,
-                maxFails: lbMeta.passive_health_check.max_fails ?? null,
-                unhealthyStatus: null,
-                unhealthyLatency: lbMeta.passive_health_check.unhealthy_latency ?? null,
-                unhealthyRequestCount: lbMeta.passive_health_check.unhealthy_request_count ?? null,
-              }
-            : null,
-        };
-      }
-
       const dnsConfig = parseDnsResolverConfig(meta.dns_resolver);
 
       const hostDnsResolution = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
@@ -2998,7 +2947,8 @@ async function buildL4Servers(
         return bare === null ? upstream : formatDialAddress(bare, L4_SAME_PORT_PLACEHOLDER);
       });
 
-      let resolvedDials = upstreams;
+      // One list of dials per configured upstream, so a weight follows it through DNS pinning.
+      let dialsPerUpstream = upstreams.map((upstream) => [upstream]);
       if (effectiveDnsResolution.enabled) {
         const resolver = new Resolver();
         const lookupServers = getLookupServers(dnsConfig, context.globalDnsSettings);
@@ -3012,7 +2962,7 @@ async function buildL4Servers(
         const timeoutMs = getLookupTimeoutMs(dnsConfig, context.globalDnsSettings);
 
         // Looked up together and flattened in list order, as the HTTP path does.
-        const pinned = await Promise.all(
+        dialsPerUpstream = await Promise.all(
           upstreams.map(async (upstream): Promise<string[]> => {
             const colonIdx = upstream.lastIndexOf(":");
             if (colonIdx <= 0) {
@@ -3038,24 +2988,32 @@ async function buildL4Servers(
             }
           }),
         );
-        resolvedDials = pinned.flat();
       }
+
+      // Refused on save in `same` mode, and dropped here for rows that predate that: the probe
+      // would dial an unexpanded placeholder.
+      const lbMeta =
+        samePort && meta.load_balancer
+          ? { ...meta.load_balancer, active_health_check: undefined }
+          : meta.load_balancer;
+      const weights = l4UpstreamWeights(lbMeta, upstreams.length);
 
       // For UDP hosts, upstream dials must also use the udp/ prefix
       const dialPrefix = (host.protocol as string) === "udp" ? "udp/" : "";
       const proxyHandler: Record<string, unknown> = {
         handler: "proxy",
-        upstreams: resolvedDials.map((u) => ({ dial: [`${dialPrefix}${u}`] })),
+        // caddy-l4 weighs each upstream, not the policy; a pinned address keeps its host's weight.
+        upstreams: dialsPerUpstream.flatMap((dials, index) =>
+          dials.map((dial) => ({
+            dial: [`${dialPrefix}${dial}`],
+            ...(weights ? { weight: weights[index] } : {}),
+          })),
+        ),
       };
       if (host.proxyProtocolVersion) {
         proxyHandler.proxy_protocol = host.proxyProtocolVersion;
       }
-      if (lbConfig) {
-        const loadBalancing = buildL4LoadBalancingConfig(lbConfig, resolvedDials.length);
-        if (loadBalancing) proxyHandler.load_balancing = loadBalancing;
-        const healthChecks = buildL4HealthChecksConfig(lbConfig);
-        if (healthChecks) proxyHandler.health_checks = healthChecks;
-      }
+      Object.assign(proxyHandler, buildL4LoadBalancerHandlerConfig(lbMeta, upstreams.length));
       handlers.push(proxyHandler);
 
       // Routes that close the connection before it is proxied: each a list of matcher sets, any
@@ -4317,60 +4275,93 @@ function activeCount(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
-/**
- * caddy-l4 accepts `selection_policy` only - no retries, try_duration or try_interval. Caddy
- * refuses the whole document on an `unknown field`, so one L4 host with retries set would
- * take down every route. Verified with `caddy validate` on the shipped image.
- */
-function buildL4LoadBalancingConfig(
-  config: LoadBalancerRouteConfig,
-  upstreamCount?: number,
-): Record<string, unknown> | null {
-  const selectionPolicy: Record<string, unknown> = { policy: config.policy };
+const VALID_L4_LB_POLICIES = [
+  "random",
+  "random_choose",
+  "round_robin",
+  "weighted_round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+];
 
-  if (config.policy === "random_choose" && config.policyChoose !== null) {
-    selectionPolicy.choose = config.policyChoose;
-  } else if (config.policy === "weighted_round_robin") {
-    const weights = config.policyWeights;
-    if (weights && (upstreamCount === undefined || weights.length === upstreamCount)) {
-      selectionPolicy.weights = weights;
-    } else {
-      selectionPolicy.policy = "round_robin";
-    }
-  }
+function trimmedString(value: unknown): string | null {
+  return typeof value === "string" ? value.trim() || null : null;
+}
 
-  return { selection_policy: selectionPolicy };
+function nonNegativeInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 /**
- * Layer 4 health checks. Everything else the HTTP checks carry is an HTTP concept caddy-l4
- * does not define, and would be rejected the same way.
+ * `weighted_round_robin` weights, positional against the host's upstream list, or null when the
+ * policy is another one or the list drifted: a padded weight would reweight a backend unnoticed.
  */
-function buildL4HealthChecksConfig(
-  config: LoadBalancerRouteConfig,
-): Record<string, unknown> | null {
-  const healthChecks: Record<string, unknown> = {};
+function l4UpstreamWeights(
+  meta: LoadBalancerMeta | undefined | null,
+  upstreamCount?: number,
+): number[] | null {
+  if (!meta?.enabled || meta.policy !== "weighted_round_robin") return null;
+  const weights = meta.policy_weights;
+  if (!Array.isArray(weights) || weights.length === 0) return null;
+  if (upstreamCount !== undefined && weights.length !== upstreamCount) return null;
+  return weights.every((w) => activeCount(w) !== null) ? weights : null;
+}
 
-  if (config.activeHealthCheck?.enabled) {
-    const active: Record<string, unknown> = {};
-    if (config.activeHealthCheck.port !== null) active.port = config.activeHealthCheck.port;
-    if (config.activeHealthCheck.interval) active.interval = config.activeHealthCheck.interval;
-    if (config.activeHealthCheck.timeout) active.timeout = config.activeHealthCheck.timeout;
-    if (Object.keys(active).length > 0) healthChecks.active = active;
+/**
+ * The `load_balancing` / `health_checks` of a caddy-l4 proxy handler. Its schema is not
+ * reverse_proxy's: the policy goes under `selection`, weights on each upstream, and there are no
+ * retries or HTTP probe fields. Caddy decodes strictly, so one foreign field fails the whole
+ * document (upstream #301); legacy `retries` / `unhealthy_latency` in stored meta are ignored.
+ */
+export function buildL4LoadBalancerHandlerConfig(
+  meta: LoadBalancerMeta | undefined | null,
+  upstreamCount?: number,
+): Record<string, unknown> {
+  if (!meta?.enabled) return {};
+
+  const result: Record<string, unknown> = {};
+
+  let policy = meta.policy && VALID_L4_LB_POLICIES.includes(meta.policy) ? meta.policy : "random";
+  const selection: Record<string, unknown> = {};
+  if (policy === "random_choose") {
+    const choose = activeCount(meta.policy_choose);
+    if (choose !== null) selection.choose = choose;
+  } else if (policy === "weighted_round_robin" && !l4UpstreamWeights(meta, upstreamCount)) {
+    policy = "round_robin";
   }
+  const loadBalancing: Record<string, unknown> = { selection: { policy, ...selection } };
+  const tryDuration = trimmedString(meta.try_duration);
+  if (tryDuration) loadBalancing.try_duration = tryDuration;
+  const tryInterval = trimmedString(meta.try_interval);
+  if (tryInterval) loadBalancing.try_interval = tryInterval;
+  result.load_balancing = loadBalancing;
 
-  if (config.passiveHealthCheck?.enabled) {
+  const healthChecks: Record<string, unknown> = {};
+  const activeMeta = meta.active_health_check;
+  if (activeMeta?.enabled) {
+    const active: Record<string, unknown> = {};
+    const port = activeCount(activeMeta.port);
+    if (port !== null) active.port = port;
+    const interval = trimmedString(activeMeta.interval);
+    if (interval) active.interval = interval;
+    const timeout = trimmedString(activeMeta.timeout);
+    if (timeout) active.timeout = timeout;
+    // Empty still turns active checks on, with caddy-l4's defaults.
+    healthChecks.active = active;
+  }
+  const passiveMeta = meta.passive_health_check;
+  if (passiveMeta?.enabled) {
     const passive: Record<string, unknown> = {};
-    if (config.passiveHealthCheck.failDuration) {
-      passive.fail_duration = config.passiveHealthCheck.failDuration;
-    }
-    if (config.passiveHealthCheck.maxFails !== null) {
-      passive.max_fails = config.passiveHealthCheck.maxFails;
-    }
+    const failDuration = trimmedString(passiveMeta.fail_duration);
+    if (failDuration) passive.fail_duration = failDuration;
+    const maxFails = nonNegativeInteger(passiveMeta.max_fails);
+    if (maxFails !== null) passive.max_fails = maxFails;
     if (Object.keys(passive).length > 0) healthChecks.passive = passive;
   }
+  if (Object.keys(healthChecks).length > 0) result.health_checks = healthChecks;
 
-  return Object.keys(healthChecks).length > 0 ? healthChecks : null;
+  return result;
 }
 
 /**

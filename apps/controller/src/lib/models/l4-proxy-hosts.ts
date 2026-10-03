@@ -56,7 +56,6 @@ export type L4LoadBalancerPassiveHealthCheck = {
   enabled: boolean;
   failDuration: string | null;
   maxFails: number | null;
-  unhealthyLatency: string | null;
 };
 
 export type L4LoadBalancerConfig = {
@@ -68,7 +67,6 @@ export type L4LoadBalancerConfig = {
   policyWeights: number[] | null;
   tryDuration: string | null;
   tryInterval: string | null;
-  retries: number | null;
   activeHealthCheck: L4LoadBalancerActiveHealthCheck | null;
   passiveHealthCheck: L4LoadBalancerPassiveHealthCheck | null;
 };
@@ -96,7 +94,6 @@ type L4LoadBalancerPassiveHealthCheckMeta = {
   enabled?: boolean;
   fail_duration?: string;
   max_fails?: number;
-  unhealthy_latency?: string;
 };
 
 type L4LoadBalancerMeta = {
@@ -106,7 +103,6 @@ type L4LoadBalancerMeta = {
   policy_weights?: number[];
   try_duration?: string;
   try_interval?: string;
-  retries?: number;
   active_health_check?: L4LoadBalancerActiveHealthCheckMeta;
   passive_health_check?: L4LoadBalancerPassiveHealthCheckMeta;
 };
@@ -259,10 +255,6 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
 
   const tryDuration = normalizeMetaValue(meta.try_duration ?? null);
   const tryInterval = normalizeMetaValue(meta.try_interval ?? null);
-  const retries =
-    typeof meta.retries === "number" && Number.isFinite(meta.retries) && meta.retries >= 0
-      ? meta.retries
-      : null;
 
   let activeHealthCheck: L4LoadBalancerActiveHealthCheck | null = null;
   if (meta.active_health_check) {
@@ -290,7 +282,6 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
         meta.passive_health_check.max_fails >= 0
           ? meta.passive_health_check.max_fails
           : null,
-      unhealthyLatency: normalizeMetaValue(meta.passive_health_check.unhealthy_latency ?? null),
     };
   }
 
@@ -304,7 +295,6 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
         : null,
     tryDuration,
     tryInterval,
-    retries,
     activeHealthCheck,
     passiveHealthCheck,
   };
@@ -333,9 +323,6 @@ function dehydrateL4LoadBalancer(
   }
   if (config.tryInterval) {
     meta.try_interval = config.tryInterval;
-  }
-  if (config.retries !== undefined && config.retries !== null) {
-    meta.retries = config.retries;
   }
 
   if (config.activeHealthCheck) {
@@ -366,9 +353,6 @@ function dehydrateL4LoadBalancer(
       config.passiveHealthCheck.maxFails !== undefined
     ) {
       phc.max_fails = config.passiveHealthCheck.maxFails;
-    }
-    if (config.passiveHealthCheck.unhealthyLatency) {
-      phc.unhealthy_latency = config.passiveHealthCheck.unhealthyLatency;
     }
     meta.passive_health_check = phc;
   }

@@ -110,6 +110,7 @@ services:
       # L4 test ports (TCP)
       - "15432:15432"
       - "15433:15433"
+      - "15434:15434"
       # L4 test ports (UDP)
       - "15353:15353/udp"
   # This file instead of a local override, so the agent recreates caddy on the "-test" volumes.

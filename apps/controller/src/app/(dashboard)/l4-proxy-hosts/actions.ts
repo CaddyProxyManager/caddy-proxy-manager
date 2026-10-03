@@ -86,16 +86,12 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   if (enabled !== undefined) result.enabled = enabled;
   if (policy) result.policy = policy;
   // Presence, not value (see parseLoadBalancerConfig in the proxy-hosts actions), or an emptied
-  // box could never be cleared. The three caddy-l4 lacks stay for hosts saved before their
-  // withdrawal; the form no longer renders them and the generator refuses to emit them.
+  // box could never be cleared.
   if (formData.has("lbTryDuration")) {
     result.tryDuration = parseOptionalText(formData.get("lbTryDuration"));
   }
   if (formData.has("lbTryInterval")) {
     result.tryInterval = parseOptionalText(formData.get("lbTryInterval"));
-  }
-  if (formData.has("lbRetries")) {
-    result.retries = parseOptionalNumber(formData.get("lbRetries")) ?? undefined;
   }
   if (formData.has("lbPolicyChoose")) {
     result.policyChoose = parseOptionalNumber(formData.get("lbPolicyChoose"));
@@ -118,7 +114,6 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
       enabled: parseCheckbox(formData.get("lbPassiveHealthEnabled")),
       failDuration: parseOptionalText(formData.get("lbPassiveHealthFailDuration")),
       maxFails: parseOptionalNumber(formData.get("lbPassiveHealthMaxFails")),
-      unhealthyLatency: parseOptionalText(formData.get("lbPassiveHealthUnhealthyLatency")),
     };
   }
 

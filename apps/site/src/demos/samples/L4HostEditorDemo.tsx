@@ -49,13 +49,11 @@ const POSTGRES: L4ProxyHost = {
     policyWeights: null,
     tryDuration: null,
     tryInterval: null,
-    retries: null,
     activeHealthCheck: { enabled: true, port: null, interval: "10s", timeout: "2s" },
     passiveHealthCheck: {
       enabled: true,
       failDuration: "30s",
       maxFails: 3,
-      unhealthyLatency: null,
     },
   },
   dnsResolver: null,

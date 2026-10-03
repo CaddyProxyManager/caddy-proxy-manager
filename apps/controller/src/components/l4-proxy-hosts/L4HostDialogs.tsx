@@ -163,6 +163,8 @@ type TextFields = {
   matcherValue: string;
   lbPolicyChoose: string;
   lbPolicyWeights: string;
+  lbTryDuration: string;
+  lbTryInterval: string;
   lbActiveHealthPort: string;
   lbActiveHealthInterval: string;
   lbActiveHealthTimeout: string;
@@ -194,6 +196,8 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
     lbPolicyChoose: lb?.policyChoose != null ? String(lb.policyChoose) : "",
     lbPolicyWeights: lb?.policyWeights?.join(", ") ?? "",
+    lbTryDuration: lb?.tryDuration ?? "",
+    lbTryInterval: lb?.tryInterval ?? "",
     lbActiveHealthPort:
       lb?.activeHealthCheck?.port != null ? String(lb.activeHealthCheck.port) : "",
     lbActiveHealthInterval: lb?.activeHealthCheck?.interval ?? "",
@@ -459,6 +463,22 @@ function L4HostForm({
               onChange={set("lbPolicyWeights")}
             />
           )}
+          <TextInput
+            label={t("tryDuration")}
+            isOptional
+            htmlName="lbTryDuration"
+            placeholder="5s"
+            value={text.lbTryDuration}
+            onChange={set("lbTryDuration")}
+          />
+          <TextInput
+            label={t("tryInterval")}
+            isOptional
+            htmlName="lbTryInterval"
+            placeholder="250ms"
+            value={text.lbTryInterval}
+            onChange={set("lbTryInterval")}
+          />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("activeHealthCheck")}

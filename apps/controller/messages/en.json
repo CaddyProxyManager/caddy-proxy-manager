@@ -1502,6 +1502,8 @@
     "tcpStreams": "TCP",
     "timeout": "Timeout",
     "tlsTermination": "TLS Termination",
+    "tryDuration": "Try Duration",
+    "tryInterval": "Try Interval",
     "udpNote": "Datagram listeners",
     "udpStreams": "UDP",
     "upstreamDnsPinning": "Upstream DNS Pinning",

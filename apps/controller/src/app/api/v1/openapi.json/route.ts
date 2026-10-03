@@ -2549,11 +2549,28 @@ const spec = {
           enabled: { type: "boolean" },
           policy: {
             type: "string",
-            enum: ["random", "round_robin", "least_conn", "ip_hash", "first"],
+            enum: [
+              "random",
+              "random_choose",
+              "round_robin",
+              "weighted_round_robin",
+              "least_conn",
+              "ip_hash",
+              "first",
+            ],
+          },
+          policyChoose: {
+            type: ["integer", "null"],
+            description: "How many upstreams random_choose picks between",
+          },
+          policyWeights: {
+            type: ["array", "null"],
+            items: { type: "integer", minimum: 1 },
+            description:
+              "weighted_round_robin weights, positional against upstreams; a list of the wrong length falls back to round_robin",
           },
           tryDuration: { type: ["string", "null"] },
           tryInterval: { type: ["string", "null"] },
-          retries: { type: ["integer", "null"] },
           activeHealthCheck: {
             type: ["object", "null"],
             properties: {
@@ -2569,7 +2586,6 @@ const spec = {
               enabled: { type: "boolean" },
               failDuration: { type: ["string", "null"] },
               maxFails: { type: ["integer", "null"] },
-              unhealthyLatency: { type: ["string", "null"] },
             },
           },
         },

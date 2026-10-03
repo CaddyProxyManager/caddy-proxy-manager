@@ -257,8 +257,8 @@ async function l4HostWithLb(loadBalancer: Lb) {
 }
 
 describe('layer 4 emits only what caddy-l4 defines', () => {
-  it('never emits retries, try_duration or try_interval', async () => {
-    // caddy-l4's load_balancing takes only selection_policy; anything else refuses the document.
+  it('uses `selection` and keeps the try window, never retries', async () => {
+    // caddy-l4 v0.1.2 decodes strictly: `selection_policy` or `retries` refuses the document.
     const doc = await l4HostWithLb({
       enabled: true,
       policy: 'round_robin',
@@ -266,8 +266,11 @@ describe('layer 4 emits only what caddy-l4 defines', () => {
       tryInterval: '250ms',
       retries: 3,
     });
-    const lb = l4Proxy(doc).load_balancing as Record<string, unknown>;
-    expect(Object.keys(lb)).toEqual(['selection_policy']);
+    expect(l4Proxy(doc).load_balancing).toEqual({
+      selection: { policy: 'round_robin' },
+      try_duration: '5s',
+      try_interval: '250ms',
+    });
   });
 
   it('never emits unhealthy_latency on the passive check', async () => {
@@ -301,22 +304,28 @@ describe('layer 4 emits only what caddy-l4 defines', () => {
     expect(active).toEqual({ port: 8080, interval: '10s', timeout: '2s' });
   });
 
-  it('supports the two policies caddy-l4 shares with reverse_proxy', async () => {
-    const wrr = await l4HostWithLb({
-      enabled: true,
-      policy: 'weighted_round_robin',
-      policyWeights: [3, 1],
-    });
-    expect((l4Proxy(wrr).load_balancing as Record<string, unknown>).selection_policy).toEqual({
-      policy: 'weighted_round_robin',
-      weights: [3, 1],
-    });
+  it('weighs each upstream rather than the policy', async () => {
+    const wrr = l4Proxy(
+      await l4HostWithLb({ enabled: true, policy: 'weighted_round_robin', policyWeights: [3, 1] }),
+    );
+    expect(wrr.load_balancing).toEqual({ selection: { policy: 'weighted_round_robin' } });
+    expect(wrr.upstreams).toEqual([
+      { dial: ['a:80'], weight: 3 },
+      { dial: ['b:80'], weight: 1 },
+    ]);
 
     await ctx.db.delete(schema.l4ProxyHosts);
+    const drifted = l4Proxy(
+      await l4HostWithLb({ enabled: true, policy: 'weighted_round_robin', policyWeights: [3] }),
+    );
+    expect(drifted.load_balancing).toEqual({ selection: { policy: 'round_robin' } });
+    expect(drifted.upstreams).toEqual([{ dial: ['a:80'] }, { dial: ['b:80'] }]);
+  });
+
+  it('puts the random_choose count in the selection', async () => {
     const rc = await l4HostWithLb({ enabled: true, policy: 'random_choose', policyChoose: 2 });
-    expect((l4Proxy(rc).load_balancing as Record<string, unknown>).selection_policy).toEqual({
-      policy: 'random_choose',
-      choose: 2,
+    expect(l4Proxy(rc).load_balancing).toEqual({
+      selection: { policy: 'random_choose', choose: 2 },
     });
   });
 });
