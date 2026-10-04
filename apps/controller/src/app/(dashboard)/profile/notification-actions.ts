@@ -3,11 +3,12 @@
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import { extractErrorMessage } from "@/src/lib/actions";
-import { requireAdmin } from "@/src/lib/auth";
+import { getCurrentSessionId, requireAdmin } from "@/src/lib/auth";
 import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
 import { setNotificationPreferences } from "@/src/lib/models/notification-preferences";
 import {
   deletePushSubscription,
+  deletePushSubscriptionById,
   hasPushSubscription,
   parsePushSubscription,
   savePushSubscription,
@@ -18,6 +19,14 @@ export type NotificationActionResult = { success: boolean; message?: string };
 async function errorText(error: unknown, fallback: string): Promise<string> {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
   return extractErrorMessage(t, error, fallback, format);
+}
+
+/**
+ * A subscription's endpoint and keys are bearer credentials, and a database error's message can
+ * carry its bound parameters: so these log the error's kind, never its message.
+ */
+function errorKind(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
 }
 
 /** The agents relay upstream errors only while some channel can carry them. */
@@ -60,11 +69,12 @@ export async function subscribePushAction(
       parsePushSubscription(subscription),
       parseLocale(await getLocale()) ?? DEFAULT_LOCALE,
       (await headers()).get("user-agent"),
+      await getCurrentSessionId(),
     );
     await refreshFleetConfig();
     return { success: true, message: t("pushEnabled") };
   } catch (error) {
-    console.error("Failed to save a push subscription:", error);
+    console.error("Failed to save a push subscription:", errorKind(error));
     return { success: false, message: await errorText(error, t("pushEnableFailed")) };
   }
 }
@@ -77,7 +87,23 @@ export async function unsubscribePushAction(endpoint: string): Promise<Notificat
     await refreshFleetConfig();
     return { success: true, message: t("pushDisabled") };
   } catch (error) {
-    console.error("Failed to remove a push subscription:", error);
+    console.error("Failed to remove a push subscription:", errorKind(error));
+    return { success: false, message: await errorText(error, t("pushDisableFailed")) };
+  }
+}
+
+/** One of the caller's browsers, from Profile's list: for a browser that is not this one. */
+export async function removePushBrowserAction(id: number): Promise<NotificationActionResult> {
+  const t = await getTranslations("profile.notifications");
+  try {
+    const session = await requireAdmin();
+    await deletePushSubscriptionById(Number(session.user.id), Number(id));
+    await refreshFleetConfig();
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/profile");
+    return { success: true, message: t("browserRemoved") };
+  } catch (error) {
+    console.error("Failed to remove a push subscription:", errorKind(error));
     return { success: false, message: await errorText(error, t("pushDisableFailed")) };
   }
 }

@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { isDemoMode } from "../demo-mode";
 import { emailReady } from "../email/config";
 import { sendEmail } from "../email/transport";
-import { adminPushTargets } from "../models/push-subscriptions";
+import { hasAdminPushTarget } from "../models/push-subscriptions";
 import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import {
@@ -130,7 +130,7 @@ async function wanted(event: NotificationEvent): Promise<boolean> {
 
 /** Email set up, or an administrator's browser subscribed: either can carry a notification. */
 export async function notificationChannelReady(): Promise<boolean> {
-  return (await emailReady()) || (await adminPushTargets()).length > 0;
+  return (await emailReady()) || (await hasAdminPushTarget());
 }
 
 function quietly(what: string, work: () => Promise<unknown>): Promise<void> {
@@ -268,14 +268,18 @@ async function flush(now: number): Promise<void> {
   };
 
   // Once each: a failed email is retried, a push is not worth repeating.
+  // In parallel: each waits on push services; one shared cache renders each payload once.
   const { sendPush } = await import("./push");
-  for (const audience of audiences) {
-    if (audience.kind !== "push") continue;
-    const notices = owed(audience.key, (category) => audienceWants(audience, category));
-    if (notices.length === 0) continue;
-    await sendPush(notices, audience.targets);
-    mark(notices, [audience.key]);
-  }
+  const payloads = new Map<string, string>();
+  await Promise.all(
+    audiences.map(async (audience) => {
+      if (audience.kind !== "push") return;
+      const notices = owed(audience.key, (category) => audienceWants(audience, category));
+      if (notices.length === 0) return;
+      await sendPush(notices, audience.targets, payloads);
+      mark(notices, [audience.key]);
+    }),
+  );
 
   // One email per distinct set of notices, so muting a category costs no one else their copy.
   const emails = new Map<string, { notices: PendingNotice[]; to: string[]; keys: string[] }>();

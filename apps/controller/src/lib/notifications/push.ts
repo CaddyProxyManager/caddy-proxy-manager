@@ -91,9 +91,18 @@ export async function pushPayload(
 export type PushOutcome = { delivered: number; failed: number };
 
 /** To every administrator's browsers. Never throws; dead subscriptions are dropped on the way. */
+/** Pushes in flight at once: each waits up to SEND_TIMEOUT_MS on a push service. */
+const SEND_CONCURRENCY = 8;
+
+/**
+ * To every administrator's browsers. Never throws; dead subscriptions are dropped on the way.
+ * `payloads` caches the rendered payload per locale and batch across calls in one flush, since
+ * every administrator with the same notices gets the same words.
+ */
 export async function sendPush(
   notices: readonly PendingNotice[],
   targets?: PushTarget[],
+  payloads: Map<string, string> = new Map(),
 ): Promise<PushOutcome> {
   const outcome: PushOutcome = { delivered: 0, failed: 0 };
   try {
@@ -103,50 +112,69 @@ export async function sendPush(
       vapidKeys(),
       getPublicBaseUrl(),
     ]);
+    const batch = notices.map((notice) => notice.id).join(",");
+    const payloadFor = async (locale: Locale) => {
+      const key = `${locale}:${batch}`;
+      let payload = payloads.get(key);
+      if (payload === undefined) {
+        payload = JSON.stringify(await pushPayload(notices, locale));
+        payloads.set(key, payload);
+      }
+      return payload;
+    };
 
-    const byLocale = new Map<Locale, PushTarget[]>();
-    for (const target of recipients) {
-      const locale = parseLocale(target.locale ?? undefined) ?? DEFAULT_LOCALE;
-      byLocale.set(locale, [...(byLocale.get(locale) ?? []), target]);
-    }
+    const send = async (target: PushTarget) => {
+      const payload = await payloadFor(parseLocale(target.locale ?? undefined) ?? DEFAULT_LOCALE);
+      try {
+        await deliver(target, payload, {
+          vapidDetails: { subject, publicKey, privateKey },
+          TTL: TTL_SECONDS,
+          urgency: "high",
+          timeout: SEND_TIMEOUT_MS,
+        });
+        outcome.delivered += 1;
+      } catch (error) {
+        outcome.failed += 1;
+        // 404 and 410 are the push service saying the browser unsubscribed or expired it.
+        if (
+          error instanceof WebPushError &&
+          (error.statusCode === 404 || error.statusCode === 410)
+        ) {
+          await forgetPushEndpoint(target.endpoint).catch((forgetError: unknown) => {
+            console.error(
+              "[notifications] could not forget a push endpoint:",
+              describe(forgetError),
+            );
+          });
+          return;
+        }
+        console.error("[notifications] push failed:", describe(error));
+      }
+    };
 
-    for (const [locale, group] of byLocale) {
-      const payload = JSON.stringify(await pushPayload(notices, locale));
-      await Promise.all(
-        group.map(async (target) => {
-          try {
-            await deliver(target, payload, {
-              vapidDetails: { subject, publicKey, privateKey },
-              TTL: TTL_SECONDS,
-              urgency: "high",
-              timeout: SEND_TIMEOUT_MS,
-            });
-            outcome.delivered += 1;
-          } catch (error) {
-            outcome.failed += 1;
-            // 404 and 410 are the push service saying the browser unsubscribed or expired it.
-            if (
-              error instanceof WebPushError &&
-              (error.statusCode === 404 || error.statusCode === 410)
-            ) {
-              await forgetPushEndpoint(target.endpoint);
-              return;
-            }
-            console.error("[notifications] push failed:", describe(error));
-          }
-        }),
-      );
-    }
+    const queue = [...recipients];
+    await Promise.all(
+      Array.from({ length: Math.min(SEND_CONCURRENCY, queue.length) }, async () => {
+        for (let target = queue.shift(); target; target = queue.shift()) await send(target);
+      }),
+    );
   } catch (error) {
     console.error("[notifications] could not send push notifications:", describe(error));
   }
   return outcome;
 }
 
-/** Never the endpoint: it is a bearer capability for pushing to that browser. */
+/**
+ * Never the endpoint or keys, which are bearer credentials: a push service's status and body, or
+ * else only the error's kind, since a database error's message carries its bound parameters.
+ */
 function describe(error: unknown): string {
   if (error instanceof WebPushError) return `${error.statusCode} ${error.body || error.message}`;
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" ? `${error.name} ${code}` : error.name;
+  }
+  return typeof error;
 }
 
 /** Test seams: what a send hands the push service, and forgetting the memoized keys. */

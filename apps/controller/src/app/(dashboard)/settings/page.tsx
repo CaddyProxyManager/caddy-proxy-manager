@@ -19,6 +19,20 @@ import SettingsHome from "./SettingsHome";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
+/** A URL's user:password@, which an upstream may carry and a tile must not show. */
+function withoutCredentials(value: string): string {
+  try {
+    const url = new URL(value);
+    if (!url.username && !url.password) return value;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    // Not a URL: a bare host:port, which has no credentials to strip.
+    return value;
+  }
+}
+
 /**
  * Every block the first batch does not cover, each reduced to the few values its tile shows, so
  * no credential-bearing blob leaves this function, let alone reaches the client.
@@ -141,7 +155,7 @@ async function remainingBlocks() {
     requireChangeOnLegacyHash: passwordPolicy?.requireChangeOnLegacyHash ?? false,
     authentikOutpost: authentik?.outpostDomain ?? "",
     forwardAuth: forwardAuth?.authUpstream
-      ? { provider: forwardAuth.provider, upstream: forwardAuth.authUpstream }
+      ? { provider: forwardAuth.provider, upstream: withoutCredentials(forwardAuth.authUpstream) }
       : null,
     crowdsec: { enabled: crowdsec.enabled, mode: crowdsec.mode },
     logging: { enabled: logging?.enabled ?? false, format: logging?.format ?? "json" },

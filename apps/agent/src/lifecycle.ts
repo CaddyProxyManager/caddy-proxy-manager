@@ -358,16 +358,28 @@ export class AgentLifecycle {
    * A failed start is marked unapplied, so the controller's next frame recreates it with its env.
    */
   private async restoreServices(services: ManagedServiceName[]): Promise<void> {
-    for (const name of services) {
-      console.log(`[agent] starting ${name} again`);
-      const result = await this.deps.docker.resumeService(name).catch((error: unknown) => ({
-        ok: false,
-        output: String(error),
-      }));
-      if (result.ok) continue;
-      console.error(`[agent] could not start ${name}: ${tail(result.output, 3)}`);
-      const applied = this.deps.store.appliedManagedServices();
-      if (applied) this.deps.store.setAppliedManagedServices({ ...applied, [name]: false });
+    // Only names this agent manages, read back from its own store; in parallel, since the first
+    // desired state waits on this.
+    const known = services.filter((name) => MANAGED_SERVICES.includes(name));
+    const failed = await Promise.all(
+      known.map(async (name) => {
+        console.log(`[agent] starting ${name} again`);
+        const result = await this.deps.docker.resumeService(name).catch((error: unknown) => ({
+          ok: false,
+          output: String(error),
+        }));
+        if (result.ok) return null;
+        console.error(`[agent] could not start ${name}: ${tail(result.output, 3)}`);
+        return name;
+      }),
+    );
+    const applied = this.deps.store.appliedManagedServices();
+    const marked = failed.filter((name): name is ManagedServiceName => name !== null);
+    if (applied && marked.length > 0) {
+      this.deps.store.setAppliedManagedServices({
+        ...applied,
+        ...Object.fromEntries(marked.map((name) => [name, false])),
+      });
     }
   }
 

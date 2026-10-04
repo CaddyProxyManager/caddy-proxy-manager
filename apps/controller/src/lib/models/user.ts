@@ -663,6 +663,9 @@ export async function deleteUser(userId: number): Promise<void> {
     await assertKeepsAnAdmin(userId);
     await db.delete(users).where(eq(users.id, userId));
   });
+  // Kept in settings, not a table with a foreign key, so it goes by hand.
+  const { deleteNotificationPreferences } = await import("./notification-preferences");
+  await deleteNotificationPreferences(userId);
 }
 
 /**

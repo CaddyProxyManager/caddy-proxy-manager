@@ -6,6 +6,7 @@ CREATE TABLE `push_subscriptions` (
 	`auth` text NOT NULL,
 	`locale` text,
 	`userAgent` text,
+	`sessionId` integer,
 	`createdAt` text NOT NULL,
 	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );

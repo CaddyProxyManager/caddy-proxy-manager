@@ -6,6 +6,9 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { Timestamp } from "@/components/ui/Timestamp";
+import { type DeviceWords, describeDevice } from "./device";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
 import type { UnavailableReason } from "@/src/lib/notifications/availability";
@@ -13,6 +16,7 @@ import { settingDescription, settingLabel } from "@/src/lib/settings/messages";
 import {
   type NotificationActionResult,
   pushSubscriptionKnownAction,
+  removePushBrowserAction,
   saveNotificationPreferencesAction,
   sendTestPushAction,
   subscribePushAction,
@@ -33,6 +37,8 @@ export type NotificationsSectionProps = {
     unavailable: UnavailableReason | null;
   }[];
   pushPublicKey: string | null;
+  /** Every browser this account turned push on in, so one left behind can be removed. */
+  browsers: { id: number; userAgent: string | null; createdAt: string }[];
 };
 
 /** Each change saves at once, like the table density; a refused save puts it back. */
@@ -42,6 +48,7 @@ export function NotificationsSection({
   address,
   categories,
   pushPublicKey,
+  browsers,
 }: NotificationsSectionProps) {
   const t = useTranslations("profile.notifications");
   const tRoot = useTranslations();
@@ -94,6 +101,7 @@ export function NotificationsSection({
         onChange={(push) => save({ ...preferences, push })}
       />
       {preferences.push && <PushBrowserForm publicKey={pushPublicKey} />}
+      {browsers.length > 0 && <SubscribedBrowsers browsers={browsers} />}
 
       <Heading level={3}>{t("events")}</Heading>
       <VStack gap={3}>
@@ -121,6 +129,51 @@ export function NotificationsSection({
           />
         ))}
       </VStack>
+    </VStack>
+  );
+}
+
+/** Removing one here stops pushes to it at once, from any browser: one lost or left signed in. */
+function SubscribedBrowsers({ browsers }: { browsers: NotificationsSectionProps["browsers"] }) {
+  const t = useTranslations("profile.notifications");
+  const tProfile = useTranslations("profile");
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<NotificationActionResult | null>(null);
+  const words: DeviceWords = {
+    unknown: tProfile("deviceUnknown"),
+    browser: tProfile("deviceBrowser"),
+    onOs: (browser, os) => tProfile("deviceOnOs", { browser, os }),
+  };
+
+  return (
+    <VStack gap={2}>
+      <Text type="label">{t("browsersTitle")}</Text>
+      {browsers.map((browser) => (
+        <HStack key={browser.id} gap={2} vAlign="center" justify="between" wrap="wrap">
+          <VStack gap={0}>
+            <Text type="body" size="sm">
+              {describeDevice(browser.userAgent, words)}
+            </Text>
+            <Text type="supporting" color="secondary">
+              <Timestamp value={browser.createdAt} />
+            </Text>
+          </VStack>
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("browserRemove")}
+            isDisabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                setResult(await removePushBrowserAction(browser.id));
+                router.refresh();
+              })
+            }
+          />
+        </HStack>
+      ))}
+      {result?.message && <StatusAlert message={result.message} success={result.success} />}
     </VStack>
   );
 }

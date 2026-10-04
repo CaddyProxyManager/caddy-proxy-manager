@@ -17,6 +17,8 @@ import { pushSubscriptions, settings, users } from '../../src/lib/db/schema';
 import { type OutgoingEmail, setEmailDeliveryForTests } from '../../src/lib/email/transport';
 import {
   adminPushTargets,
+  forgetPushForRevokedSessions,
+  MAX_SUBSCRIPTIONS_PER_USER,
   parsePushSubscription,
   savePushSubscription,
 } from '../../src/lib/models/push-subscriptions';
@@ -176,7 +178,7 @@ describe('browser push notifications', () => {
     expect(payload.body).toEndWith('…and 2 more');
   });
 
-  it('moves an endpoint to whoever subscribes it last', async () => {
+  it("refuses another administrator's endpoint rather than taking it over", async () => {
     const other = await createUser({
       email: 'second@example.com',
       role: 'admin',
@@ -184,10 +186,36 @@ describe('browser push notifications', () => {
       subject: 'c',
     });
     await savePushSubscription(adminId, subscription('shared'), 'en', null);
-    await savePushSubscription(other.id, subscription('shared'), 'en', null);
+
+    await expect(
+      savePushSubscription(other.id, subscription('shared'), 'en', null),
+    ).rejects.toMatchObject({ code: 'pushSubscriptionInvalid' });
+    const rows = await ctx.db.select().from(pushSubscriptions);
+    expect(rows.map((row) => row.userId)).toEqual([adminId]);
+  });
+
+  it('keeps the newest browsers when one administrator passes the cap', async () => {
+    for (let index = 0; index < MAX_SUBSCRIPTIONS_PER_USER + 2; index += 1) {
+      await savePushSubscription(adminId, subscription(`browser-${index}`), 'en', null);
+    }
 
     const rows = await ctx.db.select().from(pushSubscriptions);
-    expect(rows.map((row) => row.userId)).toEqual([other.id]);
+    expect(rows).toHaveLength(MAX_SUBSCRIPTIONS_PER_USER);
+    expect(rows.map((row) => row.endpoint)).not.toContain('https://push.example.com/browser-0');
+  });
+
+  it('drops the browsers of revoked sessions, keeping the one doing the revoking', async () => {
+    await savePushSubscription(adminId, subscription('here'), 'en', null, 1);
+    await savePushSubscription(adminId, subscription('there'), 'en', null, 2);
+    await savePushSubscription(adminId, subscription('unknown'), 'en', null, null);
+
+    await forgetPushForRevokedSessions(adminId, { all: true, keepSessionId: 1 });
+    expect((await ctx.db.select().from(pushSubscriptions)).map((row) => row.endpoint)).toEqual([
+      'https://push.example.com/here',
+    ]);
+
+    await forgetPushForRevokedSessions(adminId, { all: false, sessionIds: [1] });
+    expect(await ctx.db.select().from(pushSubscriptions)).toEqual([]);
   });
 });
 
@@ -206,16 +234,32 @@ describe('VAPID keys', () => {
 });
 
 describe('subscriptions from the browser', () => {
-  it('takes what PushSubscription.toJSON() gives', () => {
-    expect(parsePushSubscription({ ...subscription('ok'), expirationTime: null })).toEqual(
-      subscription('ok'),
+  const fromBrowser = (endpoint: string) => ({ ...subscription('x'), endpoint });
+
+  it.each([
+    'https://fcm.googleapis.com/fcm/send/abc',
+    'https://updates.push.services.mozilla.com/wpush/v2/abc',
+    'https://wns2-par02p.notify.windows.com/w/?token=abc',
+    'https://web.push.apple.com/abc',
+  ])('takes a push service endpoint: %s', (endpoint) => {
+    expect(parsePushSubscription({ ...fromBrowser(endpoint), expirationTime: null })).toEqual(
+      fromBrowser(endpoint),
     );
   });
 
   it.each([
-    ['no keys', { endpoint: 'https://push.example.com/x' }],
-    ['a plain-http endpoint', { ...subscription('x'), endpoint: 'http://push.example.com/x' }],
-    ['an empty key', { ...subscription('x'), keys: { p256dh: '', auth: 'a' } }],
+    ['no keys', { endpoint: 'https://fcm.googleapis.com/fcm/send/x' }],
+    ['a plain-http endpoint', fromBrowser('http://fcm.googleapis.com/fcm/send/x')],
+    [
+      'an empty key',
+      { ...fromBrowser('https://fcm.googleapis.com/x'), keys: { p256dh: '', auth: 'a' } },
+    ],
+    ['an internal address', fromBrowser('https://10.0.0.5/x')],
+    ['loopback', fromBrowser('https://[::1]/x')],
+    ['a host that is not a push service', fromBrowser('https://clickhouse/x')],
+    ['a look-alike host', fromBrowser('https://fcm.googleapis.com.evil.example/x')],
+    ['an explicit port', fromBrowser('https://fcm.googleapis.com:8443/x')],
+    ['credentials', fromBrowser('https://user:pass@fcm.googleapis.com/x')],
     ['nothing', null],
   ])('refuses %s', (_name, value) => {
     expect(() => parsePushSubscription(value)).toThrow();

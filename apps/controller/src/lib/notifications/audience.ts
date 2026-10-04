@@ -51,7 +51,8 @@ export async function notificationProfileView(user: { id: number; email: string 
       listedRecipients(),
     ]);
   const { unavailableNotificationCategories } = await import("./availability");
-  const [chosen, ready, states, unavailable, pushPublicKey] = await Promise.all([
+  const { listPushSubscriptions } = await import("../models/push-subscriptions");
+  const [chosen, ready, states, unavailable, pushPublicKey, browsers] = await Promise.all([
     getNotificationPreferences(user.id),
     emailReady(),
     notificationCategoryStates(),
@@ -63,6 +64,7 @@ export async function notificationProfileView(user: { id: number; email: string 
         console.error("[notifications] could not read the push keys:", error);
         return null;
       }),
+    listPushSubscriptions(user.id),
   ]);
   const emailState: "ready" | "off" | "undeliverable" = !ready
     ? "off"
@@ -77,6 +79,7 @@ export async function notificationProfileView(user: { id: number; email: string 
     },
     emailState,
     address: user.email,
+    browsers,
     categories: states.map((state) => ({
       ...state,
       unavailable: unavailable[state.category] ?? null,

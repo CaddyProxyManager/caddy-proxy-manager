@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { forgetPushForRevokedSessions } from "./push-subscriptions";
 import db from "../db";
 import { sessions } from "../db/schema";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
@@ -44,6 +45,8 @@ export async function revokeUserSession(userId: number, sessionId: number): Prom
     .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
   if (!existing) return false;
   await db.delete(sessions).where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  // A revoked session's browser must not keep receiving the administrators' notifications.
+  await forgetPushForRevokedSessions(userId, { all: false, sessionIds: [sessionId] });
   return true;
 }
 
@@ -62,6 +65,9 @@ export async function revokeOtherUserSessions(
       .delete(sessions)
       .where(and(eq(sessions.userId, userId), inArray(sessions.id, toRevoke)));
   }
+  // Every browser but this one's, including ones whose session already expired: "sign out
+  // everywhere else" and a password change mean exactly that.
+  await forgetPushForRevokedSessions(userId, { all: true, keepSessionId: exceptSessionId });
   return toRevoke.length;
 }
 

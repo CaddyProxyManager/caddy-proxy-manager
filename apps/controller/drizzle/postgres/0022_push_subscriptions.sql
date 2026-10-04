@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS "push_subscriptions" (
   "auth" text NOT NULL,
   "locale" text,
   "userAgent" text,
+  "sessionId" integer,
   "createdAt" text NOT NULL
 );
 --> statement-breakpoint

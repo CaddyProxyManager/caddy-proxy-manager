@@ -1728,7 +1728,10 @@
       "pushDisableFailed": "Browser notifications could not be turned off.",
       "pushTestSent": "Test notification sent to this browser.",
       "pushTestFailed": "The push service did not accept the test notification.",
-      "pushTestNotSubscribed": "This browser is not subscribed any more. Turn browser notifications on again."
+      "pushTestNotSubscribed": "This browser is not subscribed any more. Turn browser notifications on again.",
+      "browsersTitle": "Browsers receiving them",
+      "browserRemove": "Remove",
+      "browserRemoved": "That browser no longer receives notifications."
     },
     "passkeys": {
       "title": "Passkeys",

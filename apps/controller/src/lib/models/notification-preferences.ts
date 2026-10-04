@@ -68,6 +68,11 @@ export async function allNotificationPreferences(): Promise<Map<number, Notifica
   return result;
 }
 
+/** With the account: a reused id must not inherit a deleted user's choices. */
+export async function deleteNotificationPreferences(userId: number): Promise<void> {
+  await db.delete(settings).where(eq(settings.key, keyFor(userId)));
+}
+
 export async function setNotificationPreferences(
   userId: number,
   preferences: { email: boolean; push: boolean; muted: readonly string[] },

@@ -465,16 +465,23 @@ export const apiTokens = pgTable(
   }),
 );
 
-export const auditEvents = pgTable("audit_events", {
-  id: serial("id").primaryKey(),
-  userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
-  action: text("action").notNull(),
-  entityType: text("entityType").notNull(),
-  entityId: integer("entityId"),
-  summary: text("summary"),
-  data: text("data"),
-  createdAt: text("createdAt").notNull(),
-});
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    entityType: text("entityType").notNull(),
+    entityId: integer("entityId"),
+    summary: text("summary"),
+    data: text("data"),
+    createdAt: text("createdAt").notNull(),
+  },
+  // The Overview's newest-first list and its server-events line both range over this.
+  (table) => ({
+    createdAtIdx: index("audit_events_created_at_idx").on(table.createdAt),
+  }),
+);
 
 // traffic_events and waf_events live in ClickHouse (src/lib/clickhouse/client.ts); their parsers
 // and offsets live in the agent, which is where the Caddy log file is.
@@ -846,6 +853,11 @@ export const pushSubscriptions = pgTable(
     /** The reader's locale when they subscribed; a push has no request to negotiate one from. */
     locale: text("locale"),
     userAgent: text("userAgent"),
+    /**
+     * The session that turned it on. Not a foreign key: a session expiring must not stop pushes,
+     * but revoking sessions (sign out others, a password change) takes their browsers with them.
+     */
+    sessionId: integer("sessionId"),
     createdAt: text("createdAt").notNull(),
   },
   (table) => ({

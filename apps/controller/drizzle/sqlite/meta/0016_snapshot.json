@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b2e83090-1bc2-41d4-8f85-38bc9af3b853",
-  "prevId": "3c23d0b1-1bfc-4814-a63a-9d1a3b3a5655",
+  "id": "42e3dffd-88f4-4063-a55a-57c0df2e6910",
+  "prevId": "b2e83090-1bc2-41d4-8f85-38bc9af3b853",
   "tables": {
     "access_list_dns_cache": {
       "name": "access_list_dns_cache",
@@ -643,7 +643,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "audit_events_created_at_idx": {
+          "name": "audit_events_created_at_idx",
+          "columns": ["createdAt"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "audit_events_userId_users_id_fk": {
           "name": "audit_events_userId_users_id_fk",
