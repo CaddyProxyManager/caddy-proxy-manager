@@ -75,6 +75,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /** The client switches sections itself; this only picks where a fresh load or deep link opens. */
+/**
+ * The public route while the icon is the live one; inline only for a staged icon, which nothing
+ * else serves. Inlined always, every settings load would carry up to ~340 KB of base64.
+ */
+function faviconSrc(
+  staged: { data: string; type: string; hash: string } | null,
+  live: { hash: string } | null,
+): string | null {
+  if (!staged) return null;
+  if (staged.hash === live?.hash) return `/api/branding/favicon?v=${staged.hash}`;
+  return `data:${staged.type};base64,${staged.data}`;
+}
+
 export default async function SettingsSectionPage({
   params,
 }: {
@@ -88,6 +101,9 @@ export default async function SettingsSectionPage({
   if (legacy) redirect(`/settings/${legacy.page}#${legacy.anchor}`);
 
   const userId = Number(session.user.id);
+
+  // Outside the staged scope: what the public route serves, to tell a staged icon from it.
+  const liveFavicon = await getFavicon().catch(() => null);
 
   // Reads resolve against the staged set, or a reload makes a staged edit look discarded.
   const overlay = await stagedOverlay(userId);
@@ -293,7 +309,7 @@ export default async function SettingsSectionPage({
       dashboard={dashboardSettings}
       dashboardOptions={dashboardOptions}
       // The image has its own route; inlining it would be hundreds of KB of base64.
-      faviconSrc={favicon ? `data:${favicon.type};base64,${favicon.data}` : null}
+      faviconSrc={faviconSrc(favicon, liveFavicon)}
       updates={{
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,

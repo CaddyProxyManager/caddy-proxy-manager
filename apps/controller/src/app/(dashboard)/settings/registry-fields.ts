@@ -101,12 +101,14 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
   ] as AnySetting[],
 };
 
+const STAGED_BLOCKS = new Set(["branding"]);
+
 /** Which settings a block owns, for the action that saves one. Keys, since that is what it posts. */
 export const REGISTRY_BLOCK_KEYS: Record<string, readonly string[]> = Object.fromEntries(
-  Object.entries(BLOCKS).map(([block, definitions]) => [
-    block,
-    definitions.map((definition) => definition.key),
-  ]),
+  Object.entries(BLOCKS)
+    // Read here for its field, but saved by its own staged action, never at once.
+    .filter(([block]) => !STAGED_BLOCKS.has(block))
+    .map(([block, definitions]) => [block, definitions.map((definition) => definition.key)]),
 );
 
 type Translator = Awaited<ReturnType<typeof getTranslations>>;

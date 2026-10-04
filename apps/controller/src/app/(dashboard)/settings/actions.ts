@@ -969,10 +969,14 @@ async function updateAccentColorActionUnlocked(
   const t = await getTranslations("settings");
   try {
     await requireAdmin();
-    const [{ accentColor, SettingValidationError }, { setSetting }] = await Promise.all([
-      import("@/src/lib/settings/registry"),
-      import("@/src/lib/settings"),
-    ]);
+    const [{ accentColor, SettingValidationError }, { setSetting }, { isEnvOverridden }] =
+      await Promise.all([
+        import("@/src/lib/settings/registry"),
+        import("@/src/lib/settings"),
+        import("@/src/lib/settings/resolve"),
+      ]);
+    // ACCENT_COLOR pins it; the field is locked, and a stored value would never show.
+    if (isEnvOverridden(accentColor)) return { success: true, message: t("results.registrySaved") };
     try {
       await setSetting(accentColor.key, accentColor.parse(formData.get(accentColor.key)));
     } catch (error) {
@@ -2641,7 +2645,8 @@ export async function applyStagedSettingsAction(): Promise<ActionResult> {
   try {
     const session = await requireAdmin();
     const outcome = await applyStagedSettings(Number(session.user.id), session.user.name);
-    revalidatePath("/settings", "layout");
+    // Root, not /settings: the accent and favicon render in the root layout.
+    revalidatePath("/", "layout");
 
     if (!outcome.ok) {
       // Only the push failed; "failed" would invite re-entering changes already committed.

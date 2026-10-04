@@ -74,7 +74,8 @@ describe('message catalog', () => {
     for (const [key] of registry) {
       const [, , name, field] = key.split('.');
       expect(name).toMatch(/^[a-z][a-z0-9_]*$/);
-      expect(['label', 'description']).toContain(field);
+      // fieldLabel: a number setting's label without the unit its Settings field shows apart.
+      expect(['label', 'description', 'fieldLabel']).toContain(field);
     }
   });
 });

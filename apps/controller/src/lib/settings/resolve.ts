@@ -129,10 +129,12 @@ export async function resolveSetting<T extends SettingValue>(
 
   // A staged edit reads as stored inside its scope, or a reload makes it look discarded.
   const staged = currentStagingScope()?.overlay.get(definition.key);
-  const pending = staged === undefined ? undefined : decode(definition, staged);
+  // A staged clear (clearSetting in a capturing scope) skips the stored row it will remove.
+  const cleared = staged === "null" && definition.default !== null;
+  const pending = staged === undefined || cleared ? undefined : decode(definition, staged);
   if (pending !== undefined) return { value: pending as T, source: "stored" };
 
-  const stored = (await load()).get(definition.key);
+  const stored = cleared ? undefined : (await load()).get(definition.key);
   if (stored !== undefined) return { value: stored as T, source: "stored" };
 
   if (environment !== undefined) return { value: environment as T, source: "environment" };

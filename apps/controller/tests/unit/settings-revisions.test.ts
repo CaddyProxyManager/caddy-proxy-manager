@@ -141,6 +141,19 @@ describe('revision version control', () => {
     expect(await getRegistrySetting(accentColor)).toBe('teal');
   });
 
+  it('reads a staged clear of a registry setting as cleared, not as the stored value', async () => {
+    const { accentColor } = await import('../../src/lib/settings/registry');
+    const { getSetting: getRegistrySetting, invalidateSettingsCache } = await import(
+      '../../src/lib/settings/resolve'
+    );
+    const { withStagedReads } = await import('../../src/lib/settings/staging-context');
+    await apply({ [accentColor.key]: 'teal' });
+    invalidateSettingsCache();
+    const overlay = new Map([[accentColor.key, 'null']]);
+    expect(await withStagedReads(overlay, () => getRegistrySetting(accentColor))).toBe('pink');
+    expect(await getRegistrySetting(accentColor)).toBe('teal');
+  });
+
   it('records each key before and after, so the revision is comparable', async () => {
     const first = await apply({ general: { defaultDomain: 'a.test' } });
     const second = await apply({ general: { defaultDomain: 'b.test' } });

@@ -636,7 +636,6 @@
     "fleetDefault": "Fleet default (all agents)",
     "followFleetDefault": "Follow the fleet default",
     "followFleetDefaultHelp": "Clear this agent's own selection so it tracks the fleet default again.",
-    "includeModuleLabel": "Include in the build",
     "modulePath": "Module path",
     "modulePathPlaceholder": "github.com/greenpau/caddy-security",
     "moduleVersionHelp": "Tag, branch, or commit",
