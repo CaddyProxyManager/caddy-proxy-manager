@@ -90,7 +90,6 @@ export async function pushPayload(
 
 export type PushOutcome = { delivered: number; failed: number };
 
-/** To every administrator's browsers. Never throws; dead subscriptions are dropped on the way. */
 /** Pushes in flight at once: each waits up to SEND_TIMEOUT_MS on a push service. */
 const SEND_CONCURRENCY = 8;
 
