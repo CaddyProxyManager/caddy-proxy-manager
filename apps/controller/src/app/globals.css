@@ -92,6 +92,18 @@
     background-color: light-dark(var(--color-background-body), #111111);
   }
 
+  /* The rail's footer (account, and in Settings the revision and staged controls) a step darker
+     than the rail, so it reads as apart from the list scrolling above it. SideNav gives it no
+     class: it is the nav's last child whenever a footer is passed. */
+  .astryx-app-shell-sidenav .astryx-side-nav > :last-child:not(:first-child) {
+    /* Each mode its own blend: as strong a step on the light rail would turn it grey. */
+    background-color: light-dark(
+      color-mix(in srgb, var(--color-background-body) 94%, black),
+      color-mix(in srgb, #111111 40%, black)
+    );
+    border-top: 1px solid var(--color-border);
+  }
+
   /* A full-page Layout's `height="fill"` is a percentage of this wrapper, so it needs a height. */
   .cpm-mobile-content:has(> .astryx-layout) {
     height: 100%;
