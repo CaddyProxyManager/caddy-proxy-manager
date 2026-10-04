@@ -39,11 +39,35 @@ describe('the build command', () => {
       [
         'docker build \\',
         '  -f docker/caddy/Dockerfile \\',
-        '  --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \\',
+        '  --build-arg CADDY_MODULES="',
+        '    github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \\',
         '  --build-arg PUID=1000 --build-arg PGID=1000 \\',
         '  -t registry.example/caddy:custom \\',
         '  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.3.0',
       ].join('\n'),
+    );
+  });
+
+  it('splits to the same CADDY_MODULES in a real shell, which build.sh word-splits', async () => {
+    // Seven: three full lines' worth would hide a dropped remainder.
+    const many = Array.from({ length: 7 }, (_, index) => `github.com/o/m${index}`);
+    const command = caddyImageBuildCommand({ modules: many, ...EXTERNAL, version: '3.3.0' });
+    expect(command).toContain('    github.com/o/m6" \\');
+    // The --build-arg line through the closing quote, as an assignment the shell evaluates.
+    const start = command.indexOf('CADDY_MODULES="');
+    const end = command.indexOf('"', start + 'CADDY_MODULES="'.length) + 1;
+    const assignment = command.slice(start, end);
+    const shell = Bun.spawn([
+      'sh',
+      '-c',
+      `${assignment}\nfor spec in $CADDY_MODULES; do echo "$spec"; done`,
+    ]);
+    expect((await new Response(shell.stdout).text()).trim().split('\n')).toEqual(many);
+  });
+
+  it('passes an empty module list as an empty argument', () => {
+    expect(caddyImageBuildCommand({ modules: [], ...EXTERNAL })).toContain(
+      '  --build-arg CADDY_MODULES="" \\',
     );
   });
 

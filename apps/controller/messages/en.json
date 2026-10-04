@@ -642,6 +642,9 @@
     "moduleVersionHelp": "Tag, branch, or commit",
     "modulesCurrentStatus": "Caddy is running the selected modules",
     "noCustomModules": "No custom modules.",
+    "customModuleName": "Name",
+    "customModuleNamePlaceholder": "Name (optional)",
+    "customModuleIncludeNamed": "Include {name} in the build",
     "rebuildCaddy": "Rebuild Caddy",
     "rebuildCouldNotStart": "Rebuild could not be started.",
     "rebuildCouldNotStartHttp": "Rebuild could not be started (HTTP {status}).",
@@ -661,6 +664,7 @@
     "lastRebuildFailed": "The last rebuild failed",
     "rebuildRequired": "Rebuild required",
     "customModulesTitle": "Custom modules",
+    "cacheStorageNeedsHandler": "This module doesn't work without HTTP Cache",
     "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy Build and rebuild Caddy.",
     "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy Build.",
     "modules": {
@@ -678,7 +682,7 @@
       },
       "cacheHandler": {
         "name": "HTTP Cache",
-        "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild."
+        "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option."
       },
       "souinStorageOtter": {
         "name": "Otter Cache Storage",
@@ -702,11 +706,11 @@
       },
       "caddyRatelimit": {
         "name": "Rate Limit",
-        "description": "Sliding-window request limits per client. Required by a proxy host's Rate limiting option. Not in the default image: enable it here and rebuild."
+        "description": "Sliding-window request limits per client. Required by a proxy host's Rate limiting option."
       },
       "caddyCrowdsec": {
         "name": "CrowdSec",
-        "description": "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings. Not in the default image: enable it here and rebuild."
+        "description": "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings."
       },
       "corazaWaf": {
         "name": "Coraza WAF",
@@ -1231,6 +1235,7 @@
     "customModulePathMissingHost": "Invalid module path \"{path}\". Expected a host and a path, such as github.com/owner/repo",
     "customModuleVersionInvalid": "Invalid version \"{version}\" for {path}. Expected a tag, branch, or commit such as v1.2.3",
     "customModuleDuplicate": "Duplicate custom module \"{path}\"",
+    "customModuleNameInvalid": "A custom module name must be at most {max} characters, with no control characters",
     "faviconEmpty": "That file is empty.",
     "faviconTooLarge": "That file is {size} KB. The limit is {limit} KB.",
     "faviconNotImage": "That does not look like an image. Use a PNG, ICO, SVG, WebP, GIF or JPEG.",
@@ -4632,6 +4637,8 @@
     "codeEditor": {
       "keyboardHint": "Tab indents; press Escape then Tab to leave the field",
       "plaintextLabel": "Text",
+      "copy": "Copy",
+      "copied": "Copied",
       "issuesLabel": "Problems found in this text",
       "issueAt": "Line {line}: {message}",
       "errorLabel": "Error - saving will be refused",

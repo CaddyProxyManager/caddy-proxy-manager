@@ -7,6 +7,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
 import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -2708,7 +2709,13 @@ function AgentSection({
               <Text size="sm" color="secondary">
                 {t("pairingCodeRun")}
               </Text>
-              <Code>{`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}</Code>
+              <CodeBlock
+                code={`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}
+                language="bash"
+                hasLanguageLabel={false}
+                isWrapped
+                width="100%"
+              />
               {pairingHost?.insecure && (
                 <Text size="xsm" color="secondary">
                   {t("pairingHostInsecureHint")}

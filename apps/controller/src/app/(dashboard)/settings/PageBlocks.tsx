@@ -295,6 +295,8 @@ function markUnsaved(
     const unsaved =
       staged.has((control as HTMLInputElement).name) || (before !== undefined && before !== value);
     if (!unsaved) continue;
+    // A hidden input standing for several fields at once; its visible controls mark themselves.
+    if (control.getAttribute("data-unsaved-label") === "none") continue;
     for (const label of labelsFor(control, form)) labels.add(label);
     const field = fieldOf(control, form);
     if (field) fields.add(field);

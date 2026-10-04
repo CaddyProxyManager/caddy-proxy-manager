@@ -248,6 +248,31 @@ describe('sanitizeCaddyBuildSettings', () => {
     ]);
   });
 
+  it('keeps a trimmed display name, drops a blank one, and leaves it out of the build spec', () => {
+    const result = sanitizeCaddyBuildSettings({
+      customModules: [
+        { name: '  Security  ', modulePath: 'github.com/o/a', enabled: true },
+        { name: '   ', modulePath: 'github.com/o/b', enabled: true },
+      ],
+    });
+    expect(result.customModules).toEqual([
+      { name: 'Security', modulePath: 'github.com/o/a', enabled: true },
+      { modulePath: 'github.com/o/b', enabled: true },
+    ]);
+    expect(resolveModuleSpecs(result).filter((spec) => spec.startsWith('github.com/o/'))).toEqual([
+      'github.com/o/a',
+      'github.com/o/b',
+    ]);
+  });
+
+  it('rejects a display name that is too long', () => {
+    expect(() =>
+      sanitizeCaddyBuildSettings({
+        customModules: [{ name: 'x'.repeat(81), modulePath: 'github.com/o/r', enabled: true }],
+      }),
+    ).toThrow(/at most 80 characters/);
+  });
+
   it('rejects an invalid custom module rather than dropping it', () => {
     // Dropping it silently would make a typo look like a successful save.
     expect(() =>

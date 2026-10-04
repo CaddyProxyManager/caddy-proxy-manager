@@ -1453,7 +1453,8 @@ docker run --rm ghcr.io/silentspud/caddy-proxy-manager/caddy:latest cat /etc/cad
 ### Custom modules
 
 Any Caddy plugin published as a Go module can be added by path, with an optional
-tag, branch, or commit. It is compiled from source at build time, so a module
+tag, branch, or commit, and an optional name to tell it apart in the list (the
+name is never part of the build). It is compiled from source at build time, so a module
 that does not build fails the rebuild - the running container is left untouched
 when that happens.
 

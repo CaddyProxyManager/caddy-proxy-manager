@@ -225,6 +225,7 @@ export function WafPluginFiles({
               }
               onChange={isConfig ? setConfig : undefined}
               isReadOnly={!isConfig}
+              isCopyable={!isConfig}
               issues={isConfig ? configIssues : undefined}
               overlay={
                 isConfig && (

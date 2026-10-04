@@ -111,6 +111,34 @@ describe('Dockerfile', () => {
   });
 });
 
+describe('Bash', () => {
+  const code = [
+    '# build it',
+    'docker build \\',
+    '  --build-arg CADDY_MODULES="a b" \\',
+    '  https://github.com/owner/repo.git#v1.0 # the tag',
+  ].join('\n');
+
+  it('paints a flag as a keyword and a quoted value as a string', () => {
+    expect(typeAt(code, 'bash', 2, '--build-arg')).toBe('keyword');
+    expect(typeAt(code, 'bash', 2, '"a b"')).toBe('string');
+  });
+
+  it('keeps a quoted value a string across backslash-newlines', () => {
+    const split = ['--build-arg X="\\', '    a \\', '    b" \\'].join('\n');
+    const lines = tokenizeCode(split, 'bash');
+    // Each line gets its own piece of the string, within that line's bounds.
+    expect(lines[1]).toEqual([{ type: 'string', start: 0, end: 7 }]);
+    expect(lines[2]?.[0]).toEqual({ type: 'string', start: 0, end: 6 });
+  });
+
+  it('takes # for a comment only at the start of a word', () => {
+    expect(typeAt(code, 'bash', 0, '# build it')).toBe('comment');
+    expect(typeAt(code, 'bash', 3, '#v1.0')).toBeUndefined();
+    expect(typeAt(code, 'bash', 3, '# the tag')).toBe('comment');
+  });
+});
+
 describe('languages Astryx tokenizes', () => {
   it('highlights JSON', () => {
     expect(allTokens('{"handler": "headers"}', 'json').length).toBeGreaterThan(0);
@@ -126,6 +154,7 @@ describe('invariants the renderer depends on', () => {
     ['caddyfile', '# c\nhandle /x* {\n  respond "a\\"b" 200\n}\n\n@m path /y'],
     ['seclang', 'SecRule REQUEST_URI "@rx ^/a" "id:1"\n\n# trailing comment'],
     ['dockerfile', 'FROM caddy:2 AS b\nRUN echo "hi" && echo 2\n'],
+    ['bash', '# c\ndocker build \\\n\t--arg "a \\" b" \\\n  $HOME/x.git#v1 # t\n'],
     ['json', '{\n  "a": [1, 2],\n  "b": "c"\n}'],
     ['html', '<p class="x">hi</p>\n<!-- note -->'],
   ];
