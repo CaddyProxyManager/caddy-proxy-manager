@@ -22,11 +22,8 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 `docker-compose.yml`, `.env.example` and the files they mount, flat, with the images pinned to that
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
-Each release has two archives, the same but for CrowdSec. `-deploy.tar.gz` leaves out the
-[managed CrowdSec](#crowdsec) container; `-deploy-crowdsec.tar.gz` adds it, its network and its
-volumes. Take the second only for managed mode - an external CrowdSec works with either. Upgrade
-with the same one you installed from: the plain archive unpacked over a CrowdSec install removes
-the service from the compose file.
+It includes the [managed CrowdSec](#crowdsec) container, behind its Compose profile: it does not
+run until **Settings → CrowdSec** turns managed mode on.
 
 ```bash
 VERSION=v3.5.1   # the release you downloaded
@@ -1020,8 +1017,7 @@ Every agent - the one in the same stack included - fetches its own copy from the
 Caddy becomes a CrowdSec bouncer. Turn on **CrowdSec** under **Settings → Caddy Build** and
 rebuild, then pick where the Local API is under **Settings → CrowdSec**:
 
-- **Managed (bundled host only).** Needs the `-deploy-crowdsec.tar.gz` archive's compose file. The
-  bundled agent runs a `crowdsec` container
+- **Managed (bundled host only).** The bundled agent runs a `crowdsec` container
   (`crowdsecurity/crowdsec`, pinned) behind the `crowdsec` Compose profile, as it does ClickHouse.
   It reads Caddy's access log from `caddy-logs`, read-only, with the `crowdsecurity/caddy`
   collection, and the controller keeps that log on and in JSON while CrowdSec is managed. The
