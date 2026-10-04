@@ -18,6 +18,7 @@ import {
   groupForSection,
   settingsGroupLabel,
   settingsSectionName,
+  HEADER_HEIGHT_VAR,
   STAGED_SLOT_ID,
 } from "./sections";
 import { RevisionPill, StagedControls } from "./StagedChanges";
@@ -70,9 +71,6 @@ export default function SettingsFrame({
     </VStack>
   );
 }
-
-/** The sticky header's height, for anything that scrolls into view beneath it. */
-export const HEADER_HEIGHT_VAR = "--cpm-settings-header-height";
 
 /** As the dashboard layout decides it: below this there is no rail, only the tab bar. */
 const NARROW = "(max-width: 767px)";

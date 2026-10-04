@@ -485,6 +485,12 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   observability: "blue",
 };
 
+/**
+ * The settings header's height, measured by SettingsFrame, for anything that scrolls into view
+ * beneath it. Here rather than there: PageBlocks needs it, and the docs site renders PageBlocks.
+ */
+export const HEADER_HEIGHT_VAR = "--cpm-settings-header-height";
+
 /** Where the rail takes the revision and the staged controls, filled by SettingsFrame. */
 export const STAGED_SLOT_ID = "settings-rail-staged";
 

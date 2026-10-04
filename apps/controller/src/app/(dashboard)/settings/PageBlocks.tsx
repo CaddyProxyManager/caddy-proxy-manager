@@ -5,7 +5,7 @@
  * one page-level bar replaces the per-card Save buttons and submits whichever were edited.
  */
 
-import { HEADER_HEIGHT_VAR } from "./SettingsFrame";
+import { HEADER_HEIGHT_VAR } from "./sections";
 import {
   type ReactNode,
   type RefObject,
