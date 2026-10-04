@@ -5,6 +5,7 @@
 
 import type { getTranslations } from "next-intl/server";
 import {
+  accentColor,
   accountLockBaseDelayMs,
   accountLockDisableAfter,
   accountLockDisableEnabled,
@@ -54,6 +55,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 /** The blocks that render them, in the order each block lists its settings. */
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
+  branding: [accentColor] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
   "forward-auth": [forwardAuthAllowedPorts, forwardAuthSequentialUserIds] as AnySetting[],
   "sign-in": [

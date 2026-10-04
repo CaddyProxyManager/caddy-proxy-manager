@@ -11,6 +11,7 @@
  */
 
 import { EMAIL_ADDRESS } from "../email-address";
+import { ACCENT_COLORS, DEFAULT_ACCENT_COLOR } from "../accent-colors";
 import { SMTP_SECURITY_MODES } from "../email/security";
 import { hasForbiddenControlCharacter } from "../settings-validation";
 
@@ -224,6 +225,19 @@ export const appName = stringSetting({
   description: "Shown in the sidebar, on the login card, and as the suffix on every page title.",
   default: "Caddy Proxy Manager",
   maxLength: 128,
+});
+
+export const accentColor = stringSetting({
+  name: "accent_color",
+  env: "ACCENT_COLOR",
+  group: "application",
+  label: "Accent colour",
+  description:
+    "The colour of selected items, primary buttons and focus rings across the dashboard.",
+  default: DEFAULT_ACCENT_COLOR,
+  pattern: new RegExp(`^(${ACCENT_COLORS.join("|")})$`),
+  patternHint: `must be one of ${ACCENT_COLORS.join(", ")}`,
+  emptyIsDefault: true,
 });
 
 export const baseUrl = stringSetting({
@@ -933,6 +947,7 @@ export const geoipUpdateIntervalHours = numberSetting({
 /** Every definition, in the order the setup and settings pages render them. */
 export const SETTING_DEFINITIONS = [
   appName,
+  accentColor,
   baseUrl,
   caddyApiUrl,
   caddyMonitorEnabled,

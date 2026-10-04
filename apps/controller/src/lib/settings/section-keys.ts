@@ -14,6 +14,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   acme: { label: "ACME Server", keys: ["acme"] },
   "default-response": { label: "Default Response", keys: ["default_response"] },
   avatars: { label: "User Avatars", keys: ["avatars"] },
+  branding: { label: "Branding", keys: ["config:accent_color", "branding"] },
   updates: { label: "Updates", keys: ["update_settings"] },
   "caddy-build": { label: "Caddy Build", keys: ["caddy_build"] },
   "global-caddy-config": { label: "Global Caddyfile", keys: ["global_caddy_config"] },

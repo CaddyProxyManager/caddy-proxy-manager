@@ -14,6 +14,7 @@ import {
   type SettingDefinition,
   type SettingValue,
 } from "./registry";
+import { currentStagingScope } from "./staging-context";
 
 /** The promise, not the map, so concurrent cold reads share one query. */
 let cache: Promise<Map<string, SettingValue>> | null = null;
@@ -125,6 +126,11 @@ export async function resolveSetting<T extends SettingValue>(
   if (environment !== undefined && isEnvOverridden(definition as SettingDefinition)) {
     return { value: environment as T, source: "environment" };
   }
+
+  // A staged edit reads as stored inside its scope, or a reload makes it look discarded.
+  const staged = currentStagingScope()?.overlay.get(definition.key);
+  const pending = staged === undefined ? undefined : decode(definition, staged);
+  if (pending !== undefined) return { value: pending as T, source: "stored" };
 
   const stored = (await load()).get(definition.key);
   if (stored !== undefined) return { value: stored as T, source: "stored" };

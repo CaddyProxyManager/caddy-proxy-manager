@@ -46,7 +46,8 @@ export async function stageWrites(userId: number, writes: Map<string, string>): 
   const stored = await storedValues([...writes.keys()]);
 
   for (const [key, value] of writes) {
-    if (stored.get(key) === value) {
+    // A clear of a key that is not stored changes nothing either.
+    if (stored.get(key) === value || (value === "null" && !stored.has(key))) {
       await discardStagedKey(userId, key);
       continue;
     }

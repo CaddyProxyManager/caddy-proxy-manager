@@ -24,8 +24,8 @@ export async function goToSettingsSection(
 }
 
 /**
- * The save bar's button, present only while something is unsaved. By test id because the
- * favicon card keeps a Save of its own.
+ * The save bar's button, present only while something is unsaved. By test id because some cards
+ * (Dashboard Host, Email) keep a Save of their own.
  */
 export function pageSave(page: Page) {
   return page.getByTestId('settings-page-save');

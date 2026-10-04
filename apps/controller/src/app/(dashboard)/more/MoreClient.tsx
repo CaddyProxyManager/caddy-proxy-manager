@@ -76,7 +76,11 @@ export default function MoreClient({
                   }
                   endContent={
                     pinned.has(item.id) ? (
-                      <Badge variant="pink" label={tMore("inDrawer")} />
+                      <Badge
+                        variant="neutral"
+                        className="cpm-accent-badge"
+                        label={tMore("inDrawer")}
+                      />
                     ) : (
                       <Icon icon={ChevronRight} size="sm" color="secondary" />
                     )

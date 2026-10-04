@@ -2633,10 +2633,27 @@
     "ephemeralNodesHelp": "Ephemeral nodes disappear from the tailnet when Caddy stops, instead of lingering as offline machines. Their identity is not reused, so a restart shows up as a new device.",
     "fallbackIcon": "Fallback icon",
     "fallbackResolvers": "Fallback resolvers",
+    "accentColorSaved": "Saved",
+    "accentColorPreview": "Preview only, change not saved",
+    "accentColorPinned": "Set by {env}, which overrides what is stored here.",
+    "accentColors": {
+      "blue": "Blue",
+      "cyan": "Cyan",
+      "green": "Green",
+      "orange": "Orange",
+      "pink": "Pink",
+      "purple": "Purple",
+      "red": "Red",
+      "teal": "Teal"
+    },
     "favicon": "Favicon",
-    "faviconDescription": "Shown in the browser tab and in bookmarks",
     "faviconUploadHelp": "PNG, ICO, SVG, WebP, GIF or JPEG, up to 256 KB. A square image of at least 32×32 works everywhere; browsers scale it down themselves.",
     "faviconFileLabel": "Favicon image file",
+    "faviconKeep": "Keep favicon",
+    "faviconTooltipUpload": "Upload a favicon",
+    "faviconTooltipReplace": "Replace the favicon with another image",
+    "faviconTooltipPicked": "Choose a different image",
+    "faviconWillBeRemoved": "The custom favicon will be removed when saved.",
     "format": "Format",
     "generatePairingCode": "Generate a pairing code",
     "geoblockTrustedProxiesHelp": "Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins.",
@@ -2771,6 +2788,10 @@
       "analytics_enabled": {
         "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
+      },
+      "accent_color": {
+        "description": "The colour of selected items, primary buttons and focus rings across the dashboard.",
+        "label": "Accent colour"
       },
       "app_name": {
         "description": "Shown in the sidebar, on the login card, and as the suffix on every page title.",
@@ -2995,7 +3016,6 @@
     },
     "releaseUpdates": "Release updates",
     "remove": "Remove",
-    "removeFavicon": "Remove favicon",
     "responseBody": "Response body",
     "responseHeaders": "Response headers",
     "retentionDays": "Retention (days)",
@@ -3145,6 +3165,7 @@
     "tailscaleTailnetHelp": "Which tailnet to ask. \"-\" means the token's own, which is right unless you administer several.",
     "faviconSelectedAlt": "The favicon you selected",
     "faviconCurrentAlt": "The current favicon",
+    "faviconNoneAlt": "No favicon set",
     "updateAvailableTitle": "Version {version} has been published",
     "runningVersionTitle": "Running {version}",
     "clickhousePasswordStored": "A password is stored. Leave this empty to keep it.",
@@ -3266,7 +3287,7 @@
       },
       "branding": {
         "name": "Branding",
-        "desc": "The favicon browsers show for this instance"
+        "desc": "The accent colour and the favicon browsers show for this instance"
       },
       "instance": {
         "name": "Instance",
@@ -3701,8 +3722,8 @@
     "tailscaleUserspaceNote": "The node runs in userspace inside the Caddy container - no <code>tailscaled</code>, no TUN device, no extra ports published. Its identity is kept in the state directory below, so it survives a container recreate.",
     "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one - that is only discovered when Caddy tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
     "faviconSelected": "Selected: {name}. Save to apply it.",
-    "faviconCustomSet": "A custom favicon is set.",
-    "faviconNone": "No custom favicon - browsers show their own default.",
+    "faviconCustomSet": "A custom favicon is set. Click it to replace it.",
+    "faviconNone": "No custom favicon - browsers show their own default. Click the tile to upload one.",
     "updateAvailableBody": "You are running {current}. Pull the new images and recreate the stack to move to it.",
     "updateCheckIncomplete": "The last check did not complete: {error}",
     "updateUpToDate": "{latest} is the newest release published, so this is up to date.",
@@ -3877,6 +3898,7 @@
       "acme": "ACME Server",
       "defaultResponse": "Default Response",
       "avatars": "User Avatars",
+      "branding": "Branding",
       "updates": "Updates",
       "caddyBuild": "Caddy Build",
       "globalCaddyConfig": "Global Caddyfile",

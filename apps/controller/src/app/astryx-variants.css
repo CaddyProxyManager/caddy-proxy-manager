@@ -4,15 +4,77 @@
  * `astryx theme build` emits. Each variant also needs its name in src/types/astryx.d.ts.
  */
 
+/**
+ * The accent, chosen under Settings -> General -> Branding and set as data-cpm-accent on <html>.
+ * Declared on each theme element rather than the root: the theme defines its hues there, so a var()
+ * resolved anywhere else would read Astryx's base shades instead of this theme's. Pink unless set.
+ */
+@layer astryx-theme {
+  [data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-pink);
+    --cpm-accent-background: var(--color-background-pink);
+    --cpm-accent-border: var(--color-border-pink);
+  }
+
+  [data-cpm-accent="purple"] [data-astryx-theme],
+  [data-cpm-accent="purple"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-purple);
+    --cpm-accent-background: var(--color-background-purple);
+    --cpm-accent-border: var(--color-border-purple);
+  }
+
+  [data-cpm-accent="blue"] [data-astryx-theme],
+  [data-cpm-accent="blue"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-blue);
+    --cpm-accent-background: var(--color-background-blue);
+    --cpm-accent-border: var(--color-border-blue);
+  }
+
+  [data-cpm-accent="cyan"] [data-astryx-theme],
+  [data-cpm-accent="cyan"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-cyan);
+    --cpm-accent-background: var(--color-background-cyan);
+    --cpm-accent-border: var(--color-border-cyan);
+  }
+
+  [data-cpm-accent="teal"] [data-astryx-theme],
+  [data-cpm-accent="teal"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-teal);
+    --cpm-accent-background: var(--color-background-teal);
+    --cpm-accent-border: var(--color-border-teal);
+  }
+
+  [data-cpm-accent="green"] [data-astryx-theme],
+  [data-cpm-accent="green"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-green);
+    --cpm-accent-background: var(--color-background-green);
+    --cpm-accent-border: var(--color-border-green);
+  }
+
+  [data-cpm-accent="orange"] [data-astryx-theme],
+  [data-cpm-accent="orange"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-orange);
+    --cpm-accent-background: var(--color-background-orange);
+    --cpm-accent-border: var(--color-border-orange);
+  }
+
+  [data-cpm-accent="red"] [data-astryx-theme],
+  [data-cpm-accent="red"][data-astryx-theme] {
+    --cpm-accent-text: var(--color-text-red);
+    --cpm-accent-background: var(--color-background-red);
+    --cpm-accent-border: var(--color-border-red);
+  }
+}
+
 @layer astryx-theme {
   @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
     /**
-     * Pink accent, matching the phone chrome, for every control that reads the token. The theme's
-     * --color-on-accent already clears 4.5:1 on it; --color-text-accent stays, since Link reads it
-     * and a pink accent does not mean pink prose.
+     * The chosen accent (pink by default), matching the phone chrome, for every control that reads
+     * the token. The theme's --color-on-accent clears 4.5:1 on each hue's text tone;
+     * --color-text-accent stays, since Link reads it and an accent does not mean accent prose.
      */
     :scope {
-      --color-accent: var(--color-text-pink);
+      --color-accent: var(--cpm-accent-text);
 
       /* Dark halves only. The theme's secondary ink read as disabled at label sizes, and its green
          on green was dim; success follows green, being both a message's text and a badge's fill. */
@@ -26,24 +88,24 @@
      * current page read as a row the pointer was over. Forced colors remap it like the theme's.
      */
     .astryx-side-nav-item[data-selected="selected"] {
-      background-color: var(--color-background-pink);
-      color: var(--color-text-pink);
+      background-color: var(--cpm-accent-background);
+      color: var(--cpm-accent-text);
     }
 
     /* Button `tonal`, built like the theme's `destructive`: overlays in its own hue, so the
        interaction tint does not read as neutral grey. */
     .astryx-button[data-variant="tonal"] {
-      background-color: var(--color-background-pink);
-      color: var(--color-text-pink);
+      background-color: var(--cpm-accent-background);
+      color: var(--cpm-accent-text);
       /* destructive's overlay alphas (0D/1A), mixed from the text colour so both modes gain
          contrast. */
-      --color-overlay-hover: color-mix(in srgb, var(--color-text-pink) 5%, transparent);
-      --color-overlay-pressed: color-mix(in srgb, var(--color-text-pink) 10%, transparent);
+      --color-overlay-hover: color-mix(in srgb, var(--cpm-accent-text) 5%, transparent);
+      --color-overlay-pressed: color-mix(in srgb, var(--cpm-accent-text) 10%, transparent);
     }
 
     /* The ring matches its surface, as destructive's does. */
     .astryx-button[data-variant="tonal"]:focus-visible {
-      outline-color: var(--color-border-pink);
+      outline-color: var(--cpm-accent-border);
     }
   }
 }

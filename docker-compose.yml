@@ -53,6 +53,7 @@ services:
 
       # Renames the app in the sidebar, login card, and page titles.
       APP_NAME: ${APP_NAME:-}
+      ACCENT_COLOR: ${ACCENT_COLOR:-}
 
       # Seeds the managed dashboard host once, at the end of setup (default: BASE_URL's hostname);
       # after that the stored setting wins. Caddy reads it for its placeholder site.

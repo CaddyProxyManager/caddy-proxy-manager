@@ -94,7 +94,7 @@ export default async function SettingsSectionPage({
   // For the stored update-check and GeoIP failures.
   const tRoot = await getTranslations();
   // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
-  const registry = await registryFields(tRoot);
+  const registry = await withStagedReads(overlay, () => registryFields(tRoot));
 
   // Not settings, so deliberately outside the staged scope; being AsyncLocalStorage, a sibling
   // promise cannot see it. getAllAgentStatuses never throws.
@@ -293,7 +293,7 @@ export default async function SettingsSectionPage({
       dashboard={dashboardSettings}
       dashboardOptions={dashboardOptions}
       // The image has its own route; inlining it would be hundreds of KB of base64.
-      hasFavicon={favicon !== null}
+      faviconSrc={favicon ? `data:${favicon.type};base64,${favicon.data}` : null}
       updates={{
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,

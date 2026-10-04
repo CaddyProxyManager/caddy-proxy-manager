@@ -379,6 +379,7 @@ it win even then.
 | Setting | Variable | Default |
 | ------- | -------- | ------- |
 | Application name - sidebar, login card, page-title suffix, the organization of a CA generated here | `APP_NAME` | `Caddy Proxy Manager` |
+| Accent colour of the dashboard: `pink`, `purple`, `blue`, `cyan`, `teal`, `green`, `orange` or `red`. Also under **Settings → General → Branding** | `ACCENT_COLOR` | `pink` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
 | Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Under **Settings → Agent**, checked on every pass so it takes effect without a restart. Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |

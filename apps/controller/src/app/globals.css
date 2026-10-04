@@ -109,6 +109,19 @@
     height: 100%;
   }
 
+  /* A Badge in the accent, for the places that marked something with it (Badge has no accent
+     variant, and its pink one would ignore the setting). */
+  .astryx-badge.cpm-accent-badge {
+    background-color: var(--cpm-accent-background);
+    color: var(--cpm-accent-text);
+  }
+
+  /* The saved accent while another is previewed (AccentColorPicker). */
+  .astryx-card.cpm-accent-saved {
+    border-style: dashed;
+    border-color: var(--color-text-secondary);
+  }
+
   /* PanelResizeHandle: a 1px line with a wider invisible ::before to grab. */
   .cpm-panel-resize-handle {
     position: relative;
@@ -131,26 +144,26 @@
 
   .cpm-panel-resize-handle:hover,
   .cpm-panel-resize-handle[data-dragging] {
-    background-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    background-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   .cpm-panel-resize-handle:focus-visible {
     outline: none;
-    background-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    background-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   /* CodeEditor's textarea ring would draw under the highlighted glyphs, so the frame shows focus. */
   .cpm-code-editor:focus-within {
-    border-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    border-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   /* Flush: no border, and the pane clips an outer ring. An outline paints above the scrollbar. */
   .cpm-code-editor[data-flush]:focus-within {
     box-shadow: none;
-    outline: 1px solid var(--color-border-pink);
+    outline: 1px solid var(--cpm-accent-border);
     outline-offset: -1px;
   }
 
@@ -164,7 +177,7 @@
   /* Unsaved fields (PageBlocks.tsx). Descendants too: Astryx draws label text in its own element. */
   label[data-unsaved="true"],
   label[data-unsaved="true"] * {
-    color: var(--color-text-pink);
+    color: var(--cpm-accent-text);
   }
 
   /* The bordered element differs by control, so the field carries the mark. */
@@ -172,7 +185,7 @@
   [data-unsaved-field="true"] textarea,
   [data-unsaved-field="true"] select,
   [data-unsaved-field="true"] .astryx-checkbox-indicator {
-    border-color: var(--color-border-pink);
+    border-color: var(--cpm-accent-border);
   }
 
   /* A private key needs a textarea, since a password input strips PEM newlines on paste. */

@@ -139,6 +139,11 @@ function ReviewSheet({
         return;
       }
       onClose();
+      // The accent is an attribute on <html>, which vinext's cached root layout keeps after a refresh.
+      if (view.changes.some((change) => change.key === "config:accent_color")) {
+        window.location.reload();
+        return;
+      }
       router.refresh();
     });
   };

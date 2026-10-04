@@ -409,6 +409,13 @@ export const SETTING_FIELDS: Array<{
     kind: "string",
     value: "Caddy Proxy Manager",
   },
+  {
+    key: "config:accent_color",
+    env: "ACCENT_COLOR",
+    group: "application",
+    kind: "string",
+    value: "pink",
+  },
   // What the page proposes from the address it was reached at, over the loopback default.
   {
     key: "config:base_url",

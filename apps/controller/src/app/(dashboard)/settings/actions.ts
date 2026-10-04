@@ -922,7 +922,7 @@ async function updateGeoipSettingsActionUnlocked(
   }
 }
 
-/** Upload or remove in one action, so `remove` can be a submit button instead of a nested form. */
+/** Upload or remove in one form: the page's save bar submits it, and `intent` says which. */
 async function updateFaviconActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -955,6 +955,40 @@ async function updateFaviconActionUnlocked(
       success: false,
       message: await errorText(error, t("results.faviconFailed")),
     };
+  }
+}
+
+/**
+ * Through `setSetting`, not the registry's `saveSettings`: only the former is captured for staging,
+ * and the accent should wait for Review & apply like every other change on the page.
+ */
+async function updateAccentColorActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const [{ accentColor, SettingValidationError }, { setSetting }] = await Promise.all([
+      import("@/src/lib/settings/registry"),
+      import("@/src/lib/settings"),
+    ]);
+    try {
+      await setSetting(accentColor.key, accentColor.parse(formData.get(accentColor.key)));
+    } catch (error) {
+      if (error instanceof SettingValidationError) {
+        const [tRoot, { settingValidationMessage }] = await Promise.all([
+          getTranslations(),
+          import("@/src/lib/settings/messages"),
+        ]);
+        return { success: false, message: settingValidationMessage(tRoot, error) };
+      }
+      throw error;
+    }
+    return { success: true, message: t("results.registrySaved") };
+  } catch (error) {
+    console.error("Failed to save the accent colour:", error);
+    return { success: false, message: await errorText(error, t("results.registryFailed")) };
   }
 }
 
@@ -2486,7 +2520,8 @@ export const updateAvatarSettingsAction = stagedSettingsAction(updateAvatarSetti
 export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
 );
-export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
+export const updateFaviconAction = stagedSettingsAction(updateFaviconActionUnlocked);
+export const updateAccentColorAction = stagedSettingsAction(updateAccentColorActionUnlocked);
 export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
 // Not staged: none of these reach a Caddy config, so "Review & apply" has nothing to apply.
 export const updateRegistrySettingsAction = serializedSettingsAction(

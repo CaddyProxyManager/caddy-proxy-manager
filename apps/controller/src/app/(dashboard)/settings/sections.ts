@@ -75,7 +75,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             desc: "Whether to check the registry for a newer release, and which one",
             envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
           },
-          { id: "branding", name: "Branding", desc: "The favicon browsers show for this instance" },
+          {
+            id: "branding",
+            name: "Branding",
+            desc: "The accent colour and the favicon browsers show for this instance",
+            envSearch: ["ACCENT_COLOR"],
+          },
           {
             id: "instance",
             name: "Instance",

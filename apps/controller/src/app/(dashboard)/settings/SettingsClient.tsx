@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useActionState, useEffect, useTransition, type ReactNode } from "react";
+import { useState, useActionState, useEffect, useRef, useTransition, type ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
+import { Thumbnail } from "@astryxdesign/core/Thumbnail";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { Divider } from "@astryxdesign/core/Divider";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -83,6 +86,7 @@ import {
   updateCertificateAlertSettingsAction,
   updateAvatarSettingsAction,
   updateFaviconAction,
+  updateAccentColorAction,
   updateRegistrySettingsAction,
   updateUpdateSettingsAction,
   checkForUpdatesAction,
@@ -114,15 +118,10 @@ import {
 
 import type { RepairAgentResult } from "./actions";
 import { findSettingsItem, SETTINGS_ITEMS, settingsBlockName } from "./sections";
-import {
-  FocusField,
-  OnThisPage,
-  PageSaveBar,
-  SettingsBlockShell,
-  SKIP_PAGE_SAVE,
-} from "./PageBlocks";
+import { FocusField, OnThisPage, PageSaveBar, SettingsBlockShell } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
+import { AccentColorPicker } from "./AccentColorPicker";
 import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
@@ -183,8 +182,8 @@ type Props = {
   dashboardOptions?: DashboardHostOptionsData | null;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
-  /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
-  hasFavicon: boolean;
+  /** The custom favicon as staged, as a data URL; null when there is none. */
+  faviconSrc: string | null;
   updates: UpdateStatus;
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
   registry: Record<string, readonly RegistryField[]>;
@@ -256,7 +255,7 @@ export default function SettingsClient({
   dashboard,
   dashboardOptions,
   tailscale,
-  hasFavicon,
+  faviconSrc,
   updates,
   registry,
   sequentialUserIdsField,
@@ -300,6 +299,7 @@ export default function SettingsClient({
   );
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
+  const [accentState, accentFormAction] = useActionState(updateAccentColorAction, null);
   const [updatesState, updatesFormAction] = useActionState(updateUpdateSettingsAction, null);
   // One action for both, told apart by the block the form posts with its values.
   const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
@@ -379,7 +379,10 @@ export default function SettingsClient({
     ),
     branding: (
       <BrandingSection
-        hasFavicon={hasFavicon}
+        accentField={registry.branding?.[0]}
+        accentState={accentState}
+        accentFormAction={accentFormAction}
+        faviconSrc={faviconSrc}
         faviconState={faviconState}
         faviconFormAction={faviconFormAction}
       />
@@ -1939,21 +1942,31 @@ function objectUrlForPreview(file: File): string | null {
 }
 
 /**
- * A plain `<input type="file">`: Astryx has none. The preview is an object URL of the picked File,
- * since the stored icon is only served by its own route, never sent to this page.
+ * One row: a preview tile that uploads on click and removes from its corner, then what is set.
+ * Both only mark the form changed; the page's save bar stages it like any other block. The file
+ * input stays native and hidden, since Astryx's FileInput posts nothing with a form; the tile opens
+ * it. `faviconSrc` is the staged icon, which the public route cannot serve.
  */
 function BrandingSection({
-  hasFavicon,
+  accentField,
+  accentState,
+  accentFormAction,
+  faviconSrc,
   faviconState,
   faviconFormAction,
 }: {
-  hasFavicon: boolean;
+  accentField: RegistryField | undefined;
+  accentState: { success: boolean; message?: string } | null;
+  accentFormAction: (payload: FormData) => void;
+  faviconSrc: string | null;
   faviconState: { success: boolean; message?: string } | null;
   faviconFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
   const [preview, setPreview] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Revoked on replacement and unmount: an object URL pins the file in memory until it is.
   useEffect(
@@ -1963,71 +1976,106 @@ function BrandingSection({
     [preview],
   );
 
-  // The route revalidates by ETag, which a browser may skip for an unchanged URL.
-  const currentSrc = `/api/branding/favicon?v=${faviconState?.success ? "new" : "current"}`;
+  // React resets the form after its action, emptying the file input; the pending state goes too.
+  useEffect(() => {
+    if (!faviconState) return;
+    setPreview(null);
+    setChosen(null);
+    setRemoving(false);
+  }, [faviconState]);
+
+  const pick = () => fileInput.current?.click();
+  const shown = removing ? null : (preview ?? faviconSrc);
 
   return (
-    <FormCard title={t("favicon")}>
-      {/* Its own buttons: one saves the chosen file and the other removes what is stored, which
-          is not something a single page-level Save could stand for. */}
-      <form action={faviconFormAction} {...SKIP_PAGE_SAVE}>
+    // One card, untitled: the block's heading already says Branding, and each part has its own.
+    <FormCard>
+      <AccentColorPicker field={accentField} state={accentState} formAction={accentFormAction} />
+      {accentField && <Divider />}
+      <Heading level={3}>{t("favicon")}</Heading>
+      <form action={faviconFormAction}>
         <VStack gap={3}>
           {faviconState?.message && (
             <StatusAlert message={faviconState.message} success={faviconState.success} />
           )}
-          <InfoAlert title={t("faviconDescription")}>{t("faviconUploadHelp")}</InfoAlert>
-
-          <HStack gap={3} align="center">
-            {(preview || hasFavicon) && (
-              // next/image cannot serve an object URL of a just-picked File.
-              <img
-                src={preview ?? currentSrc}
-                alt={preview ? t("faviconSelectedAlt") : t("faviconCurrentAlt")}
-                width={32}
-                height={32}
-                style={{ width: 32, height: 32, objectFit: "contain" }}
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            {/* Our tooltip, not Thumbnail's `label`: it also composes the tile's and the remove
+                button's names ("Open {label}"), which a sentence would garble. `alt` names them. */}
+            <Tooltip
+              content={
+                preview
+                  ? t("faviconTooltipPicked")
+                  : shown
+                    ? t("faviconTooltipReplace")
+                    : t("faviconTooltipUpload")
+              }
+            >
+              <Thumbnail
+                src={shown ?? undefined}
+                alt={
+                  preview
+                    ? t("faviconSelectedAlt")
+                    : shown
+                      ? t("faviconCurrentAlt")
+                      : t("faviconNoneAlt")
+                }
+                // The tile is the upload control; there is no separate button.
+                onClick={pick}
+                onRemove={
+                  shown
+                    ? () => {
+                        // A picked file is dropped, not staged: removing means nothing replaces it.
+                        if (fileInput.current) fileInput.current.value = "";
+                        setPreview(null);
+                        setChosen(null);
+                        setRemoving(faviconSrc !== null);
+                      }
+                    : undefined
+                }
               />
-            )}
-            <Text size="sm" color="secondary">
-              {preview
-                ? t("faviconSelected", { name: String(chosen) })
-                : hasFavicon
-                  ? t("faviconCustomSet")
-                  : t("faviconNone")}
-            </Text>
+            </Tooltip>
+            <VStack gap={0} style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <Text type="body">
+                {removing
+                  ? t("faviconWillBeRemoved")
+                  : preview
+                    ? t("faviconSelected", { name: String(chosen) })
+                    : faviconSrc
+                      ? t("faviconCustomSet")
+                      : t("faviconNone")}
+              </Text>
+              <Text type="supporting" color="secondary">
+                {t("faviconUploadHelp")}
+              </Text>
+            </VStack>
+            <HStack gap={2}>
+              {removing && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  label={t("faviconKeep")}
+                  onClick={() => setRemoving(false)}
+                />
+              )}
+            </HStack>
           </HStack>
 
+          <input type="hidden" name="intent" value={removing ? "remove" : ""} />
           <input
+            ref={fileInput}
             type="file"
             name="favicon"
+            hidden
             aria-label={t("faviconFileLabel")}
             accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/webp,image/gif,image/jpeg,.ico"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
+              setRemoving(false);
               setChosen(file?.name ?? null);
               setPreview(file ? objectUrlForPreview(file) : null);
             }}
           />
-
-          <HStack gap={2} justify="end">
-            {hasFavicon && (
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                name="intent"
-                value="remove"
-                label={t("removeFavicon")}
-              />
-            )}
-            <Button
-              type="submit"
-              // Pink once a file is chosen, like every other save with something pending.
-              variant={preview ? "primary" : "secondary"}
-              label={t("save")}
-              isDisabled={!preview}
-            />
-          </HStack>
         </VStack>
       </form>
     </FormCard>
