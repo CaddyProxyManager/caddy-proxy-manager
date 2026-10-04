@@ -2217,6 +2217,7 @@
     "statusCodes": "Status codes",
     "stickyCookieNameHelp": "Name of the cookie for sticky sessions",
     "stickyCookieSecretHelp": "Secret key for HMAC cookie signing",
+    "stickyCookieSecretPlaceholder": "A long random string",
     "tailnetOnly": "Tailnet only",
     "tailnetOnlyHelp": "Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places.",
     "tailscale": "Tailscale",
@@ -4500,6 +4501,13 @@
     "skipMigrationDescription": "Skip the migration and configure this instance from scratch. The old file is left alone, and this offer will not appear again.",
     "skipMigrationLabel": "Skip and set up fresh",
     "skippedFilesTitle": "Files that were skipped",
+    "skippedFile": "{path} - {reason}",
+    "skippedReasons": {
+      "missingFile": "No file at that path.",
+      "unreadable": "Not a readable SQLite database: {detail}",
+      "notCpm": "Missing the {tables} tables, so this is not a Caddy Proxy Manager database.",
+      "readFailed": "Could not read the database: {detail}"
+    },
     "sqliteWarningDescription": "SQLite is only intended for legacy installs and demos. The standard Docker Compose install runs PostgreSQL for you, so there is no database server to set up yourself. For an instance you rely on, switch to it before finishing setup - see the <link>installation guide</link>.",
     "sqliteWarningTitle": "This instance is using SQLite",
     "steps": {

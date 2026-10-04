@@ -188,7 +188,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                   label={t("cookieSecret")}
                   isOptional
                   size="sm"
-                  placeholder="secret"
+                  placeholder={t("stickyCookieSecretPlaceholder")}
                   value={lb?.policyCookieSecret ?? ""}
                   onChange={(next) => patch({ policyCookieSecret: str(next) })}
                 />

@@ -228,7 +228,7 @@ export function LoadBalancerFields({
                   label={t("cookieSecret")}
                   isOptional
                   htmlName="lbPolicyCookieSecret"
-                  placeholder="your-secret-key"
+                  placeholder={t("stickyCookieSecretPlaceholder")}
                   value={text.policyCookieSecret}
                   onChange={setTextField("policyCookieSecret")}
                   description={t("stickyCookieSecretHelp")}

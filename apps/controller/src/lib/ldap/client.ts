@@ -2,6 +2,7 @@
  * Talks to a directory. Every way a sign-in can fail comes back as one of a few reasons, which the
  * caller collapses into "invalid username or password"; the detail goes to the server log only.
  */
+import { domainError } from "../domain-error";
 import { isIP } from "node:net";
 import { type ConnectionOptions, rootCertificates } from "node:tls";
 import {
@@ -93,7 +94,7 @@ export function ldapTlsOptions(directory: LdapDirectory): ConnectionOptions {
 /** Connected, and upgraded when StartTLS is on: a failed upgrade throws, never falls back. */
 async function openClient(directory: LdapDirectory): Promise<Client> {
   const parsed = parseLdapUrl(directory.url);
-  if (!parsed) throw new Error("The directory URL is not an ldap:// or ldaps:// address");
+  if (!parsed) throw domainError("ldapUrlInvalid");
   const tlsOptions = ldapTlsOptions(directory);
   const client = new Client({
     url: parsed.url,

@@ -28,7 +28,8 @@ import {
 import { migrationGroupDescription, migrationGroupLabel } from "@/src/lib/migration/messages";
 import { skipMigration } from "./actions";
 import RestartDialog from "@/src/components/setup/RestartDialog";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import type { LegacyRejection } from "@/src/lib/migration/legacy-database";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 
 export type Candidate = {
@@ -68,10 +69,26 @@ export default function SetupMigrateClient({
   sqliteWarning = false,
 }: {
   candidates: Candidate[];
-  rejected: Array<{ path: string; reason: string }>;
+  rejected: LegacyRejection[];
   sqliteWarning?: boolean;
 }) {
   const t = useTranslations("setup");
+  const format = useFormatter();
+  // Literal keys, so the catalog is type-checked; the detail is SQLite's own words.
+  const rejectionReason = (entry: LegacyRejection): string => {
+    switch (entry.reason) {
+      case "missingFile":
+        return t("skippedReasons.missingFile");
+      case "unreadable":
+        return t("skippedReasons.unreadable", { detail: entry.detail ?? "" });
+      case "notCpm":
+        return t("skippedReasons.notCpm", {
+          tables: format.list(entry.missingTables ?? [], { type: "conjunction" }),
+        });
+      case "readFailed":
+        return t("skippedReasons.readFailed", { detail: entry.detail ?? "" });
+    }
+  };
   const [selected, setSelected] = useState(candidates[0]?.path ?? "");
   // Everything by default, so pressing straight through migrates it all.
   const [picked, setPicked] = useState<MigrationGroupId[]>(ALL_MIGRATION_GROUP_IDS);
@@ -251,7 +268,7 @@ export default function SetupMigrateClient({
                 <VStack gap={2}>
                   {rejected.map((entry) => (
                     <Text key={entry.path} size="xsm" color="secondary">
-                      {entry.path} - {entry.reason}
+                      {t("skippedFile", { path: entry.path, reason: rejectionReason(entry) })}
                     </Text>
                   ))}
                 </VStack>
