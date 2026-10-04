@@ -124,7 +124,10 @@ test.describe('Dashboard home page', () => {
   });
 
   test('server events survive an empty traffic window', async ({ page }) => {
-    await expect(page.getByText(/No traffic in this range/i)).toBeVisible();
+    // No traffic, but the sign-in that got us here is a server event: the chart draws its line
+    // rather than calling the range empty.
+    await expect(page.getByRole('application', { name: /Server events/ })).toBeVisible();
+    await expect(page.getByText(/No traffic in this range/i)).toBeHidden();
 
     await selectTile(page, '5xx responses');
     await expect(page.getByText(/No requests match this tile/i)).toBeVisible();

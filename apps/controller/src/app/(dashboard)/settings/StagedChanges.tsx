@@ -110,11 +110,9 @@ function RailRevision({ staged }: { staged: StagedView }) {
     </HStack>
   );
   if (staged.currentRevision === null) return row;
-  return (
-    <Link href="/settings/history" aria-label={t("history.viewAll")}>
-      {row}
-    </Link>
-  );
+  // Named by its visible text, not "View history": a spoken name should match what is shown, and
+  // the rail's History entry already says where it leads.
+  return <Link href="/settings/history">{row}</Link>;
 }
 
 function ReviewSheet({
