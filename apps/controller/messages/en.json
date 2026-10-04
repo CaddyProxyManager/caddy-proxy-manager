@@ -1950,7 +1950,8 @@
     "blockedCount": "{count} blocked",
     "blockedShareNote": "{percent}% blocked",
     "body": "Body",
-    "bufferedInMemoryMib": "Buffered in memory (MiB)",
+    "bufferedInMemoryMib": "Buffered in memory",
+    "bufferedInMemoryMibUnit": "MiB",
     "certificate": "Certificate",
     "certificates": "Certificates",
     "certificatesEmptyTitle": "No client certificates issued yet",
@@ -2191,7 +2192,8 @@
     "cacheModeBrowserHelp": "Tells browsers to keep assets for the max age, unless the upstream already sets Cache-Control.",
     "cacheModeCaddyHelp": "Caddy also keeps a shared copy, so repeat requests skip the upstream. Responses that set a cookie or are marked private or no-store are never stored.",
     "cacheCaddyUnavailable": "Falling back to browser caching",
-    "cacheMaxAge": "Max age (seconds)",
+    "cacheMaxAge": "Max age",
+    "cacheMaxAgeUnit": "seconds",
     "cacheMaxAgeHelp": "How long an asset stays cached: 60 seconds to one year. 86400 is a day.",
     "pathRewrites": "Path Rewrites",
     "port": "Port",
@@ -2321,7 +2323,8 @@
     "maintenanceActiveDescription": "Only the bypass addresses reach the upstream. Access lists, sign-in and the WAF still apply to them",
     "maintenanceBypass": "Bypass addresses",
     "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page - yours, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted Proxies",
-    "maintenanceRetryAfter": "Retry-After (seconds)",
+    "maintenanceRetryAfter": "Retry-After",
+    "maintenanceRetryAfterUnit": "seconds",
     "maintenanceRetryAfterHelp": "Tells clients and crawlers when to come back. Leave it empty to send none",
     "maintenanceBody": "Page",
     "maintenanceBodyHelp": "HTML shown to visitors. Leave it empty to use this host's 503 error page, then the global one, then a built-in page",
@@ -2404,7 +2407,8 @@
     "proxyHostPausedTitle": "Proxy Host Paused",
     "proxyHostActiveDescription": "This host is active and routing traffic",
     "proxyHostPausedDescription": "This host is disabled and will not respond to requests",
-    "maxBodySizeMib": "Max body size (MiB, up to {max})",
+    "maxBodySizeMib": "Max body size (up to {max})",
+    "maxBodySizeMibUnit": "MiB",
     "caFallbackName": "CA #{id}",
     "certificatesIssuedBy": "Certificates issued by {name}",
     "editRuleLabel": "Edit rule {path}",
@@ -2677,7 +2681,8 @@
     "geoipSavedEnabled": "GeoIP enabled - downloading the databases from MaxMind.",
     "geoipSavedNeedsCredentials": "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
     "geoipUpdateDisabled": "Turn GeoIP on and save to download the databases.",
-    "geoipUpdateInterval": "Check for updates every (hours)",
+    "geoipUpdateInterval": "Check for updates every",
+    "geoipUpdateIntervalUnit": "hours",
     "geoipUpdateIntervalHelp": "MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check only downloads what changed.",
     "geoipUpdateUnconfigured": "Add a MaxMind account ID and licence key to download the databases.",
     "globalErrorPagesHelp": "These error pages apply to every proxy host as a fallback. A per-host error page for the same status code takes precedence.",
@@ -2765,9 +2770,18 @@
     "redirectStatus": "Redirect status",
     "redirectUrl": "Redirect URL",
     "registerNodesAsEphemeral": "Register nodes as ephemeral",
+    "units": {
+      "milliseconds": "ms",
+      "seconds": "seconds",
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days",
+      "responses": "responses"
+    },
     "registry": {
       "account_lock_base_delay_ms": {
         "description": "How long the first lock lasts. Each failure after it doubles the wait.",
+        "fieldLabel": "First account lock",
         "label": "First account lock (milliseconds)"
       },
       "account_lock_disable_after": {
@@ -2788,6 +2802,7 @@
       },
       "account_lock_max_delay_ms": {
         "description": "The doubling stops here, so guessing can slow the owner's sign-in but never shut it off.",
+        "fieldLabel": "Longest account lock",
         "label": "Longest account lock (milliseconds)"
       },
       "analytics_enabled": {
@@ -2828,6 +2843,7 @@
       },
       "auth_rate_limit_window": {
         "description": "The period over which auth requests are counted.",
+        "fieldLabel": "Auth rate-limit window",
         "label": "Auth rate-limit window (seconds)"
       },
       "auth_require_password_change_on_legacy_hash": {
@@ -2856,6 +2872,7 @@
       },
       "caddy_build_timeout": {
         "description": "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow or ARM hosts can take considerably longer than the default.",
+        "fieldLabel": "Caddy build timeout",
         "label": "Caddy build timeout (seconds)"
       },
       "clickhouse_db": {
@@ -2868,6 +2885,7 @@
       },
       "clickhouse_retention_days": {
         "description": "How long traffic and WAF events are kept. Lowering it uses less disk, and migrates the existing tables' TTL on the next start.",
+        "fieldLabel": "Analytics retention",
         "label": "Analytics retention (days)"
       },
       "clickhouse_url": {
@@ -2896,6 +2914,7 @@
       },
       "geoip_update_interval_hours": {
         "description": "How often the controller asks MaxMind for newer databases. MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
+        "fieldLabel": "Update check interval",
         "label": "Update check interval (hours)"
       },
       "geoipupdate_account_id": {
@@ -2908,6 +2927,7 @@
       },
       "login_block_ms": {
         "description": "How long a blocked client stays blocked.",
+        "fieldLabel": "Lockout duration",
         "label": "Lockout duration (milliseconds)"
       },
       "login_max_attempts": {
@@ -2916,6 +2936,7 @@
       },
       "login_window_ms": {
         "description": "The period over which failed sign-ins are counted.",
+        "fieldLabel": "Login window",
         "label": "Login window (milliseconds)"
       },
       "update_check_enabled": {
@@ -2960,6 +2981,7 @@
       },
       "certificate_expiry_alert_days": {
         "description": "Email the alert recipients once a certificate has fewer days than this left. Caddy renews on its own well before then, so an alert means renewal is failing. 0 turns alerts off.",
+        "fieldLabel": "Certificate alert threshold",
         "label": "Certificate alert threshold (days)"
       },
       "notify_account_disabled": {
@@ -2980,6 +3002,7 @@
       },
       "notify_agent_offline_minutes": {
         "description": "How long an agent may be disconnected before anyone is told. After a restart of this server every agent gets this long to reconnect.",
+        "fieldLabel": "Agent offline after",
         "label": "Agent offline after (minutes)"
       },
       "notify_upstream_errors": {
@@ -2988,10 +3011,12 @@
       },
       "notify_upstream_error_count": {
         "description": "How many 502, 503 or 504 responses from one host, within the minutes below.",
+        "fieldLabel": "Upstream errors before telling",
         "label": "Upstream errors before telling (responses)"
       },
       "notify_upstream_error_minutes": {
         "description": "Also how long a host must go without one before it counts as recovered.",
+        "fieldLabel": "Upstream error window",
         "label": "Upstream error window (minutes)"
       },
       "notify_caddy_apply": {
@@ -3023,7 +3048,8 @@
     "remove": "Remove",
     "responseBody": "Response body",
     "responseHeaders": "Response headers",
-    "retentionDays": "Retention (days)",
+    "retentionDays": "Retention",
+    "retentionDaysUnit": "days",
     "reviewApply": "Apply to Caddy",
     "reviewApplying": "Applying…",
     "reviewChangeCount": "{count, plural, one {# change} other {# changes}}",
@@ -4144,7 +4170,8 @@
       "apiUrl": "Local API URL",
       "apiUrlHelp": "Where Caddy reaches your CrowdSec Local API, such as http://crowdsec:8080. Plain http only for a private address, since the bouncer key travels with every request.",
       "apiKey": "Bouncer key",
-      "apiKeyHelp": "Create one with cscli bouncers add caddy. Stored encrypted and never shown again. A Caddy placeholder such as '{env.CROWDSEC_API_KEY}' works too, and keeps the key out of the database.",
+      "apiKeyCreate": "Create one on the CrowdSec host:",
+      "apiKeyHelp": "Stored encrypted and never shown again. A Caddy placeholder such as '{env.CROWDSEC_API_KEY}' works too, and keeps the key out of the database.",
       "apiKeyStored": "A bouncer key is stored. Leave blank to keep it.",
       "apiKeyReenter": "A bouncer key is stored, but it is only kept while both addresses stay the same. Enter it again.",
       "test": "Test connection",
@@ -4211,7 +4238,8 @@
       "testSent": "Test message sent to {email}.",
       "testFailed": "The test message could not be sent.",
       "testInvalidRecipient": "Enter a valid email address to send the test to.",
-      "alertDays": "Alert threshold (days)",
+      "alertDays": "Alert threshold",
+      "alertDaysUnit": "days",
       "alertDaysHelp": "Email once a certificate has fewer days than this left. Caddy renews managed certificates well before then, so an alert about one means its renewal is failing. 0 turns alerts off.",
       "alertRecipients": "Recipients",
       "alertRecipientsHelp": "Comma-separated addresses for certificate alerts, which go to every active administrator when this is empty. Notifications go to these too, besides each administrator's own choice under Profile → Notifications.",
@@ -4810,7 +4838,8 @@
     "blocked": "Blocked",
     "body": "Body",
     "bodySizeLimitHelp": "Largest request body the WAF will inspect.",
-    "bufferedInMemoryMib": "Buffered in memory (MiB)",
+    "bufferedInMemoryMib": "Buffered in memory",
+    "bufferedInMemoryMibUnit": "MiB",
     "cancel": "Cancel",
     "client": "Client",
     "clientIp": "Client IP",
@@ -4846,7 +4875,8 @@
     "logData": "Log Data",
     "lookUp": "Look up",
     "matchedRules": "Matched Rules",
-    "maxBodySizeMib": "Max body size (MiB)",
+    "maxBodySizeMib": "Max body size",
+    "maxBodySizeMibUnit": "MiB",
     "memoryBodyLimitHelp": "Must not exceed the request body limit.",
     "message": "Message",
     "method": "Method",
@@ -4994,7 +5024,8 @@
     "pluginRegistryRemove": "Remove {name}",
     "pluginRegistryAddOfficial": "Add the OWASP registry",
     "pluginRegistryNone": "No registries are configured, so no plugins are listed.",
-    "pluginRegistryInterval": "Check every (hours)",
+    "pluginRegistryInterval": "Check every",
+    "pluginRegistryIntervalUnit": "hours",
     "pluginRegistryIntervalHelp": "How often the registries are re-read and each plugin's latest release checked. 0 checks only when you ask.",
     "pluginRegistryToken": "GitHub token",
     "pluginRegistryTokenHelp": "Optional. Without one GitHub allows 60 API requests an hour, which a first check of a large registry can use up; with one, 5,000. It needs no scopes, and is sent only to api.github.com.",

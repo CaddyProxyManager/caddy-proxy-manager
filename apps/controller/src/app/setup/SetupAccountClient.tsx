@@ -5,6 +5,7 @@
  * `migratedFrom` explains "nothing can sign in yet" after a migration that left accounts behind,
  * which would otherwise read as a failed migration.
  */
+import { KeyRound, Link as LinkIcon, User } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -124,6 +125,7 @@ export default function SetupAccountClient({
                   <VStack gap={3}>
                     {adminState.error && <StatusAlert message={adminState.error} success={false} />}
                     <TextInput
+                      startIcon={User}
                       {...AUTOFILL_USERNAME}
                       label={ta("username")}
                       htmlName="username"
@@ -146,6 +148,7 @@ export default function SetupAccountClient({
                       isRequired
                     />
                     <TextInput
+                      startIcon={KeyRound}
                       {...AUTOFILL_NEW_PASSWORD}
                       label={ta("confirmPassword")}
                       htmlName="passwordConfirmation"
@@ -179,6 +182,7 @@ export default function SetupAccountClient({
                       width="100%"
                     />
                     <TextInput
+                      startIcon={LinkIcon}
                       label={ta("issuer")}
                       htmlName="issuer"
                       description={ta("issuerHelp")}
@@ -196,6 +200,7 @@ export default function SetupAccountClient({
                       width="100%"
                     />
                     <TextInput
+                      startIcon={KeyRound}
                       label={ta("secretLabel")}
                       htmlName="clientSecret"
                       type="password"

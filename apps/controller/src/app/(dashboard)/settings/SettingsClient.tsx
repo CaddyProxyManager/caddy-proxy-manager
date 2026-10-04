@@ -1,6 +1,20 @@
 "use client";
 
 import { useState, useActionState, useEffect, useRef, useTransition, type ReactNode } from "react";
+import {
+  CalendarDays,
+  Clock,
+  Container,
+  EthernetPort,
+  FolderOpen,
+  Globe,
+  KeyRound,
+  Link as LinkIcon,
+  Network,
+  Route,
+  Tag,
+  User,
+} from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -706,6 +720,7 @@ function GeneralSection({
             <StatusAlert message={generalState.message} success={generalState.success} />
           )}
           <TextInput
+            startIcon={Globe}
             {...NATIVE_REQUIRED}
             label={t("defaultDomain")}
             description={t("defaultDomainHelp")}
@@ -806,6 +821,7 @@ function DefaultResponseSection({
             {mode === "respond" && (
               <>
                 <NumberInput
+                  hasNumberSteppers
                   label={t("statusCode")}
                   description={t("defaultResponseStatusHelp")}
                   htmlName="status"
@@ -842,6 +858,7 @@ function DefaultResponseSection({
                   onChange={setRedirectStatus}
                 />
                 <TextInput
+                  startIcon={LinkIcon}
                   label={t("redirectUrl")}
                   isRequired
                   description={t("defaultRedirectUrlHelp")}
@@ -902,6 +919,7 @@ function AcmeSection({
             <StatusAlert message={acmeState.message} success={acmeState.success} />
           )}
           <TextInput
+            startIcon={LinkIcon}
             label={t("acmeDirectoryUrl")}
             isOptional
             description={t("acmeDirectoryHelp")}
@@ -1191,6 +1209,7 @@ function DnsResolversSection({
               rows={2}
             />
             <TextInput
+              startIcon={Clock}
               label={t("queryTimeout")}
               isOptional
               description={t("dnsQueryTimeoutHelp")}
@@ -1576,6 +1595,7 @@ function TailscaleSection({
           </InfoAlert>
           <EnvLabelledField label={t("authKey")} env={["TS_AUTHKEY"]}>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("authKey")}
               type="password"
@@ -1598,6 +1618,7 @@ function TailscaleSection({
             placeholder="caddy"
           />
           <TextInput
+            startIcon={Tag}
             {...AUTOFILL_OFF}
             label={t("tags")}
             isOptional
@@ -1608,6 +1629,7 @@ function TailscaleSection({
             placeholder="tag:caddy"
           />
           <TextInput
+            startIcon={LinkIcon}
             {...AUTOFILL_OFF}
             label={t("controlServerUrl")}
             isOptional
@@ -1618,6 +1640,7 @@ function TailscaleSection({
             placeholder="https://headscale.example.com"
           />
           <TextInput
+            startIcon={FolderOpen}
             {...AUTOFILL_OFF}
             label={t("stateDirectory")}
             isOptional
@@ -1654,6 +1677,7 @@ function TailscaleSection({
           {validateAuthKey ? (
             <>
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("apiAccessToken")}
                 type="password"
@@ -1668,6 +1692,7 @@ function TailscaleSection({
                 onChange={setApiAccessToken}
               />
               <TextInput
+                startIcon={Network}
                 {...AUTOFILL_OFF}
                 label={t("tailnet")}
                 isOptional
@@ -1715,6 +1740,7 @@ function AuthentikSection({
             <StatusAlert message={authentikState.message} success={authentikState.success} />
           )}
           <TextInput
+            startIcon={Globe}
             {...NATIVE_REQUIRED}
             label={t("outpostDomain")}
             htmlName="outpostDomain"
@@ -1724,6 +1750,7 @@ function AuthentikSection({
             isRequired
           />
           <TextInput
+            startIcon={LinkIcon}
             {...NATIVE_REQUIRED}
             label={t("outpostUpstream")}
             htmlName="outpostUpstream"
@@ -1733,6 +1760,7 @@ function AuthentikSection({
             isRequired
           />
           <TextInput
+            startIcon={Route}
             label={t("authEndpoint")}
             isOptional
             htmlName="authEndpoint"
@@ -1779,6 +1807,7 @@ function ForwardAuthSection({
             onChange={(next) => setProvider(next as string)}
           />
           <TextInput
+            startIcon={LinkIcon}
             {...NATIVE_REQUIRED}
             label={t("forwardAuthUpstream")}
             htmlName="forwardAuthUpstream"
@@ -1788,6 +1817,7 @@ function ForwardAuthSection({
             isRequired
           />
           <TextInput
+            startIcon={Route}
             label={t("authEndpoint")}
             isOptional
             htmlName="forwardAuthEndpoint"
@@ -2142,6 +2172,7 @@ function UpdatesSection({
 
           <EnvLabelledField label={t("imageRepository")} env={["UPDATE_IMAGE_REPOSITORY"]}>
             <TextInput
+              startIcon={Container}
               {...AUTOFILL_OFF}
               label={t("imageRepository")}
               description={t("imageRepositoryHelp")}
@@ -2274,6 +2305,7 @@ function AnalyticsSection({
           <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
           <EnvLabelledField label={t("clickhouseUrl")} env={["CLICKHOUSE_URL"]}>
             <TextInput
+              startIcon={LinkIcon}
               {...AUTOFILL_OFF}
               label={t("clickhouseUrl")}
               description={t("clickhouseUrlHelp")}
@@ -2284,6 +2316,7 @@ function AnalyticsSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("clickhouseUser")} env={["CLICKHOUSE_USER"]}>
             <TextInput
+              startIcon={User}
               {...AUTOFILL_OFF}
               label={t("clickhouseUser")}
               htmlName="clickhouseUser"
@@ -2316,6 +2349,9 @@ function AnalyticsSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("retentionDays")} env={["CLICKHOUSE_RETENTION_DAYS"]}>
             <NumberInput
+              startIcon={CalendarDays}
+              hasNumberSteppers
+              units={t("retentionDaysUnit")}
               label={t("retentionDays")}
               description={t("analyticsRetentionHelp")}
               htmlName="clickhouseRetentionDays"
@@ -2455,6 +2491,7 @@ function GeoipSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("maxmindLicenceKey")} env={["GEOIPUPDATE_LICENSE_KEY"]}>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("maxmindLicenceKey")}
               type="password"
@@ -2475,6 +2512,9 @@ function GeoipSection({
               value={intervalHours}
               onChange={setIntervalHours}
               isIntegerOnly
+              hasNumberSteppers
+              units={t("geoipUpdateIntervalUnit")}
+              startIcon={Clock}
               min={1}
               max={168}
             />
@@ -2812,6 +2852,8 @@ function MetricsSection({
               onChange={setEnabled}
             />
             <NumberInput
+              startIcon={EthernetPort}
+              hasNumberSteppers
               label={t("port")}
               description={t("metricsPortHelp")}
               htmlName="port"

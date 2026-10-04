@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarDays } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -181,6 +182,8 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   description={t("commonNameHelp")}
                 />
                 <NumberInput
+                  startIcon={CalendarDays}
+                  hasNumberSteppers
                   label={t("validity")}
                   htmlName="validity_days"
                   value={genValidity}

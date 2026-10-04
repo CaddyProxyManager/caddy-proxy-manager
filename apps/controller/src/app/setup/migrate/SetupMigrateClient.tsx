@@ -4,6 +4,7 @@
  * Which old database to migrate, and which parts. Candidates show their counts and last write,
  * the only way to tell a live file from a backup beside it; groups let a handover skip the users.
  */
+import { KeyRound } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
@@ -334,6 +335,7 @@ export default function SetupMigrateClient({
                     })}
                   </Text>
                   <TextInput
+                    startIcon={KeyRound}
                     {...AUTOFILL_OFF}
                     label={t("legacySecretLabel")}
                     htmlName="legacyKey"

@@ -17,6 +17,9 @@ import { hasForbiddenControlCharacter } from "../settings-validation";
 
 export type SettingGroup = "application" | "authentication" | "email" | "analytics" | "geoip";
 
+/** What a number setting counts, for the Settings field's suffix and icon. */
+export type SettingUnit = "milliseconds" | "seconds" | "minutes" | "hours" | "days" | "responses";
+
 /** A value as stored, before it is parsed. Settings are held as JSON in the `settings` table. */
 export type SettingValue = string | number | boolean | null;
 
@@ -41,6 +44,8 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   composeReads?: boolean;
   /** Switches its whole group on and off; the rest render only once it is on. One per group. */
   gate?: boolean;
+  /** A number's unit. Its label still names it, for the setup page and validation messages. */
+  unit?: SettingUnit;
   /** The bounds `parse` enforces, so a control built from them cannot disagree with it. */
   min?: number;
   max?: number;
@@ -178,7 +183,7 @@ export function secretSetting(
 }
 
 export function numberSetting(
-  spec: Common<number> & { min: number; max: number },
+  spec: Common<number> & { min: number; max: number; unit?: SettingUnit },
 ): SettingDefinition<number> {
   const key = `${KEY_PREFIX}${spec.name}`;
   const parse = (value: unknown): number => {
@@ -307,6 +312,7 @@ export const forwardAuthInternalUrl = stringSetting({
 
 export const caddyBuildTimeout = numberSetting({
   name: "caddy_build_timeout",
+  unit: "seconds",
   env: "CADDY_BUILD_TIMEOUT",
   group: "application",
   label: "Caddy build timeout (seconds)",
@@ -422,6 +428,7 @@ export const authRateLimitEnabled = booleanSetting({
 
 export const authRateLimitWindow = numberSetting({
   name: "auth_rate_limit_window",
+  unit: "seconds",
   env: "AUTH_RATE_LIMIT_WINDOW",
   group: "authentication",
   label: "Auth rate-limit window (seconds)",
@@ -455,6 +462,7 @@ export const loginMaxAttempts = numberSetting({
 
 export const loginWindowMs = numberSetting({
   name: "login_window_ms",
+  unit: "milliseconds",
   env: "LOGIN_WINDOW_MS",
   group: "authentication",
   label: "Login window (milliseconds)",
@@ -466,6 +474,7 @@ export const loginWindowMs = numberSetting({
 
 export const loginBlockMs = numberSetting({
   name: "login_block_ms",
+  unit: "milliseconds",
   env: "LOGIN_BLOCK_MS",
   group: "authentication",
   label: "Lockout duration (milliseconds)",
@@ -499,6 +508,7 @@ export const accountLockFreeFailures = numberSetting({
 
 export const accountLockBaseDelayMs = numberSetting({
   name: "account_lock_base_delay_ms",
+  unit: "milliseconds",
   env: "ACCOUNT_LOCK_BASE_DELAY_MS",
   group: "authentication",
   label: "First account lock (milliseconds)",
@@ -510,6 +520,7 @@ export const accountLockBaseDelayMs = numberSetting({
 
 export const accountLockMaxDelayMs = numberSetting({
   name: "account_lock_max_delay_ms",
+  unit: "milliseconds",
   env: "ACCOUNT_LOCK_MAX_DELAY_MS",
   group: "authentication",
   label: "Longest account lock (milliseconds)",
@@ -674,6 +685,7 @@ export const emailAlertRecipients = stringSetting({
 
 export const certificateExpiryAlertDays = numberSetting({
   name: "certificate_expiry_alert_days",
+  unit: "days",
   env: "CERTIFICATE_EXPIRY_ALERT_DAYS",
   group: "email",
   label: "Certificate alert threshold (days)",
@@ -721,6 +733,7 @@ export const notifyAgentOffline = notifySetting(
 
 export const notifyAgentOfflineMinutes = numberSetting({
   name: "notify_agent_offline_minutes",
+  unit: "minutes",
   env: "NOTIFY_AGENT_OFFLINE_MINUTES",
   group: "email",
   label: "Agent offline after (minutes)",
@@ -742,6 +755,7 @@ export const notifyUpstreamErrors = notifySetting(
 
 export const notifyUpstreamErrorCount = numberSetting({
   name: "notify_upstream_error_count",
+  unit: "responses",
   env: "NOTIFY_UPSTREAM_ERROR_COUNT",
   group: "email",
   label: "Upstream errors before telling (responses)",
@@ -753,6 +767,7 @@ export const notifyUpstreamErrorCount = numberSetting({
 
 export const notifyUpstreamErrorMinutes = numberSetting({
   name: "notify_upstream_error_minutes",
+  unit: "minutes",
   env: "NOTIFY_UPSTREAM_ERROR_MINUTES",
   group: "email",
   label: "Upstream error window (minutes)",
@@ -885,6 +900,7 @@ export const clickhouseDb = stringSetting({
 
 export const clickhouseRetentionDays = numberSetting({
   name: "clickhouse_retention_days",
+  unit: "days",
   env: "CLICKHOUSE_RETENTION_DAYS",
   group: "analytics",
   label: "Analytics retention (days)",
@@ -933,6 +949,7 @@ export const geoipLicenseKey = secretSetting({
 
 export const geoipUpdateIntervalHours = numberSetting({
   name: "geoip_update_interval_hours",
+  unit: "hours",
   env: "GEOIP_UPDATE_INTERVAL_HOURS",
   group: "geoip",
   label: "Update check interval (hours)",

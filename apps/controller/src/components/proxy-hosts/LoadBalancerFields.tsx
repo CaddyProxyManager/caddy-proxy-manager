@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock, EthernetPort, KeyRound, Route } from "lucide-react";
 import { useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -170,6 +171,7 @@ export function LoadBalancerFields({
 
             {policy === "random_choose" && (
               <NumberInput
+                hasNumberSteppers
                 label={t("lbChoose")}
                 htmlName="lbPolicyChoose"
                 min={2}
@@ -225,6 +227,7 @@ export function LoadBalancerFields({
                   description={t("stickyCookieNameHelp")}
                 />
                 <TextInput
+                  startIcon={KeyRound}
                   label={t("cookieSecret")}
                   isOptional
                   htmlName="lbPolicyCookieSecret"
@@ -242,6 +245,7 @@ export function LoadBalancerFields({
               </Text>
               <Grid columns={3} gap={4}>
                 <TextInput
+                  startIcon={Clock}
                   label={t("tryDuration")}
                   htmlName="lbTryDuration"
                   placeholder="5s"
@@ -250,6 +254,7 @@ export function LoadBalancerFields({
                   description={t("tryDurationHelp")}
                 />
                 <TextInput
+                  startIcon={Clock}
                   label={t("tryInterval")}
                   htmlName="lbTryInterval"
                   placeholder="250ms"
@@ -258,6 +263,7 @@ export function LoadBalancerFields({
                   description={t("tryIntervalHelp")}
                 />
                 <NumberInput
+                  hasNumberSteppers
                   label={t("maxRetries")}
                   htmlName="lbRetries"
                   min={0}
@@ -282,6 +288,7 @@ export function LoadBalancerFields({
                 {activeHealthEnabled && (
                   <Grid columns={2} gap={4}>
                     <TextInput
+                      startIcon={Route}
                       label={t("healthCheckUri")}
                       htmlName="lbActiveHealthUri"
                       placeholder="/health"
@@ -290,6 +297,8 @@ export function LoadBalancerFields({
                       description={t("healthCheckUriHelp")}
                     />
                     <NumberInput
+                      startIcon={EthernetPort}
+                      hasNumberSteppers
                       label={t("healthCheckPort")}
                       htmlName="lbActiveHealthPort"
                       min={1}
@@ -300,6 +309,7 @@ export function LoadBalancerFields({
                       description={t("overrideUpstreamPort")}
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("checkInterval")}
                       htmlName="lbActiveHealthInterval"
                       placeholder="30s"
@@ -308,6 +318,7 @@ export function LoadBalancerFields({
                       description={t("healthCheckIntervalHelp")}
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("checkTimeout")}
                       htmlName="lbActiveHealthTimeout"
                       placeholder="5s"
@@ -316,6 +327,7 @@ export function LoadBalancerFields({
                       description={t("healthCheckTimeoutHelp")}
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("expectedStatusCode")}
                       htmlName="lbActiveHealthStatus"
                       min={100}
@@ -334,6 +346,7 @@ export function LoadBalancerFields({
                       description={t("expectedResponseBody")}
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("lbHealthPasses")}
                       htmlName="lbActiveHealthPasses"
                       min={1}
@@ -344,6 +357,7 @@ export function LoadBalancerFields({
                       description={t("lbHealthPassesHelp")}
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("lbHealthFails")}
                       htmlName="lbActiveHealthFails"
                       min={1}
@@ -386,6 +400,7 @@ export function LoadBalancerFields({
                 {passiveHealthEnabled && (
                   <Grid columns={2} gap={4}>
                     <TextInput
+                      startIcon={Clock}
                       label={t("failDuration")}
                       htmlName="lbPassiveHealthFailDuration"
                       placeholder="30s"
@@ -394,6 +409,7 @@ export function LoadBalancerFields({
                       description={t("failDurationHelp")}
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("maxFailures")}
                       htmlName="lbPassiveHealthMaxFails"
                       min={0}
@@ -411,6 +427,7 @@ export function LoadBalancerFields({
                       description={t("unhealthyStatusCodesHelp")}
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("unhealthyLatency")}
                       htmlName="lbPassiveHealthUnhealthyLatency"
                       placeholder="5s"
@@ -419,6 +436,7 @@ export function LoadBalancerFields({
                       description={t("unhealthyLatencyHelp")}
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("lbUnhealthyRequestCount")}
                       htmlName="lbPassiveHealthUnhealthyRequestCount"
                       min={1}

@@ -2,6 +2,8 @@
 
 /** Renders from the registry definitions rather than repeating their decisions. */
 
+import { CalendarDays, Clock, type LucideIcon } from "lucide-react";
+import type { SettingUnit } from "@/src/lib/settings/registry";
 import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -13,6 +15,15 @@ import { useTranslations } from "next-intl";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { FormCard, StatusAlert } from "@/src/components/ui/FormLayout";
+
+/** A duration gets a clock, a count of days a calendar; a plain count no icon. */
+const UNIT_ICONS: Partial<Record<SettingUnit, LucideIcon>> = {
+  milliseconds: Clock,
+  seconds: Clock,
+  minutes: Clock,
+  hours: Clock,
+  days: CalendarDays,
+};
 
 export type RegistryField = {
   /** Also the name the field posts under. */
@@ -26,7 +37,15 @@ export type RegistryField = {
 } & (
   | { kind: "text"; value: string; maxLength?: number; placeholder?: string }
   | { kind: "boolean"; value: boolean }
-  | { kind: "number"; value: number; min: number; max: number }
+  | {
+      kind: "number";
+      value: number;
+      min: number;
+      max: number;
+      /** The suffix, already translated, and what it counts, which picks the icon. */
+      units?: string;
+      unit?: SettingUnit;
+    }
 );
 
 export function RegistrySettingsBlock({
@@ -171,6 +190,9 @@ function NumberField({
         badge={badge}
       >
         <NumberInput
+          hasNumberSteppers
+          units={field.units}
+          startIcon={field.unit ? UNIT_ICONS[field.unit] : undefined}
           label={field.label}
           htmlName={field.key}
           value={value}

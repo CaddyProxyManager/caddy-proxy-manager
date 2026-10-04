@@ -3,18 +3,19 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Clock,
+  Globe,
   KeyRound,
   Network,
   Plus,
-  Users,
-  Globe,
-  Settings2,
   RefreshCw,
-  Trash2,
+  Settings2,
   Sparkles,
-  AlertTriangle,
-  Clock,
+  Trash2,
+  User,
+  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -324,6 +325,7 @@ function MembersTab({
         <Card variant="muted" padding={3}>
           <VStack gap={3}>
             <TextInput
+              startIcon={User}
               {...AUTOFILL_OFF}
               label={t("username")}
               isRequired
@@ -336,6 +338,7 @@ function MembersTab({
             <VStack gap={1}>
               <HStack gap={2} vAlign="end">
                 <TextInput
+                  startIcon={KeyRound}
                   {...AUTOFILL_OFF}
                   label={t("password")}
                   isRequired
@@ -849,6 +852,7 @@ function NewListDialog({
           {seed.map((s, i) => (
             <HStack key={s.rowId} gap={2} vAlign="end">
               <TextInput
+                startIcon={User}
                 {...AUTOFILL_OFF}
                 label={t("seedUsernameLabel", { index: i + 1 })}
                 isLabelHidden
@@ -861,6 +865,7 @@ function NewListDialog({
                 width="100%"
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_OFF}
                 label={t("seedPasswordLabel", { index: i + 1 })}
                 isLabelHidden

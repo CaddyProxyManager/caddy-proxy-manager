@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRound, Link } from "lucide-react";
 import { useState } from "react";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -56,6 +57,7 @@ export function CaptchaSection({
             <>
               {provider === "cap" && (
                 <TextInput
+                  startIcon={Link}
                   {...AUTOFILL_OFF}
                   label={t("capInstanceUrl")}
                   description={t("capInstanceUrlHelp")}
@@ -66,6 +68,7 @@ export function CaptchaSection({
                 />
               )}
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_OFF}
                 label={t("siteKey")}
                 description={t("siteKeyHelp")}
@@ -74,6 +77,7 @@ export function CaptchaSection({
                 onChange={setSiteKey}
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("secretKey")}
                 type="password"

@@ -12,7 +12,17 @@ import {
 import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  HardDrive,
+  Hash,
+  MoreHorizontal,
+  Search,
+  ShieldOff,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -850,6 +860,7 @@ function GlobalSuppressedRules({
       <VStack gap={2}>
         <HStack gap={2} vAlign="end" maxWidth={360}>
           <TextInput
+            startIcon={Hash}
             {...nativeAttrs({ pattern: "[0-9]*" })}
             label={t("addRuleById")}
             size="sm"
@@ -1545,6 +1556,9 @@ export default function WafEventsClient({
               />
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("maxBodySizeMibUnit")}
                   label={t("maxBodySizeMib")}
                   htmlName="wafRequestBodyLimitMb"
                   value={wafBodyLimitMb}
@@ -1558,6 +1572,9 @@ export default function WafEventsClient({
                   description={t("bodySizeLimitHelp")}
                 />
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("bufferedInMemoryMibUnit")}
                   label={t("bufferedInMemoryMib")}
                   htmlName="wafRequestBodyInMemoryLimitMb"
                   value={wafInMemoryLimitMb}

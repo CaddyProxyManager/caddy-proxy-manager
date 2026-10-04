@@ -3,7 +3,7 @@
 /** Save only records; Rebuild restarts the proxy, hence two separately-confirmed buttons. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleAlert, Hammer, PackageCheck, Plus, Trash2 } from "lucide-react";
+import { CircleAlert, Hammer, Package, PackageCheck, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -395,6 +395,7 @@ export function CaddyBuildFields({
                       </span>
                       <span data-cell="path">
                         <TextInput
+                          startIcon={Package}
                           label={t("modulePath")}
                           isLabelHidden
                           value={entry.modulePath}
@@ -497,8 +498,8 @@ function ModuleToggle({
         <Switch label={caddyModuleName(t, module)} value={value} onChange={onChange} />
         {warning && (
           <Tooltip content={warning}>
-            {/* An HTML anchor for the tooltip, which cannot attach to the SVG, and a tab stop. */}
-            <span role="img" aria-label={warning} tabIndex={0} style={{ display: "inline-flex" }}>
+            {/* An HTML anchor for the tooltip, which cannot attach to the SVG. */}
+            <span role="img" aria-label={warning} style={{ display: "inline-flex" }}>
               <Icon icon={CircleAlert} color="red" />
             </span>
           </Tooltip>

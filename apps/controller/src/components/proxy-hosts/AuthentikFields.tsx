@@ -1,5 +1,6 @@
 "use client";
 
+import { Globe, Link, Network, Route } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -111,6 +112,7 @@ export function AuthentikFields({
         {enabled && (
           <VStack gap={4}>
             <TextInput
+              startIcon={Globe}
               label={t("outpostDomain")}
               htmlName="authentikOutpostDomain"
               placeholder="outpost.goauthentik.io"
@@ -119,6 +121,7 @@ export function AuthentikFields({
               isRequired
             />
             <TextInput
+              startIcon={Link}
               label={t("outpostUpstreamUrl")}
               htmlName="authentikOutpostUpstream"
               placeholder="https://outpost.internal:9000"
@@ -127,6 +130,7 @@ export function AuthentikFields({
               isRequired
             />
             <TextInput
+              startIcon={Route}
               label={t("authEndpoint")}
               isOptional
               htmlName="authentikAuthEndpoint"
@@ -142,6 +146,7 @@ export function AuthentikFields({
               rows={3}
             />
             <TextInput
+              startIcon={Network}
               label={t("trustedProxies")}
               htmlName="authentikTrustedProxies"
               value={trustedProxiesValue}

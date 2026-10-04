@@ -1,7 +1,9 @@
 "use client";
 
+import { Clock, KeyRound, Link } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
@@ -146,6 +148,7 @@ export function CrowdSecSection({
           ) : (
             <>
               <TextInput
+                startIcon={Link}
                 {...AUTOFILL_OFF}
                 label={t("apiUrl")}
                 description={t("apiUrlHelp")}
@@ -155,6 +158,7 @@ export function CrowdSecSection({
                 placeholder="http://crowdsec:8080"
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("apiKey")}
                 type="password"
@@ -170,6 +174,22 @@ export function CrowdSecSection({
                 value={apiKey}
                 onChange={setApiKey}
               />
+              {/* Beside the field rather than in it: a description is plain text, and a command
+                  wants to look like one and be copyable. */}
+              {!keyKept && !crowdsec.hasApiKey && (
+                <VStack gap={1}>
+                  <Text type="body" size="sm" color="secondary">
+                    {t("apiKeyCreate")}
+                  </Text>
+                  <CodeBlock
+                    code="cscli bouncers add caddy"
+                    language="bash"
+                    hasLanguageLabel={false}
+                    size="sm"
+                    width="100%"
+                  />
+                </VStack>
+              )}
               <HStack justify="start" gap={2}>
                 <Button
                   type="button"
@@ -184,6 +204,7 @@ export function CrowdSecSection({
                 <StatusAlert message={testResult.message} success={testResult.success} />
               )}
               <TextInput
+                startIcon={Link}
                 {...AUTOFILL_OFF}
                 label={t("appsecUrl")}
                 isOptional
@@ -206,6 +227,7 @@ export function CrowdSecSection({
             />
           )}
           <TextInput
+            startIcon={Clock}
             {...AUTOFILL_OFF}
             label={t("tickerInterval")}
             description={t("tickerIntervalHelp")}

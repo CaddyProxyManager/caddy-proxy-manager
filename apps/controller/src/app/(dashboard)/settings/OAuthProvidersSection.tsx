@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { KeyRound, Link, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -453,6 +453,7 @@ export default function OAuthProvidersSection({
           ) : (
             <VStack gap={2}>
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={editingProvider ? t("newClientSecret") : t("secretLabel")}
                 isRequired
@@ -480,6 +481,7 @@ export default function OAuthProvidersSection({
           )}
 
           <TextInput
+            startIcon={Link}
             label={t("issuerUrl")}
             isOptional
             size="sm"
@@ -490,6 +492,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("authorizationUrl")}
             isOptional
             size="sm"
@@ -499,6 +502,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("tokenUrl")}
             isOptional
             size="sm"
@@ -508,6 +512,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("userinfoUrl")}
             isOptional
             size="sm"

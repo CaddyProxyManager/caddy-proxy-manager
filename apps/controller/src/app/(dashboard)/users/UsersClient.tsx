@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  User,
   UserCog,
   Users as UsersIcon,
 } from "lucide-react";
@@ -777,6 +778,7 @@ function CreateUserDialog({
             placeholder={t("displayName")}
           />
           <TextInput
+            startIcon={User}
             data-testid="create-username"
             label={t("signInUsername")}
             isOptional
@@ -903,6 +905,7 @@ function EditUserDialog({
             placeholder={t("emailAddress")}
           />
           <TextInput
+            startIcon={User}
             label={t("signInUsername")}
             htmlName="username"
             value={username}

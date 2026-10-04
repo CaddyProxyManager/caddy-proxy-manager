@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Network, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -170,6 +170,7 @@ export function NetworkTab({
                   onChange={(next) => patch(rule.rowId, { action: next as Rule["action"] })}
                 />
                 <TextInput
+                  startIcon={Network}
                   {...NO_SPELLCHECK}
                   label={t("ipCidr")}
                   isLabelHidden={index > 0}

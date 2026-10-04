@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock, EthernetPort, KeyRound, Route } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -135,6 +136,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
 
             {policy === "random_choose" && (
               <NumberInput
+                hasNumberSteppers
                 label={t("lbChoose")}
                 description={t("lbChooseHelp")}
                 size="sm"
@@ -185,6 +187,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                   onChange={(next) => patch({ policyCookieName: str(next) })}
                 />
                 <TextInput
+                  startIcon={KeyRound}
                   label={t("cookieSecret")}
                   isOptional
                   size="sm"
@@ -197,6 +200,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
 
             <Grid columns={3} gap={3}>
               <TextInput
+                startIcon={Clock}
                 label={t("tryDuration")}
                 size="sm"
                 placeholder="5s"
@@ -204,6 +208,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 onChange={(next) => patch({ tryDuration: str(next) })}
               />
               <TextInput
+                startIcon={Clock}
                 label={t("tryInterval")}
                 size="sm"
                 placeholder="250ms"
@@ -211,6 +216,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 onChange={(next) => patch({ tryInterval: str(next) })}
               />
               <NumberInput
+                hasNumberSteppers
                 label={t("maxRetries")}
                 size="sm"
                 min={0}
@@ -236,6 +242,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 {lb?.activeHealthCheck?.enabled && (
                   <Grid columns={2} gap={3}>
                     <TextInput
+                      startIcon={Route}
                       label={t("uri")}
                       size="sm"
                       placeholder="/health"
@@ -245,6 +252,8 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
+                      startIcon={EthernetPort}
+                      hasNumberSteppers
                       label={t("port")}
                       size="sm"
                       min={1}
@@ -256,6 +265,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("interval")}
                       size="sm"
                       placeholder="30s"
@@ -267,6 +277,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("timeout")}
                       size="sm"
                       placeholder="5s"
@@ -278,6 +289,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("expectedStatus")}
                       size="sm"
                       min={100}
@@ -318,6 +330,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 {lb?.passiveHealthCheck?.enabled && (
                   <Grid columns={2} gap={3}>
                     <TextInput
+                      startIcon={Clock}
                       label={t("failDuration")}
                       size="sm"
                       placeholder="30s"
@@ -332,6 +345,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
+                      hasNumberSteppers
                       label={t("maxFailures")}
                       size="sm"
                       min={0}
@@ -360,6 +374,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }}
                     />
                     <TextInput
+                      startIcon={Clock}
                       label={t("unhealthyLatency")}
                       size="sm"
                       placeholder="5s"

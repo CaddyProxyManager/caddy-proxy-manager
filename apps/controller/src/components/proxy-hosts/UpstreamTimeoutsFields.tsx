@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
@@ -72,6 +73,7 @@ export function UpstreamTimeoutsFields({
                 const value = values[key].trim();
                 return (
                   <TextInput
+                    startIcon={Clock}
                     {...NO_SPELLCHECK}
                     key={key}
                     label={t(`upstreamTimeoutFields.${key}.label`)}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, KeyRound, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -86,6 +86,7 @@ export function GeneratedPasswordField({
   return (
     <HStack gap={2} vAlign="end" width={width}>
       <TextInput
+        startIcon={KeyRound}
         {...AUTOFILL_NEW_PASSWORD}
         {...(isRequired ? NATIVE_REQUIRED : {})}
         {...(minLength === undefined ? {} : nativeAttrs({ minLength }))}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Globe, Link } from "lucide-react";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Code } from "@astryxdesign/core/Code";
@@ -247,6 +248,7 @@ export function DnsDelegationSection({
           <VStack gap={3}>
             <input type="hidden" name="action" value="delegation-save" />
             <TextInput
+              startIcon={Globe}
               {...AUTOFILL_OFF}
               label={t("domainLabel")}
               description={t("domainHelp")}
@@ -257,6 +259,7 @@ export function DnsDelegationSection({
               isRequired
             />
             <TextInput
+              startIcon={Globe}
               {...AUTOFILL_OFF}
               label={t("targetLabel")}
               description={t("targetHelp")}
@@ -324,6 +327,7 @@ export function DnsDelegationSection({
               </InfoAlert>
             )}
             <TextInput
+              startIcon={Globe}
               {...AUTOFILL_OFF}
               label={t("domainLabel")}
               description={t("registerDomainHelp")}
@@ -335,6 +339,7 @@ export function DnsDelegationSection({
             />
             {/* The public server is a placeholder only: which server holds the account is the operator's call. */}
             <TextInput
+              startIcon={Link}
               {...AUTOFILL_OFF}
               label={t("serverUrlLabel")}
               description={t("serverUrlHelp")}

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
-import { Download } from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -205,6 +205,8 @@ export function IssueClientCertDialog({
               description={t("commonNameHelp")}
             />
             <NumberInput
+              startIcon={CalendarDays}
+              hasNumberSteppers
               label={t("validity")}
               htmlName="validity_days"
               value={validityDays}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Link, Plus, Route, Trash2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -59,6 +59,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
+                startIcon={Route}
                 label={t("fromPath")}
                 isLabelHidden={i > 0}
                 size="sm"
@@ -67,6 +68,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "from", next)}
               />
               <TextInput
+                startIcon={Link}
                 label={t("toUrlPath")}
                 isLabelHidden={i > 0}
                 size="sm"

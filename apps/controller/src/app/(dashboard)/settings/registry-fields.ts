@@ -45,7 +45,12 @@ import {
   type SettingDefinition,
   type SettingValue,
 } from "@/src/lib/settings/registry";
-import { settingDescription, settingLabel } from "@/src/lib/settings/messages";
+import {
+  settingDescription,
+  settingFieldLabel,
+  settingLabel,
+  settingUnit,
+} from "@/src/lib/settings/messages";
 import { isEnvOverridden, resolveSetting } from "@/src/lib/settings/resolve";
 import type { RegistryField } from "./RegistrySettingsBlock";
 
@@ -120,6 +125,9 @@ function field(t: Translator, definition: AnySetting, value: SettingValue): Regi
   if (typeof definition.default === "number") {
     return {
       ...common,
+      label: settingFieldLabel(t, definition.key, definition.unit),
+      units: definition.unit ? settingUnit(t, definition.unit) : undefined,
+      unit: definition.unit,
       kind: "number",
       value: typeof value === "number" ? value : definition.default,
       // The registry's own range. A number setting always has one.

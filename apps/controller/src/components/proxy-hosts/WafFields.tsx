@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ShieldOff } from "lucide-react";
+import { HardDrive, ShieldOff } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -165,6 +165,9 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               </Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("maxBodySizeMibUnit")}
                   label={t("maxBodySizeMib", { max: MAX_BODY_LIMIT_MIB })}
                   value={bodyLimitMb}
                   onChange={setBodyLimitMb}
@@ -176,6 +179,9 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                   placeholder={t("inherit")}
                 />
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("bufferedInMemoryMibUnit")}
                   label={t("bufferedInMemoryMib")}
                   value={inMemoryLimitMb}
                   onChange={setInMemoryLimitMb}

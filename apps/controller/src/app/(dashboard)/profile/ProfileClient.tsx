@@ -34,8 +34,8 @@ import {
   Key,
   KeyRound,
   Link,
-  LogIn,
   Lock,
+  LogIn,
   LogOut,
   Monitor,
   Plus,
@@ -936,6 +936,7 @@ export default function ProfileClient({
         <VStack gap={3}>
           {hasPassword && (
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_CURRENT_PASSWORD}
               label={t("currentPassword")}
               type="password"
@@ -955,6 +956,7 @@ export default function ProfileClient({
             description={passwordPolicyHint(tRoot)}
           />
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_NEW_PASSWORD}
             label={t("confirmNewPassword")}
             type="password"
@@ -981,6 +983,7 @@ export default function ProfileClient({
             {t("unlinkOauthConfirm", { providers: linkedNames.join(", ") })}
           </Text>
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
             label={t("currentPassword")}
             type="password"
@@ -1008,6 +1011,7 @@ export default function ProfileClient({
             {t("removePasswordDescription", { providers: otherSignInMethods.join(", ") })}
           </Text>
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
             label={t("currentPassword")}
             type="password"
