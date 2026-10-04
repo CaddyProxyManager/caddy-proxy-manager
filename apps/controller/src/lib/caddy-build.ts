@@ -322,7 +322,9 @@ export function sanitizeCaddyBuildSettings(input: {
       throw domainError("customModuleDuplicate", { path: modulePath }, { status: 400 });
     }
     seen.add(modulePath);
+    const name = entry.name?.trim();
     customModules.push({
+      ...(name ? { name } : {}),
       modulePath,
       ...(entry.version?.trim() ? { version: entry.version.trim() } : {}),
       enabled: entry.enabled !== false,

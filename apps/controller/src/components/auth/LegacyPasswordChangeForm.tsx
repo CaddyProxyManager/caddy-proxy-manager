@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRound } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -90,6 +91,7 @@ export default function LegacyPasswordChangeForm() {
           <Card padding={4}>
             <VStack gap={3}>
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_CURRENT_PASSWORD}
                 label={t("auth.passwordChange.currentPassword")}
                 type="password"
@@ -99,6 +101,7 @@ export default function LegacyPasswordChangeForm() {
                 width="100%"
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("auth.passwordChange.newPassword")}
                 type="password"
@@ -108,6 +111,7 @@ export default function LegacyPasswordChangeForm() {
                 width="100%"
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("auth.passwordChange.confirmPassword")}
                 type="password"

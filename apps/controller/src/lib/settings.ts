@@ -207,6 +207,12 @@ export async function setSetting<T>(key: string, value: T): Promise<void> {
 }
 
 export async function clearSetting(key: string): Promise<void> {
+  // Staged as "null", which the overlay reads as absent; see ./settings/staging-context.ts.
+  const capture = currentStagingScope()?.capture;
+  if (capture) {
+    capture.set(key, "null");
+    return;
+  }
   await db.delete(settings).where(eq(settings.key, key));
 }
 

@@ -7,6 +7,7 @@ import { flatTokensToLines, tokenize, type TokenLine } from "@astryxdesign/core/
 
 export type CodeEditorLanguage =
   | "json"
+  | "bash"
   | "caddyfile"
   | "dockerfile"
   | "html"
@@ -16,6 +17,7 @@ export type CodeEditorLanguage =
 /** Names, so not translated; plain text is described in words, from the catalog in CodeEditor. */
 export const LANGUAGE_LABELS: Record<Exclude<CodeEditorLanguage, "plaintext">, string> = {
   json: "JSON",
+  bash: "Bash",
   caddyfile: "Caddyfile",
   dockerfile: "Dockerfile",
   html: "HTML",
@@ -65,6 +67,18 @@ const DOCKERFILE: readonly Rule[] = [
   [/\b\d+\b/, "number"],
 ];
 
+// Astryx has a bash grammar, but it takes the `#` of `repo.git#v1.0` for a comment.
+const BASH: readonly Rule[] = [
+  // Only at the start of a word, which in the shell is the only place `#` starts one.
+  [/(?:^|[ \t])#.*/, "comment", "indented"],
+  // `\\[\s\S]`, not `\\.`: a quoted value may continue over a backslash-newline.
+  [/"(?:[^"\\]|\\[\s\S])*"/, "string"],
+  [/'[^']*'/, "string"],
+  [/\$\{?[A-Za-z_]\w*\}?/, "variable"],
+  [/(?:^|[ \t])--?[A-Za-z][\w-]*/, "keyword", "indented"],
+  [/\\$/, "punctuation"],
+];
+
 type Compiled = { pattern: RegExp; types: string[]; indented: boolean[] };
 
 /** Case matters in two of the three: SecLang variables are screaming case, Caddyfile is lowercase. */
@@ -80,6 +94,7 @@ const SOURCES: Partial<Record<CodeEditorLanguage, [readonly Rule[], string]>> = 
   caddyfile: [CADDYFILE, "gm"],
   seclang: [SECLANG, "gm"],
   dockerfile: [DOCKERFILE, "gmi"],
+  bash: [BASH, "gm"],
 };
 
 /**
@@ -133,6 +148,28 @@ function scan(code: string, compiled: Compiled): { type: string; start: number; 
 }
 
 /**
+ * A token per line it covers: `flatTokensToLines` files a token under the line it starts on, and
+ * the renderer drops one that runs past that line's end, as a string continued over `\`-newlines.
+ */
+function splitAtNewlines(
+  tokens: { type: string; start: number; end: number }[],
+  code: string,
+): { type: string; start: number; end: number }[] {
+  const split: { type: string; start: number; end: number }[] = [];
+  for (const token of tokens) {
+    let start = token.start;
+    let newline = code.indexOf("\n", start);
+    while (newline !== -1 && newline < token.end) {
+      if (newline > start) split.push({ type: token.type, start, end: newline });
+      start = newline + 1;
+      newline = code.indexOf("\n", start);
+    }
+    if (token.end > start) split.push({ type: token.type, start, end: token.end });
+  }
+  return split;
+}
+
+/**
  * Per line, line-relative offsets, as Astryx's `CodeBlock` takes them. Empty for plaintext or on
  * failure: unhighlighted text beats a field that throws.
  */
@@ -141,7 +178,9 @@ export function tokenizeCode(code: string, language: CodeEditorLanguage): TokenL
 
   try {
     const compiled = compiledFor(language);
-    return compiled ? flatTokensToLines(scan(code, compiled), code) : tokenize(code, language);
+    return compiled
+      ? flatTokensToLines(splitAtNewlines(scan(code, compiled), code), code)
+      : tokenize(code, language);
   } catch {
     return [];
   }

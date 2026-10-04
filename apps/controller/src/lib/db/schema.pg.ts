@@ -465,16 +465,23 @@ export const apiTokens = pgTable(
   }),
 );
 
-export const auditEvents = pgTable("audit_events", {
-  id: serial("id").primaryKey(),
-  userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
-  action: text("action").notNull(),
-  entityType: text("entityType").notNull(),
-  entityId: integer("entityId"),
-  summary: text("summary"),
-  data: text("data"),
-  createdAt: text("createdAt").notNull(),
-});
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    entityType: text("entityType").notNull(),
+    entityId: integer("entityId"),
+    summary: text("summary"),
+    data: text("data"),
+    createdAt: text("createdAt").notNull(),
+  },
+  // The Overview's newest-first list and its server-events line both range over this.
+  (table) => ({
+    createdAtIdx: index("audit_events_created_at_idx").on(table.createdAt),
+  }),
+);
 
 // traffic_events and waf_events live in ClickHouse (src/lib/clickhouse/client.ts); their parsers
 // and offsets live in the agent, which is where the Caddy log file is.
@@ -828,5 +835,33 @@ export const groupGrants = pgTable(
     ),
     l4HostUnique: uniqueIndex("group_grants_l4_host_unique").on(table.groupId, table.l4ProxyHostId),
     agentUnique: uniqueIndex("group_grants_agent_unique").on(table.groupId, table.agentId),
+  }),
+);
+
+/** A browser an administrator turned notifications on in. The keys encrypt each push for it. */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The push service's URL for this browser; what the browser itself identifies it by. */
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    /** The reader's locale when they subscribed; a push has no request to negotiate one from. */
+    locale: text("locale"),
+    userAgent: text("userAgent"),
+    /**
+     * The session that turned it on. Not a foreign key: a session expiring must not stop pushes,
+     * but revoking sessions (sign out others, a password change) takes their browsers with them.
+     */
+    sessionId: integer("sessionId"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    endpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
+    userIdx: index("push_subscriptions_user_idx").on(table.userId),
   }),
 );

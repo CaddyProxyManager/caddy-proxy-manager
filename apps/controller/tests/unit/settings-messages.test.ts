@@ -20,6 +20,21 @@ describe('settings.registry messages', () => {
     expect(missing).toEqual([]);
   });
 
+  it('gives every number with a unit a field label and a word for the unit', () => {
+    const units = (messages.settings as { units: Record<string, string> }).units;
+    const missing = SETTING_DEFINITIONS.filter((definition) => definition.unit).flatMap(
+      (definition) => {
+        const name = settingMessageName(definition.key);
+        const entry = registry[name] as { fieldLabel?: string } | undefined;
+        return [
+          ...(entry?.fieldLabel ? [] : [`${name}.fieldLabel`]),
+          ...(units[definition.unit as string] ? [] : [`units.${definition.unit}`]),
+        ];
+      },
+    );
+    expect(missing).toEqual([]);
+  });
+
   it('has no entry for a setting that no longer exists', () => {
     const known = new Set(
       SETTING_DEFINITIONS.map((definition) => settingMessageName(definition.key)),

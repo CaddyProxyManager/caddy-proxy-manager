@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Clock, Plus, Route, Trash2 } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -138,6 +138,7 @@ export function RateLimitFields({ rateLimit }: { rateLimit?: HostRateLimitConfig
                 />
               </HStack>
               <TextInput
+                startIcon={Route}
                 {...NO_SPELLCHECK}
                 label={t("rateLimitPaths")}
                 isOptional
@@ -150,6 +151,7 @@ export function RateLimitFields({ rateLimit }: { rateLimit?: HostRateLimitConfig
               />
               <Grid columns={{ minWidth: 160, max: 4 }} gap={3}>
                 <NumberInput
+                  hasNumberSteppers
                   label={t("rateLimitMaxEvents")}
                   size="sm"
                   min={1}
@@ -160,6 +162,7 @@ export function RateLimitFields({ rateLimit }: { rateLimit?: HostRateLimitConfig
                   isDisabled={locked}
                 />
                 <TextInput
+                  startIcon={Clock}
                   {...NO_SPELLCHECK}
                   label={t("rateLimitWindow")}
                   size="sm"
@@ -182,6 +185,7 @@ export function RateLimitFields({ rateLimit }: { rateLimit?: HostRateLimitConfig
                   isDisabled={locked}
                 />
                 <NumberInput
+                  hasNumberSteppers
                   label={t("rateLimitIpv6Prefix")}
                   isOptional
                   size="sm"

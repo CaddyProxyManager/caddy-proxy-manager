@@ -1,5 +1,6 @@
 "use client";
 
+import { Route } from "lucide-react";
 import { useState } from "react";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import type { RewriteConfig } from "@/lib/models/proxy-hosts";
@@ -14,6 +15,7 @@ export function RewriteFields({ initialData }: Props) {
 
   return (
     <TextInput
+      startIcon={Route}
       label={t("pathPrefixRewrite")}
       htmlName="rewritePathPrefix"
       value={pathPrefix}

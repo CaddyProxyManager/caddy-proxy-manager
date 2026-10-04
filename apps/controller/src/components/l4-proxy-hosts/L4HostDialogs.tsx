@@ -22,7 +22,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
-import { Globe, Layers, MapPin, Pin, ShieldBan } from "lucide-react";
+import { Clock, Earth, Globe, Layers, MapPin, Network, Pin, ShieldBan } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
@@ -141,8 +141,8 @@ function Section({
         defaultIsOpen={defaultIsOpen}
         trigger={
           <HStack gap={2} vAlign="center">
-            <Icon icon={icon} size="sm" />
-            <Text type="body" size="sm" weight="medium">
+            <Icon icon={icon} />
+            <Text type="label" size="lg">
               {title}
             </Text>
           </HStack>
@@ -335,6 +335,7 @@ function L4HostForm({
         />
 
         <TextInput
+          startIcon={Network}
           {...NATIVE_REQUIRED}
           label={t("listenAddress")}
           htmlName="listenAddress"
@@ -379,6 +380,7 @@ function L4HostForm({
 
         {(matcherType === "tls_sni" || matcherType === "http_host") && (
           <TextInput
+            startIcon={Globe}
             {...NATIVE_REQUIRED}
             label={matcherType === "tls_sni" ? t("sniHostnames") : t("httpHostnames")}
             htmlName="matcherValue"
@@ -467,6 +469,7 @@ function L4HostForm({
             />
           )}
           <TextInput
+            startIcon={Clock}
             label={t("tryDuration")}
             isOptional
             htmlName="lbTryDuration"
@@ -475,6 +478,7 @@ function L4HostForm({
             onChange={set("lbTryDuration")}
           />
           <TextInput
+            startIcon={Clock}
             label={t("tryInterval")}
             isOptional
             htmlName="lbTryInterval"
@@ -504,6 +508,7 @@ function L4HostForm({
             onChange={set("lbActiveHealthPort")}
           />
           <TextInput
+            startIcon={Clock}
             label={t("interval")}
             isOptional
             htmlName="lbActiveHealthInterval"
@@ -512,6 +517,7 @@ function L4HostForm({
             onChange={set("lbActiveHealthInterval")}
           />
           <TextInput
+            startIcon={Clock}
             label={t("timeout")}
             isOptional
             htmlName="lbActiveHealthTimeout"
@@ -531,6 +537,7 @@ function L4HostForm({
             onChange={setLbPassiveHealthEnabled}
           />
           <TextInput
+            startIcon={Clock}
             label={t("failDuration")}
             isOptional
             htmlName="lbPassiveHealthFailDuration"
@@ -581,6 +588,7 @@ function L4HostForm({
             description={t("fallbackResolversHelp")}
           />
           <TextInput
+            startIcon={Clock}
             label={t("timeout")}
             isOptional
             htmlName="dnsTimeout"
@@ -626,6 +634,7 @@ function L4HostForm({
             {t("blockRules")}
           </Text>
           <TextInput
+            startIcon={Earth}
             label={t("blockCountries")}
             isOptional
             htmlName="geoblockBlockCountries"
@@ -635,6 +644,7 @@ function L4HostForm({
             description={t("countryCodesHelp")}
           />
           <TextInput
+            startIcon={Earth}
             label={t("blockContinents")}
             isOptional
             htmlName="geoblockBlockContinents"
@@ -644,6 +654,7 @@ function L4HostForm({
             description={t("continentCodesHelp")}
           />
           <TextInput
+            startIcon={Network}
             label={t("blockAsns")}
             isOptional
             htmlName="geoblockBlockAsns"
@@ -652,6 +663,7 @@ function L4HostForm({
             onChange={set("geoblockBlockAsns")}
           />
           <TextInput
+            startIcon={Network}
             label={t("blockCidrs")}
             isOptional
             htmlName="geoblockBlockCidrs"
@@ -660,6 +672,7 @@ function L4HostForm({
             onChange={set("geoblockBlockCidrs")}
           />
           <TextInput
+            startIcon={Network}
             label={t("blockIps")}
             isOptional
             htmlName="geoblockBlockIps"
@@ -672,6 +685,7 @@ function L4HostForm({
             {t("allowRulesOverrideBlocks")}
           </Text>
           <TextInput
+            startIcon={Earth}
             label={t("allowCountries")}
             isOptional
             htmlName="geoblockAllowCountries"
@@ -680,6 +694,7 @@ function L4HostForm({
             onChange={set("geoblockAllowCountries")}
           />
           <TextInput
+            startIcon={Earth}
             label={t("allowContinents")}
             isOptional
             htmlName="geoblockAllowContinents"
@@ -688,6 +703,7 @@ function L4HostForm({
             onChange={set("geoblockAllowContinents")}
           />
           <TextInput
+            startIcon={Network}
             label={t("allowAsns")}
             isOptional
             htmlName="geoblockAllowAsns"
@@ -696,6 +712,7 @@ function L4HostForm({
             onChange={set("geoblockAllowAsns")}
           />
           <TextInput
+            startIcon={Network}
             label={t("allowCidrs")}
             isOptional
             htmlName="geoblockAllowCidrs"
@@ -704,6 +721,7 @@ function L4HostForm({
             onChange={set("geoblockAllowCidrs")}
           />
           <TextInput
+            startIcon={Network}
             label={t("allowIps")}
             isOptional
             htmlName="geoblockAllowIps"

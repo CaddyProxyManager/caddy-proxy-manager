@@ -6,7 +6,8 @@ import { useRef, type RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import { canSee, DESTINATIONS, type DestinationId } from "@/src/lib/nav/destinations";
-import { DESTINATION_ICONS } from "./nav-icons";
+import { ACCENTS } from "@/src/components/ui/accent";
+import { DESTINATION_HUES, DESTINATION_ICONS } from "./nav-icons";
 
 /** Two taps on More within this window go to the full More page instead of the drawer. */
 const DOUBLE_TAP_MS = 350;
@@ -91,7 +92,12 @@ export function MobileTabBar({
             onClick={onCloseMore}
           >
             <span className="cpm-tab-bar-mark" aria-hidden="true" />
-            <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+            <Icon
+              size={22}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className={ACCENTS[DESTINATION_HUES[tab.destination]].text}
+            />
             <span className="cpm-tab-label">{t(tab.labelKey)}</span>
           </Link>
         );

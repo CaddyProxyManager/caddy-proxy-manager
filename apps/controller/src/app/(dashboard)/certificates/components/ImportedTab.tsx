@@ -7,6 +7,7 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { ACCENTS } from "@/components/ui/accent";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { downloadText } from "@/src/lib/download-text";
@@ -195,9 +196,11 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
   );
 }
 
+const EXPIRY_HUE = { error: "red", warning: "yellow", success: "green" } as const;
+
 function importedMobileCard(c: ImportedCertView, onEdit: () => void) {
   return (
-    <Card>
+    <Card className={ACCENTS[EXPIRY_HUE[expiryIconColor(c.expiryStatus)]].edge}>
       <VStack gap={2}>
         <HStack justify="between" vAlign="center" gap={2}>
           <HStack gap={2} vAlign="center">

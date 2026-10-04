@@ -86,6 +86,8 @@ export default async function proxy(req: NextRequest) {
     pathname === "/api/health" ||
     // Branding, not a secret; the pages before a session need it too.
     pathname === "/api/branding/favicon" ||
+    // The push service worker: the browser's update check carries no guarantee of a session.
+    pathname === "/sw.js" ||
     pathname.startsWith("/api/v1/") ||
     // Authenticates itself (Bearer, session or agent signature); a redirect to HTML would break
     // GraphQL clients and the agent protocol.

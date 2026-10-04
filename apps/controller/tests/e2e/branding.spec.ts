@@ -3,7 +3,8 @@
  * not the upload's claim, so nothing stored as an image is served as a document.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { goToSetting } from '../helpers/settings-nav';
+import { goToSetting, savePage } from '../helpers/settings-nav';
+import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 
 const FAVICON_URL = '/api/branding/favicon';
 
@@ -14,15 +15,30 @@ const PNG = Buffer.from(
 );
 
 async function goToBranding(page: Page) {
-  // Branding's own heading is "Favicon", not its nav label.
   await goToSetting(page, 'Branding');
 }
 
+/** Saving stages; the favicon route serves only what Review & apply has made live. */
+async function saveAndApply(page: Page) {
+  await savePage(page);
+  await expectStaged(page);
+  await applyStagedChanges(page);
+}
+
+async function uploadPng(page: Page) {
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'logo.png',
+    mimeType: 'image/png',
+    buffer: PNG,
+  });
+  await saveAndApply(page);
+}
+
 async function removeIfPresent(page: Page) {
-  const remove = page.getByRole('button', { name: 'Remove favicon' });
+  const remove = page.getByRole('button', { name: /^Remove .*favicon/i });
   if (await remove.isVisible().catch(() => false)) {
     await remove.click();
-    await expect(page.getByText('Custom favicon removed')).toBeVisible({ timeout: 15_000 });
+    await saveAndApply(page);
   }
 }
 
@@ -46,13 +62,7 @@ test.describe('Branding - custom favicon', () => {
 
   test('an uploaded PNG is stored and served back with its own type', async ({ page }) => {
     await goToBranding(page);
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'logo.png',
-      mimeType: 'image/png',
-      buffer: PNG,
-    });
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Favicon updated')).toBeVisible({ timeout: 15_000 });
+    await uploadPng(page);
 
     const response = await page.request.get(FAVICON_URL);
     expect(response.status()).toBe(200);
@@ -64,17 +74,12 @@ test.describe('Branding - custom favicon', () => {
 
   test('removing it goes back to 404', async ({ page }) => {
     await goToBranding(page);
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'logo.png',
-      mimeType: 'image/png',
-      buffer: PNG,
-    });
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Favicon updated')).toBeVisible({ timeout: 15_000 });
+    await uploadPng(page);
     expect((await page.request.get(FAVICON_URL)).status()).toBe(200);
 
-    await page.getByRole('button', { name: 'Remove favicon' }).click();
-    await expect(page.getByText('Custom favicon removed')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /^Remove .*favicon/i }).click();
+    await expect(page.getByText('will be removed when saved')).toBeVisible();
+    await saveAndApply(page);
     expect((await page.request.get(FAVICON_URL)).status()).toBe(404);
   });
 
@@ -86,7 +91,7 @@ test.describe('Branding - custom favicon', () => {
       mimeType: 'image/png',
       buffer: Buffer.from('<html><script>alert(document.domain)</script></html>'),
     });
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
 
     await expect(page.getByText(/does not look like an image/i)).toBeVisible({ timeout: 15_000 });
     expect((await page.request.get(FAVICON_URL)).status()).toBe(404);

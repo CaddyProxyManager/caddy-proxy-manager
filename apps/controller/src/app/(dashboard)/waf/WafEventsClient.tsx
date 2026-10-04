@@ -12,7 +12,17 @@ import {
 import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  HardDrive,
+  Hash,
+  MoreHorizontal,
+  Search,
+  ShieldOff,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -64,6 +74,7 @@ import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
 import { WafPresetPicker } from "@/components/proxy-hosts/WafPresetPicker";
@@ -258,19 +269,19 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 function StatsBar({ stats }: { stats: WafEventStats }) {
   const t = useTranslations("waf");
   const items = [
-    { label: t("statTotalEvents"), value: stats.total, color: "primary" as const },
-    { label: t("blocked"), value: stats.blocked, color: "accent" as const },
-    { label: t("statCritical"), value: stats.critical, color: "accent" as const },
-    { label: t("statUniqueHosts"), value: stats.uniqueHosts, color: "accent" as const },
-    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered, color: "accent" as const },
-  ];
+    { label: t("statTotalEvents"), value: stats.total, hue: "blue" },
+    { label: t("blocked"), value: stats.blocked, hue: "red" },
+    { label: t("statCritical"), value: stats.critical, hue: "orange" },
+    { label: t("statUniqueHosts"), value: stats.uniqueHosts, hue: "teal" },
+    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered, hue: "purple" },
+  ] satisfies { label: string; value: number; hue: Hue }[];
 
   return (
     <Grid columns={{ minWidth: 140, max: 5 }} gap={3}>
-      {items.map(({ label, value, color }) => (
-        <Card key={label} padding={3}>
+      {items.map(({ label, value, hue }) => (
+        <Card key={label} padding={3} className={ACCENTS[hue].edge}>
           <VStack gap={0}>
-            <Text type="display-3" color={color} hasTabularNumbers>
+            <Text type="display-3" hasTabularNumbers className={ACCENTS[hue].text}>
               {value}
             </Text>
             <Text type="body" weight="medium" style={CARD_TITLE_STYLE}>
@@ -589,7 +600,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
       <Collapsible
         defaultIsOpen={false}
         trigger={
-          <Text type="body" size="xsm">
+          <Text type="label" size="lg">
             {t("rawJson")}
           </Text>
         }
@@ -849,6 +860,7 @@ function GlobalSuppressedRules({
       <VStack gap={2}>
         <HStack gap={2} vAlign="end" maxWidth={360}>
           <TextInput
+            startIcon={Hash}
             {...nativeAttrs({ pattern: "[0-9]*" })}
             label={t("addRuleById")}
             size="sm"
@@ -1544,6 +1556,9 @@ export default function WafEventsClient({
               />
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("maxBodySizeMibUnit")}
                   label={t("maxBodySizeMib")}
                   htmlName="wafRequestBodyLimitMb"
                   value={wafBodyLimitMb}
@@ -1557,6 +1572,9 @@ export default function WafEventsClient({
                   description={t("bodySizeLimitHelp")}
                 />
                 <NumberInput
+                  startIcon={HardDrive}
+                  hasNumberSteppers
+                  units={t("bufferedInMemoryMibUnit")}
                   label={t("bufferedInMemoryMib")}
                   htmlName="wafRequestBodyInMemoryLimitMb"
                   value={wafInMemoryLimitMb}

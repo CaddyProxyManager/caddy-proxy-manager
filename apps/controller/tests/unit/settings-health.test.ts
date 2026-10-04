@@ -3,6 +3,7 @@ import { describe, it, expect } from 'bun:test';
 import { createTranslator } from 'next-intl';
 import messages from '../../messages/en.json';
 import { needsAttention, sectionHealth, type HealthInput } from '../../src/lib/settings/health';
+import { SETTINGS_GROUPS } from '../../src/app/(dashboard)/settings/sections';
 
 // The real catalog, so wording assertions hold the English.
 const t = createTranslator({ locale: 'en', messages, namespace: 'settings' });
@@ -54,6 +55,37 @@ function input(overrides: Partial<HealthInput> = {}): HealthInput {
     oauthProviderCount: 0,
     agentsConnected: 1,
     agentsPaired: 1,
+    general: { defaultDomain: 'example.com', acmeEmail: '' },
+    updates: {
+      enabled: true,
+      current: '3.5.1',
+      latest: '3.5.1',
+      updateAvailable: false,
+      error: null,
+    },
+    faviconSet: false,
+    instance: { appName: 'Caddy Proxy Manager', baseUrl: 'https://cpm.example.com' },
+    gravatarEnabled: false,
+    errorPageRules: 0,
+    globalCaddyfileLines: 0,
+    httpCacheStorage: 'memory',
+    dashboardHost: null,
+    email: { status: 'ready', host: 'smtp.example.com' },
+    notifications: { alertDays: 14, lastError: null, noRecipients: false },
+    dnsResolvers: { enabled: false, count: 0 },
+    upstreamDns: null,
+    httpProtocols: { http2: true, http3: true },
+    compressionEnabled: true,
+    tailscaleEnabled: false,
+    ldapDirectoryCount: 0,
+    signIn: { localUsersDisabled: false, accountLockEnabled: true },
+    captchaProvider: null,
+    twoFactorRequiredForAdmins: false,
+    requireChangeOnLegacyHash: false,
+    authentikOutpost: '',
+    forwardAuth: null,
+    crowdsec: { enabled: false, mode: 'external' },
+    logging: { enabled: true, format: 'json' },
     stagedKeys: new Set<string>(),
     ...overrides,
   };
@@ -370,5 +402,61 @@ describe('sectionHealth', () => {
     );
 
     expect(find(sections, 'caddy-build').value).toBe('1 custom, 1 disabled');
+  });
+});
+
+describe('the overview covers every block', () => {
+  it('has a tile for each block in the Settings navigation, and none for anything else', () => {
+    const blocks = SETTINGS_GROUPS.flatMap((group) =>
+      group.items.flatMap((item) => item.blocks.map((block) => block.id)),
+    );
+    const tiles = health(input()).map((section) => section.id);
+
+    expect([...tiles].sort()).toEqual([...blocks].sort());
+  });
+
+  it('flags email that is on but cannot send, and notifications that are failing', () => {
+    const sections = health(
+      input({
+        email: { status: 'incomplete', host: '' },
+        notifications: { alertDays: 14, lastError: 'connection refused', noRecipients: false },
+      }),
+    );
+
+    expect(needsAttention(sections).map((section) => section.id)).toEqual([
+      'email',
+      'certificate-alerts',
+    ]);
+  });
+
+  it('flags an update check that failed, not an update that is available', () => {
+    const available = health(
+      input({
+        updates: {
+          enabled: true,
+          current: '3.5.1',
+          latest: '3.6.0',
+          updateAvailable: true,
+          error: null,
+        },
+      }),
+    );
+    expect(needsAttention(available)).toEqual([]);
+    expect(available.find((section) => section.id === 'updates')?.value).toBe(
+      '3.6.0 available, running 3.5.1',
+    );
+
+    const failed = health(
+      input({
+        updates: {
+          enabled: true,
+          current: '3.5.1',
+          latest: null,
+          updateAvailable: false,
+          error: 'timeout',
+        },
+      }),
+    );
+    expect(needsAttention(failed).map((section) => section.id)).toEqual(['updates']);
   });
 });

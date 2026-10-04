@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Globe, Home, Plus, X } from "lucide-react";
+import { Globe, Home, Link, Plus, X } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -532,7 +532,13 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </div>
             </VStack>
 
-            <Collapsible trigger={t("trustedProxiesBlockResponse")}>
+            <Collapsible
+              trigger={
+                <Text type="label" size="lg">
+                  {t("trustedProxiesBlockResponse")}
+                </Text>
+              }
+            >
               <VStack gap={4}>
                 <TagInput
                   key={`trusted-proxies-${resetKey}`}
@@ -555,6 +561,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
 
                 <Grid columns={3} gap={4}>
                   <NumberInput
+                    hasNumberSteppers
                     label={t("statusCode")}
                     htmlName="geoblockResponseStatus"
                     min={100}
@@ -572,6 +579,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                     description={t("geoblockResponseBodyHelp")}
                   />
                   <TextInput
+                    startIcon={Link}
                     label={t("redirectUrl")}
                     htmlName="geoblockRedirectUrl"
                     value={redirectUrl}

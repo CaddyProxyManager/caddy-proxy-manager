@@ -20,6 +20,52 @@
 /* Unlayered last so existing app utility classes keep winning during migration. */
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* The coloured numbers on cards (components/ui/accent.ts). Light mode's text tokens are near-black
+   (the theme gives text and icon the same tone), so there they are lightened, keeping their chroma;
+   dark mode keeps the text token as it is. */
+@theme inline {
+  --color-blue-number: light-dark(
+    oklch(from var(--color-text-blue) calc(l + 0.18) c h),
+    var(--color-text-blue)
+  );
+  --color-cyan-number: light-dark(
+    oklch(from var(--color-text-cyan) calc(l + 0.18) c h),
+    var(--color-text-cyan)
+  );
+  --color-gray-number: light-dark(
+    oklch(from var(--color-text-gray) calc(l + 0.18) c h),
+    var(--color-text-gray)
+  );
+  --color-green-number: light-dark(
+    oklch(from var(--color-text-green) calc(l + 0.18) c h),
+    var(--color-text-green)
+  );
+  --color-orange-number: light-dark(
+    oklch(from var(--color-text-orange) calc(l + 0.18) c h),
+    var(--color-text-orange)
+  );
+  --color-pink-number: light-dark(
+    oklch(from var(--color-text-pink) calc(l + 0.18) c h),
+    var(--color-text-pink)
+  );
+  --color-purple-number: light-dark(
+    oklch(from var(--color-text-purple) calc(l + 0.18) c h),
+    var(--color-text-purple)
+  );
+  --color-red-number: light-dark(
+    oklch(from var(--color-text-red) calc(l + 0.18) c h),
+    var(--color-text-red)
+  );
+  --color-teal-number: light-dark(
+    oklch(from var(--color-text-teal) calc(l + 0.18) c h),
+    var(--color-text-teal)
+  );
+  --color-yellow-number: light-dark(
+    oklch(from var(--color-text-yellow) calc(l + 0.18) c h),
+    var(--color-text-yellow)
+  );
+}
+
 @layer base {
   /* light-dark() tokens resolved by `color-scheme`, no `.dark` block. See src/lib/theme-mode.ts. */
   * {
@@ -46,9 +92,82 @@
     background-color: light-dark(var(--color-background-body), #111111);
   }
 
+  /* The rail's footer (account, and in Settings the revision and staged controls) a step darker
+     than the rail, so it reads as apart from the list scrolling above it. SideNav gives it no
+     class: it is the nav's last child whenever a footer is passed. */
+  .astryx-app-shell-sidenav .astryx-side-nav > :last-child:not(:first-child) {
+    /* Each mode its own blend: as strong a step on the light rail would turn it grey. */
+    background-color: light-dark(
+      color-mix(in srgb, var(--color-background-body) 94%, black),
+      color-mix(in srgb, #111111 40%, black)
+    );
+    border-top: 1px solid var(--color-border);
+  }
+
   /* A full-page Layout's `height="fill"` is a percentage of this wrapper, so it needs a height. */
   .cpm-mobile-content:has(> .astryx-layout) {
     height: 100%;
+  }
+
+  /* A Badge in the accent, for the places that marked something with it (Badge has no accent
+     variant, and its pink one would ignore the setting). */
+  .astryx-badge.cpm-accent-badge {
+    background-color: var(--cpm-accent-background);
+    color: var(--cpm-accent-text);
+  }
+
+  /* The saved accent while another is previewed (AccentColorPicker). */
+  .astryx-card.cpm-accent-saved {
+    border-style: dashed;
+    border-color: var(--color-text-secondary);
+  }
+
+  /* The demo's stand-in for a Failed badge: solid like it, in orange rather than alarm red. */
+  .astryx-badge.cpm-demo-badge {
+    background-color: var(--color-text-orange);
+    color: var(--color-background-body);
+  }
+
+  /* Caddy Build's custom modules: one table row each, restacked under the name on a phone. */
+  .cpm-module-grid {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(0, 2fr) 120px 36px;
+    grid-template-areas: "switch name path version remove";
+    gap: var(--spacing-2);
+    align-items: start;
+  }
+
+  .cpm-module-grid > [data-cell="switch"] {
+    grid-area: switch;
+    /* Level with the inputs' text rather than their top edge. */
+    padding-top: var(--spacing-1);
+  }
+  .cpm-module-grid > [data-cell="name"] {
+    grid-area: name;
+  }
+  .cpm-module-grid > [data-cell="path"] {
+    grid-area: path;
+  }
+  .cpm-module-grid > [data-cell="version"] {
+    grid-area: version;
+  }
+  .cpm-module-grid > [data-cell="remove"] {
+    grid-area: remove;
+  }
+
+  @media (max-width: 767px) {
+    .cpm-module-grid {
+      grid-template-columns: 44px minmax(0, 1fr) 36px;
+      grid-template-areas:
+        "switch name remove"
+        ". path path"
+        ". version version";
+    }
+
+    /* Each input says what it is through its placeholder there. */
+    .cpm-module-grid[data-header] {
+      display: none;
+    }
   }
 
   /* PanelResizeHandle: a 1px line with a wider invisible ::before to grab. */
@@ -73,27 +192,41 @@
 
   .cpm-panel-resize-handle:hover,
   .cpm-panel-resize-handle[data-dragging] {
-    background-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    background-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   .cpm-panel-resize-handle:focus-visible {
     outline: none;
-    background-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    background-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   /* CodeEditor's textarea ring would draw under the highlighted glyphs, so the frame shows focus. */
   .cpm-code-editor:focus-within {
-    border-color: var(--color-border-pink);
-    box-shadow: 0 0 0 1px var(--color-border-pink);
+    border-color: var(--cpm-accent-border);
+    box-shadow: 0 0 0 1px var(--cpm-accent-border);
   }
 
   /* Flush: no border, and the pane clips an outer ring. An outline paints above the scrollbar. */
   .cpm-code-editor[data-flush]:focus-within {
     box-shadow: none;
-    outline: 1px solid var(--color-border-pink);
+    outline: 1px solid var(--cpm-accent-border);
     outline-offset: -1px;
+  }
+
+  /* Top corner, backed so it stays legible over a long first line. */
+  .cpm-code-editor-copy {
+    position: absolute;
+    top: var(--spacing-1);
+    right: calc(var(--cpm-scrollbar-gutter) + var(--spacing-1));
+    border-radius: var(--radius-element);
+    background-color: var(--color-syntax-background);
+  }
+
+  /* A headerless CodeBlock floats its copy button over the first line; keep the text clear of it. */
+  pre.astryx-code-block:has(> .astryx-code-block-copy-button) > div:first-child {
+    padding-right: var(--spacing-8);
   }
 
   /* Clear of the native scrollbar, whose width CodeEditor measures onto its frame. */
@@ -106,7 +239,7 @@
   /* Unsaved fields (PageBlocks.tsx). Descendants too: Astryx draws label text in its own element. */
   label[data-unsaved="true"],
   label[data-unsaved="true"] * {
-    color: var(--color-text-pink);
+    color: var(--cpm-accent-text);
   }
 
   /* The bordered element differs by control, so the field carries the mark. */
@@ -114,7 +247,7 @@
   [data-unsaved-field="true"] textarea,
   [data-unsaved-field="true"] select,
   [data-unsaved-field="true"] .astryx-checkbox-indicator {
-    border-color: var(--color-border-pink);
+    border-color: var(--cpm-accent-border);
   }
 
   /* A private key needs a textarea, since a password input strips PEM newlines on paste. */

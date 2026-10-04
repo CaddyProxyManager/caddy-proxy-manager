@@ -9,14 +9,6 @@ Web interface for managing [Caddy Server](https://caddyserver.com/) reverse prox
 > and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta -
 > take a backup before upgrading.
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
-
-[Report Bug](https://github.com/silentspud/caddy-proxy-manager/issues) • [Request Feature](https://github.com/silentspud/caddy-proxy-manager/issues)
-
-<img width="100%" alt="Dashboard" src="apps/site/assets/screenshots/dashboard-main.png" />
-
 ## Overview
 
 This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through an Astryx interface. Built with Vinext version whatever, React 19, Astryx, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
@@ -30,11 +22,8 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 `docker-compose.yml`, `.env.example` and the files they mount, flat, with the images pinned to that
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
-Each release has two archives, the same but for CrowdSec. `-deploy.tar.gz` leaves out the
-[managed CrowdSec](#crowdsec) container; `-deploy-crowdsec.tar.gz` adds it, its network and its
-volumes. Take the second only for managed mode - an external CrowdSec works with either. Upgrade
-with the same one you installed from: the plain archive unpacked over a CrowdSec install removes
-the service from the compose file.
+It includes the [managed CrowdSec](#crowdsec) container, behind its Compose profile: it does not
+run until **Settings → CrowdSec** turns managed mode on.
 
 ```bash
 VERSION=v3.5.1   # the release you downloaded
@@ -290,7 +279,7 @@ starts their count over - the way back in when that user is the only administrat
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
 - **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, a certificate expiry digest for the administrators, and admin notifications, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
-- **Notifications** - Emails the administrators, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications**
+- **Notifications** - Tells the administrators by email and browser push, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications** turns it off for everyone; each administrator picks their own events and channels under **Profile → Notifications**
 - **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. Optionally required for administrators; resettable by an admin or from the container console
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
@@ -387,6 +376,7 @@ it win even then.
 | Setting | Variable | Default |
 | ------- | -------- | ------- |
 | Application name - sidebar, login card, page-title suffix, the organization of a CA generated here | `APP_NAME` | `Caddy Proxy Manager` |
+| Accent colour of the dashboard: `pink`, `purple`, `blue`, `cyan`, `teal`, `green`, `orange` or `red`. Also under **Settings → General → Branding** | `ACCENT_COLOR` | `pink` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
 | Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Under **Settings → Agent**, checked on every pass so it takes effect without a restart. Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |
@@ -433,7 +423,7 @@ it win even then.
 | SMTP username. Empty for a relay that needs no sign-in | `SMTP_USERNAME` | None |
 | SMTP password. Encrypted at rest | `SMTP_PASSWORD` | None |
 | Sender address; the application name is the sender's name | `SMTP_FROM` | None |
-| Comma-separated recipients of certificate alerts and notifications. Empty sends them to every active administrator | `EMAIL_ALERT_RECIPIENTS` | None |
+| Comma-separated recipients of certificate alerts (empty: every active administrator), and extra recipients of every notification | `EMAIL_ALERT_RECIPIENTS` | None |
 | Email once a certificate has fewer days than this left, 0-90. `0` turns alerts off | `CERTIFICATE_EXPIRY_ALERT_DAYS` | `14` |
 | Notify: An account disabled after failed sign-ins, or the last administrator kept enabled | `NOTIFY_ACCOUNT_DISABLED` | `true` |
 | Notify: Failed sign-ins locking an administrator's account | `NOTIFY_ADMIN_LOCKED` | `true` |
@@ -448,6 +438,7 @@ it win even then.
 | Notify: The GeoIP update failing three times in a row, and working again | `NOTIFY_GEOIP_FAILED` | `true` |
 | Notify: A CRS plugin switched off because Caddy refused it | `NOTIFY_CRS_PLUGIN_DISABLED` | `true` |
 | Notify: A new release, once each, while the update check is on | `NOTIFY_UPDATE_AVAILABLE` | `true` |
+| Email the owner of an account, once, when it is disabled. A disabled account gets nothing else | `NOTIFY_DISABLED_ACCOUNT_OWNER` | `false` |
 
 > Compose reads `CLICKHOUSE_PASSWORD` too, to provision the `clickhouse` container. **With an agent
 > running the stack you do not need to keep it in `.env`**: the agent starts ClickHouse itself and
@@ -1026,8 +1017,7 @@ Every agent - the one in the same stack included - fetches its own copy from the
 Caddy becomes a CrowdSec bouncer. Turn on **CrowdSec** under **Settings → Caddy Build** and
 rebuild, then pick where the Local API is under **Settings → CrowdSec**:
 
-- **Managed (bundled host only).** Needs the `-deploy-crowdsec.tar.gz` archive's compose file. The
-  bundled agent runs a `crowdsec` container
+- **Managed (bundled host only).** The bundled agent runs a `crowdsec` container
   (`crowdsecurity/crowdsec`, pinned) behind the `crowdsec` Compose profile, as it does ClickHouse.
   It reads Caddy's access log from `caddy-logs`, read-only, with the `crowdsecurity/caddy`
   collection, and the controller keeps that log on and in JSON while CrowdSec is managed. The
@@ -1459,7 +1449,8 @@ docker run --rm ghcr.io/silentspud/caddy-proxy-manager/caddy:latest cat /etc/cad
 ### Custom modules
 
 Any Caddy plugin published as a Go module can be added by path, with an optional
-tag, branch, or commit. It is compiled from source at build time, so a module
+tag, branch, or commit, and an optional name to tell it apart in the list (the
+name is never part of the build). It is compiled from source at build time, so a module
 that does not build fails the rebuild - the running container is left untouched
 when that happens.
 

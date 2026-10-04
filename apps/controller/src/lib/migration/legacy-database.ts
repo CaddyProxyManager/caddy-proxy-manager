@@ -24,7 +24,16 @@ export type LegacyCandidate = {
   lastUpdatedAt: string | null;
 };
 
-export type LegacyRejection = { path: string; reason: string };
+/** A code, not a sentence: the setup screen renders it in the reader's language. */
+export type LegacyRejectionReason = "missingFile" | "unreadable" | "notCpm" | "readFailed";
+export type LegacyRejection = {
+  path: string;
+  reason: LegacyRejectionReason;
+  /** What SQLite said, in English: a technical detail, shown as is. */
+  detail?: string;
+  /** For notCpm: the tables it lacks. */
+  missingTables?: string[];
+};
 
 export type LegacyScan = {
   candidates: LegacyCandidate[];
@@ -73,27 +82,24 @@ function newestUpdate(database: Database, present: Set<string>): string | null {
   return newest;
 }
 
-/** A rejection's reason is shown verbatim: it is what tells an operator to pick another file. */
+/** A rejection's reason is what tells an operator to pick another file. */
 export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRejection {
   if (!existsSync(path)) {
-    return { path, reason: "No file at that path." };
+    return { path, reason: "missingFile" };
   }
 
   let database: Database;
   try {
     database = new Database(path, { readonly: true });
   } catch (error) {
-    return { path, reason: `Not a readable SQLite database: ${describe(error)}` };
+    return { path, reason: "unreadable", detail: describe(error) };
   }
 
   try {
     const present = tableNames(database);
     const missing = REQUIRED_TABLES.filter((table) => !present.has(table));
     if (missing.length > 0) {
-      return {
-        path,
-        reason: `Missing the ${missing.join(", ")} table(s) - this is not a Caddy Proxy Manager database.`,
-      };
+      return { path, reason: "notCpm", missingTables: missing };
     }
 
     return {
@@ -109,7 +115,7 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
       lastUpdatedAt: newestUpdate(database, present),
     };
   } catch (error) {
-    return { path, reason: `Could not read the database: ${describe(error)}` };
+    return { path, reason: "readFailed", detail: describe(error) };
   } finally {
     database.close(true);
   }

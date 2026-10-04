@@ -1,5 +1,6 @@
 "use client";
 
+import { User } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -65,6 +66,7 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
             <form onSubmit={handleSubmit}>
               <VStack gap={3}>
                 <TextInput
+                  startIcon={User}
                   {...AUTOFILL_USERNAME}
                   {...NO_SPELLCHECK}
                   label={t("identifier")}

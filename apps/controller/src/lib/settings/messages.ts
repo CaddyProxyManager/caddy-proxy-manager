@@ -4,7 +4,7 @@
  */
 
 import type { useTranslations } from "next-intl";
-import type { SettingGroup, SettingValidationError } from "./registry";
+import type { SettingGroup, SettingUnit, SettingValidationError } from "./registry";
 
 type Translator = ReturnType<typeof useTranslations>;
 
@@ -22,6 +22,17 @@ export function settingMessageName(settingKey: string): string {
 
 export function settingLabel(t: Translator, settingKey: string): string {
   return dynamic(t)(`settings.registry.${settingMessageName(settingKey)}.label`);
+}
+
+/** The Settings field's label: without the unit a number shows as its suffix instead. */
+export function settingFieldLabel(t: Translator, settingKey: string, unit?: SettingUnit): string {
+  return unit
+    ? dynamic(t)(`settings.registry.${settingMessageName(settingKey)}.fieldLabel`)
+    : settingLabel(t, settingKey);
+}
+
+export function settingUnit(t: Translator, unit: SettingUnit): string {
+  return dynamic(t)(`settings.units.${unit}`);
 }
 
 export function settingDescription(t: Translator, settingKey: string): string {

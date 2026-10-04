@@ -5,6 +5,7 @@
  * one page-level bar replaces the per-card Save buttons and submits whichever were edited.
  */
 
+import { HEADER_HEIGHT_VAR } from "./sections";
 import {
   type ReactNode,
   type RefObject,
@@ -14,15 +15,16 @@ import {
   useRef,
   useState,
 } from "react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { EnvTokens } from "@/src/components/ui/EnvTokens";
-import { type SettingsBlock, settingsBlockDescription, settingsBlockName } from "./sections";
+import { type SettingsBlock, settingsBlockName } from "./sections";
 
 /**
  * A form the page bar must not submit (it confirms first, or does more than save). An attribute,
@@ -48,18 +50,15 @@ export function SettingsBlockShell({
       id={block.id}
       // The dirty tracker keys baselines on this; ids also appear on design-system elements.
       data-settings-block={block.id}
-      style={{ scrollMarginTop: "var(--spacing-5)" }}
+      style={{
+        scrollMarginTop: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
+      }}
     >
       {showHeading ? (
-        <VStack gap={1}>
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            <Heading level={2}>{settingsBlockName(t, block.id)}</Heading>
-            <EnvTokens names={block.env} />
-          </HStack>
-          <Text type="body" size="sm" color="secondary">
-            {settingsBlockDescription(t, block.id)}
-          </Text>
-        </VStack>
+        <HStack gap={2} vAlign="center" wrap="wrap">
+          <Heading level={2}>{settingsBlockName(t, block.id)}</Heading>
+          <EnvTokens names={block.env} />
+        </HStack>
       ) : (
         <EnvTokens names={block.env} />
       )}
@@ -93,18 +92,87 @@ export function FocusField() {
 
 export type PageAnchor = { id: string; label: string };
 
+/** The nearest ancestor that scrolls: the content pane, not the window. */
+function scrollParent(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+  }
+  return null;
+}
+
 /**
- * Only from three blocks up. Highlights on click rather than scroll position, because a scroll
- * observer argues with the jump.
+ * Only from three blocks up. Follows the scroll: the current block is the last whose top has
+ * reached the header. A clicked entry holds until its jump settles, or the blocks it passes on
+ * the way would flicker through the list.
  */
 export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
   const t = useTranslations("settings");
   const [current, setCurrent] = useState<string | null>(null);
+  const heldUntil = useRef(0);
+
+  useEffect(() => {
+    const first = anchors[0] && document.getElementById(anchors[0].id);
+    if (!first) return;
+    const scroller = scrollParent(first);
+    const target: HTMLElement | Window = scroller ?? window;
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (performance.now() < heldUntil.current) return;
+      const header = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(HEADER_HEIGHT_VAR),
+      );
+      const top = (scroller?.getBoundingClientRect().top ?? 0) + (header || 0);
+      // A few pixels of slack: a jump lands the block a margin below the header, not on it.
+      const line = top + 32;
+      let next: string | null = anchors[0].id;
+      for (const anchor of anchors) {
+        const element = document.getElementById(anchor.id);
+        if (element && element.getBoundingClientRect().top <= line) next = anchor.id;
+      }
+      // Short last blocks never reach the line; at the bottom, the last one is what is in view.
+      const atBottom = scroller
+        ? scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
+        : window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom && (scroller?.scrollTop ?? window.scrollY) > 0) {
+        next = anchors[anchors.length - 1].id;
+      }
+      setCurrent(next);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    // A jump's end releases the hold at once, rather than waiting out the timeout.
+    const onScrollEnd = () => {
+      heldUntil.current = 0;
+    };
+
+    update();
+    target.addEventListener("scroll", onScroll, { passive: true });
+    target.addEventListener("scrollend", onScrollEnd);
+    return () => {
+      cancelAnimationFrame(frame);
+      target.removeEventListener("scroll", onScroll);
+      target.removeEventListener("scrollend", onScrollEnd);
+    };
+  }, [anchors]);
 
   return (
     <nav
       aria-label={t("onThisPage")}
-      style={{ width: "176px", flexShrink: 0, position: "sticky", top: 0 }}
+      // A phone has no room for it beside the blocks.
+      className="cpm-desktop-only"
+      style={{
+        width: "176px",
+        flexShrink: 0,
+        position: "sticky",
+        // The frame's padding again, so it does not jump up to the header once it sticks.
+        top: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
+      }}
     >
       <VStack gap={1}>
         <Text type="label" size="sm" color="secondary">
@@ -114,7 +182,18 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
           <a
             key={anchor.id}
             href={`#${anchor.id}`}
-            onClick={() => setCurrent(anchor.id)}
+            onClick={(event) => {
+              setCurrent(anchor.id);
+              // Until the jump lands; scrollend clears it sooner where the browser has it.
+              heldUntil.current = performance.now() + 1000;
+              const target = document.getElementById(anchor.id);
+              if (!target) return;
+              // Scrolled here: the router's hash jump scrolls the window, and the content pane is
+              // the scroller. scrollIntoView honours the block's header-clearing scroll-margin.
+              event.preventDefault();
+              target.scrollIntoView({ behavior: "smooth" });
+              window.history.replaceState(window.history.state, "", `#${anchor.id}`);
+            }}
             style={{
               display: "block",
               padding: "var(--spacing-1) var(--spacing-2)",
@@ -216,6 +295,8 @@ function markUnsaved(
     const unsaved =
       staged.has((control as HTMLInputElement).name) || (before !== undefined && before !== value);
     if (!unsaved) continue;
+    // A hidden input standing for several fields at once; its visible controls mark themselves.
+    if (control.getAttribute("data-unsaved-label") === "none") continue;
     for (const label of labelsFor(control, form)) labels.add(label);
     const field = fieldOf(control, form);
     if (field) fields.add(field);
@@ -343,6 +424,61 @@ function useDirtyForms(
   return { dirty, accept: () => accept.current() };
 }
 
+/**
+ * Holds the page while something is unsaved: the browser's own prompt for a reload, close or
+ * another site, and a dialog for an in-app link, which `beforeunload` never sees. Back and forward
+ * stay unguarded, since the App Router offers no way to cancel a history step.
+ */
+function useLeaveGuard(active: boolean) {
+  const router = useRouter();
+  const [target, setTarget] = useState<string | null>(null);
+  // Set by the bar's own Discard, which reloads on purpose.
+  const allowUnload = useRef(false);
+
+  useEffect(() => {
+    if (!active) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!allowUnload.current) event.preventDefault();
+    };
+    // Capture, so it runs before Next's Link handler on the React root.
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.hasAttribute("download")) return;
+      if (link.target && link.target !== "_self") return;
+      const url = new URL(link.href);
+      // Another site unloads the page, which beforeunload already covers.
+      if (url.origin !== window.location.origin) return;
+      // A jump within this page (On this page) loses nothing.
+      if (url.pathname === window.location.pathname && url.search === window.location.search)
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      setTarget(url.pathname + url.search + url.hash);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [active]);
+
+  return {
+    target,
+    stay: () => setTarget(null),
+    leave: () => {
+      if (target) router.push(target);
+      setTarget(null);
+    },
+    discard: () => {
+      allowUnload.current = true;
+      window.location.reload();
+    },
+  };
+}
+
 /** Submits each dirty form in turn; `stagedSettingsAction` takes the update lock, so they queue. */
 export function PageSaveBar({
   stagedFields,
@@ -357,6 +493,7 @@ export function PageSaveBar({
   // A stable set: the effect that marks the labels depends on it.
   const staged = useMemo(() => new Set(stagedFields), [stagedFields]);
   const { dirty, accept } = useDirtyForms(container, staged);
+  const guard = useLeaveGuard(dirty.length > 0);
 
   const save = useCallback(() => {
     for (const form of dirty) form.requestSubmit();
@@ -367,6 +504,16 @@ export function PageSaveBar({
   return (
     <>
       <div ref={container}>{children}</div>
+      <AlertDialog
+        isOpen={guard.target !== null}
+        onOpenChange={(open) => !open && guard.stay()}
+        title={t("pageLeaveTitle")}
+        description={t("pageLeaveDescription", { count: dirty.length })}
+        cancelLabel={t("pageLeaveStay")}
+        actionLabel={t("pageLeave")}
+        actionVariant="destructive"
+        onAction={guard.leave}
+      />
       {dirty.length > 0 && (
         // Sticky, not fixed: the pane scrolls, and fixed would float over the rail and header.
         <div
@@ -390,7 +537,7 @@ export function PageSaveBar({
                   variant="secondary"
                   size="sm"
                   // A DOM reset would desync from the React state these fields hold.
-                  onClick={() => window.location.reload()}
+                  onClick={guard.discard}
                   label={t("pageDiscard")}
                 />
                 <Button

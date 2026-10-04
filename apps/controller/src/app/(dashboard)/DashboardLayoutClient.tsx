@@ -27,7 +27,8 @@ import {
 import { LocaleSwitcher } from "@/src/components/locale/LocaleSwitcher";
 import { MobileTabBar } from "@/src/components/mobile/MobileTabBar";
 import { MoreDrawer } from "@/src/components/mobile/MoreDrawer";
-import { DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { ACCENTS } from "@/src/components/ui/accent";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import { formatAppVersion } from "@/src/lib/app-version";
 import {
@@ -180,7 +181,7 @@ export default function DashboardLayoutClient({
         as={Link}
         href={href}
         label={t(labelKey)}
-        icon={<RailIcon />}
+        icon={<RailIcon className={ACCENTS[DESTINATION_HUES[id]].text} />}
         isSelected={pathname === href}
       />
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
@@ -70,6 +71,7 @@ export function DnsResolverFields({
               description={t("fallbackResolversHelp")}
             />
             <TextInput
+              startIcon={Clock}
               label={t("dnsConnectTimeout")}
               htmlName="dnsTimeout"
               placeholder="5s"

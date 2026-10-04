@@ -21,9 +21,9 @@ const WEB = 'caddy-proxy-manager-web';
 const REMOTE = 'caddy-proxy-manager-agent-remote';
 const DEAD_DOMAIN = 'notify-upstream.test';
 
-const OFFLINE_MINUTES = 'Agent offline after (minutes)';
-const ERROR_COUNT = 'Upstream errors before telling (responses)';
-const ERROR_MINUTES = 'Upstream error window (minutes)';
+const OFFLINE_MINUTES = 'Agent offline after';
+const ERROR_COUNT = 'Upstream errors before telling';
+const ERROR_MINUTES = 'Upstream error window';
 const DISABLE_SWITCH = 'Disable accounts after repeated failed sign-ins';
 const DISABLE_AFTER = 'Failed sign-ins before an account is disabled';
 

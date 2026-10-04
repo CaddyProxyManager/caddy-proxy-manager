@@ -671,6 +671,59 @@ describe('update checks', () => {
   });
 });
 
+describe('the favicon', () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const upload = (file: File) => {
+    const data = new FormData();
+    data.set('favicon', file);
+    return data;
+  };
+
+  it('stages an image by its sniffed type, then a removal, and applies each', async () => {
+    const svgNamed = new File([PNG], 'icon.svg', { type: 'image/svg+xml' });
+    expect(await actions.updateFaviconAction(null, upload(svgNamed))).toEqual(STAGED);
+    expect((await staged('branding')).favicon).toMatchObject({ type: 'image/png' });
+    expect(await stored('branding')).toBeUndefined();
+
+    await actions.applyStagedSettingsAction();
+    expect((await stored('branding')).favicon).toMatchObject({ type: 'image/png' });
+
+    expect(await actions.updateFaviconAction(null, form({ intent: 'remove' }))).toEqual(STAGED);
+    // A staged clear is the JSON null, which reads as no favicon.
+    expect(await staged('branding')).toBeNull();
+    expect((await stored('branding')).favicon).toBeDefined();
+
+    await actions.applyStagedSettingsAction();
+    expect(await stored('branding')).toBeNull();
+  });
+
+  it('stages no removal of a favicon that was never stored', async () => {
+    await actions.updateFaviconAction(null, form({ intent: 'remove' }));
+    expect(await stagedKeys()).toEqual([]);
+  });
+
+  it('asks for a file, and refuses one that is not an image', async () => {
+    expect(await actions.updateFaviconAction(null, form())).toEqual({
+      success: false,
+      message: results.faviconChooseFile,
+    });
+
+    const html = new File(['<html></html>'], 'icon.png', { type: 'image/png' });
+    expect(await actions.updateFaviconAction(null, upload(html))).toEqual({
+      success: false,
+      message: domainErrorMessage('faviconNotImage'),
+    });
+    expect(await stagedKeys()).toEqual([]);
+  });
+
+  it('refuses a non-administrator', async () => {
+    ctx.session = { user: viewer };
+    await expect(actions.updateFaviconAction(null, form({ intent: 'remove' }))).rejects.toThrow(
+      domainErrorMessage('adminRequired'),
+    );
+  });
+});
+
 describe('who may stage', () => {
   it('refuses a non-administrator before anything is read or staged', async () => {
     ctx.session = { user: viewer };

@@ -1,5 +1,6 @@
 "use client";
 
+import { Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
@@ -100,6 +101,7 @@ export function DashboardHostSection({
             />
             <EnvLabelledField label={t("dashboardDomainLabel")} env={["DASHBOARD_DOMAIN"]}>
               <TextInput
+                startIcon={Globe}
                 {...NO_SPELLCHECK}
                 label={t("dashboardDomainLabel")}
                 description={t("dashboardDomainHelp")}
@@ -139,7 +141,11 @@ export function DashboardHostSection({
             {options && (
               <Collapsible
                 defaultIsOpen={false}
-                trigger={<Text size="sm">{t("dashboardProxyOptions")}</Text>}
+                trigger={
+                  <Text type="label" size="lg">
+                    {t("dashboardProxyOptions")}
+                  </Text>
+                }
               >
                 <VStack gap={3} padding={2}>
                   <Text size="xsm" color="secondary">

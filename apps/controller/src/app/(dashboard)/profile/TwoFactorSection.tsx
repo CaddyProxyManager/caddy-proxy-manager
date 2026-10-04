@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRound, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -139,6 +140,7 @@ export function TwoFactorSection({
 
   const passwordField = (
     <TextInput
+      startIcon={KeyRound}
       {...AUTOFILL_CURRENT_PASSWORD}
       label={t("password")}
       type="password"
@@ -233,6 +235,7 @@ export function TwoFactorSection({
             </Text>
             <CodeBlock code={secretOf(flow.totpURI)} size="sm" width="100%" />
             <TextInput
+              startIcon={ShieldCheck}
               {...NO_SPELLCHECK}
               {...AUTOFILL_ONE_TIME_CODE}
               label={t("code")}

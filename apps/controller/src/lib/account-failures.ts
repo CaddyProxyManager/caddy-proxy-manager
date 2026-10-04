@@ -141,7 +141,7 @@ async function disableForFailedSignIns(user: AccountKeyUser, failures: number): 
   // Imported here: the user model imports rate-limit, which this module sits beside.
   const { updateUserStatus } = await import("./models/user");
   try {
-    await updateUserStatus(user.id, "disabled");
+    await updateUserStatus(user.id, "disabled", { by: "failedSignIns", failures });
   } catch (error) {
     if (
       error instanceof DomainError &&

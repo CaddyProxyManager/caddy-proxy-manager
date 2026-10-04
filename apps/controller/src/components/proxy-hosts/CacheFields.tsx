@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
@@ -83,6 +84,9 @@ export function CacheFields({ cache }: { cache?: HostCacheConfig | null }) {
               />
             )}
             <NumberInput
+              startIcon={Clock}
+              hasNumberSteppers
+              units={t("cacheMaxAgeUnit")}
               label={t("cacheMaxAge")}
               htmlName="cacheMaxAge"
               min={MIN_CACHE_MAX_AGE}

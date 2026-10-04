@@ -1,5 +1,6 @@
 /** The only place a settings edit reaches Caddy: one reload per batch, reviewed beforehand. */
 
+import { invalidateSettingsCache } from "./resolve";
 import db, { nowIso } from "../db";
 import { settings, settingsRevisions } from "../db/schema";
 import { desc, sql } from "drizzle-orm";
@@ -75,6 +76,7 @@ export async function applyStagedSettings(
         set: { value: sql`excluded.value`, updatedAt: now },
       });
     await discardAllStaged(userId);
+    invalidateSettingsCache();
 
     const keys = staged.map((entry) => entry.key);
     const fallback = domainError("applyCaddyConfigFailed");

@@ -27,6 +27,9 @@ let running: boolean;
 let stopResult: CommandResult;
 /** Resolves a start that the test holds open, to put a desired state in the middle of it. */
 let releaseStart: (() => void) | null;
+let runningServices: Set<string>;
+/** What the next resumeService answers. */
+let resumeResult: CommandResult;
 
 function stubDocker(): DockerHost {
   return {
@@ -35,6 +38,18 @@ function stubDocker(): DockerHost {
       calls.push(`stop:${timeoutSeconds ?? "default"}`);
       if (stopResult.ok) running = false;
       return stopResult;
+    },
+    runningServices: async () => [...runningServices],
+    stopService: async (name: string, _env: unknown, timeoutSeconds: number) => {
+      calls.push(`stop-${name}:${timeoutSeconds}`);
+      runningServices.delete(name);
+      return ok;
+    },
+    resumeService: async (name: string) => {
+      calls.push(`resume-${name}`);
+      if (!resumeResult.ok) return resumeResult;
+      runningServices.add(name);
+      return ok;
     },
     startCaddy: async () => {
       calls.push("start");
@@ -79,6 +94,8 @@ beforeEach(() => {
   running = true;
   stopResult = ok;
   releaseStart = null;
+  runningServices = new Set();
+  resumeResult = ok;
   // The resumed stream never gets anywhere: these tests are about what happens around it.
   globalThis.fetch = (async () =>
     new Response(new ReadableStream(), { status: 200 })) as unknown as typeof fetch;
@@ -130,6 +147,65 @@ describe("shutting the agent down", () => {
     await lifecycle.stopCaddyForShutdown(40);
 
     expect(store.caddyStoppedForShutdown()).toBe(false);
+  });
+});
+
+describe("the managed services across a shutdown", () => {
+  it("stops the running ones, which `docker compose down` skips, and remembers which", async () => {
+    store.setAppliedManagedServices({ clickhouse: true, crowdsec: true });
+    runningServices = new Set(["clickhouse", "crowdsec"]);
+
+    await lifecycle.stopServicesForShutdown(40);
+
+    expect(calls.sort()).toEqual(["stop-clickhouse:40", "stop-crowdsec:40"]);
+    expect(store.servicesStoppedForShutdown().sort()).toEqual(["clickhouse", "crowdsec"]);
+  });
+
+  it("leaves alone a service this agent was never asked to run", async () => {
+    store.setAppliedManagedServices({ clickhouse: true, crowdsec: false });
+    runningServices = new Set(["clickhouse", "crowdsec"]);
+
+    await lifecycle.stopServicesForShutdown(40);
+
+    expect(calls).toEqual(["stop-clickhouse:40"]);
+  });
+
+  it("stops nothing on an agent the controller never gave services to", async () => {
+    runningServices = new Set(["clickhouse"]);
+
+    await lifecycle.stopServicesForShutdown(40);
+
+    expect(calls).toEqual([]);
+  });
+
+  it("records nothing when none is running", async () => {
+    store.setAppliedManagedServices({ clickhouse: true, crowdsec: false });
+
+    await lifecycle.stopServicesForShutdown(40);
+
+    expect(calls).toEqual([]);
+    expect(store.servicesStoppedForShutdown()).toEqual([]);
+  });
+
+  it("starts them again on the next start, paired or not, and only once", async () => {
+    store.setServicesStoppedForShutdown(["clickhouse"]);
+
+    await lifecycle.start();
+    await Bun.sleep(10);
+
+    expect(calls).toContain("resume-clickhouse");
+    expect(store.servicesStoppedForShutdown()).toEqual([]);
+  });
+
+  it("leaves a service that will not start to the controller's next frame", async () => {
+    store.setAppliedManagedServices({ clickhouse: true, crowdsec: false });
+    store.setServicesStoppedForShutdown(["clickhouse"]);
+    resumeResult = { ok: false, exitCode: 1, output: "no container to start", timedOut: false };
+
+    await lifecycle.start();
+    await Bun.sleep(10);
+
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
   });
 });
 

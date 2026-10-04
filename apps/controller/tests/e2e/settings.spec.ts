@@ -572,18 +572,18 @@ test.describe('Settings - Sign-in account lock', () => {
   test('shows the account lock settings, and a changed value persists', async ({ page }) => {
     await goToSection(page, 'Sign-in');
     await expect(page.getByLabel('Lock accounts after failed sign-ins')).toBeChecked();
-    await expect(page.getByLabel('First account lock (milliseconds)')).toHaveValue('1000');
-    await expect(page.getByLabel('Longest account lock (milliseconds)')).toHaveValue('900000');
-    const free = page.getByLabel(FREE_FAILURES);
+    await expect(page.getByLabel('First account lock', { exact: true })).toHaveValue('1000');
+    await expect(page.getByLabel('Longest account lock', { exact: true })).toHaveValue('900000');
+    const free = page.getByLabel(FREE_FAILURES, { exact: true });
     await expect(free).toHaveValue('5');
 
     await free.fill('3');
     await savePage(page);
     await saved(page);
     await goToSection(page, 'Sign-in');
-    await expect(page.getByLabel(FREE_FAILURES)).toHaveValue('3');
+    await expect(page.getByLabel(FREE_FAILURES, { exact: true })).toHaveValue('3');
 
-    await page.getByLabel(FREE_FAILURES).fill('5');
+    await page.getByLabel(FREE_FAILURES, { exact: true }).fill('5');
     await savePage(page);
     await saved(page);
   });
@@ -978,11 +978,13 @@ test.describe('Settings - form data round-trip via API', () => {
 
 test.describe('Settings - detail header', () => {
   test('header shows the page title with no description under it', async ({ page }) => {
-    // Asks the header, not the page: each block still has its own description.
+    // The section's description is for the overview and search, not the page it describes.
     await goToSection(page, 'General');
     const header = page.getByTestId('settings-header');
     await expect(header.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
-    await expect(header.getByText('Primary domain and ACME contact email')).toHaveCount(0);
+    await expect(
+      header.getByText('Domain, ACME contact, updates, branding and avatars'),
+    ).toHaveCount(0);
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {

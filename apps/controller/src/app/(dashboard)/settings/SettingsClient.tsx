@@ -1,10 +1,28 @@
 "use client";
 
-import { useState, useActionState, useEffect, useTransition, type ReactNode } from "react";
+import { useState, useActionState, useEffect, useRef, useTransition, type ReactNode } from "react";
+import {
+  CalendarDays,
+  Clock,
+  Container,
+  EthernetPort,
+  FolderOpen,
+  Globe,
+  KeyRound,
+  Link as LinkIcon,
+  Network,
+  Route,
+  Tag,
+  User,
+} from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
+import { Thumbnail } from "@astryxdesign/core/Thumbnail";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Divider } from "@astryxdesign/core/Divider";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -83,6 +101,7 @@ import {
   updateCertificateAlertSettingsAction,
   updateAvatarSettingsAction,
   updateFaviconAction,
+  updateAccentColorAction,
   updateRegistrySettingsAction,
   updateUpdateSettingsAction,
   checkForUpdatesAction,
@@ -114,22 +133,17 @@ import {
 
 import type { RepairAgentResult } from "./actions";
 import { findSettingsItem, SETTINGS_ITEMS, settingsBlockName } from "./sections";
-import {
-  FocusField,
-  OnThisPage,
-  PageSaveBar,
-  SettingsBlockShell,
-  SKIP_PAGE_SAVE,
-} from "./PageBlocks";
+import { FocusField, OnThisPage, PageSaveBar, SettingsBlockShell } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
+import { AccentColorPicker } from "./AccentColorPicker";
 import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
-import { EmailServerSection, NotificationsSection, UpstreamAccessLogWarning } from "./EmailSection";
+import { EmailServerSection, NotificationsSection } from "./EmailSection";
 import type { EmailSettingsView } from "@/src/lib/email/view";
 import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
@@ -183,8 +197,8 @@ type Props = {
   dashboardOptions?: DashboardHostOptionsData | null;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
-  /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
-  hasFavicon: boolean;
+  /** The custom favicon as staged, as a data URL; null when there is none. */
+  faviconSrc: string | null;
   updates: UpdateStatus;
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
   registry: Record<string, readonly RegistryField[]>;
@@ -256,7 +270,7 @@ export default function SettingsClient({
   dashboard,
   dashboardOptions,
   tailscale,
-  hasFavicon,
+  faviconSrc,
   updates,
   registry,
   sequentialUserIdsField,
@@ -300,6 +314,7 @@ export default function SettingsClient({
   );
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
+  const [accentState, accentFormAction] = useActionState(updateAccentColorAction, null);
   const [updatesState, updatesFormAction] = useActionState(updateUpdateSettingsAction, null);
   // One action for both, told apart by the block the form posts with its values.
   const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
@@ -379,7 +394,10 @@ export default function SettingsClient({
     ),
     branding: (
       <BrandingSection
-        hasFavicon={hasFavicon}
+        accentField={registry.branding?.[0]}
+        accentState={accentState}
+        accentFormAction={accentFormAction}
+        faviconSrc={faviconSrc}
         faviconState={faviconState}
         faviconFormAction={faviconFormAction}
       />
@@ -596,10 +614,18 @@ export default function SettingsClient({
           formAction={certificateAlertsFormAction}
         />
         <Heading level={3}>{t("email.notificationsTitle")}</Heading>
-        <UpstreamAccessLogWarning email={email} />
+        <Text size="sm" color="secondary">
+          {t("email.notificationsPerUser")}
+        </Text>
         <RegistrySettingsBlock
           block="notifications"
           fields={registry.notifications ?? []}
+          unavailable={Object.fromEntries(
+            Object.entries(email.notifications.unavailable).map(([key, reason]) => [
+              key,
+              t(`email.unavailable.${reason}`),
+            ]),
+          )}
           state={notificationsRegistryState}
           formAction={notificationsRegistryFormAction}
         />
@@ -639,11 +665,8 @@ export default function SettingsClient({
   const page = findSettingsItem(active) ?? SETTINGS_ITEMS[0];
   // Saved but not applied, so marked the same as a field typed into just now.
   const stagedFields = staged.changes.flatMap((change) => change.fields);
-  // Below three blocks the page fits a screen and the list would only name what is visible.
-  const showAnchors = page.blocks.length >= 3;
-
   return (
-    <SettingsFrame sectionId={active} staged={staged} aside={showAnchors}>
+    <SettingsFrame sectionId={active} staged={staged} aside>
       <FocusField />
       <HStack gap={5} align="start">
         <VStack gap={5} maxWidth={768} style={{ flexGrow: 1, minWidth: 0 }}>
@@ -661,14 +684,12 @@ export default function SettingsClient({
             </VStack>
           </PageSaveBar>
         </VStack>
-        {showAnchors && (
-          <OnThisPage
-            anchors={page.blocks.map((block) => ({
-              id: block.id,
-              label: settingsBlockName(t, block.id),
-            }))}
-          />
-        )}
+        <OnThisPage
+          anchors={page.blocks.map((block) => ({
+            id: block.id,
+            label: settingsBlockName(t, block.id),
+          }))}
+        />
       </HStack>
     </SettingsFrame>
   );
@@ -699,6 +720,7 @@ function GeneralSection({
             <StatusAlert message={generalState.message} success={generalState.success} />
           )}
           <TextInput
+            startIcon={Globe}
             {...NATIVE_REQUIRED}
             label={t("defaultDomain")}
             description={t("defaultDomainHelp")}
@@ -799,6 +821,7 @@ function DefaultResponseSection({
             {mode === "respond" && (
               <>
                 <NumberInput
+                  hasNumberSteppers
                   label={t("statusCode")}
                   description={t("defaultResponseStatusHelp")}
                   htmlName="status"
@@ -835,6 +858,7 @@ function DefaultResponseSection({
                   onChange={setRedirectStatus}
                 />
                 <TextInput
+                  startIcon={LinkIcon}
                   label={t("redirectUrl")}
                   isRequired
                   description={t("defaultRedirectUrlHelp")}
@@ -895,6 +919,7 @@ function AcmeSection({
             <StatusAlert message={acmeState.message} success={acmeState.success} />
           )}
           <TextInput
+            startIcon={LinkIcon}
             label={t("acmeDirectoryUrl")}
             isOptional
             description={t("acmeDirectoryHelp")}
@@ -1184,6 +1209,7 @@ function DnsResolversSection({
               rows={2}
             />
             <TextInput
+              startIcon={Clock}
               label={t("queryTimeout")}
               isOptional
               description={t("dnsQueryTimeoutHelp")}
@@ -1569,6 +1595,7 @@ function TailscaleSection({
           </InfoAlert>
           <EnvLabelledField label={t("authKey")} env={["TS_AUTHKEY"]}>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("authKey")}
               type="password"
@@ -1591,6 +1618,7 @@ function TailscaleSection({
             placeholder="caddy"
           />
           <TextInput
+            startIcon={Tag}
             {...AUTOFILL_OFF}
             label={t("tags")}
             isOptional
@@ -1601,6 +1629,7 @@ function TailscaleSection({
             placeholder="tag:caddy"
           />
           <TextInput
+            startIcon={LinkIcon}
             {...AUTOFILL_OFF}
             label={t("controlServerUrl")}
             isOptional
@@ -1611,6 +1640,7 @@ function TailscaleSection({
             placeholder="https://headscale.example.com"
           />
           <TextInput
+            startIcon={FolderOpen}
             {...AUTOFILL_OFF}
             label={t("stateDirectory")}
             isOptional
@@ -1647,6 +1677,7 @@ function TailscaleSection({
           {validateAuthKey ? (
             <>
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("apiAccessToken")}
                 type="password"
@@ -1661,6 +1692,7 @@ function TailscaleSection({
                 onChange={setApiAccessToken}
               />
               <TextInput
+                startIcon={Network}
                 {...AUTOFILL_OFF}
                 label={t("tailnet")}
                 isOptional
@@ -1708,6 +1740,7 @@ function AuthentikSection({
             <StatusAlert message={authentikState.message} success={authentikState.success} />
           )}
           <TextInput
+            startIcon={Globe}
             {...NATIVE_REQUIRED}
             label={t("outpostDomain")}
             htmlName="outpostDomain"
@@ -1717,6 +1750,7 @@ function AuthentikSection({
             isRequired
           />
           <TextInput
+            startIcon={LinkIcon}
             {...NATIVE_REQUIRED}
             label={t("outpostUpstream")}
             htmlName="outpostUpstream"
@@ -1726,6 +1760,7 @@ function AuthentikSection({
             isRequired
           />
           <TextInput
+            startIcon={Route}
             label={t("authEndpoint")}
             isOptional
             htmlName="authEndpoint"
@@ -1772,6 +1807,7 @@ function ForwardAuthSection({
             onChange={(next) => setProvider(next as string)}
           />
           <TextInput
+            startIcon={LinkIcon}
             {...NATIVE_REQUIRED}
             label={t("forwardAuthUpstream")}
             htmlName="forwardAuthUpstream"
@@ -1781,6 +1817,7 @@ function ForwardAuthSection({
             isRequired
           />
           <TextInput
+            startIcon={Route}
             label={t("authEndpoint")}
             isOptional
             htmlName="forwardAuthEndpoint"
@@ -1931,21 +1968,31 @@ function objectUrlForPreview(file: File): string | null {
 }
 
 /**
- * A plain `<input type="file">`: Astryx has none. The preview is an object URL of the picked File,
- * since the stored icon is only served by its own route, never sent to this page.
+ * One row: a preview tile that uploads on click and removes from its corner, then what is set.
+ * Both only mark the form changed; the page's save bar stages it like any other block. The file
+ * input stays native and hidden, since Astryx's FileInput posts nothing with a form; the tile opens
+ * it. `faviconSrc` is the staged icon, which the public route cannot serve.
  */
 function BrandingSection({
-  hasFavicon,
+  accentField,
+  accentState,
+  accentFormAction,
+  faviconSrc,
   faviconState,
   faviconFormAction,
 }: {
-  hasFavicon: boolean;
+  accentField: RegistryField | undefined;
+  accentState: { success: boolean; message?: string } | null;
+  accentFormAction: (payload: FormData) => void;
+  faviconSrc: string | null;
   faviconState: { success: boolean; message?: string } | null;
   faviconFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
   const [preview, setPreview] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Revoked on replacement and unmount: an object URL pins the file in memory until it is.
   useEffect(
@@ -1955,71 +2002,106 @@ function BrandingSection({
     [preview],
   );
 
-  // The route revalidates by ETag, which a browser may skip for an unchanged URL.
-  const currentSrc = `/api/branding/favicon?v=${faviconState?.success ? "new" : "current"}`;
+  // React resets the form after its action, emptying the file input; the pending state goes too.
+  useEffect(() => {
+    if (!faviconState) return;
+    setPreview(null);
+    setChosen(null);
+    setRemoving(false);
+  }, [faviconState]);
+
+  const pick = () => fileInput.current?.click();
+  const shown = removing ? null : (preview ?? faviconSrc);
 
   return (
-    <FormCard title={t("favicon")}>
-      {/* Its own buttons: one saves the chosen file and the other removes what is stored, which
-          is not something a single page-level Save could stand for. */}
-      <form action={faviconFormAction} {...SKIP_PAGE_SAVE}>
+    // One card, untitled: the block's heading already says Branding, and each part has its own.
+    <FormCard>
+      <AccentColorPicker field={accentField} state={accentState} formAction={accentFormAction} />
+      {accentField && <Divider />}
+      <Heading level={3}>{t("favicon")}</Heading>
+      <form action={faviconFormAction}>
         <VStack gap={3}>
           {faviconState?.message && (
             <StatusAlert message={faviconState.message} success={faviconState.success} />
           )}
-          <InfoAlert title={t("faviconDescription")}>{t("faviconUploadHelp")}</InfoAlert>
-
-          <HStack gap={3} align="center">
-            {(preview || hasFavicon) && (
-              // next/image cannot serve an object URL of a just-picked File.
-              <img
-                src={preview ?? currentSrc}
-                alt={preview ? t("faviconSelectedAlt") : t("faviconCurrentAlt")}
-                width={32}
-                height={32}
-                style={{ width: 32, height: 32, objectFit: "contain" }}
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            {/* Our tooltip, not Thumbnail's `label`: it also composes the tile's and the remove
+                button's names ("Open {label}"), which a sentence would garble. `alt` names them. */}
+            <Tooltip
+              content={
+                preview
+                  ? t("faviconTooltipPicked")
+                  : shown
+                    ? t("faviconTooltipReplace")
+                    : t("faviconTooltipUpload")
+              }
+            >
+              <Thumbnail
+                src={shown ?? undefined}
+                alt={
+                  preview
+                    ? t("faviconSelectedAlt")
+                    : shown
+                      ? t("faviconCurrentAlt")
+                      : t("faviconNoneAlt")
+                }
+                // The tile is the upload control; there is no separate button.
+                onClick={pick}
+                onRemove={
+                  shown
+                    ? () => {
+                        // A picked file is dropped, not staged: removing means nothing replaces it.
+                        if (fileInput.current) fileInput.current.value = "";
+                        setPreview(null);
+                        setChosen(null);
+                        setRemoving(faviconSrc !== null);
+                      }
+                    : undefined
+                }
               />
-            )}
-            <Text size="sm" color="secondary">
-              {preview
-                ? t("faviconSelected", { name: String(chosen) })
-                : hasFavicon
-                  ? t("faviconCustomSet")
-                  : t("faviconNone")}
-            </Text>
+            </Tooltip>
+            <VStack gap={0} style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <Text type="body">
+                {removing
+                  ? t("faviconWillBeRemoved")
+                  : preview
+                    ? t("faviconSelected", { name: String(chosen) })
+                    : faviconSrc
+                      ? t("faviconCustomSet")
+                      : t("faviconNone")}
+              </Text>
+              <Text type="supporting" color="secondary">
+                {t("faviconUploadHelp")}
+              </Text>
+            </VStack>
+            <HStack gap={2}>
+              {removing && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  label={t("faviconKeep")}
+                  onClick={() => setRemoving(false)}
+                />
+              )}
+            </HStack>
           </HStack>
 
+          <input type="hidden" name="intent" value={removing ? "remove" : ""} />
           <input
+            ref={fileInput}
             type="file"
             name="favicon"
+            hidden
             aria-label={t("faviconFileLabel")}
             accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/webp,image/gif,image/jpeg,.ico"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
+              setRemoving(false);
               setChosen(file?.name ?? null);
               setPreview(file ? objectUrlForPreview(file) : null);
             }}
           />
-
-          <HStack gap={2} justify="end">
-            {hasFavicon && (
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                name="intent"
-                value="remove"
-                label={t("removeFavicon")}
-              />
-            )}
-            <Button
-              type="submit"
-              // Pink once a file is chosen, like every other save with something pending.
-              variant={preview ? "primary" : "secondary"}
-              label={t("save")}
-              isDisabled={!preview}
-            />
-          </HStack>
         </VStack>
       </form>
     </FormCard>
@@ -2090,6 +2172,7 @@ function UpdatesSection({
 
           <EnvLabelledField label={t("imageRepository")} env={["UPDATE_IMAGE_REPOSITORY"]}>
             <TextInput
+              startIcon={Container}
               {...AUTOFILL_OFF}
               label={t("imageRepository")}
               description={t("imageRepositoryHelp")}
@@ -2222,6 +2305,7 @@ function AnalyticsSection({
           <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
           <EnvLabelledField label={t("clickhouseUrl")} env={["CLICKHOUSE_URL"]}>
             <TextInput
+              startIcon={LinkIcon}
               {...AUTOFILL_OFF}
               label={t("clickhouseUrl")}
               description={t("clickhouseUrlHelp")}
@@ -2232,6 +2316,7 @@ function AnalyticsSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("clickhouseUser")} env={["CLICKHOUSE_USER"]}>
             <TextInput
+              startIcon={User}
               {...AUTOFILL_OFF}
               label={t("clickhouseUser")}
               htmlName="clickhouseUser"
@@ -2264,6 +2349,9 @@ function AnalyticsSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("retentionDays")} env={["CLICKHOUSE_RETENTION_DAYS"]}>
             <NumberInput
+              startIcon={CalendarDays}
+              hasNumberSteppers
+              units={t("retentionDaysUnit")}
               label={t("retentionDays")}
               description={t("analyticsRetentionHelp")}
               htmlName="clickhouseRetentionDays"
@@ -2403,6 +2491,7 @@ function GeoipSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("maxmindLicenceKey")} env={["GEOIPUPDATE_LICENSE_KEY"]}>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("maxmindLicenceKey")}
               type="password"
@@ -2423,6 +2512,9 @@ function GeoipSection({
               value={intervalHours}
               onChange={setIntervalHours}
               isIntegerOnly
+              hasNumberSteppers
+              units={t("geoipUpdateIntervalUnit")}
+              startIcon={Clock}
               min={1}
               max={168}
             />
@@ -2657,7 +2749,13 @@ function AgentSection({
               <Text size="sm" color="secondary">
                 {t("pairingCodeRun")}
               </Text>
-              <Code>{`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}</Code>
+              <CodeBlock
+                code={`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}
+                language="bash"
+                hasLanguageLabel={false}
+                isWrapped
+                width="100%"
+              />
               {pairingHost?.insecure && (
                 <Text size="xsm" color="secondary">
                   {t("pairingHostInsecureHint")}
@@ -2754,6 +2852,8 @@ function MetricsSection({
               onChange={setEnabled}
             />
             <NumberInput
+              startIcon={EthernetPort}
+              hasNumberSteppers
               label={t("port")}
               description={t("metricsPortHelp")}
               htmlName="port"

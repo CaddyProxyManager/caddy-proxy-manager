@@ -1,5 +1,6 @@
 /** One source for the staged bar and review sheet, so no two pages disagree on what is pending. */
 
+import { isDemoMode } from "../demo-mode";
 import db from "../db";
 import { listStagedSettings } from "./staging";
 import { recentRevisions } from "./apply";
@@ -21,6 +22,8 @@ export type StagedView = {
   diff: ReturnType<typeof diffConfigDocuments>;
   revisions: Awaited<ReturnType<typeof recentRevisions>>;
   currentRevision: number | null;
+  /** Every apply fails in the demo, which has no Caddy; the rail says so instead of "failed". */
+  demoMode: boolean;
 };
 
 function changedFields(storedValue: string | null, stagedValue: string): string[] {
@@ -83,6 +86,7 @@ export async function stagedView(userId: number): Promise<StagedView> {
     diff,
     revisions,
     currentRevision: revisions[0]?.id ?? null,
+    demoMode: isDemoMode(),
   };
 }
 

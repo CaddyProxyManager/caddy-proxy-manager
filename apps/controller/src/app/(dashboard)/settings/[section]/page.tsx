@@ -74,6 +74,19 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("settings") };
 }
 
+/**
+ * The public route while the icon is the live one; inline only for a staged icon, which nothing
+ * else serves. Inlined always, every settings load would carry up to ~340 KB of base64.
+ */
+function faviconSrc(
+  staged: { data: string; type: string; hash: string } | null,
+  live: { hash: string } | null,
+): string | null {
+  if (!staged) return null;
+  if (staged.hash === live?.hash) return `/api/branding/favicon?v=${staged.hash}`;
+  return `data:${staged.type};base64,${staged.data}`;
+}
+
 /** The client switches sections itself; this only picks where a fresh load or deep link opens. */
 export default async function SettingsSectionPage({
   params,
@@ -89,12 +102,15 @@ export default async function SettingsSectionPage({
 
   const userId = Number(session.user.id);
 
+  // Outside the staged scope: what the public route serves, to tell a staged icon from it.
+  const liveFavicon = await getFavicon().catch(() => null);
+
   // Reads resolve against the staged set, or a reload makes a staged edit look discarded.
   const overlay = await stagedOverlay(userId);
   // For the stored update-check and GeoIP failures.
   const tRoot = await getTranslations();
   // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
-  const registry = await registryFields(tRoot);
+  const registry = await withStagedReads(overlay, () => registryFields(tRoot));
 
   // Not settings, so deliberately outside the staged scope; being AsyncLocalStorage, a sibling
   // promise cannot see it. getAllAgentStatuses never throws.
@@ -293,7 +309,7 @@ export default async function SettingsSectionPage({
       dashboard={dashboardSettings}
       dashboardOptions={dashboardOptions}
       // The image has its own route; inlining it would be hundreds of KB of base64.
-      hasFavicon={favicon !== null}
+      faviconSrc={faviconSrc(favicon, liveFavicon)}
       updates={{
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,

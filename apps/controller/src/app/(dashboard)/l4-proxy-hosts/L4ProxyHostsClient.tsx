@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Network, ArrowRight, Shield } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
+import { ACCENTS } from "@/components/ui/accent";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
@@ -321,7 +322,7 @@ export default function L4ProxyHostsClient({
   ];
 
   const mobileCard = (host: L4ProxyHost) => (
-    <Card>
+    <Card className={ACCENTS[host.enabled ? "green" : "gray"].edge}>
       <HStack justify="between" vAlign="start" gap={2}>
         <VStack gap={1}>
           <HStack gap={2} vAlign="center">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plug, Plus, Trash2 } from "lucide-react";
+import { Filter, KeyRound, Link, Pencil, Plug, Plus, Trash2, User } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -376,6 +376,7 @@ export default function LdapDirectoriesSection({
           </HStack>
 
           <TextInput
+            startIcon={Link}
             {...NO_SPELLCHECK}
             label={t("url")}
             isRequired
@@ -461,6 +462,7 @@ export default function LdapDirectoriesSection({
               />
               {templateKind !== "dn" && (
                 <TextInput
+                  startIcon={Filter}
                   {...NO_SPELLCHECK}
                   label={t("userFilter")}
                   isRequired
@@ -484,6 +486,7 @@ export default function LdapDirectoriesSection({
                 description={t("bindDnHelp")}
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("bindPassword")}
                 type="password"
@@ -493,6 +496,7 @@ export default function LdapDirectoriesSection({
                 description={passwordStored ? t("bindPasswordStoredHelp") : t("bindPasswordHelp")}
               />
               <TextInput
+                startIcon={Filter}
                 {...NO_SPELLCHECK}
                 label={t("userFilter")}
                 isRequired
@@ -536,6 +540,7 @@ export default function LdapDirectoriesSection({
           {form.config.groupSource === "search" && (
             <>
               <TextInput
+                startIcon={Filter}
                 {...NO_SPELLCHECK}
                 label={t("groupFilter")}
                 size="sm"
@@ -588,6 +593,7 @@ export default function LdapDirectoriesSection({
               </VStack>
               <Grid columns={{ minWidth: 160, max: 2 }} gap={2}>
                 <TextInput
+                  startIcon={User}
                   {...NO_SPELLCHECK}
                   label={t("test.username")}
                   isOptional
@@ -596,6 +602,7 @@ export default function LdapDirectoriesSection({
                   onChange={(v) => setProbe((prev) => ({ ...prev, username: v }))}
                 />
                 <TextInput
+                  startIcon={KeyRound}
                   {...AUTOFILL_NEW_PASSWORD}
                   label={t("test.password")}
                   isOptional

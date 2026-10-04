@@ -52,6 +52,7 @@ export function WafRuleExclusions({ value }: Props) {
 
       <HStack gap={2} vAlign="end">
         <NumberInput
+          hasNumberSteppers
           label={t("ruleId")}
           isLabelHidden
           placeholder={t("ruleId")}

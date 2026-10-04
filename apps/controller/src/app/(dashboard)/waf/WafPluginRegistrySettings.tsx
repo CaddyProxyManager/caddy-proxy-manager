@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Clock, KeyRound, Link, Plus, Trash2 } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -107,6 +107,7 @@ export function WafPluginRegistrySettings({
                 width={200}
               />
               <TextInput
+                startIcon={Link}
                 label={t("pluginRegistryUrl")}
                 value={draft.url}
                 onChange={(url) => update(draft.key, { url })}
@@ -149,6 +150,9 @@ export function WafPluginRegistrySettings({
         <Divider />
 
         <NumberInput
+          startIcon={Clock}
+          hasNumberSteppers
+          units={t("pluginRegistryIntervalUnit")}
           label={t("pluginRegistryInterval")}
           description={t("pluginRegistryIntervalHelp")}
           value={intervalHours}
@@ -161,6 +165,7 @@ export function WafPluginRegistrySettings({
 
         <VStack gap={2}>
           <TextInput
+            startIcon={KeyRound}
             type="password"
             autoComplete="off"
             label={t("pluginRegistryToken")}

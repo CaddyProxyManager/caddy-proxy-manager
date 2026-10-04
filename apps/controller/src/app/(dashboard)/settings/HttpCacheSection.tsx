@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRound, Mail, User } from "lucide-react";
 import { useState } from "react";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -92,6 +93,7 @@ export function HttpCacheSection({
           )}
           {storage === "otter" && (
             <NumberInput
+              hasNumberSteppers
               label={t("otterSize")}
               description={t("otterSizeHelp")}
               htmlName="otterSize"
@@ -116,6 +118,7 @@ export function HttpCacheSection({
                 onChange={setRedisAddresses}
               />
               <TextInput
+                startIcon={User}
                 {...AUTOFILL_OFF}
                 label={t("redisUsername")}
                 description={t("redisUsernameHelp")}
@@ -125,6 +128,7 @@ export function HttpCacheSection({
                 onChange={setRedisUsername}
               />
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={t("redisPassword")}
                 type="password"
@@ -137,6 +141,7 @@ export function HttpCacheSection({
                 onChange={setRedisPassword}
               />
               <NumberInput
+                hasNumberSteppers
                 label={t("redisDb")}
                 htmlName="redisDb"
                 isIntegerOnly
@@ -170,6 +175,7 @@ export function HttpCacheSection({
           />
           {provider !== "none" && (
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("cdnApiKey")}
               type="password"
@@ -187,6 +193,7 @@ export function HttpCacheSection({
           {provider === "cloudflare" && (
             <>
               <TextInput
+                startIcon={Mail}
                 {...AUTOFILL_OFF}
                 label={t("cdnEmail")}
                 description={t("cdnEmailHelp")}

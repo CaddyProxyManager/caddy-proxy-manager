@@ -20,13 +20,13 @@ import {
   Waypoints,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { Hue } from "@/src/components/ui/accent";
 import type { useTranslations } from "next-intl";
 
 /** `id` is the anchor, the `settings.blocks.*` key, and where legacy links redirect. */
 export type SettingsBlock = {
   id: string;
   name: string;
-  desc: string;
   /**
    * Variables governing the whole block, shown beside its heading. Only ones that set a value
    * this block shows: a near-miss sends someone to a screen that cannot change it.
@@ -61,30 +61,30 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         desc: "Domain, ACME contact, updates, branding and avatars",
         icon: Settings2,
         blocks: [
-          { id: "general", name: "General", desc: "Primary domain and ACME contact email" },
+          { id: "general", name: "General" },
           {
             id: "acme",
             name: "ACME Server",
-            desc: "Custom ACME directory URL for internal CAs",
             envSearch: ["ACME_CA_ROOT_DIR"],
           },
           {
             id: "updates",
             name: "Updates",
-            desc: "Whether to check the registry for a newer release, and which one",
             envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
           },
-          { id: "branding", name: "Branding", desc: "The favicon browsers show for this instance" },
+          {
+            id: "branding",
+            name: "Branding",
+            envSearch: ["ACCENT_COLOR"],
+          },
           {
             id: "instance",
             name: "Instance",
-            desc: "Names this instance and the address it is reached at",
             envSearch: ["APP_NAME", "BASE_URL"],
           },
           {
             id: "avatars",
             name: "User Avatars",
-            desc: "Gravatar fallback for users without an icon",
             envSearch: ["AVATAR_GRAVATAR"],
           },
         ],
@@ -98,12 +98,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "default-response",
             name: "Default Response",
-            desc: "Handle requests for unknown hosts and direct IP access",
           },
           {
             id: "error-pages",
             name: "Error Pages",
-            desc: "Global custom error responses (fallback for all hosts)",
           },
         ],
       },
@@ -116,18 +114,15 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "caddy-build",
             name: "Caddy Build",
-            desc: "Which plugins the Caddy image is compiled with",
             env: ["CADDY_BUILD_TIMEOUT"],
           },
           {
             id: "global-caddy-config",
             name: "Global Caddyfile",
-            desc: "Raw Caddy configuration added to every agent's config",
           },
           {
             id: "http-cache",
             name: "HTTP Cache",
-            desc: "Where the Caddy cache keeps entries, and which CDN it purges",
           },
         ],
       },
@@ -140,7 +135,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "dashboard",
             name: "Dashboard Host",
-            desc: "Serve this dashboard through Caddy, on a domain of its own",
             envSearch: ["DASHBOARD_DOMAIN"],
           },
         ],
@@ -154,7 +148,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "agent",
             name: "Agent",
-            desc: "The service that recreates and rebuilds the Caddy container",
             env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
             envSearch: ["CADDY_MONITOR_ENABLED"],
           },
@@ -169,7 +162,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "email",
             name: "SMTP Server",
-            desc: "The server this instance sends mail through, and the address it sends as",
             envSearch: [
               "SMTP_ENABLED",
               "SMTP_HOST",
@@ -184,7 +176,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             // Was "Certificate Alerts"; the id stays, so anchors and links still land here.
             id: "certificate-alerts",
             name: "Notifications",
-            desc: "What the administrators are emailed about, and who else is",
             envSearch: [
               "CERTIFICATE_EXPIRY_ALERT_DAYS",
               "EMAIL_ALERT_RECIPIENTS",
@@ -201,6 +192,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "NOTIFY_GEOIP_FAILED",
               "NOTIFY_CRS_PLUGIN_DISABLED",
               "NOTIFY_UPDATE_AVAILABLE",
+              "NOTIFY_DISABLED_ACCOUNT_OWNER",
             ],
           },
         ],
@@ -220,17 +212,14 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "dns-providers",
             name: "DNS Providers",
-            desc: "Provider credentials for ACME DNS-01",
           },
           {
             id: "dns-resolvers",
             name: "DNS Resolvers",
-            desc: "Custom resolvers for challenge verification",
           },
           {
             id: "upstream-dns",
             name: "Upstream DNS Pinning",
-            desc: "Pin upstream IPs at config-apply time",
           },
         ],
       },
@@ -243,22 +232,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "trusted-proxies",
             name: "Trusted Proxies",
-            desc: "Resolve real client IP behind an upstream proxy",
           },
           {
             id: "http-protocols",
             name: "HTTP Versions",
-            desc: "Turn HTTP/2 or HTTP/3 off for every host",
           },
           {
             id: "compression",
             name: "Compression",
-            desc: "Compress text responses with zstd or gzip",
           },
           {
             id: "tailscale",
             name: "Tailscale",
-            desc: "Node defaults for hosts served on, or reached over, your tailnet",
             envSearch: ["TS_AUTHKEY"],
           },
         ],
@@ -278,7 +263,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "oauth",
             name: "OAuth Providers",
-            desc: "OAuth/OIDC SSO providers",
             // Nineteen tokens would drown the heading, so only the prefix is shown.
             env: ["OAUTH_*"],
             envSearch: [
@@ -306,12 +290,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "ldap",
             name: "Directories (LDAP)",
-            desc: "Sign in with an LDAP or Active Directory account",
           },
           {
             id: "sign-in",
             name: "Sign-in",
-            desc: "Who may sign in or sign up, and how hard the door is to knock on",
             envSearch: [
               "AUTH_ALLOW_SELF_REGISTRATION",
               "AUTH_ALLOW_OAUTH_REGISTRATION",
@@ -335,17 +317,14 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "captcha",
             name: "CAPTCHA",
-            desc: "A challenge to solve before the password is asked for",
           },
           {
             id: "two-factor",
             name: "Two-factor Sign-in",
-            desc: "Require administrators to use an authenticator app",
           },
           {
             id: "password-policy",
             name: "Password Policy",
-            desc: "Migrate users off older password hashes",
             envSearch: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
           },
         ],
@@ -359,13 +338,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "authentik",
             name: "Authentik Defaults",
-            desc: "Forward-auth defaults for new proxy hosts",
             env: ["FORWARD_AUTH_INTERNAL_URL"],
           },
           {
             id: "forward-auth",
             name: "Forward Auth Defaults",
-            desc: "Defaults for hosts authenticating through an external auth server",
             envSearch: ["FORWARD_AUTH_ALLOWED_PORTS"],
           },
         ],
@@ -379,7 +356,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "geoip",
             name: "GeoIP Databases",
-            desc: "MaxMind subscription and whether country lookups run at all",
             envSearch: [
               "GEOIP_ENABLED",
               "GEOIPUPDATE_ACCOUNT_ID",
@@ -390,7 +366,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "geoblock",
             name: "Global Geoblocking",
-            desc: "Default geoblock rules across all hosts",
           },
         ],
       },
@@ -403,7 +378,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "crowdsec",
             name: "CrowdSec",
-            desc: "The Local API and bouncer key every host checks clients against",
           },
         ],
       },
@@ -422,7 +396,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "analytics",
             name: "Analytics",
-            desc: "Traffic and WAF event collection, and the ClickHouse it writes to",
             envSearch: [
               "ANALYTICS_ENABLED",
               "CLICKHOUSE_URL",
@@ -432,8 +405,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "CLICKHOUSE_RETENTION_DAYS",
             ],
           },
-          { id: "metrics", name: "Metrics & Monitoring", desc: "Prometheus metrics endpoint" },
-          { id: "logging", name: "Access Logging", desc: "HTTP access log for proxied requests" },
+          { id: "metrics", name: "Metrics & Monitoring" },
+          { id: "logging", name: "Access Logging" },
         ],
       },
     ],
@@ -462,6 +435,35 @@ export const LEGACY_SECTION_PAGES: ReadonlyMap<string, { page: string; anchor: s
       .map((block) => [block.id, { page: item.id, anchor: block.id }] as const),
   ),
 );
+
+/**
+ * The rail's icon colours, by section id. Where a section configures a page, the page's hue: the
+ * agent teal, CrowdSec red beside the WAF, observability blue like Analytics.
+ */
+export const SETTINGS_HUES: Record<string, Hue> = {
+  general: "blue",
+  responses: "red",
+  "caddy-build": "orange",
+  dashboard: "purple",
+  agent: "teal",
+  email: "pink",
+  dns: "cyan",
+  network: "green",
+  authentication: "yellow",
+  "forward-auth": "purple",
+  geo: "teal",
+  crowdsec: "red",
+  observability: "blue",
+};
+
+/**
+ * The settings header's height, measured by SettingsFrame, for anything that scrolls into view
+ * beneath it. Here rather than there: PageBlocks needs it, and the docs site renders PageBlocks.
+ */
+export const HEADER_HEIGHT_VAR = "--cpm-settings-header-height";
+
+/** Where the rail takes the revision and the staged controls, filled by SettingsFrame. */
+export const STAGED_SLOT_ID = "settings-rail-staged";
 
 /** Callers link through this so none needs updating when a block moves page. */
 export function settingsHref(id: string): string {
@@ -499,10 +501,6 @@ export function settingsSectionDescription(t: SettingsTranslator, item: SettingI
 
 export function settingsBlockName(t: SettingsTranslator, id: string): string {
   return dynamic(t)(`blocks.${sectionMessageName(id)}.name`);
-}
-
-export function settingsBlockDescription(t: SettingsTranslator, id: string): string {
-  return dynamic(t)(`blocks.${sectionMessageName(id)}.desc`);
 }
 
 export function settingsGroupLabel(t: SettingsTranslator, group: SettingsGroup): string {

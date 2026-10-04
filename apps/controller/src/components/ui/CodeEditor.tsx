@@ -19,10 +19,13 @@ import {
   useState,
 } from "react";
 import { Field } from "@astryxdesign/core/Field";
+import { useClipboard } from "@astryxdesign/core/hooks";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { ensureHighlightStyles } from "@astryxdesign/core/CodeBlock";
+import { Check, Copy } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { LANGUAGE_LABELS, tokenizeCode, type CodeEditorLanguage } from "./code-syntax";
 
@@ -79,6 +82,8 @@ export type CodeEditorProps = {
   /** No border or rounding, for an editor filling a pane whose own dividers frame it. */
   isFlush?: boolean;
   isFooterHidden?: boolean;
+  /** A copy button in the top corner, for a value meant to be pasted somewhere else. */
+  isCopyable?: boolean;
   /** Floats over the editor's bottom corner, clear of the scrollbar: a Save button, say. */
   overlay?: ReactNode;
   issues?: readonly CodeEditorIssue[];
@@ -172,6 +177,7 @@ export function CodeEditor({
   isLabelHidden,
   isFlush,
   isFooterHidden,
+  isCopyable,
   overlay,
   issues = [],
 }: CodeEditorProps) {
@@ -206,6 +212,10 @@ export function CodeEditor({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const scrollbarWidth = useScrollbarWidth(scrollerRef);
+  const { copy, isCopied } = useClipboard({ announce: t("codeEditor.copied") });
+  // No clipboard API over plain http; the text stays selectable there.
+  const [canCopy, setCanCopy] = useState(false);
+  useEffect(() => setCanCopy(window.isSecureContext), []);
 
   useLayoutEffect(() => {
     const caret = pendingCaret.current;
@@ -329,6 +339,18 @@ export function CodeEditor({
             />
           </div>
         </div>
+        {isCopyable && canCopy && (
+          <div className="cpm-code-editor-copy">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={isCopied ? <Check /> : <Copy />}
+              tooltip={t("codeEditor.copy")}
+              label={isCopied ? t("codeEditor.copied") : t("codeEditor.copy")}
+              onClick={() => void copy(value)}
+            />
+          </div>
+        )}
         {overlay && <div className="cpm-code-editor-overlay">{overlay}</div>}
       </div>
 

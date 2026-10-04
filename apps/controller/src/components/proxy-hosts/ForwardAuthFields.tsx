@@ -1,5 +1,6 @@
 "use client";
 
+import { Link, Network, Route } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -136,6 +137,7 @@ export function ForwardAuthFields({
               onChange={(next) => onProviderChange(next as ForwardAuthProvider)}
             />
             <TextInput
+              startIcon={Link}
               label={t("forwardAuthUpstream")}
               htmlName="forwardAuthUpstream"
               placeholder="http://authelia:9091"
@@ -145,6 +147,7 @@ export function ForwardAuthFields({
               description={t("forwardAuthUpstreamHelp")}
             />
             <TextInput
+              startIcon={Route}
               label={t("authEndpoint")}
               htmlName="forwardAuthEndpoint"
               isOptional={provider === "authelia"}
@@ -163,6 +166,7 @@ export function ForwardAuthFields({
               description={t("forwardAuthCopyHeadersHelp")}
             />
             <TextInput
+              startIcon={Network}
               label={t("trustedProxies")}
               htmlName="forwardAuthTrustedProxies"
               value={trustedProxies}

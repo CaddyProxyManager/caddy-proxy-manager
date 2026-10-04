@@ -10,7 +10,8 @@ import { List } from "@astryxdesign/core/List";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
+import { ACCENTS } from "@/src/components/ui/accent";
 import {
   type Destination,
   type DestinationId,
@@ -67,10 +68,19 @@ export default function MoreClient({
                   as="li"
                   href={item.href}
                   label={t(item.labelKey)}
-                  startContent={<Icon icon={DESTINATION_ICONS[item.id]} color="secondary" />}
+                  startContent={
+                    <Icon
+                      icon={DESTINATION_ICONS[item.id]}
+                      className={ACCENTS[DESTINATION_HUES[item.id]].text}
+                    />
+                  }
                   endContent={
                     pinned.has(item.id) ? (
-                      <Badge variant="pink" label={tMore("inDrawer")} />
+                      <Badge
+                        variant="neutral"
+                        className="cpm-accent-badge"
+                        label={tMore("inDrawer")}
+                      />
                     ) : (
                       <Icon icon={ChevronRight} size="sm" color="secondary" />
                     )

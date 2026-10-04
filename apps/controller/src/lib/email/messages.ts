@@ -3,6 +3,7 @@
  * certificate alerts are sent from a timer, where there is no request to read a locale from.
  */
 
+import type { AccountDisabledReason } from "../notifications/account-owner";
 import { createTranslator } from "next-intl";
 import { getAppName } from "../app-name";
 import { DEFAULT_LOCALE, type Locale } from "../locale";
@@ -115,6 +116,26 @@ export async function resetLinkEmail(
       paragraphs: [t("passwordReset.intro", { appName, email: input.to })],
       action: { label: t("passwordReset.action"), url: input.link },
       notes: [t("passwordReset.expiry", { minutes: input.minutes }), t("passwordReset.ignore")],
+      footer,
+    }),
+  };
+}
+
+export async function accountDisabledEmail(
+  input: { to: string; reason: AccountDisabledReason },
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<EmailMessage> {
+  const { t, appName, footer } = await emailContext(locale);
+  const why =
+    input.reason.by === "failedSignIns"
+      ? t("accountDisabled.byFailedSignIns", { failures: input.reason.failures })
+      : t("accountDisabled.byAdministrator");
+  return {
+    to: input.to,
+    subject: t("accountDisabled.subject", { appName }),
+    ...renderBody({
+      paragraphs: [t("accountDisabled.intro", { appName, email: input.to }), why],
+      notes: [t("accountDisabled.nothingElse")],
       footer,
     }),
   };

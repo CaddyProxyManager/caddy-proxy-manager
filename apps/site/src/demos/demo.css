@@ -206,3 +206,53 @@
     display: none;
   }
 }
+
+/* The controller's globals.css rules its demoed components rely on, which the docs do not load. */
+@layer cpm-demo-phone {
+  .cpm-demo .cpm-code-editor-copy {
+    position: absolute;
+    top: var(--spacing-1);
+    right: calc(var(--cpm-scrollbar-gutter) + var(--spacing-1));
+    border-radius: var(--radius-element);
+    background-color: var(--color-syntax-background);
+  }
+
+  .cpm-demo .cpm-module-grid {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(0, 2fr) 120px 36px;
+    grid-template-areas: "switch name path version remove";
+    gap: var(--spacing-2);
+    align-items: start;
+  }
+
+  .cpm-demo .cpm-module-grid > [data-cell="switch"] {
+    grid-area: switch;
+    padding-top: var(--spacing-1);
+  }
+  .cpm-demo .cpm-module-grid > [data-cell="name"] {
+    grid-area: name;
+  }
+  .cpm-demo .cpm-module-grid > [data-cell="path"] {
+    grid-area: path;
+  }
+  .cpm-demo .cpm-module-grid > [data-cell="version"] {
+    grid-area: version;
+  }
+  .cpm-demo .cpm-module-grid > [data-cell="remove"] {
+    grid-area: remove;
+  }
+
+  @media (max-width: 767px) {
+    .cpm-demo .cpm-module-grid {
+      grid-template-columns: 44px minmax(0, 1fr) 36px;
+      grid-template-areas:
+        "switch name remove"
+        ". path path"
+        ". version version";
+    }
+
+    .cpm-demo .cpm-module-grid[data-header] {
+      display: none;
+    }
+  }
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { ShieldCheck } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@astryxdesign/core/Button";
@@ -49,6 +50,7 @@ export function TwoFactorStep({
           {method === "totp" ? t("totpPrompt") : t("backupPrompt")}
         </Text>
         <TextInput
+          startIcon={ShieldCheck}
           {...NO_SPELLCHECK}
           {...AUTOFILL_ONE_TIME_CODE}
           {...(method === "totp" ? NUMERIC_INPUT : {})}

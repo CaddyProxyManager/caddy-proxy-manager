@@ -636,12 +636,14 @@
     "fleetDefault": "Fleet default (all agents)",
     "followFleetDefault": "Follow the fleet default",
     "followFleetDefaultHelp": "Clear this agent's own selection so it tracks the fleet default again.",
-    "includeModuleLabel": "Include in the build",
     "modulePath": "Module path",
     "modulePathPlaceholder": "github.com/greenpau/caddy-security",
     "moduleVersionHelp": "Tag, branch, or commit",
     "modulesCurrentStatus": "Caddy is running the selected modules",
     "noCustomModules": "No custom modules.",
+    "customModuleName": "Name",
+    "customModuleNamePlaceholder": "Name (optional)",
+    "customModuleIncludeNamed": "Include {name} in the build",
     "rebuildCaddy": "Rebuild Caddy",
     "rebuildCouldNotStart": "Rebuild could not be started.",
     "rebuildCouldNotStartHttp": "Rebuild could not be started (HTTP {status}).",
@@ -661,6 +663,7 @@
     "lastRebuildFailed": "The last rebuild failed",
     "rebuildRequired": "Rebuild required",
     "customModulesTitle": "Custom modules",
+    "cacheStorageNeedsHandler": "This module doesn't work without HTTP Cache",
     "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy Build and rebuild Caddy.",
     "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy Build.",
     "modules": {
@@ -678,7 +681,7 @@
       },
       "cacheHandler": {
         "name": "HTTP Cache",
-        "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild."
+        "description": "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option."
       },
       "souinStorageOtter": {
         "name": "Otter Cache Storage",
@@ -702,11 +705,11 @@
       },
       "caddyRatelimit": {
         "name": "Rate Limit",
-        "description": "Sliding-window request limits per client. Required by a proxy host's Rate limiting option. Not in the default image: enable it here and rebuild."
+        "description": "Sliding-window request limits per client. Required by a proxy host's Rate limiting option."
       },
       "caddyCrowdsec": {
         "name": "CrowdSec",
-        "description": "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings. Not in the default image: enable it here and rebuild."
+        "description": "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings."
       },
       "corazaWaf": {
         "name": "Coraza WAF",
@@ -1231,6 +1234,7 @@
     "customModulePathMissingHost": "Invalid module path \"{path}\". Expected a host and a path, such as github.com/owner/repo",
     "customModuleVersionInvalid": "Invalid version \"{version}\" for {path}. Expected a tag, branch, or commit such as v1.2.3",
     "customModuleDuplicate": "Duplicate custom module \"{path}\"",
+    "customModuleNameInvalid": "A custom module name must be at most {max} characters, with no control characters",
     "faviconEmpty": "That file is empty.",
     "faviconTooLarge": "That file is {size} KB. The limit is {limit} KB.",
     "faviconNotImage": "That does not look like an image. Use a PNG, ICO, SVG, WebP, GIF or JPEG.",
@@ -1259,6 +1263,7 @@
     "geoipDatabaseMissing": "the download has no {edition}.mmdb in it",
     "apiTokenNameTooLong": "Token name must be {max} characters or fewer",
     "apiTokenLimitReached": "Maximum of {max} API tokens per user",
+    "pushSubscriptionInvalid": "The browser sent a push subscription this server cannot use",
     "l4ListenAddressInvalid": "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535 or a range such as 5000-5010",
     "l4ListenRangeTooLarge": "A port range can hold at most {max} ports",
     "l4ListenPortInUse": "Port {port} is already used by another L4 host with a different listen address. Hosts share a port only when their listen addresses are exactly the same.",
@@ -1700,6 +1705,38 @@
     }
   },
   "profile": {
+    "notifications": {
+      "title": "Notifications",
+      "description": "What you are told about, and how. Only administrators are notified. An event turned off under Settings → Email → Notifications is off for everyone.",
+      "email": "Email",
+      "emailHelp": "To {address}.",
+      "emailOff": "Email is not set up on this server.",
+      "emailUndeliverable": "{address} cannot receive mail. Change your email address to get notifications by email.",
+      "push": "Browser notifications",
+      "pushHelp": "To every browser you turn them on in below.",
+      "events": "Events",
+      "eventOffForEveryone": "Turned off for everyone under Settings → Email → Notifications.",
+      "saveFailed": "Your notification settings could not be saved.",
+      "pushChecking": "Checking this browser…",
+      "pushOn": "On in this browser.",
+      "pushOff": "Off in this browser.",
+      "pushUnsupported": "This browser cannot receive them here. Browser notifications need HTTPS, or localhost, and a browser with Push support; on an iPhone or iPad, add the dashboard to the Home Screen first.",
+      "pushBlocked": "This browser blocks notifications from this site. Allow them in the site's settings, then turn them on here.",
+      "pushNoKey": "The server's push keys could not be read; see the controller's log.",
+      "pushEnable": "Turn on in this browser",
+      "pushDisable": "Turn off in this browser",
+      "pushTest": "Send a test",
+      "pushEnabled": "Browser notifications are on in this browser.",
+      "pushEnableFailed": "Browser notifications could not be turned on.",
+      "pushDisabled": "Browser notifications are off in this browser.",
+      "pushDisableFailed": "Browser notifications could not be turned off.",
+      "pushTestSent": "Test notification sent to this browser.",
+      "pushTestFailed": "The push service did not accept the test notification.",
+      "pushTestNotSubscribed": "This browser is not subscribed any more. Turn browser notifications on again.",
+      "browsersTitle": "Browsers receiving them",
+      "browserRemove": "Remove",
+      "browserRemoved": "That browser no longer receives notifications."
+    },
     "passkeys": {
       "title": "Passkeys",
       "description": "Sign in with your fingerprint, face or device PIN instead of a password. A passkey stands in for both your password and a two-factor code.",
@@ -1912,7 +1949,8 @@
     "blockedCount": "{count} blocked",
     "blockedShareNote": "{percent}% blocked",
     "body": "Body",
-    "bufferedInMemoryMib": "Buffered in memory (MiB)",
+    "bufferedInMemoryMib": "Buffered in memory",
+    "bufferedInMemoryMibUnit": "MiB",
     "certificate": "Certificate",
     "certificates": "Certificates",
     "certificatesEmptyTitle": "No client certificates issued yet",
@@ -2153,7 +2191,8 @@
     "cacheModeBrowserHelp": "Tells browsers to keep assets for the max age, unless the upstream already sets Cache-Control.",
     "cacheModeCaddyHelp": "Caddy also keeps a shared copy, so repeat requests skip the upstream. Responses that set a cookie or are marked private or no-store are never stored.",
     "cacheCaddyUnavailable": "Falling back to browser caching",
-    "cacheMaxAge": "Max age (seconds)",
+    "cacheMaxAge": "Max age",
+    "cacheMaxAgeUnit": "seconds",
     "cacheMaxAgeHelp": "How long an asset stays cached: 60 seconds to one year. 86400 is a day.",
     "pathRewrites": "Path Rewrites",
     "port": "Port",
@@ -2187,6 +2226,7 @@
     "statusCodes": "Status codes",
     "stickyCookieNameHelp": "Name of the cookie for sticky sessions",
     "stickyCookieSecretHelp": "Secret key for HMAC cookie signing",
+    "stickyCookieSecretPlaceholder": "A long random string",
     "tailnetOnly": "Tailnet only",
     "tailnetOnlyHelp": "Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places.",
     "tailscale": "Tailscale",
@@ -2282,7 +2322,8 @@
     "maintenanceActiveDescription": "Only the bypass addresses reach the upstream. Access lists, sign-in and the WAF still apply to them",
     "maintenanceBypass": "Bypass addresses",
     "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page - yours, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted Proxies",
-    "maintenanceRetryAfter": "Retry-After (seconds)",
+    "maintenanceRetryAfter": "Retry-After",
+    "maintenanceRetryAfterUnit": "seconds",
     "maintenanceRetryAfterHelp": "Tells clients and crawlers when to come back. Leave it empty to send none",
     "maintenanceBody": "Page",
     "maintenanceBodyHelp": "HTML shown to visitors. Leave it empty to use this host's 503 error page, then the global one, then a built-in page",
@@ -2365,7 +2406,8 @@
     "proxyHostPausedTitle": "Proxy Host Paused",
     "proxyHostActiveDescription": "This host is active and routing traffic",
     "proxyHostPausedDescription": "This host is disabled and will not respond to requests",
-    "maxBodySizeMib": "Max body size (MiB, up to {max})",
+    "maxBodySizeMib": "Max body size (up to {max})",
+    "maxBodySizeMibUnit": "MiB",
     "caFallbackName": "CA #{id}",
     "certificatesIssuedBy": "Certificates issued by {name}",
     "editRuleLabel": "Edit rule {path}",
@@ -2599,10 +2641,27 @@
     "ephemeralNodesHelp": "Ephemeral nodes disappear from the tailnet when Caddy stops, instead of lingering as offline machines. Their identity is not reused, so a restart shows up as a new device.",
     "fallbackIcon": "Fallback icon",
     "fallbackResolvers": "Fallback resolvers",
+    "accentColorSaved": "Saved",
+    "accentColorPreview": "Preview only, change not saved",
+    "accentColorPinned": "Set by {env}, which overrides what is stored here.",
+    "accentColors": {
+      "blue": "Blue",
+      "cyan": "Cyan",
+      "green": "Green",
+      "orange": "Orange",
+      "pink": "Pink",
+      "purple": "Purple",
+      "red": "Red",
+      "teal": "Teal"
+    },
     "favicon": "Favicon",
-    "faviconDescription": "Shown in the browser tab and in bookmarks",
     "faviconUploadHelp": "PNG, ICO, SVG, WebP, GIF or JPEG, up to 256 KB. A square image of at least 32×32 works everywhere; browsers scale it down themselves.",
     "faviconFileLabel": "Favicon image file",
+    "faviconKeep": "Keep favicon",
+    "faviconTooltipUpload": "Upload a favicon",
+    "faviconTooltipReplace": "Replace the favicon with another image",
+    "faviconTooltipPicked": "Choose a different image",
+    "faviconWillBeRemoved": "The custom favicon will be removed when saved.",
     "format": "Format",
     "generatePairingCode": "Generate a pairing code",
     "geoblockTrustedProxiesHelp": "Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins.",
@@ -2621,7 +2680,8 @@
     "geoipSavedEnabled": "GeoIP enabled - downloading the databases from MaxMind.",
     "geoipSavedNeedsCredentials": "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
     "geoipUpdateDisabled": "Turn GeoIP on and save to download the databases.",
-    "geoipUpdateInterval": "Check for updates every (hours)",
+    "geoipUpdateInterval": "Check for updates every",
+    "geoipUpdateIntervalUnit": "hours",
     "geoipUpdateIntervalHelp": "MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check only downloads what changed.",
     "geoipUpdateUnconfigured": "Add a MaxMind account ID and licence key to download the databases.",
     "globalErrorPagesHelp": "These error pages apply to every proxy host as a fallback. A per-host error page for the same status code takes precedence.",
@@ -2649,9 +2709,6 @@
     "homeConfigure": "Configure",
     "homeEnvBadge": "env",
     "save": "Save",
-    "homeGroupAccess": "Access",
-    "homeGroupRuntime": "Runtime",
-    "homeGroupTraffic": "Traffic",
     "homeOverview": "Overview",
     "homeStagedBadge": "staged",
     "homeStatusAttention": "Needs attention",
@@ -2712,9 +2769,18 @@
     "redirectStatus": "Redirect status",
     "redirectUrl": "Redirect URL",
     "registerNodesAsEphemeral": "Register nodes as ephemeral",
+    "units": {
+      "milliseconds": "ms",
+      "seconds": "seconds",
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days",
+      "responses": "responses"
+    },
     "registry": {
       "account_lock_base_delay_ms": {
         "description": "How long the first lock lasts. Each failure after it doubles the wait.",
+        "fieldLabel": "First account lock",
         "label": "First account lock (milliseconds)"
       },
       "account_lock_disable_after": {
@@ -2735,11 +2801,16 @@
       },
       "account_lock_max_delay_ms": {
         "description": "The doubling stops here, so guessing can slow the owner's sign-in but never shut it off.",
+        "fieldLabel": "Longest account lock",
         "label": "Longest account lock (milliseconds)"
       },
       "analytics_enabled": {
         "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
+      },
+      "accent_color": {
+        "description": "The colour of selected items, primary buttons and focus rings across the dashboard.",
+        "label": "Accent colour"
       },
       "app_name": {
         "description": "Shown in the sidebar, on the login card, and as the suffix on every page title.",
@@ -2771,6 +2842,7 @@
       },
       "auth_rate_limit_window": {
         "description": "The period over which auth requests are counted.",
+        "fieldLabel": "Auth rate-limit window",
         "label": "Auth rate-limit window (seconds)"
       },
       "auth_require_password_change_on_legacy_hash": {
@@ -2799,6 +2871,7 @@
       },
       "caddy_build_timeout": {
         "description": "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow or ARM hosts can take considerably longer than the default.",
+        "fieldLabel": "Caddy build timeout",
         "label": "Caddy build timeout (seconds)"
       },
       "clickhouse_db": {
@@ -2811,6 +2884,7 @@
       },
       "clickhouse_retention_days": {
         "description": "How long traffic and WAF events are kept. Lowering it uses less disk, and migrates the existing tables' TTL on the next start.",
+        "fieldLabel": "Analytics retention",
         "label": "Analytics retention (days)"
       },
       "clickhouse_url": {
@@ -2839,6 +2913,7 @@
       },
       "geoip_update_interval_hours": {
         "description": "How often the controller asks MaxMind for newer databases. MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
+        "fieldLabel": "Update check interval",
         "label": "Update check interval (hours)"
       },
       "geoipupdate_account_id": {
@@ -2851,6 +2926,7 @@
       },
       "login_block_ms": {
         "description": "How long a blocked client stays blocked.",
+        "fieldLabel": "Lockout duration",
         "label": "Lockout duration (milliseconds)"
       },
       "login_max_attempts": {
@@ -2859,6 +2935,7 @@
       },
       "login_window_ms": {
         "description": "The period over which failed sign-ins are counted.",
+        "fieldLabel": "Login window",
         "label": "Login window (milliseconds)"
       },
       "update_check_enabled": {
@@ -2898,11 +2975,12 @@
         "label": "Sender address"
       },
       "email_alert_recipients": {
-        "description": "Comma-separated addresses that certificate alerts and notifications go to. If left empty they go to every active administrator.",
+        "description": "Comma-separated addresses for certificate alerts, and extra recipients of every notification. If left empty, certificate alerts go to every active administrator.",
         "label": "Alert recipients"
       },
       "certificate_expiry_alert_days": {
         "description": "Email the alert recipients once a certificate has fewer days than this left. Caddy renews on its own well before then, so an alert means renewal is failing. 0 turns alerts off.",
+        "fieldLabel": "Certificate alert threshold",
         "label": "Certificate alert threshold (days)"
       },
       "notify_account_disabled": {
@@ -2923,6 +3001,7 @@
       },
       "notify_agent_offline_minutes": {
         "description": "How long an agent may be disconnected before anyone is told. After a restart of this server every agent gets this long to reconnect.",
+        "fieldLabel": "Agent offline after",
         "label": "Agent offline after (minutes)"
       },
       "notify_upstream_errors": {
@@ -2931,10 +3010,12 @@
       },
       "notify_upstream_error_count": {
         "description": "How many 502, 503 or 504 responses from one host, within the minutes below.",
+        "fieldLabel": "Upstream errors before telling",
         "label": "Upstream errors before telling (responses)"
       },
       "notify_upstream_error_minutes": {
         "description": "Also how long a host must go without one before it counts as recovered.",
+        "fieldLabel": "Upstream error window",
         "label": "Upstream error window (minutes)"
       },
       "notify_caddy_apply": {
@@ -2956,14 +3037,18 @@
       "notify_update_available": {
         "description": "Once per release, while the update check under General is on.",
         "label": "New release"
+      },
+      "notify_disabled_account_owner": {
+        "description": "Email one message to an account's own address when it is disabled, by an administrator or after failed sign-ins. A disabled account gets nothing else.",
+        "label": "Tell the owner of a disabled account"
       }
     },
     "releaseUpdates": "Release updates",
     "remove": "Remove",
-    "removeFavicon": "Remove favicon",
     "responseBody": "Response body",
     "responseHeaders": "Response headers",
-    "retentionDays": "Retention (days)",
+    "retentionDays": "Retention",
+    "retentionDaysUnit": "days",
     "reviewApply": "Apply to Caddy",
     "reviewApplying": "Applying…",
     "reviewChangeCount": "{count, plural, one {# change} other {# changes}}",
@@ -2979,6 +3064,7 @@
     "reviewUndo": "Undo",
     "revisionFailed": "Last apply failed",
     "revisionNever": "Never applied",
+    "revisionDemo": "Demo",
     "revisionPill": "Revision #{id}",
     "history": {
       "title": "Revision history",
@@ -3110,6 +3196,7 @@
     "tailscaleTailnetHelp": "Which tailnet to ask. \"-\" means the token's own, which is right unless you administer several.",
     "faviconSelectedAlt": "The favicon you selected",
     "faviconCurrentAlt": "The current favicon",
+    "faviconNoneAlt": "No favicon set",
     "updateAvailableTitle": "Version {version} has been published",
     "runningVersionTitle": "Running {version}",
     "clickhousePasswordStored": "A password is stored. Leave this empty to keep it.",
@@ -3218,148 +3305,112 @@
     },
     "blocks": {
       "general": {
-        "name": "General",
-        "desc": "Primary domain and ACME contact email"
+        "name": "General"
       },
       "acme": {
-        "name": "ACME Server",
-        "desc": "Custom ACME directory URL for internal CAs"
+        "name": "ACME Server"
       },
       "updates": {
-        "name": "Updates",
-        "desc": "Whether to check the registry for a newer release, and which one"
+        "name": "Updates"
       },
       "branding": {
-        "name": "Branding",
-        "desc": "The favicon browsers show for this instance"
+        "name": "Branding"
       },
       "instance": {
-        "name": "Instance",
-        "desc": "Names this instance and the address it is reached at"
+        "name": "Instance"
       },
       "avatars": {
-        "name": "User Avatars",
-        "desc": "Gravatar fallback for users without an icon"
+        "name": "User Avatars"
       },
       "defaultResponse": {
-        "name": "Default Response",
-        "desc": "Handle requests for unknown hosts and direct IP access"
+        "name": "Default Response"
       },
       "errorPages": {
-        "name": "Error Pages",
-        "desc": "Global custom error responses (fallback for all hosts)"
+        "name": "Error Pages"
       },
       "caddyBuild": {
-        "name": "Caddy Build",
-        "desc": "Which plugins the Caddy image is compiled with"
+        "name": "Caddy Build"
       },
       "globalCaddyConfig": {
-        "name": "Global Caddyfile",
-        "desc": "Raw Caddy configuration added to every agent's config"
+        "name": "Global Caddyfile"
       },
       "httpCache": {
-        "name": "HTTP Cache",
-        "desc": "Where the Caddy cache keeps entries, and which CDN it purges"
+        "name": "HTTP Cache"
       },
       "dashboard": {
-        "name": "Dashboard Host",
-        "desc": "Serve this dashboard through Caddy, on a domain of its own"
+        "name": "Dashboard Host"
       },
       "agent": {
-        "name": "Agent",
-        "desc": "The service that recreates and rebuilds the Caddy container"
+        "name": "Agent"
       },
       "dnsProviders": {
-        "name": "DNS Providers",
-        "desc": "Provider credentials for ACME DNS-01"
+        "name": "DNS Providers"
       },
       "dnsResolvers": {
-        "name": "DNS Resolvers",
-        "desc": "Custom resolvers for challenge verification"
+        "name": "DNS Resolvers"
       },
       "upstreamDns": {
-        "name": "Upstream DNS Pinning",
-        "desc": "Pin upstream IPs at config-apply time"
+        "name": "Upstream DNS Pinning"
       },
       "trustedProxies": {
-        "name": "Trusted Proxies",
-        "desc": "Resolve real client IP behind an upstream proxy"
+        "name": "Trusted Proxies"
       },
       "httpProtocols": {
-        "name": "HTTP Versions",
-        "desc": "Turn HTTP/2 or HTTP/3 off for every host"
+        "name": "HTTP Versions"
       },
       "compression": {
-        "name": "Compression",
-        "desc": "Compress text responses with zstd or gzip"
+        "name": "Compression"
       },
       "twoFactor": {
-        "name": "Two-factor Sign-in",
-        "desc": "Require administrators to use an authenticator app"
+        "name": "Two-factor Sign-in"
       },
       "tailscale": {
-        "name": "Tailscale",
-        "desc": "Node defaults for hosts served on, or reached over, your tailnet"
+        "name": "Tailscale"
       },
       "oauth": {
-        "name": "OAuth Providers",
-        "desc": "OAuth/OIDC SSO providers"
+        "name": "OAuth Providers"
       },
       "signIn": {
-        "name": "Sign-in",
-        "desc": "Who may sign in or sign up, and how hard the door is to knock on"
+        "name": "Sign-in"
       },
       "passwordPolicy": {
-        "name": "Password Policy",
-        "desc": "Migrate users off older password hashes"
+        "name": "Password Policy"
       },
       "authentik": {
-        "name": "Authentik Defaults",
-        "desc": "Forward-auth defaults for new proxy hosts"
+        "name": "Authentik Defaults"
       },
       "forwardAuth": {
-        "name": "Forward Auth Defaults",
-        "desc": "Defaults for hosts authenticating through an external auth server"
+        "name": "Forward Auth Defaults"
       },
       "geoip": {
-        "name": "GeoIP Databases",
-        "desc": "MaxMind subscription and whether country lookups run at all"
+        "name": "GeoIP Databases"
       },
       "geoblock": {
-        "name": "Global Geoblocking",
-        "desc": "Default geoblock rules across all hosts"
+        "name": "Global Geoblocking"
       },
       "crowdsec": {
-        "name": "CrowdSec",
-        "desc": "The Local API and bouncer key every host checks clients against"
+        "name": "CrowdSec"
       },
       "analytics": {
-        "name": "Analytics",
-        "desc": "Traffic and WAF event collection, and the ClickHouse it writes to"
+        "name": "Analytics"
       },
       "metrics": {
-        "name": "Metrics & Monitoring",
-        "desc": "Prometheus metrics endpoint"
+        "name": "Metrics & Monitoring"
       },
       "logging": {
-        "name": "Access Logging",
-        "desc": "HTTP access log for proxied requests"
+        "name": "Access Logging"
       },
       "captcha": {
-        "name": "CAPTCHA",
-        "desc": "A challenge to solve before the password is asked for"
+        "name": "CAPTCHA"
       },
       "email": {
-        "name": "SMTP Server",
-        "desc": "The server this instance sends mail through, and the address it sends as"
+        "name": "SMTP Server"
       },
       "certificateAlerts": {
-        "name": "Notifications",
-        "desc": "What the administrators are emailed about, and who else is"
+        "name": "Notifications"
       },
       "ldap": {
-        "name": "Directories (LDAP)",
-        "desc": "Sign in with an LDAP or Active Directory account"
+        "name": "Directories (LDAP)"
       }
     },
     "dnsDelegation": {
@@ -3666,8 +3717,8 @@
     "tailscaleUserspaceNote": "The node runs in userspace inside the Caddy container - no <code>tailscaled</code>, no TUN device, no extra ports published. Its identity is kept in the state directory below, so it survives a container recreate.",
     "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one - that is only discovered when Caddy tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
     "faviconSelected": "Selected: {name}. Save to apply it.",
-    "faviconCustomSet": "A custom favicon is set.",
-    "faviconNone": "No custom favicon - browsers show their own default.",
+    "faviconCustomSet": "A custom favicon is set. Click it to replace it.",
+    "faviconNone": "No custom favicon - browsers show their own default. Click the tile to upload one.",
     "updateAvailableBody": "You are running {current}. Pull the new images and recreate the stack to move to it.",
     "updateCheckIncomplete": "The last check did not complete: {error}",
     "updateUpToDate": "{latest} is the newest release published, so this is up to date.",
@@ -3696,6 +3747,86 @@
     "oauthDialogAddDescription": "Configure a new OAuth or OIDC provider for single sign-on.",
     "health": {
       "off": "Off",
+      "on": "On",
+      "notSet": "Not set",
+      "general": {
+        "valueNone": "No primary domain",
+        "detailAcmeEmail": "ACME contact {email}"
+      },
+      "updates": {
+        "valueAvailable": "{latest} available, running {current}",
+        "valueCurrent": "Up to date, {current}",
+        "valueUnchecked": "Not checked yet",
+        "detailError": "The last check failed: {error}"
+      },
+      "branding": {
+        "valueCustom": "Custom favicon",
+        "valueDefault": "Default favicon"
+      },
+      "avatars": {
+        "valueGravatar": "Gravatar on"
+      },
+      "errorPages": {
+        "valueRules": "{count, plural, one {# custom page} other {# custom pages}}",
+        "valueNone": "Caddy's defaults"
+      },
+      "globalCaddyConfig": {
+        "valueLines": "{count, plural, one {# line} other {# lines}} of Caddyfile",
+        "valueNone": "None"
+      },
+      "httpCache": {
+        "valueStorage": "Stored in {storage}"
+      },
+      "email": {
+        "valueReady": "Sending through {host}",
+        "valueIncomplete": "Incomplete",
+        "detailIncomplete": "Email is on, but the server or sender address is missing, so nothing can be sent."
+      },
+      "certificateAlerts": {
+        "valueDays": "Certificate alerts at {days, plural, one {# day} other {# days}}",
+        "valueAlertsOff": "Certificate alerts off",
+        "detailFailed": "The last notification could not be sent: {error}",
+        "detailNoRecipients": "The last notifications were dropped: there was nobody to send them to."
+      },
+      "dnsResolvers": {
+        "valueResolvers": "{count, plural, one {# resolver} other {# resolvers}}",
+        "valueDefault": "System resolvers"
+      },
+      "upstreamDns": {
+        "valueFamily": "Pinning {family, select, ipv4 {IPv4} ipv6 {IPv6} other {IPv4 and IPv6}}"
+      },
+      "httpProtocols": {
+        "valueBoth": "HTTP/2 and HTTP/3",
+        "valueHttp2": "HTTP/2, no HTTP/3",
+        "valueHttp3": "HTTP/3, no HTTP/2",
+        "valueHttp1": "HTTP/1.1 only"
+      },
+      "ldap": {
+        "valueDirectories": "{count, plural, one {# directory} other {# directories}}",
+        "valueNone": "No directories"
+      },
+      "signIn": {
+        "valueLocal": "Local accounts and single sign-on",
+        "valueSsoOnly": "Single sign-on and directories only",
+        "detailNoLock": "Accounts do not lock after failed sign-ins."
+      },
+      "twoFactor": {
+        "valueRequired": "Required for administrators",
+        "valueOptional": "Optional"
+      },
+      "passwordPolicy": {
+        "valueRequireChange": "Old password hashes must be changed",
+        "valueAccept": "Old password hashes accepted"
+      },
+      "forwardAuth": {
+        "valueProvider": "{provider, select, authelia {Authelia} other {Custom}} at {upstream}"
+      },
+      "crowdsec": {
+        "valueMode": "{mode, select, managed {Managed} other {External}} bouncer"
+      },
+      "logging": {
+        "valueFormat": "{format, select, console {Console format} other {JSON}}"
+      },
       "dnsProviders": {
         "valueMore": "{provider} and {count} more",
         "valueNone": "No provider - DNS-01 unavailable",
@@ -3762,6 +3893,7 @@
       "acme": "ACME Server",
       "defaultResponse": "Default Response",
       "avatars": "User Avatars",
+      "branding": "Branding",
       "updates": "Updates",
       "caddyBuild": "Caddy Build",
       "globalCaddyConfig": "Global Caddyfile",
@@ -3937,6 +4069,10 @@
     "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
     "pageDiscard": "Discard",
+    "pageLeave": "Leave",
+    "pageLeaveDescription": "{count, plural, one {# change on this page is} other {# changes on this page are}} not saved and will be lost.",
+    "pageLeaveStay": "Stay",
+    "pageLeaveTitle": "Leave without saving?",
     "httpCache": {
       "moduleOffTitle": "The Caddy cache is not available",
       "storage": "Storage",
@@ -4033,7 +4169,8 @@
       "apiUrl": "Local API URL",
       "apiUrlHelp": "Where Caddy reaches your CrowdSec Local API, such as http://crowdsec:8080. Plain http only for a private address, since the bouncer key travels with every request.",
       "apiKey": "Bouncer key",
-      "apiKeyHelp": "Create one with cscli bouncers add caddy. Stored encrypted and never shown again. A Caddy placeholder such as '{env.CROWDSEC_API_KEY}' works too, and keeps the key out of the database.",
+      "apiKeyCreate": "Create one on the CrowdSec host:",
+      "apiKeyHelp": "Stored encrypted and never shown again. A Caddy placeholder such as '{env.CROWDSEC_API_KEY}' works too, and keeps the key out of the database.",
       "apiKeyStored": "A bouncer key is stored. Leave blank to keep it.",
       "apiKeyReenter": "A bouncer key is stored, but it is only kept while both addresses stay the same. Enter it again.",
       "test": "Test connection",
@@ -4100,24 +4237,31 @@
       "testSent": "Test message sent to {email}.",
       "testFailed": "The test message could not be sent.",
       "testInvalidRecipient": "Enter a valid email address to send the test to.",
-      "alertDays": "Alert threshold (days)",
+      "alertDays": "Alert threshold",
+      "alertDaysUnit": "days",
       "alertDaysHelp": "Email once a certificate has fewer days than this left. Caddy renews managed certificates well before then, so an alert about one means its renewal is failing. 0 turns alerts off.",
       "alertRecipients": "Recipients",
-      "alertRecipientsHelp": "Comma-separated addresses, for certificate alerts and every notification below. If left empty, they go to every active administrator with a deliverable address.",
+      "alertRecipientsHelp": "Comma-separated addresses for certificate alerts, which go to every active administrator when this is empty. Notifications go to these too, besides each administrator's own choice under Profile → Notifications.",
       "alertRecipientsPlaceholder": "Every active administrator",
       "alertsNeedEmailTitle": "Alerts and notifications wait for email",
-      "alertsNeedEmailBody": "Nothing is sent until the SMTP server above is set up.",
+      "alertsNeedEmailBody": "Certificate alerts wait for the SMTP server above. Notifications go out once it is set up, or to the browsers administrators turn on under Profile → Notifications.",
       "alertsLastChecked": "Certificates last checked {when}",
       "alertsNeverChecked": "Certificates have not been checked yet. The first check runs a few minutes after the controller starts, then twice a day.",
       "alertsFailed": "The last check failed: {error}",
       "notificationsLastSent": "Last notification sent {when}",
-      "notificationsNeverSent": "No notification has been sent yet. Events raised within a minute go out together in one email.",
+      "notificationsNeverSent": "No notification has been sent yet. Events raised within a minute go out together, in one email and one browser notification.",
       "notificationsPending": "{count, plural, one {# notification is} other {# notifications are}} waiting to be sent.",
       "notificationsFailed": "The last notification could not be sent: {error}. It is tried again every five minutes, for a day.",
       "notificationsNoRecipients": "The last notifications were dropped: no recipients are set, and no active administrator has a deliverable address.",
-      "notificationsTitle": "Events to email about",
-      "upstreamNeedsAccessLogTitle": "Upstream errors need the access log",
-      "upstreamNeedsAccessLogBody": "They are counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+      "notificationsTitle": "Events to notify about",
+      "notificationsPerUser": "These turn an event off for everyone. Each administrator chooses their own events, and email or browser, under Profile → Notifications.",
+      "unavailable": {
+        "accessLogOff": "Counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+        "accountLockOff": "Needs accounts to lock after failed sign-ins, which is off under Authentication → Sign-in.",
+        "accountDisableOff": "Needs accounts to be disabled after repeated failed sign-ins, which is off under Authentication → Sign-in.",
+        "updateCheckOff": "Needs the update check, which is off under General → Updates.",
+        "geoipOff": "The controller downloads GeoIP databases only with GeoIP on and a MaxMind account ID and licence key set, under Geo-blocking → GeoIP Databases."
+      },
       "testNotification": "Send a test notification",
       "testNotificationHelp": "Sends one to the recipients above, or every active administrator, straight away.",
       "testNotificationSent": "Test notification sent to {recipients}.",
@@ -4383,6 +4527,13 @@
     "skipMigrationDescription": "Skip the migration and configure this instance from scratch. The old file is left alone, and this offer will not appear again.",
     "skipMigrationLabel": "Skip and set up fresh",
     "skippedFilesTitle": "Files that were skipped",
+    "skippedFile": "{path} - {reason}",
+    "skippedReasons": {
+      "missingFile": "No file at that path.",
+      "unreadable": "Not a readable SQLite database: {detail}",
+      "notCpm": "Missing the {tables} tables, so this is not a Caddy Proxy Manager database.",
+      "readFailed": "Could not read the database: {detail}"
+    },
     "sqliteWarningDescription": "SQLite is only intended for legacy installs and demos. The standard Docker Compose install runs PostgreSQL for you, so there is no database server to set up yourself. For an instance you rely on, switch to it before finishing setup - see the <link>installation guide</link>.",
     "sqliteWarningTitle": "This instance is using SQLite",
     "steps": {
@@ -4513,6 +4664,8 @@
     "codeEditor": {
       "keyboardHint": "Tab indents; press Escape then Tab to leave the field",
       "plaintextLabel": "Text",
+      "copy": "Copy",
+      "copied": "Copied",
       "issuesLabel": "Problems found in this text",
       "issueAt": "Line {line}: {message}",
       "errorLabel": "Error - saving will be refused",
@@ -4684,7 +4837,8 @@
     "blocked": "Blocked",
     "body": "Body",
     "bodySizeLimitHelp": "Largest request body the WAF will inspect.",
-    "bufferedInMemoryMib": "Buffered in memory (MiB)",
+    "bufferedInMemoryMib": "Buffered in memory",
+    "bufferedInMemoryMibUnit": "MiB",
     "cancel": "Cancel",
     "client": "Client",
     "clientIp": "Client IP",
@@ -4720,7 +4874,8 @@
     "logData": "Log Data",
     "lookUp": "Look up",
     "matchedRules": "Matched Rules",
-    "maxBodySizeMib": "Max body size (MiB)",
+    "maxBodySizeMib": "Max body size",
+    "maxBodySizeMibUnit": "MiB",
     "memoryBodyLimitHelp": "Must not exceed the request body limit.",
     "message": "Message",
     "method": "Method",
@@ -4868,7 +5023,8 @@
     "pluginRegistryRemove": "Remove {name}",
     "pluginRegistryAddOfficial": "Add the OWASP registry",
     "pluginRegistryNone": "No registries are configured, so no plugins are listed.",
-    "pluginRegistryInterval": "Check every (hours)",
+    "pluginRegistryInterval": "Check every",
+    "pluginRegistryIntervalUnit": "hours",
     "pluginRegistryIntervalHelp": "How often the registries are re-read and each plugin's latest release checked. 0 checks only when you ask.",
     "pluginRegistryToken": "GitHub token",
     "pluginRegistryTokenHelp": "Optional. Without one GitHub allows 60 API requests an hour, which a first check of a large registry can use up; with one, 5,000. It needs no scopes, and is sent only to api.github.com.",
@@ -4946,6 +5102,13 @@
       "expiry": "The link works once, within {minutes} minutes.",
       "ignore": "If it was not you, ignore this message. Your password has not changed."
     },
+    "accountDisabled": {
+      "subject": "Your {appName} account has been disabled",
+      "intro": "The account {email} on {appName} has been disabled. You cannot sign in with it until an administrator enables it again.",
+      "byAdministrator": "An administrator disabled it.",
+      "byFailedSignIns": "It was disabled after {failures} failed sign-ins in a row. If those were not you, someone may be guessing your password; tell an administrator.",
+      "nothingElse": "This is the only message this account will receive while it is disabled."
+    },
     "invite": {
       "subject": "You have been invited to {appName}",
       "intro": "{inviter} created an account for {email} on {appName}.",
@@ -4969,6 +5132,7 @@
       "intro": "{count, plural, one {Something happened} other {# things happened}} on {appName} that an administrator should know about:",
       "item": "{time}: {text}",
       "withDetail": "{text} ({detail})",
+      "pushMore": "…and {count} more",
       "action": "Open the dashboard",
       "manage": "Sent to the notification recipients, or every active administrator when none are set. Choose what is sent under Settings → Email → Notifications.",
       "kinds": {

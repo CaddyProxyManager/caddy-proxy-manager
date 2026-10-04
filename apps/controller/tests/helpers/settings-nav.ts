@@ -24,8 +24,8 @@ export async function goToSettingsSection(
 }
 
 /**
- * The save bar's button, present only while something is unsaved. By test id because the
- * favicon card keeps a Save of its own.
+ * The save bar's button, present only while something is unsaved. By test id because some cards
+ * (Dashboard Host, Email) keep a Save of their own.
  */
 export function pageSave(page: Page) {
   return page.getByTestId('settings-page-save');
@@ -90,6 +90,9 @@ const SETTING_PAGES: Record<string, string> = {
 export async function goToSetting(page: Page, name: string): Promise<void> {
   const pageName = SETTING_PAGES[name] ?? name;
   await goToSettingsSection(page, pageName);
+  // The rail click re-fetches the page; an edit made before that lands is reset with the form,
+  // and a late response for the page it left can switch the view back to it.
+  await page.waitForLoadState('networkidle');
   if (pageName === name) return;
   const heading = page.getByRole('heading', { level: 2, name, exact: true });
   await expect(heading).toBeVisible({ timeout: 10_000 });

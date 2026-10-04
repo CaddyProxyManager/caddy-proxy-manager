@@ -1,7 +1,7 @@
 /**
- * Emails the administrators about what happened while nobody was looking. Callers report events;
- * this decides whether each is wanted (its Settings switch, email being set up), deduplicates it,
- * and batches a minute's worth into one email. It never throws into a caller: a notification is
+ * Tells the administrators what happened while nobody was looking, by email and browser push.
+ * Callers report events; this decides whether each is wanted (its Settings switch, a channel being
+ * set up), deduplicates it, and batches a minute's worth into one email and one push. It never throws into a caller: a notification is
  * never worth failing the sign-in, the apply or the agent report it came from.
  *
  * State is one JSON row in `settings`, like the certificate alerts', so a restart neither repeats
@@ -10,12 +10,17 @@
 
 import { randomUUID } from "node:crypto";
 import { isDemoMode } from "../demo-mode";
-import { alertRecipients } from "../email/certificate-alerts";
 import { emailReady } from "../email/config";
 import { sendEmail } from "../email/transport";
+import { hasAdminPushTarget } from "../models/push-subscriptions";
 import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
-import { categoryOf, type NotificationCategory, type NotificationEvent } from "./events";
+import {
+  categoryOf,
+  NOTIFICATION_CATEGORIES,
+  type NotificationCategory,
+  type NotificationEvent,
+} from "./events";
 import {
   EMPTY_STATE,
   type NotificationState,
@@ -24,6 +29,8 @@ import {
   planDropped,
   planFailure,
   planNotice,
+  planDelivered,
+  type PendingNotice,
   planRaise,
   planResolve,
   planSendFailed,
@@ -67,14 +74,9 @@ async function update(
 }
 
 /** Whether this category's switch is on. Imported lazily, as the registry reads env on load. */
-export async function notificationCategoryEnabled(
-  category: NotificationCategory,
-): Promise<boolean> {
-  const [registry, { getSetting }] = await Promise.all([
-    import("../settings/registry"),
-    import("../settings/resolve"),
-  ]);
-  const switches: Record<NotificationCategory, typeof registry.notifyAccountDisabled> = {
+async function categorySwitches() {
+  const registry = await import("../settings/registry");
+  return {
     accountDisabled: registry.notifyAccountDisabled,
     adminLocked: registry.notifyAdminLocked,
     adminAdded: registry.notifyAdminAdded,
@@ -85,16 +87,50 @@ export async function notificationCategoryEnabled(
     geoip: registry.notifyGeoipFailed,
     crsPlugin: registry.notifyCrsPluginDisabled,
     updateAvailable: registry.notifyUpdateAvailable,
-  };
+  } satisfies Record<NotificationCategory, typeof registry.notifyAccountDisabled>;
+}
+
+export async function notificationCategoryEnabled(
+  category: NotificationCategory,
+): Promise<boolean> {
+  const [switches, { getSetting }] = await Promise.all([
+    categorySwitches(),
+    import("../settings/resolve"),
+  ]);
   return getSetting(switches[category]);
 }
 
-/** Wanted at all: with email off nothing is queued, so nothing floods out once it is set up. */
+/** Each category with its Settings switch, for a page that labels it the way Settings does. */
+export async function notificationCategoryStates(): Promise<
+  { category: NotificationCategory; settingKey: string; enabled: boolean }[]
+> {
+  const [switches, { getSetting }] = await Promise.all([
+    categorySwitches(),
+    import("../settings/resolve"),
+  ]);
+  return Promise.all(
+    NOTIFICATION_CATEGORIES.map(async (category) => ({
+      category,
+      settingKey: switches[category].key,
+      enabled: await getSetting(switches[category]),
+    })),
+  );
+}
+
+/**
+ * Wanted at all: with neither email nor a subscribed browser nothing is queued, so nothing floods
+ * out once one is set up.
+ */
 async function wanted(event: NotificationEvent): Promise<boolean> {
   if (isDemoMode()) return false;
   const category = categoryOf(event);
   if (category && !(await notificationCategoryEnabled(category))) return false;
-  return emailReady();
+  return notificationChannelReady();
+}
+
+/** Email set up, or an administrator's browser subscribed: either can carry a notification. */
+export async function notificationChannelReady(): Promise<boolean> {
+  return (await emailReady()) || (await hasAdminPushTarget());
 }
 
 function quietly(what: string, work: () => Promise<unknown>): Promise<void> {
@@ -195,11 +231,15 @@ async function flush(now: number): Promise<void> {
   if (batch.length === 0) return;
 
   const ready = await emailReady();
+  const { notificationAudiences, audienceWants } = await import("./audience");
+  const audiences = await notificationAudiences({ email: ready });
   const keep: typeof batch = [];
   const drop: string[] = [];
   for (const notice of batch) {
     const category = categoryOf(notice.event);
-    const on = ready && (!category || (await notificationCategoryEnabled(category)));
+    const on =
+      (ready || audiences.length > 0) &&
+      (!category || (await notificationCategoryEnabled(category)));
     if (on) keep.push(notice);
     else drop.push(notice.id);
   }
@@ -207,9 +247,7 @@ async function flush(now: number): Promise<void> {
     await update((state) => planDropped(state, drop, now, null));
     return;
   }
-
-  const recipients = await alertRecipients();
-  if (recipients.length === 0) {
+  if (audiences.length === 0) {
     await update((state) =>
       planDropped(
         state,
@@ -221,31 +259,84 @@ async function flush(now: number): Promise<void> {
     return;
   }
 
-  try {
-    const { notificationEmail } = await import("./email");
-    await sendEmail(await notificationEmail({ to: recipients, notices: keep }));
-    await update((state) =>
-      planDropped(
-        planSent(
-          state,
-          keep.map((notice) => notice.id),
-          now,
-        ),
-        drop,
-        now,
-        null,
-      ),
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[notifications] send failed; retrying later:", message);
-    await update((state) => planDropped(planSendFailed(state, message, now), drop, now, null));
+  const owed = (key: string, wants: (category: ReturnType<typeof categoryOf>) => boolean) =>
+    keep.filter((notice) => !notice.delivered?.includes(key) && wants(categoryOf(notice.event)));
+  const reached = new Map<string, string[]>();
+  const mark = (notices: readonly PendingNotice[], keys: readonly string[]) => {
+    for (const notice of notices)
+      reached.set(notice.id, [...(reached.get(notice.id) ?? []), ...keys]);
+  };
+
+  // Once each: a failed email is retried, a push is not worth repeating.
+  // In parallel: each waits on push services; one shared cache renders each payload once.
+  const { sendPush } = await import("./push");
+  const payloads = new Map<string, string>();
+  await Promise.all(
+    audiences.map(async (audience) => {
+      if (audience.kind !== "push") return;
+      const notices = owed(audience.key, (category) => audienceWants(audience, category));
+      if (notices.length === 0) return;
+      await sendPush(notices, audience.targets, payloads);
+      mark(notices, [audience.key]);
+    }),
+  );
+
+  // One email per distinct set of notices, so muting a category costs no one else their copy.
+  const emails = new Map<string, { notices: PendingNotice[]; to: string[]; keys: string[] }>();
+  for (const audience of audiences) {
+    if (audience.kind !== "email") continue;
+    const notices = owed(audience.key, (category) => audienceWants(audience, category));
+    if (notices.length === 0) continue;
+    const signature = notices.map((notice) => notice.id).join(",");
+    const email = emails.get(signature) ?? { notices, to: [], keys: [] };
+    email.to.push(audience.address);
+    email.keys.push(audience.key);
+    emails.set(signature, email);
   }
+  let failure: string | null = null;
+  if (emails.size > 0) {
+    const { notificationEmail } = await import("./email");
+    for (const email of emails.values()) {
+      try {
+        await sendEmail(await notificationEmail({ to: email.to, notices: email.notices }));
+        mark(email.notices, email.keys);
+      } catch (error) {
+        failure = error instanceof Error ? error.message : String(error);
+      }
+    }
+  }
+
+  if (failure !== null) {
+    const message = failure;
+    console.error("[notifications] send failed; retrying later:", message);
+    await update((state) =>
+      planDropped(planSendFailed(planDelivered(state, reached), message, now), drop, now, null),
+    );
+    return;
+  }
+  await update((state) =>
+    planDropped(
+      planSent(
+        state,
+        keep.map((notice) => notice.id),
+        now,
+      ),
+      drop,
+      now,
+      null,
+    ),
+  );
 }
 
-/** Straight away, to the notification recipients; throws so Settings can say why it failed. */
+/**
+ * Straight away, by email to everyone notifications are emailed to; throws so Settings can say
+ * why it failed.
+ */
 export async function sendTestNotification(now = Date.now()): Promise<string[]> {
-  const recipients = await alertRecipients();
+  const { notificationAudiences } = await import("./audience");
+  const recipients = (await notificationAudiences({ email: true })).flatMap((audience) =>
+    audience.kind === "email" ? [audience.address] : [],
+  );
   if (recipients.length === 0) return [];
   const { notificationEmail } = await import("./email");
   await sendEmail(

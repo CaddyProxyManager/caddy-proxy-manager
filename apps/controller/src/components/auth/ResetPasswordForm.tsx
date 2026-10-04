@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRound } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -172,6 +173,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                     hidden
                   />
                   <TextInput
+                    startIcon={KeyRound}
                     {...AUTOFILL_NEW_PASSWORD}
                     label={t("auth.passwordChange.newPassword")}
                     type="password"
@@ -182,6 +184,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                     width="100%"
                   />
                   <TextInput
+                    startIcon={KeyRound}
                     {...AUTOFILL_NEW_PASSWORD}
                     label={t("auth.passwordChange.confirmPassword")}
                     type="password"

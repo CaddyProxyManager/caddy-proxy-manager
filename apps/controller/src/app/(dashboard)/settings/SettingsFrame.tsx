@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Every settings screen's frame. The sticky header names the page, the live revision and the apply
- * control, which therefore never moves with the scroll.
+ * Every settings screen's frame. The sticky header names the page; the live revision and the apply
+ * control go to the rail (the header on a phone), so neither moves with the scroll.
  */
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -16,6 +18,8 @@ import {
   groupForSection,
   settingsGroupLabel,
   settingsSectionName,
+  HEADER_HEIGHT_VAR,
+  STAGED_SLOT_ID,
 } from "./sections";
 import { RevisionPill, StagedControls } from "./StagedChanges";
 
@@ -68,6 +72,34 @@ export default function SettingsFrame({
   );
 }
 
+/** As the dashboard layout decides it: below this there is no rail, only the tab bar. */
+const NARROW = "(max-width: 767px)";
+
+/**
+ * The revision and the staged change set's controls, in the rail beside History on a desktop.
+ * A phone has no rail, so there they stay in the header.
+ */
+function StagedSummary({ staged }: { staged: StagedView }) {
+  const isNarrow = useMediaQuery(NARROW);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setSlot(document.getElementById(STAGED_SLOT_ID)), []);
+
+  const controls = (
+    <VStack gap={2} hAlign="start">
+      <RevisionPill staged={staged} inRail />
+      <StagedControls view={staged} fill />
+    </VStack>
+  );
+  if (slot && !isNarrow) return createPortal(controls, slot);
+  if (!isNarrow) return null;
+  return (
+    <HStack gap={2} vAlign="center" style={{ flexShrink: 0 }}>
+      <RevisionPill staged={staged} />
+      <StagedControls view={staged} />
+    </HStack>
+  );
+}
+
 function SettingsHeader({
   sectionId,
   title,
@@ -83,9 +115,33 @@ function SettingsHeader({
   const tNav = useTranslations("nav");
   const item = sectionId ? findSettingsItem(sectionId) : undefined;
   const group = sectionId ? groupForSection(sectionId) : undefined;
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Blocks clear the header by its real height, which wraps with the title and the controls.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const root = document.documentElement;
+    const publish = () =>
+      root.style.setProperty(HEADER_HEIGHT_VAR, `${header.getBoundingClientRect().height}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(header);
+    // A link into a block (the overview's tiles) may land before this ran: align it again.
+    const target = window.location.hash
+      ? document.getElementById(decodeURIComponent(window.location.hash.slice(1)))
+      : null;
+    const frame = target ? requestAnimationFrame(() => target.scrollIntoView()) : 0;
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      root.style.removeProperty(HEADER_HEIGHT_VAR);
+    };
+  }, []);
 
   return (
     <div
+      ref={headerRef}
       style={{
         flexShrink: 0,
         // Sticky, not fixed: it scrolls away where a narrow viewport cannot spare the room.
@@ -117,10 +173,7 @@ function SettingsHeader({
             </Heading>
           </VStack>
 
-          <HStack gap={2} vAlign="center" style={{ flexShrink: 0 }}>
-            <RevisionPill staged={staged} />
-            <StagedControls view={staged} />
-          </HStack>
+          <StagedSummary staged={staged} />
         </HStack>
       </Measure>
     </div>

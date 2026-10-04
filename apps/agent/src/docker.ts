@@ -11,6 +11,7 @@ import {
   isValidL4PortMapping,
   isValidModuleSpec,
   MANAGED_SERVICE_ENV_KEYS,
+  MANAGED_SERVICES,
   type ManagedServiceName,
   type ManagedServicesRequest,
 } from "@cpm/shared";
@@ -430,8 +431,30 @@ export class DockerHost {
   async stopService(
     service: ManagedServiceName,
     env: Record<string, string> = {},
+    timeoutSeconds = 120,
   ): Promise<CommandResult> {
-    return this.compose(["--profile", service, "stop", service], { timeoutSeconds: 120, env });
+    return this.compose(["--profile", service, "stop", service], { timeoutSeconds, env });
+  }
+
+  /**
+   * Restarts the container a shutdown stopped, never `up`: without the controller's env, compose
+   * would see a changed config and recreate it with placeholder credentials.
+   */
+  async resumeService(service: ManagedServiceName): Promise<CommandResult> {
+    return this.compose(["--profile", service, "start", service], {
+      timeoutSeconds: this.config.serviceTimeoutSeconds,
+    });
+  }
+
+  /** Each managed service compose reports running. Profiles named, or `ps` skips them. */
+  async runningServices(): Promise<ManagedServiceName[]> {
+    const profiles = MANAGED_SERVICES.flatMap((name) => ["--profile", name]);
+    const result = await this.compose([...profiles, "ps", "--services", "--status", "running"], {
+      timeoutSeconds: 15,
+    });
+    if (!result.ok) return [];
+    const listed = new Set(result.output.split("\n").map((line) => line.trim()));
+    return MANAGED_SERVICES.filter((name) => listed.has(name));
   }
 
   /**

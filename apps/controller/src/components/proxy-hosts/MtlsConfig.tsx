@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { LockKeyhole, Plus, Pencil, Trash2, Ban } from "lucide-react";
+import { Ban, LockKeyhole, Pencil, Plus, Route, Trash2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -476,6 +476,7 @@ function RuleDialog({
 
         <HStack gap={3} vAlign="start">
           <TextInput
+            startIcon={Route}
             label={t("pathPattern")}
             value={pathPattern}
             onChange={setPathPattern}
@@ -483,6 +484,7 @@ function RuleDialog({
             description={t("mtlsPathPatternHelp")}
           />
           <NumberInput
+            hasNumberSteppers
             label={t("priority")}
             value={priority}
             onChange={setPriority}

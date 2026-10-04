@@ -1,5 +1,6 @@
 "use client";
 
+import { Link } from "lucide-react";
 import { useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { Text } from "@astryxdesign/core/Text";
@@ -40,6 +41,7 @@ export function AnubisFields({ anubis }: { anubis?: HostAnubisConfig | null }) {
           />
         </HStack>
         <TextInput
+          startIcon={Link}
           {...NO_SPELLCHECK}
           label={t("anubisUpstream")}
           isRequired={enabled}

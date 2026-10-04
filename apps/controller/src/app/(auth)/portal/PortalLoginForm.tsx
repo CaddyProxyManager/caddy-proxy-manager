@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { KeyRound, Shield } from "lucide-react";
+import { KeyRound, Shield, User } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -386,6 +386,7 @@ export default function PortalLoginForm({
               ) : (
                 <>
                   <TextInput
+                    startIcon={User}
                     {...AUTOFILL_USERNAME_WEBAUTHN}
                     label={t("username")}
                     htmlName="username"
@@ -409,6 +410,7 @@ export default function PortalLoginForm({
               )}
               <div hidden={!onPasswordStep}>
                 <TextInput
+                  startIcon={KeyRound}
                   {...AUTOFILL_CURRENT_PASSWORD}
                   ref={passwordRef}
                   label={t("password")}

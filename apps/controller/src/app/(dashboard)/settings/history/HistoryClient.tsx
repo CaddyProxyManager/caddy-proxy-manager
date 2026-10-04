@@ -80,6 +80,7 @@ export default function HistoryClient(props: Props) {
                     key={revision.id}
                     revision={revision}
                     latest={latest}
+                    demoMode={props.staged.demoMode}
                     isSelected={selection?.to === revision.id}
                     // Only `to`: the server finds the revision before it, which the capped id list
                     // may not hold for an old page.
@@ -119,11 +120,14 @@ export default function HistoryClient(props: Props) {
 function RevisionListRow({
   revision,
   latest,
+  demoMode,
   isSelected,
   onView,
 }: {
   revision: RevisionRow;
   latest: number;
+  /** Every apply fails without a Caddy, so the demo labels it as itself rather than an error. */
+  demoMode: boolean;
   isSelected: boolean;
   onView: () => void;
 }) {
@@ -157,7 +161,11 @@ function RevisionListRow({
           {revision.id === latest && <Badge variant="success" label={t("history.current")} />}
           {revision.outcome === "failed" && (
             <Tooltip content={revision.error ?? ""}>
-              <Badge variant="error" label={t("history.failed")} />
+              {demoMode ? (
+                <Badge variant="neutral" className="cpm-demo-badge" label={t("revisionDemo")} />
+              ) : (
+                <Badge variant="error" label={t("history.failed")} />
+              )}
             </Tooltip>
           )}
           {!revision.recorded && (

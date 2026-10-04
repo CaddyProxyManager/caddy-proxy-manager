@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MinusCircle, Plus } from "lucide-react";
+import { MinusCircle, Network, Plus } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -103,6 +103,7 @@ export function UpstreamInput({
               onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
             />
             <TextInput
+              startIcon={Network}
               {...NO_SPELLCHECK}
               label={t("upstreamLabel", { index: index + 1 })}
               isLabelHidden

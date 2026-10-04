@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarDays, EthernetPort, Globe, KeyRound, Mail, User } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -65,6 +66,7 @@ export function EmailServerSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("host")} env={["SMTP_HOST"]}>
             <TextInput
+              startIcon={Globe}
               {...AUTOFILL_OFF}
               label={t("host")}
               description={t("hostHelp")}
@@ -94,6 +96,8 @@ export function EmailServerSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("port")} env={["SMTP_PORT"]}>
             <NumberInput
+              startIcon={EthernetPort}
+              hasNumberSteppers
               label={t("port")}
               htmlName="smtpPort"
               value={port}
@@ -105,6 +109,7 @@ export function EmailServerSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("username")} env={["SMTP_USERNAME"]}>
             <TextInput
+              startIcon={User}
               {...AUTOFILL_OFF}
               label={t("username")}
               description={t("usernameHelp")}
@@ -116,6 +121,7 @@ export function EmailServerSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("password")} env={["SMTP_PASSWORD"]}>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
               label={t("password")}
               type="password"
@@ -213,6 +219,7 @@ export function NotificationsSection({
           )}
           <EnvLabelledField label={t("alertRecipients")} env={["EMAIL_ALERT_RECIPIENTS"]}>
             <TextInput
+              startIcon={Mail}
               {...AUTOFILL_OFF}
               label={t("alertRecipients")}
               description={t("alertRecipientsHelp")}
@@ -225,6 +232,9 @@ export function NotificationsSection({
           </EnvLabelledField>
           <EnvLabelledField label={t("alertDays")} env={["CERTIFICATE_EXPIRY_ALERT_DAYS"]}>
             <NumberInput
+              startIcon={CalendarDays}
+              hasNumberSteppers
+              units={t("alertDaysUnit")}
               label={t("alertDays")}
               description={t("alertDaysHelp")}
               htmlName="alertDays"
@@ -282,18 +292,6 @@ export function NotificationsSection({
       </form>
       <TestNotificationForm ready={email.status === "ready"} />
     </FormCard>
-  );
-}
-
-/** A warning above the switches, while upstream errors are on with nothing to count them from. */
-export function UpstreamAccessLogWarning({ email }: { email: EmailSettingsView }) {
-  const t = useTranslations("settings.email");
-  const { notifications } = email;
-  if (!notifications.upstreamErrorsOn || notifications.accessLogOn) return null;
-  return (
-    <WarnAlert title={t("upstreamNeedsAccessLogTitle")}>
-      {t("upstreamNeedsAccessLogBody")}
-    </WarnAlert>
   );
 }
 

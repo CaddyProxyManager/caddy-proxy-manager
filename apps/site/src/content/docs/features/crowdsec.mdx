@@ -24,9 +24,8 @@ opt-in module, not in the default image.
 
 ## Managed
 
-Managed mode needs the `crowdsec` service in your `docker-compose.yml`. The release's default
-`-deploy.tar.gz` leaves it out; deploy from `-deploy-crowdsec.tar.gz` instead, unpacked over the
-same directory.
+Managed mode needs the `crowdsec` service in your `docker-compose.yml`. The release archive
+includes it, behind its Compose profile, so it does not run until you turn managed mode on.
 
 <Steps>
 

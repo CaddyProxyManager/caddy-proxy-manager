@@ -71,10 +71,12 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
   {
     id: "caddy-blocker",
     name: "Request Blocker",
+    // The repository moved to ingres-si, but its go.mod still declares this path, and saved
+    // Caddy Build settings are keyed by it.
     modulePath: "github.com/fuomag9/caddy-blocker-plugin",
     description:
       "Country, continent, ASN, and CIDR blocking. Required by global geoblocking and by per-host geoblock rules.",
-    docsUrl: "https://github.com/fuomag9/caddy-blocker-plugin",
+    docsUrl: "https://github.com/ingres-si/caddy-blocker-plugin",
     category: "security",
     features: ["geoblock"],
   },
@@ -93,7 +95,7 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     name: "Rate Limit",
     modulePath: "github.com/mholt/caddy-ratelimit",
     description:
-      "Sliding-window request limits per client. Required by a proxy host's Rate limiting option. Not in the default image: enable it here and rebuild.",
+      "Sliding-window request limits per client. Required by a proxy host's Rate limiting option.",
     docsUrl: "https://github.com/mholt/caddy-ratelimit",
     category: "security",
     features: ["ratelimit"],
@@ -106,7 +108,7 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     name: "CrowdSec",
     modulePath: "github.com/hslatman/caddy-crowdsec-bouncer",
     description:
-      "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings. Not in the default image: enable it here and rebuild.",
+      "A CrowdSec bouncer: refuses clients your CrowdSec Local API has banned, on proxy hosts and L4 hosts, with optional AppSec. Required by the CrowdSec settings.",
     docsUrl: "https://github.com/hslatman/caddy-crowdsec-bouncer",
     category: "security",
     features: ["crowdsec"],
@@ -117,7 +119,7 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     name: "HTTP Cache",
     modulePath: "github.com/caddyserver/cache-handler",
     description:
-      "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option. Not in the default image: enable it here and rebuild.",
+      "A shared HTTP cache (Souin) in front of upstreams. Enables the Caddy cache mode of a proxy host's Cache assets option.",
     docsUrl: "https://github.com/caddyserver/cache-handler",
     category: "cache",
     features: ["cache"],
@@ -208,7 +210,20 @@ export const DEFAULT_ENABLED_MODULE_IDS: string[] = CADDY_MODULES.filter(
 
 // ─── Custom modules ──────────────────────────────────────────────────────────
 
+export const CUSTOM_MODULE_NAME_MAX = 80;
+
+// Local, not settings-validation's: this module ships to the browser and that one imports node APIs.
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
 export type CaddyCustomModule = {
+  /** A label for the settings list only; never part of the build. */
+  name?: string;
   modulePath: string;
   /** Passed as `--with path@version`. */
   version?: string;
@@ -237,6 +252,16 @@ export function customModuleProblem(entry: CaddyCustomModule): DomainError | nul
   }
   if (!path.includes("/")) {
     return domainError("customModulePathMissingHost", { path }, { status: 400 });
+  }
+  if (entry.name !== undefined) {
+    const name = entry.name.trim();
+    if (name.length > CUSTOM_MODULE_NAME_MAX || hasControlCharacter(name)) {
+      return domainError(
+        "customModuleNameInvalid",
+        { max: CUSTOM_MODULE_NAME_MAX },
+        { status: 400 },
+      );
+    }
   }
   if (entry.version) {
     const version = entry.version.trim();

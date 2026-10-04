@@ -30,11 +30,12 @@ import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
 import {
+  Bell,
   Key,
   KeyRound,
   Link,
-  LogIn,
   Lock,
+  LogIn,
   LogOut,
   Monitor,
   Plus,
@@ -47,6 +48,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { TwoFactorSection } from "./TwoFactorSection";
 import { PasskeySection } from "./PasskeySection";
+import { type DeviceWords, describeDevice } from "./device";
+import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import type { PasskeySummary } from "@/src/lib/passkeys";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
@@ -67,38 +70,6 @@ interface ActiveSession {
   ipAddress: string | null;
   userAgent: string | null;
   current: boolean;
-}
-
-type DeviceWords = {
-  unknown: string;
-  browser: string;
-  onOs: (browser: string, os: string) => string;
-};
-
-/** Only the prose words are passed in; browser and OS names are the same in every language. */
-function describeDevice(ua: string | null, words: DeviceWords): string {
-  if (!ua) return words.unknown;
-  const browser = /Edg\//.test(ua)
-    ? "Edge"
-    : /Chrome\//.test(ua)
-      ? "Chrome"
-      : /Firefox\//.test(ua)
-        ? "Firefox"
-        : /Safari\//.test(ua)
-          ? "Safari"
-          : words.browser;
-  const os = /Windows/.test(ua)
-    ? "Windows"
-    : /Mac OS X|Macintosh/.test(ua)
-      ? "macOS"
-      : /Android/.test(ua)
-        ? "Android"
-        : /iPhone|iPad|iOS/.test(ua)
-          ? "iOS"
-          : /Linux/.test(ua)
-            ? "Linux"
-            : "";
-  return os ? words.onOs(browser, os) : browser;
 }
 
 interface UserData {
@@ -136,6 +107,8 @@ interface ProfileClientProps {
   directories?: Array<{ id: string; name: string }>;
   /** The directory whose password this account signs in with, when it has none of its own. */
   managedByDirectory?: string | null;
+  /** An administrator's notification choices; null for everyone else, who is never notified. */
+  notifications?: NotificationsSectionProps | null;
 }
 
 function ProfileSection({
@@ -230,6 +203,7 @@ export default function ProfileClient({
   passkeyRpId = null,
   directories = [],
   managedByDirectory = null,
+  notifications = null,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
@@ -612,6 +586,12 @@ export default function ProfileClient({
 
         <DisplaySection onError={setError} />
 
+        {notifications && (
+          <ProfileSection icon={Bell} title={t("notifications.title")}>
+            <NotificationsSection {...notifications} />
+          </ProfileSection>
+        )}
+
         {localPasswordsEnabled && (
           <ProfileSection icon={Lock} title={t("passwordManagement")}>
             {passwordLocked ? (
@@ -956,6 +936,7 @@ export default function ProfileClient({
         <VStack gap={3}>
           {hasPassword && (
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_CURRENT_PASSWORD}
               label={t("currentPassword")}
               type="password"
@@ -975,6 +956,7 @@ export default function ProfileClient({
             description={passwordPolicyHint(tRoot)}
           />
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_NEW_PASSWORD}
             label={t("confirmNewPassword")}
             type="password"
@@ -1001,6 +983,7 @@ export default function ProfileClient({
             {t("unlinkOauthConfirm", { providers: linkedNames.join(", ") })}
           </Text>
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
             label={t("currentPassword")}
             type="password"
@@ -1028,6 +1011,7 @@ export default function ProfileClient({
             {t("removePasswordDescription", { providers: otherSignInMethods.join(", ") })}
           </Text>
           <TextInput
+            startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
             label={t("currentPassword")}
             type="password"

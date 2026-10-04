@@ -6,7 +6,8 @@ import { useEffect, useRef, type RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronRight, LayoutGrid, SlidersHorizontal } from "lucide-react";
 import { type Destination, MORE_DRAWER_SLOTS } from "@/src/lib/nav/destinations";
-import { DESTINATION_ICONS } from "./nav-icons";
+import { ACCENTS } from "@/src/components/ui/accent";
+import { DESTINATION_HUES, DESTINATION_ICONS } from "./nav-icons";
 
 /**
  * Not Astryx's modal BottomSheet: a modal makes the tab bar inert, so a second tap on More could
@@ -76,7 +77,12 @@ export function MoreDrawer({
                 aria-current={isCurrent ? "page" : undefined}
                 onClick={onClose}
               >
-                <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+                <Icon
+                  size={22}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                  className={ACCENTS[DESTINATION_HUES[item.id]].text}
+                />
                 <span className="cpm-tile-label">{t(item.labelKey)}</span>
               </Link>
             );

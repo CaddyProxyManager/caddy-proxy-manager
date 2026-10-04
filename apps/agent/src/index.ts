@@ -278,10 +278,14 @@ function shutdown(signal: string, options: { stopCaddy: boolean } = { stopCaddy:
   shuttingDown = true;
   console.log(`[agent] ${signal} received, shutting down`);
   lifecycle.stop();
-  // Caddy goes down with its agent rather than serving a config nothing here can change.
+  // Caddy goes down with its agent rather than serving a config nothing here can change, and the
+  // managed services with it, in parallel to fit the grace period.
   void (
     options.stopCaddy
-      ? lifecycle.stopCaddyForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS)
+      ? Promise.all([
+          lifecycle.stopCaddyForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS),
+          lifecycle.stopServicesForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS),
+        ])
       : Promise.resolve()
   )
     .then(() => stopAnalytics())

@@ -23,6 +23,7 @@ import {
   type LogReadRequest,
   type LogReadResponse,
   MANAGED_SERVICES,
+  type ManagedServiceName,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
   sameL4PortSet,
@@ -50,7 +51,7 @@ import {
   normalizePairingCode,
 } from "./controller-url";
 import type { AgentStore } from "./db";
-import { type DockerHost, managedServicesEnvFingerprint, tail } from "./docker";
+import { composeEnv, type DockerHost, managedServicesEnvFingerprint, tail } from "./docker";
 import { listCaddyCertificates, readCaddyCertificate } from "./certificates";
 import {
   CertificateFilePoller,
@@ -103,6 +104,8 @@ export class AgentLifecycle {
   private retryQueued = false;
   /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
   private caddyRestore: Promise<void> | null = null;
+  /** The same for the managed services; awaited before a frame may stop them. */
+  private servicesRestore: Promise<void> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   /** Resolved by the next config load forwarded to Caddy; see `nextConfigLoad`. */
   private configLoadWaiters: (() => void)[] = [];
@@ -133,6 +136,11 @@ export class AgentLifecycle {
     // Cleared at once: it describes the last shutdown, and only this start acts on it.
     const restoreCaddy = this.deps.store.caddyStoppedForShutdown();
     this.deps.store.setCaddyStoppedForShutdown(false);
+    const restoreServices = this.deps.store.servicesStoppedForShutdown();
+    this.deps.store.setServicesStoppedForShutdown([]);
+    if (restoreServices.length > 0) {
+      this.servicesRestore = this.restoreServices(restoreServices);
+    }
 
     if (storedUrl && storedController) {
       // Also on resume, so a pairing stored before public plain http was refused stops using it.
@@ -310,6 +318,68 @@ export class AgentLifecycle {
       }
     } catch (error) {
       console.error("[agent] could not stop Caddy:", error);
+    }
+  }
+
+  /**
+   * The managed services too: `docker compose down` skips them behind their profiles, so stopping
+   * them here is what takes them down with the stack. Only those this agent started, which only
+   * the controller's own agent does. Bounded and never throws, as above.
+   */
+  async stopServicesForShutdown(timeoutSeconds: number): Promise<void> {
+    try {
+      const applied = this.deps.store.appliedManagedServices();
+      if (!applied || !MANAGED_SERVICES.some((name) => applied[name])) return;
+      const running = (await this.deps.docker.runningServices()).filter((name) => applied[name]);
+      if (running.length === 0) return;
+      console.log(`[agent] stopping ${running.join(" and ")} before shutting down`);
+      let env: Record<string, string> = {};
+      try {
+        env = composeEnv(this.desired?.services.env);
+      } catch {
+        // A value compose cannot take only matters to `up`; `stop` still works without it.
+      }
+      const stopped: ManagedServiceName[] = [];
+      await Promise.all(
+        running.map(async (name) => {
+          const result = await this.deps.docker.stopService(name, env, timeoutSeconds);
+          if (result.ok) stopped.push(name);
+          else console.error(`[agent] could not stop ${name}: ${tail(result.output, 3)}`);
+        }),
+      );
+      this.deps.store.setServicesStoppedForShutdown(stopped);
+    } catch (error) {
+      console.error("[agent] could not stop the managed services:", error);
+    }
+  }
+
+  /**
+   * Whatever is unpaired: these were running before the shutdown and nothing else will start them.
+   * A failed start is marked unapplied, so the controller's next frame recreates it with its env.
+   */
+  private async restoreServices(services: ManagedServiceName[]): Promise<void> {
+    // Only names this agent manages, read back from its own store; in parallel, since the first
+    // desired state waits on this.
+    const known = services.filter((name) => MANAGED_SERVICES.includes(name));
+    const failed = await Promise.all(
+      known.map(async (name) => {
+        console.log(`[agent] starting ${name} again`);
+        const result = await this.deps.docker.resumeService(name).catch((error: unknown) => ({
+          ok: false,
+          output: String(error),
+        }));
+        if (result.ok) return null;
+        console.error(`[agent] could not start ${name}: ${tail(result.output, 3)}`);
+        return name;
+      }),
+    );
+    const applied = this.deps.store.appliedManagedServices();
+    const marked = failed.filter((name): name is ManagedServiceName => name !== null);
+    if (applied && marked.length > 0) {
+      this.deps.store.setAppliedManagedServices({
+        ...applied,
+        ...Object.fromEntries(marked.map((name) => [name, false])),
+      });
     }
   }
 
@@ -522,6 +592,10 @@ export class AgentLifecycle {
     if (this.caddyRestore) {
       await this.caddyRestore;
       this.caddyRestore = null;
+    }
+    if (this.servicesRestore) {
+      await this.servicesRestore;
+      this.servicesRestore = null;
     }
     this.desired = state;
     const { store, operations } = this.deps;

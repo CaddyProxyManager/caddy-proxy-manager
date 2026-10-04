@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus, MinusCircle } from "lucide-react";
+import { MinusCircle, Network, Plus, Route, Trash2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Card } from "@astryxdesign/core/Card";
@@ -160,6 +160,7 @@ export function LocationRulesFields({ initialData = [], accessLists }: Props) {
               <VStack gap={3}>
                 <HStack gap={2} vAlign="end">
                   <TextInput
+                    startIcon={Route}
                     label={t("pathPattern")}
                     size="sm"
                     placeholder="/ws/*"
@@ -195,6 +196,7 @@ export function LocationRulesFields({ initialData = [], accessLists }: Props) {
                           }
                         />
                         <TextInput
+                          startIcon={Network}
                           label={t("upstreamLabel", { index: j + 1 })}
                           isLabelHidden
                           size="sm"

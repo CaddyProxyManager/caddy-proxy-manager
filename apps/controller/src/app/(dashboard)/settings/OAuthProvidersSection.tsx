@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { KeyRound, Link, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -312,7 +312,11 @@ export default function OAuthProvidersSection({
                   {provider.syncGroups && <Badge label={t("groupSync")} />}
                   {!provider.enabled && <Badge variant="warning" label={t("disabled")} />}
                   {isPrimary && provider.enabled && (
-                    <Badge variant="pink" label={t("primaryProvider")} />
+                    <Badge
+                      variant="neutral"
+                      className="cpm-accent-badge"
+                      label={t("primaryProvider")}
+                    />
                   )}
                 </HStack>
                 <HStack gap={2} vAlign="center">
@@ -325,11 +329,11 @@ export default function OAuthProvidersSection({
                     variant="secondary"
                     size="sm"
                     label={isPrimary ? t("clearPrimary") : t("makePrimary")}
-                    // The badge's pink, so the button that sets the primary also shows it.
+                    // The badge's accent, so the button that sets the primary also shows it.
                     icon={
                       <Star
                         fill={isPrimary ? "currentColor" : "none"}
-                        style={isPrimary ? { color: "var(--color-text-pink)" } : undefined}
+                        style={isPrimary ? { color: "var(--cpm-accent-text)" } : undefined}
                       />
                     }
                     isDisabled={!provider.enabled}
@@ -449,6 +453,7 @@ export default function OAuthProvidersSection({
           ) : (
             <VStack gap={2}>
               <TextInput
+                startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
                 label={editingProvider ? t("newClientSecret") : t("secretLabel")}
                 isRequired
@@ -476,6 +481,7 @@ export default function OAuthProvidersSection({
           )}
 
           <TextInput
+            startIcon={Link}
             label={t("issuerUrl")}
             isOptional
             size="sm"
@@ -486,6 +492,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("authorizationUrl")}
             isOptional
             size="sm"
@@ -495,6 +502,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("tokenUrl")}
             isOptional
             size="sm"
@@ -504,6 +512,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
+            startIcon={Link}
             label={t("userinfoUrl")}
             isOptional
             size="sm"

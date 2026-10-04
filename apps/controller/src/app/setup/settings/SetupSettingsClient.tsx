@@ -5,6 +5,7 @@
  * it lives in the older `general` object, and is here because without an ACME contact the first
  * certificate is issued with nobody to warn about its expiry.
  */
+import { Globe } from "lucide-react";
 import { type ComponentProps, type FormEvent, useEffect, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Center } from "@astryxdesign/core/Center";
@@ -231,6 +232,7 @@ export default function SetupSettingsClient({
             <FormCard title={t("defaults")}>
               <VStack gap={3}>
                 <TextInput
+                  startIcon={Globe}
                   // isRequired only marks the field; the native attribute stops an empty post.
                   {...NATIVE_REQUIRED}
                   label={t("defaultDomain")}
@@ -660,7 +662,14 @@ function IdentityProviderCard({
           onChange={set("clientSecret")}
         />
 
-        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">{t("moreOptions")}</Text>}>
+        <Collapsible
+          defaultIsOpen={false}
+          trigger={
+            <Text type="label" size="lg">
+              {t("moreOptions")}
+            </Text>
+          }
+        >
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
               {t("manualEndpointsHelp")}

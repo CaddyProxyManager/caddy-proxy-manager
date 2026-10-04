@@ -30,6 +30,17 @@ export default async function ProfilePage() {
   const session = await requireUser();
   const userId = Number(session.user.id);
 
+  // Only administrators are notified, so only they have anything to choose. Started now, beside
+  // the reads below, rather than after them.
+  const notificationsView =
+    session.user.role === "admin"
+      ? import("@/src/lib/notifications/audience").then(({ notificationProfileView }) =>
+          notificationProfileView({ id: userId, email: session.user.email }),
+        )
+      : Promise.resolve(null);
+  // Awaited below; marked handled now so a failure while the rest load is not reported twice.
+  notificationsView.catch(() => {});
+
   // Everything keys off the session's user id alone, so nothing has to wait for the user row.
   const [
     user,
@@ -69,6 +80,7 @@ export default async function ProfilePage() {
   const managedByDirectory =
     !passwordHash && directoryLink ? (directoryNames.get(directoryLink.providerId) ?? null) : null;
   const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+  const notifications = await notificationsView;
 
   return (
     <ProfileClient
@@ -95,6 +107,7 @@ export default async function ProfilePage() {
       passkeyRpId={passkeyRpId(publicBaseUrl)}
       passwordLocked={isDemoAdmin(userId)}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
+      notifications={notifications}
     />
   );
 }

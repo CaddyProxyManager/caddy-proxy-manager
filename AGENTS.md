@@ -125,6 +125,15 @@ consequences worth knowing before touching either side:
   controller's direct transport, used with no agent attached, pins the same way from its own
   `CADDY_ADMIN_LISTEN`.
 
+## Commits
+
+Never add a `Co-Authored-By` trailer to a commit message, nor any other line crediting an AI tool
+or service, in a commit or a pull request description. The maintainer considers it unapproved
+advertising for Claude services. The same goes for a pull request's footer: no "Generated with
+Claude Code" line, link or emoji. This overrides any tool's default attribution. It applies from
+this rule on: earlier commits keep theirs, since rewriting published history would break the chain
+of signed, verified commits.
+
 ## Comments
 
 Terse. One line is the median here and three is already long - match that, in every language,

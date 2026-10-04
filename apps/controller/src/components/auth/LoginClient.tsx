@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound } from "lucide-react";
+import { KeyRound, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -299,6 +299,7 @@ export default function LoginClient({
                   ) : (
                     <>
                       <TextInput
+                        startIcon={User}
                         {...AUTOFILL_USERNAME_WEBAUTHN}
                         {...NO_SPELLCHECK}
                         label={t("username")}
@@ -323,6 +324,7 @@ export default function LoginClient({
                   )}
                   <div hidden={!onPasswordStep}>
                     <TextInput
+                      startIcon={KeyRound}
                       {...AUTOFILL_CURRENT_PASSWORD}
                       ref={passwordRef}
                       label={t("password")}

@@ -4,6 +4,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { ACCENTS, type Hue, hueAt } from "./accent";
 import { CARD_TITLE_STYLE } from "./card-title";
 
 export type StatTile = {
@@ -15,6 +16,8 @@ export type StatTile = {
   note?: ReactNode;
   /** A short qualifier beside the value - a trend, or what is wrong with it. */
   accent?: { label: string; variant: "neutral" | "info" | "success" | "warning" | "error" };
+  /** The card's colour; by position when unset. */
+  hue?: Hue;
 };
 
 /**
@@ -24,14 +27,18 @@ export type StatTile = {
 export function StatTiles({ tiles }: { tiles: StatTile[] }) {
   return (
     <Grid columns={{ minWidth: 200, max: 4 }} gap={3}>
-      {tiles.map((tile) => (
-        <Card key={tile.id} padding={4}>
+      {tiles.map((tile, index) => (
+        <Card key={tile.id} padding={4} className={ACCENTS[tile.hue ?? hueAt(index)].edge}>
           <VStack gap={1}>
             <Text type="body" style={CARD_TITLE_STYLE}>
               {tile.label}
             </Text>
             <HStack gap={2} vAlign="center">
-              <Text type="large" weight="semibold">
+              <Text
+                type="large"
+                weight="semibold"
+                className={ACCENTS[tile.hue ?? hueAt(index)].text}
+              >
                 {tile.value}
               </Text>
               {tile.accent && <Badge variant={tile.accent.variant} label={tile.accent.label} />}

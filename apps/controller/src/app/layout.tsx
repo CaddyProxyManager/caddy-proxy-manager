@@ -5,6 +5,7 @@ import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
+import { getAccentColor } from "@/src/lib/accent-color";
 import { getAppName } from "@/src/lib/app-name";
 import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/theme-mode";
@@ -44,6 +45,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // provider so the browser formats timestamps in the zone the server just did.
   const timeZone = await getTimeZone();
   const localePreference = parsePreference(cookieStore.get(LOCALE_COOKIE)?.value);
+  const accent = await getAccentColor();
 
   return (
     // data-theme is rendered from the cookie so the first paint is already in the right mode;
@@ -53,6 +55,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       lang={locale}
       dir={getLocaleDirection(locale)}
       data-theme={themeAttr(themeMode)}
+      data-cpm-accent={accent}
       suppressHydrationWarning
     >
       <body>

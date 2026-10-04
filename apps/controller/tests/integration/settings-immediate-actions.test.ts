@@ -1,6 +1,6 @@
 /**
- * The Settings actions that apply at once rather than stage: the registry blocks, CAPTCHA, the
- * favicon, update checks, analytics and GeoIP (which start or stop containers through the agent),
+ * The Settings actions that apply at once rather than stage: the registry blocks, CAPTCHA,
+ * update checks, analytics and GeoIP (which start or stop containers through the agent),
  * and the WAF rule shortcuts. Each writes `settings` directly and leaves the change set empty; for
  * a non-administrator each answers with a refusal rather than a thrown error.
  */
@@ -230,42 +230,6 @@ describe('CAPTCHA', () => {
   });
 });
 
-describe('the favicon', () => {
-  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-
-  it('stores an image by its sniffed type, and removes it again', async () => {
-    const upload = new FormData();
-    upload.set('favicon', new File([PNG], 'icon.svg', { type: 'image/svg+xml' }));
-
-    expect(await actions.updateFaviconAction(null, upload)).toEqual({
-      success: true,
-      message: t('faviconUpdated'),
-    });
-    expect((await stored('branding')).favicon).toMatchObject({ type: 'image/png' });
-
-    expect(await actions.updateFaviconAction(null, form({ intent: 'remove' }))).toEqual({
-      success: true,
-      message: t('faviconRemoved'),
-    });
-    expect(await stored('branding')).toBeUndefined();
-  });
-
-  it('asks for a file, and refuses one that is not an image', async () => {
-    expect(await actions.updateFaviconAction(null, form())).toEqual({
-      success: false,
-      message: t('faviconChooseFile'),
-    });
-
-    const upload = new FormData();
-    upload.set('favicon', new File(['<html></html>'], 'icon.png', { type: 'image/png' }));
-    expect(await actions.updateFaviconAction(null, upload)).toEqual({
-      success: false,
-      message: domainErrorMessage('faviconNotImage'),
-    });
-    expect(await stored('branding')).toBeUndefined();
-  });
-});
-
 describe('checking for updates now', () => {
   it('reports the newest release it found', async () => {
     globalThis.fetch = (async () =>
@@ -490,7 +454,6 @@ describe('a non-administrator', () => {
     const refusals = await Promise.all([
       actions.updateRegistrySettingsAction(null, form({ registryBlock: 'instance' })),
       actions.updateCaptchaSettingsAction(null, form({ captchaProvider: 'none' })),
-      actions.updateFaviconAction(null, form({ intent: 'remove' })),
       actions.updateAnalyticsSettingsAction(null, form({})),
       actions.updateGeoipSettingsAction(null, form({})),
       actions.updateGeoipDatabasesAction(),

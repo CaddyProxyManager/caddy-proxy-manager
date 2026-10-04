@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Plus, Route, Trash2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -40,6 +40,7 @@ export function PathAllowsFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
+                startIcon={Route}
                 label={t("pathLabel", { index: i + 1 })}
                 isLabelHidden={i > 0}
                 size="sm"

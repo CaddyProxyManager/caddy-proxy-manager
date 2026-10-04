@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
@@ -61,6 +62,9 @@ export function MaintenanceFields({ maintenance }: { maintenance?: HostMaintenan
           description={t("maintenanceBypassHelp")}
         />
         <NumberInput
+          startIcon={Clock}
+          hasNumberSteppers
+          units={t("maintenanceRetryAfterUnit")}
           label={t("maintenanceRetryAfter")}
           isOptional
           htmlName="maintenanceRetryAfter"

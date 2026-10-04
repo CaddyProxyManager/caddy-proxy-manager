@@ -141,8 +141,8 @@ describe('inspection', () => {
     const result = inspectLegacyDatabase(path);
     expect('reason' in result).toBe(true);
     if (!('reason' in result)) return;
-    expect(result.reason).toMatch(/users/);
-    expect(result.reason).toMatch(/not a Caddy Proxy Manager database/i);
+    expect(result.reason).toBe('notCpm');
+    expect(result.missingTables).toContain('users');
   });
 
   it('rejects a file that is not a database at all', async () => {
@@ -155,7 +155,7 @@ describe('inspection', () => {
 
   it('rejects a path with nothing at it', () => {
     const result = inspectLegacyDatabase(join(directory, 'missing.db'));
-    expect(result).toMatchObject({ reason: 'No file at that path.' });
+    expect(result).toMatchObject({ reason: 'missingFile' });
   });
 
   it('honours LEGACY_SQLITE_PATH over searching', () => {

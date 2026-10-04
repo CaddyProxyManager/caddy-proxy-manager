@@ -1,5 +1,6 @@
+import { and, count, gte, lte, sql } from "drizzle-orm";
 import db from "./db";
-import { proxyHosts } from "./db/schema";
+import { auditEvents, proxyHosts, schemaDialect } from "./db/schema";
 import {
   querySummary,
   queryTimeline,
@@ -14,6 +15,7 @@ import {
   queryDistinctHosts,
   queryHostTotals,
   isAnalyticsEnabled,
+  bucketSizeForDuration,
   type AnalyticsSummary as CHSummary,
   type TimelineBucket,
   type CountryStats,
@@ -173,12 +175,74 @@ export async function getAnalyticsBlocked(
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 
+export type OverviewTimelineBucket = TimelineBucket & {
+  /** Audit rows - changes made on the controller - in the same bucket. */
+  serverEvents: number;
+};
+
 export interface OverviewAnalytics {
   summary: AnalyticsSummary;
   statusClasses: StatusClassCounts;
   wafBlocked: number;
-  timeline: TimelineBucket[];
+  timeline: OverviewTimelineBucket[];
   events: TrafficEvent[];
+}
+
+/**
+ * Audit rows counted per bucket, aligned the way ClickHouse aligns its own, so both lines share an
+ * x-axis. Grouped in SQL (on the createdAt index): a month of audit rows never reaches this process.
+ * Empty on failure: the traffic is still worth showing without the line.
+ */
+async function serverEventCounts(from: number, to: number): Promise<Map<number, number>> {
+  const size = bucketSizeForDuration(to - from);
+  // createdAt is ISO text; each dialect reads it as an instant its own way.
+  const epoch =
+    schemaDialect === "sqlite"
+      ? sql`CAST(strftime('%s', ${auditEvents.createdAt}) AS INTEGER)`
+      : sql`CAST(EXTRACT(EPOCH FROM CAST(${auditEvents.createdAt} AS TIMESTAMPTZ)) AS BIGINT)`;
+  // Inlined, not bound: PostgreSQL matches GROUP BY to the select list by text, and two bound
+  // parameters would make them differ. A whole number from bucketSizeForDuration, never input.
+  const width = sql.raw(String(Math.trunc(size)));
+  const bucket = sql<number>`(${epoch} / ${width}) * ${width}`;
+  try {
+    const rows = await db
+      .select({ ts: bucket, count: count() })
+      .from(auditEvents)
+      .where(
+        and(
+          gte(auditEvents.createdAt, new Date(from * 1000).toISOString()),
+          lte(auditEvents.createdAt, new Date(to * 1000).toISOString()),
+        ),
+      )
+      .groupBy(bucket);
+    return new Map(rows.map((row) => [Number(row.ts), Number(row.count)]));
+  } catch (error) {
+    console.error("[analytics] could not count server events for the timeline:", error);
+    return new Map();
+  }
+}
+
+/** A bucket with events and no traffic is added with zero traffic, since that is what it had. */
+function withServerEvents(
+  timeline: TimelineBucket[],
+  counts: Map<number, number>,
+): OverviewTimelineBucket[] {
+  const buckets = new Map<number, OverviewTimelineBucket>(
+    timeline.map((bucket) => [bucket.ts, { ...bucket, serverEvents: counts.get(bucket.ts) ?? 0 }]),
+  );
+  for (const [ts, serverEvents] of counts) {
+    if (buckets.has(ts)) continue;
+    buckets.set(ts, {
+      ts,
+      total: 0,
+      blocked: 0,
+      clientErrors: 0,
+      serverErrors: 0,
+      bytes: 0,
+      serverEvents,
+    });
+  }
+  return [...buckets.values()].sort((a, b) => a.ts - b.ts);
 }
 
 /**
@@ -207,19 +271,27 @@ export async function getOverviewAnalytics(
       },
       statusClasses: { ok: 0, clientErrors: 0, serverErrors: 0, blocked: 0 },
       wafBlocked: 0,
-      timeline: [],
+      // Controller changes are recorded whether or not traffic is.
+      timeline: withServerEvents([], await serverEventCounts(from, to)),
       events: [],
     };
   }
 
-  const [summary, statusClasses, wafBlocked, timeline, events] = await Promise.all([
+  const [summary, statusClasses, wafBlocked, timeline, events, eventCounts] = await Promise.all([
     getAnalyticsSummary(from, to, hosts),
     queryStatusClasses(from, to, hosts),
     queryWafCount(from, to),
     queryTimeline(from, to, hosts),
     queryTrafficEvents(from, to, hosts, filter, limit),
+    serverEventCounts(from, to),
   ]);
-  return { summary, statusClasses, wafBlocked, timeline, events };
+  return {
+    summary,
+    statusClasses,
+    wafBlocked,
+    timeline: withServerEvents(timeline, eventCounts),
+    events,
+  };
 }
 
 // ── Per-host traffic ─────────────────────────────────────────────────────────

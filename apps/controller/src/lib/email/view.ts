@@ -1,5 +1,6 @@
 /** The Email settings page's data; of the password, only whether one is stored. */
 
+import type { UnavailableReason } from "../notifications/availability";
 import type { SmtpSecurity } from "./security";
 import { getCertificateAlertState } from "./certificate-alerts";
 import { type EmailStatus, readSmtpConfig } from "./config";
@@ -24,38 +25,28 @@ export type EmailSettingsView = {
     lastErrorAt: string | null;
     lastErrorCode: "noRecipients" | null;
     pending: number;
-    /** Upstream errors are read from the access log, which Caddy writes only while this holds. */
-    accessLogOn: boolean;
-    upstreamErrorsOn: boolean;
+    /** Notification fields greyed out because their event cannot happen, with why. */
+    unavailable: Record<string, UnavailableReason>;
   };
 };
 
 export async function emailSettingsView(): Promise<EmailSettingsView> {
-  const [registry, { getSetting }, { getNotificationStatus }, stored] = await Promise.all([
-    import("../settings/registry"),
-    import("../settings/resolve"),
-    import("../notifications"),
-    import("../settings"),
-  ]);
-  const [
-    { status, config },
-    alertRecipients,
-    alertDays,
-    alerts,
-    notifications,
-    logging,
-    crowdsec,
-    upstreamErrorsOn,
-  ] = await Promise.all([
-    readSmtpConfig(),
-    getSetting(registry.emailAlertRecipients),
-    getSetting(registry.certificateExpiryAlertDays),
-    getCertificateAlertState(),
-    getNotificationStatus(),
-    stored.getLoggingSettings(),
-    stored.getCrowdSecSettings(),
-    getSetting(registry.notifyUpstreamErrors),
-  ]);
+  const [registry, { getSetting }, { getNotificationStatus }, { unavailableNotificationSettings }] =
+    await Promise.all([
+      import("../settings/registry"),
+      import("../settings/resolve"),
+      import("../notifications"),
+      import("../notifications/availability"),
+    ]);
+  const [{ status, config }, alertRecipients, alertDays, alerts, notifications, unavailable] =
+    await Promise.all([
+      readSmtpConfig(),
+      getSetting(registry.emailAlertRecipients),
+      getSetting(registry.certificateExpiryAlertDays),
+      getCertificateAlertState(),
+      getNotificationStatus(),
+      unavailableNotificationSettings(),
+    ]);
   return {
     status,
     enabled: status !== "off",
@@ -69,13 +60,6 @@ export async function emailSettingsView(): Promise<EmailSettingsView> {
     alertDays,
     alertsCheckedAt: alerts.checkedAt,
     alertsError: alerts.error,
-    notifications: {
-      ...notifications,
-      // As lib/caddy.ts decides it: managed CrowdSec forces the log on, in JSON.
-      accessLogOn:
-        (crowdsec.enabled && crowdsec.mode === "managed") ||
-        (logging?.enabled === true && (logging.format ?? "json") === "json"),
-      upstreamErrorsOn,
-    },
+    notifications: { ...notifications, unavailable },
   };
 }

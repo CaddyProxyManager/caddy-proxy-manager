@@ -47,7 +47,7 @@
       padding: 0;
       border: 0;
       border-radius: 9999px;
-      background: var(--color-text-pink);
+      background: var(--cpm-accent-text);
       /* Not a fixed #111, which is 1.6:1 against the light-mode plum. */
       color: var(--color-on-accent);
       box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
@@ -63,7 +63,7 @@
     }
 
     .cpm-fab:focus-visible {
-      outline: 2px solid var(--color-border-pink);
+      outline: 2px solid var(--cpm-accent-border);
       outline-offset: 3px;
     }
 
@@ -126,13 +126,13 @@
 
     /* In the accent, so a narrowed page never passes for the whole. */
     .cpm-chip[data-active] {
-      background: var(--color-text-pink);
-      border-color: var(--color-text-pink);
+      background: var(--cpm-accent-text);
+      border-color: var(--cpm-accent-text);
       color: var(--color-on-accent);
     }
 
     .cpm-chip:focus-visible {
-      outline: 2px solid var(--color-border-pink);
+      outline: 2px solid var(--cpm-accent-border);
       outline-offset: 2px;
     }
 
@@ -215,11 +215,11 @@
     }
 
     .cpm-tab[data-active] {
-      color: var(--color-text-pink);
+      color: var(--cpm-accent-text);
     }
 
     .cpm-tab:focus-visible {
-      outline: 2px solid var(--color-border-pink);
+      outline: 2px solid var(--cpm-accent-border);
       outline-offset: -4px;
       border-radius: 10px;
     }
@@ -235,7 +235,7 @@
     }
 
     .cpm-tab[data-active] .cpm-tab-bar-mark {
-      background: var(--color-text-pink);
+      background: var(--cpm-accent-text);
     }
 
     .cpm-tab-label {
@@ -316,14 +316,14 @@
     }
 
     .cpm-tile[data-current] {
-      background: var(--color-background-pink);
-      border-color: var(--color-border-pink);
-      color: var(--color-text-pink);
+      background: var(--cpm-accent-background);
+      border-color: var(--cpm-accent-border);
+      color: var(--cpm-accent-text);
     }
 
     .cpm-tile:focus-visible,
     .cpm-sheet-row:focus-visible {
-      outline: 2px solid var(--color-border-pink);
+      outline: 2px solid var(--cpm-accent-border);
       outline-offset: 2px;
     }
 

@@ -53,6 +53,7 @@ services:
 
       # Renames the app in the sidebar, login card, and page titles.
       APP_NAME: ${APP_NAME:-}
+      ACCENT_COLOR: ${ACCENT_COLOR:-}
 
       # Seeds the managed dashboard host once, at the end of setup (default: BASE_URL's hostname);
       # after that the stored setting wins. Caddy reads it for its placeholder site.
@@ -166,6 +167,7 @@ services:
       NOTIFY_GEOIP_FAILED: ${NOTIFY_GEOIP_FAILED:-true}
       NOTIFY_CRS_PLUGIN_DISABLED: ${NOTIFY_CRS_PLUGIN_DISABLED:-true}
       NOTIFY_UPDATE_AVAILABLE: ${NOTIFY_UPDATE_AVAILABLE:-true}
+      NOTIFY_DISABLED_ACCOUNT_OWNER: ${NOTIFY_DISABLED_ACCOUNT_OWNER:-false}
 
       # First-start defaults of Settings fields.
       FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
@@ -396,7 +398,7 @@ services:
     container_name: caddy-proxy-manager-clickhouse
     image: clickhouse/clickhouse-server:26.9.8.3-alpine@sha256:7370147ab29301f9aad4b4424297d0c423c68efc4ece9d5150e9afa1a4d1afbe
     profiles: [clickhouse]
-    restart: always
+    restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}

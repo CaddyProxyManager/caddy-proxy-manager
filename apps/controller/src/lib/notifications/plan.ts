@@ -13,6 +13,8 @@ export type PendingNotice = {
   /** ISO, when it happened. */
   at: string;
   event: NotificationEvent;
+  /** Audience keys it already reached, so a retried batch goes only to the rest. */
+  delivered?: string[];
 };
 
 export type NotificationState = {
@@ -249,6 +251,23 @@ export function planSent(
     lastErrorAt: null,
     lastErrorCode: null,
     retryAt: null,
+  };
+}
+
+/** `reached` maps a notice id to the audience keys that now have it. */
+export function planDelivered(
+  state: NotificationState,
+  reached: ReadonlyMap<string, readonly string[]>,
+): NotificationState {
+  if (reached.size === 0) return state;
+  return {
+    ...state,
+    pending: state.pending.map((notice) => {
+      const keys = reached.get(notice.id);
+      return keys
+        ? { ...notice, delivered: [...new Set([...(notice.delivered ?? []), ...keys])] }
+        : notice;
+    }),
   };
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Download, Upload } from "lucide-react";
+import { Download, KeyRound, Upload } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -90,6 +90,7 @@ function DownloadCard() {
         </Text>
         {error && <Banner status="error" title={t("downloadFailed")} description={error} />}
         <TextInput
+          startIcon={KeyRound}
           {...AUTOFILL_NEW_PASSWORD}
           label={t("passphrase")}
           description={t("passphraseHelp", { min: MIN_PASSPHRASE })}
@@ -99,6 +100,7 @@ function DownloadCard() {
           width="100%"
         />
         <TextInput
+          startIcon={KeyRound}
           {...AUTOFILL_NEW_PASSWORD}
           label={t("passphraseConfirm")}
           type="password"
@@ -220,6 +222,7 @@ function RestoreCard() {
               <MetadataListItem label={t("tables.other")}>{others}</MetadataListItem>
             </MetadataList>
             <TextInput
+              startIcon={KeyRound}
               {...AUTOFILL_OFF}
               label={t("passphrase")}
               type="password"

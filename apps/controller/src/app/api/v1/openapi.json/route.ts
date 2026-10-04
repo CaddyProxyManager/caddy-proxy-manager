@@ -3273,6 +3273,11 @@ const spec = {
         type: "object",
         required: ["modulePath"],
         properties: {
+          name: {
+            type: "string",
+            maxLength: 80,
+            description: "Optional label shown in the settings list; not part of the build",
+          },
           modulePath: {
             type: "string",
             description: "Go module path, e.g. github.com/greenpau/caddy-security",

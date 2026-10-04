@@ -8,6 +8,8 @@ import { Button } from "@astryxdesign/core/Button";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
+import { Icon } from "@astryxdesign/core/Icon";
+import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -22,8 +24,9 @@ import { sectionForStorageKey, stagedChangeLabel } from "@/src/lib/settings/sect
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
 
-/** In the header, so the apply control has one address and covers no form field. */
-export function StagedControls({ view }: { view: StagedView }) {
+/** In the rail (the header on a phone), so the apply control has one address and covers no field. */
+/** `fill`: as wide as the rail, the buttons sharing it by the length of their labels. */
+export function StagedControls({ view, fill = false }: { view: StagedView; fill?: boolean }) {
   const t = useTranslations("settings");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -39,16 +42,24 @@ export function StagedControls({ view }: { view: StagedView }) {
   };
 
   return (
-    <HStack gap={2} vAlign="center" data-testid="staged-bar">
+    <HStack
+      gap={2}
+      vAlign="center"
+      wrap="wrap"
+      width={fill ? "100%" : undefined}
+      data-testid="staged-bar"
+    >
       <Button
         variant="ghost"
         size="sm"
         label={t("stagedDiscard")}
         onClick={discardAll}
         isDisabled={pending}
+        className={fill ? "grow" : undefined}
       />
       <Button
         size="sm"
+        className={fill ? "grow" : undefined}
         label={t("stagedReview")}
         endContent={<Badge variant="warning" label={String(view.changes.length)} />}
         onClick={() => setOpen(true)}
@@ -59,8 +70,9 @@ export function StagedControls({ view }: { view: StagedView }) {
 }
 
 /** Which configuration Caddy runs, and whether the last apply got there. */
-export function RevisionPill({ staged }: { staged: StagedView }) {
+export function RevisionPill({ staged, inRail = false }: { staged: StagedView; inRail?: boolean }) {
   const t = useTranslations("settings");
+  if (inRail) return <RailRevision staged={staged} />;
   if (staged.currentRevision === null) {
     return (
       <Text type="supporting" color="secondary">
@@ -69,14 +81,51 @@ export function RevisionPill({ staged }: { staged: StagedView }) {
     );
   }
   const latest = staged.revisions[0];
+  const demo = staged.demoMode && latest?.outcome === "failed";
   return (
     <Link href="/settings/history" aria-label={t("history.viewAll")}>
       <Badge
-        variant={latest?.outcome === "failed" ? "error" : "success"}
+        variant={demo ? "orange" : latest?.outcome === "failed" ? "error" : "success"}
         label={t("revisionPill", { id: staged.currentRevision })}
       />
     </Link>
   );
+}
+
+/** In the rail: shaped like its entries, so it reads as one of them rather than a caption. */
+function RailRevision({ staged }: { staged: StagedView }) {
+  const t = useTranslations("settings");
+  const failed = staged.revisions[0]?.outcome === "failed";
+  // No Caddy to reach, so every apply "fails"; that is the demo working, not something broken.
+  const demo = staged.demoMode && failed;
+  const row = (
+    // gap 3: the entries' icon box is wider than this icon, and their labels start 48px in.
+    <HStack gap={3} vAlign="center" padding={2}>
+      <Icon
+        icon={
+          staged.currentRevision === null
+            ? CircleDashed
+            : demo
+              ? CircleAlert
+              : failed
+                ? CircleX
+                : CircleCheck
+        }
+        color={
+          staged.currentRevision === null ? "secondary" : demo ? "orange" : failed ? "red" : "green"
+        }
+      />
+      <Text type="body" color={staged.currentRevision === null ? "secondary" : "primary"}>
+        {staged.currentRevision === null
+          ? t("revisionNever")
+          : t("revisionPill", { id: staged.currentRevision })}
+      </Text>
+    </HStack>
+  );
+  if (staged.currentRevision === null) return row;
+  // Named by its visible text, not "View history": a spoken name should match what is shown, and
+  // the rail's History entry already says where it leads.
+  return <Link href="/settings/history">{row}</Link>;
 }
 
 function ReviewSheet({
@@ -103,6 +152,11 @@ function ReviewSheet({
         return;
       }
       onClose();
+      // The accent is an attribute on <html>, which vinext's cached root layout keeps after a refresh.
+      if (view.changes.some((change) => change.key === "config:accent_color")) {
+        window.location.reload();
+        return;
+      }
       router.refresh();
     });
   };
@@ -196,9 +250,16 @@ function ReviewSheet({
                       {revisionSummary(t, format, revision)}
                     </Text>
                     <div style={{ flexGrow: 1 }} />
-                    {revision.outcome === "failed" && (
-                      <Badge variant="error" label={t("revisionFailed")} />
-                    )}
+                    {revision.outcome === "failed" &&
+                      (view.demoMode ? (
+                        <Badge
+                          variant="neutral"
+                          className="cpm-demo-badge"
+                          label={t("revisionDemo")}
+                        />
+                      ) : (
+                        <Badge variant="error" label={t("revisionFailed")} />
+                      ))}
                   </HStack>
                 ))}
               </>

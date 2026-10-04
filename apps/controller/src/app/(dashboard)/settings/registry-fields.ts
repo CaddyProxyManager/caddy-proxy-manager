@@ -5,6 +5,7 @@
 
 import type { getTranslations } from "next-intl/server";
 import {
+  accentColor,
   accountLockBaseDelayMs,
   accountLockDisableAfter,
   accountLockDisableEnabled,
@@ -34,6 +35,7 @@ import {
   notifyAgentProblems,
   notifyCaddyApply,
   notifyCrsPluginDisabled,
+  notifyDisabledAccountOwner,
   notifyGeoipFailed,
   notifyUpdateAvailable,
   notifyUpstreamErrorCount,
@@ -43,7 +45,12 @@ import {
   type SettingDefinition,
   type SettingValue,
 } from "@/src/lib/settings/registry";
-import { settingDescription, settingLabel } from "@/src/lib/settings/messages";
+import {
+  settingDescription,
+  settingFieldLabel,
+  settingLabel,
+  settingUnit,
+} from "@/src/lib/settings/messages";
 import { isEnvOverridden, resolveSetting } from "@/src/lib/settings/resolve";
 import type { RegistryField } from "./RegistrySettingsBlock";
 
@@ -53,6 +60,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 /** The blocks that render them, in the order each block lists its settings. */
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
+  branding: [accentColor] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
   "forward-auth": [forwardAuthAllowedPorts, forwardAuthSequentialUserIds] as AnySetting[],
   "sign-in": [
@@ -89,15 +97,18 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
     notifyGeoipFailed,
     notifyCrsPluginDisabled,
     notifyUpdateAvailable,
+    notifyDisabledAccountOwner,
   ] as AnySetting[],
 };
 
+const STAGED_BLOCKS = new Set(["branding"]);
+
 /** Which settings a block owns, for the action that saves one. Keys, since that is what it posts. */
 export const REGISTRY_BLOCK_KEYS: Record<string, readonly string[]> = Object.fromEntries(
-  Object.entries(BLOCKS).map(([block, definitions]) => [
-    block,
-    definitions.map((definition) => definition.key),
-  ]),
+  Object.entries(BLOCKS)
+    // Read here for its field, but saved by its own staged action, never at once.
+    .filter(([block]) => !STAGED_BLOCKS.has(block))
+    .map(([block, definitions]) => [block, definitions.map((definition) => definition.key)]),
 );
 
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
@@ -116,6 +127,9 @@ function field(t: Translator, definition: AnySetting, value: SettingValue): Regi
   if (typeof definition.default === "number") {
     return {
       ...common,
+      label: settingFieldLabel(t, definition.key, definition.unit),
+      units: definition.unit ? settingUnit(t, definition.unit) : undefined,
+      unit: definition.unit,
       kind: "number",
       value: typeof value === "number" ? value : definition.default,
       // The registry's own range. A number setting always has one.
