@@ -74,7 +74,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("settings") };
 }
 
-/** The client switches sections itself; this only picks where a fresh load or deep link opens. */
 /**
  * The public route while the icon is the live one; inline only for a staged icon, which nothing
  * else serves. Inlined always, every settings load would carry up to ~340 KB of base64.
@@ -88,6 +87,7 @@ function faviconSrc(
   return `data:${staged.type};base64,${staged.data}`;
 }
 
+/** The client switches sections itself; this only picks where a fresh load or deep link opens. */
 export default async function SettingsSectionPage({
   params,
 }: {
