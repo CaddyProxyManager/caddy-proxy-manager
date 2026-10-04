@@ -15,15 +15,16 @@ import {
   useRef,
   useState,
 } from "react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { EnvTokens } from "@/src/components/ui/EnvTokens";
-import { type SettingsBlock, settingsBlockDescription, settingsBlockName } from "./sections";
+import { type SettingsBlock, settingsBlockName } from "./sections";
 
 /**
  * A form the page bar must not submit (it confirms first, or does more than save). An attribute,
@@ -54,15 +55,10 @@ export function SettingsBlockShell({
       }}
     >
       {showHeading ? (
-        <VStack gap={1}>
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            <Heading level={2}>{settingsBlockName(t, block.id)}</Heading>
-            <EnvTokens names={block.env} />
-          </HStack>
-          <Text type="body" size="sm" color="secondary">
-            {settingsBlockDescription(t, block.id)}
-          </Text>
-        </VStack>
+        <HStack gap={2} vAlign="center" wrap="wrap">
+          <Heading level={2}>{settingsBlockName(t, block.id)}</Heading>
+          <EnvTokens names={block.env} />
+        </HStack>
       ) : (
         <EnvTokens names={block.env} />
       )}
@@ -168,6 +164,8 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
   return (
     <nav
       aria-label={t("onThisPage")}
+      // A phone has no room for it beside the blocks.
+      className="cpm-desktop-only"
       style={{
         width: "176px",
         flexShrink: 0,
@@ -424,6 +422,61 @@ function useDirtyForms(
   return { dirty, accept: () => accept.current() };
 }
 
+/**
+ * Holds the page while something is unsaved: the browser's own prompt for a reload, close or
+ * another site, and a dialog for an in-app link, which `beforeunload` never sees. Back and forward
+ * stay unguarded, since the App Router offers no way to cancel a history step.
+ */
+function useLeaveGuard(active: boolean) {
+  const router = useRouter();
+  const [target, setTarget] = useState<string | null>(null);
+  // Set by the bar's own Discard, which reloads on purpose.
+  const allowUnload = useRef(false);
+
+  useEffect(() => {
+    if (!active) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!allowUnload.current) event.preventDefault();
+    };
+    // Capture, so it runs before Next's Link handler on the React root.
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.hasAttribute("download")) return;
+      if (link.target && link.target !== "_self") return;
+      const url = new URL(link.href);
+      // Another site unloads the page, which beforeunload already covers.
+      if (url.origin !== window.location.origin) return;
+      // A jump within this page (On this page) loses nothing.
+      if (url.pathname === window.location.pathname && url.search === window.location.search)
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      setTarget(url.pathname + url.search + url.hash);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [active]);
+
+  return {
+    target,
+    stay: () => setTarget(null),
+    leave: () => {
+      if (target) router.push(target);
+      setTarget(null);
+    },
+    discard: () => {
+      allowUnload.current = true;
+      window.location.reload();
+    },
+  };
+}
+
 /** Submits each dirty form in turn; `stagedSettingsAction` takes the update lock, so they queue. */
 export function PageSaveBar({
   stagedFields,
@@ -438,6 +491,7 @@ export function PageSaveBar({
   // A stable set: the effect that marks the labels depends on it.
   const staged = useMemo(() => new Set(stagedFields), [stagedFields]);
   const { dirty, accept } = useDirtyForms(container, staged);
+  const guard = useLeaveGuard(dirty.length > 0);
 
   const save = useCallback(() => {
     for (const form of dirty) form.requestSubmit();
@@ -448,6 +502,16 @@ export function PageSaveBar({
   return (
     <>
       <div ref={container}>{children}</div>
+      <AlertDialog
+        isOpen={guard.target !== null}
+        onOpenChange={(open) => !open && guard.stay()}
+        title={t("pageLeaveTitle")}
+        description={t("pageLeaveDescription", { count: dirty.length })}
+        cancelLabel={t("pageLeaveStay")}
+        actionLabel={t("pageLeave")}
+        actionVariant="destructive"
+        onAction={guard.leave}
+      />
       {dirty.length > 0 && (
         // Sticky, not fixed: the pane scrolls, and fixed would float over the rail and header.
         <div
@@ -471,7 +535,7 @@ export function PageSaveBar({
                   variant="secondary"
                   size="sm"
                   // A DOM reset would desync from the React state these fields hold.
-                  onClick={() => window.location.reload()}
+                  onClick={guard.discard}
                   label={t("pageDiscard")}
                 />
                 <Button

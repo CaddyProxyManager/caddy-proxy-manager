@@ -3034,6 +3034,7 @@
     "reviewUndo": "Undo",
     "revisionFailed": "Last apply failed",
     "revisionNever": "Never applied",
+    "revisionDemo": "Demo",
     "revisionPill": "Revision #{id}",
     "history": {
       "title": "Revision history",
@@ -3274,148 +3275,112 @@
     },
     "blocks": {
       "general": {
-        "name": "General",
-        "desc": "Primary domain and ACME contact email"
+        "name": "General"
       },
       "acme": {
-        "name": "ACME Server",
-        "desc": "Custom ACME directory URL for internal CAs"
+        "name": "ACME Server"
       },
       "updates": {
-        "name": "Updates",
-        "desc": "Whether to check the registry for a newer release, and which one"
+        "name": "Updates"
       },
       "branding": {
-        "name": "Branding",
-        "desc": "The accent colour and the favicon browsers show for this instance"
+        "name": "Branding"
       },
       "instance": {
-        "name": "Instance",
-        "desc": "Names this instance and the address it is reached at"
+        "name": "Instance"
       },
       "avatars": {
-        "name": "User Avatars",
-        "desc": "Gravatar fallback for users without an icon"
+        "name": "User Avatars"
       },
       "defaultResponse": {
-        "name": "Default Response",
-        "desc": "Handle requests for unknown hosts and direct IP access"
+        "name": "Default Response"
       },
       "errorPages": {
-        "name": "Error Pages",
-        "desc": "Global custom error responses (fallback for all hosts)"
+        "name": "Error Pages"
       },
       "caddyBuild": {
-        "name": "Caddy Build",
-        "desc": "Which plugins the Caddy image is compiled with"
+        "name": "Caddy Build"
       },
       "globalCaddyConfig": {
-        "name": "Global Caddyfile",
-        "desc": "Raw Caddy configuration added to every agent's config"
+        "name": "Global Caddyfile"
       },
       "httpCache": {
-        "name": "HTTP Cache",
-        "desc": "Where the Caddy cache keeps entries, and which CDN it purges"
+        "name": "HTTP Cache"
       },
       "dashboard": {
-        "name": "Dashboard Host",
-        "desc": "Serve this dashboard through Caddy, on a domain of its own"
+        "name": "Dashboard Host"
       },
       "agent": {
-        "name": "Agent",
-        "desc": "The service that recreates and rebuilds the Caddy container"
+        "name": "Agent"
       },
       "dnsProviders": {
-        "name": "DNS Providers",
-        "desc": "Provider credentials for ACME DNS-01"
+        "name": "DNS Providers"
       },
       "dnsResolvers": {
-        "name": "DNS Resolvers",
-        "desc": "Custom resolvers for challenge verification"
+        "name": "DNS Resolvers"
       },
       "upstreamDns": {
-        "name": "Upstream DNS Pinning",
-        "desc": "Pin upstream IPs at config-apply time"
+        "name": "Upstream DNS Pinning"
       },
       "trustedProxies": {
-        "name": "Trusted Proxies",
-        "desc": "Resolve real client IP behind an upstream proxy"
+        "name": "Trusted Proxies"
       },
       "httpProtocols": {
-        "name": "HTTP Versions",
-        "desc": "Turn HTTP/2 or HTTP/3 off for every host"
+        "name": "HTTP Versions"
       },
       "compression": {
-        "name": "Compression",
-        "desc": "Compress text responses with zstd or gzip"
+        "name": "Compression"
       },
       "twoFactor": {
-        "name": "Two-factor Sign-in",
-        "desc": "Require administrators to use an authenticator app"
+        "name": "Two-factor Sign-in"
       },
       "tailscale": {
-        "name": "Tailscale",
-        "desc": "Node defaults for hosts served on, or reached over, your tailnet"
+        "name": "Tailscale"
       },
       "oauth": {
-        "name": "OAuth Providers",
-        "desc": "OAuth/OIDC SSO providers"
+        "name": "OAuth Providers"
       },
       "signIn": {
-        "name": "Sign-in",
-        "desc": "Who may sign in or sign up, and how hard the door is to knock on"
+        "name": "Sign-in"
       },
       "passwordPolicy": {
-        "name": "Password Policy",
-        "desc": "Migrate users off older password hashes"
+        "name": "Password Policy"
       },
       "authentik": {
-        "name": "Authentik Defaults",
-        "desc": "Forward-auth defaults for new proxy hosts"
+        "name": "Authentik Defaults"
       },
       "forwardAuth": {
-        "name": "Forward Auth Defaults",
-        "desc": "Defaults for hosts authenticating through an external auth server"
+        "name": "Forward Auth Defaults"
       },
       "geoip": {
-        "name": "GeoIP Databases",
-        "desc": "MaxMind subscription and whether country lookups run at all"
+        "name": "GeoIP Databases"
       },
       "geoblock": {
-        "name": "Global Geoblocking",
-        "desc": "Default geoblock rules across all hosts"
+        "name": "Global Geoblocking"
       },
       "crowdsec": {
-        "name": "CrowdSec",
-        "desc": "The Local API and bouncer key every host checks clients against"
+        "name": "CrowdSec"
       },
       "analytics": {
-        "name": "Analytics",
-        "desc": "Traffic and WAF event collection, and the ClickHouse it writes to"
+        "name": "Analytics"
       },
       "metrics": {
-        "name": "Metrics & Monitoring",
-        "desc": "Prometheus metrics endpoint"
+        "name": "Metrics & Monitoring"
       },
       "logging": {
-        "name": "Access Logging",
-        "desc": "HTTP access log for proxied requests"
+        "name": "Access Logging"
       },
       "captcha": {
-        "name": "CAPTCHA",
-        "desc": "A challenge to solve before the password is asked for"
+        "name": "CAPTCHA"
       },
       "email": {
-        "name": "SMTP Server",
-        "desc": "The server this instance sends mail through, and the address it sends as"
+        "name": "SMTP Server"
       },
       "certificateAlerts": {
-        "name": "Notifications",
-        "desc": "What the administrators are emailed about, and who else is"
+        "name": "Notifications"
       },
       "ldap": {
-        "name": "Directories (LDAP)",
-        "desc": "Sign in with an LDAP or Active Directory account"
+        "name": "Directories (LDAP)"
       }
     },
     "dnsDelegation": {
@@ -4074,6 +4039,10 @@
     "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
     "pageDiscard": "Discard",
+    "pageLeave": "Leave",
+    "pageLeaveDescription": "{count, plural, one {# change on this page is} other {# changes on this page are}} not saved and will be lost.",
+    "pageLeaveStay": "Stay",
+    "pageLeaveTitle": "Leave without saving?",
     "httpCache": {
       "moduleOffTitle": "The Caddy cache is not available",
       "storage": "Storage",

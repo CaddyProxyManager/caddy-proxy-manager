@@ -978,11 +978,13 @@ test.describe('Settings - form data round-trip via API', () => {
 
 test.describe('Settings - detail header', () => {
   test('header shows the page title with no description under it', async ({ page }) => {
-    // Asks the header, not the page: each block still has its own description.
+    // The section's description is for the overview and search, not the page it describes.
     await goToSection(page, 'General');
     const header = page.getByTestId('settings-header');
     await expect(header.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
-    await expect(header.getByText('Primary domain and ACME contact email')).toHaveCount(0);
+    await expect(
+      header.getByText('Domain, ACME contact, updates, branding and avatars'),
+    ).toHaveCount(0);
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {

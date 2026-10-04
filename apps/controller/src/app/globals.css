@@ -122,6 +122,12 @@
     border-color: var(--color-text-secondary);
   }
 
+  /* The demo's stand-in for a Failed badge: solid like it, in orange rather than alarm red. */
+  .astryx-badge.cpm-demo-badge {
+    background-color: var(--color-text-orange);
+    color: var(--color-background-body);
+  }
+
   /* PanelResizeHandle: a 1px line with a wider invisible ::before to grab. */
   .cpm-panel-resize-handle {
     position: relative;

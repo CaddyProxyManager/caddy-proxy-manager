@@ -650,11 +650,8 @@ export default function SettingsClient({
   const page = findSettingsItem(active) ?? SETTINGS_ITEMS[0];
   // Saved but not applied, so marked the same as a field typed into just now.
   const stagedFields = staged.changes.flatMap((change) => change.fields);
-  // Below three blocks the page fits a screen and the list would only name what is visible.
-  const showAnchors = page.blocks.length >= 3;
-
   return (
-    <SettingsFrame sectionId={active} staged={staged} aside={showAnchors}>
+    <SettingsFrame sectionId={active} staged={staged} aside>
       <FocusField />
       <HStack gap={5} align="start">
         <VStack gap={5} maxWidth={768} style={{ flexGrow: 1, minWidth: 0 }}>
@@ -672,14 +669,12 @@ export default function SettingsClient({
             </VStack>
           </PageSaveBar>
         </VStack>
-        {showAnchors && (
-          <OnThisPage
-            anchors={page.blocks.map((block) => ({
-              id: block.id,
-              label: settingsBlockName(t, block.id),
-            }))}
-          />
-        )}
+        <OnThisPage
+          anchors={page.blocks.map((block) => ({
+            id: block.id,
+            label: settingsBlockName(t, block.id),
+          }))}
+        />
       </HStack>
     </SettingsFrame>
   );

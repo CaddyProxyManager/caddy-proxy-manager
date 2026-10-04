@@ -9,7 +9,6 @@ import {
   SETTINGS_BLOCKS,
   SETTINGS_GROUPS,
   SETTINGS_ITEMS,
-  settingsBlockDescription,
   settingsBlockName,
   sectionMessageName,
   settingsGroupLabel,
@@ -28,11 +27,10 @@ describe('settings.sections messages', () => {
     expect(mismatches).toEqual([]);
   });
 
-  it('names and describes every block as sections.ts does', () => {
-    const mismatches = SETTINGS_BLOCKS.flatMap((block) => [
-      ...(settingsBlockName(t, block.id) === block.name ? [] : [`${block.id}.name`]),
-      ...(settingsBlockDescription(t, block.id) === block.desc ? [] : [`${block.id}.desc`]),
-    ]);
+  it('names every block as sections.ts does', () => {
+    const mismatches = SETTINGS_BLOCKS.flatMap((block) =>
+      settingsBlockName(t, block.id) === block.name ? [] : [`${block.id}.name`],
+    );
     expect(mismatches).toEqual([]);
   });
 

@@ -9,7 +9,7 @@ import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
-import { CircleCheck, CircleDashed, CircleX } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -81,10 +81,11 @@ export function RevisionPill({ staged, inRail = false }: { staged: StagedView; i
     );
   }
   const latest = staged.revisions[0];
+  const demo = staged.demoMode && latest?.outcome === "failed";
   return (
     <Link href="/settings/history" aria-label={t("history.viewAll")}>
       <Badge
-        variant={latest?.outcome === "failed" ? "error" : "success"}
+        variant={demo ? "orange" : latest?.outcome === "failed" ? "error" : "success"}
         label={t("revisionPill", { id: staged.currentRevision })}
       />
     </Link>
@@ -95,12 +96,24 @@ export function RevisionPill({ staged, inRail = false }: { staged: StagedView; i
 function RailRevision({ staged }: { staged: StagedView }) {
   const t = useTranslations("settings");
   const failed = staged.revisions[0]?.outcome === "failed";
+  // No Caddy to reach, so every apply "fails"; that is the demo working, not something broken.
+  const demo = staged.demoMode && failed;
   const row = (
     // gap 3: the entries' icon box is wider than this icon, and their labels start 48px in.
     <HStack gap={3} vAlign="center" padding={2}>
       <Icon
-        icon={staged.currentRevision === null ? CircleDashed : failed ? CircleX : CircleCheck}
-        color={staged.currentRevision === null ? "secondary" : failed ? "red" : "green"}
+        icon={
+          staged.currentRevision === null
+            ? CircleDashed
+            : demo
+              ? CircleAlert
+              : failed
+                ? CircleX
+                : CircleCheck
+        }
+        color={
+          staged.currentRevision === null ? "secondary" : demo ? "orange" : failed ? "red" : "green"
+        }
       />
       <Text type="body" color={staged.currentRevision === null ? "secondary" : "primary"}>
         {staged.currentRevision === null
@@ -237,9 +250,16 @@ function ReviewSheet({
                       {revisionSummary(t, format, revision)}
                     </Text>
                     <div style={{ flexGrow: 1 }} />
-                    {revision.outcome === "failed" && (
-                      <Badge variant="error" label={t("revisionFailed")} />
-                    )}
+                    {revision.outcome === "failed" &&
+                      (view.demoMode ? (
+                        <Badge
+                          variant="neutral"
+                          className="cpm-demo-badge"
+                          label={t("revisionDemo")}
+                        />
+                      ) : (
+                        <Badge variant="error" label={t("revisionFailed")} />
+                      ))}
                   </HStack>
                 ))}
               </>
