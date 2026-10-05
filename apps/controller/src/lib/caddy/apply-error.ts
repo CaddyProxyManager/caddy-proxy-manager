@@ -13,16 +13,20 @@ export type WafRejection = {
 export class CaddyApplyError extends Error {
   readonly code: CaddyApplyErrorCode;
   readonly waf: WafRejection;
+  /** The agent whose Caddy refused, when known: a fleet apply still fails on one host. */
+  readonly agent: { agentId: string; name: string } | null;
 
   constructor(
     message: string,
     code: CaddyApplyErrorCode,
     waf: WafRejection = { wafFailed: false, ruleIds: [] },
+    agent: { agentId: string; name: string } | null = null,
   ) {
     super(message);
     this.name = "CaddyApplyError";
     this.code = code;
     this.waf = waf;
+    this.agent = agent;
   }
 }
 

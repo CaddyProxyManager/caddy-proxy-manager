@@ -301,6 +301,9 @@
     "noDescription": "No description"
   },
   "agents": {
+    "applyRefusedAt": "Refused <time></time>. Caddy keeps serving the last configuration it loaded.",
+    "applyRefusedFleetTitle": "Caddy refused the last configuration",
+    "applyRefusedTitle": "Caddy on this agent refused the last configuration",
     "assignedAgents": "Assigned agents",
     "assignedHosts": "Assigned hosts",
     "assignedToAll": "Served by every agent",

@@ -95,6 +95,12 @@ Any number of Caddy hosts can serve one configuration. Every apply goes to all o
 any host refuses the config or cannot be reached the apply fails and names it - the change is not
 recorded as applied until every host has it, so the disagreement is visible rather than silent.
 
+A configuration a host's Caddy refuses stays on that agent's card on the **Agents** page - when it
+happened and Caddy's reason, with the whole message a click away when it is long - until a later
+apply to that agent loads. Caddy keeps serving the last configuration it accepted meanwhile. The
+same refusal is listed in Needs attention, which links straight to the card, and the GraphQL `Agent`
+type answers it as `lastApplyFailure`. An operator sees it on the agents their groups were granted.
+
 Hosts can also be pinned to specific agents, so one machine serves a subset rather than everything.
 
 <Demo title="Pinning a host to agents" note="One of the three is offline.">

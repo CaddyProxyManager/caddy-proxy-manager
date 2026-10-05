@@ -3889,7 +3889,11 @@ export async function buildCaddyDocument(
  * Turn one Caddy's answer into an outcome, or throw. `who` names the agent, so a rejection in
  * a fleet says which host is now out of step.
  */
-function assertCaddyAccepted(response: { status: number; text: string }, who: string): void {
+function assertCaddyAccepted(
+  response: { status: number; text: string },
+  who: string,
+  agent: { agentId: string; name: string } | null,
+): void {
   if (response.status >= 200 && response.status < 300) return;
 
   const reason = describeCaddyRejection(response.text);
@@ -3905,6 +3909,7 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
       : `Caddy rejected configuration${where}`,
     "CADDY_REJECTED",
     describeWafRejection(response.text),
+    agent,
   );
 }
 
@@ -3989,6 +3994,8 @@ async function reportedApply(
   await Promise.all([reportApplySuccess(target), recordApplySuccess(target)]);
 }
 
+type ConnectedAgentRef = { agentId: string; agentRowId: number; name: string };
+
 async function loadEveryAgent(): Promise<void> {
   const { broadcastCaddyAdmin, listAgentTargets } = await import("../agent/client");
   const targets = await listAgentTargets();
@@ -4019,9 +4026,19 @@ async function loadEveryAgent(): Promise<void> {
     );
   }
 
+  // Results carry only names, and two agents may share one: those are left unattributed.
+  const byName = new Map<string, ConnectedAgentRef | null>();
+  for (const target of targets) {
+    byName.set(target.name, byName.has(target.name) ? null : target);
+  }
   for (const result of results) {
     if (!result.ok) continue;
-    assertCaddyAccepted(result.value, result.agent);
+    const agent = byName.get(result.agent);
+    assertCaddyAccepted(
+      result.value,
+      result.agent,
+      agent ? { agentId: agent.agentId, name: agent.name } : null,
+    );
   }
 
   // Every agent accepted, so record what each is serving for the monitor to compare against.
@@ -4032,10 +4049,7 @@ async function loadEveryAgent(): Promise<void> {
  * Build one agent's document, with its snippets adapted by that agent, and load it through the
  * transport seam pinned to the same agent. Null is the Caddy reached with no agent attached.
  */
-async function loadOne(
-  agent: { agentId: string; agentRowId: number } | null,
-  who: string,
-): Promise<void> {
+async function loadOne(agent: ConnectedAgentRef | null, who: string): Promise<void> {
   const payload = JSON.stringify(
     await buildCaddyDocument(agent?.agentRowId, { adaptVia: agent?.agentId }),
   );
@@ -4054,7 +4068,7 @@ async function loadOne(
     }
     throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
   }
-  assertCaddyAccepted(response, who);
+  assertCaddyAccepted(response, who, agent && { agentId: agent.agentId, name: agent.name });
   await noteAppliedConfig(agent?.agentId);
 }
 

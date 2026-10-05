@@ -338,6 +338,14 @@ export const typeDefs = /* GraphQL */ `
     connected: Boolean!
     lastSeenAt: DateTime
     createdAt: DateTime!
+    """The last configuration this agent's Caddy refused, until one loads again."""
+    lastApplyFailure: AgentApplyFailure
+  }
+
+  type AgentApplyFailure {
+    at: DateTime!
+    """Caddy's refusal as the controller worded it."""
+    error: String!
   }
 
   type OAuthProvider {

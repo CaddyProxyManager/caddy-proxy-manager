@@ -79,6 +79,36 @@ describe('caddy apply', () => {
     list = await collectAttention(access('admin'), { providers: only('caddyApply') });
     expect(list.items).toEqual([]);
   });
+
+  it("links a paired agent's refusal to its card, and a fleet one to the page", async () => {
+    const [row] = await ctx.db
+      .insert(schema.agents)
+      .values({ name: 'edge-1', agentId: 'a1', secret: 'unused', createdAt: NOW, updatedAt: NOW })
+      .returning();
+    try {
+      // A fleet apply that one agent refused is filed under that agent.
+      await recordApplyFailure(
+        null,
+        new CaddyApplyError('bad handler', 'CADDY_REJECTED', undefined, {
+          agentId: 'a1',
+          name: 'edge-1',
+        }),
+      );
+      await recordApplyFailure(null, new CaddyApplyError('no agent', 'CADDY_REJECTED'));
+      const list = await collectAttention(access('admin'), { providers: only('caddyApply') });
+      const hrefs = Object.fromEntries(list.items.map((item) => [item.id, item.href]));
+      expect(hrefs).toEqual({
+        'caddy-apply:a1': `/agents#agent-${row.id}`,
+        'caddy-apply:all': '/agents',
+      });
+
+      await recordApplySuccess({ agentId: 'a1' });
+      expect(Object.keys(await getApplyFailures())).toEqual(['all']);
+    } finally {
+      await recordApplySuccess(null);
+      await ctx.db.delete(schema.agents);
+    }
+  });
 });
 
 describe('certificates', () => {

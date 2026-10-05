@@ -151,8 +151,12 @@ const caddyApply: AttentionProvider = {
   id: "caddyApply",
   adminOnly: true,
   async run() {
-    const { getApplyFailures } = await import("../caddy/apply-status");
+    const [{ getApplyFailures }, { listAgents }] = await Promise.all([
+      import("../caddy/apply-status"),
+      import("../models/agents"),
+    ]);
     const failures = await getApplyFailures();
+    const rowIds = new Map((await listAgents()).map((agent) => [agent.agentId, agent.id]));
     return {
       items: Object.entries(failures).map(([key, failure]) => ({
         id: `caddy-apply:${key}`,
@@ -164,7 +168,7 @@ const caddyApply: AttentionProvider = {
           agent: failure.agent ?? "",
           error: failure.error,
         },
-        href: "/agents",
+        href: rowIds.has(key) ? `/agents#agent-${rowIds.get(key)}` : "/agents",
         at: failure.at,
         scope: {},
       })),

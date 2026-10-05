@@ -47,10 +47,13 @@ export function recordApplyFailure(
   if (!(error instanceof CaddyApplyError) || error.code === "CADDY_UNREACHABLE") {
     return Promise.resolve();
   }
+  // A fleet apply refused by one agent is that agent's: its card shows it, and its next success
+  // clears it. "all" is left for a Caddy reached with no agent attached.
+  const agent = target ?? error.agent;
   return update((state) => ({
     ...state,
-    [target?.agentId ?? "all"]: {
-      agent: target?.name ?? null,
+    [agent?.agentId ?? "all"]: {
+      agent: agent?.name ?? null,
       error: error.message,
       at: new Date(now).toISOString(),
     },

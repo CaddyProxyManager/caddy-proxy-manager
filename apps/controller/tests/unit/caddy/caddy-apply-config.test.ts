@@ -90,6 +90,46 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
     });
     expect(caddy.requests.some((r) => r.path === '/load')).toBe(true);
   });
+
+  it("files a fleet apply's refusal under the agent that refused it, until a load succeeds", async () => {
+    const { attach, resetRegistry } = await import('../../../src/lib/agent/registry');
+    const { getApplyFailures } = await import('../../../src/lib/caddy/apply-status');
+    const now = new Date().toISOString();
+    const agentId = 'r'.repeat(32);
+    // The refusals the tests above provoked had no agent attached.
+    await ctx.db.delete(schema.settings);
+    const [row] = await ctx.db
+      .insert(schema.agents)
+      .values({ name: 'edge-1', agentId, secret: 'unused', createdAt: now, updatedAt: now })
+      .returning();
+    resetRegistry();
+    attach({
+      agentId,
+      agentRowId: row.id,
+      name: 'edge-1',
+      controllerId: 'controller',
+      controllerName: 'CPM',
+      initialState: {} as Parameters<typeof attach>[0]['initialState'],
+    });
+    try {
+      caddy.failWith(400, 'invalid handler');
+      await expect(applyCaddyConfig()).rejects.toMatchObject({
+        code: 'CADDY_REJECTED',
+        agent: { agentId, name: 'edge-1' },
+      });
+      const failures = await getApplyFailures();
+      expect(Object.keys(failures)).toEqual([agentId]);
+      expect(failures[agentId]).toMatchObject({ agent: 'edge-1' });
+
+      caddy.reset();
+      await applyCaddyConfig();
+      expect(await getApplyFailures()).toEqual({});
+    } finally {
+      resetRegistry();
+      await ctx.db.delete(schema.agents);
+      await ctx.db.delete(schema.settings);
+    }
+  });
 });
 
 describe('fake Caddy serves back what was loaded', () => {

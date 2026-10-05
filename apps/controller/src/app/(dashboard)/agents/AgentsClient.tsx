@@ -41,7 +41,42 @@ export type AgentRow = {
   canManage: boolean;
   /** Each with the command that fixes it. */
   logAccessFixes: LogAccessFix[];
+  /** The last configuration this agent's Caddy refused, until one loads again. */
+  applyFailure: ApplyFailure | null;
 };
+
+export type ApplyFailure = { at: string; error: string };
+
+/** Past this the banner clamps the message and offers the whole of it below. */
+const APPLY_ERROR_PREVIEW_CHARS = 240;
+
+function ApplyFailureBanner({ failure, title }: { failure: ApplyFailure; title: string }) {
+  const t = useTranslations("agents");
+  const long = failure.error.length > APPLY_ERROR_PREVIEW_CHARS;
+  return (
+    <Banner
+      status="error"
+      title={title}
+      description={
+        <VStack gap={1}>
+          <Text type="body" size="sm">
+            {t.rich("applyRefusedAt", { time: () => <Timestamp value={failure.at} /> })}
+          </Text>
+          {/* React escapes it; Caddy's wording is shown, never rendered. */}
+          <Text type="code" size="sm" maxLines={3} wordBreak="break-word">
+            {failure.error}
+          </Text>
+        </VStack>
+      }
+    >
+      {long ? (
+        <Text type="code" size="sm" wordBreak="break-word">
+          {failure.error}
+        </Text>
+      ) : undefined}
+    </Banner>
+  );
+}
 
 /** Relative while recent, absolute once "14 days ago" stops meaning anything. */
 const LAST_SEEN_RELATIVE_MS = 48 * 60 * 60 * 1000;
@@ -50,10 +85,13 @@ export default function AgentsClient({
   agents,
   anyPaired,
   isAdmin,
+  fleetApplyFailure = null,
 }: {
   agents: AgentRow[];
   anyPaired: boolean;
   isAdmin: boolean;
+  /** A refusal no one agent owns: a Caddy reached with no agent attached. */
+  fleetApplyFailure?: ApplyFailure | null;
 }) {
   const t = useTranslations("agents");
   const emptyValue = useEmptyValue();
@@ -122,6 +160,10 @@ export default function AgentsClient({
 
       {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}
 
+      {fleetApplyFailure && (
+        <ApplyFailureBanner failure={fleetApplyFailure} title={t("applyRefusedFleetTitle")} />
+      )}
+
       {agents.length === 0 && (
         <EmptyState
           headingLevel={2}
@@ -174,7 +216,10 @@ export default function AgentsClient({
             <VStack gap={3}>
               <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
                 <VStack gap={1}>
-                  <Heading level={2}>{agent.name}</Heading>
+                  {/* The anchor Needs attention links a refused apply to. */}
+                  <Heading level={2} id={`agent-${agent.id}`}>
+                    {agent.name}
+                  </Heading>
                   <Text type="body" size="sm" color="secondary">
                     {agent.version ? `v${agent.version}` : t("never")}
                   </Text>
@@ -206,6 +251,10 @@ export default function AgentsClient({
                   )}
                 </HStack>
               </HStack>
+
+              {agent.applyFailure && (
+                <ApplyFailureBanner failure={agent.applyFailure} title={t("applyRefusedTitle")} />
+              )}
 
               <Divider />
 

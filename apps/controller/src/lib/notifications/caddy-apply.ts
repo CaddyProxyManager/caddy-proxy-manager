@@ -17,9 +17,11 @@ export async function reportApplyFailure(
   now = Date.now(),
 ): Promise<void> {
   if (!(error instanceof CaddyApplyError) || error.code === "CADDY_UNREACHABLE") return;
+  // Keyed as apply-status keys it, so the same success resolves both.
+  const agent = target ?? error.agent;
   await raiseProblem(
-    `${PREFIX}${target?.agentId ?? "all"}`,
-    { kind: "caddyApplyFailed", agent: target?.name ?? null, error: error.message },
+    `${PREFIX}${agent?.agentId ?? "all"}`,
+    { kind: "caddyApplyFailed", agent: agent?.name ?? null, error: error.message },
     now,
   );
 }

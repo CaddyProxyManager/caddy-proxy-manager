@@ -150,6 +150,46 @@ describe('reading through GraphQL', () => {
     }
   });
 
+  it("answers an agent's last refused apply until a load succeeds", async () => {
+    const { recordApplyFailure, recordApplySuccess } = await import(
+      '../../../src/lib/caddy/apply-status'
+    );
+    const { CaddyApplyError } = await import('../../../src/lib/caddy/apply-error');
+    const now = new Date().toISOString();
+    const agentId = 'f'.repeat(32);
+    await ctx.db
+      .insert(dbSchema.agents)
+      .values({ name: 'edge', agentId, secret: 'unused', createdAt: now, updatedAt: now });
+    const query = '{ agents { name lastApplyFailure { at error } } }';
+    try {
+      await recordApplyFailure(
+        { agentId, name: 'edge' },
+        new CaddyApplyError('Caddy rejected configuration on edge', 'CADDY_REJECTED'),
+        Date.parse('2026-03-01T00:00:00.000Z'),
+      );
+      const refused = await run(query, 'admin');
+      expect(refused.errors).toBeUndefined();
+      expect(refused.data).toEqual({
+        agents: [
+          {
+            name: 'edge',
+            lastApplyFailure: {
+              at: '2026-03-01T00:00:00.000Z',
+              error: 'Caddy rejected configuration on edge',
+            },
+          },
+        ],
+      });
+
+      await recordApplySuccess({ agentId });
+      const cleared = await run(query, 'admin');
+      expect(cleared.data).toEqual({ agents: [{ name: 'edge', lastApplyFailure: null }] });
+    } finally {
+      await recordApplySuccess(null);
+      await ctx.db.delete(dbSchema.agents);
+    }
+  });
+
   it('puts the configuration the models validate into config', async () => {
     await run('mutation ($input: JSON!) { createProxyHost(input: $input) { id } }', 'admin', {
       input: { name: 'app', domains: ['app.example.com'], upstreams: ['backend:8080'] },

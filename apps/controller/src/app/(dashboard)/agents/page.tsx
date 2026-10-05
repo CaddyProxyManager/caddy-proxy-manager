@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import AgentsClient, { type AgentRow } from "./AgentsClient";
 import { storedErrorMessage } from "@/src/lib/errors/action-error";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
+import { getApplyFailures } from "@/src/lib/caddy/apply-status";
 import { logAccessFixes } from "@/src/lib/agent/log-access";
 import { connectedAgents } from "@/src/lib/agent/registry";
 import { listAgents } from "@/src/lib/models/agents";
@@ -28,13 +29,15 @@ export default async function AgentsPage() {
   // For a status failure this side worded, such as an agent that has not reported yet.
   const tRoot = await getTranslations();
 
-  const [paired, statuses, httpAssignments, l4Assignments, agentOptions] = await Promise.all([
-    listAgents(),
-    getAllAgentStatuses(),
-    listHostAssignments("http"),
-    listHostAssignments("l4"),
-    listAgentOptions().catch(() => []),
-  ]);
+  const [paired, statuses, httpAssignments, l4Assignments, agentOptions, applyFailures] =
+    await Promise.all([
+      listAgents(),
+      getAllAgentStatuses(),
+      listHostAssignments("http"),
+      listHostAssignments("l4"),
+      listAgentOptions().catch(() => []),
+      getApplyFailures(),
+    ]);
 
   // Names, because that is all getAllAgentStatuses reports against. Routing is by row id
   // everywhere else, so this map exists only to attach a status to the row it came from.
@@ -47,6 +50,7 @@ export default async function AgentsPage() {
     .map((agent) => {
       const status = live.get(agent.id)?.status ?? null;
       const reported = byName.get(agent.name);
+      const refused = applyFailures[agent.agentId];
       return {
         id: agent.id,
         name: agent.name,
@@ -68,6 +72,7 @@ export default async function AgentsPage() {
         assignedL4Hosts: countAssigned(l4Assignments, agent.id),
         canManage: canManage(access, "agent", agent.id),
         logAccessFixes: logAccessFixes(status?.logAccess),
+        applyFailure: refused ? { at: refused.at, error: refused.error } : null,
       };
     });
 
@@ -75,5 +80,16 @@ export default async function AgentsPage() {
   // different problems with different fixes, and an operator cannot tell them apart otherwise.
   const anyPaired = agentOptions.length > 0;
 
-  return <AgentsClient agents={rows} anyPaired={anyPaired} isAdmin={access.isAdmin} />;
+  // Not tied to one agent, and may name any of them: an admin's to see, as in Needs attention.
+  const fleet = applyFailures.all;
+  const fleetApplyFailure = access.isAdmin && fleet ? { at: fleet.at, error: fleet.error } : null;
+
+  return (
+    <AgentsClient
+      agents={rows}
+      anyPaired={anyPaired}
+      isAdmin={access.isAdmin}
+      fleetApplyFailure={fleetApplyFailure}
+    />
+  );
 }

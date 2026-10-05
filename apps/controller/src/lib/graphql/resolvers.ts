@@ -5,6 +5,7 @@
  */
 
 import { applyCaddyConfig as applyCaddy } from "../caddy";
+import { getApplyFailures } from "../caddy/apply-status";
 import { DNS_PROVIDERS } from "../dns/providers";
 import { getCaddyModuleAvailability } from "../caddy/image-build";
 import {
@@ -170,6 +171,10 @@ export const resolvers = {
   Agent: {
     // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
     connected: (agent: PairedAgent) => isConnected(agent.agentId),
+    lastApplyFailure: async (agent: PairedAgent) => {
+      const failure = (await getApplyFailures())[agent.agentId];
+      return failure ? { at: failure.at, error: failure.error } : null;
+    },
   },
 
   Query: {
