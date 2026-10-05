@@ -27,6 +27,9 @@ const CONCENTRATION_LIMIT = 50;
 
 export const DEFAULT_SIGNAL_BUDGET_MS = 4000;
 const DEFAULT_SIGNAL_WINDOW_SECONDS = 86400;
+/** The Host header is the client's, so its groups are capped in count and in time. */
+export const MAX_SIGNAL_WINDOW_SECONDS = 92 * 86400;
+export const SIGNAL_GROUP_LIMIT = 10_000;
 
 export type SignalSeverity = "critical" | "warning" | "info";
 
@@ -173,8 +176,10 @@ async function minuteErrors(window: TimeWindow): Promise<MinuteErrors[]> {
     WHERE ${timeFilter()} AND host != ''
     GROUP BY host, minute
     HAVING errors > 0
+    ORDER BY errors DESC
+    LIMIT {p_limit:UInt32}
   `,
-    timeParams(window.from, window.to),
+    { ...timeParams(window.from, window.to), p_limit: SIGNAL_GROUP_LIMIT },
   );
   return rows.map((row) => ({
     host: String(row.host),
@@ -194,8 +199,14 @@ async function mitigatedCounts(window: TimeWindow): Promise<MitigatedCount[]> {
     FROM traffic_events
     WHERE ts >= toDateTime({p_baseline:UInt32}) AND ts <= toDateTime({p_to:UInt32}) AND host != ''
     GROUP BY host
+    ORDER BY current DESC, baseline DESC
+    LIMIT {p_limit:UInt32}
   `,
-    { ...timeParams(window.from, window.to), p_baseline: Math.max(0, baselineFrom) },
+    {
+      ...timeParams(window.from, window.to),
+      p_baseline: Math.max(0, baselineFrom),
+      p_limit: SIGNAL_GROUP_LIMIT,
+    },
   );
   return rows.map((row) => ({
     host: String(row.host),
@@ -251,7 +262,11 @@ export async function detectTrafficSignals(
   options: { window?: TimeWindow; budgetMs?: number; now?: number } = {},
 ): Promise<TrafficSignals> {
   const now = options.now ?? Math.floor(Date.now() / 1000);
-  const window = options.window ?? { from: now - DEFAULT_SIGNAL_WINDOW_SECONDS, to: now };
+  const asked = options.window ?? { from: now - DEFAULT_SIGNAL_WINDOW_SECONDS, to: now };
+  const window = {
+    from: Math.max(asked.from, asked.to - MAX_SIGNAL_WINDOW_SECONDS),
+    to: asked.to,
+  };
   if (!(await isAnalyticsEnabled().catch(() => false))) {
     return { available: false, window, signals: [], skipped: [] };
   }

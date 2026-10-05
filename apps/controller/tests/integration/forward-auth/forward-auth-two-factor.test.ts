@@ -30,6 +30,10 @@ import * as schema from '../../../src/lib/db/schema';
 import { config } from '../../../src/lib/config';
 import { POST as login } from '../../../src/app/api/forward-auth/login/route';
 import { POST as verifyCode } from '../../../src/app/api/forward-auth/login/verify/route';
+import { POST as sessionLogin } from '../../../src/app/api/forward-auth/session-login/route';
+import { auth } from '../../../src/lib/auth';
+import { setSetting } from '../../../src/lib/settings';
+import { invalidateSettingsCache } from '../../../src/lib/settings/resolve';
 import { createRedirectIntent } from '../../../src/lib/models/forward-auth';
 import { hashPassword } from '../../../src/lib/auth/password';
 import { accountKey, resetAccountFailures } from '../../../src/lib/auth/rate-limit';
@@ -126,7 +130,20 @@ async function codeStep(body: Record<string, unknown>) {
 
 const totp = () => createOTP(SECRET, { digits: 6, period: 30 }).totp();
 
+/** Every password account, enforced since a month ago with a week's grace. */
+async function requireForEveryone() {
+  await setSetting('two_factor_policy', {
+    mode: 'all',
+    graceDays: 7,
+    since: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+    requireForAdmins: true,
+  });
+  invalidateSettingsCache();
+}
+
 beforeEach(async () => {
+  await ctx.db.delete(schema.settings);
+  invalidateSettingsCache();
   await ctx.db.delete(schema.twoFactors);
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.users);
@@ -238,5 +255,54 @@ describe('portal sign-in with 2FA', () => {
     expect(row.twoFactorEnabled).toBe(false);
     const { body } = await passwordStep(await createRedirectIntent(TARGET));
     expect(body.needsSecondFactor).toBeUndefined();
+  });
+});
+
+describe('portal sign-in under the "every password account" policy', () => {
+  it('refuses a password sign-in past the grace period without a second factor', async () => {
+    const user = await setup({ twoFactor: false });
+    await ctx.db
+      .update(schema.users)
+      .set({ createdAt: new Date(Date.now() - 60 * 86_400_000).toISOString() })
+      .where(eq(schema.users.id, user.id));
+    await requireForEveryone();
+    const { status, body } = await passwordStep(await createRedirectIntent(TARGET));
+    expect(status).toBe(403);
+    expect(body.code).toBe('TWO_FACTOR_SETUP_REQUIRED');
+    expect(body.redirectTo).toBeUndefined();
+  });
+
+  it('still asks an enrolled account for its code', async () => {
+    await setup({ twoFactor: true });
+    await requireForEveryone();
+    const { body } = await passwordStep(await createRedirectIntent(TARGET));
+    expect(body.needsSecondFactor).toBe(true);
+  });
+
+  it('refuses to exchange a dashboard session that must enrol first', async () => {
+    const user = await setup({ twoFactor: false });
+    await requireForEveryone();
+    await ctx.db
+      .update(schema.users)
+      .set({ createdAt: new Date(Date.now() - 60 * 86_400_000).toISOString() })
+      .where(eq(schema.users.id, user.id));
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: {
+        id: String(user.id),
+        email: user.email,
+        role: 'user',
+        hasPassword: true,
+        twoFactorEnabled: false,
+      },
+    } as never);
+    const response = await sessionLogin(
+      new NextRequest('http://localhost:3000/api/forward-auth/session-login', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ rid: await createRedirectIntent(TARGET) }),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { code?: string }).code).toBe('TWO_FACTOR_SETUP_REQUIRED');
   });
 });

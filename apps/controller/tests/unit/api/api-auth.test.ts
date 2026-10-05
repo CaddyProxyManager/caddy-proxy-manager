@@ -60,7 +60,7 @@ describe('authenticateApiRequest', () => {
         scope: 'full',
         permissions: [],
       },
-      user: { id: 42, role: 'admin' },
+      user: { id: 42, role: 'admin', hasPassword: false, twoFactorEnabled: false },
     });
 
     const result = await authenticateApiRequest(
@@ -120,7 +120,7 @@ describe('requireApiAdmin', () => {
         scope: 'full',
         permissions: [],
       },
-      user: { id: 1, role: 'admin' },
+      user: { id: 1, role: 'admin', hasPassword: false, twoFactorEnabled: false },
     });
 
     const result = await requireApiAdmin(createMockRequest({ authorization: 'Bearer token' }));
@@ -139,7 +139,7 @@ describe('requireApiAdmin', () => {
         scope: 'full',
         permissions: [],
       },
-      user: { id: 2, role: 'user' },
+      user: { id: 2, role: 'user', hasPassword: false, twoFactorEnabled: false },
     });
 
     try {
@@ -205,7 +205,7 @@ describe('requireApiUser', () => {
         scope: 'full',
         permissions: [],
       },
-      user: { id: 42, role: 'admin' },
+      user: { id: 42, role: 'admin', hasPassword: false, twoFactorEnabled: false },
     });
 
     const mockCheckSameOrigin = vi.mocked(checkSameOrigin);
@@ -234,7 +234,7 @@ describe('requireApiUser - a scoped token', () => {
         scope,
         permissions: permissions as never,
       },
-      user: { id: 42, role: 'admin' },
+      user: { id: 42, role: 'admin', hasPassword: false, twoFactorEnabled: false },
     });
   }
 
@@ -274,7 +274,7 @@ describe('requireApiUser - a scoped token', () => {
         scope: 'custom',
         permissions: ['users:write'],
       },
-      user: { id: 7, role: 'user' },
+      user: { id: 7, role: 'user', hasPassword: false, twoFactorEnabled: false },
     });
     const request = createMockRequest({ authorization: 'Bearer t', pathname: '/api/v1/users' });
     await expect(requireApiAdmin(request)).rejects.toMatchObject({ status: 403 });

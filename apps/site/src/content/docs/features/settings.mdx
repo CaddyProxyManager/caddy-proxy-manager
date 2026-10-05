@@ -105,7 +105,12 @@ file you can read, review or keep in a repository, rather than one sealed blob. 
 Users, API tokens, sessions, agents, the audit log and saved analytics views stay behind. Each
 secret in the file (certificate keys, access-list password hashes, credentials in settings and
 host options) is sealed on its own with the passphrase, by the same scrypt and AES-256-GCM scheme
-as a backup.
+as a backup, and bound to the row, column and place it was sealed in.
+
+The rest stays readable, but not editable: the file carries an HMAC over everything in it under a
+key derived from the same passphrase, so a file changed by anyone without the passphrase - a
+provider's endpoint repointed, a group member added, the version it claims - is refused before
+anything in it is read. Edit the source and export again instead.
 
 **Import configuration** merges instead of replacing:
 
@@ -115,12 +120,26 @@ as a backup.
   certificates by fingerprint, exclusions by rule and scope, settings by key. Ids are remapped,
   including those inside host options (WAF presets, CRS plugins, location rules' access lists,
   trusted mTLS roles and certificates).
-- **Grants map to users by email**, and agent pins to agents by name.
+- **Grants map to users by email**, and agent pins to agents by their agent ID. An agent re-paired
+  under a new ID is still found by name, but only when one agent here and one in the file have it.
+- **A shared name matches nothing.** Two lists called `office`, here or in the file, are both
+  skipped as ambiguous, and so is whatever points at them, rather than one being picked by id.
+- **Rows are checked as a save checks them**: host names, upstreams and options (the WAF directive
+  lint and raw JSON included), access-list rules and denial responses, blocked sources and WAF
+  exclusions. A row that fails is skipped with the reason the form would give, and two hosts in
+  the file claiming one domain are a conflict like any other. A DNS credential carried in the
+  clear is encrypted on arrival.
+- **Revocation is one-way.** A client certificate revoked here stays revoked, whatever an older
+  export says; the preview lists the field as kept.
+- **The preview shows each change**: the fields before and after, credentials masked as in the
+  audit log, with references named rather than numbered, for creates as well as updates.
 - **Nothing is overwritten silently.** A host whose domain another host here already serves is
   skipped and named. So is a host pinned to an agent, or protected by a list, this instance does
   not have: dropping the reference would widen where it is served or who gets in. A group member
   or grant naming someone missing is left out and listed.
-- **Limits**: 50 MiB, administrators only, and both the export and the import are audited.
+- **Limits**: 50 MiB, administrators only, and both the export and the import are audited. The
+  export and the import itself, not the dry run, need a sign-in from the last 10 minutes, as a
+  restore does; over the API they need a token with the **Same as my role** scope.
 
 GraphQL has the same operations: `exportConfig`, `previewConfigImport` and `applyConfigImport`,
 with the file as base64.

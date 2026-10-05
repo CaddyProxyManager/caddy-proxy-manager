@@ -18,7 +18,9 @@ Anubis is a separate switch, checked first, so bots never reach the login page.
 No external identity provider required. CPM serves the login page itself, issues a session cookie,
 and validates each request against it. Visitors sign in with a local account or through an
 [OAuth provider](../users-and-groups/#oauth--sso). A local account with
-[two-factor sign-in](../users-and-groups/#two-factor-sign-in) is asked for its code here too.
+[two-factor sign-in](../users-and-groups/#two-factor-sign-in) is asked for its code here too, and
+one the [two-factor policy](../users-and-groups/#the-two-factor-policy) has made overdue for setup
+is refused until it finishes setup in the dashboard.
 
 ## Who gets in
 

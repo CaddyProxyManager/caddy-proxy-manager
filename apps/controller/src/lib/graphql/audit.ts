@@ -9,8 +9,22 @@ import {
   exportConfigAudited,
   previewConfigImport,
 } from "../config-transfer";
-import { domainError } from "../errors/domain-error";
+import { ApiAuthError } from "../api/auth";
+import { FRESH_SESSION_MAX_AGE_MS, getCurrentSessionInfo, isFreshSession } from "../auth";
+import { domainError, domainErrorMessage } from "../errors/domain-error";
 import { type GraphQLContext, requireAdmin } from "./context";
+
+/** As the dashboard's routes: a session must be recent. A token is checked by its scope instead. */
+async function requireFreshSession(context: GraphQLContext): Promise<void> {
+  const viewer = await context.viewer();
+  if (viewer.authMethod !== "session") return;
+  if (!isFreshSession(await getCurrentSessionInfo(context.request))) {
+    throw new ApiAuthError(
+      domainErrorMessage("configNeedsFreshSignIn", { minutes: FRESH_SESSION_MAX_AGE_MS / 60_000 }),
+      403,
+    );
+  }
+}
 
 /** Base64 runs a third over the bytes; the decoded file is held to the same limit as an upload. */
 function decodeFile(file: string): Buffer {
@@ -43,6 +57,7 @@ export const auditMutationResolvers = {
     context: GraphQLContext,
   ) => {
     const { userId } = await requireAdmin(context);
+    await requireFreshSession(context);
     const sections = args.sections
       ? args.sections.filter((s): s is ConfigSection =>
           CONFIG_SECTIONS.includes(s as ConfigSection),
@@ -65,6 +80,7 @@ export const auditMutationResolvers = {
     context: GraphQLContext,
   ) => {
     const { userId } = await requireAdmin(context);
+    await requireFreshSession(context);
     return await applyConfigImport(decodeFile(args.file), args.passphrase, userId);
   },
 };

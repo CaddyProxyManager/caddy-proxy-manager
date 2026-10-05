@@ -22,6 +22,26 @@ export async function register() {
       console.log("Demo mode: no Caddy server is configured and no DNS records are changed");
     }
 
+    // Before anything logs an event: one written under a key the chain's seal does not match breaks it.
+    const { prepareAuditChain } = await import("./lib/audit/chain");
+    try {
+      const outcome = await prepareAuditChain();
+      if (outcome === "sealed") {
+        console.log("Sealed the audit log's hash chain with SESSION_SECRET");
+      }
+      if (outcome === "rekeyed") {
+        console.log("Re-keyed the audit log's hash chain from SESSION_SECRET_PREVIOUS");
+      }
+      if (outcome === "unverified") {
+        console.warn(
+          "The audit log's hash chain is not sealed with SESSION_SECRET and did not verify under " +
+            "SESSION_SECRET_PREVIOUS; Verify integrity reports it as altered",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to prepare the audit log's hash chain:", error);
+    }
+
     const { ensureAdminUser } = await import("./lib/db/init");
     try {
       await ensureAdminUser();

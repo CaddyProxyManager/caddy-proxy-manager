@@ -1,5 +1,5 @@
 import { isHostname } from "../dashboard-host";
-import { isIP } from "node:net";
+import { ipVersion } from "../http/ip-version";
 import {
   bodyLimitRangeMessage,
   customDirectivesError,
@@ -172,11 +172,11 @@ function ipOrCidr(value: string, label: string, allowPrivateRanges = false): voi
   if (allowPrivateRanges && value === "private_ranges") return;
   const separator = value.lastIndexOf("/");
   if (separator === -1) {
-    if (isIP(value) === 0) invalid(`${label} must be an IP address or CIDR range`);
+    if (ipVersion(value) === 0) invalid(`${label} must be an IP address or CIDR range`);
     return;
   }
   const address = value.slice(0, separator);
-  const version = isIP(address);
+  const version = ipVersion(address);
   const prefix = Number(value.slice(separator + 1));
   const maxPrefix = version === 4 ? 32 : version === 6 ? 128 : -1;
   if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
@@ -551,7 +551,7 @@ function validateGeoBlock(value: Record<string, unknown>): void {
   }
   for (const key of ["block_ips", "allow_ips"]) {
     stringList(value[key], `geoblock.${key}`, (item, label) => {
-      if (isIP(item) === 0) invalid(`${label} must be an IP address`);
+      if (ipVersion(item) === 0) invalid(`${label} must be an IP address`);
     });
   }
   stringList(value.trusted_proxies, "geoblock.trusted_proxies", (item, label) =>

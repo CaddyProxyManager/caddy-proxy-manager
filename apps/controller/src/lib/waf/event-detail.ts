@@ -170,6 +170,9 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// Go accepts any token as a method, quotes and `$` included; anything but a plain verb is dropped.
+const SAFE_METHOD = /^[A-Z]{1,16}$/;
+
 const SKIPPED_HEADERS = new Set(["host", "content-length", "connection", "transfer-encoding"]);
 
 /**
@@ -181,12 +184,13 @@ export function wafEventCurl(
   fallback: { host: string; method: string; uri: string },
 ): string {
   const request = parseRecord(rawData)?.transaction?.request;
-  const method = (request?.method || fallback.method || "GET").toUpperCase();
+  const claimed = (request?.method || fallback.method || "GET").toUpperCase();
+  const method = SAFE_METHOD.test(claimed) ? claimed : "GET";
   const uri = request?.uri || fallback.uri || "/";
   const headers = request?.headers ?? {};
   const hostHeader = Object.entries(headers).find(([name]) => name.toLowerCase() === "host")?.[1];
   const host = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) || fallback.host;
-  const parts = ["curl", "-X", method, shellQuote(`https://${host}${uri}`)];
+  const parts = ["curl", "-X", shellQuote(method), shellQuote(`https://${host}${uri}`)];
   for (const [name, value] of Object.entries(headers)) {
     if (SKIPPED_HEADERS.has(name.toLowerCase())) continue;
     for (const one of Array.isArray(value) ? value : [value]) {

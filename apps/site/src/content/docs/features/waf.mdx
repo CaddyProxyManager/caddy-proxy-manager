@@ -239,14 +239,16 @@ stopped a request.
 ### Why was this blocked
 
 Opening an event explains it: every rule it matched, the points each added, the variable it
-matched in and the data it matched, and the total score against the threshold with the rule that
-made the decision. Then:
+matched in and the data it matched, the total score against the threshold with the rule that
+made the decision, and the agent that reported it. Then:
 
 - **Working as intended** marks the event reviewed.
 - **False positive** opens the narrowest [exclusion](#exclusions) for it, and marks the event a
   false positive once saved.
 - **Block source** adds the client's address to the [blocked sources](../security/#blocked-sources).
-- **Copy as curl** copies the request as a curl command, to reproduce it.
+- **Copy as curl** copies the request as a curl command, to reproduce it. It is quoted for a POSIX
+  shell such as bash or zsh, not for PowerShell or cmd, and a method that is not a plain verb is
+  replaced with `GET`, since the method is whatever the client sent.
 - **Raw JSON** shows the audit record as stored.
 
 ### Credentials are not kept
@@ -256,12 +258,18 @@ again on ingest and once more when an event is shown, so an event recorded by an
 covered too:
 
 - the `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` headers, and any header
-  whose name contains `token`, `secret`, `api-key` or `apikey`;
-- query parameters and form fields named like `password`, `passwd`, `token`, `secret`, `api_key`
-  or `apikey`;
+  whose name contains `token`, `secret`, `api-key`, `apikey`, `sessid` or `sessionid`;
+- query parameters and form fields named like `password`, `passwd`, `token`, `secret`, `api_key`,
+  `apikey` or `authentication`, in the request line, the body, and the URLs in the `Referer`,
+  `Origin` and `Location` headers;
+- a request body too long to read through, which is replaced whole;
 - the matched value a rule reports, when it is one of those.
 
 The curl command keeps the placeholders, so a credential you need to replay has to be filled in.
+
+An agent only reports on the hosts it serves. An event for a host pinned to other agents is
+dropped when it arrives, so a compromised agent cannot fill another host's history; events for a
+name no host claims, such as a scanner's request to a bare address, are kept.
 
 :::note
 The WAF is a compiled-in Caddy module. If the settings are greyed out, turn Coraza on in

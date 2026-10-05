@@ -336,4 +336,22 @@ describe('the audit hash chain across a restore', () => {
     await log('after');
     expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 1, legacy: 1 });
   });
+
+  it('re-keys a chain another installation hashed', async () => {
+    await ctx.db.insert(schema.auditEvents).values(
+      [1, 2].map((seq) => ({
+        action: 'update',
+        entityType: 'proxy_host',
+        createdAt: NOW,
+        seq,
+        prevHash: seq === 1 ? '0'.repeat(64) : 'a'.repeat(64),
+        hash: 'ab'[seq - 1].repeat(64),
+      })),
+    );
+    expect((await verifyAuditChain()).ok).toBe(false);
+    const file = await createBackup(PASSPHRASE, { auditLog: true });
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    await log('after');
+    expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 3, legacy: 0 });
+  });
 });

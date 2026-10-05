@@ -218,6 +218,13 @@
       "when": 1791700000000,
       "tag": "0030_agents_drop_last_error",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0031_audit_chain_keyed",
+      "breakpoints": true
     }
   ]
 }

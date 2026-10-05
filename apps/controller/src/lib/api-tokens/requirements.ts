@@ -5,10 +5,17 @@
  */
 import { type TokenAccess, type TokenArea, type TokenScope, scopeAllows } from "./scope";
 
-export type TokenRequirement = { area: TokenArea; access: TokenAccess };
+export type TokenRequirement = {
+  area: TokenArea;
+  access: TokenAccess;
+  /** Only a full-scope token: no area grant covers it. */
+  fullOnly?: true;
+};
 
 const read = (area: TokenArea): TokenRequirement => ({ area, access: "read" });
 const write = (area: TokenArea): TokenRequirement => ({ area, access: "write" });
+/** Every private key, and writes to groups and grants: more than any one area. */
+const full = (area: TokenArea): TokenRequirement => ({ area, access: "write", fullOnly: true });
 
 /** Longest prefix first is not needed: no prefix here is a prefix of another's area boundary. */
 const REST_AREAS: ReadonlyArray<readonly [string, TokenArea]> = [
@@ -43,8 +50,8 @@ const REST_AREAS: ReadonlyArray<readonly [string, TokenArea]> = [
 const ANY_TOKEN_PATHS = new Set(["/api/v1/openapi.json"]);
 
 /**
- * GET and HEAD read. A backup download is a write: it carries every secret, sealed or not, which
- * is more than a read-only token was handed out for.
+ * GET and HEAD read. A backup, download or restore, needs a full token: it carries every secret
+ * and restores users and grants, which no area covers.
  */
 export function restRequirement(pathname: string, method: string): TokenRequirement | "any" | null {
   if (ANY_TOKEN_PATHS.has(pathname)) return "any";
@@ -53,9 +60,9 @@ export function restRequirement(pathname: string, method: string): TokenRequirem
   );
   if (!match) return null;
   const area = match[1];
+  if (pathname === "/api/v1/backup" || pathname.startsWith("/api/v1/backup/")) return full(area);
   const verb = method.toUpperCase();
-  const reads = (verb === "GET" || verb === "HEAD") && !pathname.startsWith("/api/v1/backup");
-  return reads ? read(area) : write(area);
+  return verb === "GET" || verb === "HEAD" ? read(area) : write(area);
 }
 
 /** `Type.field`. Agent mutations and the subscription authenticate as agents and are not here. */
@@ -123,10 +130,10 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Mutation.deleteApiToken": write("tokens"),
   "Mutation.saveSettings": write("settings"),
   "Mutation.applyCaddyConfig": write("settings"),
-  // Exports every secret sealed, and writes an audit event.
-  "Mutation.exportConfig": write("settings"),
-  "Mutation.previewConfigImport": write("settings"),
-  "Mutation.applyConfigImport": write("settings"),
+  // Every private key out, and groups and grants in.
+  "Mutation.exportConfig": full("settings"),
+  "Mutation.previewConfigImport": full("settings"),
+  "Mutation.applyConfigImport": full("settings"),
   // Writes an audit event.
   "Mutation.verifyAuditChain": write("audit"),
   "Mutation.createAnalyticsView": write("analytics"),
@@ -148,5 +155,6 @@ export function tokenAllows(
   requirement: TokenRequirement | "any" | null,
 ): boolean {
   if (!scope || scope.kind === "full" || requirement === "any") return true;
+  if (requirement?.fullOnly) return false;
   return requirement !== null && scopeAllows(scope, requirement.area, requirement.access);
 }

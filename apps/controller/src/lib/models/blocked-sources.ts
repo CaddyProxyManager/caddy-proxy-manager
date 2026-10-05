@@ -3,7 +3,7 @@
  * by the build at once and deleted by the expiry pass within a minute.
  */
 
-import { isIP } from "node:net";
+import { ipVersion } from "../http/ip-version";
 import { asc, count, eq, isNotNull, lte, and } from "drizzle-orm";
 import db, { nowIso, toIso } from "../db";
 import { blockedSources, users } from "../db/schema";
@@ -53,7 +53,7 @@ export function normalizeBlockedValue(kind: BlockedSourceKind, raw: string): str
   switch (kind) {
     case "ip": {
       const bare = value.replace(/^\[(.*)\]$/, "$1");
-      if (!isIP(bare)) throw domainError("blockedSourceIpInvalid", {}, { status: 400 });
+      if (!ipVersion(bare)) throw domainError("blockedSourceIpInvalid", {}, { status: 400 });
       return bare.toLowerCase();
     }
     case "cidr": {

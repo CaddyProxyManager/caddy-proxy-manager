@@ -4,11 +4,17 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import type { TestDb } from '@/tests/helpers/db';
 
 const ctx = vi.hoisted(() => ({
   enabled: true,
   writes: [] as { table: string; rows: unknown[]; agentId: string }[],
+  db: null as unknown as TestDb,
 }));
+
+const { createTestDb } = await import('@/tests/helpers/db');
+vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('@/src/lib/clickhouse/client', () => ({
   isAnalyticsEnabled: async () => ctx.enabled,
@@ -20,9 +26,10 @@ vi.mock('@/src/lib/clickhouse/client', () => ({
   },
 }));
 
-const { ingestAnalytics, parseTrafficRow, parseWafRow } = await import(
+const { bareHost, ingestAnalytics, parseTrafficRow, parseWafRow } = await import(
   '@/src/lib/agent/analytics-ingest'
 );
+const { agents, proxyHostAgents, proxyHosts } = await import('@/src/lib/db/schema');
 
 const traffic = {
   ts: 1_757_000_000.25,
@@ -52,10 +59,37 @@ const waf = {
   uri: '/login',
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   ctx.enabled = true;
   ctx.writes = [];
+  ctx.db = await createTestDb();
 });
+
+async function agent(name: string): Promise<number> {
+  const now = new Date().toISOString();
+  const [row] = await ctx.db
+    .insert(agents)
+    .values({ name, agentId: name, secret: 'x', createdAt: now, updatedAt: now })
+    .returning();
+  return row.id;
+}
+
+async function host(domains: string[], pinnedTo: number[] = []): Promise<void> {
+  const now = new Date().toISOString();
+  const [row] = await ctx.db
+    .insert(proxyHosts)
+    .values({
+      name: domains[0],
+      domains: JSON.stringify(domains),
+      upstreams: '["app:80"]',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  for (const agentId of pinnedTo) {
+    await ctx.db.insert(proxyHostAgents).values({ proxyHostId: row.id, agentId, createdAt: now });
+  }
+}
 
 describe('parseTrafficRow', () => {
   it('keeps a well-formed row, fractional timestamp included, and nothing it did not ask for', () => {
@@ -174,20 +208,52 @@ describe('parseWafRow', () => {
 
 describe('ingestAnalytics', () => {
   it('writes the good rows stamped with the agent that sent them, and counts the rest', async () => {
-    const result = await ingestAnalytics('edge-1', 'traffic', [traffic, { nope: true }, traffic]);
+    const result = await ingestAnalytics(
+      'edge-1',
+      'traffic',
+      [traffic, { nope: true }, traffic],
+      1,
+    );
 
     expect(result).toEqual({ accepted: 2, rejected: 1 });
     const stored = { ...traffic, duration_ms: null, outcome: 'served', asn: null, asn_org: null };
     expect(ctx.writes).toEqual([{ table: 'traffic', rows: [stored, stored], agentId: 'edge-1' }]);
   });
 
+  it('drops rows for a host pinned only to other agents, and keeps what it serves', async () => {
+    const edge = await agent('edge-1');
+    const other = await agent('edge-2');
+    await host(['mine.example.com'], [edge]);
+    await host(['theirs.example.com'], [other]);
+    await host(['*.shared.example.com']);
+    const rows = [
+      { ...waf, host: 'mine.example.com:443' },
+      { ...waf, host: 'THEIRS.example.com' },
+      { ...waf, host: 'a.shared.example.com' },
+      { ...waf, host: '203.0.113.1' },
+    ];
+    const result = await ingestAnalytics('edge-1', 'waf', rows, edge);
+    expect(result).toEqual({ accepted: 3, rejected: 1 });
+    expect(ctx.writes[0].rows.map((row) => (row as { host: string }).host)).toEqual([
+      'mine.example.com',
+      'a.shared.example.com',
+      '203.0.113.1',
+    ]);
+  });
+
+  it('strips the port from a host, IPv6 included', () => {
+    expect(bareHost('App.Example.com:8443')).toBe('app.example.com');
+    expect(bareHost('[2001:db8::1]:443')).toBe('[2001:db8::1]');
+    expect(bareHost('2001:db8::1')).toBe('2001:db8::1');
+  });
+
   it('writes WAF rows to their own table', async () => {
-    await ingestAnalytics('edge-1', 'waf', [waf]);
+    await ingestAnalytics('edge-1', 'waf', [waf], 1);
     expect(ctx.writes.map((write) => write.table)).toEqual(['waf']);
   });
 
   it('refuses a kind it does not know', async () => {
-    await expect(ingestAnalytics('edge-1', 'metrics', [traffic])).rejects.toMatchObject({
+    await expect(ingestAnalytics('edge-1', 'metrics', [traffic], 1)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
     expect(ctx.writes).toEqual([]);
@@ -196,7 +262,7 @@ describe('ingestAnalytics', () => {
   it('refuses while analytics are off, so the agent keeps the rows rather than losing them', async () => {
     ctx.enabled = false;
 
-    await expect(ingestAnalytics('edge-1', 'traffic', [traffic])).rejects.toMatchObject({
+    await expect(ingestAnalytics('edge-1', 'traffic', [traffic], 1)).rejects.toMatchObject({
       code: 'ANALYTICS_DISABLED',
     });
     expect(ctx.writes).toEqual([]);

@@ -548,6 +548,12 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Verified the audit log's hash chain$/,
   },
   {
+    entityType: "audit_log",
+    action: "audit_rekeyed",
+    message: "auditChainRekeyed",
+    pattern: /^Re-keyed the audit log's hash chain$/,
+  },
+  {
     entityType: "config",
     action: "config_exported",
     message: "configExported",

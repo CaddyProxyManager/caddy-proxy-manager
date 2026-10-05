@@ -6,12 +6,19 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { waitForHydration } from '../../helpers/hydration';
+import { signInWithCredentials } from '../../helpers/sign-in';
 
 const PASSPHRASE = 'e2e config passphrase';
+
+// The export wants a sign-in from the last ten minutes, which the shared one may not be by now.
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test('exports a readable configuration with its secrets sealed, and previews importing it', async ({
   page,
 }) => {
+  await page.goto('/login');
+  await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15_000 });
   await page.goto('/settings/backup');
   await waitForHydration(page);
 
@@ -25,6 +32,7 @@ test('exports a readable configuration with its secrets sealed, and previews imp
   const contents = readFileSync(await file.path(), 'utf8');
   const parsed = JSON.parse(contents);
   expect(parsed.format).toBe('cpm-config');
+  expect(typeof parsed.mac).toBe('string');
   expect(parsed.tables.users).toBeUndefined();
   expect(contents).not.toContain('enc:v1:');
 

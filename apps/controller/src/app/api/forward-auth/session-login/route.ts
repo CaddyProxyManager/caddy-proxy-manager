@@ -9,6 +9,8 @@ import {
   consumeRedirectIntent,
 } from "@/src/lib/models/forward-auth";
 import { logAuditEvent } from "@/src/lib/audit";
+import { mustEnrollTwoFactor } from "@/src/lib/auth/two-factor/policy";
+import { TWO_FACTOR_SETUP_REQUIRED } from "@/src/lib/auth/two-factor/error";
 
 /** Turns a dashboard session into a forward auth one, for a portal visitor already signed in. */
 export async function POST(request: NextRequest) {
@@ -26,6 +28,13 @@ export async function POST(request: NextRequest) {
     // View-as is a dashboard preview; it doesn't carry into the hosts behind forward auth.
     if (session.viewAs) {
       return NextResponse.json({ error: t("viewAsForbidden") }, { status: 403 });
+    }
+    // The proxy gates the dashboard on this, but /api/forward-auth/* is public.
+    if (await mustEnrollTwoFactor(session)) {
+      return NextResponse.json(
+        { error: t("twoFactorSetupRequired"), code: TWO_FACTOR_SETUP_REQUIRED },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();

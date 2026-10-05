@@ -2,7 +2,7 @@
 
 import { eq, inArray, lt } from "drizzle-orm";
 import db, { nowIso, toIso } from "../db";
-import { users, wafEventReviews } from "../db/schema";
+import { agents, users, wafEventReviews } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { domainError } from "../errors/domain-error";
 import { isAnalyticsEnabled } from "../clickhouse/client";
@@ -33,8 +33,12 @@ export type SuggestedExclusion = {
   target: string | null;
 };
 
+/** The agent whose rows these were; its name only while it is still paired. */
+export type WafEventRelay = { agentId: string; name: string | null };
+
 export type WafEventDetail = {
   event: WafEvent;
+  relayedBy: WafEventRelay | null;
   explanation: WafEventExplanation;
   suggestedExclusion: SuggestedExclusion | null;
   curl: string;
@@ -56,12 +60,20 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
   }
   const stored = (await queryWafEventsAt(ts)).find((event) => event.key === key);
   if (!stored) throw domainError("wafEventNotFound", {}, { status: 404 });
-  const event = redactStoredWafEvent(stored);
+  const { relayedBy: relayAgentId, ...storedEvent } = stored;
+  const event = redactStoredWafEvent(storedEvent);
 
-  const [settings, hosts, reviews] = await Promise.all([
+  const [settings, hosts, reviews, relay] = await Promise.all([
     getWafSettings(),
     listProxyHosts(),
     getWafEventReviews([key]),
+    relayAgentId
+      ? db
+          .select({ name: agents.name })
+          .from(agents)
+          .where(eq(agents.agentId, relayAgentId))
+          .limit(1)
+      : Promise.resolve([]),
   ]);
   const explanation = explainWafEvent(event.rawData, {
     threshold: effectiveTuning(settings).inboundThreshold,
@@ -91,6 +103,7 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
 
   return {
     event,
+    relayedBy: relayAgentId ? { agentId: relayAgentId, name: relay[0]?.name ?? null } : null,
     explanation,
     suggestedExclusion,
     curl: wafEventCurl(event.rawData, event),

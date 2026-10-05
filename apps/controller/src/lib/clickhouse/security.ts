@@ -27,13 +27,16 @@ function num(value: unknown): number {
 const WAF_EVENT_COLUMNS = `toUInt32(ts) AS ts, host, client_ip, country_code, method, uri,
   rule_id, rule_message, severity, raw_data, blocked`;
 
-/** Every event stored at one second, which an event key names. */
-export async function queryWafEventsAt(ts: number): Promise<WafEvent[]> {
-  const rows = await queryRows<StoredWafEventRow>(
-    `SELECT ${WAF_EVENT_COLUMNS} FROM waf_events WHERE ${timeFilter()} LIMIT 500`,
+/** Every event stored at one second, which an event key names, with the agent that relayed it. */
+export async function queryWafEventsAt(ts: number): Promise<(WafEvent & { relayedBy: string })[]> {
+  const rows = await queryRows<StoredWafEventRow & { agent_id?: string | null }>(
+    `SELECT ${WAF_EVENT_COLUMNS}, agent_id FROM waf_events WHERE ${timeFilter()} LIMIT 500`,
     timeParams(ts, ts),
   );
-  return rows.map((row, index) => toWafEvent(row, index + 1));
+  return rows.map((row, index) => ({
+    ...toWafEvent(row, index + 1),
+    relayedBy: row.agent_id ?? "",
+  }));
 }
 
 export async function queryWafEventPage(
@@ -213,11 +216,15 @@ export async function queryTopWafSources(
   });
 }
 
+const WAF_HOST_GROUP_LIMIT = 5_000;
+
 /** WAF events per Host header since `from`, for the per-host table. */
 export async function queryWafEventsByHost(from: number, to: number): Promise<Map<string, number>> {
   const rows = await queryRows<Record<string, unknown>>(
-    `SELECT host, count() AS events FROM waf_events WHERE ${timeFilter()} GROUP BY host`,
-    timeParams(from, to),
+    // The Host header is the client's: only the busiest groups come back.
+    `SELECT host, count() AS events FROM waf_events WHERE ${timeFilter()} GROUP BY host
+     ORDER BY events DESC LIMIT {p_limit:UInt32}`,
+    { ...timeParams(from, to), p_limit: WAF_HOST_GROUP_LIMIT },
   );
   const out = new Map<string, number>();
   for (const row of rows) {

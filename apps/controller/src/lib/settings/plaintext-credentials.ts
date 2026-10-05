@@ -34,6 +34,11 @@ function encryptJsonText(key: string, raw: string): string | null {
   return after === before ? null : after;
 }
 
+/** A settings value as stored JSON text, its credentials encrypted as the save path stores them. */
+export function encryptSettingCredentials(key: string, raw: string): string {
+  return key in ENCRYPTORS ? (encryptJsonText(key, raw) ?? raw) : raw;
+}
+
 /** Idempotent. Returns how many rows were rewritten. */
 export async function encryptPlaintextDnsCredentials(): Promise<number> {
   let rewritten = 0;

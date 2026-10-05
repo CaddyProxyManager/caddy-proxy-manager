@@ -28,6 +28,7 @@ export const WAF_REDACTED = "[redacted]";
 const CREDENTIAL_NAME_WORDS = new Set([
   "apikey",
   "auth",
+  "authentication",
   "authorization",
   "code",
   "credential",
@@ -57,6 +58,8 @@ const CREDENTIAL_NAME_PARTS = [
   "apikey",
   "password",
   "passwd",
+  "sessid",
+  "sessionid",
 ];
 
 /** Whether a header, query parameter or form field name carries a credential. */
@@ -96,8 +99,15 @@ export function redactFormEncoded(encoded: string): string {
     .join("&");
 }
 
-/** A body that reads as `name=value&...`; JSON or multipart is left to the rules' own redaction. */
-const FORM_ENCODED_BODY = /^[^\s{}[\]<>"]*=[^\s]*$/;
+/**
+ * A body that reads as `name=value&...`; JSON or multipart is left to the rules' own redaction.
+ * `=` stays out of the first class, or a long run of them backtracks quadratically.
+ */
+const FORM_ENCODED_BODY = /^[^\s{}[\]<>"=]*=[^\s]*$/;
+/** Past this, a body is not parsed at all but replaced, so an agent cannot make ingest crawl. */
+const FORM_BODY_TEST_CAP = 64 * 1024;
+/** Headers whose value is a URL that may carry a credential in its query. */
+const URL_HEADERS = new Set(["referer", "origin", "location", "content-location"]);
 
 // CRS logdata such as "Matched Data: %{TX.0} found within %{MATCHED_VAR_NAME}: %{MATCHED_VAR}"
 // echoes the variable's value, so these are the names whose value it must not keep.
@@ -123,6 +133,10 @@ const MSG_OR_DATA_FIELD = /^(?:msg|data)(?:_match_\d+)?$/;
 /** ErrorLog writes the msg unquoted after this prefix. */
 const ERROR_LOG_ACTION = /^\s*Coraza: (?:Warning|[A-Za-z ]+ \(phase \d+\))\. /;
 
+function redactUrlValue(value: unknown): unknown {
+  return typeof value === "string" ? redactQueryString(value) : value;
+}
+
 function redactHeaderMap(headers: unknown): unknown {
   if (!headers || typeof headers !== "object" || Array.isArray(headers)) return headers;
   // fromEntries defines own properties, so a header named "__proto__" stays a key.
@@ -133,7 +147,11 @@ function redactHeaderMap(headers: unknown): unknown {
         ? Array.isArray(value)
           ? value.map(() => WAF_REDACTED)
           : WAF_REDACTED
-        : value,
+        : URL_HEADERS.has(name.toLowerCase())
+          ? Array.isArray(value)
+            ? value.map(redactUrlValue)
+            : redactUrlValue(value)
+          : value,
     ]),
   );
 }
@@ -336,8 +354,11 @@ export function redactAuditEntry<T>(entry: T): T {
       if (typeof request.uri === "string") request.uri = redactQueryString(request.uri);
       // Query and form fields by name, as some Coraza builds log them beside the URI.
       if ("args" in request) request.args = redactHeaderMap(request.args);
-      if (typeof request.body === "string" && FORM_ENCODED_BODY.test(request.body)) {
-        request.body = redactFormEncoded(request.body);
+      if (typeof request.body === "string") {
+        if (request.body.length > FORM_BODY_TEST_CAP) request.body = WAF_REDACTED;
+        else if (FORM_ENCODED_BODY.test(request.body)) {
+          request.body = redactFormEncoded(request.body);
+        }
       }
     }
     for (const part of ["request", "response"] as const) {

@@ -60,6 +60,7 @@ import { getProxyHostUpstreamHealth } from "../proxy-hosts/upstream-health";
 import { previewL4HostChange, previewProxyHostChange } from "../host-review";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
 import { ApiAuthError, NotFoundError } from "../api/auth";
+import { domainErrorMessage } from "../errors/domain-error";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
 import { assertNotSelf, assertUserRole } from "../users/admin";
 import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics";
@@ -480,6 +481,10 @@ export const resolvers = {
       // As over REST: a stolen Bearer token must not mint a successor outliving its revocation.
       if (viewer.authMethod !== "session") {
         throw new ApiAuthError("API tokens can only be created from an authenticated session", 403);
+      }
+      // A token carries the account's real role, not the one being previewed.
+      if (viewer.viewAsGroupIds !== undefined) {
+        throw new ApiAuthError(domainErrorMessage("viewAsForbidden"), 403);
       }
       const created = await createApiToken(
         args.input.name,

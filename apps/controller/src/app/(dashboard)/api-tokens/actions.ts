@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
 import { createApiToken, deleteApiToken } from "@/src/lib/models/api-tokens";
 import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
-import { isTokenExpiryPreset, resolveTokenExpiry } from "@/src/lib/api-tokens/expiry";
+import { resolveTokenExpiry, tokenExpiryPreset } from "@/src/lib/api-tokens/expiry";
 import { parseTokenScope } from "@/src/lib/api-tokens/scope";
 
 export type CreateApiTokenInput = {
@@ -35,12 +35,14 @@ export async function createApiTokenAction(
     return { error: t("nameRequired") };
   }
 
-  const preset = isTokenExpiryPreset(input.expiry) ? input.expiry : "never";
-  const expiresAt = resolveTokenExpiry(preset, input.expiresAt);
-
   // The model refuses with codes; translate them before the client shows the message.
   const { rawToken } = await withTranslatedErrors(async () =>
-    createApiToken(name, userId, expiresAt, parseTokenScope(input.scope, input.permissions)),
+    createApiToken(
+      name,
+      userId,
+      resolveTokenExpiry(tokenExpiryPreset(input.expiry), input.expiresAt),
+      parseTokenScope(input.scope, input.permissions),
+    ),
   );
   revalidatePath("/profile");
   return { rawToken };

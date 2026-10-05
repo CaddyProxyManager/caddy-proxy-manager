@@ -101,14 +101,30 @@ describe('wafEventCurl', () => {
       { host: 'fallback', method: 'GET', uri: '/' },
     );
     expect(curl).toBe(
-      "curl -X POST 'https://app.example.com/search?q=it'\\''s' -H 'authorization: [redacted]' " +
+      "curl -X 'POST' 'https://app.example.com/search?q=it'\\''s' -H 'authorization: [redacted]' " +
         "-H 'user-agent: curl/8' --data-raw 'a=1'",
     );
   });
 
   it('falls back to the event when the record has no request', () => {
     expect(wafEventCurl(null, { host: 'h.example.com', method: 'get', uri: '/x' })).toBe(
-      "curl -X GET 'https://h.example.com/x'",
+      "curl -X 'GET' 'https://h.example.com/x'",
+    );
+  });
+
+  it('drops a method that is not a plain verb and keeps the URI inert', () => {
+    const curl = wafEventCurl(
+      record([], {
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell expansion is the payload
+        method: "X' /;touch${IFS}/tmp/PWNED;#",
+        uri: '/a?x=$(id)&y=`id`',
+        headers: { host: ['app.example.com'] },
+      }),
+      { host: 'fallback', method: 'GET', uri: '/' },
+    );
+    expect(curl).toBe("curl -X 'GET' 'https://app.example.com/a?x=$(id)&y=`id`'");
+    expect(wafEventCurl(null, { host: 'h', method: "X'", uri: '/' })).toBe(
+      "curl -X 'GET' 'https://h/'",
     );
   });
 });

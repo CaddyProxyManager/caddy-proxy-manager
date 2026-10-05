@@ -3249,6 +3249,54 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
   };
 }
 
+function jsonStringList(raw: unknown): string[] | null {
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string")
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A host's stored columns from somewhere other than the form (a config import), checked as a save
+ * checks them: names and upstreams normalised, and the meta put through the editor's checks (the
+ * WAF lint, raw JSON, one forward-auth provider) before the read sanitizers decide what is kept.
+ * Throws the save's domain errors.
+ */
+export function normalizeImportedProxyHost(
+  row: { domains: unknown; upstreams: unknown; meta: unknown },
+  globalWaf: WafSettings | null,
+): { domains: string; upstreams: string; meta: string | null } {
+  const domains = jsonStringList(row.domains);
+  if (!domains) throw domainError("proxyHostDomainsRequired", {}, { status: 400 });
+  const upstreams = jsonStringList(row.upstreams)?.map((upstream) => upstream.trim());
+  if (!upstreams || upstreams.filter(Boolean).length === 0) {
+    throw domainError("upstreamsRequired", {}, { status: 400 });
+  }
+  upstreams.forEach(validateUpstreamProtocol);
+  let meta: string | null = null;
+  if (row.meta !== null && row.meta !== undefined && row.meta !== "") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(String(row.meta));
+    } catch {
+      parsed = undefined;
+    }
+    if (!isPlainObject(parsed)) throw domainError("proxyHostMetaInvalid", {}, { status: 400 });
+    buildMeta({}, proxyHostMetaView(String(row.meta)) as Partial<ProxyHostInput>, globalWaf);
+    meta = serializeMeta(parseMeta(String(row.meta)));
+  }
+  return {
+    domains: JSON.stringify(normalizeProxyHostDomains(domains)),
+    upstreams: JSON.stringify(Array.from(new Set(upstreams.filter(Boolean)))),
+    meta,
+  };
+}
+
 /**
  * Apply a host form's meta fields to a stored blob: `undefined` leaves a field alone, `null` or
  * empty clears it. The same merge `updateProxyHost` does, for a blob that is not in `proxy_hosts`.

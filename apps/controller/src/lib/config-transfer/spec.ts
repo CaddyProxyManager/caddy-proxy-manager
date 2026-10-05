@@ -159,6 +159,11 @@ export const NOT_COMPARED = new Set([
   "sourceError",
 ]);
 
+/** Columns an import may set but never clear: a revoked certificate stays revoked. */
+export const ONE_WAY_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  issued_client_certificates: ["revokedAt"],
+};
+
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
 
 /** Null when the row cannot be keyed, e.g. it points at something that has no key either. */
@@ -166,6 +171,9 @@ export function naturalKey(table: string, row: Row, ref: RefKey): string | null 
   switch (table) {
     case "users":
       return text(row.email).toLowerCase() || null;
+    // An agent names itself, after its Caddy container by default, so the name says little.
+    case "agents":
+      return text(row.agentId) || null;
     case "issued_client_certificates":
       return text(row.fingerprintSha256) || null;
     case "waf_exclusions": {

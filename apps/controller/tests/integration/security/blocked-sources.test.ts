@@ -76,6 +76,15 @@ describe('normalizeBlockedValue', () => {
     );
   });
 
+  it('refuses an IPv6 zone id', async () => {
+    expect(await codeOf(() => normalizeBlockedValue('ip', 'fe80::1%eth0'))).toBe(
+      'blockedSourceIpInvalid',
+    );
+    expect(await codeOf(() => normalizeBlockedValue('cidr', 'fe80::%eth0/64'))).toBe(
+      'blockedSourceCidrInvalid',
+    );
+  });
+
   it('refuses values that do not fit the kind', async () => {
     expect(await codeOf(() => normalizeBlockedValue('ip', '203.0.113.0/24'))).toBe(
       'blockedSourceIpInvalid',

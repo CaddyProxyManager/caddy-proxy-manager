@@ -61,6 +61,49 @@ describe('query and form redaction', () => {
       body,
     );
   });
+
+  it('tests a long run of = in linear time', () => {
+    const body = `${'='.repeat(40_000)} `;
+    const started = performance.now();
+    expect(redactAuditEntry({ transaction: { request: { body } } }).transaction.request.body).toBe(
+      body,
+    );
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it('replaces a body too long to parse', () => {
+    const body = `password=${'x'.repeat(70_000)}`;
+    expect(redactAuditEntry({ transaction: { request: { body } } }).transaction.request.body).toBe(
+      '[redacted]',
+    );
+  });
+
+  it('covers authentication and session-id names', () => {
+    for (const name of ['X-Authentication', 'PHPSESSID', 'jsessionid', 'aspnet_sessionid']) {
+      expect(isCredentialName(name)).toBe(true);
+    }
+  });
+
+  it('redacts credential query parameters in URL-valued headers', () => {
+    const redacted = redactAuditEntry({
+      transaction: {
+        request: {
+          headers: {
+            Referer: ['https://a.example.com/cb?code=abc&state=1'],
+            Origin: 'https://a.example.com',
+          },
+        },
+        response: { headers: { Location: ['/next?access_token=t'] } },
+      },
+    });
+    expect(redacted.transaction.request.headers.Referer).toEqual([
+      'https://a.example.com/cb?code=[redacted]&state=1',
+    ]);
+    expect(redacted.transaction.request.headers.Origin).toBe('https://a.example.com');
+    expect(redacted.transaction.response.headers.Location).toEqual([
+      '/next?access_token=[redacted]',
+    ]);
+  });
 });
 
 describe('redaction on read', () => {

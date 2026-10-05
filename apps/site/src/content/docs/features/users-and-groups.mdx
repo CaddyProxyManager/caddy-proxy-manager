@@ -157,8 +157,14 @@ answered only on the container's own loopback. It removes the user's passkeys to
   later - a banner across the dashboard asks for setup and names the date. After that, signing in
   leads straight to setup, and until it is done the dashboard, REST and GraphQL answer nothing
   else. Changing only the number of days keeps the clock that is running.
-- **API tokens keep working.** They are credentials of their own, scoped as
-  [the API page](../api/#scopes) describes.
+- **API tokens follow their owner.** A token keeps working through its owner's grace period and
+  is refused, with 403, once setup is overdue; it works again as soon as the owner has a second
+  factor. An account in its grace period cannot create a token, since one would outlast the
+  deadline. Scopes are on [the API page](../api/#scopes).
+- **The forward-auth portal holds to it too.** A password sign-in there from an account whose
+  setup is overdue is refused with a link to finish it in the dashboard, since the portal has no
+  setup of its own, and so is a dashboard session the portal would otherwise turn into a sign-in.
+  A passkey counts as the second factor on the portal as it does on the dashboard.
 - **"Require for administrators" from an earlier release** is the administrators policy, enforced
   at once as it was.
 

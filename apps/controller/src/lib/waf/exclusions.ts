@@ -85,6 +85,25 @@ export function normalizeExclusionPath(raw: unknown): string | null {
   return normalized;
 }
 
+/**
+ * A stored path as the save left it. Not re-normalised, since it is already decoded and a `%` in
+ * it would not decode twice; only what could leave the quoted operator is refused.
+ */
+export function checkStoredExclusionPath(path: string | null): string | null {
+  if (path === null || path === "") return null;
+  const body = path.endsWith("*") ? path.slice(0, -1) : path;
+  if (
+    typeof path !== "string" ||
+    !body.startsWith("/") ||
+    path.length > MAX_EXCLUSION_PATH ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point
+    /[\s"\\\u0000-\u001f\u007f*]|%\{/.test(body)
+  ) {
+    throw new ExclusionInputError("wafExclusionPathInvalid");
+  }
+  return path;
+}
+
 /** Collections a request rule can be told to skip; a key never holds what ends an action list. */
 const TARGET_COLLECTIONS = [
   "ARGS",
@@ -158,9 +177,20 @@ export function exclusionDirectives(exclusions: readonly WafExclusionRule[]): {
   const removeIds: number[] = [];
   const rules: string[] = [];
   const sorted = [...exclusions].sort((a, b) => a.id - b.id);
-  for (const exclusion of sorted) {
-    if (PROTECTED_RULE_IDS.includes(exclusion.ruleId)) continue;
-    if (!Number.isInteger(exclusion.ruleId) || exclusion.ruleId <= 0) continue;
+  for (const stored of sorted) {
+    // Checked again here: an import or a restore writes rows without the save path's checks.
+    let exclusion: WafExclusionRule;
+    try {
+      exclusion = {
+        ...stored,
+        ruleId: validateExclusionRuleId(stored.ruleId),
+        path: checkStoredExclusionPath(stored.path),
+        target: normalizeExclusionTarget(stored.target),
+      };
+    } catch {
+      console.warn(`[waf] skipped exclusion ${stored.id}: it is not a valid exclusion`);
+      continue;
+    }
     const ctl = exclusion.target
       ? `ctl:ruleRemoveTargetById=${exclusion.ruleId};${exclusion.target}`
       : `ctl:ruleRemoveById=${exclusion.ruleId}`;

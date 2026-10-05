@@ -512,8 +512,10 @@ export const auditChain = sqliteTable("audit_chain", {
   headHash: text("headHash").notNull(),
   anchorSeq: integer("anchorSeq").notNull(),
   anchorHash: text("anchorHash").notNull(),
-  // Events up to this id predate the chain and are not covered by it.
-  legacyMaxId: integer("legacyMaxId").notNull(),
+  // Events from before the chain, each carrying a keyed mark instead of a link.
+  legacyCount: integer("legacyCount").notNull().default(0),
+  // HMAC over the fields above; null only before the first keyed write (src/lib/audit/chain.ts).
+  seal: text("seal"),
   updatedAt: text("updatedAt").notNull(),
 });
 

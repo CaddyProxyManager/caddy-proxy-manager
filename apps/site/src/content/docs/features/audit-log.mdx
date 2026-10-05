@@ -36,21 +36,31 @@ before it is stored, so the log never holds it.
 
 ## Tamper evidence
 
-Every event stores a SHA-256 hash of the event before it plus its own content, so the log is a
-chain: changing an event, removing one or slipping one in breaks it from that point on. **Verify
-integrity** recomputes the chain and reports the first broken link - which event changed, which is
-missing, or that the newest events are gone. The check is itself logged.
+Every event stores a keyed hash (HMAC-SHA256) of the event before it plus its own content, under a
+key derived from `SESSION_SECRET`, so the log is a chain: changing an event, removing one or
+slipping one in breaks it from that point on, and write access to the database alone is not enough
+to rebuild it. **Verify integrity** recomputes the chain and reports the first broken link - which
+event changed, which is missing, or that the newest events are gone. The check is itself logged.
 
-- Events logged before the upgrade that introduced the chain have no hash. They are counted as
-  older history and not covered; the chain starts from a genesis marker after them.
+- Events logged before the upgrade that introduced the chain are older history, outside the
+  sequence. Each carries a keyed mark of its own instead of a link, so editing one, removing one or
+  adding one among them at any position is still reported.
+- The chain's head is sealed with the same key, so it cannot be moved back over removed events.
 - Concurrent writes cannot fork the chain: each write takes the chain's head in its own
   transaction, a row lock on PostgreSQL and the single writer on SQLite.
-- A [restore](../settings/#backup-and-restore) that includes the audit log brings its chain along and
-  carries on from it; one without leaves the chain here as it was. Removing old events on purpose
-  anchors the chain at the oldest event kept, so pruning is not reported as tampering.
-- The chain shows that the log was altered, not who altered it. Someone with write access to the
-  database can rebuild a consistent chain; keep backups that include the audit log somewhere they
-  cannot reach if that matters to you.
+- A [restore](../settings/#backup-and-restore) that includes the audit log brings its events along
+  and re-hashes them under this installation's key, since the backup may come from another one;
+  one without leaves the chain here as it was. Removing old events on purpose anchors the chain at
+  the newest event removed, so pruning is not reported as tampering.
+- **Rotating `SESSION_SECRET`** re-keys the chain on the first start with the new secret: with the
+  old one in `SESSION_SECRET_PREVIOUS`, the chain is verified under the old key and, only if it
+  holds, re-hashed under the new one in a single transaction, and an event records the re-key.
+  Verify does not keep accepting the old key, since a secret is often rotated because it leaked.
+  Rotate without `SESSION_SECRET_PREVIOUS`, or with a chain already altered, and Verify reports the
+  log as altered from then on.
+- The chain shows that the log was altered, not who altered it. Someone who holds
+  `SESSION_SECRET` as well as write access to the database can rebuild a consistent chain; keep
+  backups that include the audit log somewhere they cannot reach if that matters to you.
 
 `verifyAuditChain` in [GraphQL](../api/) runs the same check, and each event's `changes` field
 carries its diff.

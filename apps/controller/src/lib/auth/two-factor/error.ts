@@ -3,6 +3,12 @@
  * rather than its English message. `restart` means the challenge itself is gone and the password
  * has to be entered again.
  */
+/** Outside the dashboard layout. */
+export const TWO_FACTOR_SETUP_PATH = "/two-factor-setup";
+
+/** The portal's refusal of a covered account past its grace period: it has no setup of its own. */
+export const TWO_FACTOR_SETUP_REQUIRED = "TWO_FACTOR_SETUP_REQUIRED";
+
 export type TwoFactorErrorKey =
   | "invalidSecondFactor"
   | "secondFactorExpired"

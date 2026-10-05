@@ -106,6 +106,20 @@ describe('exclusionsFor', () => {
 });
 
 describe('exclusionDirectives', () => {
+  it('skips a stored row that would inject SecLang, keeping the valid ones', () => {
+    const { rules, removeIds } = exclusionDirectives([
+      rule({ id: 1, path: '/x" "id:1,phase:1,deny"' }),
+      rule({ id: 2, target: 'ARGS:a;REQUEST_HEADERS' }),
+      rule({ id: 3, target: 'ARGS:a",deny,"' }),
+      rule({ id: 4, path: '/x%{tx.0}' }),
+      rule({ id: 5, ruleId: 949110 }),
+      rule({ id: 6, path: '/a%b' }),
+    ]);
+    expect(removeIds).toEqual([]);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toContain('"@streq /a%b"');
+  });
+
   it('removes an unscoped rule at load time', () => {
     expect(exclusionDirectives([rule({})])).toEqual({ removeIds: [942100], rules: [] });
   });

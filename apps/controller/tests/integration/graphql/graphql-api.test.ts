@@ -319,6 +319,20 @@ describe('the rules REST already enforced', () => {
     expect(await listApiTokens(1)).toHaveLength(0);
   });
 
+  it('refuses to mint an API token while viewing as another role', async () => {
+    const context = contextFor('admin', 'session');
+    const viewer = context.viewer;
+    context.viewer = async () => ({ ...(await viewer()), viewAsGroupIds: [] });
+    const result = await graphql({
+      schema,
+      source: 'mutation { createApiToken(input: { name: "ci" }) { secret } }',
+      contextValue: context,
+    });
+
+    expect(result.errors?.[0]?.message).toContain('viewing as another role');
+    expect(await listApiTokens(1)).toHaveLength(0);
+  });
+
   it('mints an API token from a session', async () => {
     const result = await run(
       'mutation { createApiToken(input: { name: "ci" }) { secret } }',

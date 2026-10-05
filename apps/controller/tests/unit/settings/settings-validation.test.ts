@@ -72,6 +72,21 @@ describe('REST settings runtime validation', () => {
     });
   }
 
+  it('refuses IPv6 zone ids in trusted proxies and geoblock lists', () => {
+    expect(() =>
+      validateSettingsGroup('trusted-proxies', {
+        ...validGroups['trusted-proxies'],
+        ranges: ['fe80::%eth0/64'],
+      }),
+    ).toThrow(SettingsValidationError);
+    expect(() =>
+      validateSettingsGroup('geoblock', { ...geoblock, allow_ips: ['fe80::1%eth0'] }),
+    ).toThrow(SettingsValidationError);
+    expect(() =>
+      validateSettingsGroup('geoblock', { ...geoblock, block_cidrs: ['fe80::1%1'] }),
+    ).toThrow(SettingsValidationError);
+  });
+
   it('rejects type confusion and out-of-range values', () => {
     expect(() => validateSettingsGroup('metrics', { enabled: 'yes', port: 70000 })).toThrow(
       /boolean/,

@@ -52,9 +52,7 @@ function seedSource(path: string): void {
     `INSERT INTO audit_events (id, userId, actorId, action, entityType, summary, createdAt, seq, prevHash, hash)
      VALUES (11, 7, 7, 'create', 'access_list', 'Created access list office', '${NOW}', 1, '${'0'.repeat(64)}', '${'a'.repeat(64)}')`,
   );
-  source.run(
-    `UPDATE audit_chain SET headSeq = 1, headHash = '${'a'.repeat(64)}', anchorSeq = 0, legacyMaxId = 0`,
-  );
+  source.run(`UPDATE audit_chain SET headSeq = 1, headHash = '${'a'.repeat(64)}', anchorSeq = 0`);
   source.close(true);
 }
 

@@ -85,6 +85,33 @@ describe('diffHostFields', () => {
     ]);
   });
 
+  it('masks health-check headers and probe bodies', () => {
+    const check = (headers: Record<string, string>, requestBody: string) => ({
+      ...BLANK,
+      loadBalancer: { activeHealthCheck: { enabled: true, headers, requestBody } },
+    });
+    const before = check({ Authorization: 'Bearer old', 'X-Tenant': 'a' }, 'user=a&pw=1');
+    const after = check({ Authorization: 'Bearer new', 'X-Tenant': 'b' }, 'user=a&pw=2');
+    const [change] = diffHostFields('http', before, after, BLANK);
+    expect(change.masked).toBe(true);
+    expect(JSON.stringify(change.leaves)).not.toMatch(/Bearer|pw=|"a"|"b"/);
+    expect(change.leaves?.map((leaf) => leaf.path)).toEqual([
+      'activeHealthCheck.headers.Authorization',
+      'activeHealthCheck.headers.X-Tenant',
+      'activeHealthCheck.requestBody',
+    ]);
+  });
+
+  it('masks cookie and bearer-named settings', () => {
+    const [change] = diffHostFields(
+      'http',
+      { ...BLANK, forwardAuth: { sessionCookie: 'a', bearer: 'x' } },
+      { ...BLANK, forwardAuth: { sessionCookie: 'b', bearer: 'y' } },
+      BLANK,
+    );
+    expect(change.leaves?.every((leaf) => leaf.after === MASKED_VALUE)).toBe(true);
+  });
+
   it('redacts credentials inside raw config rather than hiding the snippet', () => {
     const after = {
       ...BLANK,

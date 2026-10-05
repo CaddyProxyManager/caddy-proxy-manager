@@ -39,6 +39,15 @@ describe('diffAuditRecords', () => {
     expect(change.leaves).toEqual([{ path: 'waf.mode', before: 'On', after: 'DetectionOnly' }]);
   });
 
+  it('masks every value of a headers field, the field name included', () => {
+    const [change] = diffAuditRecords(
+      { headers: JSON.stringify({ 'X-Tenant': 'a', Authorization: 'Bearer old' }) },
+      { headers: JSON.stringify({ 'X-Tenant': 'b', Authorization: 'Bearer new' }) },
+    );
+    expect(change.masked).toBe(true);
+    expect(change.leaves?.every((leaf) => leaf.before === MASKED_VALUE)).toBe(true);
+  });
+
   it('honours omit, and diffs a create against nothing', () => {
     expect(diffAuditRecords(null, { name: 'n', pem: 'x' }, { omit: ['pem'] })).toEqual([
       { field: 'name', section: null, before: null, after: 'n', leaves: null, masked: false },

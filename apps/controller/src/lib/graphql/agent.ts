@@ -195,7 +195,7 @@ export const agentResolvers = {
 
       // No connection check: rows parsed while the stream was down still describe real traffic.
       try {
-        return await ingestAnalytics(agent.agentId, args.kind, args.rows);
+        return await ingestAnalytics(agent.agentId, args.kind, args.rows, agent.id);
       } catch (error) {
         if (error instanceof AnalyticsIngestError) {
           throw new GraphQLError(error.message, { extensions: { code: error.code } });

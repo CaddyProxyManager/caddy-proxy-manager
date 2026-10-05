@@ -228,7 +228,7 @@ export async function importLegacyDatabase(
     }
 
     if (results.some((result) => result.table === "audit_events" && result.copied > 0)) {
-      await reanchorAuditChain({ adoptUnchained: true });
+      await reanchorAuditChain();
     }
 
     return {

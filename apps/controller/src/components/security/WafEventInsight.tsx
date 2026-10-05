@@ -18,6 +18,7 @@ import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useTranslations } from "next-intl";
 import { getWafEventDetailAction, reviewWafEventAction } from "@/src/app/(dashboard)/waf/actions";
 import { withRowIds } from "@/lib/forms/row-id";
@@ -83,7 +84,7 @@ export function WafEventInsight({
     );
   }
 
-  const { explanation, suggestedExclusion, review, event } = detail;
+  const { explanation, suggestedExclusion, review, event, relayedBy } = detail;
   const reached = explanation.totalScore >= explanation.threshold;
 
   function saveReview(verdict: "intended" | "false_positive" | null) {
@@ -131,6 +132,13 @@ export function WafEventInsight({
               ? t("decidingRuleUnknown")
               : t("detectedOnly")}
         </Text>
+        {relayedBy && (
+          <Text type="body" size="xsm" color="secondary">
+            {relayedBy.name
+              ? t("relayedBy", { name: relayedBy.name })
+              : t("relayedByUnpaired", { agentId: relayedBy.agentId })}
+          </Text>
+        )}
         {!explanation.scoreReported && explanation.rules.length > 0 && (
           <Text type="body" size="xsm" color="secondary">
             {t("scoreSummed")}
@@ -216,20 +224,22 @@ export function WafEventInsight({
           isDisabled={pending}
           onClick={() => setBlock({ kind: "ip", value: event.clientIp, reason: "" })}
         />
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={<ClipboardCopy />}
-          label={t("copyAsCurl")}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(detail.curl);
-              toast.success(t("curlCopied"));
-            } catch {
-              toast.error(t("curlCopyFailed"));
-            }
-          }}
-        />
+        <Tooltip content={t("curlPosixNote")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<ClipboardCopy />}
+            label={t("copyAsCurl")}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(detail.curl);
+                toast.success(t("curlCopied"));
+              } catch {
+                toast.error(t("curlCopyFailed"));
+              }
+            }}
+          />
+        </Tooltip>
         {review && (
           <Button
             size="sm"

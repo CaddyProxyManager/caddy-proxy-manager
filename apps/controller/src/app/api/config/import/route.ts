@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
+import {
+  FRESH_SESSION_MAX_AGE_MS,
+  checkSameOrigin,
+  getCurrentSessionInfo,
+  isFreshSession,
+  requireAdmin,
+} from "@/src/lib/auth";
 import {
   MAX_CONFIG_BYTES,
   applyConfigImport,
@@ -36,6 +42,18 @@ export async function POST(request: NextRequest) {
       case "describe":
         return NextResponse.json(describeConfigFile(file));
       case "apply":
+        // Writes groups and grants; the dry run before it needs no fresh sign-in.
+        if (!isFreshSession(await getCurrentSessionInfo(request))) {
+          return NextResponse.json(
+            {
+              error: t("errors.configNeedsFreshSignIn", {
+                minutes: FRESH_SESSION_MAX_AGE_MS / 60_000,
+              }),
+              code: "reauth-required",
+            },
+            { status: 403 },
+          );
+        }
         return NextResponse.json(
           await applyConfigImport(file, passphrase, Number(session.user.id)),
         );

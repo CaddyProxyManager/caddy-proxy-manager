@@ -8,6 +8,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { Heading } from "@astryxdesign/core/Heading";
 import { List, ListItem } from "@astryxdesign/core/List";
@@ -16,6 +17,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
+import { AuditChanges } from "@/components/audit/AuditChanges";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type {
@@ -39,6 +41,33 @@ type Described = { exportedAt: string; appVersion: string; counts: Record<string
 
 const ACTION_COLOR = { create: "green", update: "blue", skip: "gray" } as const;
 
+/** What a refused request says, and whether a fresh sign-in is what it wants. */
+type Failure = { message: string; reauth: boolean };
+
+async function failureOf(response: Response, fallback: string): Promise<Failure> {
+  const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+  return { message: body.error ?? fallback, reauth: body.code === "reauth-required" };
+}
+
+/** Export and import hand over every key, so they want a recent sign-in, as a restore does. */
+function FailureBanner({ failure, title }: { failure: Failure; title: string }) {
+  const t = useTranslations("settings.configTransfer");
+  const tCommon = useTranslations("common");
+  if (!failure.reauth) return <Banner status="error" title={title} description={failure.message} />;
+  return (
+    <Banner
+      status="warning"
+      title={t("reauthTitle")}
+      description={failure.message}
+      endContent={
+        <form action="/api/auth/logout" method="post">
+          <Button type="submit" size="sm" variant="secondary" label={tCommon("signOut")} />
+        </form>
+      }
+    />
+  );
+}
+
 function ExportCard() {
   const t = useTranslations("settings.configTransfer");
   const tErrors = useTranslations("errors");
@@ -47,7 +76,7 @@ function ExportCard() {
   const [passphrase, setPassphrase] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Failure | null>(null);
 
   const mismatch = confirmation.length > 0 && confirmation !== passphrase;
   const ready =
@@ -63,9 +92,7 @@ function ExportCard() {
         body: JSON.stringify({ passphrase, sections }),
       });
       if (!response.ok) {
-        setError(
-          ((await response.json()) as { error?: string }).error ?? tErrors("configExportFailed"),
-        );
+        setError(await failureOf(response, tErrors("configExportFailed")));
         return;
       }
       const name =
@@ -80,7 +107,7 @@ function ExportCard() {
       setPassphrase("");
       setConfirmation("");
     } catch {
-      setError(tErrors("configExportFailed"));
+      setError({ message: tErrors("configExportFailed"), reauth: false });
     } finally {
       setBusy(false);
     }
@@ -95,9 +122,7 @@ function ExportCard() {
         <Text type="body" size="sm" color="secondary">
           {t("exportHelp")}
         </Text>
-        {error && (
-          <Banner status="error" title={tErrors("configExportFailed")} description={error} />
-        )}
+        {error && <FailureBanner failure={error} title={tErrors("configExportFailed")} />}
         <CheckboxList label={t("sectionsLabel")} value={sections} onChange={setSections}>
           {SECTIONS.map((section) => (
             <CheckboxListItem key={section} value={section} label={t(`sections.${section}`)} />
@@ -137,6 +162,8 @@ function ExportCard() {
 
 function ItemLine({ item }: { item: ConfigImportItem }) {
   const t = useTranslations("settings.configTransfer");
+  const tErrors = useTranslations("errors");
+  const errorCode = item.values.code as Parameters<typeof tErrors>[0] | undefined;
   const reason = item.reason
     ? t(`reasons.${item.reason}`, {
         domain: item.values.domain ?? "",
@@ -144,6 +171,11 @@ function ItemLine({ item }: { item: ConfigImportItem }) {
         listen: item.values.listen ?? "",
         name: item.values.name ?? "",
         kind: item.values.kind ?? "",
+        // The code is the model's, whose sentence the catalog holds; the English is a fallback.
+        detail:
+          errorCode && tErrors.has(errorCode)
+            ? tErrors(errorCode, item.values)
+            : (item.values.message ?? ""),
       })
     : item.action === "update" && item.fields.length > 0
       ? t("updatedFields", { fields: item.fields.join(", ") })
@@ -151,7 +183,32 @@ function ItemLine({ item }: { item: ConfigImportItem }) {
   return (
     <ListItem
       label={item.label}
-      description={reason}
+      description={
+        <VStack gap={1}>
+          {reason && (
+            <Text type="body" size="sm" color="secondary">
+              {reason}
+            </Text>
+          )}
+          {item.kept.length > 0 && (
+            <Text type="body" size="sm" color="secondary">
+              {t("keptFields", { fields: item.kept.join(", ") })}
+            </Text>
+          )}
+          {item.changes.length > 0 && (
+            <Collapsible
+              defaultIsOpen={false}
+              trigger={
+                <Text type="label" size="sm">
+                  {t("showChanges")}
+                </Text>
+              }
+            >
+              <AuditChanges changes={item.changes} layout="unified" />
+            </Collapsible>
+          )}
+        </VStack>
+      }
       startContent={
         <Token size="sm" label={t(`actions.${item.action}`)} color={ACTION_COLOR[item.action]} />
       }
@@ -174,7 +231,7 @@ function ImportCard() {
   const [done, setDone] = useState<ConfigImportPreview | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Failure | null>(null);
 
   const send = async (step: "describe" | "preview" | "apply", chosen = file) => {
     if (!chosen) return null;
@@ -183,10 +240,13 @@ function ImportCard() {
     form.set("step", step);
     form.set("passphrase", passphrase);
     const response = await fetch("/api/config/import", { method: "POST", body: form });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error ?? tErrors("configImportFailed"));
-    return body;
+    if (!response.ok) throw await failureOf(response, tErrors("configImportFailed"));
+    return await response.json();
   };
+  const failed = (cause: unknown): Failure =>
+    cause && typeof cause === "object" && "message" in cause && "reauth" in cause
+      ? (cause as Failure)
+      : { message: tErrors("configImportFailed"), reauth: false };
 
   const choose = async (chosen: File | null) => {
     setFile(chosen);
@@ -198,7 +258,7 @@ function ImportCard() {
     try {
       setDescribed((await send("describe", chosen)) as Described);
     } catch (cause) {
-      setError((cause as Error).message);
+      setError(failed(cause));
     }
   };
 
@@ -214,7 +274,7 @@ function ImportCard() {
         setPreview(result);
       }
     } catch (cause) {
-      setError((cause as Error).message);
+      setError(failed(cause));
     } finally {
       setBusy(false);
       setConfirmOpen(false);
@@ -234,9 +294,7 @@ function ImportCard() {
         <Text type="body" size="sm" color="secondary">
           {t("importHelp")}
         </Text>
-        {error && (
-          <Banner status="error" title={tErrors("configImportFailed")} description={error} />
-        )}
+        {error && <FailureBanner failure={error} title={tErrors("configImportFailed")} />}
         {done && (
           <Banner
             status="success"

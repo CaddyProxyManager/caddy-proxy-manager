@@ -13,6 +13,9 @@ import {
   redactWafEventRow,
 } from "@cpm/shared";
 import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
+import db from "../db";
+import { proxyHosts } from "../db/schema";
+import { listHostAssignments, servedByAgent } from "../models/host-agents";
 
 /** A URI or user agent past this is noise, not a request. */
 const MAX_FIELD_CHARS = 64 * 1024;
@@ -143,6 +146,50 @@ export function parseWafRow(value: unknown): WafEventRow | null {
   });
 }
 
+/** `host:port` and `[v6]:port` to the bare, lower-cased name, so a port cannot split a group. */
+export function bareHost(host: string): string {
+  const lower = host.trim().toLowerCase();
+  if (lower.startsWith("[")) {
+    const end = lower.indexOf("]");
+    return end === -1 ? lower : lower.slice(0, end + 1);
+  }
+  return lower.split(":").length === 2 ? lower.replace(/:\d*$/, "") : lower;
+}
+
+function matchesDomain(domains: ReadonlySet<string>, host: string): boolean {
+  if (domains.has(host)) return true;
+  const dot = host.indexOf(".");
+  return dot !== -1 && domains.has(`*${host.slice(dot)}`);
+}
+
+/**
+ * Whether a row's host is one this agent may report on: a host it serves, or one no proxy host
+ * claims (scanners, the catch-all). A host pinned only to other agents is not its to report.
+ */
+export async function agentHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
+  const [rows, assignments] = await Promise.all([
+    db.select({ id: proxyHosts.id, domains: proxyHosts.domains }).from(proxyHosts),
+    listHostAssignments("http"),
+  ]);
+  const mine = new Set<string>();
+  const others = new Set<string>();
+  for (const row of rows) {
+    let domains: unknown;
+    try {
+      domains = JSON.parse(row.domains);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(domains)) continue;
+    const bucket = servedByAgent(assignments, row.id, agentRowId) ? mine : others;
+    for (const domain of domains) if (typeof domain === "string") bucket.add(domain.toLowerCase());
+  }
+  return (host) => {
+    const bare = bareHost(host);
+    return matchesDomain(mine, bare) || !matchesDomain(others, bare);
+  };
+}
+
 function isKind(value: unknown): value is AgentAnalyticsKind {
   return (AGENT_ANALYTICS_KINDS as readonly unknown[]).includes(value);
 }
@@ -152,6 +199,8 @@ export async function ingestAnalytics(
   agentId: string,
   kind: unknown,
   rows: readonly unknown[],
+  /** `agents.id`, which host assignments name. */
+  agentRowId: number,
 ): Promise<AgentAnalyticsResult> {
   if (!isKind(kind)) {
     throw new AnalyticsIngestError("BAD_REQUEST", "Unknown analytics kind.");
@@ -171,13 +220,22 @@ export async function ingestAnalytics(
     throw new AnalyticsIngestError("ANALYTICS_DISABLED", "Analytics are switched off.");
   }
 
+  const serves = await agentHostFilter(agentRowId);
+  const ours = <T extends { host: string }>(row: T | null): row is T =>
+    row !== null && serves(row.host);
   if (kind === "traffic") {
-    const valid = rows.map(parseTrafficRow).filter((row) => row !== null);
+    const valid = rows
+      .map(parseTrafficRow)
+      .filter(ours)
+      .map((row) => ({ ...row, host: bareHost(row.host) }));
     await insertTrafficEvents(valid, agentId);
     return { accepted: valid.length, rejected: rows.length - valid.length };
   }
 
-  const valid = rows.map(parseWafRow).filter((row) => row !== null);
+  const valid = rows
+    .map(parseWafRow)
+    .filter(ours)
+    .map((row) => ({ ...row, host: bareHost(row.host) }));
   await insertWafEvents(valid, agentId);
   return { accepted: valid.length, rejected: rows.length - valid.length };
 }

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { mustEnrollTwoFactor } from "../auth/two-factor/policy";
+import { mfaStandingForAccount, mustEnrollTwoFactor } from "../auth/two-factor/policy";
 import { auth, checkSameOrigin } from "../auth";
 import { validateToken } from "../models/api-tokens";
 import { randomUUID } from "node:crypto";
@@ -48,6 +48,10 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
     const result = await validateToken(rawToken);
     if (!result) {
       throw new ApiAuthError("Invalid or expired API token", 401);
+    }
+    // The policy binds the owner, so a token is no way around it once the grace period ends.
+    if ((await mfaStandingForAccount(result.user)).status === "required") {
+      throw new ApiAuthError(domainErrorMessage("apiTokenOwnerNeedsSecondFactor"), 403);
     }
 
     return {

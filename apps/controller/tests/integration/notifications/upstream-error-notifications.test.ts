@@ -161,11 +161,16 @@ describe('upstream error notifications', () => {
   it('is ingested with analytics off, and asked of the agents only while wanted', async () => {
     await host(['app.example.com']);
     const now = Date.now();
-    const result = await ingestAnalytics('agent-1', 'upstream-errors', [
-      errors('app.example.com', 12, now),
-      { minute: 1, host: 'x', status: 200, count: 1 },
-      'nonsense',
-    ]);
+    const result = await ingestAnalytics(
+      'agent-1',
+      'upstream-errors',
+      [
+        errors('app.example.com', 12, now),
+        { minute: 1, host: 'x', status: 200, count: 1 },
+        'nonsense',
+      ],
+      1,
+    );
     expect(result).toEqual({ accepted: 1, rejected: 2 });
     // The count was raised at its own Date.now(), a moment after `now`.
     expect(await flush(Date.now())).toHaveLength(1);

@@ -5,6 +5,7 @@
  * decided by the blocker module instead, since only it can look those up.
  */
 import { isIP } from "node:net";
+import { ipVersion } from "../http/ip-version";
 import { CONTINENT_CODES } from "../blocked-sources/types";
 import { domainError } from "../errors/domain-error";
 import { tagOutcome } from "../caddy/outcome-markers";
@@ -81,12 +82,12 @@ export function normalizeCidr(value: string): string | null {
   const text = value.trim();
   const slash = text.indexOf("/");
   if (slash === -1) {
-    const version = isIP(text);
+    const version = ipVersion(text);
     return version === 4 ? `${text}/32` : version === 6 ? `${text}/128` : null;
   }
   const address = text.slice(0, slash);
   const prefix = text.slice(slash + 1);
-  const version = isIP(address);
+  const version = ipVersion(address);
   if (version === 0 || !/^\d{1,3}$/.test(prefix)) return null;
   return Number(prefix) <= (version === 4 ? 32 : 128) ? `${address}/${Number(prefix)}` : null;
 }

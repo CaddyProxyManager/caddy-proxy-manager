@@ -9,6 +9,7 @@ import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
@@ -24,7 +25,11 @@ import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
 import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
 import { accountLockSeconds, lockLiftsIn } from "@/src/lib/auth/sign-in-error";
-import { twoFactorError } from "@/src/lib/auth/two-factor/error";
+import {
+  TWO_FACTOR_SETUP_PATH,
+  TWO_FACTOR_SETUP_REQUIRED,
+  twoFactorError,
+} from "@/src/lib/auth/two-factor/error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import {
   AUTOFILL_CURRENT_PASSWORD,
@@ -96,10 +101,13 @@ export default function PortalLoginForm({
 }: PortalLoginFormProps) {
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const tl = useTranslations("auth.login");
   const tPasskey = useTranslations("auth.passkey");
   const format = useFormatter();
   const [error, setError] = useState<string | null>(initialError);
+  // The account must set up 2FA in the dashboard first, which the error banner links to.
+  const [setupRequired, setSetupRequired] = useState(false);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -123,6 +131,7 @@ export default function PortalLoginForm({
   // A dashboard session (OAuth's, or a passkey's) is exchanged for a forward auth one.
   const exchangeSession = useCallback(() => {
     setPending(true);
+    setSetupRequired(false);
     fetch("/api/forward-auth/session-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,6 +142,7 @@ export default function PortalLoginForm({
         if (data.redirectTo) {
           window.location.href = data.redirectTo;
         } else {
+          setSetupRequired(data.code === TWO_FACTOR_SETUP_REQUIRED);
           setError(data.error ?? t("authorizeFailed"));
           setPending(false);
         }
@@ -158,6 +168,7 @@ export default function PortalLoginForm({
 
   const submitCredentials = async (trimmedUsername: string) => {
     setPending(true);
+    setSetupRequired(false);
     try {
       const response = await fetch("/api/forward-auth/login", {
         method: "POST",
@@ -181,6 +192,7 @@ export default function PortalLoginForm({
 
       if (!response.ok) {
         captchaStep.spent();
+        setSetupRequired(data.code === TWO_FACTOR_SETUP_REQUIRED);
         const lockSeconds = accountLockSeconds({ ...data, status: response.status });
         setError(
           lockSeconds === null
@@ -346,7 +358,19 @@ export default function PortalLoginForm({
           : t("signInToContinue")
       }
     >
-      {error && <Banner status="error" title={t("couldNotSignIn")} description={error} />}
+      {error &&
+        (setupRequired ? (
+          <Banner
+            status="warning"
+            title={t("twoFactorSetupTitle")}
+            description={error}
+            endContent={
+              <AstryxLink href={TWO_FACTOR_SETUP_PATH}>{tNav("mfaGraceAction")}</AstryxLink>
+            }
+          />
+        ) : (
+          <Banner status="error" title={t("couldNotSignIn")} description={error} />
+        ))}
 
       {!passwordFormEnabled && !hasProviders && (
         <Banner

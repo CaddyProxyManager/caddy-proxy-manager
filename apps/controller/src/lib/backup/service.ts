@@ -197,8 +197,8 @@ export async function restoreBackup(
     }
   }
   if (prepared.some(({ table }) => table.name === BACKUP_OPTIONAL.auditLog)) {
-    // A backup from before the chain brings events without hashes: they predate it, as here.
-    await reanchorAuditChain({ adoptUnchained: true });
+    // Re-hashed under this key: the backup may be another installation's, or from before the chain.
+    await reanchorAuditChain();
   }
 
   return {

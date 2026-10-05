@@ -118,9 +118,28 @@ describe('REST requirements', () => {
       area: 'hosts',
       access: 'write',
     });
-    expect(restRequirement('/api/v1/backup', 'GET')).toEqual({ area: 'settings', access: 'write' });
+    expect(restRequirement('/api/v1/backup', 'GET')).toMatchObject({ access: 'write' });
     expect(restRequirement('/api/v1/proxy-hostsx', 'GET')).toBeNull();
     expect(restRequirement('/api/v1/openapi.json', 'GET')).toBe('any');
+  });
+
+  it('keep the backup and config transfer from any token short of full', () => {
+    const settingsWrite = {
+      kind: 'custom' as const,
+      permissions: ['settings:write' as const, 'users:write' as const],
+    };
+    for (const requirement of [
+      restRequirement('/api/v1/backup', 'GET'),
+      restRequirement('/api/v1/backup', 'POST'),
+      GRAPHQL_REQUIREMENTS['Mutation.exportConfig'],
+      GRAPHQL_REQUIREMENTS['Mutation.previewConfigImport'],
+      GRAPHQL_REQUIREMENTS['Mutation.applyConfigImport'],
+    ]) {
+      expect(tokenAllows(settingsWrite, requirement ?? null)).toBe(false);
+      expect(tokenAllows({ kind: 'full' }, requirement ?? null)).toBe(true);
+      expect(tokenAllows(undefined, requirement ?? null)).toBe(true);
+    }
+    expect(tokenAllows(settingsWrite, restRequirement('/api/v1/settings', 'PUT'))).toBe(true);
   });
 
   it('let a session and a full token through, and refuse an unnamed path to a narrowed one', () => {

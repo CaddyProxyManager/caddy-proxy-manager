@@ -23,6 +23,8 @@ import { getAuth } from "@/src/lib/auth/server";
 import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import { resolveSignInDirectory, signInWithDirectory } from "@/src/lib/ldap/sign-in";
 import { ACCOUNT_LOCKED } from "@/src/lib/auth/sign-in-error";
+import { mfaStandingForAccount } from "@/src/lib/auth/two-factor/policy";
+import { TWO_FACTOR_SETUP_REQUIRED } from "@/src/lib/auth/two-factor/error";
 
 // The form posts a username, a password and a rid; anything larger is not a login.
 const MAX_BODY_BYTES = 16 * 1024;
@@ -211,6 +213,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { needsSecondFactor: true, challenge: issuePortalChallenge(user.id, rid) },
         { headers: spentHeaders },
+      );
+    }
+
+    // The dashboard would send this account to set up 2FA; the portal has no setup, so it refuses.
+    // An account whose factor is a passkey stands satisfied, and the portal takes passkeys.
+    const standing = await mfaStandingForAccount({
+      id: user.id,
+      role: user.role,
+      hasPassword: Boolean(user.passwordHash),
+      twoFactorEnabled: false,
+    });
+    if (standing.status === "required") {
+      await logAuditEvent({
+        userId: user.id,
+        action: "forward_auth_login_failed",
+        entityType: "user",
+        entityId: user.id,
+        summary: `Forward auth login refused for user ${user.email}: two-factor setup is required`,
+      });
+      return NextResponse.json(
+        { error: t("twoFactorSetupRequired"), code: TWO_FACTOR_SETUP_REQUIRED },
+        { status: 403, headers: spentHeaders },
       );
     }
 

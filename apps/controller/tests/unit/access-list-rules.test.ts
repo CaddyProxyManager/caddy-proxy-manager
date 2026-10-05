@@ -48,6 +48,12 @@ describe('normalizeCidr', () => {
       expect(normalizeCidr(bad)).toBeNull();
     }
   });
+
+  it('refuses an IPv6 zone id, bare or in a range', () => {
+    for (const bad of ['fe80::1%eth0', 'fe80::%eth0/64', 'fe80::1%25eth0/128']) {
+      expect(normalizeCidr(bad)).toBeNull();
+    }
+  });
 });
 
 describe('sanitizeIpRules', () => {

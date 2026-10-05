@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
+import {
+  FRESH_SESSION_MAX_AGE_MS,
+  checkSameOrigin,
+  getCurrentSessionInfo,
+  isFreshSession,
+  requireAdmin,
+} from "@/src/lib/auth";
 import {
   CONFIG_SECTIONS,
   type ConfigSection,
@@ -14,6 +20,17 @@ export async function POST(request: NextRequest) {
   if (forbidden) return forbidden;
   try {
     const session = await requireAdmin();
+    // Every private key leaves in the file, so a borrowed old session is not enough.
+    if (!isFreshSession(await getCurrentSessionInfo(request))) {
+      const t = await getTranslations();
+      return NextResponse.json(
+        {
+          error: t("errors.configNeedsFreshSignIn", { minutes: FRESH_SESSION_MAX_AGE_MS / 60_000 }),
+          code: "reauth-required",
+        },
+        { status: 403 },
+      );
+    }
     const body = await request.json();
     const sections = Array.isArray(body.sections)
       ? body.sections.filter((s: unknown): s is ConfigSection =>

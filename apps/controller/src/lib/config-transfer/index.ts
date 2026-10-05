@@ -9,14 +9,20 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import pkg from "../../../package.json";
 import { logAuditEvent } from "../audit";
-import { exportRow, importRow } from "../backup/secrets";
+import { type AuditChange, diffAuditRecords } from "../audit/changes";
+import { MARKER, exportRow, importRow } from "../backup/secrets";
 import { applyCaddyConfig } from "../caddy";
 import db, { nowIso, runInTransaction } from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
-import { domainError } from "../errors/domain-error";
+import { type DomainError, domainError, domainErrorOf } from "../errors/domain-error";
+import { MASKED_VALUE } from "../host-review/types";
 import { type Described, describeTables, resyncSequence } from "../migration/import";
 import { isNewer } from "../runtime/updates";
+import { getWafSettings } from "../settings";
+import { encryptSettingCredentials } from "../settings/plaintext-credentials";
 import { invalidateSettingsCache } from "../settings/resolve";
+import { mapTextColumn } from "../secrets/walk";
+import { IMPORT_CHECKS } from "./checks";
 import {
   CONFIG_SECTIONS,
   type ConfigFile,
@@ -29,6 +35,7 @@ import {
   CONFIG_TABLES,
   type EmbeddedRef,
   NOT_COMPARED,
+  ONE_WAY_COLUMNS,
   PORTABLE_SETTING_KEYS,
   type RefKey,
   type Row,
@@ -46,7 +53,11 @@ export type SkipReason =
   | "domainConflict"
   | "listenerConflict"
   | "missingReference"
-  | "unkeyable";
+  | "unkeyable"
+  /** Two rows share the natural key, here or in the file: neither is matched by guesswork. */
+  | "ambiguous"
+  /** A check the save would run refused it; `values.code` names which. */
+  | "invalid";
 
 export type ConfigImportItem = {
   table: string;
@@ -57,6 +68,10 @@ export type ConfigImportItem = {
   values: Record<string, string>;
   /** Columns that differ, for an update. */
   fields: string[];
+  /** Before and after, secrets masked; a create's before is empty. */
+  changes: AuditChange[];
+  /** Columns the file would have changed but an import never does, such as a revocation. */
+  kept: string[];
 };
 
 export type ConfigImportWarning = {
@@ -125,6 +140,14 @@ async function readLocal(name: string): Promise<Row[]> {
 
 /** Tables a reference can reach that the file never carries, keyed by what identifies them. */
 const REFERENCE_ONLY = ["users", "agents", "oauth_providers"] as const;
+
+/** What the preview calls a reference whose key is not for reading, and an agent's fallback. */
+const REF_LABELS: Partial<Record<string, (row: Row | undefined) => string | null>> = {
+  agents: (row) => (row?.name ? String(row.name) : null),
+};
+
+/** Hidden from the preview's before and after: bookkeeping, and certificate bodies. */
+const DISPLAY_OMIT = ["id", "createdAt", "updatedAt", "sourceReadAt", "sourceError"];
 
 function sectionTables(sections: readonly ConfigSection[]): TableSpec[] {
   return CONFIG_TABLES.filter((spec) => sections.includes(spec.section));
@@ -205,32 +228,44 @@ function canonical(value: unknown): string {
 
 export type ExportOptions = { sections?: readonly ConfigSection[] };
 
-/** Keys repeated within one set get #2, #3 in id order, so duplicate names still pair up. */
-function keyIndex(
-  table: string,
-  rows: Row[],
-  ref: RefKey,
-): { byKey: Map<string, Row>; keyOf: Map<unknown, string> } {
-  const byKey = new Map<string, Row>();
-  const keyOf = new Map<unknown, string>();
-  const seen = new Map<string, number>();
-  const sorted = [...rows].sort((a, b) => Number(a.id ?? 0) - Number(b.id ?? 0));
-  for (const row of sorted) {
-    const base = naturalKey(table, row, ref);
-    if (base === null) continue;
-    const count = (seen.get(base) ?? 0) + 1;
-    seen.set(base, count);
-    const key = count === 1 ? base : `${base}#${count}`;
-    byKey.set(key, row);
-    keyOf.set(row.id ?? row.key, key);
+type KeyIndex = {
+  /** Unique keys only. */
+  byKey: Map<string, Row>;
+  keyOf: Map<unknown, string>;
+  /** Keys more than one row has: none of those rows is matched, since ids say nothing across instances. */
+  ambiguous: Set<string>;
+  /** Every keyable row's key, ambiguous ones included, for naming them. */
+  baseOf: Map<unknown, string>;
+};
+
+function keyIndex(table: string, rows: Row[], ref: RefKey): KeyIndex {
+  const keyed = rows.map((row) => [row, naturalKey(table, row, ref)] as const);
+  const counts = new Map<string, number>();
+  for (const [, key] of keyed) if (key !== null) counts.set(key, (counts.get(key) ?? 0) + 1);
+  const index: KeyIndex = {
+    byKey: new Map(),
+    keyOf: new Map(),
+    ambiguous: new Set(),
+    baseOf: new Map(),
+  };
+  for (const [row, key] of keyed) {
+    if (key === null) continue;
+    const id = row.id ?? row.key;
+    index.baseOf.set(id, key);
+    if ((counts.get(key) ?? 0) > 1) {
+      index.ambiguous.add(key);
+      continue;
+    }
+    index.byKey.set(key, row);
+    index.keyOf.set(id, key);
   }
-  return { byKey, keyOf };
+  return index;
 }
 
 /** Local rows and their keys, loaded once per table on demand. */
 class LocalIndex {
   private rows = new Map<string, Row[]>();
-  private indexes = new Map<string, ReturnType<typeof keyIndex>>();
+  private indexes = new Map<string, KeyIndex>();
 
   async load(tables: Iterable<string>): Promise<void> {
     for (const table of tables) {
@@ -243,7 +278,7 @@ class LocalIndex {
     return this.rows.get(table) ?? [];
   }
 
-  index(table: string): ReturnType<typeof keyIndex> {
+  index(table: string): KeyIndex {
     let index = this.indexes.get(table);
     if (!index) {
       index = keyIndex(table, this.all(table), this.ref);
@@ -281,12 +316,18 @@ export async function exportConfig(
 
   const tables: Record<string, Row[]> = {};
   const refs: Record<string, Record<string, string>> = {};
+  const refLabels: Record<string, Record<string, string>> = {};
   const note = (target: string, id: unknown) => {
     if (included.has(target) || id === null || id === undefined) return;
     const key = local.ref(target, id);
     if (key === null) return;
     refs[target] ??= {};
     refs[target][String(id)] = key;
+    const label = REF_LABELS[target]?.(local.all(target).find((row) => row.id === id));
+    if (label) {
+      refLabels[target] ??= {};
+      refLabels[target][String(id)] = label;
+    }
   };
   for (const spec of specs) {
     const references = referencesOf(spec.table);
@@ -305,7 +346,10 @@ export async function exportConfig(
       if (spec.table === "waf_exclusions") note("proxy_hosts", row.proxyHostId);
     }
   }
-  return await sealConfigFile({ appVersion: pkg.version, sections, refs, tables }, passphrase);
+  return await sealConfigFile(
+    { appVersion: pkg.version, sections, refs, refLabels, tables },
+    passphrase,
+  );
 }
 
 // ── Plan ────────────────────────────────────────────────────────────────────
@@ -327,16 +371,49 @@ type Plan = {
   warnings: ConfigImportWarning[];
 };
 
+function invalidValues(error: DomainError): Record<string, string> {
+  return {
+    ...Object.fromEntries(
+      Object.entries(error.params).map(([name, value]) => [
+        name,
+        typeof value === "object" ? value.join(", ") : String(value),
+      ]),
+    ),
+    code: error.code,
+    message: error.message,
+  };
+}
+
+/** Secrets as the backup layer marks them, masked like any the audit diff finds by name. */
+function masked(row: Row): Row {
+  return Object.fromEntries(
+    Object.entries(row).map(([column, value]) => [
+      column,
+      typeof value === "string"
+        ? mapTextColumn(value, MARKER, (text) => (text.startsWith(MARKER) ? MASKED_VALUE : text))
+        : value,
+    ]),
+  );
+}
+
+function hostListener(row: Row): string {
+  return [row.protocol, row.listenAddress, row.matcherType ?? "none", row.matcherValue ?? null]
+    .map((part) => JSON.stringify(part ?? null))
+    .join("|");
+}
+
 async function planImport(file: ConfigFile): Promise<Plan> {
+  // `file` is authenticated by now, appVersion included, so this gate cannot be edited around.
   if (isNewer(pkg.version, file.appVersion)) {
     throw domainError("configFromNewerVersion", {}, { status: 400 });
   }
   const specs = CONFIG_TABLES.filter((spec) => Array.isArray(file.tables[spec.table]));
   const local = new LocalIndex();
   await local.load([...specs.map((spec) => spec.table), ...allTargets(specs)]);
+  const context = { globalWaf: await getWafSettings().catch(() => null) };
 
   // The file's own keys, the same way: a referenced row is in the file or named in `refs`.
-  const fileIndexes = new Map<string, ReturnType<typeof keyIndex>>();
+  const fileIndexes = new Map<string, KeyIndex>();
   const fileRef: RefKey = (table, id) => {
     if (id === null || id === undefined) return null;
     const rows = file.tables[table];
@@ -363,9 +440,34 @@ async function planImport(file: ConfigFile): Promise<Plan> {
     }
     return map;
   };
+  const fileLabel = (table: string, id: unknown) => file.refLabels[table]?.[String(id)] ?? null;
+  /**
+   * An agent the file names by an agentId this instance lacks may still be the same machine,
+   * re-paired: matched by name, but only when that name is unique on both sides and the local
+   * agent is not claimed by another of the file's agentIds.
+   */
+  const agentByName = (fileId: unknown): number | null => {
+    const name = fileLabel("agents", fileId);
+    if (!name) return null;
+    const labels = Object.values(file.refLabels.agents ?? {});
+    if (labels.filter((label) => label === name).length !== 1) return null;
+    const named = local.all("agents").filter((row) => row.name === name);
+    if (named.length !== 1) return null;
+    const claimed = new Set(Object.values(file.refs.agents ?? {}));
+    return claimed.has(String(named[0].agentId)) ? null : (named[0].id as number);
+  };
   const resolveRef = (table: string, fileId: unknown): number | string | null => {
     const key = fileRef(table, fileId);
-    return key === null ? null : (resolvedFor(table).get(key) ?? null);
+    if (key === null) return null;
+    const found = resolvedFor(table).get(key) ?? null;
+    if (found !== null || local.index(table).ambiguous.has(key)) return found;
+    return table === "agents" ? agentByName(fileId) : null;
+  };
+  /** How the preview names a referenced row: its key, with its label where the key is an id. */
+  const describeRef = (table: string, fileId: unknown) => {
+    const key = fileRef(table, fileId) ?? `#${String(fileId)}`;
+    const label = fileLabel(table, fileId);
+    return label ? `${label} (${key})` : key;
   };
   const nextId = new Map<string, number>();
   const allocate = (table: string) => {
@@ -386,12 +488,13 @@ async function planImport(file: ConfigFile): Promise<Plan> {
     resolvedFor(planned.spec.table).delete(planned.key);
   };
 
-  /** A file row with its references turned into local ids, or what it is missing. */
+  /** A file row with its references turned into local ids, or what it is missing or fails. */
   const translate = (spec: TableSpec, raw: Row, skipColumn?: string) => {
     const references = referencesOf(spec.table);
     const columns = new Set(tableInfo(spec.table).columns.map((column) => column.name));
-    const values: Row = {};
+    let values: Row = {};
     let missing: { target: string; name: string } | null = null;
+    let invalid: DomainError | null = null;
     for (const [column, value] of Object.entries(raw)) {
       if (!columns.has(column) || column === "id" || column === skipColumn) continue;
       const reference = references.get(column);
@@ -403,10 +506,7 @@ async function planImport(file: ConfigFile): Promise<Plan> {
       if (localId !== null) {
         values[column] = localId;
       } else if (reference.required || spec.mustResolve?.includes(column)) {
-        missing ??= {
-          target: reference.target,
-          name: fileRef(reference.target, value) ?? `#${String(value)}`,
-        };
+        missing ??= { target: reference.target, name: describeRef(reference.target, value) };
       } else {
         values[column] = null;
       }
@@ -417,14 +517,40 @@ async function planImport(file: ConfigFile): Promise<Plan> {
         const [first] = lost;
         missing ??= {
           target: first?.target ?? "",
-          name: fileRef(first?.target ?? "", first?.id) ?? `#${String(first?.id)}`,
+          name: describeRef(first?.target ?? "", first?.id),
         };
       } else if (value !== undefined) {
         values[column] = value;
       }
     }
-    return { values, missing };
+    const check = IMPORT_CHECKS[spec.table];
+    if (!missing && check) {
+      try {
+        values = check(values, context);
+      } catch (error) {
+        invalid = domainErrorOf(error);
+        if (!invalid) throw error;
+      }
+    }
+    return { values, missing, invalid };
   };
+
+  // Shown once everything is planned, so a reference to a planned create can be named.
+  const pendingChanges: {
+    item: ConfigImportItem;
+    table: string;
+    before: Row | null;
+    after: Row;
+  }[] = [];
+  const pendingChildren: {
+    item: ConfigImportItem;
+    table: string;
+    parentColumn: string;
+    before: Row[];
+    after: Row[];
+  }[] = [];
+  const claimedDomains = new Map<string, string>();
+  const claimedListeners = new Map<string, string>();
 
   const differing = (localRow: Row, values: Row) =>
     Object.keys(values).filter(
@@ -459,7 +585,12 @@ async function planImport(file: ConfigFile): Promise<Plan> {
         if (parent.item.action === "skip" && parent.item.reason !== "unchanged") continue;
         const incoming: Row[] = [];
         for (const raw of grouped.get(fileParentId) ?? []) {
-          const { values, missing } = translate(spec, raw, parentColumn);
+          const { values, missing, invalid } = translate(spec, raw, parentColumn);
+          // Dropping a rule that fails could widen the set (a deny rule), so the parent waits.
+          if (invalid) {
+            skip(parent, "invalid", invalidValues(invalid));
+            break;
+          }
           if (!missing) {
             incoming.push(values);
             continue;
@@ -487,6 +618,13 @@ async function planImport(file: ConfigFile): Promise<Plan> {
         const after = incoming.map(normalize).sort();
         if (parent.item.action !== "create" && canonical(before) === canonical(after)) continue;
         parent.children.set(spec.table, incoming);
+        pendingChildren.push({
+          item: parent.item,
+          table: spec.table,
+          parentColumn,
+          before: existing,
+          after: incoming,
+        });
         if (parent.item.reason === "unchanged") {
           parent.item.action = "update";
           parent.item.reason = null;
@@ -501,13 +639,16 @@ async function planImport(file: ConfigFile): Promise<Plan> {
     for (const raw of fileRows) {
       const key = index.keyOf.get(raw.id ?? raw.key);
       if (spec.table === "settings" && !PORTABLE_SETTING_KEYS.has(String(raw.key))) continue;
+      const base = index.baseOf.get(raw.id ?? raw.key);
       const item: ConfigImportItem = {
         table: spec.table,
-        label: itemLabel(spec.table, key ?? String(raw.name ?? raw.id ?? "")),
+        label: itemLabel(spec.table, key ?? base ?? String(raw.name ?? raw.id ?? "")),
         action: "create",
         reason: null,
         values: {},
         fields: [],
+        changes: [],
+        kept: [],
       };
       const entry: PlannedRow = {
         spec,
@@ -521,23 +662,43 @@ async function planImport(file: ConfigFile): Promise<Plan> {
       rows.push(entry);
       planned.set(entry.fileId, entry);
       if (!key) {
-        skip(entry, "unkeyable");
+        if (base !== undefined) skip(entry, "ambiguous", { name: item.label });
+        else skip(entry, "unkeyable");
         continue;
       }
-      const { values, missing } = translate(spec, raw);
+      if (local.index(spec.table).ambiguous.has(key)) {
+        skip(entry, "ambiguous", { name: item.label });
+        continue;
+      }
+      const { values, missing, invalid } = translate(spec, raw);
       entry.values = values;
       if (missing) {
         skip(entry, "missingReference", { kind: missing.target, name: missing.name });
         continue;
       }
+      if (invalid) {
+        skip(entry, "invalid", invalidValues(invalid));
+        continue;
+      }
       const match = local.index(spec.table).byKey.get(key);
-      const conflict = findConflict(spec.table, values, match?.id, local);
+      const conflict =
+        findConflict(spec.table, values, match?.id, local) ??
+        fileConflict(spec.table, values, claimedDomains, claimedListeners);
       if (conflict) {
         skip(entry, conflict.reason, conflict.values);
         continue;
       }
+      claim(spec.table, values, item.label, claimedDomains, claimedListeners);
       if (match) {
         entry.targetId = (match.id ?? match.key) as number | string;
+        // An import never undoes these, whatever the file says.
+        item.kept = (ONE_WAY_COLUMNS[spec.table] ?? []).filter(
+          (column) =>
+            column in values &&
+            match[column] != null &&
+            canonical(match[column]) !== canonical(values[column]),
+        );
+        for (const column of item.kept) values[column] = match[column];
         const fields = differing(match, values);
         if (fields.length === 0) {
           item.action = "skip";
@@ -545,15 +706,113 @@ async function planImport(file: ConfigFile): Promise<Plan> {
         } else {
           item.action = "update";
           item.fields = fields;
+          const shown = Object.fromEntries(
+            Object.keys(values).map((column) => [column, match[column]]),
+          );
+          pendingChanges.push({ item, table: spec.table, before: shown, after: values });
         }
       } else {
         entry.targetId = spec.table === "settings" ? String(raw.key) : allocate(spec.table);
+        pendingChanges.push({ item, table: spec.table, before: null, after: values });
       }
       resolvedFor(spec.table).set(key, entry.targetId);
     }
     byParent.set(spec.table, planned);
   }
+
+  // References read as what they name, not as ids that mean nothing to the reader.
+  const nameOf = (table: string, id: unknown): string => {
+    if (table === "agents") {
+      const agent = local.all("agents").find((row) => row.id === id);
+      if (agent) return String(agent.name);
+    }
+    for (const [key, localId] of resolvedFor(table))
+      if (localId === id) return itemLabel(table, key);
+    return `#${String(id)}`;
+  };
+  const display = (table: string, row: Row, omit: readonly string[] = []): Row => {
+    const references = referencesOf(table);
+    return masked(
+      Object.fromEntries(
+        Object.entries(row)
+          .filter(([column]) => !omit.includes(column))
+          .map(([column, value]) => {
+            const reference = references.get(column);
+            return [
+              column,
+              reference && value !== null && value !== undefined
+                ? nameOf(reference.target, value)
+                : value,
+            ];
+          }),
+      ),
+    );
+  };
+  const pemColumns = (table: string) =>
+    tableInfo(table)
+      .columns.map((column) => column.name)
+      .filter((column) => column.endsWith("Pem"));
+  for (const { item, table, before, after } of pendingChanges) {
+    if (item.action === "skip") continue;
+    item.changes = diffAuditRecords(before && display(table, before), display(table, after), {
+      omit: [...DISPLAY_OMIT, ...pemColumns(table)],
+    });
+  }
+  for (const { item, table, parentColumn, before, after } of pendingChildren) {
+    if (item.action === "skip") continue;
+    const omit = [...DISPLAY_OMIT, parentColumn];
+    const list = (rows: Row[]) =>
+      rows
+        .map((row) => display(table, row, omit))
+        .sort((a, b) => canonical(a).localeCompare(canonical(b)));
+    item.changes.push(
+      ...diffAuditRecords(item.action === "create" ? null : { [table]: list(before) }, {
+        [table]: list(after),
+      }),
+    );
+  }
   return { file, rows, warnings };
+}
+
+/** A domain or listener an earlier row of the same file already takes. */
+function fileConflict(
+  table: string,
+  values: Row,
+  domains: Map<string, string>,
+  listeners: Map<string, string>,
+): { reason: SkipReason; values: Record<string, string> } | null {
+  if (table === "proxy_hosts") {
+    const clash = hostDomains(values.domains).find((domain) => domains.has(domain));
+    if (clash) {
+      return {
+        reason: "domainConflict",
+        values: { domain: clash, host: domains.get(clash) as string },
+      };
+    }
+  }
+  if (table === "l4_proxy_hosts") {
+    const owner = listeners.get(hostListener(values));
+    if (owner) {
+      return {
+        reason: "listenerConflict",
+        values: { listen: String(values.listenAddress), host: owner },
+      };
+    }
+  }
+  return null;
+}
+
+function claim(
+  table: string,
+  values: Row,
+  label: string,
+  domains: Map<string, string>,
+  listeners: Map<string, string>,
+): void {
+  if (table === "proxy_hosts") {
+    for (const domain of hostDomains(values.domains)) domains.set(domain, label);
+  }
+  if (table === "l4_proxy_hosts") listeners.set(hostListener(values), label);
 }
 
 function hostDomains(value: unknown): string[] {
@@ -628,7 +887,7 @@ export function describeConfigFile(bytes: Buffer) {
   return {
     appVersion: file.appVersion,
     exportedAt: file.exportedAt,
-    sections: file.sections,
+    sections: file.sections.filter((s) => CONFIG_SECTIONS.includes(s)),
     counts: Object.fromEntries(
       Object.entries(file.tables).map(([table, rows]) => [
         table,
@@ -689,14 +948,16 @@ export async function applyConfigImport(
       ...(isCreate && hasColumn(table, "createdAt") ? { createdAt: now } : {}),
     });
     if (table === "settings") {
-      writes.push({
-        kind: "setting",
-        values: await toFields(table, {
-          key: planned.targetId,
-          value: planned.values.value,
-          updatedAt: now,
-        }),
+      const values = await toFields(table, {
+        key: planned.targetId,
+        value: planned.values.value,
+        updatedAt: now,
       });
+      // A credential the file carried in the clear is stored as a save would store it.
+      if (typeof values.value === "string") {
+        values.value = encryptSettingCredentials(String(planned.targetId), values.value);
+      }
+      writes.push({ kind: "setting", values });
       continue;
     }
     const id = planned.targetId as number;
@@ -801,12 +1062,13 @@ export async function applyConfigImport(
       sections: preview.sections,
       items: preview.items
         .filter((item) => item.action !== "skip" || item.reason !== "unchanged")
-        .map(({ table, label, action, reason, fields }) => ({
+        .map(({ table, label, action, reason, fields, kept }) => ({
           table,
           label,
           action,
           reason,
           fields,
+          kept,
         })),
     },
   });

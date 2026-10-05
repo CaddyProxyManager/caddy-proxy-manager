@@ -107,7 +107,10 @@ export const CONFIG_NEUTRAL_FIELDS: readonly string[] = [
 ];
 
 export const SECRET_KEY =
-  /secret|password|passwd|token|api[_-]?key|auth[_-]?key|private[_-]?key|credential/i;
+  /secret|password|passwd|token|api[_-]?key|auth[_-]?key|private[_-]?key|credential|authorization|cookie|bearer/i;
+
+/** A header map's values and a probe body are free-form, so every leaf under them is hidden. */
+const OPAQUE_SEGMENT = /^(?:.*headers|requestbody)$/i;
 
 const JSON_SECRET =
   /("[^"]*(?:secret|password|passwd|token|api[_-]?key|auth[_-]?key|private[_-]?key|credential|authorization)[^"]*"\s*:\s*)("(?:[^"\\]|\\.)*"|\[[^\]]*\])/gi;
@@ -185,8 +188,12 @@ function dormant(before: unknown, after: unknown): boolean {
 }
 
 function maskLeaf(path: string, value: DiffValue): { value: DiffValue; masked: boolean } {
-  const last = path.split(".").pop() ?? path;
-  if (SECRET_KEY.test(last) && !isEmpty(value)) return { value: MASKED_VALUE, masked: true };
+  const segments = path.split(".");
+  const last = segments.at(-1) ?? path;
+  const opaque = segments.some((segment) => OPAQUE_SEGMENT.test(segment));
+  if ((opaque || SECRET_KEY.test(last)) && !isEmpty(value)) {
+    return { value: MASKED_VALUE, masked: true };
+  }
   return { value, masked: false };
 }
 
@@ -231,8 +238,9 @@ function diffField(
   let masked = false;
   for (const path of paths) {
     if (sameFlat(left.get(path), right.get(path))) continue;
-    const b = maskLeaf(path, display(left.get(path)));
-    const a = maskLeaf(path, display(right.get(path)));
+    // The field's own name counts, so a field called `headers` hides every leaf.
+    const b = maskLeaf(`${field}.${path}`, display(left.get(path)));
+    const a = maskLeaf(`${field}.${path}`, display(right.get(path)));
     masked ||= b.masked || a.masked;
     leaves.push({ path, before: b.value, after: a.value });
   }

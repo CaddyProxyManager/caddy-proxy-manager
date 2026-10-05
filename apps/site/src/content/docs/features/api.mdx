@@ -93,7 +93,10 @@ answering `ok`, how many events it `checked` and the `firstBroken` link.
 `exportConfig(passphrase, sections)` returns the [portable configuration](../settings/#portable-configuration)
 as base64 of its JSON file. `previewConfigImport(file, passphrase)` answers what importing it
 would create, update or skip, writing nothing; `applyConfigImport` takes the same arguments and
-plans again before it writes. All three are admin only and audited.
+plans again before it writes. All three are admin only, audited and need a token with the full
+scope; from a dashboard session, the export and the import need a sign-in from the last 10
+minutes. Each preview item carries `changes`, its fields before and after with secrets masked,
+and `kept`, the fields an import never changes, such as a client certificate's revocation.
 
 ```graphql
 mutation {
@@ -208,8 +211,9 @@ Global rate-limit zones and the never-limited list are the `rate-limit` settings
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session. That
 restriction is deliberate: an existing token cannot mint replacement credentials, so a leaked one
-cannot extend its own life. An account holds at most ten, and each expires in 30 days, 90 days, a
-year, on a date you pick, or never.
+cannot extend its own life. An account holds at most ten, and each expires in 30 days, 90 days (the
+default), a year, on a date you pick, or never. A token stops working while its owner is overdue
+for [two-factor setup](../users-and-groups/#the-two-factor-policy).
 
 A token carries its owner's role. The management fields are **admin-only**, including for an
 operator - a [group grant](../users-and-groups/) delegates the dashboard, not the API. Managing your
@@ -222,14 +226,17 @@ Each token also has a scope, which can only narrow what the role allows:
 | Scope | What it may do |
 | --- | --- |
 | **Same as my role** (`full`) | Everything the owner's role can do through the API. Tokens made before scopes existed have this one |
-| **Read only** (`read`) | Queries and `GET` requests. Every mutation is refused, the config export and import, the audit log check and the host previews included |
+| **Read only** (`read`) | Queries and `GET` requests. Every mutation is refused, the audit log check and the host previews included |
 | **Chosen permissions** (`custom`) | Only the areas listed, each `read` or `write` (write includes read) |
 
 The areas are `overview`, `hosts` (proxy and L4 hosts), `accessLists`, `certificates` (with CAs,
 client certificates and mTLS roles), `security` (WAF, CRS plugins and blocked sources),
-`analytics`, `agents`, `users` (users, groups and sessions), `settings` (settings, providers, Caddy,
-backups and the portable config), `audit` and `tokens`. A permission is written `area:access`, such
-as `hosts:write`.
+`analytics`, `agents`, `users` (users, groups and sessions), `settings` (settings, providers and
+Caddy), `audit` and `tokens`. A permission is written `area:access`, such as `hosts:write`.
+
+Backups (`/api/v1/backup`, download and restore) and the portable config (`exportConfig`,
+`previewConfigImport`, `applyConfigImport`) need a **Same as my role** token. They carry every
+private key and write users, groups and grants, which no single area covers.
 
 What a request gets is the role and the scope together. A user's token scoped to `users:write`
 still cannot manage users, because the role cannot; an admin's read-only token cannot delete a host,

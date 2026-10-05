@@ -570,6 +570,17 @@ function validateL4Upstreams(
   }
 }
 
+/** An imported row checked as a create checks it, minus what needs the database. Throws. */
+export function assertImportedL4ProxyHostValid(row: Record<string, unknown>): void {
+  const host = parseL4ProxyHost(row as L4ProxyHostRow);
+  validateL4Input(host as unknown as L4ProxyHostInput, true);
+  validateL4Upstreams(
+    host.upstreams,
+    host.upstreamPortMode,
+    Boolean(host.loadBalancer?.activeHealthCheck?.enabled),
+  );
+}
+
 /**
  * Only a list's IP rules apply at layer 4 - there is no request to ask a password in - so a list
  * without any would close every connection.

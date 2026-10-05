@@ -294,7 +294,8 @@ export const typeDefs = /* GraphQL */ `
 
   """
   The first place the audit log's hash chain does not hold. reason: missing, link, content, head
-  (the newest events were removed or rewritten) or unchained (an event added outside the chain).
+  (the newest events were removed or rewritten), unchained (an event added outside the chain) or
+  legacy (events from before the chain were removed).
   """
   type AuditChainBreak {
     reason: String!
@@ -305,7 +306,7 @@ export const typeDefs = /* GraphQL */ `
   type AuditChainVerification {
     ok: Boolean!
     checked: Int!
-    """Events written before the chain existed, which it does not cover."""
+    """Events written before the chain existed, each sealed with a mark rather than linked."""
     legacy: Int!
     firstBroken: AuditChainBreak
     verifiedAt: DateTime!
@@ -319,6 +320,10 @@ export const typeDefs = /* GraphQL */ `
     reason: String
     values: JSON!
     fields: [String!]!
+    """Before and after per field, secrets masked, as the audit log shows them."""
+    changes: JSON!
+    """Columns the file would have changed but an import never does, such as a revocation."""
+    kept: [String!]!
   }
 
   type ConfigImportPreview {
@@ -801,9 +806,16 @@ export const typeDefs = /* GraphQL */ `
     blocked: Boolean!
   }
 
+  type WafEventRelay {
+    agentId: String!
+    name: String
+  }
+
   """A WAF event in full. Credentials in the record are redacted."""
   type WafEventDetail {
     event: WafEventSummary!
+    """The agent that relayed the event; its name is null once it is no longer paired."""
+    relayedBy: WafEventRelay
     explanation: WafEventExplanation!
     suggestedExclusion: SuggestedWafExclusion
     """The request as a curl command, credentials redacted."""

@@ -287,6 +287,17 @@ describe('WAF event detail', () => {
       path: '/search',
       target: 'ARGS:id',
     });
+    // Rows from edge-1, which no agent row names yet.
+    expect(detail.relayedBy).toEqual({ agentId: 'edge-1', name: null });
+    const now = new Date().toISOString();
+    await ctx.db.insert(schema.agents).values({
+      name: 'Edge one',
+      agentId: 'edge-1',
+      secret: 'x',
+      createdAt: now,
+      updatedAt: now,
+    });
+    expect((await getWafEventDetail(await sqliKey())).relayedBy?.name).toBe('Edge one');
     expect(detail.curl).toContain("'https://app.example.com/search?id=1%27&token=[redacted]'");
     expect(detail.curl).not.toContain('secret-value');
     expect(detail.event.rawData).not.toContain('secret-value');
