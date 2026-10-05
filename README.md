@@ -26,7 +26,7 @@ It includes the [managed CrowdSec](#crowdsec) container, behind its Compose prof
 run until **Settings → CrowdSec** turns managed mode on.
 
 ```bash
-VERSION=v3.5.1   # the release you downloaded
+VERSION=v3.6.1   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
