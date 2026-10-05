@@ -90,6 +90,8 @@ export const RULES: readonly Rule[] = [
       "biome.jsonc",
       "scripts/check-bundle-budget.ts",
       "scripts/test-all.sh",
+      "scripts/publish-deploy-repo.sh",
+      "docker/deploy-repo/",
       ".github/ISSUE_TEMPLATE/",
       ".github/FUNDING.yml",
       ".github/dependabot.yml",

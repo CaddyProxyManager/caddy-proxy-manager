@@ -197,6 +197,14 @@ Keep in mind when touching it:
   default. `crowdsec`'s are not: the controller generates the bouncer key and sends both on every
   invocation that touches that service, so `.env` has nothing to add.
 
+### The deploy repository
+
+`CaddyProxyManager/deploy` is what users clone and `git pull`. It is generated: each release's
+`-deploy.tar.gz` plus `docker/deploy-repo/` and `LICENSE`, committed by `release.yml` through
+`scripts/publish-deploy-repo.sh`. Never edit it by hand. A file the stack mounts must also be in the
+archive's `package` call, or the deploy repository never receives it. Its users keep their changes
+in `docker-compose.override.yml`, so a release must keep working with one merged over it.
+
 ### Adding a DNS provider
 
 Only on request - each module grows the Caddy image. It must build against libdns v1 (Caddy

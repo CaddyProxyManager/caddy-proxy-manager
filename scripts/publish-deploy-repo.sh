@@ -19,7 +19,7 @@ head_of() { gh api "repos/${DEPLOY_REPO}/git/ref/heads/$1" --jq .object.sha 2>/d
 
 # commit <branch> <staging> <message> - prints the commit the branch ends on.
 commit() {
-  local branch="$1" staging="$2" message="$3" head tree changes
+  local branch="$1" staging="$2" message="$3" head changes
   head="$(head_of "$branch")"
   [ -n "$head" ] || { echo "::error::${DEPLOY_REPO} has no ${branch} branch" >&2; return 1; }
 
@@ -72,8 +72,11 @@ for tag in "$@"; do
 
   staging="$work/${tag}"
   mkdir -p "$staging"
-  GH_TOKEN="$SOURCE_GH_TOKEN" gh release download "$tag" --repo "$SOURCE_REPO" \
-    --pattern '*-deploy.tar.gz' --dir "$work/archive-${tag}"
+  if ! GH_TOKEN="$SOURCE_GH_TOKEN" gh release download "$tag" --repo "$SOURCE_REPO" \
+    --pattern '*-deploy.tar.gz' --dir "$work/archive-${tag}"; then
+    echo "::warning::${tag} has no deploy archive - not published"
+    continue
+  fi
   tar -xzf "$work/archive-${tag}"/*-deploy.tar.gz -C "$staging"
   cp "$root/docker/deploy-repo/README.md" "$root/docker/deploy-repo/.gitignore" "$root/LICENSE" "$staging/"
 

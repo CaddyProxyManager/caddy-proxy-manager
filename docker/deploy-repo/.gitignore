@@ -1,0 +1,3 @@
+# Yours, never in a release: secrets, and every local change to the stack.
+.env
+docker-compose.override.yml
