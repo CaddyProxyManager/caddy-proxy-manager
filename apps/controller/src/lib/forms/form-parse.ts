@@ -56,3 +56,9 @@ export function parseOptionalNumber(value: FormDataEntryValue | null): number | 
   if (!Number.isFinite(num)) return null;
   return num;
 }
+
+/** One `tag` field per chip. Undefined without the `tagsPresent` marker, so a save keeps them. */
+export function parseHostTags(formData: FormData): string[] | undefined {
+  if (!formData.has("tagsPresent")) return undefined;
+  return formData.getAll("tag").filter((value): value is string => typeof value === "string");
+}

@@ -967,6 +967,7 @@
     "certificateFileKeyMismatch": "The private key does not belong to the certificate.",
     "certificateFileNoNames": "The certificate names no domains or IP addresses.",
     "bulkHostsFailed": "Failed to change the selected hosts.",
+    "upstreamHealthFailed": "Could not read the health of this host's upstreams.",
     "bulkRequestInvalid": "The batch request is malformed: it needs an action and a list of host ids.",
     "bulkTooManyHosts": "Choose at most {max} hosts at a time.",
     "certificateInUseByDashboard": "The certificate is still used by the dashboard host. Choose another certificate there first.",
@@ -1055,6 +1056,10 @@
     "backupTooLarge": "That file is too large to be a backup",
     "backupRestoreNeedsFreshSignIn": "Restoring replaces every account. Sign out and in again, then restore within {minutes} minutes",
     "hostDescriptionTooLong": "Notes can be at most {max} characters",
+    "hostTagsInvalid": "Tags must be a list of text values",
+    "hostTagInvalid": "\"{tag}\" is not a valid tag. A tag starts with a letter or digit and may then use letters, digits and . _ : / -",
+    "hostTagTooLong": "\"{tag}\" is too long. A tag can be at most {max} characters",
+    "hostTooManyTags": "A host can have at most {max} tags",
     "rawCaddyConfigAdminOnly": "Only an administrator can change a host's custom Caddyfile, pre-handlers or reverse proxy JSON",
     "upstreamTargetAdminOnly": "Only an administrator can point an upstream at Caddy's admin port, a unix socket or a placeholder",
     "rebuildCaddyFailed": "Failed to trigger a Caddy rebuild",
@@ -1909,6 +1914,29 @@
     "passwordManagedBy": "Your password is managed by {directory}. Change it there; this instance never stores it."
   },
   "proxyHosts": {
+    "upstreamHealth": {
+      "title": "Live upstream health",
+      "loading": "Asking Caddy…",
+      "checkedAt": "Checked <when></when>",
+      "refresh": "Check again",
+      "noHealthChecks": "This host has no health checks, so Caddy counts no failures. Turn on passive health checks under load balancing to see them here.",
+      "agentsSilent": "{count, plural, one {# agent did not answer, so its view is unknown: {names}} other {# agents did not answer, so their view is unknown: {names}}}",
+      "caddy": "Caddy",
+      "agentState": "{agent}: {state}",
+      "state": {
+        "healthy": "Healthy",
+        "failing": "Failing",
+        "unchecked": "Not checked",
+        "unreported": "Not reported",
+        "unknown": "Unknown"
+      },
+      "healthyDetail": "No recent failures",
+      "failingDetail": "{count, plural, one {# recent failure} other {# recent failures}}",
+      "outOfRotation": "{count, plural, one {# recent failure, taken out of rotation} other {# recent failures, taken out of rotation}}",
+      "uncheckedDetail": "Serving, but no health checks are configured",
+      "unreportedDetail": "Caddy does not list this address",
+      "unknownDetail": "No agent answered"
+    },
     "accessList": "Access List",
     "accessListEmptyWarning": "This list has no users and no IP rules, so this host will refuse every request until one is added.",
     "accessListNoMembers": "{name} (empty)",
@@ -4658,7 +4686,21 @@
       "disableTitle": "Disable hosts",
       "deleteTitle": "Delete hosts",
       "updatedResult": "{count, plural, one {Updated # host.} other {Updated # hosts.}}",
-      "deletedResult": "{count, plural, one {Deleted # host.} other {Deleted # hosts.}}"
+      "deletedResult": "{count, plural, one {Deleted # host.} other {Deleted # hosts.}}",
+      "addTag": "Add tag",
+      "addTagTitle": "Add a tag to hosts"
+    },
+    "hostTags": {
+      "label": "Tags",
+      "placeholder": "Type a tag and press Enter",
+      "help": "Labels for finding this host in the lists, at most {max}. They do not change how it is served",
+      "invalid": "Start with a letter or digit, then use letters, digits and . _ : / -",
+      "tooLong": "At most {max} characters",
+      "tooMany": "A host can have at most {max} tags",
+      "filterLabel": "Filter by tag",
+      "filterAll": "All tags",
+      "bulkLabel": "Tag",
+      "bulkHelp": "Added beside each host's own tags. A host that already has it keeps it once"
     },
     "cancel": "Cancel",
     "codeEditor": {

@@ -13,6 +13,7 @@ import { domainError } from "../errors/domain-error";
 import { assertCertificatesServable } from "../certificates/placement";
 import { assertL4PortPlan } from "../l4/port-plan";
 import { agentIdsForHosts } from "./host-agents";
+import { normalizeHostTags, withHostTags } from "../proxy-hosts/tags";
 import { assertTailscaleServable, assertWildcardIssuable, withMaintenance } from "./proxy-hosts";
 
 /** A page is 25 rows; this only bounds what a REST caller can ask for in one statement. */
@@ -26,9 +27,10 @@ export const PROXY_HOST_BULK_ACTIONS = [
   "maintenanceOff",
   "setCertificate",
   "setAccessList",
+  "addTag",
 ] as const;
 
-export const L4_HOST_BULK_ACTIONS = ["enable", "disable", "delete"] as const;
+export const L4_HOST_BULK_ACTIONS = ["enable", "disable", "delete", "addTag"] as const;
 
 export type ProxyHostBulkAction = (typeof PROXY_HOST_BULK_ACTIONS)[number];
 export type L4HostBulkAction = (typeof L4_HOST_BULK_ACTIONS)[number];
@@ -40,9 +42,11 @@ export type ProxyHostBulkRequest = {
   certificateId?: number | null;
   /** With `setAccessList`; null removes it. */
   accessListId?: number | null;
+  /** With `addTag`, normalised as a host's own tags are. */
+  tag?: string;
 };
 
-export type L4HostBulkRequest = { action: L4HostBulkAction; ids: number[] };
+export type L4HostBulkRequest = { action: L4HostBulkAction; ids: number[]; tag?: string };
 
 const invalid = () => domainError("bulkRequestInvalid", {}, { status: 400 });
 
@@ -59,6 +63,14 @@ export function normalizeBulkIds(ids: unknown): number[] {
     throw domainError("bulkTooManyHosts", { max: BULK_HOST_LIMIT }, { status: 400 });
   }
   return unique;
+}
+
+/** One tag, as it will be stored; blank or several is a malformed request, not a validation error. */
+function bulkTag(value: unknown): string {
+  if (typeof value !== "string") throw invalid();
+  const tags = normalizeHostTags([value]) ?? [];
+  if (tags.length !== 1) throw invalid();
+  return tags[0];
 }
 
 function optionalId(value: unknown): number | null {
@@ -81,6 +93,7 @@ export function parseProxyHostBulkRequest(body: unknown): ProxyHostBulkRequest {
     if (!("accessListId" in input)) throw invalid();
     return { action, ids, accessListId: optionalId(input.accessListId) };
   }
+  if (action === "addTag") return { action, ids, tag: bulkTag(input.tag) };
   return { action, ids };
 }
 
@@ -88,7 +101,9 @@ export function parseL4HostBulkRequest(body: unknown): L4HostBulkRequest {
   const input = (body ?? {}) as Record<string, unknown>;
   const action = input.action as L4HostBulkAction;
   if (!L4_HOST_BULK_ACTIONS.includes(action)) throw invalid();
-  return { action, ids: normalizeBulkIds(input.ids) };
+  const ids = normalizeBulkIds(input.ids);
+  if (action === "addTag") return { action, ids, tag: bulkTag(input.tag) };
+  return { action, ids };
 }
 
 /** English, parsed back by `lib/audit/summary.ts` into the reader's language like a single edit. */
@@ -113,6 +128,8 @@ function proxyHostAuditData(request: ProxyHostBulkRequest): Record<string, unkno
       return { certificateId: request.certificateId ?? null, bulk: true };
     case "setAccessList":
       return { accessListId: request.accessListId ?? null, bulk: true };
+    case "addTag":
+      return { addedTag: request.tag, bulk: true };
     default:
       return { bulk: true };
   }
@@ -134,12 +151,18 @@ export async function bulkUpdateProxyHosts(
       domains: proxyHosts.domains,
       certificateId: proxyHosts.certificateId,
       meta: proxyHosts.meta,
+      tags: proxyHosts.tags,
     })
     .from(proxyHosts)
     .where(inArray(proxyHosts.id, ids));
   if (rows.length !== ids.length) {
     throw domainError("proxyHostNotFound", {}, { status: 404 });
   }
+  // Before anything is written: one host already at the limit refuses the batch.
+  const taggedTo =
+    request.action === "addTag"
+      ? new Map(rows.map((row) => [row.id, withHostTags(row.tags, [bulkTag(request.tag)])]))
+      : null;
 
   if (request.action === "setCertificate" && request.certificateId != null) {
     const [certificate] = await db
@@ -216,7 +239,14 @@ export async function bulkUpdateProxyHosts(
         // exactly as a single delete does.
         case "delete":
           return [tx.delete(proxyHosts).where(where)];
-        // Meta differs per host, so one statement each - still inside the one transaction.
+        // Tags and meta differ per host, so one statement each - still inside the one transaction.
+        case "addTag":
+          return rows.map((row) =>
+            tx
+              .update(proxyHosts)
+              .set({ tags: taggedTo?.get(row.id), updatedAt: now })
+              .where(eq(proxyHosts.id, row.id)),
+          );
         case "maintenanceOn":
         case "maintenanceOff":
           return rows.map((row) =>
@@ -233,7 +263,8 @@ export async function bulkUpdateProxyHosts(
     return [...writes, tx.insert(auditEvents).values(audits.map(auditEventRow))];
   });
 
-  await applyCaddyConfig();
+  // Tags never reach the config, so there is nothing to reload.
+  if (request.action !== "addTag") await applyCaddyConfig();
   return { count: rows.length };
 }
 
@@ -249,6 +280,7 @@ export async function bulkUpdateL4ProxyHosts(
       protocol: l4ProxyHosts.protocol,
       listenAddress: l4ProxyHosts.listenAddress,
       enabled: l4ProxyHosts.enabled,
+      tags: l4ProxyHosts.tags,
     })
     .from(l4ProxyHosts)
     .where(inArray(l4ProxyHosts.id, ids));
@@ -267,6 +299,11 @@ export async function bulkUpdateL4ProxyHosts(
     );
   }
 
+  const taggedTo =
+    request.action === "addTag"
+      ? new Map(rows.map((row) => [row.id, withHostTags(row.tags, [bulkTag(request.tag)])]))
+      : null;
+
   const where = inArray(l4ProxyHosts.id, ids);
   const audits = rows.map((row) =>
     auditEventRow({
@@ -281,21 +318,33 @@ export async function bulkUpdateL4ProxyHosts(
       data:
         request.action === "delete"
           ? { bulk: true }
-          : { enabled: request.action === "enable", bulk: true },
+          : request.action === "addTag"
+            ? { addedTag: request.tag, bulk: true }
+            : { enabled: request.action === "enable", bulk: true },
     }),
   );
 
+  const now = nowIso();
   await runInTransaction((tx) => [
-    request.action === "delete"
-      ? tx.delete(l4ProxyHosts).where(where)
-      : tx
-          .update(l4ProxyHosts)
-          .set({ enabled: request.action === "enable", updatedAt: nowIso() })
-          .where(where),
+    ...(request.action === "delete"
+      ? [tx.delete(l4ProxyHosts).where(where)]
+      : request.action === "addTag"
+        ? rows.map((row) =>
+            tx
+              .update(l4ProxyHosts)
+              .set({ tags: taggedTo?.get(row.id), updatedAt: now })
+              .where(eq(l4ProxyHosts.id, row.id)),
+          )
+        : [
+            tx
+              .update(l4ProxyHosts)
+              .set({ enabled: request.action === "enable", updatedAt: now })
+              .where(where),
+          ]),
     tx.insert(auditEvents).values(audits),
   ]);
 
   // Published ports are derived from the enabled hosts: the ports banner picks this up unaided.
-  await applyCaddyConfig();
+  if (request.action !== "addTag") await applyCaddyConfig();
   return { count: rows.length };
 }

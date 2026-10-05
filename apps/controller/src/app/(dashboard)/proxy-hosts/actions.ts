@@ -2,10 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
+import { assertCanManage, assertCanView, requireAccess } from "@/src/lib/users/permissions";
+import {
+  type HostUpstreamHealth,
+  getProxyHostUpstreamHealth,
+} from "@/src/lib/proxy-hosts/upstream-health";
 import {
   actionError,
   actionSuccess,
+  extractErrorMessage,
   INITIAL_ACTION_STATE,
   type ActionState,
 } from "@/src/lib/errors/action-error";
@@ -30,6 +35,7 @@ import {
   parseOptionalText,
   parseCertificateId,
   parseAccessListId,
+  parseHostTags,
 } from "@/src/lib/forms/form-parse";
 import {
   parseAuthentikConfig,
@@ -83,6 +89,7 @@ export async function createProxyHostAction(
       {
         name: String(formData.get("name") ?? "Untitled"),
         description: formData.has("description") ? String(formData.get("description")) : undefined,
+        tags: parseHostTags(formData),
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
         // Empty means every agent, as an absent field does, so older clients keep working.
@@ -197,6 +204,7 @@ export async function updateProxyHostAction(
       {
         name: formData.get("name") ? String(formData.get("name")) : undefined,
         description: formData.has("description") ? String(formData.get("description")) : undefined,
+        tags: parseHostTags(formData),
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
         upstreams: formData.get("upstreams")
           ? parseUpstreams(formData.get("upstreams"))
@@ -316,5 +324,20 @@ export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promi
     const t = await getTranslations();
     console.error("Failed to change proxy hosts in bulk:", error);
     return actionError(t, error, t("errors.bulkHostsFailed"));
+  }
+}
+
+/** Read-only, so viewing the host is enough: anyone who can see its upstreams sees their health. */
+export async function proxyHostUpstreamHealthAction(
+  id: number,
+): Promise<{ ok: true; health: HostUpstreamHealth } | { ok: false; message: string }> {
+  try {
+    const access = await requireAccess();
+    assertCanView(access, "proxyHost", id);
+    return { ok: true, health: await getProxyHostUpstreamHealth(id) };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to read upstream health:", id, error);
+    return { ok: false, message: extractErrorMessage(t, error, t("errors.upstreamHealthFailed")) };
   }
 }

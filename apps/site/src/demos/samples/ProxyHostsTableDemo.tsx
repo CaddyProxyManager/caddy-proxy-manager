@@ -6,6 +6,10 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useFormatter, useTranslations } from "next-intl";
 import { HostNotesHint } from "@cpm/controller/src/components/proxy-hosts/HostNotesField";
+import {
+  HostTagFilter,
+  HostTagList,
+} from "@cpm/controller/src/components/proxy-hosts/HostTagsField";
 import { BulkActionBar } from "@cpm/controller/src/components/ui/BulkActionBar";
 import {
   DataTable,
@@ -28,6 +32,7 @@ type Row = {
   requests: { total: number; blocked: number } | null;
   protections: string[];
   notes: string | null;
+  tags: string[];
   enabled: boolean;
   maintenance?: boolean;
 };
@@ -42,6 +47,7 @@ const HOSTS: Row[] = [
     requests: { total: 18_412, blocked: 96 },
     protections: ["WAF", "LB"],
     notes: null,
+    tags: ["prod", "team:web"],
     enabled: true,
   },
   {
@@ -53,6 +59,7 @@ const HOSTS: Row[] = [
     requests: { total: 5_730, blocked: 0 },
     protections: ["Authentik"],
     notes: null,
+    tags: ["monitoring", "prod"],
     enabled: true,
     maintenance: true,
   },
@@ -65,6 +72,7 @@ const HOSTS: Row[] = [
     requests: null,
     protections: [],
     notes: "Off until the next release candidate. Ask Priya before turning it back on.",
+    tags: ["team:web"],
     enabled: false,
   },
   {
@@ -76,6 +84,7 @@ const HOSTS: Row[] = [
     requests: { total: 812, blocked: 4 },
     protections: ["mTLS", "Tailnet"],
     notes: null,
+    tags: [],
     enabled: true,
   },
 ];
@@ -98,6 +107,8 @@ function ProxyHostsTableDemoContent() {
     params.get("state") === "enabled" || params.get("state") === "disabled"
       ? (params.get("state") as "enabled" | "disabled")
       : "all";
+  const tag = params.get("tag");
+  const allTags = [...new Set(hosts.flatMap((h) => h.tags))].sort();
 
   const counts = {
     total: hosts.length,
@@ -114,21 +125,30 @@ function ProxyHostsTableDemoContent() {
   const format = useFormatter();
 
   const rows = useMemo(() => {
-    const filtered =
-      state === "all" ? hosts : hosts.filter((h) => h.enabled === (state === "enabled"));
+    const filtered = hosts.filter(
+      (h) =>
+        (state === "all" || h.enabled === (state === "enabled")) && (!tag || h.tags.includes(tag)),
+    );
     const sorted = [...filtered].sort((a, b) =>
       sortBy === "status"
         ? Number(b.enabled) - Number(a.enabled)
         : a.domain.localeCompare(b.domain),
     );
     return sortDir === "desc" ? sorted.reverse() : sorted;
-  }, [hosts, sortBy, sortDir, state]);
+  }, [hosts, sortBy, sortDir, state, tag]);
 
   const [selectedKeys, setSelectedKeys] = useRowSelection(rows, "id");
   const setEnabled = (enabled: boolean) => {
     setHosts((all) => all.map((h) => (selectedKeys.has(String(h.id)) ? { ...h, enabled } : h)));
     setSelectedKeys(new Set());
   };
+
+  function setTag(value: string | null) {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set("tag", value);
+    else next.delete("tag");
+    router.push(`${location.pathname}?${next.toString()}`);
+  }
 
   function setState(value: string) {
     const next = new URLSearchParams(params.toString());
@@ -155,6 +175,7 @@ function ProxyHostsTableDemoContent() {
             <Text type="code" size="xsm" color="secondary">
               {r.upstreams}
             </Text>
+            <HostTagList tags={r.tags} />
           </VStack>
           {r.protections.length > 0 && (
             <HStack gap={1} wrap="wrap">
@@ -273,19 +294,22 @@ function ProxyHostsTableDemoContent() {
           <Button variant="ghost" label={tb("disable")} onClick={() => setEnabled(false)} />
         </BulkActionBar>
       ) : (
-        <TabList value={state} onChange={setState}>
-          <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-          <Tab
-            value="enabled"
-            label={t("filterEnabled")}
-            endContent={<Badge label={counts.enabled} />}
-          />
-          <Tab
-            value="disabled"
-            label={t("filterDisabled")}
-            endContent={<Badge label={counts.disabled} />}
-          />
-        </TabList>
+        <HStack gap={3} vAlign="center" wrap="wrap">
+          <TabList value={state} onChange={setState}>
+            <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+            <Tab
+              value="enabled"
+              label={t("filterEnabled")}
+              endContent={<Badge label={counts.enabled} />}
+            />
+            <Tab
+              value="disabled"
+              label={t("filterDisabled")}
+              endContent={<Badge label={counts.disabled} />}
+            />
+          </TabList>
+          <HostTagFilter tags={allTags} value={tag} onChange={setTag} />
+        </HStack>
       )}
       <DataTable
         columns={columns}

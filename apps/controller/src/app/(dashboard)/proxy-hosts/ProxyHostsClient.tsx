@@ -28,6 +28,8 @@ import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
 import { ReachabilityDialog } from "@/components/certificates/ReachabilityDialog";
 import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
+import { HostTagFilter, HostTagList } from "@/components/proxy-hosts/HostTagsField";
+import { duplicateProxyHostDraft } from "@/lib/proxy-hosts/duplicate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -77,6 +79,9 @@ type Props = {
   tailscaleDefaults: TailscaleHostDefaults | null;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
+  /** Every tag on a host the viewer can see, for the filter. */
+  tags?: string[];
+  activeTag?: string | null;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   mtlsRoles?: MtlsRole[];
   issuedClientCerts?: IssuedClientCertificate[];
@@ -290,6 +295,8 @@ export default function ProxyHostsClient({
   tailscaleDefaults,
   pagination,
   initialSearch,
+  tags = [],
+  activeTag = null,
   initialSort,
   mtlsRoles,
   issuedClientCerts,
@@ -347,6 +354,14 @@ export default function ProxyHostsClient({
     }, 400);
   }
 
+  function handleTagChange(value: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("tag", value);
+    else params.delete("tag");
+    params.set("page", "1");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   function handleStateChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") params.delete("state");
@@ -364,7 +379,7 @@ export default function ProxyHostsClient({
   };
 
   function openDuplicate(host: ProxyHost) {
-    setDuplicateHost(host);
+    setDuplicateHost(duplicateProxyHostDraft(host));
     setDialogKey((k) => k + 1);
     setCreateOpen(true);
   }
@@ -404,6 +419,7 @@ export default function ProxyHostsClient({
                 {summarize(host.domains)}
               </Text>
             </Tooltip>
+            <HostTagList tags={host.tags} />
           </VStack>
         </HStack>
       ),
@@ -558,6 +574,7 @@ export default function ProxyHostsClient({
               {host.description}
             </Text>
           )}
+          <HostTagList tags={host.tags} />
           <HStack gap={2} vAlign="center">
             <HostStatus host={host} />
             {host.certificateId && <Badge variant="info" label={t("tls")} />}
@@ -632,19 +649,22 @@ export default function ProxyHostsClient({
           />
         }
         filters={
-          <TabList value={activeState} onChange={handleStateChange}>
-            <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-            <Tab
-              value="enabled"
-              label={t("filterEnabled")}
-              endContent={<Badge label={counts.enabled} />}
-            />
-            <Tab
-              value="disabled"
-              label={t("filterDisabled")}
-              endContent={<Badge label={counts.disabled} />}
-            />
-          </TabList>
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            <TabList value={activeState} onChange={handleStateChange}>
+              <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+              <Tab
+                value="enabled"
+                label={t("filterEnabled")}
+                endContent={<Badge label={counts.enabled} />}
+              />
+              <Tab
+                value="disabled"
+                label={t("filterDisabled")}
+                endContent={<Badge label={counts.disabled} />}
+              />
+            </TabList>
+            <HostTagFilter tags={tags} value={activeTag} onChange={handleTagChange} />
+          </HStack>
         }
         search={
           <SearchField
@@ -669,7 +689,7 @@ export default function ProxyHostsClient({
         columns={columns}
         data={hosts}
         keyField="id"
-        emptyMessage={searchTerm ? t("noHostsMatchSearch") : t("noProxyHostsFound")}
+        emptyMessage={searchTerm || activeTag ? t("noHostsMatchSearch") : t("noProxyHostsFound")}
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}

@@ -3,6 +3,7 @@ import {
   listProxyHostsPaginated,
   countProxyHosts,
   countProxyHostsByState,
+  listProxyHostTags,
 } from "@/src/lib/models/proxy-hosts";
 import { getTrafficByProxyHost } from "@/src/lib/analytics/db";
 import { listCertificates } from "@/src/lib/models/certificates";
@@ -38,6 +39,7 @@ interface PageProps {
     sortBy?: string;
     sortDir?: string;
     state?: string;
+    tag?: string;
   }>;
 }
 
@@ -57,7 +59,9 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     sortBy: sortByParam,
     sortDir: sortDirParam,
     state: stateParam,
+    tag: tagParam,
   } = await searchParams;
+  const tag = tagParam?.trim().toLowerCase() || undefined;
   // Filtered in the query: client-side, "Disabled 2" shows nothing when both sit on a later page.
   const enabled = stateParam === "enabled" ? true : stateParam === "disabled" ? false : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
@@ -71,6 +75,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     hosts,
     total,
     counts,
+    tags,
     certificates,
     caCertificates,
     accessLists,
@@ -87,9 +92,10 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     wafPresets,
     crsPlugins,
   ] = await Promise.all([
-    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled),
-    countProxyHosts(search, visibleIds, enabled),
-    countProxyHostsByState(search, visibleIds),
+    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled, tag),
+    countProxyHosts(search, visibleIds, enabled, tag),
+    countProxyHostsByState(search, visibleIds, tag),
+    listProxyHostTags(visibleIds),
     listCertificates(),
     listCaCertificates(),
     listAccessLists(),
@@ -169,6 +175,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         }}
         pagination={{ total, page, perPage: PER_PAGE }}
         initialSearch={search ?? ""}
+        tags={tags}
+        activeTag={tag ?? null}
         activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
         initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
         mtlsRoles={mtlsRoles}

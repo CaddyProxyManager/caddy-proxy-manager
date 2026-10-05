@@ -2397,6 +2397,7 @@ const spec = {
               "maintenanceOff",
               "setCertificate",
               "setAccessList",
+              "addTag",
             ],
           },
           ids: {
@@ -2413,18 +2414,28 @@ const spec = {
             type: ["integer", "null"],
             description: "Required with setAccessList; null removes it.",
           },
+          tag: {
+            type: "string",
+            description:
+              "Required with addTag. Added to each host's tags; the Caddy config is not reloaded.",
+          },
         },
         required: ["action", "ids"],
       },
       L4ProxyHostBulkInput: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["enable", "disable", "delete"] },
+          action: { type: "string", enum: ["enable", "disable", "delete", "addTag"] },
           ids: {
             type: "array",
             items: { type: "integer" },
             minItems: 1,
             maxItems: 500,
+          },
+          tag: {
+            type: "string",
+            description:
+              "Required with addTag. Added to each host's tags; the Caddy config is not reloaded.",
           },
         },
         required: ["action", "ids"],
@@ -3337,6 +3348,12 @@ const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           description: { type: ["string", "null"], description: "Free-text notes" },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Lowercase and sorted. Labels for finding hosts; never part of the Caddy config.",
+          },
           domains: {
             type: "array",
             items: { type: "string" },
@@ -3459,6 +3476,13 @@ const spec = {
             maxLength: 2000,
             description: "Free-text notes. Blank or null clears them.",
           },
+          tags: {
+            type: ["array", "null"],
+            items: { type: "string", maxLength: 40 },
+            maxItems: 16,
+            description:
+              "Lowercased, trimmed, deduplicated and sorted on save. Each starts with a letter or digit, then letters, digits and . _ : / -. Null or an empty list clears them.",
+          },
           domains: { type: "array", items: { type: "string" }, example: ["app.example.com"] },
           upstreams: { type: "array", items: { type: "string" }, example: ["localhost:3000"] },
           certificateId: { type: ["integer", "null"] },
@@ -3558,6 +3582,12 @@ const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           description: { type: ["string", "null"], description: "Free-text notes" },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Lowercase and sorted. Labels for finding hosts; never part of the Caddy config.",
+          },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {
             type: "string",
@@ -3636,6 +3666,13 @@ const spec = {
             type: ["string", "null"],
             maxLength: 2000,
             description: "Free-text notes. Blank or null clears them.",
+          },
+          tags: {
+            type: ["array", "null"],
+            items: { type: "string", maxLength: 40 },
+            maxItems: 16,
+            description:
+              "Lowercased, trimmed, deduplicated and sorted on save. Each starts with a letter or digit, then letters, digits and . _ : / -. Null or an empty list clears them.",
           },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {

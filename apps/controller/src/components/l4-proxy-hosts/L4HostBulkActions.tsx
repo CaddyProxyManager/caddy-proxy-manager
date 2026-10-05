@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { bulkL4ProxyHostsAction } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
 import { BulkActionBar, BulkConfirmDialog } from "@/components/ui/BulkActionBar";
 import type { L4HostBulkAction } from "@/lib/models/bulk-hosts";
+import { BulkTagInput } from "@/components/proxy-hosts/HostTagsField";
 
 /** The L4 list's bar while rows are selected. `onDone` also refreshes the ports banner. */
 export function L4HostBulkActions({
@@ -21,6 +22,7 @@ export function L4HostBulkActions({
   const tb = useTranslations("ui.bulk");
   const [action, setAction] = useState<L4HostBulkAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tag, setTag] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function open(next: L4HostBulkAction) {
@@ -31,7 +33,11 @@ export function L4HostBulkActions({
   function confirm() {
     if (!action) return;
     startTransition(async () => {
-      const result = await bulkL4ProxyHostsAction({ action, ids: hosts.map((host) => host.id) });
+      const result = await bulkL4ProxyHostsAction({
+        action,
+        ids: hosts.map((host) => host.id),
+        ...(action === "addTag" ? { tag } : {}),
+      });
       if (result.status === "error") {
         setError(result.message ?? null);
         return;
@@ -47,6 +53,7 @@ export function L4HostBulkActions({
     enable: tb("enableTitle"),
     disable: tb("disableTitle"),
     delete: tb("deleteTitle"),
+    addTag: tb("addTagTitle"),
   };
 
   return (
@@ -55,6 +62,7 @@ export function L4HostBulkActions({
         <Button variant="ghost" label={tb("enable")} onClick={() => open("enable")} />
         <Button variant="ghost" label={tb("disable")} onClick={() => open("disable")} />
         <Button variant="ghost" label={tb("delete")} onClick={() => open("delete")} />
+        <Button variant="ghost" label={tb("addTag")} onClick={() => open("addTag")} />
       </BulkActionBar>
       <BulkConfirmDialog
         open={action !== null}
@@ -66,7 +74,9 @@ export function L4HostBulkActions({
         error={error}
         onConfirm={confirm}
         onClose={() => setAction(null)}
-      />
+      >
+        {action === "addTag" && <BulkTagInput value={tag} onChange={setTag} />}
+      </BulkConfirmDialog>
     </>
   );
 }

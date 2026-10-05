@@ -43,8 +43,9 @@ with the validator while looking authoritative.
 
 `bulkProxyHosts` and `bulkL4ProxyHosts` take `{ action, ids }` and return how many hosts changed.
 Proxy hosts accept `enable`, `disable`, `delete`, `maintenanceOn`, `maintenanceOff`,
-`setCertificate` (with `certificateId`, null for automatic) and `setAccessList` (with
-`accessListId`, null for none); L4 hosts the first three. Up to 500 ids per call.
+`setCertificate` (with `certificateId`, null for automatic), `setAccessList` (with
+`accessListId`, null for none) and `addTag` (with `tag`); L4 hosts `enable`, `disable`, `delete`
+and `addTag`. Up to 500 ids per call.
 
 ```graphql
 mutation {
@@ -53,8 +54,31 @@ mutation {
 ```
 
 A batch is all or nothing: an unknown id, or a change one host cannot take, fails the call and
-writes nothing. Each host is audited on its own, and Caddy is applied once. The REST equivalents
-are `POST /api/v1/proxy-hosts/bulk` and `POST /api/v1/l4-proxy-hosts/bulk`.
+writes nothing. Each host is audited on its own, and Caddy is applied once, or not at all for
+`addTag`. The REST equivalents are `POST /api/v1/proxy-hosts/bulk` and
+`POST /api/v1/l4-proxy-hosts/bulk`.
+
+Both host types carry `tags` as a field, and take them as `tags` in a create or update input,
+where they are normalised the way the editor stores them.
+
+## Upstream health
+
+`proxyHostUpstreamHealth(id)` asks Caddy on every agent serving the host for its upstreams' state,
+as the host editor shows it. Each upstream has a merged `state` (`healthy`, `failing`,
+`unchecked`, `unreported` or `unknown`), its failure count, whether it is `outOfRotation`, and the
+same per agent; an agent that did not answer is `unknown` and `reachable: false`.
+
+```graphql
+query {
+  proxyHostUpstreamHealth(id: 4) {
+    healthChecks
+    agents { name reachable }
+    upstreams { upstream state fails outOfRotation }
+  }
+}
+```
+
+There is no REST route for it: new API surface goes into GraphQL only.
 
 ## Authentication
 

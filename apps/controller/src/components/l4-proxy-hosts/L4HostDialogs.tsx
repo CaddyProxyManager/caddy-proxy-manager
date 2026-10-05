@@ -27,6 +27,7 @@ import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { HostNotesField } from "@/components/proxy-hosts/HostNotesField";
+import { HostTagsField } from "@/components/proxy-hosts/HostTagsField";
 import { useTranslations } from "next-intl";
 
 /**
@@ -325,6 +326,8 @@ function L4HostForm({
         />
 
         <HostNotesField value={text.description} onChange={set("description")} />
+
+        <HostTagsField initial={initialData?.tags} />
 
         <Selector
           label={t("protocol")}

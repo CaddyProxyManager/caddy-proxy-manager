@@ -15,6 +15,8 @@ export const typeDefs = /* GraphQL */ `
     id: Int!
     name: String!
     description: String
+    """Lowercase and sorted. Labels for finding hosts; they never reach the Caddy config."""
+    tags: [String!]!
     domains: [String!]!
     upstreams: [String!]!
     enabled: Boolean!
@@ -40,6 +42,8 @@ export const typeDefs = /* GraphQL */ `
     id: Int!
     name: String!
     description: String
+    """As on ProxyHost."""
+    tags: [String!]!
     protocol: String!
     listenAddress: String!
     upstreams: [String!]!
@@ -194,6 +198,58 @@ export const typeDefs = /* GraphQL */ `
     configured: Boolean!
   }
 
+  """
+  healthy, failing (recent passive-check failures), unchecked (the host configures no health
+  checks), unreported (Caddy does not list the address) or unknown (no agent answered).
+  """
+  enum UpstreamHealthState {
+    healthy
+    failing
+    unchecked
+    unreported
+    unknown
+  }
+
+  """One agent's Caddy on one upstream. An agent that is offline or silent is unknown."""
+  type UpstreamAgentHealth {
+    """The agent's id, or null for a Caddy run without an agent."""
+    agentId: Int
+    name: String
+    state: UpstreamHealthState!
+    fails: Int!
+    requests: Int!
+  }
+
+  type UpstreamHealth {
+    """As the host lists it."""
+    upstream: String!
+    """The addresses Caddy dials for it."""
+    dials: [String!]!
+    """Across the agents: failing if any agent reports failures."""
+    state: UpstreamHealthState!
+    fails: Int!
+    """At or past the passive check's max fails on some agent, so Caddy skips it there."""
+    outOfRotation: Boolean!
+    requests: Int!
+    agents: [UpstreamAgentHealth!]!
+  }
+
+  type HostUpstreamAgent {
+    agentId: Int
+    name: String
+    reachable: Boolean!
+  }
+
+  """Read live from Caddy on every agent serving the host; nothing is stored."""
+  type HostUpstreamHealth {
+    hostId: Int!
+    healthChecks: Boolean!
+    maxFails: Int!
+    checkedAt: DateTime!
+    agents: [HostUpstreamAgent!]!
+    upstreams: [UpstreamHealth!]!
+  }
+
   """A page of results, with the total so a client can size its pager."""
   type AuditEventPage {
     items: [AuditEvent!]!
@@ -203,6 +259,8 @@ export const typeDefs = /* GraphQL */ `
   type Query {
     proxyHosts: [ProxyHost!]!
     proxyHost(id: Int!): ProxyHost
+    """Live health of a proxy host's upstreams, from Caddy on each agent that serves it."""
+    proxyHostUpstreamHealth(id: Int!): HostUpstreamHealth!
     l4ProxyHosts: [L4ProxyHost!]!
     l4ProxyHost(id: Int!): L4ProxyHost
     certificates: [Certificate!]!
@@ -236,15 +294,15 @@ export const typeDefs = /* GraphQL */ `
     updateProxyHost(id: Int!, input: JSON!): ProxyHost!
     deleteProxyHost(id: Int!): Boolean!
     """
-    As POST /api/v1/proxy-hosts/bulk: { action, ids, certificateId?, accessListId? }, all or
-    nothing. Returns how many hosts changed.
+    As POST /api/v1/proxy-hosts/bulk: { action, ids, certificateId?, accessListId?, tag? }, all
+    or nothing. Returns how many hosts changed.
     """
     bulkProxyHosts(input: JSON!): Int!
 
     createL4ProxyHost(input: JSON!): L4ProxyHost!
     updateL4ProxyHost(id: Int!, input: JSON!): L4ProxyHost!
     deleteL4ProxyHost(id: Int!): Boolean!
-    """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids }, all or nothing."""
+    """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids, tag? }, all or nothing."""
     bulkL4ProxyHosts(input: JSON!): Int!
 
     createAccessList(input: JSON!): AccessList!

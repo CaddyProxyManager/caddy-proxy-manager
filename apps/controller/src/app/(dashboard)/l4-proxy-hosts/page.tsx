@@ -3,6 +3,7 @@ import {
   listL4ProxyHostsPaginated,
   countL4ProxyHosts,
   countL4ProxyHostsByProtocol,
+  listL4ProxyHostTags,
 } from "@/src/lib/models/l4-proxy-hosts";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
@@ -21,6 +22,7 @@ interface PageProps {
     sortBy?: string;
     sortDir?: string;
     protocol?: string;
+    tag?: string;
   }>;
 }
 
@@ -39,7 +41,9 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     sortBy: sortByParam,
     sortDir: sortDirParam,
     protocol: protocolParam,
+    tag: tagParam,
   } = await searchParams;
+  const tag = tagParam?.trim().toLowerCase() || undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
@@ -50,10 +54,11 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 
-  const [hosts, total, counts, agents, accessLists] = await Promise.all([
-    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol),
-    countL4ProxyHosts(search, visibleIds, protocol),
-    countL4ProxyHostsByProtocol(search, visibleIds),
+  const [hosts, total, counts, tags, agents, accessLists] = await Promise.all([
+    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol, tag),
+    countL4ProxyHosts(search, visibleIds, protocol, tag),
+    countL4ProxyHostsByProtocol(search, visibleIds, tag),
+    listL4ProxyHostTags(visibleIds),
     listAgentOptions().catch(() => []),
     listL4AccessListOptions(),
   ]);
@@ -71,6 +76,8 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       counts={counts}
       activeProtocol={protocol ?? "all"}
       initialSearch={search ?? ""}
+      tags={tags}
+      activeTag={tag ?? null}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
       agents={agents}
       accessLists={accessLists}

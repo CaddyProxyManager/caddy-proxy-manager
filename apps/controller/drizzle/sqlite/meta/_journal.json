@@ -120,6 +120,13 @@
       "when": 1791071152171,
       "tag": "0016_audit_events_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791184741815,
+      "tag": "0017_host_tags",
+      "breakpoints": true
     }
   ]
 }

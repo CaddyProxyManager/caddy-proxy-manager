@@ -39,6 +39,7 @@ import {
   parseOptionalText,
   parseOptionalNumber,
   parseAccessListId,
+  parseHostTags,
 } from "@/src/lib/forms/form-parse";
 
 const VALID_PROTOCOLS: L4Protocol[] = ["tcp", "udp"];
@@ -255,6 +256,7 @@ export async function createL4ProxyHostAction(
     const input: L4ProxyHostInput = {
       name: String(formData.get("name") ?? "Untitled"),
       description: formData.has("description") ? String(formData.get("description")) : undefined,
+      tags: parseHostTags(formData),
       protocol: parseProtocol(formData),
       listenAddress: String(formData.get("listenAddress") ?? "").trim(),
       upstreams: parseUpstreams(formData.get("upstreams")),
@@ -315,6 +317,7 @@ export async function updateL4ProxyHostAction(
     const input: Partial<L4ProxyHostInput> = {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
       description: formData.has("description") ? String(formData.get("description")) : undefined,
+      tags: parseHostTags(formData),
       protocol: formData.has("protocol") ? parseProtocol(formData) : undefined,
       listenAddress: formData.get("listenAddress")
         ? String(formData.get("listenAddress")).trim()

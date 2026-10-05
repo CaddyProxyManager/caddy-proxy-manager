@@ -12,6 +12,7 @@ import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHostBulkAction } from "@/lib/models/bulk-hosts";
 import { NONE_VALUE, accessListOptions, accessListStatus, toOptions } from "./HostDialogs";
+import { BulkTagInput } from "./HostTagsField";
 
 type Props = {
   hosts: { id: number; name: string }[];
@@ -29,6 +30,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
   const [action, setAction] = useState<ProxyHostBulkAction | null>(null);
   const [certificateId, setCertificateId] = useState(NONE_VALUE);
   const [accessListId, setAccessListId] = useState(NONE_VALUE);
+  const [tag, setTag] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -45,6 +47,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
         ids: hosts.map((host) => host.id),
         ...(action === "setCertificate" ? { certificateId: idOrNull(certificateId) } : {}),
         ...(action === "setAccessList" ? { accessListId: idOrNull(accessListId) } : {}),
+        ...(action === "addTag" ? { tag } : {}),
       });
       if (result.status === "error") {
         setError(result.message ?? null);
@@ -64,6 +67,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
     maintenanceOff: t("turnOffMaintenance"),
     setCertificate: t("bulkSetCertificate"),
     setAccessList: t("bulkSetAccessList"),
+    addTag: tb("addTagTitle"),
   };
 
   return (
@@ -81,6 +85,8 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
             { type: "divider" },
             { label: t("bulkSetCertificate"), onClick: () => open("setCertificate") },
             { label: t("bulkSetAccessList"), onClick: () => open("setAccessList") },
+            { type: "divider" },
+            { label: tb("addTag"), onClick: () => open("addTag") },
           ]}
         />
       </BulkActionBar>
@@ -113,6 +119,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
             status={accessListStatus(accessLists, accessListId, t)}
           />
         )}
+        {action === "addTag" && <BulkTagInput value={tag} onChange={setTag} />}
       </BulkConfirmDialog>
     </>
   );

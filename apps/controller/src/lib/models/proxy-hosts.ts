@@ -33,6 +33,7 @@ import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
 import { normalizeHostDescription } from "../proxy-hosts/description";
+import { collectTags, hasTagClause, normalizeHostTags, parseStoredTags } from "../proxy-hosts/tags";
 import {
   type HostCacheConfig,
   type HostCacheMeta,
@@ -965,6 +966,8 @@ export type ProxyHost = {
   id: number;
   name: string;
   description: string | null;
+  /** Lowercase, sorted; for finding hosts only. */
+  tags: string[];
   domains: string[];
   upstreams: string[];
   certificateId: number | null;
@@ -1020,6 +1023,8 @@ export type ProxyHostInput = {
   name: string;
   /** Free-text notes; blank clears them. */
   description?: string | null;
+  /** Normalised on save; null clears them. */
+  tags?: string[] | null;
   domains: string[];
   upstreams: string[];
   /**
@@ -3303,6 +3308,7 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
     id: row.id,
     name: row.name,
     description: row.description ?? null,
+    tags: parseStoredTags(row.tags),
     domains: JSON.parse(row.domains),
     upstreams: JSON.parse(row.upstreams),
     certificateId: row.certificateId ?? null,
@@ -3329,16 +3335,25 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
  * `visibleIds` null means unrestricted (admin). An empty array means the viewer sees nothing and
  * must not be dropped, or the query would list the whole fleet.
  */
-function proxyHostListFilter(search?: string, visibleIds?: number[] | null, enabled?: boolean) {
+function proxyHostListFilter(
+  search?: string,
+  visibleIds?: number[] | null,
+  enabled?: boolean,
+  tag?: string,
+) {
   const clauses = [];
   if (enabled !== undefined) {
     clauses.push(eq(proxyHosts.enabled, enabled));
+  }
+  if (tag) {
+    clauses.push(hasTagClause(proxyHosts.tags, tag));
   }
   if (search) {
     clauses.push(
       or(
         like(proxyHosts.name, `%${search}%`),
         like(proxyHosts.description, `%${search}%`),
+        like(proxyHosts.tags, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
         like(proxyHosts.upstreams, `%${search}%`),
       ),
@@ -3355,11 +3370,12 @@ export async function countProxyHosts(
   search?: string,
   visibleIds?: number[] | null,
   enabled?: boolean,
+  tag?: string,
 ): Promise<number> {
   const [row] = await db
     .select({ value: count() })
     .from(proxyHosts)
-    .where(proxyHostListFilter(search, visibleIds, enabled));
+    .where(proxyHostListFilter(search, visibleIds, enabled, tag));
   return row?.value ?? 0;
 }
 
@@ -3372,6 +3388,7 @@ export type ProxyHostCounts = { total: number; enabled: number; disabled: number
 export async function countProxyHostsByState(
   search?: string,
   visibleIds?: number[] | null,
+  tag?: string,
 ): Promise<ProxyHostCounts> {
   const [row] = await db
     .select({
@@ -3379,7 +3396,7 @@ export async function countProxyHostsByState(
       enabled: sql<number>`sum(case when ${proxyHosts.enabled} then 1 else 0 end)`.mapWith(Number),
     })
     .from(proxyHosts)
-    .where(proxyHostListFilter(search, visibleIds));
+    .where(proxyHostListFilter(search, visibleIds, undefined, tag));
   const total = row?.total ?? 0;
   const enabled = row?.enabled ?? 0;
   return { total, enabled, disabled: total - enabled };
@@ -3402,8 +3419,9 @@ export async function listProxyHostsPaginated(
   sortDir?: "asc" | "desc",
   visibleIds?: number[] | null,
   enabled?: boolean,
+  tag?: string,
 ): Promise<ProxyHost[]> {
-  const where = proxyHostListFilter(search, visibleIds, enabled);
+  const where = proxyHostListFilter(search, visibleIds, enabled, tag);
   const col = (sortBy && PROXY_HOST_SORT_COLUMNS[sortBy]) || proxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db
@@ -3414,6 +3432,15 @@ export async function listProxyHostsPaginated(
     .limit(limit)
     .offset(offset);
   return hosts.map(parseProxyHost);
+}
+
+/** Every tag on the hosts the viewer can see, for the list's tag filter. */
+export async function listProxyHostTags(visibleIds?: number[] | null): Promise<string[]> {
+  const rows = await db
+    .select({ tags: proxyHosts.tags })
+    .from(proxyHosts)
+    .where(proxyHostListFilter(undefined, visibleIds));
+  return collectTags(rows);
 }
 
 /**
@@ -3518,6 +3545,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     .values({
       name: input.name.trim(),
       description: normalizeHostDescription(input.description) ?? null,
+      tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
       domains: JSON.stringify(domains),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
       certificateId: input.certificateId ?? null,
@@ -3584,6 +3612,7 @@ export async function updateProxyHost(
   if (!existing) {
     throw domainError("proxyHostNotFound");
   }
+  const tags = normalizeHostTags(input.tags);
   await assertRawConfigChangeAllowed(existing, input, actorUserId);
   await assertDialTargetsAllowed(existing, input, actorUserId);
 
@@ -3688,6 +3717,7 @@ export async function updateProxyHost(
         input.description !== undefined
           ? normalizeHostDescription(input.description)
           : existing.description,
+      tags: JSON.stringify(tags ?? existing.tags),
       domains,
       upstreams,
       certificateId: effectiveCertificateId,

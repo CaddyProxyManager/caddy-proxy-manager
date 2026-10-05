@@ -51,6 +51,8 @@ import { AgentAssignmentFields, type AgentOption } from "@/components/agents/Age
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 import { HostNotesField } from "./HostNotesField";
+import { HostTagsField } from "./HostTagsField";
+import { UpstreamHealthPanel } from "./upstreams/UpstreamHealthPanel";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -137,7 +139,7 @@ export function CreateHostDialog({
   authentikDefaults: AuthentikSettings | null;
   forwardAuthDefaults: ForwardAuthSettings | null;
   tailscaleDefaults?: TailscaleHostDefaults | null;
-  /** Prefilled for a new host only: a duplicate carries the domains the operator came to change. */
+  /** Prefilled for a new host only; a duplicate starts with none, as two hosts cannot share one. */
   defaultDomain?: string;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];
@@ -152,7 +154,7 @@ export function CreateHostDialog({
 
   const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
   const [description, setDescription] = useState(initialData?.description ?? "");
-  const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? defaultDomain ?? "");
+  const [domains, setDomains] = useState(initialData ? "" : (defaultDomain ?? ""));
   const [certificateId, setCertificateId] = useState(
     String(initialData?.certificateId ?? NONE_VALUE),
   );
@@ -194,6 +196,7 @@ export function CreateHostDialog({
             isRequired
           />
           <HostNotesField value={description} onChange={setDescription} />
+          <HostTagsField initial={initialData?.tags} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}
@@ -344,6 +347,7 @@ export function EditHostDialog({
           />
           <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
           <HostNotesField value={description} onChange={setDescription} />
+          <HostTagsField initial={host.tags} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}
@@ -354,6 +358,7 @@ export function EditHostDialog({
             description={t("domainsHelp")}
           />
           <UpstreamInput defaultUpstreams={host.upstreams} />
+          <UpstreamHealthPanel hostId={host.id} />
           <Selector
             label={t("certificate")}
             htmlName="certificateId"

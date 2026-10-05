@@ -31,6 +31,7 @@ const POSTGRES: L4ProxyHost = {
   id: 1,
   name: "postgres",
   description: "Primary and replica. Failover is manual; see the runbook.",
+  tags: ["database", "prod"],
   protocol: "tcp",
   listenAddress: ":5432",
   upstreams: ["db-1:5432", "db-2:5432"],

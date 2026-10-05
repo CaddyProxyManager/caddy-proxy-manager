@@ -10,6 +10,8 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
 import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
+import { HostTagFilter, HostTagList } from "@/components/proxy-hosts/HostTagsField";
+import { duplicateL4ProxyHostDraft } from "@/src/lib/proxy-hosts/duplicate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -42,6 +44,9 @@ type Props = {
   counts: { total: number; tcp: number; udp: number; enabled: number };
   activeProtocol: "all" | "tcp" | "udp";
   initialSearch: string;
+  /** Every tag on a host the viewer can see, for the filter. */
+  tags?: string[];
+  activeTag?: string | null;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
@@ -151,6 +156,8 @@ export default function L4ProxyHostsClient({
   counts,
   activeProtocol,
   initialSearch,
+  tags = [],
+  activeTag = null,
   initialSort,
   agents,
   accessLists = [],
@@ -201,6 +208,14 @@ export default function L4ProxyHostsClient({
     }, 400);
   }
 
+  function handleTagChange(value: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("tag", value);
+    else params.delete("tag");
+    params.set("page", "1");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   function handleProtocolChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") params.delete("protocol");
@@ -222,7 +237,7 @@ export default function L4ProxyHostsClient({
   }
 
   function openDuplicate(host: L4ProxyHost) {
-    setDuplicateHost(host);
+    setDuplicateHost(duplicateL4ProxyHostDraft(host));
     openCreate();
   }
 
@@ -258,6 +273,7 @@ export default function L4ProxyHostsClient({
                 {formatMatcher(host, t)}
               </Text>
             </Tooltip>
+            <HostTagList tags={host.tags} />
           </VStack>
         </HStack>
       ),
@@ -340,6 +356,7 @@ export default function L4ProxyHostsClient({
               {host.description}
             </Text>
           )}
+          <HostTagList tags={host.tags} />
           <StatusChip status={host.enabled ? "active" : "inactive"} />
         </VStack>
         {actionsFor(host)}
@@ -392,11 +409,14 @@ export default function L4ProxyHostsClient({
           />
         }
         filters={
-          <TabList value={activeProtocol} onChange={handleProtocolChange}>
-            <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-            <Tab value="tcp" label="TCP" endContent={<Badge label={counts.tcp} />} />
-            <Tab value="udp" label="UDP" endContent={<Badge label={counts.udp} />} />
-          </TabList>
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            <TabList value={activeProtocol} onChange={handleProtocolChange}>
+              <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+              <Tab value="tcp" label="TCP" endContent={<Badge label={counts.tcp} />} />
+              <Tab value="udp" label="UDP" endContent={<Badge label={counts.udp} />} />
+            </TabList>
+            <HostTagFilter tags={tags} value={activeTag} onChange={handleTagChange} />
+          </HStack>
         }
         search={
           <SearchField
@@ -423,7 +443,7 @@ export default function L4ProxyHostsClient({
         columns={columns}
         data={hosts}
         keyField="id"
-        emptyMessage={searchTerm ? t("searchEmptyMessage") : t("emptyMessage")}
+        emptyMessage={searchTerm || activeTag ? t("searchEmptyMessage") : t("emptyMessage")}
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}

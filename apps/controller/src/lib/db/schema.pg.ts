@@ -428,6 +428,8 @@ export const proxyHosts = pgTable("proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  /** JSON array, normalised on save; labels for finding hosts, never read by the config build. */
+  tags: text("tags").notNull().default("[]"),
   domains: text("domains").notNull(),
   upstreams: text("upstreams").notNull(),
   certificateId: integer("certificateId").references(() => certificates.id, {
@@ -724,6 +726,8 @@ export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  /** As on proxy_hosts. */
+  tags: text("tags").notNull().default("[]"),
   protocol: text("protocol").notNull(),
   listenAddress: text("listenAddress").notNull(),
   upstreams: text("upstreams").notNull(),

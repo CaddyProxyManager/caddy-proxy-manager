@@ -15,6 +15,7 @@ import { domainError } from "../errors/domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { normalizeHostDescription } from "../proxy-hosts/description";
+import { collectTags, hasTagClause, normalizeHostTags, parseStoredTags } from "../proxy-hosts/tags";
 import { assertL4PortPlan, MAX_L4_PORTS_PER_HOST } from "../l4/port-plan";
 import {
   type HostCrowdSecMeta,
@@ -165,6 +166,8 @@ export type L4ProxyHost = {
   id: number;
   name: string;
   description: string | null;
+  /** Lowercase, sorted; for finding hosts only. */
+  tags: string[];
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
@@ -194,6 +197,8 @@ export type L4ProxyHostInput = {
   name: string;
   /** Free-text notes; blank clears them. */
   description?: string | null;
+  /** Normalised on save; null clears them. */
+  tags?: string[] | null;
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
@@ -447,6 +452,7 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
     id: row.id,
     name: row.name,
     description: row.description ?? null,
+    tags: parseStoredTags(row.tags),
     protocol: row.protocol as L4Protocol,
     listenAddress: row.listenAddress,
     upstreams: safeJsonParse<string[]>(row.upstreams, []),
@@ -592,16 +598,25 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
  * `visibleIds` null means unrestricted (admin). An empty array means the viewer sees nothing and
  * must not be dropped, or the query would list every host.
  */
-function l4ListFilter(search?: string, visibleIds?: number[] | null, protocol?: L4Protocol) {
+function l4ListFilter(
+  search?: string,
+  visibleIds?: number[] | null,
+  protocol?: L4Protocol,
+  tag?: string,
+) {
   const clauses = [];
   if (protocol) {
     clauses.push(eq(l4ProxyHosts.protocol, protocol));
+  }
+  if (tag) {
+    clauses.push(hasTagClause(l4ProxyHosts.tags, tag));
   }
   if (search) {
     clauses.push(
       or(
         like(l4ProxyHosts.name, `%${search}%`),
         like(l4ProxyHosts.description, `%${search}%`),
+        like(l4ProxyHosts.tags, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
         like(l4ProxyHosts.upstreams, `%${search}%`),
       ),
@@ -618,11 +633,12 @@ export async function countL4ProxyHosts(
   search?: string,
   visibleIds?: number[] | null,
   protocol?: L4Protocol,
+  tag?: string,
 ): Promise<number> {
   const [row] = await db
     .select({ value: count() })
     .from(l4ProxyHosts)
-    .where(l4ListFilter(search, visibleIds, protocol));
+    .where(l4ListFilter(search, visibleIds, protocol, tag));
   return row?.value ?? 0;
 }
 
@@ -653,8 +669,9 @@ export async function listL4ProxyHostsPaginated(
   sortDir?: "asc" | "desc",
   visibleIds?: number[] | null,
   protocol?: L4Protocol,
+  tag?: string,
 ): Promise<L4ProxyHost[]> {
-  const where = l4ListFilter(search, visibleIds, protocol);
+  const where = l4ListFilter(search, visibleIds, protocol, tag);
   const col = (sortBy && L4_SORT_COLUMNS[sortBy]) || l4ProxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db
@@ -665,6 +682,15 @@ export async function listL4ProxyHostsPaginated(
     .limit(limit)
     .offset(offset);
   return hosts.map(parseL4ProxyHost);
+}
+
+/** Every tag on the hosts the viewer can see, for the list's tag filter. */
+export async function listL4ProxyHostTags(visibleIds?: number[] | null): Promise<string[]> {
+  const rows = await db
+    .select({ tags: l4ProxyHosts.tags })
+    .from(l4ProxyHosts)
+    .where(l4ListFilter(undefined, visibleIds));
+  return collectTags(rows);
 }
 
 /** The metrics listener's port is configurable, so it is checked here rather than in the constant. */
@@ -706,6 +732,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     .values({
       name: input.name.trim(),
       description: normalizeHostDescription(input.description) ?? null,
+      tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
       protocol: input.protocol,
       listenAddress: input.listenAddress.trim(),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
@@ -846,6 +873,7 @@ export async function updateL4ProxyHost(
       ...(input.description !== undefined
         ? { description: normalizeHostDescription(input.description) }
         : {}),
+      ...(input.tags !== undefined ? { tags: JSON.stringify(normalizeHostTags(input.tags)) } : {}),
       ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
       ...(input.listenAddress !== undefined ? { listenAddress: input.listenAddress.trim() } : {}),
       ...(input.upstreams !== undefined
@@ -992,6 +1020,7 @@ export type L4ProxyHostCounts = { total: number; tcp: number; udp: number; enabl
 export async function countL4ProxyHostsByProtocol(
   search?: string,
   visibleIds?: number[] | null,
+  tag?: string,
 ): Promise<L4ProxyHostCounts> {
   const [row] = await db
     .select({
@@ -1004,7 +1033,7 @@ export async function countL4ProxyHostsByProtocol(
       ),
     })
     .from(l4ProxyHosts)
-    .where(l4ListFilter(search, visibleIds));
+    .where(l4ListFilter(search, visibleIds, undefined, tag));
   const total = row?.total ?? 0;
   const tcp = row?.tcp ?? 0;
   return { total, tcp, udp: total - tcp, enabled: row?.enabled ?? 0 };

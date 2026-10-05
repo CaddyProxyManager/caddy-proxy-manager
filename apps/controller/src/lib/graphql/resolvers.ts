@@ -52,6 +52,7 @@ import {
   parseL4HostBulkRequest,
   parseProxyHostBulkRequest,
 } from "../models/bulk-hosts";
+import { getProxyHostUpstreamHealth } from "../proxy-hosts/upstream-health";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
 import { ApiAuthError, NotFoundError } from "../api/auth";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
@@ -64,6 +65,7 @@ const PROXY_HOST_SCALAR_FIELDS = new Set([
   "id",
   "name",
   "description",
+  "tags",
   "domains",
   "upstreams",
   "enabled",
@@ -83,6 +85,7 @@ const L4_SCALAR_FIELDS = new Set([
   "id",
   "name",
   "description",
+  "tags",
   "protocol",
   "listenAddress",
   "upstreams",
@@ -164,6 +167,10 @@ export const resolvers = {
     proxyHost: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
       await requireAdmin(context);
       return await getProxyHost(args.id);
+    },
+    proxyHostUpstreamHealth: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
+      await requireAdmin(context);
+      return await getProxyHostUpstreamHealth(args.id);
     },
     l4ProxyHosts: async (_: unknown, __: unknown, context: GraphQLContext) => {
       await requireAdmin(context);

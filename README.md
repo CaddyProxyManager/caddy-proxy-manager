@@ -257,8 +257,8 @@ starts their count over - the way back in when that user is the only administrat
 
 ## Features
 
-- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (12 policies, including weighted and query/header/cookie hashing), active/passive health checks, retries, Force HTTPS, HSTS, WebSocket, Preserve Host Header and Discourage Search Engines switches, zstd/gzip compression (global, with a per-host override), maintenance mode (a 503 with bypass addresses, toggled from the host list), upstream connect, read, write and stream timeouts, per-client rate limiting (a 429 with Retry-After, with the opt-in Rate Limit module), free-text notes, enable/disable toggle, and bulk actions on ticked hosts (enable, disable, delete, maintenance, certificate, access list - all or nothing, one reload)
-- **L4 Proxy Hosts** - TCP/UDP stream proxying on a port or a port range (each connection optionally sent to the port it arrived on), with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, per-host geo blocking, an access list's IP rules, notes, and bulk enable/disable/delete. Automatic Docker Compose port management via agent
+- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (12 policies, including weighted and query/header/cookie hashing), active/passive health checks, retries, Force HTTPS, HSTS, WebSocket, Preserve Host Header and Discourage Search Engines switches, zstd/gzip compression (global, with a per-host override), maintenance mode (a 503 with bypass addresses, toggled from the host list), upstream connect, read, write and stream timeouts, per-client rate limiting (a 429 with Retry-After, with the opt-in Rate Limit module), live upstream health from every serving agent, free-text notes, tags with a tag filter, duplicate (domains and secrets left out), enable/disable toggle, and bulk actions on ticked hosts (enable, disable, delete, maintenance, certificate, access list, add tag - all or nothing, one reload)
+- **L4 Proxy Hosts** - TCP/UDP stream proxying on a port or a port range (each connection optionally sent to the port it arrived on), with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, per-host geo blocking, an access list's IP rules, notes, tags, duplicate, and bulk enable/disable/delete/add tag. Automatic Docker Compose port management via agent
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another), each with its own access list or the host's
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308), optionally keeping the request's path and query (whole, or after the rule's prefix), and path prefix rewriting
 - **Cache Assets** - Per-host asset caching: browser Cache-Control defaults, or a shared Caddy cache with the opt-in HTTP Cache module, kept in memory, on disk, in Redis or in etcd, with Cloudflare or Fastly purging
@@ -558,7 +558,11 @@ beside it hand identical input to identical validation, which is what makes them
 `bulkProxyHosts` and `bulkL4ProxyHosts` take `{ action, ids }` (up to 500) and return how many hosts
 changed; the REST equivalents are `POST /api/v1/proxy-hosts/bulk` and
 `POST /api/v1/l4-proxy-hosts/bulk`. A batch is all or nothing, each host is audited on its own, and
-Caddy is applied once.
+Caddy is applied once (not at all for `addTag`, which takes a `tag`).
+
+`proxyHostUpstreamHealth(id)` reads each upstream's live state from Caddy on every agent serving
+the host: healthy, failing (with the failure count and whether it is out of rotation), unchecked,
+unreported, or unknown for an agent that did not answer.
 
 ### Roles
 
