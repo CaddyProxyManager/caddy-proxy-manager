@@ -4,6 +4,7 @@
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -25,7 +26,7 @@ function location(res: Awaited<ReturnType<typeof httpGet>>): string {
 test.describe
   .serial('Redirect Rules - full URLs, cross-domain, wildcards', () => {
     test('setup: create proxy host with advanced redirect rules', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

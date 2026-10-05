@@ -3,6 +3,9 @@ import { expect, type Download, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { injectFormFields, turnOffForceHttps } from './http';
 
+/** The list puts the busiest first, so a host just made, with no traffic, can sit past page one. */
+export const PROXY_HOSTS_NEWEST_FIRST = '/proxy-hosts?sortBy=createdAt&sortDir=desc';
+
 export interface ProxyHostConfig {
   name: string;
   domain: string;
@@ -67,7 +70,7 @@ export async function openCreateHostDialog(page: Page): Promise<void> {
 
 /** Force HTTPS is always off so functional tests can use plain HTTP. */
 export async function createProxyHost(page: Page, config: ProxyHostConfig): Promise<void> {
-  await page.goto('/proxy-hosts');
+  await page.goto(PROXY_HOSTS_NEWEST_FIRST);
   await openCreateHostDialog(page);
 
   await page.getByLabel('Name').fill(config.name);

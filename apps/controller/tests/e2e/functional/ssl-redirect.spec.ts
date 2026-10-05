@@ -1,5 +1,6 @@
 /** ssl_forced: plain HTTP gets a 308. Domain: func-ssl.test */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -9,7 +10,7 @@ test.describe
   .serial('SSL Redirect (ssl_forced)', () => {
     test('setup: create proxy host with ssl_forced=true', async ({ page }) => {
       // Opened by hand rather than through createProxyHost, which turns Force HTTPS off.
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

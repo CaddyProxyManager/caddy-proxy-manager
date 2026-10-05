@@ -3,6 +3,7 @@
  * redirects_json field is injected directly. Domain: func-redirects.test
  */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -11,7 +12,7 @@ const DOMAIN = 'func-redirects.test';
 test.describe
   .serial('Per-path Redirect Rules', () => {
     test('setup: create proxy host with redirect rules', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

@@ -2,13 +2,14 @@ import { test, expect } from '@playwright/test';
 import { goToSetting } from '../../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../../helpers/staged-settings';
 import { waitForHydration } from '../../helpers/hydration';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik';
 
 test.describe('Proxy Hosts', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/proxy-hosts');
+    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     // The tests below click Create Host first thing; a click before hydration opens nothing.
     await waitForHydration(page);
   });
@@ -251,7 +252,7 @@ test.describe('Proxy Hosts', () => {
       await expectStaged(page);
       await applyStagedChanges(page);
 
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -322,7 +323,7 @@ test.describe('Proxy Hosts', () => {
       });
       expect(saveResp.ok()).toBeTruthy();
 
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       const row = page.locator('tr', { hasText: 'Authentik Edit Defaults Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
@@ -414,7 +415,7 @@ test.describe('Proxy Hosts', () => {
       });
       expect(saveResp.ok()).toBeTruthy();
 
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       const row = page.locator('tr', { hasText: 'Authentik Own Values Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
@@ -571,14 +572,16 @@ test.describe('Proxy Hosts', () => {
     try {
       await page.reload();
 
+      // With analytics on, the list's protection badges call it "Sign-in".
+      const badge = /^(Forward Auth|Sign-in)$/;
       const enabledRow = page.locator('tr', { hasText: 'FwdAuth Badge Host' });
-      await expect(enabledRow.getByText('Forward Auth', { exact: true })).toBeVisible({
+      await expect(enabledRow.getByText(badge)).toBeVisible({
         timeout: 10000,
       });
 
       const disabledRow = page.locator('tr', { hasText: 'Plain Proxy Host' });
       await expect(disabledRow).toBeVisible({ timeout: 10000 });
-      await expect(disabledRow.getByText('Forward Auth', { exact: true })).toHaveCount(0);
+      await expect(disabledRow.getByText(badge)).toHaveCount(0);
     } finally {
       await page.request.delete(`${API_PROXY_HOSTS}/${withHost.id}`, {
         headers: { Origin: origin },

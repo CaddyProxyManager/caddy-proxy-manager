@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { applyStagedChanges, expectStaged } from '../../helpers/staged-settings';
 import {
   goToSetting,
@@ -27,6 +27,11 @@ async function openPaletteWithKeyboard(page: Page) {
 }
 
 const goToSection = goToSetting;
+
+/** A section's own result: each of its settings is listed too, captioned with the section's name. */
+function sectionResult(dialog: Locator, label: string) {
+  return dialog.getByRole('option', { name: new RegExp(`^${label} `) }).first();
+}
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
 
@@ -182,10 +187,10 @@ test.describe('Settings - Cmd-K palette', () => {
     await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('General', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Responses', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('DNS', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Observability', { exact: true })).toBeVisible();
+    await expect(sectionResult(dialog, 'General')).toBeVisible();
+    await expect(sectionResult(dialog, 'Responses')).toBeVisible();
+    await expect(sectionResult(dialog, 'DNS')).toBeVisible();
+    await expect(sectionResult(dialog, 'Observability')).toBeVisible();
   });
 
   test('typing in the palette filters results', async ({ page }) => {
@@ -195,8 +200,8 @@ test.describe('Settings - Cmd-K palette', () => {
     const input = dialog.getByPlaceholder(/search/i);
     // Specific enough that cmdk's fuzzy match reaches nothing unrelated; it matches a block name.
     await input.fill('geob');
-    await expect(dialog.getByText('Geo-blocking', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Observability', { exact: true })).not.toBeVisible();
+    await expect(sectionResult(dialog, 'Geo-blocking')).toBeVisible();
+    await expect(sectionResult(dialog, 'Observability')).not.toBeVisible();
   });
 
   test('selecting a palette result navigates to that section', async ({ page }) => {
@@ -205,7 +210,7 @@ test.describe('Settings - Cmd-K palette', () => {
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
     await input.fill('logging');
-    await dialog.getByText('Observability', { exact: true }).click();
+    await sectionResult(dialog, 'Observability').click();
     await expect(dialog).not.toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
   });
@@ -854,7 +859,7 @@ test.describe('Settings - cross-section navigation', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('access logging');
-    await dialog.getByText('Observability', { exact: true }).click();
+    await sectionResult(dialog, 'Observability').click();
     await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
 
     await page

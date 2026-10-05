@@ -3,7 +3,7 @@
  * no DNS needed, requests go to 127.0.0.1:80 with a custom Host header.
  */
 import { test, expect } from '@playwright/test';
-import { createProxyHost } from '../../helpers/proxy-api';
+import { createProxyHost, PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, waitForRoute } from '../../helpers/http';
 
 const DOMAIN = 'func-proxy.test';
@@ -39,7 +39,7 @@ test.describe
     });
 
     test('disabled proxy host stops routing traffic', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       const row = page.locator('tr', { hasText: 'Functional Proxy Test' });
       await row.getByRole('switch').click();
       await page.waitForTimeout(3_000);

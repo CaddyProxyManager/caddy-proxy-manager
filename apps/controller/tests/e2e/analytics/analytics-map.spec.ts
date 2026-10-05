@@ -66,6 +66,8 @@ test.describe('Analytics world map', () => {
       .toBeGreaterThan(100);
 
     const canvas = page.locator(MAP_CANVAS);
+    // The map sits below the fold, and the mouse cannot reach outside the viewport.
+    await canvas.scrollIntoViewIfNeeded();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
     if (!box) return;

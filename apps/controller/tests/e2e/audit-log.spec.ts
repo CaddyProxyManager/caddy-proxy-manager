@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../helpers/proxy-api';
 import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Audit Log', () => {
@@ -17,7 +18,7 @@ test.describe('Audit Log', () => {
   });
 
   test('creating a proxy host creates audit log entry', async ({ page }) => {
-    await page.goto('/proxy-hosts');
+    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     await waitForHydration(page);
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -55,7 +56,7 @@ test.describe('Audit Log', () => {
   });
 
   test("shows a host change's before and after, unified or side by side", async ({ page }) => {
-    await page.goto('/proxy-hosts');
+    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     await waitForHydration(page);
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();

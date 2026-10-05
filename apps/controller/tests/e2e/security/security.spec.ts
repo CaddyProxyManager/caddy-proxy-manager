@@ -8,7 +8,7 @@ test.describe('Security', () => {
     await page.goto('/security');
     await expect(page).not.toHaveURL(/login/);
     await expect(page.getByRole('heading', { name: 'Security events', level: 1 })).toBeVisible();
-    await expect(page.getByText('Rule set')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rule set' })).toBeVisible();
 
     await waitForHydration(page);
     await page.getByRole('radio', { name: '7d' }).click();
@@ -22,7 +22,7 @@ test.describe('Security', () => {
     await page.getByRole('button', { name: 'Block a source' }).first().click();
 
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Source', { exact: true }).fill(address);
+    await dialog.getByRole('textbox', { name: /^Source/ }).fill(address);
     await dialog.getByLabel('Reason').fill('e2e');
     await dialog.getByRole('button', { name: 'Block', exact: true }).click();
 
@@ -40,8 +40,8 @@ test.describe('Security', () => {
 
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('combobox', { name: 'Type' }).click();
-    await page.getByRole('option', { name: 'Network' }).click();
-    await dialog.getByLabel('Source', { exact: true }).fill('0.0.0.0/0');
+    await page.getByRole('option', { name: 'Network', exact: true }).click();
+    await dialog.getByRole('textbox', { name: /^Source/ }).fill('0.0.0.0/0');
     await dialog.getByRole('button', { name: 'Block', exact: true }).click();
     await expect(dialog.getByText(/every address on the internet/)).toBeVisible();
   });

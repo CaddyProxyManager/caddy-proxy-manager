@@ -24,13 +24,11 @@ test.describe
       await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
       // Astryx controls emit no ids; by role and name instead.
-      const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
+      const blocking = page.getByRole('radio', { name: 'Blocking', exact: true });
       const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
-      if (!(await wafSwitch.isChecked())) {
-        await wafSwitch.click();
-        await expect(wafSwitch).toBeChecked();
-      }
+      await blocking.click();
+      await expect(blocking).toBeChecked();
       if (!(await owaspCheckbox.isChecked())) {
         await owaspCheckbox.click();
         await expect(owaspCheckbox).toBeChecked();

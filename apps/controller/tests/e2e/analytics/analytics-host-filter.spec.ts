@@ -55,7 +55,10 @@ test.describe('Analytics host filter (#171)', () => {
 
       await page.goto(`/analytics?range=1h&f=${encodeURIComponent(`host:is:${host}`)}`);
       const hostsList = page.getByTestId('analytics-top-host');
-      await expect(hostsList.getByText(host, { exact: true })).toBeVisible({ timeout: 15_000 });
+      // Each label's tooltip carries the same text, after it.
+      await expect(hostsList.getByText(host, { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
       await expect(
         page.getByTestId('analytics-stats').getByText('1', { exact: true }).first(),
       ).toBeVisible();
@@ -63,7 +66,7 @@ test.describe('Analytics host filter (#171)', () => {
       // Leaving it out from its own row empties the list.
       await hostsList.getByRole('button', { name: `Leave out ${host}` }).click();
       await expect(page).toHaveURL(new RegExp(`host%3Anot%3A${host.replace(/\./g, '\\.')}`));
-      await expect(hostsList.getByText(host, { exact: true })).toBeHidden({ timeout: 15_000 });
+      await expect(hostsList.getByText(host, { exact: true })).toHaveCount(0, { timeout: 15_000 });
     } finally {
       await ch
         .command({

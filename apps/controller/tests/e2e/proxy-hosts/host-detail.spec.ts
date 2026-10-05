@@ -3,6 +3,7 @@
  * the editor at that section.
  */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { waitForHydration } from '../../helpers/hydration';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
@@ -13,7 +14,7 @@ test.describe('Proxy host page', () => {
   let origin: string;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/proxy-hosts');
+    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     origin = new URL(page.url()).origin;
     const response = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },

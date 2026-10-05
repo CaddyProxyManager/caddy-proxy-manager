@@ -3,6 +3,7 @@
  * reflects the request line, so /users must arrive as /api/users. Domain: func-rewrite.test
  */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -11,7 +12,7 @@ const DOMAIN = 'func-rewrite.test';
 test.describe
   .serial('Path Prefix Rewrite', () => {
     test('setup: create proxy host with path prefix rewrite', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

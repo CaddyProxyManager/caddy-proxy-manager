@@ -9,7 +9,9 @@ test('the sign-in overview lists the methods and previews the login page', async
   await expect(page).toHaveURL(/\/users\/sign-in$/);
 
   await expect(page.getByRole('heading', { name: 'Sign-in overview', level: 1 })).toBeVisible();
-  await expect(page.getByRole('cell', { name: /username and password/i })).toBeVisible();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: /username and password/i }),
+  ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'The login page' })).toBeVisible();
   // The preview is inert: its fields are there to be looked at.
   await expect(page.getByRole('textbox', { name: 'Username' })).toBeDisabled();
@@ -21,6 +23,6 @@ test('the users list names where an account came from and how it last signed in'
   await page.goto('/users');
   await waitForHydration(page);
   await expect(page.getByText('Account source')).toBeVisible();
-  await expect(page.getByText('Second factor')).toBeVisible();
+  await expect(page.getByText('Second factor', { exact: true })).toBeVisible();
   await expect(page.getByText('Last sign-in')).toBeVisible();
 });

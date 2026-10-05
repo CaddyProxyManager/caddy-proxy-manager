@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { waitForHydration } from '../../helpers/hydration';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
@@ -8,7 +9,7 @@ const NAMES = ['Bulk E2E One', 'Bulk E2E Two', 'Bulk E2E Three'];
 
 test.describe('Proxy host bulk actions', () => {
   test('select two hosts and disable them together', async ({ page }) => {
-    await page.goto('/proxy-hosts');
+    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     const origin = new URL(page.url()).origin;
     const ids: number[] = [];
     for (const [index, name] of NAMES.entries()) {

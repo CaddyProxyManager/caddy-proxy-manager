@@ -4,6 +4,7 @@
  * re-match the block, since subroute routes run sequentially. Domain: func-path-rules.test
  */
 import { test, expect } from '@playwright/test';
+import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -12,7 +13,7 @@ const DOMAIN = 'func-path-rules.test';
 test.describe
   .serial('Path Blocks and Path Rewrites', () => {
     test('setup: create proxy host with path blocks and rewrites', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -91,7 +92,7 @@ const ALLOW_DOMAIN = 'func-path-allows.test';
 test.describe
   .serial('Path Allows override Path Blocks', () => {
     test('setup: create host that blocks /* but allows /secret and /public/*', async ({ page }) => {
-      await page.goto('/proxy-hosts');
+      await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

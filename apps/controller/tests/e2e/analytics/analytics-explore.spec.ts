@@ -97,16 +97,20 @@ test.describe('Analytics explore', () => {
       await page.goto(`/analytics?range=1h&${filterTo(host)}`);
 
       const paths = page.getByTestId('analytics-top-path');
-      await expect(paths.getByText('/.env', { exact: true })).toBeVisible({ timeout: 15_000 });
+      // Each label's tooltip carries the same text, after it.
+      await expect(paths.getByText('/.env', { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
       await paths.getByRole('button', { name: 'Show only /.env' }).click();
       await expect(page).toHaveURL(/path%3Ais%3A%2F\.env/);
-      await expect(paths.getByText('/admin', { exact: true })).toBeHidden({ timeout: 15_000 });
+      await expect(paths.getByText('/admin', { exact: true })).toHaveCount(0, { timeout: 15_000 });
 
       await page.goto(`/analytics?range=1h&${filterTo(host)}`);
       await page.getByRole('switch', { name: 'Mitigated only' }).click();
       await expect(page).toHaveURL(/log=mitigated/);
       await expect(page.getByText('GET /admin').first()).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('GET /', { exact: true })).toBeHidden();
+      // Only the log has an outcome column; the top lists show "GET /" too.
+      await expect(page.getByRole('cell', { name: 'Served', exact: true })).toHaveCount(0);
 
       // CSV export of the chart buckets.
       const download = page.waitForEvent('download');

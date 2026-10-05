@@ -140,7 +140,7 @@ test.describe('WAF', () => {
     await page.getByRole('radio', { name: 'Detection only', exact: true }).click();
     await expect(page.getByRole('radio', { name: 'Detection only', exact: true })).toBeChecked();
     await expect(page.getByText('Paranoia level')).toBeVisible();
-    await expect(page.getByLabel('Inbound anomaly threshold')).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'Inbound anomaly threshold' })).toBeVisible();
   });
 
   test('WAF exclusions tab adds and removes a scoped exclusion', async ({ page }) => {

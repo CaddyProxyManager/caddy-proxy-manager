@@ -44,7 +44,8 @@ test.describe('Mobile layout', () => {
     await waitForHydration(page);
     await page.getByRole('button', { name: 'More', exact: true }).click();
     const drawer = page.getByRole('dialog', { name: 'Jump to' });
-    await drawer.getByRole('link', { name: 'Users', exact: true }).click();
+    // A tile's link is a hidden overlay its content covers; a tap lands on the tile, as here.
+    await drawer.getByText('Users', { exact: true }).click();
     await expect(page).toHaveURL('/users');
     await expect(drawer).toHaveCount(0);
   });
@@ -55,7 +56,7 @@ test.describe('Mobile layout', () => {
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page
       .getByRole('dialog', { name: 'Jump to' })
-      .getByRole('link', { name: 'All pages' })
+      .getByText('All pages', { exact: true })
       .click();
     await expect(page).toHaveURL('/more');
     await expect(page.getByRole('heading', { name: 'More', level: 1 })).toBeVisible();
