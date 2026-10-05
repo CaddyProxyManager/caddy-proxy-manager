@@ -48,12 +48,12 @@ function relativeActionsShim() {
  */
 
 /**
- * Served from GitHub Pages under `/<repo>/`, which `base` must say. For a custom domain: point
- * `site` at it, set `base` to "/", and add a CNAME file to `public/`.
+ * At the domain's root, which the docs' `/features/...` links assume. The domain itself is set in
+ * the repository's Pages settings: a site deployed by Actions ignores a CNAME file.
  */
 export default defineConfig({
-  site: "https://silentspud.github.io",
-  base: "/caddy-proxy-manager",
+  site: "https://caddyproxy.com",
+  base: "/",
   integrations: [
     react(),
     starlight({

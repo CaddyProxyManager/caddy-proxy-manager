@@ -1,6 +1,7 @@
 /**
  * Picks the e2e specs a change can break, from the files it touches. A path no rule names runs the
- * whole suite, so a gap here costs CI time, never coverage; main still runs everything on merge.
+ * whole suite, so a gap here costs CI time, never coverage. A rule too narrow does cost coverage:
+ * nothing runs on merge, only `e2e-full` or a dispatch runs everything.
  *
  *   git diff --name-only main... | bun apps/controller/scripts/select-e2e.ts --base main
  *

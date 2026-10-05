@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Check the [documentation](https://silentspud.github.io/caddy-proxy-manager/) first - the install and feature pages cover the
+        Check the [documentation](https://caddyproxy.com/) first - the install and feature pages cover the
         common surprises. If you have, and it still looks wrong, you are in the right place.
 
   - type: checkboxes

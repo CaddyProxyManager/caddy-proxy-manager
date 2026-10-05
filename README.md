@@ -1036,7 +1036,7 @@ rebuild, then pick where the Local API is under **Settings → CrowdSec**:
   reaches it and the key. The key is encrypted at rest, never returned by the API, and kept only
   while the Local API and AppSec addresses are unchanged. **Test connection** runs from the
   controller, which may not reach a Local API only Caddy's network can. The
-  [CrowdSec docs](https://silentspud.github.io/caddy-proxy-manager/features/crowdsec/#external)
+  [CrowdSec docs](https://caddyproxy.com/features/crowdsec/#external)
   walk through it.
 
 Every proxy host and L4 host then refuses the addresses CrowdSec has decided against, first in the
@@ -1058,7 +1058,7 @@ it, after the WAF and before any sign-in; a visitor without a pass gets a 307 to
   restart. Leave `PUBLIC_URL` unset.
 - API clients and webhooks cannot solve a challenge: list their paths under **Exempt paths**.
 
-See the [bot challenge docs](https://silentspud.github.io/caddy-proxy-manager/features/bot-challenge/)
+See the [bot challenge docs](https://caddyproxy.com/features/bot-challenge/)
 for a Compose file and the caveats.
 
 ---
@@ -2059,7 +2059,7 @@ Contributions welcome:
 
 ## Support
 
-- **Documentation:** [silentspud.github.io/caddy-proxy-manager](https://silentspud.github.io/caddy-proxy-manager/)
+- **Documentation:** [caddyproxy.com](https://caddyproxy.com/)
 - **Issues:** [GitHub Issues](https://github.com/silentspud/caddy-proxy-manager/issues) for bugs and feature requests
 
 ---

@@ -3,13 +3,10 @@ name: End-to-end tests
 on:
   # Opt-in on PRs: label one `e2e` to run the specs its changes can reach
   # (apps/controller/scripts/select-e2e.ts) on every push after that, or `e2e-full` for all of them.
-  # Main runs the whole suite on each merge to catch what the map missed; so does a dispatch.
+  # Nothing runs on merge: dispatch on main runs the whole suite, to catch what the map missed.
   # No `ref` input: one feeding `actions/checkout` would let any commit seed main's cache (CodeQL
   # actions/cache-poisoning). To test a commit, push it to a branch or tag and dispatch that.
   workflow_dispatch:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -20,7 +17,7 @@ on:
       - synchronize
 
 # One run per ref. On a PR a force-push supersedes the in-flight run rather than leaving a 30-minute
-# Docker job grinding against a commit nobody is looking at; main's queue, so every merge is tested.
+# Docker job grinding against a commit nobody is looking at; dispatches queue.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
