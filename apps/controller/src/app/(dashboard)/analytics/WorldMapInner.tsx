@@ -8,7 +8,7 @@ import { setWorkerUrl, type ExpressionSpecification } from "maplibre-gl";
 import { useTheme } from "@astryxdesign/core";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Text } from "@astryxdesign/core/Text";
-import { HStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import {
@@ -479,6 +479,7 @@ export default function WorldMapInner({
           onMouseMove={onHover}
           onMouseLeave={() => setHoverInfo(null)}
           onClick={onClick}
+          // MapGL takes a style object, not a class.
           style={{ position: "absolute", inset: 0 }}
           attributionControl={false}
           dragRotate={false}
@@ -512,90 +513,55 @@ export default function WorldMapInner({
                   anchor="bottom"
                   className="wm-popup"
                 >
-                  <div
-                    style={{
-                      color: "var(--color-text-primary)",
-                      fontFamily: "inherit",
-                      fontSize: 13,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 7,
-                        marginBottom: 7,
-                        fontWeight: 600,
-                        fontSize: 14,
-                      }}
-                    >
-                      <span style={{ fontSize: 20, lineHeight: 1 }}>
+                  <VStack gap={1}>
+                    <HStack gap={2} vAlign="center" paddingBlockEnd={1}>
+                      <Text type="body" size="xl">
                         {info.alpha2 ? flag(info.alpha2) : "🌐"}
-                      </span>
-                      <span>{info.alpha2 ? regionName(info.alpha2, locale) : t("territory")}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}>
-                      <span style={{ color: "var(--color-text-secondary)" }}>
+                      </Text>
+                      <Text type="body" weight="semibold">
+                        {info.alpha2 ? regionName(info.alpha2, locale) : t("territory")}
+                      </Text>
+                    </HStack>
+                    <HStack justify="between" gap={5}>
+                      <Text type="body" size="sm" color="secondary">
                         {t("metricRequests")}
-                      </span>
-                      <span
-                        style={{
-                          color: "var(--color-text-accent)",
-                          fontWeight: 700,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
+                      </Text>
+                      <Text type="body" size="sm" weight="bold" color="accent" hasTabularNumbers>
                         {format.number(info.total)}
-                      </span>
-                    </div>
+                      </Text>
+                    </HStack>
                     {info.blocked > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 20,
-                          marginTop: 3,
-                        }}
-                      >
-                        <span style={{ color: "var(--color-text-secondary)" }}>
+                      <HStack justify="between" gap={5}>
+                        <Text type="body" size="sm" color="secondary">
                           {t("metricBlocked")}
-                        </span>
-                        <span
-                          style={{
-                            color: "var(--color-error)",
-                            fontWeight: 700,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
+                        </Text>
+                        <Text
+                          type="body"
+                          size="sm"
+                          weight="bold"
+                          hasTabularNumbers
+                          className="text-error"
                         >
                           {format.number(info.blocked)}
-                        </span>
-                      </div>
+                        </Text>
+                      </HStack>
                     )}
                     {info.uniqueIps > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 20,
-                          marginTop: 3,
-                        }}
-                      >
-                        <span style={{ color: "var(--color-text-secondary)" }}>
+                      <HStack justify="between" gap={5}>
+                        <Text type="body" size="sm" color="secondary">
                           {t("uniqueIps")}
-                        </span>
-                        <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                        </Text>
+                        <Text type="body" size="sm" weight="bold" hasTabularNumbers>
                           {format.number(info.uniqueIps)}
-                        </span>
-                      </div>
+                        </Text>
+                      </HStack>
                     )}
                     {info.total === 0 && (
-                      <div
-                        style={{ color: "var(--color-text-disabled)", marginTop: 3, fontSize: 12 }}
-                      >
+                      <Text type="supporting" size="xsm" color="disabled">
                         {t("noTrafficRecorded")}
-                      </div>
+                      </Text>
                     )}
-                  </div>
+                  </VStack>
                 </Popup>
               );
             })()}
@@ -609,10 +575,8 @@ export default function WorldMapInner({
           </Text>
           {/* The map's own stops, so the key stays true after a theme flip inverts the ramp. */}
           <div
+            className="h-1 flex-1 rounded-full"
             style={{
-              flex: 1,
-              height: 5,
-              borderRadius: 999,
               background: `linear-gradient(to right, ${palette.ramp[0]}, ${palette.ramp[1]}, ${palette.ramp[2]})`,
             }}
           />

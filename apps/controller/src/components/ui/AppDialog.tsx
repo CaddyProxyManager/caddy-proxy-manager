@@ -2,8 +2,8 @@
 
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
-import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
-import { HStack } from "@astryxdesign/core/Stack";
+import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign/core/Layout";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Button } from "@astryxdesign/core/Button";
 import { useTranslations } from "next-intl";
 
@@ -21,6 +21,8 @@ type AppDialogProps = {
   isSubmitDisabled?: boolean;
   /** Left of the buttons, such as an unsaved-changes count. */
   footerStart?: ReactNode;
+  /** Pinned under the title rather than scrolled with the content, such as section tabs. */
+  subheader?: ReactNode;
 };
 
 const DIALOG_WIDTH: Record<NonNullable<AppDialogProps["maxWidth"]>, number> = {
@@ -70,6 +72,7 @@ export function AppDialog({
   isSubmitting = false,
   isSubmitDisabled = false,
   footerStart,
+  subheader,
 }: AppDialogProps) {
   const t = useTranslations("ui");
   useReturnFocus(open);
@@ -97,7 +100,18 @@ export function AppDialog({
       purpose="form"
     >
       <Layout
-        header={<DialogHeader title={title} onOpenChange={() => onClose()} />}
+        header={
+          subheader ? (
+            <VStack gap={0}>
+              <DialogHeader title={title} onOpenChange={() => onClose()} hasDivider={false} />
+              <LayoutHeader hasDivider paddingBlockEnd={0}>
+                {subheader}
+              </LayoutHeader>
+            </VStack>
+          ) : (
+            <DialogHeader title={title} onOpenChange={() => onClose()} />
+          )
+        }
         content={<LayoutContent>{children}</LayoutContent>}
         footer={
           <LayoutFooter>

@@ -3,21 +3,22 @@
 /** Save only records; Rebuild restarts the proxy, hence two separately-confirmed buttons. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleAlert, Hammer, Package, PackageCheck, Plus, Trash2 } from "lucide-react";
+import { Hammer, Package, PackageCheck, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
+import { FieldStatus } from "@astryxdesign/core/FieldStatus";
 import { Heading } from "@astryxdesign/core/Heading";
-import { Icon } from "@astryxdesign/core/Icon";
 import { Link } from "@astryxdesign/core/Link";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
@@ -237,6 +238,88 @@ export function CaddyBuildFields({
   const removeCustomModule = (uid: string) =>
     setCustomModules((prev) => prev.filter((c) => c.uid !== uid));
 
+  // Inputs keep their labels for screen readers, hidden: the column headings say it on screen.
+  const customModuleColumns: TableColumn<CustomModuleRow>[] = [
+    {
+      key: "enabled",
+      header: <VisuallyHidden>{t("customModuleInclude")}</VisuallyHidden>,
+      width: pixel(56),
+      renderCell: (entry) => (
+        <Switch
+          label={t("customModuleIncludeNamed", {
+            name: entry.name?.trim() || entry.modulePath.trim() || t("customModulesTitle"),
+          })}
+          isLabelHidden
+          value={entry.enabled}
+          onChange={(next) => updateCustomModule(entry.uid, { enabled: next })}
+        />
+      ),
+    },
+    {
+      key: "name",
+      header: t("customModuleName"),
+      width: proportional(1),
+      renderCell: (entry) => (
+        <TextInput
+          label={t("customModuleName")}
+          isLabelHidden
+          value={entry.name ?? ""}
+          onChange={(next) => updateCustomModule(entry.uid, { name: next })}
+          placeholder={t("customModuleNamePlaceholder")}
+          {...nativeAttrs({ maxLength: CUSTOM_MODULE_NAME_MAX })}
+        />
+      ),
+    },
+    {
+      key: "modulePath",
+      header: t("modulePath"),
+      width: proportional(2),
+      renderCell: (entry) => {
+        const problem = entry.modulePath.trim() ? customModuleProblem(entry) : null;
+        const error = problem ? extractErrorMessage(tRoot, problem, problem.message) : null;
+        return (
+          <TextInput
+            startIcon={Package}
+            label={t("modulePath")}
+            isLabelHidden
+            value={entry.modulePath}
+            onChange={(next) => updateCustomModule(entry.uid, { modulePath: next })}
+            placeholder={t("modulePathPlaceholder")}
+            status={error ? { type: "error", message: error } : undefined}
+          />
+        );
+      },
+    },
+    {
+      key: "version",
+      header: t("version"),
+      width: pixel(112),
+      renderCell: (entry) => (
+        <TextInput
+          label={t("version")}
+          isLabelHidden
+          value={entry.version ?? ""}
+          onChange={(next) => updateCustomModule(entry.uid, { version: next })}
+          placeholder="latest"
+        />
+      ),
+    },
+    {
+      key: "uid",
+      header: <VisuallyHidden>{t("remove")}</VisuallyHidden>,
+      width: pixel(48),
+      renderCell: (entry) => (
+        <Button
+          variant="ghost"
+          icon={<Trash2 />}
+          label={t("remove")}
+          isIconOnly
+          onClick={() => removeCustomModule(entry.uid)}
+        />
+      ),
+    },
+  ];
+
   return (
     <VStack gap={5}>
       <input type="hidden" name="agentRowId" value={String(target)} />
@@ -348,87 +431,15 @@ export function CaddyBuildFields({
                 {t("noCustomModules")}
               </Text>
             ) : (
-              // A table in shape: column headings once, then a row per module, the switch first
-              // as in the lists above. Columns are .cpm-module-grid's, which stacks them on a
-              // phone; inputs keep their labels for screen readers, hidden.
-              <VStack gap={2}>
-                <div className="cpm-module-grid" data-header="">
-                  <span data-cell="name">
-                    <Text type="label" size="sm" color="secondary">
-                      {t("customModuleName")}
-                    </Text>
-                  </span>
-                  <span data-cell="path">
-                    <Text type="label" size="sm" color="secondary">
-                      {t("modulePath")}
-                    </Text>
-                  </span>
-                  <span data-cell="version">
-                    <Text type="label" size="sm" color="secondary">
-                      {t("version")}
-                    </Text>
-                  </span>
-                </div>
-                {customModules.map((entry) => {
-                  const problem = entry.modulePath.trim() ? customModuleProblem(entry) : null;
-                  const error = problem
-                    ? extractErrorMessage(tRoot, problem, problem.message)
-                    : null;
-                  const title =
-                    entry.name?.trim() || entry.modulePath.trim() || t("customModulesTitle");
-                  return (
-                    <div key={entry.uid} className="cpm-module-grid">
-                      <span data-cell="switch">
-                        <Switch
-                          label={t("customModuleIncludeNamed", { name: title })}
-                          isLabelHidden
-                          value={entry.enabled}
-                          onChange={(next) => updateCustomModule(entry.uid, { enabled: next })}
-                        />
-                      </span>
-                      <span data-cell="name">
-                        <TextInput
-                          label={t("customModuleName")}
-                          isLabelHidden
-                          value={entry.name ?? ""}
-                          onChange={(next) => updateCustomModule(entry.uid, { name: next })}
-                          placeholder={t("customModuleNamePlaceholder")}
-                          {...nativeAttrs({ maxLength: CUSTOM_MODULE_NAME_MAX })}
-                        />
-                      </span>
-                      <span data-cell="path">
-                        <TextInput
-                          startIcon={Package}
-                          label={t("modulePath")}
-                          isLabelHidden
-                          value={entry.modulePath}
-                          onChange={(next) => updateCustomModule(entry.uid, { modulePath: next })}
-                          placeholder={t("modulePathPlaceholder")}
-                          status={error ? { type: "error", message: error } : undefined}
-                        />
-                      </span>
-                      <span data-cell="version">
-                        <TextInput
-                          label={t("version")}
-                          isLabelHidden
-                          value={entry.version ?? ""}
-                          onChange={(next) => updateCustomModule(entry.uid, { version: next })}
-                          placeholder="latest"
-                        />
-                      </span>
-                      <span data-cell="remove">
-                        <Button
-                          variant="ghost"
-                          icon={<Trash2 />}
-                          label={t("remove")}
-                          isIconOnly
-                          onClick={() => removeCustomModule(entry.uid)}
-                        />
-                      </span>
-                    </div>
-                  );
-                })}
-              </VStack>
+              // The switch first, as in the lists above. Scrolls sideways on a phone.
+              <Table
+                data={customModules}
+                idKey="uid"
+                columns={customModuleColumns}
+                density="compact"
+                dividers="none"
+                verticalAlign="top"
+              />
             )}
 
             <HStack justify="start">
@@ -488,7 +499,7 @@ function ModuleToggle({
   posted: boolean;
   value: boolean;
   onChange: (next: boolean) => void;
-  /** Shown as a red alert beside the name: on, but unusable as the selection stands. */
+  /** On, but unusable as the selection stands. */
   warning?: string;
 }) {
   const t = useTranslations();
@@ -499,14 +510,6 @@ function ModuleToggle({
       <input type="hidden" name={`module:${module.id}`} value={posted ? "on" : ""} />
       <HStack gap={3} vAlign="center" wrap="wrap">
         <Switch label={caddyModuleName(t, module)} value={value} onChange={onChange} />
-        {warning && (
-          <Tooltip content={warning}>
-            {/* An HTML anchor for the tooltip, which cannot attach to the SVG. */}
-            <span role="img" aria-label={warning} style={{ display: "inline-flex" }}>
-              <Icon icon={CircleAlert} color="red" />
-            </span>
-          </Tooltip>
-        )}
         {module.docsUrl && (
           <Text type="body" size="xsm">
             <Link href={module.docsUrl} target="_blank" rel="noreferrer">
@@ -515,6 +518,7 @@ function ModuleToggle({
           </Text>
         )}
       </HStack>
+      {warning && <FieldStatus type="error" variant="detached" message={warning} />}
       <Text type="body" size="sm" color="secondary">
         {caddyModuleDescription(t, module)}
       </Text>

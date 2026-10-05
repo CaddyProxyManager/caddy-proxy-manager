@@ -217,7 +217,7 @@ export default function SetupSettingsClient({
         <VStack gap={2}>
           <Heading level={1}>{t("settingsStep.heading")}</Heading>
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
-          {/* The same text colors the badges use, so each line reads as the key to its badges. */}
+          {/* The badges' text colours, so each line keys its badges; inline as Text has no hues. */}
           <Text style={{ color: "var(--color-text-purple)" }}>{t("envBadgeLegend")}</Text>
           {(dashboard.fromEnvironment ||
             fields.some((field) => field.source === "environment")) && (
@@ -433,7 +433,7 @@ function LabeledSwitch({
         value={value}
         onChange={onChange}
       />
-      <label htmlFor={inputId} style={{ cursor: "pointer" }}>
+      <label htmlFor={inputId} className="cursor-pointer">
         <VStack gap={0}>
           <FieldLabel label={label} env={env} fromEnvironment={fromEnvironment} />
           {description && (

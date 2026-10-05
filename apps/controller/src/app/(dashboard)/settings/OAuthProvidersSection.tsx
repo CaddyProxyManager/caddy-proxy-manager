@@ -333,7 +333,7 @@ export default function OAuthProvidersSection({
                     icon={
                       <Star
                         fill={isPrimary ? "currentColor" : "none"}
-                        style={isPrimary ? { color: "var(--cpm-accent-text)" } : undefined}
+                        className={isPrimary ? "text-(--cpm-accent-text)" : undefined}
                       />
                     }
                     isDisabled={!provider.enabled}

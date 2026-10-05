@@ -105,15 +105,6 @@ export default function SettingsSideNav({
 function StagedDot() {
   return (
     // Visual only: the item's accessible description already says "staged".
-    <span
-      aria-hidden="true"
-      style={{
-        width: 6,
-        height: 6,
-        borderRadius: 999,
-        background: "var(--color-warning)",
-        display: "block",
-      }}
-    />
+    <span aria-hidden="true" className="block size-1.5 rounded-full bg-warning" />
   );
 }

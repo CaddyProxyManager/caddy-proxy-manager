@@ -15,7 +15,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Pagination } from "@astryxdesign/core/Pagination";
 import { Selector } from "@astryxdesign/core/Selector";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useFormatter, useTranslations } from "next-intl";
@@ -136,52 +136,51 @@ function RevisionListRow({
   return (
     <>
       <Divider />
-      <div
-        style={{
-          padding: "var(--spacing-3) var(--spacing-4)",
-          background: isSelected ? "var(--color-background-muted)" : undefined,
-        }}
+      <HStack
+        gap={3}
+        vAlign="center"
+        paddingBlock={3}
+        paddingInline={4}
+        className={isSelected ? "bg-muted" : undefined}
         data-testid={`revision-${revision.id}`}
       >
-        <HStack gap={3} vAlign="center">
-          <Text type="code" size="sm" color="secondary">
-            #{revision.id}
+        <Text type="code" size="sm" color="secondary">
+          #{revision.id}
+        </Text>
+        <VStack gap={0} className="min-w-0 grow">
+          <Text type="label" maxLines={1}>
+            {revisionSummary(t, format, revision)}
           </Text>
-          <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
-            <Text type="label" maxLines={1}>
-              {revisionSummary(t, format, revision)}
-            </Text>
-            <Text type="supporting" color="secondary">
-              {t("history.appliedBy", {
-                name: revision.appliedByName ?? t("history.unknownUser"),
-              })}{" "}
-              · <Timestamp value={revision.appliedAt} style="dateTimeShort" />
-            </Text>
-          </VStack>
-          {revision.id === latest && <Badge variant="success" label={t("history.current")} />}
-          {revision.outcome === "failed" && (
-            <Tooltip content={revision.error ?? ""}>
-              {demoMode ? (
-                <Badge variant="neutral" className="cpm-demo-badge" label={t("revisionDemo")} />
-              ) : (
-                <Badge variant="error" label={t("history.failed")} />
-              )}
-            </Tooltip>
-          )}
-          {!revision.recorded && (
-            <Tooltip content={t("history.notRecordedHelp")}>
-              <Badge label={t("history.notRecorded")} />
-            </Tooltip>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            label={t("history.view")}
-            onClick={onView}
-            isDisabled={isSelected}
-          />
-        </HStack>
-      </div>
+          <Text type="supporting" color="secondary">
+            {t("history.appliedBy", {
+              name: revision.appliedByName ?? t("history.unknownUser"),
+            })}{" "}
+            · <Timestamp value={revision.appliedAt} style="dateTimeShort" />
+          </Text>
+        </VStack>
+        {revision.id === latest && <Badge variant="success" label={t("history.current")} />}
+        {revision.outcome === "failed" && (
+          <Tooltip content={revision.error ?? ""}>
+            {demoMode ? (
+              <Badge variant="neutral" className="cpm-demo-badge" label={t("revisionDemo")} />
+            ) : (
+              <Badge variant="error" label={t("history.failed")} />
+            )}
+          </Tooltip>
+        )}
+        {!revision.recorded && (
+          <Tooltip content={t("history.notRecordedHelp")}>
+            <Badge label={t("history.notRecorded")} />
+          </Tooltip>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          label={t("history.view")}
+          onClick={onView}
+          isDisabled={isSelected}
+        />
+      </HStack>
     </>
   );
 }
@@ -230,7 +229,7 @@ function ComparisonCard({
       <VStack gap={4} data-testid="revision-comparison">
         <HStack gap={3} vAlign="end" wrap="wrap">
           <Heading level={3}>{t("history.compareTitle")}</Heading>
-          <div style={{ flexGrow: 1 }} />
+          <StackItem size="fill" />
           <Selector
             label={t("history.compareFrom")}
             size="sm"
@@ -259,7 +258,7 @@ function ComparisonCard({
 
         {canRestore && (
           <HStack gap={3} vAlign="center">
-            <Text type="supporting" color="secondary" style={{ flexGrow: 1 }}>
+            <Text type="supporting" color="secondary" className="grow">
               {t("history.restoreHelp", { id: to })}
             </Text>
             <Button
@@ -329,7 +328,7 @@ function DiffHeading({ title, diff, code }: { title: string; diff: ConfigDiff; c
           {code}
         </Text>
       )}
-      <div style={{ flexGrow: 1 }} />
+      <StackItem size="fill" />
       <Text type="supporting" color="secondary">
         {t("reviewDiffStat", { added: diff.added, removed: diff.removed })}
       </Text>

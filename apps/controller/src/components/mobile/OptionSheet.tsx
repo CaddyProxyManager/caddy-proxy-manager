@@ -32,7 +32,8 @@ export function OptionSheet<V extends string>({
 }) {
   return (
     <BottomSheet label={title} isOpen={isOpen} onOpenChange={onOpenChange} height="hug">
-      <VStack gap={3} paddingInline={4} paddingBlockEnd={4}>
+      {/* Clear of the grab handle, which overlays the top of the content. */}
+      <VStack gap={3} paddingInline={4} paddingBlockStart={6} paddingBlockEnd={4}>
         <Text type="body" weight="semibold" justify="center">
           {title}
         </Text>

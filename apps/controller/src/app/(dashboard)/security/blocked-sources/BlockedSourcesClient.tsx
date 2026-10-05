@@ -107,7 +107,7 @@ export default function BlockedSourcesClient({
           size="sm"
           icon={<ArrowLeft />}
           label={t("backToSecurity")}
-          onClick={() => router.push("/security")}
+          href="/security"
         />
       </HStack>
       <HStack justify="between" vAlign="start" gap={3} wrap="wrap">

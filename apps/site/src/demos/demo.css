@@ -57,42 +57,6 @@
       width: 100%;
       max-width: 100%;
     }
-
-    /* The filter pills that stand in for segmented controls, opening a sheet each. */
-    .cpm-demo .cpm-chip-row {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .cpm-demo .cpm-chip {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 40px;
-      padding: 0 13px;
-      border-radius: 9999px;
-      border: 1px solid light-dark(#c4c4c4, #525252);
-      background: var(--color-background-card);
-      color: var(--color-text-primary);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .cpm-demo .cpm-chip[data-active] {
-      background: var(--color-text-pink);
-      border-color: var(--color-text-pink);
-      color: #111111;
-    }
-
-    .cpm-demo .cpm-chip:focus-visible {
-      outline: 2px solid var(--color-border-pink);
-      outline-offset: 2px;
-    }
   }
 }
 
@@ -209,50 +173,60 @@
 
 /* The controller's globals.css rules its demoed components rely on, which the docs do not load. */
 @layer cpm-demo-phone {
+  /* The one Tailwind utility a demoed component uses that the docs, loading no Tailwind, lack. */
+  .cpm-demo .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .cpm-demo .cpm-card-title {
+    color: color-mix(in srgb, var(--color-text-primary) 60%, var(--color-text-secondary));
+    text-transform: capitalize;
+  }
+
+  /* CodeEditor's frame. Its glyph geometry stays inline, beside the constants it derives from. */
+  .cpm-demo .cpm-code-editor {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-syntax-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-element);
+  }
+
+  .cpm-demo .cpm-code-editor[data-flush] {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .cpm-demo .cpm-code-editor[data-disabled] {
+    opacity: 0.6;
+  }
+
+  .cpm-demo .cpm-code-editor-scroller {
+    height: 100%;
+    overflow: auto;
+  }
+
+  .cpm-demo .cpm-code-editor-content {
+    position: relative;
+    min-height: 100%;
+  }
+
+  /* The theme's `code` line-height puts every line 2px off the textarea. */
+  .cpm-demo .cpm-code-editor code {
+    display: block;
+    font: inherit;
+    line-height: inherit;
+  }
+
+  .cpm-demo .cpm-code-editor-placeholder {
+    opacity: 0.5;
+  }
+
   .cpm-demo .cpm-code-editor-copy {
     position: absolute;
     top: var(--spacing-1);
     right: calc(var(--cpm-scrollbar-gutter) + var(--spacing-1));
     border-radius: var(--radius-element);
     background-color: var(--color-syntax-background);
-  }
-
-  .cpm-demo .cpm-module-grid {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) minmax(0, 2fr) 120px 36px;
-    grid-template-areas: "switch name path version remove";
-    gap: var(--spacing-2);
-    align-items: start;
-  }
-
-  .cpm-demo .cpm-module-grid > [data-cell="switch"] {
-    grid-area: switch;
-    padding-top: var(--spacing-1);
-  }
-  .cpm-demo .cpm-module-grid > [data-cell="name"] {
-    grid-area: name;
-  }
-  .cpm-demo .cpm-module-grid > [data-cell="path"] {
-    grid-area: path;
-  }
-  .cpm-demo .cpm-module-grid > [data-cell="version"] {
-    grid-area: version;
-  }
-  .cpm-demo .cpm-module-grid > [data-cell="remove"] {
-    grid-area: remove;
-  }
-
-  @media (max-width: 767px) {
-    .cpm-demo .cpm-module-grid {
-      grid-template-columns: 44px minmax(0, 1fr) 36px;
-      grid-template-areas:
-        "switch name remove"
-        ". path path"
-        ". version version";
-    }
-
-    .cpm-demo .cpm-module-grid[data-header] {
-      display: none;
-    }
   }
 }

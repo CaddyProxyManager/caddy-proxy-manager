@@ -24,7 +24,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useFormatter, useTranslations } from "next-intl";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
-import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
+import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
@@ -270,7 +270,7 @@ function Tile({
       className={ACCENTS[hue].edge}
     >
       <VStack gap={1}>
-        <Text type="body" weight="semibold" style={CARD_TITLE_STYLE}>
+        <Text type="body" weight="semibold" className={CARD_TITLE_CLASS}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers className={ACCENTS[hue].text}>
@@ -671,7 +671,7 @@ export default function OverviewClient({
                     </Text>
                   )}
                 </HStack>
-                <Text type="body" style={CARD_TITLE_STYLE}>
+                <Text type="body" className={CARD_TITLE_CLASS}>
                   {stat.label}
                 </Text>
               </VStack>

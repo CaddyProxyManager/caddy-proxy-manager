@@ -5,12 +5,15 @@
 import Link from "next/link";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { Divider } from "@astryxdesign/core/Divider";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
-import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
+import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import type { SectionHealth } from "@/src/lib/settings/health";
 import { SETTINGS_GROUPS, SETTINGS_HUES, settingsGroupLabel, settingsHref } from "./sections";
 import type { StagedView } from "@/src/lib/settings/staged-view";
@@ -29,29 +32,20 @@ type StatusLabelKey =
   | "homeStatusUnset"
   | "homeStatusEnv";
 
-const STATUS_TOKEN: Record<SectionHealth["status"], { color: string; labelKey: StatusLabelKey }> = {
-  ok: { color: "var(--color-success)", labelKey: "homeStatusHealthy" },
-  attention: { color: "var(--color-warning)", labelKey: "homeStatusAttention" },
-  unset: { color: "var(--color-border-emphasized)", labelKey: "homeStatusUnset" },
-  env: { color: "var(--color-border-emphasized)", labelKey: "homeStatusEnv" },
+const STATUS_TOKEN: Record<
+  SectionHealth["status"],
+  { variant: "success" | "warning" | "neutral"; labelKey: StatusLabelKey }
+> = {
+  ok: { variant: "success", labelKey: "homeStatusHealthy" },
+  attention: { variant: "warning", labelKey: "homeStatusAttention" },
+  unset: { variant: "neutral", labelKey: "homeStatusUnset" },
+  env: { variant: "neutral", labelKey: "homeStatusEnv" },
 };
 
-function StatusDot({ status }: { status: SectionHealth["status"] }) {
+function SectionStatusDot({ status }: { status: SectionHealth["status"] }) {
   const t = useTranslations("settings");
   const token = STATUS_TOKEN[status];
-  return (
-    <span
-      role="img"
-      aria-label={t(token.labelKey)}
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 999,
-        background: token.color,
-        flexShrink: 0,
-      }}
-    />
-  );
+  return <StatusDot variant={token.variant} label={t(token.labelKey)} />;
 }
 
 export default function SettingsHome({ sections, attention, staged }: Props) {
@@ -76,39 +70,36 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
         {attention.length > 0 && (
           <Card padding={0}>
             <VStack gap={0}>
-              <div
-                style={{
-                  padding: "var(--spacing-3) var(--spacing-4)",
-                  background: "var(--color-warning-muted)",
-                  borderTopLeftRadius: "var(--radius-container)",
-                  borderTopRightRadius: "var(--radius-container)",
-                }}
+              <HStack
+                gap={2}
+                vAlign="center"
+                paddingBlock={3}
+                paddingInline={4}
+                className="rounded-t-lg bg-warning-muted"
               >
-                <HStack gap={2} vAlign="center">
-                  <Text type="label">{t("homeAttentionTitle")}</Text>
-                  <Text type="supporting" color="secondary">
-                    {t("homeAttentionCount", { count: attention.length })}
-                  </Text>
-                </HStack>
-              </div>
+                <Text type="label">{t("homeAttentionTitle")}</Text>
+                <Text type="supporting" color="secondary">
+                  {t("homeAttentionCount", { count: attention.length })}
+                </Text>
+              </HStack>
               {attention.map((section, index) => (
                 <VStack key={section.id} gap={0}>
                   {index > 0 && <Divider />}
-                  <div style={{ padding: "var(--spacing-3) var(--spacing-4)" }}>
-                    <HStack gap={3} vAlign="center">
-                      <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
+                  <HStack gap={3} vAlign="center" paddingBlock={3} paddingInline={4}>
+                    <StackItem size="fill">
+                      <VStack gap={0}>
                         <Text type="label">{section.value}</Text>
                         <Text type="supporting" color="secondary">
                           {section.detail}
                         </Text>
                       </VStack>
-                      <Link href={settingsHref(section.id)} style={{ flexShrink: 0 }}>
-                        <Text type="body" color="accent">
-                          {t("homeConfigure")}
-                        </Text>
-                      </Link>
-                    </HStack>
-                  </div>
+                    </StackItem>
+                    <Link href={settingsHref(section.id)} className="shrink-0">
+                      <Text type="body" color="accent">
+                        {t("homeConfigure")}
+                      </Text>
+                    </Link>
+                  </HStack>
                 </VStack>
               ))}
             </VStack>
@@ -123,21 +114,15 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
                 <Text type="label" size="sm" color="secondary">
                   {settingsGroupLabel(t, group)}
                 </Text>
-                <div style={{ flexGrow: 1 }}>
+                <StackItem size="fill">
                   <Divider />
-                </div>
+                </StackItem>
               </HStack>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                  gap: "var(--spacing-3)",
-                }}
-              >
+              <Grid columns={{ minWidth: 240 }} gap={3}>
                 {tiles.map(({ section, hue }) => (
                   <SectionTile key={section.id} section={section} hue={hue} />
                 ))}
-              </div>
+              </Grid>
             </VStack>
           );
         })}
@@ -149,32 +134,37 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
 function SectionTile({ section, hue }: { section: SectionHealth; hue: Hue }) {
   const t = useTranslations("settings");
   return (
-    <Link
+    <ClickableCard
+      label={section.name}
       href={settingsHref(section.id)}
-      style={{ textDecoration: "none", color: "inherit", display: "block" }}
+      padding={3}
+      height="100%"
+      className={ACCENTS[hue].edge}
       data-testid={`settings-tile-${section.id}`}
       data-status={section.status}
     >
-      <Card padding={3} height="100%" className={ACCENTS[hue].edge}>
-        <VStack gap={2}>
-          <HStack gap={2} vAlign="center">
-            <Text type="body" style={{ ...CARD_TITLE_STYLE, flexGrow: 1, minWidth: 0 }}>
+      <VStack gap={2}>
+        <HStack gap={2} vAlign="center">
+          <StackItem size="fill">
+            <Text type="body" className={CARD_TITLE_CLASS}>
               {section.name}
             </Text>
-            {section.staged && <Badge variant="warning" label={t("homeStagedBadge")} />}
-            {section.status === "env" && <Badge variant="neutral" label={t("homeEnvBadge")} />}
-            {!section.staged && section.status !== "env" && <StatusDot status={section.status} />}
-          </HStack>
-          <Text type="body" color="secondary" maxLines={1}>
-            {section.value}
-          </Text>
-          {section.detail && (
-            <Text type="supporting" color="secondary" maxLines={2}>
-              {section.detail}
-            </Text>
+          </StackItem>
+          {section.staged && <Badge variant="warning" label={t("homeStagedBadge")} />}
+          {section.status === "env" && <Badge variant="neutral" label={t("homeEnvBadge")} />}
+          {!section.staged && section.status !== "env" && (
+            <SectionStatusDot status={section.status} />
           )}
-        </VStack>
-      </Card>
-    </Link>
+        </HStack>
+        <Text type="body" color="secondary" maxLines={1}>
+          {section.value}
+        </Text>
+        {section.detail && (
+          <Text type="supporting" color="secondary" maxLines={2}>
+            {section.detail}
+          </Text>
+        )}
+      </VStack>
+    </ClickableCard>
   );
 }

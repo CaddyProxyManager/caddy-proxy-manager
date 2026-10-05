@@ -14,7 +14,7 @@
 @import "./astryx-variants.css";
 /* Backs Tailwind utilities with Astryx tokens (bg-surface, text-primary, ...). */
 @import "@astryxdesign/core/tailwind-theme.css";
-/* Phone chrome no Astryx component draws: tab bar, More drawer, floating action button. */
+/* Phone chrome: the tab bar no Astryx component draws, and placement for the drawer and FAB. */
 @import "../components/mobile/mobile.css";
 
 /* Unlayered last so existing app utility classes keep winning during migration. */
@@ -128,48 +128,6 @@
     color: var(--color-background-body);
   }
 
-  /* Caddy Build's custom modules: one table row each, restacked under the name on a phone. */
-  .cpm-module-grid {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) minmax(0, 2fr) 120px 36px;
-    grid-template-areas: "switch name path version remove";
-    gap: var(--spacing-2);
-    align-items: start;
-  }
-
-  .cpm-module-grid > [data-cell="switch"] {
-    grid-area: switch;
-    /* Level with the inputs' text rather than their top edge. */
-    padding-top: var(--spacing-1);
-  }
-  .cpm-module-grid > [data-cell="name"] {
-    grid-area: name;
-  }
-  .cpm-module-grid > [data-cell="path"] {
-    grid-area: path;
-  }
-  .cpm-module-grid > [data-cell="version"] {
-    grid-area: version;
-  }
-  .cpm-module-grid > [data-cell="remove"] {
-    grid-area: remove;
-  }
-
-  @media (max-width: 767px) {
-    .cpm-module-grid {
-      grid-template-columns: 44px minmax(0, 1fr) 36px;
-      grid-template-areas:
-        "switch name remove"
-        ". path path"
-        ". version version";
-    }
-
-    /* Each input says what it is through its placeholder there. */
-    .cpm-module-grid[data-header] {
-      display: none;
-    }
-  }
-
   /* PanelResizeHandle: a 1px line with a wider invisible ::before to grab. */
   .cpm-panel-resize-handle {
     position: relative;
@@ -200,6 +158,51 @@
     outline: none;
     background-color: var(--cpm-accent-border);
     box-shadow: 0 0 0 1px var(--cpm-accent-border);
+  }
+
+  /* A stat card's title: Astryx has no token between primary and secondary, so it mixes them. */
+  .cpm-card-title {
+    color: color-mix(in srgb, var(--color-text-primary) 60%, var(--color-text-secondary));
+    text-transform: capitalize;
+  }
+
+  /* CodeEditor's frame. Its glyph geometry stays inline, beside the constants it derives from. */
+  .cpm-code-editor {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-syntax-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-element);
+  }
+
+  .cpm-code-editor[data-flush] {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .cpm-code-editor[data-disabled] {
+    opacity: 0.6;
+  }
+
+  .cpm-code-editor-scroller {
+    height: 100%;
+    overflow: auto;
+  }
+
+  .cpm-code-editor-content {
+    position: relative;
+    min-height: 100%;
+  }
+
+  /* The theme's `code` line-height puts every line 2px off the textarea. */
+  .cpm-code-editor code {
+    display: block;
+    font: inherit;
+    line-height: inherit;
+  }
+
+  .cpm-code-editor-placeholder {
+    opacity: 0.5;
   }
 
   /* CodeEditor's textarea ring would draw under the highlighted glyphs, so the frame shows focus. */

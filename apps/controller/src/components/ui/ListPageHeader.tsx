@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { HStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader, type PageHeaderProps } from "./PageHeader";
 
 /**
@@ -24,12 +24,12 @@ export function ListPageHeader({
 }) {
   return (
     <>
-      <div className="cpm-list-header">
+      <VStack gap={1} className="cpm-list-header">
         <PageHeader {...header} />
-        {stats && <div className="cpm-desktop-only">{stats}</div>}
-        {summary && <div className="cpm-desktop-only">{summary}</div>}
+        {stats && <StackItem className="cpm-desktop-only">{stats}</StackItem>}
+        {summary && <StackItem className="cpm-desktop-only">{summary}</StackItem>}
         {bulkBar ? (
-          <div className="cpm-list-toolbar">{bulkBar}</div>
+          <StackItem className="cpm-list-toolbar">{bulkBar}</StackItem>
         ) : (
           (filters || search) && (
             <HStack
@@ -39,13 +39,13 @@ export function ListPageHeader({
               justify="between"
               className="cpm-list-toolbar"
             >
-              {filters && <div className="cpm-list-filters">{filters}</div>}
-              {search && <div className="cpm-list-search">{search}</div>}
+              {filters && <StackItem className="cpm-list-filters">{filters}</StackItem>}
+              {search && <StackItem className="cpm-list-search">{search}</StackItem>}
             </HStack>
           )
         )}
-      </div>
-      {summary && <div className="cpm-mobile-only">{summary}</div>}
+      </VStack>
+      {summary && <StackItem className="cpm-mobile-only">{summary}</StackItem>}
     </>
   );
 }

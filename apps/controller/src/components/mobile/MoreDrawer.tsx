@@ -1,18 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type RefObject } from "react";
+import type { RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronRight, LayoutGrid, SlidersHorizontal } from "lucide-react";
+import { BottomSheet } from "@astryxdesign/core/BottomSheet";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Item } from "@astryxdesign/core/Item";
+import { List } from "@astryxdesign/core/List";
+import { VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
 import { type Destination, MORE_DRAWER_SLOTS } from "@/src/lib/nav/destinations";
 import { ACCENTS } from "@/src/components/ui/accent";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "./nav-icons";
 
 /**
- * Not Astryx's modal BottomSheet: a modal makes the tab bar inert, so a second tap on More could
- * never land. Unmounted when closed, or every page name is duplicated for find-in-page, screen
- * readers and test locators.
+ * Without a scrim: a modal sheet makes the tab bar inert, so a second tap on More could never
+ * land. `cpm-more-sheet` lifts the panel clear of the bar.
  */
 export function MoreDrawer({
   isOpen,
@@ -34,80 +41,86 @@ export function MoreDrawer({
   const t = useTranslations("nav");
   const tMore = useTranslations("nav.more");
   const pathname = usePathname();
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const returnTo = returnFocusRef.current;
-    sheetRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      returnTo?.focus();
-    };
-  }, [isOpen, onClose, returnFocusRef]);
-
-  if (!isOpen) return null;
 
   return (
-    <>
-      <div className="cpm-sheet-scrim" onClick={onClose} aria-hidden="true" />
-      <div
-        ref={sheetRef}
-        className="cpm-sheet"
-        role="dialog"
-        aria-label={tMore("jumpTo")}
-        tabIndex={-1}
-      >
-        <div className="cpm-sheet-handle" aria-hidden="true" />
-        <h2 className="cpm-sheet-title">{tMore("jumpTo")}</h2>
-        <div className="cpm-drawer-grid">
+    <BottomSheet
+      label={tMore("jumpTo")}
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      hasScrim={false}
+      height="hug"
+      finalFocusRef={returnFocusRef}
+      className="cpm-more-sheet"
+    >
+      {/* Clear of the grab handle, which overlays the top of the content. */}
+      <VStack gap={3} paddingInline={3} paddingBlockStart={6} paddingBlockEnd={4}>
+        {/* A non-modal sheet moves no focus itself, and Escape only reaches it from inside. */}
+        <Heading level={2} justify="center" tabIndex={-1} data-autofocus="">
+          {tMore("jumpTo")}
+        </Heading>
+        {/* Three columns of three: eight pins and All pages fill it exactly. */}
+        <Grid columns={3} gap={2}>
           {items.map((item) => {
-            const Icon = DESTINATION_ICONS[item.id];
             const isCurrent = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
-              <Link
+              <ClickableCard
                 key={item.id}
+                label={t(item.labelKey)}
                 href={item.href}
+                onClick={onClose}
+                padding={3}
                 className="cpm-tile"
                 data-current={isCurrent || undefined}
-                aria-current={isCurrent ? "page" : undefined}
-                onClick={onClose}
               >
-                <Icon
-                  size={22}
-                  strokeWidth={1.75}
-                  aria-hidden="true"
-                  className={ACCENTS[DESTINATION_HUES[item.id]].text}
-                />
-                <span className="cpm-tile-label">{t(item.labelKey)}</span>
-              </Link>
+                <VStack gap={2} hAlign="center">
+                  <Icon
+                    icon={DESTINATION_ICONS[item.id]}
+                    size="lg"
+                    className={ACCENTS[DESTINATION_HUES[item.id]].text}
+                  />
+                  <Text type="label" size="sm" justify="center">
+                    {t(item.labelKey)}
+                  </Text>
+                </VStack>
+              </ClickableCard>
             );
           })}
-          <Link href="/more" className="cpm-tile cpm-tile-all" onClick={onClose}>
-            <LayoutGrid size={22} strokeWidth={1.75} aria-hidden="true" />
-            <span className="cpm-tile-label">{tMore("allPages")}</span>
-            <span className="cpm-tile-caption">
-              {tMore("allPagesCount", { count: totalPages })}
-            </span>
-          </Link>
-        </div>
+          <ClickableCard
+            label={tMore("allPages")}
+            href="/more"
+            onClick={onClose}
+            padding={3}
+            variant="muted"
+            className="cpm-tile"
+          >
+            <VStack gap={2} hAlign="center">
+              <Icon icon={LayoutGrid} size="lg" color="secondary" />
+              <VStack gap={0.5} hAlign="center">
+                <Text type="label" size="sm" justify="center">
+                  {tMore("allPages")}
+                </Text>
+                <Text type="supporting" size="2xs" justify="center">
+                  {tMore("allPagesCount", { count: totalPages })}
+                </Text>
+              </VStack>
+            </VStack>
+          </ClickableCard>
+        </Grid>
         {offerCustomize && (
-          <Link href="/more/customize" className="cpm-sheet-row" onClick={onClose}>
-            <SlidersHorizontal size={19} strokeWidth={1.75} aria-hidden="true" />
-            <span className="cpm-sheet-row-text">
-              <span className="cpm-sheet-row-label">{tMore("customize")}</span>
-              <span className="cpm-sheet-row-caption">
-                {tMore("customizeDescription", { max: MORE_DRAWER_SLOTS })}
-              </span>
-            </span>
-            <ChevronRight size={16} aria-hidden="true" />
-          </Link>
+          <List>
+            <Item
+              as="li"
+              href="/more/customize"
+              label={tMore("customize")}
+              description={tMore("customizeDescription", { max: MORE_DRAWER_SLOTS })}
+              startContent={<Icon icon={SlidersHorizontal} color="secondary" />}
+              endContent={<Icon icon={ChevronRight} size="sm" color="secondary" />}
+            />
+          </List>
         )}
-      </div>
-    </>
+      </VStack>
+    </BottomSheet>
   );
 }

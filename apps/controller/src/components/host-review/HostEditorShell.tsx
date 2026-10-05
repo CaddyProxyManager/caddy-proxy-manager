@@ -3,7 +3,8 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button } from "@astryxdesign/core/Button";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { VStack } from "@astryxdesign/core/Stack";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
@@ -16,6 +17,58 @@ export type EditorSectionLink = { id: string; anchor: string };
 
 function scrollToAnchor(anchor: string) {
   document.getElementById(anchor)?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function scrollParent(element: HTMLElement | null): HTMLElement | null {
+  for (let node = element?.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+  }
+  return null;
+}
+
+/**
+ * The section at the top of the editor's scroll area. A jumped-to section stays selected until the
+ * user scrolls, since the last ones are too short to reach the top.
+ */
+function useActiveSection(open: boolean, sections: EditorSectionLink[]) {
+  const [active, setActive] = useState(sections[0]?.id ?? "");
+  const jumped = useRef<string | null>(null);
+  const anchors = sections.map((s) => `${s.id}=${s.anchor}`).join(" ");
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `anchors` is the identity of `sections`.
+  useEffect(() => {
+    if (!open || sections.length < 2) return;
+    const root = scrollParent(document.getElementById(sections[0].anchor));
+    if (!root) return;
+    const update = () => {
+      if (jumped.current) return;
+      const { top } = root.getBoundingClientRect();
+      let current = sections[0].id;
+      for (const section of sections) {
+        const at = document.getElementById(section.anchor)?.getBoundingClientRect().top;
+        if (at !== undefined && at <= top + 1) current = section.id;
+      }
+      setActive(current);
+    };
+    const release = () => {
+      jumped.current = null;
+    };
+    const userInput = ["wheel", "touchmove", "keydown"] as const;
+    update();
+    root.addEventListener("scroll", update, { passive: true });
+    for (const type of userInput) root.addEventListener(type, release, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", update);
+      for (const type of userInput) root.removeEventListener(type, release);
+    };
+  }, [open, anchors]);
+
+  const select = (id: string) => {
+    jumped.current = id;
+    setActive(id);
+  };
+  return [active, select] as const;
 }
 
 /** Ctrl+S, or Cmd+S on a Mac; nothing else. */
@@ -172,7 +225,10 @@ export function HostEditorShell({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [open, unsaved, state.status]);
 
+  const [activeSection, selectSection] = useActiveSection(open, sections);
+
   const jump = (section: EditorSectionLink) => {
+    selectSection(section.id);
     scrollToAnchor(section.anchor);
     onSectionLink?.(section.id);
   };
@@ -184,6 +240,24 @@ export function HostEditorShell({
         onClose={requestClose}
         title={title}
         maxWidth="lg"
+        subheader={
+          sections.length > 1 ? (
+            // No role="tablist": these scroll to a section rather than swap a panel in.
+            <TabList
+              aria-label={t("jumpTo")}
+              size="sm"
+              value={activeSection}
+              onChange={(id) => {
+                const section = sections.find((s) => s.id === id);
+                if (section) jump(section);
+              }}
+            >
+              {sections.map((section) => (
+                <Tab key={section.id} value={section.id} label={t(sectionKey(section.id))} />
+              ))}
+            </TabList>
+          ) : undefined
+        }
         footerStart={
           <Text type="supporting" size="sm" color={unsaved > 0 ? "primary" : "secondary"}>
             {unsaved > 0 ? t("unsaved", { count: unsaved }) : t("noUnsaved")}
@@ -210,22 +284,6 @@ export function HostEditorShell({
         }
       >
         <VStack gap={4}>
-          {sections.length > 1 && (
-            <HStack gap={1} wrap="wrap" vAlign="center">
-              <Text type="supporting" size="sm">
-                {t("jumpTo")}
-              </Text>
-              {sections.map((section) => (
-                <Button
-                  key={section.id}
-                  variant="ghost"
-                  size="sm"
-                  label={t(sectionKey(section.id))}
-                  onClick={() => jump(section)}
-                />
-              ))}
-            </HStack>
-          )}
           {children}
           {reviewOpen &&
             reverted.map((field) => (

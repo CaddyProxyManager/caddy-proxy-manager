@@ -682,7 +682,7 @@ export default function SettingsClient({
     <SettingsFrame sectionId={active} staged={staged} aside>
       <FocusField />
       <HStack gap={5} align="start">
-        <VStack gap={5} maxWidth={768} style={{ flexGrow: 1, minWidth: 0 }}>
+        <VStack gap={5} maxWidth={768} className="min-w-0 grow">
           <PageSaveBar stagedFields={stagedFields}>
             <VStack gap={5}>
               {page.blocks.map((block) => (
@@ -2073,7 +2073,7 @@ function BrandingSection({
                 }
               />
             </Tooltip>
-            <VStack gap={0} style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <VStack gap={0} className="min-w-0 grow basis-55">
               <Text type="body">
                 {removing
                   ? t("faviconWillBeRemoved")

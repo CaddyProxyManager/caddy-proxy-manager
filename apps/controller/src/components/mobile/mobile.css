@@ -1,5 +1,5 @@
 /**
- * Mobile chrome no Astryx component draws, over Astryx's tokens so every theme reaches it. Behind
+ * The tab bar no Astryx component draws, plus placement for Astryx parts, over Astryx tokens. Behind
  * the app's one 767px "narrow" edge, so the phone layout never half-applies.
  */
 
@@ -33,38 +33,17 @@
 
     /* ---- floating action button ---------------------------------------------------------- */
 
+    /* Astryx's Button draws it; this only places it and sizes it as a thumb target. */
     .cpm-fab {
       position: fixed;
-      right: 16px;
-      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px) + 16px);
-      /* Under the drawer's scrim (50). */
+      right: var(--spacing-4);
+      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px) + var(--spacing-4));
       z-index: 45;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 56px;
-      height: 56px;
-      padding: 0;
-      border: 0;
-      border-radius: 9999px;
-      background: var(--cpm-accent-text);
-      /* Not a fixed #111, which is 1.6:1 against the light-mode plum. */
-      color: var(--color-on-accent);
-      box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
-      text-decoration: none;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
+      display: inline-flex;
+      width: calc(var(--spacing-12) + var(--spacing-2));
+      height: calc(var(--spacing-12) + var(--spacing-2));
+      border-radius: var(--radius-full);
       touch-action: manipulation;
-    }
-
-    .cpm-fab:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-
-    .cpm-fab:focus-visible {
-      outline: 2px solid var(--cpm-accent-border);
-      outline-offset: 3px;
     }
 
     /* ---- list page header ---------------------------------------------------------------- */
@@ -72,7 +51,7 @@
     /* Full bleed, so the line under it spans the width like the tab bar's. Pure black on black: the
        line is the whole boundary, and on OLED the header costs nothing. */
     .cpm-list-header {
-      display: block;
+      display: flex;
       position: sticky;
       /* Sticky offsets count from inside the container's padding; `top: 0` would sit 24px down. */
       top: calc(-1 * var(--cpm-page-pad));
@@ -92,50 +71,6 @@
       align-items: flex-start;
     }
 
-    /* ---- card feed (WAF, Analytics) ------------------------------------------------------ */
-
-    .cpm-chip-row {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .cpm-chip-row::-webkit-scrollbar {
-      display: none;
-    }
-
-    .cpm-chip {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 40px;
-      padding: 0 13px;
-      border-radius: 9999px;
-      border: 1px solid light-dark(#c4c4c4, #525252);
-      background: var(--color-background-card);
-      color: var(--color-text-primary);
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    /* In the accent, so a narrowed page never passes for the whole. */
-    .cpm-chip[data-active] {
-      background: var(--cpm-accent-text);
-      border-color: var(--cpm-accent-text);
-      color: var(--color-on-accent);
-    }
-
-    .cpm-chip:focus-visible {
-      outline: 2px solid var(--cpm-accent-border);
-      outline-offset: 2px;
-    }
-
     /* Inside a rail that pads itself (Access Lists): cancels the rail's 12px, not the shell's 24,
        sticks at the very top with no shell padding above, and stands in for the rail's gaps. */
     .cpm-list-header-inset {
@@ -151,7 +86,6 @@
       flex-direction: column;
       align-items: stretch;
       gap: 10px;
-      margin-top: 4px;
     }
 
     .cpm-list-search {
@@ -250,68 +184,13 @@
 
     /* ---- More drawer --------------------------------------------------------------------- */
 
-    /* Stops at the tab bar: the bar stays live under the drawer, so a second tap on More lands. */
-    .cpm-sheet-scrim {
-      position: fixed;
-      inset: 0 0 calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px)) 0;
-      z-index: 50;
-      background: rgb(0 0 0 / 0.45);
-    }
-
-    .cpm-sheet {
-      position: fixed;
-      inset-inline: 0;
-      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px));
-      z-index: 55;
-      max-height: calc(100dvh - var(--cpm-tabbar-height) - 48px);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      padding: 8px 12px 16px;
-      background: var(--color-background-surface);
-      border-top: 1px solid var(--color-neutral);
-      border-radius: 16px 16px 0 0;
-      /* Focused on open, not by the user, so a ring on the whole panel would look like an error. */
-      outline: none;
-    }
-
-    .cpm-sheet-handle {
-      width: 36px;
-      height: 4px;
-      margin: 2px auto 12px;
-      border-radius: 2px;
-      background: var(--color-neutral);
-    }
-
-    .cpm-sheet-title {
-      margin: 0 0 10px;
-      text-align: center;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--color-text-primary);
-    }
-
-    /* Three columns of three: eight pins and All pages fill it exactly. */
-    .cpm-drawer-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+    /* A scrimless BottomSheet: it stops at the tab bar, which stays live under it. */
+    .cpm-more-sheet {
+      margin-bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px));
     }
 
     .cpm-tile {
-      min-height: 88px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      padding: 12px 8px;
-      border-radius: 12px;
-      border: 1px solid var(--color-neutral);
-      background: var(--color-background-surface);
-      color: var(--color-text-primary);
-      text-align: center;
-      text-decoration: none;
-      -webkit-tap-highlight-color: transparent;
+      min-height: calc(var(--spacing-12) * 2 - var(--spacing-2));
       touch-action: manipulation;
     }
 
@@ -319,62 +198,6 @@
       background: var(--cpm-accent-background);
       border-color: var(--cpm-accent-border);
       color: var(--cpm-accent-text);
-    }
-
-    .cpm-tile:focus-visible,
-    .cpm-sheet-row:focus-visible {
-      outline: 2px solid var(--cpm-accent-border);
-      outline-offset: 2px;
-    }
-
-    .cpm-tile-all {
-      border-style: dashed;
-      color: var(--color-text-secondary);
-    }
-
-    .cpm-tile-label {
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.25;
-    }
-
-    .cpm-tile-caption {
-      font-size: 10px;
-      line-height: 1.2;
-      color: var(--color-text-secondary);
-    }
-
-    .cpm-sheet-row {
-      margin-top: 8px;
-      min-height: 56px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--color-neutral);
-      color: var(--color-text-secondary);
-      text-decoration: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    .cpm-sheet-row-text {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .cpm-sheet-row-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--color-text-primary);
-    }
-
-    .cpm-sheet-row-caption {
-      font-size: 12px;
-      color: var(--color-text-secondary);
     }
   }
 }

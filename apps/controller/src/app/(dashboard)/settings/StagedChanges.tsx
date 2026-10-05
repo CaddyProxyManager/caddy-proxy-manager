@@ -10,7 +10,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
 import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Spinner } from "@astryxdesign/core/Spinner";
@@ -180,20 +180,13 @@ function ReviewSheet({
 
         {error && <Banner status="error" title={error} />}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
-            gap: "var(--spacing-4)",
-            alignItems: "start",
-          }}
-        >
-          <VStack gap={3}>
+        <HStack gap={4} vAlign="start">
+          <VStack gap={3} width="100%" maxWidth={360}>
             <Heading level={3}>{t("reviewChangeCount", { count: view.changes.length })}</Heading>
             <Divider />
             {view.changes.map((change) => (
               <HStack key={change.key} gap={2} vAlign="start">
-                <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
+                <VStack gap={0} className="min-w-0 grow">
                   {/* A way back to the block it came from. */}
                   {change.sectionId ? (
                     <Link href={settingsHref(change.sectionId)} onClick={onClose}>
@@ -236,7 +229,7 @@ function ReviewSheet({
                 <Divider />
                 <HStack gap={2} vAlign="center">
                   <Heading level={5}>{t("reviewHistoryTitle")}</Heading>
-                  <div style={{ flexGrow: 1 }} />
+                  <StackItem size="fill" />
                   <Link href="/settings/history" onClick={onClose}>
                     <Text type="supporting">{t("history.viewAll")}</Text>
                   </Link>
@@ -249,7 +242,7 @@ function ReviewSheet({
                     <Text type="supporting" color="secondary" maxLines={1}>
                       {revisionSummary(t, format, revision)}
                     </Text>
-                    <div style={{ flexGrow: 1 }} />
+                    <StackItem size="fill" />
                     {revision.outcome === "failed" &&
                       (view.demoMode ? (
                         <Badge
@@ -266,27 +259,29 @@ function ReviewSheet({
             )}
           </VStack>
 
-          <VStack gap={2}>
-            <HStack gap={2} vAlign="center">
-              <Heading level={3}>{t("reviewTabConfig")}</Heading>
-              <div style={{ flexGrow: 1 }} />
-              <Text type="supporting" color="secondary">
-                {t("reviewDiffStat", { added: view.diff.added, removed: view.diff.removed })}
-              </Text>
-            </HStack>
-            <Divider />
-            {view.diff.unchanged ? (
-              <Banner status="info" title={t("reviewNoConfigChange")} />
-            ) : (
-              <>
-                <DiffView lines={view.diff.lines} />
+          <StackItem size="fill">
+            <VStack gap={2}>
+              <HStack gap={2} vAlign="center">
+                <Heading level={3}>{t("reviewTabConfig")}</Heading>
+                <StackItem size="fill" />
                 <Text type="supporting" color="secondary">
-                  {t("reviewSecretsMasked")}
+                  {t("reviewDiffStat", { added: view.diff.added, removed: view.diff.removed })}
                 </Text>
-              </>
-            )}
-          </VStack>
-        </div>
+              </HStack>
+              <Divider />
+              {view.diff.unchanged ? (
+                <Banner status="info" title={t("reviewNoConfigChange")} />
+              ) : (
+                <>
+                  <DiffView lines={view.diff.lines} />
+                  <Text type="supporting" color="secondary">
+                    {t("reviewSecretsMasked")}
+                  </Text>
+                </>
+              )}
+            </VStack>
+          </StackItem>
+        </HStack>
 
         <Divider />
         <HStack gap={2} justify="end" vAlign="center">
@@ -324,26 +319,19 @@ export function revisionSummary(
 }
 
 /** Status tokens, so the diff follows the theme. */
-const DIFF_BACKGROUND: Record<DiffLine["kind"], string | undefined> = {
-  added: "var(--color-success-muted)",
-  removed: "var(--color-error-muted)",
-  context: undefined,
-  gap: "var(--color-background-muted)",
+const DIFF_BACKGROUND: Record<DiffLine["kind"], string> = {
+  added: "bg-success-muted",
+  removed: "bg-error-muted",
+  context: "",
+  gap: "bg-muted",
 };
 
 export function DiffView({ lines }: { lines: DiffLine[] }) {
   const t = useTranslations("settings");
   return (
-    <div
-      style={{
-        maxHeight: 420,
-        overflow: "auto",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-inner)",
-        fontFamily: "var(--font-family-code)",
-        fontSize: "var(--font-size-sm)",
-        lineHeight: 1.7,
-      }}
+    <VStack
+      isScrollable
+      className="max-h-105 rounded-sm border border-border font-mono text-sm leading-relaxed"
       data-testid="config-diff"
     >
       {lines.map((line, index) => (
@@ -351,23 +339,10 @@ export function DiffView({ lines }: { lines: DiffLine[] }) {
           // Text recurs and the list is replaced wholesale, so no state can follow a reorder.
           // biome-ignore lint/suspicious/noArrayIndexKey: position is the only identity a diff line has
           key={`${index}-${line.kind}`}
-          style={{
-            display: "flex",
-            gap: "var(--spacing-2)",
-            padding: "0 var(--spacing-2)",
-            background: DIFF_BACKGROUND[line.kind],
-            whiteSpace: "pre",
-          }}
+          className={`flex gap-2 px-2 whitespace-pre ${DIFF_BACKGROUND[line.kind]}`}
         >
-          <span style={{ width: 44, flexShrink: 0, color: "var(--color-text-secondary)" }}>
-            {line.line ?? ""}
-          </span>
-          <span
-            style={{
-              color:
-                line.kind === "gap" ? "var(--color-text-secondary)" : "var(--color-text-primary)",
-            }}
-          >
+          <span className="w-11 shrink-0 text-secondary">{line.line ?? ""}</span>
+          <span className={line.kind === "gap" ? "text-secondary" : "text-primary"}>
             {line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}
             {line.kind === "gap"
               ? ` ${t("reviewUnchangedLines", { count: line.skipped ?? 0 })} `
@@ -375,6 +350,6 @@ export function DiffView({ lines }: { lines: DiffLine[] }) {
           </span>
         </div>
       ))}
-    </div>
+    </VStack>
   );
 }

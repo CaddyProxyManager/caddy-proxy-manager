@@ -802,7 +802,7 @@ function AddMemberDialog({
             ) : (
               /* Scroll cap: neither CheckboxList nor Stack exposes a max-height, and a fixed
                  height would pad out a short list. */
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              <VStack isScrollable className="max-h-80">
                 <CheckboxList
                   label={t("usersToAdd")}
                   isLabelHidden
@@ -827,7 +827,7 @@ function AddMemberDialog({
                     />
                   ))}
                 </CheckboxList>
-              </div>
+              </VStack>
             )}
             {selected.length > 0 && (
               <HStack justify="between" vAlign="center" gap={2}>

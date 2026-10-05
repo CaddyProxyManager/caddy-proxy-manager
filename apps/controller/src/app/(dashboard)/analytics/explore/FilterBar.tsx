@@ -158,7 +158,6 @@ export function FilterBar({
       placeholder={t("filtersPlaceholder")}
       startIcon={<Filter />}
       tokenOverflowBehavior="unfocusedInline"
-      style={{ width: "100%" }}
     />
   );
 }

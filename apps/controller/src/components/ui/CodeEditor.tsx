@@ -138,7 +138,8 @@ function Line({
   if (at < text.length) parts.push(text.slice(at));
 
   return (
-    <span style={{ display: "block", position: "relative" }}>
+    <span className="relative block">
+      {/* Inline: placed by the gutter constants, coloured by the line's issue. */}
       <span
         style={{
           position: "absolute",
@@ -153,7 +154,7 @@ function Line({
         {number}
       </span>
       {isPlaceholder ? (
-        <span style={{ opacity: 0.5 }}>{text || ZERO_WIDTH_SPACE}</span>
+        <span className="cpm-code-editor-placeholder">{text || ZERO_WIDTH_SPACE}</span>
       ) : parts.length > 0 ? (
         parts
       ) : (
@@ -252,25 +253,16 @@ export function CodeEditor({
       <div
         className="cpm-code-editor"
         data-flush={isFlush ? "" : undefined}
+        data-disabled={isDisabled ? "" : undefined}
         style={{
-          position: "relative",
           height: `${HEIGHTS[height]}px`,
-          background: "var(--color-syntax-background)",
-          border: isFlush ? 0 : "1px solid var(--color-border)",
-          borderRadius: isFlush ? 0 : "var(--radius-element)",
-          overflow: "hidden",
-          opacity: isDisabled ? 0.6 : 1,
-          // Read by .cpm-code-editor-overlay to keep floated content off the scrollbar.
+          // Measured: read by .cpm-code-editor-overlay to keep floated content off the scrollbar.
           ["--cpm-scrollbar-gutter" as string]: `${scrollbarWidth}px`,
         }}
       >
-        <div
-          ref={scrollerRef}
-          className="cpm-code-editor-scroller"
-          style={{ height: "100%", overflow: "auto" }}
-        >
-          <div style={{ position: "relative", minHeight: "100%" }}>
-            {/* Content-tall, not viewport-tall, so it scrolls with the numbers. */}
+        <div ref={scrollerRef} className="cpm-code-editor-scroller">
+          <div className="cpm-code-editor-content">
+            {/* Content-tall, so it scrolls with the numbers; inline, as gutter geometry. */}
             <div
               aria-hidden="true"
               style={{
@@ -289,8 +281,7 @@ export function CodeEditor({
               translate="no"
               style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
             >
-              {/* The theme's `code` line-height puts every line 2px off the textarea. */}
-              <code style={{ display: "block", font: "inherit", lineHeight: "inherit" }}>
+              <code>
                 {lines.map((line, index) => (
                   <Line
                     // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position

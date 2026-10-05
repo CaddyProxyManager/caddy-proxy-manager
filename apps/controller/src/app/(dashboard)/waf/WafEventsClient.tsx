@@ -54,7 +54,7 @@ import { withRowIds } from "@/lib/forms/row-id";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
-import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
+import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
 import { WafPresetPicker } from "@/components/proxy-hosts/waf/WafPresetPicker";
 import { WafPluginPicker } from "@/components/proxy-hosts/waf/WafPluginPicker";
@@ -278,7 +278,7 @@ function StatsBar({ stats }: { stats: WafEventStats }) {
             <Text type="display-3" hasTabularNumbers className={ACCENTS[hue].text}>
               {value}
             </Text>
-            <Text type="body" weight="medium" style={CARD_TITLE_STYLE}>
+            <Text type="body" weight="medium" className={CARD_TITLE_CLASS}>
               {label}
             </Text>
           </VStack>
@@ -1131,20 +1131,20 @@ export default function WafEventsClient({
                   ))}
                 </SegmentedControl>
               </div>
-              <div className="cpm-chip-row cpm-mobile-flex">
-                <FilterChip
-                  label={rangeOptions.find((o) => o.value === range)?.label ?? range}
-                  aria-label={t("timeRange")}
-                  isActive={range !== "all"}
-                  onClick={() => setRangeSheetOpen(true)}
-                />
-              </div>
+              <FilterChip
+                className="cpm-mobile-flex"
+                label={rangeOptions.find((o) => o.value === range)?.label ?? range}
+                aria-label={t("timeRange")}
+                isActive={range !== "all"}
+                onClick={() => setRangeSheetOpen(true)}
+              />
               {/* Shown on a phone while a search is applied, so the filter never hides. The auto
                   margin keeps it right-aligned when it wraps. */}
               <div
                 ref={searchWrapRef}
-                className={searchOpen || hasFilters ? undefined : "cpm-desktop-only"}
-                style={{ flex: "1 1 240px", maxWidth: 640, marginInlineStart: "auto" }}
+                className={`ms-auto max-w-160 grow basis-60 ${
+                  searchOpen || hasFilters ? "" : "cpm-desktop-only"
+                }`}
               >
                 <UrlPowerSearch
                   name="WafEvents"
@@ -1201,7 +1201,7 @@ export default function WafEventsClient({
             </VStack>
           ) : (
             <HStack gap={4} vAlign="start" wrap="wrap">
-              <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
+              <div className="min-w-0 grow basis-130">
                 <DataTable
                   columns={columns}
                   data={events}
@@ -1216,12 +1216,8 @@ export default function WafEventsClient({
                 />
               </div>
 
-              {/* flexBasis: below ~900px the panel wraps instead of squeezing the table. */}
-              {selected && (
-                <div style={{ flexGrow: 1, flexBasis: 380, maxWidth: 460, minWidth: 0 }}>
-                  {detailPanel}
-                </div>
-              )}
+              {/* The basis: below ~900px the panel wraps instead of squeezing the table. */}
+              {selected && <div className="min-w-0 max-w-115 grow basis-95">{detailPanel}</div>}
             </HStack>
           )}
         </VStack>

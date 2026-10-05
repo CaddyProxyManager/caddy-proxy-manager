@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Check, X } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import {
@@ -37,17 +38,9 @@ export function PasswordPolicyChecklist({ password }: { password: string }) {
             return (
               <HStack key={rule} as="li" gap={2} vAlign="center">
                 {isMet ? (
-                  <Check
-                    size={16}
-                    aria-hidden="true"
-                    style={{ color: "var(--color-success)", flex: "none" }}
-                  />
+                  <Icon icon={Check} size="sm" color="success" />
                 ) : (
-                  <X
-                    size={16}
-                    aria-hidden="true"
-                    style={{ color: "var(--color-text-secondary)", flex: "none" }}
-                  />
+                  <Icon icon={X} size="sm" color="secondary" />
                 )}
                 <Text type="body" size="sm" color={isMet ? "primary" : "secondary"}>
                   {t(`passwordPolicy.rule.${rule}`, { min: MIN_PASSWORD_LENGTH })}

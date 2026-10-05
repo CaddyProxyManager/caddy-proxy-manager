@@ -6,15 +6,15 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { Circle, CircleCheck, Rocket } from "lucide-react";
+import { Rocket } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
-import { List, ListItem } from "@astryxdesign/core/List";
-import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Step, Stepper } from "@astryxdesign/core/Stepper";
+import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import {
   loadSetupChecklistAction,
@@ -50,6 +50,10 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
   if (!checklist || checklist.hidden) return null;
 
   const complete = checklist.steps.filter(stepComplete).length;
+  // Steps finish in any order: the Stepper fills up to the first open one, and a step done
+  // past it gets its check from `status`.
+  const firstOpen = checklist.steps.findIndex((step) => !stepComplete(step));
+  const activeStep = firstOpen === -1 ? checklist.steps.length : firstOpen;
 
   function markDone(step: SetupStep, done: boolean) {
     setChecklist((current) =>
@@ -97,22 +101,17 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
             isDisabled={isPending}
           />
         </HStack>
-        <ProgressBar
-          label={t("progress", { done: complete, total: checklist.steps.length })}
-          isLabelHidden
-          value={complete}
-          max={checklist.steps.length}
-          variant={complete === checklist.steps.length ? "success" : "accent"}
-          hasValueLabel
-          formatValueLabel={() => t("progress", { done: complete, total: checklist.steps.length })}
-        />
+        <Text type="supporting">
+          {t("progress", { done: complete, total: checklist.steps.length })}
+        </Text>
         {error && <Banner status="error" title={error} />}
-        <List hasDividers density="compact">
-          {checklist.steps.map((step) => {
+        <Stepper activeStep={activeStep} orientation="vertical" label={t("title")}>
+          {checklist.steps.map((step, index) => {
             const isComplete = stepComplete(step);
             return (
-              <ListItem
+              <Step
                 key={step.step}
+                step={index}
                 label={t(`steps.${step.step}.title`)}
                 description={
                   step.detected
@@ -121,15 +120,10 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
                       ? t("markedDone")
                       : t(`steps.${step.step}.description`)
                 }
-                startContent={
-                  <Icon
-                    icon={isComplete ? CircleCheck : Circle}
-                    size="sm"
-                    color={isComplete ? "success" : "secondary"}
-                  />
-                }
-                endContent={
-                  <HStack gap={1} vAlign="center">
+                status={isComplete ? "success" : undefined}
+              >
+                {!step.detected && (
+                  <HStack gap={1} vAlign="center" wrap="wrap">
                     {!isComplete && (
                       <Button
                         variant="secondary"
@@ -138,21 +132,19 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
                         href={SETUP_STEP_HREF[step.step]}
                       />
                     )}
-                    {!step.detected && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        label={step.markedDone ? t("undo") : t("markDone")}
-                        onClick={() => markDone(step.step, !step.markedDone)}
-                        isDisabled={isPending}
-                      />
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={step.markedDone ? t("undo") : t("markDone")}
+                      onClick={() => markDone(step.step, !step.markedDone)}
+                      isDisabled={isPending}
+                    />
                   </HStack>
-                }
-              />
+                )}
+              </Step>
             );
           })}
-        </List>
+        </Stepper>
       </VStack>
     </Card>
   );

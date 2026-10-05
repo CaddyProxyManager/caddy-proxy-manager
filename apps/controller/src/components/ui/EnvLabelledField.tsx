@@ -15,7 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { EnvTokens } from "./EnvTokens";
 
@@ -53,7 +53,7 @@ export function EnvLabelledField({
 
   const labelLine = (
     <HStack gap={2} vAlign="center" wrap="wrap">
-      <label id={labelId} htmlFor={controlId} style={{ cursor: "pointer" }}>
+      <label id={labelId} htmlFor={controlId} className="cursor-pointer">
         <Text type="label">{label}</Text>
       </label>
       <EnvTokens names={env} />
@@ -63,35 +63,21 @@ export function EnvLabelledField({
   const control = cloneElement(children, { isLabelHidden: true, ref: controlRef });
 
   if (layout === "inline") {
-    // A grid, so the description starts under the label, not the box, and the box centres across
-    // both rows however long the description runs.
+    // The description starts under the label, not the box, which centres across both lines.
     return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto minmax(0, 1fr)",
-          columnGap: "var(--spacing-3)",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            gridColumn: 1,
-            gridRow: description ? "1 / span 2" : "1",
-            alignSelf: "center",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          {control}
-        </div>
-        {labelLine}
-        {description && (
-          <Text size="xsm" color="secondary" style={{ gridColumn: 2 }}>
-            {description}
-          </Text>
-        )}
-      </div>
+      <HStack gap={3} vAlign="center">
+        {control}
+        <StackItem size="fill">
+          <VStack gap={0}>
+            {labelLine}
+            {description && (
+              <Text size="xsm" color="secondary">
+                {description}
+              </Text>
+            )}
+          </VStack>
+        </StackItem>
+      </HStack>
     );
   }
 

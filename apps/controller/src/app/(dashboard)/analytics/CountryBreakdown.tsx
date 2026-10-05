@@ -47,21 +47,11 @@ function RankedList({ title, rows, color }: { title: string; rows: Row[]; color:
               {format.number(row.count)}
             </Text>
           </HStack>
-          <div
-            aria-hidden="true"
-            style={{
-              height: 4,
-              borderRadius: 999,
-              background: "var(--color-border)",
-              overflow: "hidden",
-            }}
-          >
+          <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-border">
+            {/* Inline: the share is computed, and each list passes its own data colour. */}
             <div
-              style={{
-                width: top > 0 ? `${(row.count / top) * 100}%` : 0,
-                height: "100%",
-                background: color,
-              }}
+              className="h-full"
+              style={{ width: top > 0 ? `${(row.count / top) * 100}%` : 0, background: color }}
             />
           </div>
         </VStack>

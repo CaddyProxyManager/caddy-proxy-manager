@@ -960,6 +960,7 @@
     "noCustomModules": "No custom modules.",
     "customModuleName": "Name",
     "customModuleNamePlaceholder": "Name (optional)",
+    "customModuleInclude": "Include",
     "customModuleIncludeNamed": "Include {name} in the build",
     "rebuildCaddy": "Rebuild Caddy",
     "rebuildCouldNotStart": "Rebuild could not be started.",

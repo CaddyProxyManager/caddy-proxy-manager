@@ -110,7 +110,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
 
   return (
     <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
-      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400 }}>
+      <VStack as="form" width="100%" maxWidth={400} onSubmit={handleSubmit}>
         <VStack gap={3}>
           <VStack gap={1}>
             <Heading level={1}>
@@ -213,7 +213,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
             </>
           )}
         </VStack>
-      </form>
+      </VStack>
     </Center>
   );
 }

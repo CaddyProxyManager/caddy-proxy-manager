@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
+import { Button } from "@astryxdesign/core/Button";
 
 /**
  * Rendered at every width and hidden by CSS above the narrow edge, so SSR and client markup agree
@@ -21,26 +21,19 @@ export function Fab({
   href?: string;
   isDisabled?: boolean;
 }) {
-  const content = icon ?? <Plus size={24} strokeWidth={2} aria-hidden="true" />;
-
-  if (href && !isDisabled) {
-    return (
-      <Link href={href} className="cpm-fab" aria-label={label} title={label}>
-        {content}
-      </Link>
-    );
-  }
-
   return (
-    <button
-      type="button"
+    <Button
       className="cpm-fab"
-      aria-label={label}
-      title={label}
+      variant="primary"
+      size="lg"
+      elevation="high"
+      isIconOnly
+      icon={icon ?? <Plus />}
+      label={label}
+      tooltip={label}
       onClick={onClick}
-      disabled={isDisabled}
-    >
-      {content}
-    </button>
+      href={isDisabled ? undefined : href}
+      isDisabled={isDisabled}
+    />
   );
 }

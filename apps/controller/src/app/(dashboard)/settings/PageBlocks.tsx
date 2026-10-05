@@ -19,7 +19,7 @@ import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Heading } from "@astryxdesign/core/Heading";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -50,6 +50,7 @@ export function SettingsBlockShell({
       id={block.id}
       // The dirty tracker keys baselines on this; ids also appear on design-system elements.
       data-settings-block={block.id}
+      // Inline: the header height is measured and published at runtime under a JS-named variable.
       style={{
         scrollMarginTop: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
       }}
@@ -165,14 +166,9 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
     <nav
       aria-label={t("onThisPage")}
       // A phone has no room for it beside the blocks.
-      className="cpm-desktop-only"
-      style={{
-        width: "176px",
-        flexShrink: 0,
-        position: "sticky",
-        // The frame's padding again, so it does not jump up to the header once it sticks.
-        top: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))`,
-      }}
+      className="cpm-desktop-only sticky w-44 shrink-0"
+      // The frame's padding again, so it does not jump up to the header once it sticks.
+      style={{ top: `calc(var(${HEADER_HEIGHT_VAR}, 0px) + var(--spacing-5))` }}
     >
       <VStack gap={1}>
         <Text type="label" size="sm" color="secondary">
@@ -194,17 +190,11 @@ export function OnThisPage({ anchors }: { anchors: readonly PageAnchor[] }) {
               target.scrollIntoView({ behavior: "smooth" });
               window.history.replaceState(window.history.state, "", `#${anchor.id}`);
             }}
-            style={{
-              display: "block",
-              padding: "var(--spacing-1) var(--spacing-2)",
-              borderInlineStart: `2px solid ${
-                current === anchor.id ? "var(--color-border-accent)" : "var(--color-border)"
-              }`,
-              color:
-                current === anchor.id ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              textDecoration: "none",
-              fontSize: "var(--font-size-sm)",
-            }}
+            className={`block border-s-2 px-2 py-1 text-sm no-underline ${
+              current === anchor.id
+                ? "border-(--color-border-accent) text-primary"
+                : "border-border text-secondary"
+            }`}
           >
             {anchor.label}
           </a>
@@ -516,17 +506,12 @@ export function PageSaveBar({
       />
       {dirty.length > 0 && (
         // Sticky, not fixed: the pane scrolls, and fixed would float over the rail and header.
-        <div
-          style={{
-            position: "sticky",
-            bottom: 0,
-            display: "flex",
-            justifyContent: "center",
-            paddingTop: "var(--spacing-4)",
-            pointerEvents: "none",
-          }}
+        <HStack
+          justify="center"
+          paddingBlockStart={4}
+          className="pointer-events-none sticky bottom-0"
         >
-          <div style={{ pointerEvents: "auto" }} data-testid="settings-page-save-bar">
+          <StackItem className="pointer-events-auto" data-testid="settings-page-save-bar">
             <Card padding={2}>
               <HStack gap={3} vAlign="center">
                 <Text type="body" size="sm">
@@ -551,8 +536,8 @@ export function PageSaveBar({
                 />
               </HStack>
             </Card>
-          </div>
-        </div>
+          </StackItem>
+        </HStack>
       )}
     </>
   );

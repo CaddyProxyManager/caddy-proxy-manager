@@ -32,15 +32,13 @@ const ASIDE = 176;
 
 function Measure({ aside, children }: { aside: boolean; children: ReactNode }) {
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: aside ? `calc(${COLUMN}px + ${ASIDE}px + var(--spacing-5))` : COLUMN,
-        marginInline: "auto",
-      }}
+    <VStack
+      width="100%"
+      maxWidth={aside ? `calc(${COLUMN}px + ${ASIDE}px + var(--spacing-5))` : COLUMN}
+      className="mx-auto"
     >
       {children}
-    </div>
+    </VStack>
   );
 }
 
@@ -65,9 +63,9 @@ export default function SettingsFrame({
       <SettingsHeader sectionId={sectionId} title={title} staged={staged} aside={aside} />
       {/* No overflow here: it would become the scrollport sticky measures against, and nothing
           inside (header, save bar) would pin. */}
-      <div style={{ flexGrow: 1, padding: "var(--spacing-5)" }}>
+      <VStack padding={5} className="grow">
         <Measure aside={aside}>{children}</Measure>
-      </div>
+      </VStack>
     </VStack>
   );
 }
@@ -93,7 +91,7 @@ function StagedSummary({ staged }: { staged: StagedView }) {
   if (slot && !isNarrow) return createPortal(controls, slot);
   if (!isNarrow) return null;
   return (
-    <HStack gap={2} vAlign="center" style={{ flexShrink: 0 }}>
+    <HStack gap={2} vAlign="center" className="shrink-0">
       <RevisionPill staged={staged} />
       <StagedControls view={staged} />
     </HStack>
@@ -115,7 +113,7 @@ function SettingsHeader({
   const tNav = useTranslations("nav");
   const item = sectionId ? findSettingsItem(sectionId) : undefined;
   const group = sectionId ? groupForSection(sectionId) : undefined;
-  const headerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   // Blocks clear the header by its real height, which wraps with the title and the controls.
   useLayoutEffect(() => {
@@ -140,23 +138,17 @@ function SettingsHeader({
   }, []);
 
   return (
-    <div
+    // Sticky, not fixed: it scrolls away where a narrow viewport cannot spare the room.
+    <VStack
       ref={headerRef}
-      style={{
-        flexShrink: 0,
-        // Sticky, not fixed: it scrolls away where a narrow viewport cannot spare the room.
-        position: "sticky",
-        top: 0,
-        zIndex: 4,
-        background: "var(--color-background-body)",
-        borderBottom: "1px solid var(--color-border)",
-        padding: "var(--spacing-4) var(--spacing-5)",
-      }}
+      paddingBlock={4}
+      paddingInline={5}
+      className="sticky top-0 z-4 shrink-0 border-b border-border bg-body"
       data-testid="settings-header"
     >
       <Measure aside={aside}>
         <HStack gap={4} vAlign="end" wrap="wrap">
-          <VStack gap={1} style={{ flexGrow: 1, minWidth: 0 }}>
+          <VStack gap={1} className="min-w-0 grow">
             <div data-testid="settings-breadcrumb">
               <Breadcrumbs>
                 <BreadcrumbItem>{tNav("settings")}</BreadcrumbItem>
@@ -176,6 +168,6 @@ function SettingsHeader({
           <StagedSummary staged={staged} />
         </HStack>
       </Measure>
-    </div>
+    </VStack>
   );
 }

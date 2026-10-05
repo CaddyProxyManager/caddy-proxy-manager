@@ -77,7 +77,7 @@ export default function LegacyPasswordChangeForm() {
 
   return (
     <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
-      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400 }}>
+      <VStack as="form" width="100%" maxWidth={400} onSubmit={handleSubmit}>
         <VStack gap={3}>
           <VStack gap={1}>
             <Heading level={1}>{t("auth.passwordChange.heading")}</Heading>
@@ -139,7 +139,7 @@ export default function LegacyPasswordChangeForm() {
 
           <PasswordPolicyChecklist password={newPassword} />
         </VStack>
-      </form>
+      </VStack>
     </Center>
   );
 }

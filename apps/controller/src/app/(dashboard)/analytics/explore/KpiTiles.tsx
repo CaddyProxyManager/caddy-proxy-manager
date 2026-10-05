@@ -15,7 +15,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { useFormatter, useTranslations } from "next-intl";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
-import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
+import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import type { ExploreBucket, ExploreTotals } from "@/src/lib/clickhouse/explore";
 import { useChartTheme } from "../chart-theme";
 import { formatBytes, formatShare } from "./format";
@@ -198,7 +198,7 @@ export function KpiTiles({
         return (
           <Card key={kpi.id} padding={4} height="100%" className={ACCENTS[kpi.hue].edge}>
             <VStack gap={1}>
-              <Text type="body" style={CARD_TITLE_STYLE}>
+              <Text type="body" className={CARD_TITLE_CLASS}>
                 {t(`kpi.${kpi.id}`)}
               </Text>
               <Text type="display-3" hasTabularNumbers className={ACCENTS[kpi.hue].text}>

@@ -218,7 +218,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
         <HStack gap={2} vAlign="start">
           {/* The mask is a CSS wrapper, not input type=password: a password
               input strips newlines on paste and would corrupt the PEM. */}
-          <div data-masked-input={showKey ? "false" : "true"} style={{ flex: 1 }}>
+          <div data-masked-input={showKey ? "false" : "true"} className="flex-1">
             <TextArea
               label={t("privateKeyPem")}
               htmlName="private_key_pem"

@@ -136,7 +136,8 @@ export function UrlPowerSearch({
       startIcon={<Search />}
       resultCount={resultCount}
       tokenOverflowBehavior="unfocusedInline"
-      // Astryx's table pulls itself up by its cell padding, swallowing the gap.
+      // Inline: PowerSearch has no width prop. The margin: Astryx's table pulls itself up by its
+      // cell padding, swallowing the gap.
       style={{ width, maxWidth: "100%", marginBottom: "var(--spacing-4)" }}
     />
   );

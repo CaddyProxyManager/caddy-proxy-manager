@@ -578,13 +578,12 @@ export default function AnalyticsClient() {
             </SegmentedControl>
           </div>
           {/* Five segments do not fit a phone: the range is a pill that opens a sheet. */}
-          <div className="cpm-chip-row cpm-mobile-flex">
-            <FilterChip
-              label={rangeLabel(state.range)}
-              aria-label={t("timeInterval")}
-              onClick={() => setRangeSheetOpen(true)}
-            />
-          </div>
+          <FilterChip
+            className="cpm-mobile-flex"
+            label={rangeLabel(state.range)}
+            aria-label={t("timeInterval")}
+            onClick={() => setRangeSheetOpen(true)}
+          />
           <OptionSheet
             title={t("timeInterval")}
             isOpen={rangeSheetOpen}
