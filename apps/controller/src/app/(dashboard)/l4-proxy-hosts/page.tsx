@@ -4,6 +4,7 @@ import {
   countL4ProxyHosts,
   countL4ProxyHostsByProtocol,
   listL4ProxyHostTags,
+  getL4ProxyHost,
 } from "@/src/lib/models/l4-proxy-hosts";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
@@ -23,6 +24,8 @@ interface PageProps {
     sortDir?: string;
     protocol?: string;
     tag?: string;
+    /** A host to open the editor on. */
+    edit?: string;
   }>;
 }
 
@@ -42,6 +45,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     sortDir: sortDirParam,
     protocol: protocolParam,
     tag: tagParam,
+    edit: editParam,
   } = await searchParams;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
@@ -63,11 +67,18 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     listL4AccessListOptions(),
   ]);
 
-  // Only the hosts on this page - the map is for the edit dialog.
-  const assignments = await agentIdsForHosts(
-    "l4",
-    hosts.map((host) => host.id),
-  ).catch(() => new Map<number, number[]>());
+  // The editor opened from a link, on a host that may sit on another page of the list.
+  const editId = Number.parseInt(editParam ?? "", 10);
+  const editHost =
+    Number.isInteger(editId) && canManage(access, "l4ProxyHost", editId)
+      ? (hosts.find((h) => h.id === editId) ?? (await getL4ProxyHost(editId)))
+      : null;
+
+  // Only the hosts on this page and the one being edited - the map is for the edit dialog.
+  const assignments = await agentIdsForHosts("l4", [
+    ...hosts.map((host) => host.id),
+    ...(editHost && !hosts.includes(editHost) ? [editHost.id] : []),
+  ]).catch(() => new Map<number, number[]>());
 
   return (
     <L4ProxyHostsClient
@@ -84,6 +95,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       agentAssignments={Object.fromEntries(assignments)}
       canCreate={canCreate(access)}
       manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
+      editTarget={editHost}
     />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { clearEditorLink } from "@/components/host-review/section-link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -365,7 +366,10 @@ export default function ProxyHostsClient({
   function closeEditor() {
     setEditHost(null);
     setEditSection(null);
-    if (!searchParams.has("edit")) return;
+    if (!searchParams.has("edit")) {
+      clearEditorLink();
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.delete("edit");
     const query = params.toString();

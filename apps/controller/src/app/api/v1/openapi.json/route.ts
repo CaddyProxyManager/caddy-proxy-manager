@@ -310,6 +310,71 @@ const spec = {
       },
     },
 
+    "/api/v1/proxy-hosts/preview": {
+      post: {
+        tags: ["Proxy Hosts"],
+        summary: "Preview creating a proxy host",
+        description:
+          "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
+        operationId: "previewProxyHostCreate",
+        parameters: [{ $ref: "#/components/parameters/RevertQuery" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ProxyHostInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "What the save would change; nothing stored",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/HostChangePreview" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/proxy-hosts/{id}/preview": {
+      post: {
+        tags: ["Proxy Hosts"],
+        summary: "Preview updating a proxy host",
+        description:
+          "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
+        operationId: "previewProxyHostUpdate",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/RevertQuery" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ProxyHostInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "What the save would change; nothing stored",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/HostChangePreview" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
     "/api/v1/proxy-hosts/bulk": {
       post: {
         tags: ["Proxy Hosts"],
@@ -441,6 +506,71 @@ const spec = {
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
+    "/api/v1/l4-proxy-hosts/preview": {
+      post: {
+        tags: ["L4 Proxy Hosts"],
+        summary: "Preview creating an L4 proxy host",
+        description:
+          "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
+        operationId: "previewL4ProxyHostCreate",
+        parameters: [{ $ref: "#/components/parameters/RevertQuery" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/L4ProxyHostInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "What the save would change; nothing stored",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/HostChangePreview" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/l4-proxy-hosts/{id}/preview": {
+      post: {
+        tags: ["L4 Proxy Hosts"],
+        summary: "Preview updating an L4 proxy host",
+        description:
+          "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
+        operationId: "previewL4ProxyHostUpdate",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/RevertQuery" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/L4ProxyHostInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "What the save would change; nothing stored",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/HostChangePreview" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { $ref: "#/components/responses/NotFound" },
         },
@@ -2316,6 +2446,15 @@ const spec = {
       },
     },
     parameters: {
+      RevertQuery: {
+        name: "revert",
+        in: "query",
+        required: false,
+        description: "A field to leave as stored (or at its default, for a create). Repeatable.",
+        schema: { type: "array", items: { type: "string" } },
+        style: "form",
+        explode: true,
+      },
       IdPath: {
         name: "id",
         in: "path",
@@ -2439,6 +2578,72 @@ const spec = {
           },
         },
         required: ["action", "ids"],
+      },
+      HostChangePreview: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["http", "l4"] },
+          hostId: { type: ["integer", "null"] },
+          changes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                field: { type: "string" },
+                section: { type: "string" },
+                before: {},
+                after: {},
+                leaves: {
+                  type: ["array", "null"],
+                  items: {
+                    type: "object",
+                    properties: { path: { type: "string" }, before: {}, after: {} },
+                  },
+                },
+                masked: { type: "boolean" },
+                revertible: { type: "boolean" },
+              },
+            },
+          },
+          impact: {
+            type: "object",
+            properties: {
+              reload: { type: "boolean" },
+              agents: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "integer" },
+                    name: { type: "string" },
+                    connected: { type: "boolean" },
+                  },
+                },
+              },
+              everyAgent: { type: "boolean" },
+              pinned: { type: "boolean" },
+              pinChanged: { type: "boolean" },
+              certificates: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { domain: { type: "string" }, wildcard: { type: "boolean" } },
+                },
+              },
+              warnings: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    code: { type: "string" },
+                    severity: { type: "string", enum: ["warning", "info"] },
+                    values: { type: "object" },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       BulkResult: {
         type: "object",

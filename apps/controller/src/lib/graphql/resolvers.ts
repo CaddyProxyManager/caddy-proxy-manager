@@ -55,6 +55,7 @@ import {
   parseProxyHostBulkRequest,
 } from "../models/bulk-hosts";
 import { getProxyHostUpstreamHealth } from "../proxy-hosts/upstream-health";
+import { previewL4HostChange, previewProxyHostChange } from "../host-review";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
 import { ApiAuthError, NotFoundError } from "../api/auth";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
@@ -314,6 +315,17 @@ export const resolvers = {
       await deleteProxyHost(args.id, userId);
       return true;
     },
+    previewProxyHost: async (
+      _: unknown,
+      args: { id?: number | null; input: unknown; revert?: string[] | null },
+      context: GraphQLContext,
+    ) => {
+      const { userId } = await requireAdmin(context);
+      return await previewProxyHostChange(
+        { id: args.id ?? null, input: args.input as never, reverted: args.revert ?? [] },
+        userId,
+      );
+    },
     bulkProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
       const { userId } = await requireAdmin(context);
       return (await bulkUpdateProxyHosts(parseProxyHostBulkRequest(args.input), userId)).count;
@@ -335,6 +347,17 @@ export const resolvers = {
       const { userId } = await requireAdmin(context);
       await deleteL4ProxyHost(args.id, userId);
       return true;
+    },
+    previewL4ProxyHost: async (
+      _: unknown,
+      args: { id?: number | null; input: unknown; revert?: string[] | null },
+      context: GraphQLContext,
+    ) => {
+      const { userId } = await requireAdmin(context);
+      return await previewL4HostChange(
+        { id: args.id ?? null, input: args.input as never, reverted: args.revert ?? [] },
+        userId,
+      );
     },
     bulkL4ProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
       const { userId } = await requireAdmin(context);

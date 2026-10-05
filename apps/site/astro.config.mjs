@@ -156,7 +156,8 @@ export default defineConfig({
       /**
        * Three controller tsconfig paths repeated (`@/*` is unused by demos), plus shims for
        * next-intl, next/navigation, the auth client, full page loads, the host and overview
-       * actions. The shims must precede the `@/src/` alias, which would otherwise match first.
+       * actions, and the editors' URL section links. The shims must precede the `@/src/` alias,
+       * which would otherwise match first.
        */
       alias: [
         {
@@ -184,6 +185,10 @@ export default defineConfig({
         {
           find: /^@\/src\/app\/\(dashboard\)\/l4-proxy-hosts\/actions$/,
           replacement: fileURLToPath(new URL("./src/demos/shims/l4-actions.ts", import.meta.url)),
+        },
+        {
+          find: /^@\/components\/host-review\/section-link$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/section-link.ts", import.meta.url)),
         },
         { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
         { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },

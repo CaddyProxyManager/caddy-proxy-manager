@@ -3,6 +3,7 @@
  * HostDialogs imports it, and a demo that ever submits fails as a save with no controller would.
  */
 import type { ActionState } from "@cpm/controller/src/lib/errors/action-error";
+import type { HostPreviewResult } from "@cpm/controller/src/lib/host-review/types";
 import {
   type HostUpstreamHealth,
   summarizeUpstreamHealth,
@@ -26,6 +27,13 @@ export async function updateProxyHostAction(
   _formData: FormData,
 ): Promise<ActionState> {
   return refused;
+}
+
+export async function previewProxyHostAction(
+  _id: number | null,
+  _formData: FormData,
+): Promise<HostPreviewResult> {
+  return { ok: false, message: refused.message ?? "" };
 }
 
 export async function deleteProxyHostAction(

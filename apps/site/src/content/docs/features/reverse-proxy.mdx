@@ -82,6 +82,38 @@ need a manage grant.
   <HostTagsDemo client:visible />
 </Demo>
 
+### Reviewing a change before saving
+
+The editor is grouped into the same parts as the host's page, with a row of links at the top that
+jumps to each. In an existing host's editor a jump also lands in the address bar, as
+`/proxy-hosts?edit=<id>#protection`, so the link opens the editor there again.
+
+The footer counts the fields you have changed. **Review changes**, or Ctrl+S (Cmd+S on a Mac)
+anywhere in the open editor, asks the server what the save would do without saving anything. The
+answer runs every check the save runs, so a refusal shows here first, and lists:
+
+- **each changed field** under its part of the editor, with what it was and what it becomes. A
+  nested setting such as load balancing or the WAF lists only the values inside it that changed.
+  Anything that looks like a secret - a sticky-session cookie secret, a token or password inside a
+  custom Caddyfile or JSON snippet - is hidden on both sides;
+- **Undo** beside each change, which leaves that field as stored for this save while the editor
+  keeps your edit. Undone changes are listed below with **Restore**;
+- **what saving does**: the agents that are sent a new config (every agent, or the ones the host
+  is pinned to, offline ones marked), whether the host is pinned and whether that changes, and the
+  new names Caddy will request a certificate for. A name an imported certificate or another host's
+  automatic wildcard already covers is not requested again;
+- **warnings**: a domain another host already answers for, a protection this save takes away (WAF,
+  sign-in, access list, mTLS, rate limiting, geo blocking, CrowdSec, bot challenge), a WAF moving
+  to detection only, a sign-in changing kind, a rate-limit mode that changes which global zones
+  apply, an access list with its own deny response, fail-closed behaviour or geo rules, an imported
+  certificate that does not cover a domain, and a host being disabled or put into maintenance.
+
+**Save changes** in the review saves what it shows; Ctrl+S there saves too. The footer's own save
+button still saves straight away. Closing the editor, or the browser tab, with unsaved changes asks
+first. Notes and tags reach no Caddy config, so a change to only those reloads nothing.
+
+The same preview is in the [API](../api/#previewing-a-change).
+
 ### Duplicating a host
 
 **Duplicate** in a host's row menu opens a new host's editor filled in from that one, named with

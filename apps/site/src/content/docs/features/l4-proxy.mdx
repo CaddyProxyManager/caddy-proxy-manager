@@ -31,9 +31,19 @@ the `bulkL4ProxyHosts` mutation.
 - **PROXY protocol** - connections that arrive wrapped in a PROXY protocol header, from a load
   balancer in front of Caddy.
 
-<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send.">
+<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send; Review changes shows the diff first.">
   <L4HostEditorDemo client:visible />
 </Demo>
+
+The editor is in four parts - General, Listener, Upstreams and Protection - with links at the top
+to jump between them; an existing host's editor puts the part in the address bar, as
+`/l4-proxy-hosts?edit=<id>#upstreams`. It has the same
+[review step](../reverse-proxy/#reviewing-a-change-before-saving) as an HTTP host: an
+unsaved-change count in the footer, **Review changes** (or Ctrl+S, Cmd+S on a Mac) listing each
+changed field before and after with Undo, the agents that reload and whether the host is pinned,
+and warnings when the save removes the access list, geo blocking or CrowdSec, switches to an access
+list with geo rules, or disables the host. A new listen address, protocol or agent pinning also
+notes that the port is published only when the agent recreates Caddy, from the banner after saving.
 
 ## Port ranges
 

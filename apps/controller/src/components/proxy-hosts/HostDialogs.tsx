@@ -10,6 +10,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import {
   createProxyHostAction,
   deleteProxyHostAction,
+  previewProxyHostAction,
   updateProxyHostAction,
 } from "@/src/app/(dashboard)/proxy-hosts/actions";
 import { INITIAL_ACTION_STATE } from "@/lib/errors/action-error";
@@ -53,7 +54,13 @@ import { useTranslations } from "next-intl";
 import { HostNotesField } from "./HostNotesField";
 import { HostTagsField } from "./HostTagsField";
 import { UpstreamHealthPanel } from "./upstreams/UpstreamHealthPanel";
-import { type EditorSection, editorSectionAnchor } from "@/lib/proxy-hosts/editor-sections";
+import {
+  EDITOR_SECTIONS,
+  type EditorSection,
+  editorSectionAnchor,
+} from "@/lib/proxy-hosts/editor-sections";
+import { HostEditorShell } from "@/components/host-review/HostEditorShell";
+import { linkEditorSection } from "@/components/host-review/section-link";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -116,6 +123,11 @@ export function accessListStatus(accessLists: AccessList[], accessListId: string
     : undefined;
 }
 
+/** The create dialog's anchors differ: it stays mounted beside an open editor. */
+function sectionLinks(prefix: string) {
+  return EDITOR_SECTIONS.map((id) => ({ id, anchor: `${prefix}${editorSectionAnchor(id)}` }));
+}
+
 export function CreateHostDialog({
   open,
   onClose,
@@ -151,7 +163,10 @@ export function CreateHostDialog({
   agents?: AgentOption[];
 }) {
   const t = useTranslations("proxyHosts");
-  const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
+  const [state, formAction, isPending] = useActionState(
+    createProxyHostAction,
+    INITIAL_ACTION_STATE,
+  );
 
   const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
   const [description, setDescription] = useState(initialData?.description ?? "");
@@ -162,109 +177,132 @@ export function CreateHostDialog({
   const [accessListId, setAccessListId] = useState(String(initialData?.accessListId ?? NONE_VALUE));
 
   useCloseOnSuccess(state, onClose);
+  const anchor = (section: EditorSection) => `create-${editorSectionAnchor(section)}`;
 
   return (
-    <AppDialog
+    <HostEditorShell
       open={open}
       onClose={onClose}
       title={initialData ? t("duplicateProxyHost") : t("createProxyHost")}
-      maxWidth="lg"
+      kind="http"
+      isCreate
+      formId="create-host-form"
       submitLabel={t("create")}
-      onSubmit={() => {
-        (document.getElementById("create-host-form") as HTMLFormElement)?.requestSubmit();
-      }}
+      state={state}
+      isPending={isPending}
+      preview={(data) => previewProxyHostAction(null, data)}
+      sections={sectionLinks("create-")}
     >
       <form id="create-host-form" action={formAction}>
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
-          <SettingsToggles
-            sslForced={initialData?.sslForced}
-            hstsEnabled={initialData?.hstsEnabled}
-            hstsSubdomains={initialData?.hstsSubdomains}
-            allowWebsocket={initialData?.allowWebsocket}
-            preserveHostHeader={initialData?.preserveHostHeader}
-            skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
-            compression={initialData?.compression}
-            discourageIndexing={initialData?.discourageIndexing}
-            enabled={true}
-          />
-          <TextInput
-            label={t("name")}
-            htmlName="name"
-            placeholder={t("namePlaceholder")}
-            value={name}
-            onChange={setName}
-            isRequired
-          />
-          <HostNotesField value={description} onChange={setDescription} />
-          <HostTagsField initial={initialData?.tags} />
-          <TextArea
-            {...NO_SPELLCHECK}
-            label={t("domains")}
-            htmlName="domains"
-            placeholder="app.example.com"
-            value={domains}
-            onChange={setDomains}
-            isRequired
-            rows={2}
-            description={t("domainsHelp")}
-          />
-          <UpstreamInput defaultUpstreams={initialData?.upstreams} />
-          <Selector
-            label={t("certificate")}
-            htmlName="certificateId"
-            options={toOptions(certificates, t("managedByCaddyAuto"))}
-            value={certificateId}
-            onChange={(next) => setCertificateId(next as string)}
-          />
-          <Selector
-            label={t("accessList")}
-            htmlName="accessListId"
-            options={accessListOptions(accessLists, t)}
-            value={accessListId}
-            onChange={(next) => setAccessListId(next as string)}
-            status={accessListStatus(accessLists, accessListId, t)}
-          />
-          <AgentAssignmentFields agents={agents} selected={[]} />
-          <RedirectsFields initialData={initialData?.redirects} />
-          <LocationRulesFields initialData={initialData?.locationRules} accessLists={accessLists} />
-          <RewriteFields initialData={initialData?.rewrite} />
-          <PathAllowsFields initialData={initialData?.pathAllows} />
-          <PathBlocksFields initialData={initialData?.pathBlocks} />
-          <PathRewritesFields initialData={initialData?.pathRewrites} />
-          <ErrorPagesFields initialData={initialData?.errorPages} />
-          <CacheFields cache={initialData?.cache} />
-          <MaintenanceFields maintenance={initialData?.maintenance} />
-          <AdvancedConfigFields host={initialData} />
-          <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
-          <ForwardAuthFields
-            defaults={forwardAuthDefaults}
-            forwardAuth={initialData?.forwardAuth}
-          />
-          <CpmForwardAuthFields
-            cpmForwardAuth={initialData?.cpmForwardAuth}
-            users={forwardAuthUsers}
-            groups={forwardAuthGroups}
-          />
-          <TailscaleFields tailscale={initialData?.tailscale} defaults={tailscaleDefaults} />
-          <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
-          <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
-          <UpstreamTimeoutsFields upstreamTimeouts={initialData?.upstreamTimeouts} />
-          <UpstreamDnsResolutionFields upstreamDnsResolution={initialData?.upstreamDnsResolution} />
-          <RateLimitFields rateLimit={initialData?.rateLimit} />
-          <GeoBlockFields />
-          <CrowdSecFields enabled={initialData?.crowdsec} />
-          <AnubisFields anubis={initialData?.anubis} />
-          <WafFields value={initialData?.waf} />
-          <MtlsFields
-            value={initialData?.mtls}
-            caCertificates={caCertificates}
-            mtlsRoles={mtlsRoles}
-            issuedClientCerts={issuedClientCerts}
-          />
+          <VStack gap={5} id={anchor("general")}>
+            <SettingsToggles
+              sslForced={initialData?.sslForced}
+              hstsEnabled={initialData?.hstsEnabled}
+              hstsSubdomains={initialData?.hstsSubdomains}
+              allowWebsocket={initialData?.allowWebsocket}
+              preserveHostHeader={initialData?.preserveHostHeader}
+              skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
+              compression={initialData?.compression}
+              discourageIndexing={initialData?.discourageIndexing}
+              enabled={true}
+            />
+            <TextInput
+              label={t("name")}
+              htmlName="name"
+              placeholder={t("namePlaceholder")}
+              value={name}
+              onChange={setName}
+              isRequired
+            />
+            <HostNotesField value={description} onChange={setDescription} />
+            <HostTagsField initial={initialData?.tags} />
+            <TextArea
+              {...NO_SPELLCHECK}
+              label={t("domains")}
+              htmlName="domains"
+              placeholder="app.example.com"
+              value={domains}
+              onChange={setDomains}
+              isRequired
+              rows={2}
+              description={t("domainsHelp")}
+            />
+          </VStack>
+          <VStack gap={5} id={anchor("upstreams")}>
+            <UpstreamInput defaultUpstreams={initialData?.upstreams} />
+            <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
+            <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
+            <UpstreamTimeoutsFields upstreamTimeouts={initialData?.upstreamTimeouts} />
+            <UpstreamDnsResolutionFields
+              upstreamDnsResolution={initialData?.upstreamDnsResolution}
+            />
+          </VStack>
+          <VStack gap={5} id={anchor("tls")}>
+            <Selector
+              label={t("certificate")}
+              htmlName="certificateId"
+              options={toOptions(certificates, t("managedByCaddyAuto"))}
+              value={certificateId}
+              onChange={(next) => setCertificateId(next as string)}
+            />
+            <MtlsFields
+              value={initialData?.mtls}
+              caCertificates={caCertificates}
+              mtlsRoles={mtlsRoles}
+              issuedClientCerts={issuedClientCerts}
+            />
+          </VStack>
+          <VStack gap={5} id={anchor("access")}>
+            <Selector
+              label={t("accessList")}
+              htmlName="accessListId"
+              options={accessListOptions(accessLists, t)}
+              value={accessListId}
+              onChange={(next) => setAccessListId(next as string)}
+              status={accessListStatus(accessLists, accessListId, t)}
+            />
+            <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
+            <ForwardAuthFields
+              defaults={forwardAuthDefaults}
+              forwardAuth={initialData?.forwardAuth}
+            />
+            <CpmForwardAuthFields
+              cpmForwardAuth={initialData?.cpmForwardAuth}
+              users={forwardAuthUsers}
+              groups={forwardAuthGroups}
+            />
+            <TailscaleFields tailscale={initialData?.tailscale} defaults={tailscaleDefaults} />
+          </VStack>
+          <VStack gap={5} id={anchor("protection")}>
+            <RateLimitFields rateLimit={initialData?.rateLimit} />
+            <GeoBlockFields />
+            <CrowdSecFields enabled={initialData?.crowdsec} />
+            <AnubisFields anubis={initialData?.anubis} />
+            <WafFields value={initialData?.waf} />
+          </VStack>
+          <VStack gap={5} id={anchor("routing")}>
+            <RedirectsFields initialData={initialData?.redirects} />
+            <LocationRulesFields
+              initialData={initialData?.locationRules}
+              accessLists={accessLists}
+            />
+            <RewriteFields initialData={initialData?.rewrite} />
+            <PathAllowsFields initialData={initialData?.pathAllows} />
+            <PathBlocksFields initialData={initialData?.pathBlocks} />
+            <PathRewritesFields initialData={initialData?.pathRewrites} />
+            <ErrorPagesFields initialData={initialData?.errorPages} />
+          </VStack>
+          <VStack gap={5} id={anchor("advanced")}>
+            <AgentAssignmentFields agents={agents} selected={[]} />
+            <CacheFields cache={initialData?.cache} />
+            <MaintenanceFields maintenance={initialData?.maintenance} />
+            <AdvancedConfigFields host={initialData} />
+          </VStack>
         </VStack>
       </form>
-    </AppDialog>
+    </HostEditorShell>
   );
 }
 
@@ -311,7 +349,7 @@ export function EditHostDialog({
   tailscaleDefaults?: TailscaleHostDefaults | null;
 }) {
   const t = useTranslations("proxyHosts");
-  const [state, formAction] = useActionState(
+  const [state, formAction, isPending] = useActionState(
     updateProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
   );
@@ -336,15 +374,19 @@ export function EditHostDialog({
   }, [open, initialSection]);
 
   return (
-    <AppDialog
+    <HostEditorShell
       open={open}
       onClose={onClose}
       title={t("editProxyHost")}
-      maxWidth="lg"
+      kind="http"
+      isCreate={false}
+      formId="edit-host-form"
       submitLabel={t("saveChanges")}
-      onSubmit={() => {
-        (document.getElementById("edit-host-form") as HTMLFormElement)?.requestSubmit();
-      }}
+      state={state}
+      isPending={isPending}
+      preview={(data) => previewProxyHostAction(host.id, data)}
+      sections={sectionLinks("")}
+      onSectionLink={(section) => linkEditorSection(host.id, section)}
     >
       <form id="edit-host-form" action={formAction}>
         {/* Grouped by the sections the host's page links to (lib/proxy-hosts/editor-sections). */}
@@ -453,7 +495,7 @@ export function EditHostDialog({
           </VStack>
         </VStack>
       </form>
-    </AppDialog>
+    </HostEditorShell>
   );
 }
 

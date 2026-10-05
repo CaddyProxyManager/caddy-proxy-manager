@@ -705,7 +705,13 @@ export async function assertNotMetricsPort(listenAddress: string | undefined): P
   }
 }
 
-export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
+type L4ProxyHostInsert = typeof l4ProxyHosts.$inferInsert;
+
+/** Every check a create runs, and the row it would insert; nothing is written. */
+async function prepareL4ProxyHostCreate(
+  input: L4ProxyHostInput,
+  actorUserId: number,
+): Promise<Omit<L4ProxyHostInsert, "createdAt" | "updatedAt">> {
   validateL4Input(input, true);
   validateL4Upstreams(
     input.upstreams,
@@ -726,51 +732,115 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
   await assertL4AccessList(input.accessListId);
   await assertNoNewAdminDialTargets([], input.upstreams, actorUserId);
 
+  return {
+    name: input.name.trim(),
+    description: normalizeHostDescription(input.description) ?? null,
+    tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
+    protocol: input.protocol,
+    listenAddress: input.listenAddress.trim(),
+    upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
+    matcherType: input.matcherType ?? "none",
+    matcherValue: input.matcherValue
+      ? JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean))
+      : null,
+    tlsTermination: input.tlsTermination ?? false,
+    proxyProtocolVersion: input.proxyProtocolVersion ?? null,
+    proxyProtocolReceive: input.proxyProtocolReceive ?? false,
+    accessListId: input.accessListId ?? null,
+    ownerUserId: actorUserId,
+    meta: (() => {
+      const meta: L4ProxyHostMeta = { ...(input.meta ?? {}) };
+      if (input.loadBalancer) meta.load_balancer = dehydrateL4LoadBalancer(input.loadBalancer);
+      if (input.dnsResolver) meta.dns_resolver = dehydrateL4DnsResolver(input.dnsResolver);
+      if (input.upstreamDnsResolution)
+        meta.upstream_dns_resolution = dehydrateL4UpstreamDnsResolution(
+          input.upstreamDnsResolution,
+        );
+      if (input.geoblock) meta.geoblock = input.geoblock;
+      if (input.geoblockMode && input.geoblockMode !== "merge")
+        meta.geoblock_mode = input.geoblockMode;
+      const crowdsec =
+        input.crowdsec !== undefined
+          ? storedHostCrowdSec(input.crowdsec !== false)
+          : sanitizeHostCrowdSec(meta.crowdsec);
+      if (crowdsec) meta.crowdsec = crowdsec;
+      else delete meta.crowdsec;
+      // What was validated, not a raw `meta` passed through.
+      if (input.upstreamPortMode === "same") meta.upstream_port_mode = "same";
+      else delete meta.upstream_port_mode;
+      return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
+    })(),
+    enabled: input.enabled ?? true,
+  };
+}
+
+/** A new host as the defaults leave it, for diffing a create against. */
+export function blankL4ProxyHost(): L4ProxyHost {
+  const now = nowIso();
+  return parseL4ProxyHost({
+    id: 0,
+    name: "",
+    description: null,
+    tags: "[]",
+    protocol: "tcp",
+    listenAddress: "",
+    upstreams: "[]",
+    matcherType: "none",
+    matcherValue: null,
+    tlsTermination: false,
+    proxyProtocolVersion: null,
+    proxyProtocolReceive: false,
+    accessListId: null,
+    ownerUserId: null,
+    meta: null,
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+/** As planProxyHostChange: the host a save would leave, checked but not stored. */
+export async function planL4ProxyHostChange(
+  id: number | null,
+  input: Partial<L4ProxyHostInput>,
+  actorUserId: number,
+): Promise<{ before: L4ProxyHost | null; after: L4ProxyHost; agentIdsBefore: number[] }> {
+  const now = nowIso();
+  if (id === null) {
+    const values = await prepareL4ProxyHostCreate(input as L4ProxyHostInput, actorUserId);
+    const after = parseL4ProxyHost({
+      ...values,
+      id: 0,
+      description: values.description ?? null,
+      tags: values.tags ?? "[]",
+      matcherType: values.matcherType ?? "none",
+      matcherValue: values.matcherValue ?? null,
+      tlsTermination: values.tlsTermination ?? false,
+      proxyProtocolVersion: values.proxyProtocolVersion ?? null,
+      proxyProtocolReceive: values.proxyProtocolReceive ?? false,
+      accessListId: values.accessListId ?? null,
+      ownerUserId: actorUserId,
+      meta: values.meta ?? null,
+      enabled: values.enabled ?? true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { before: null, after, agentIdsBefore: [] };
+  }
+  const { existing, row, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
+  return {
+    before: existing,
+    after: parseL4ProxyHost({ ...row, ...set }),
+    agentIdsBefore: await agentIdsForHost("l4", id),
+  };
+}
+
+export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
+  const values = await prepareL4ProxyHostCreate(input, actorUserId);
   const now = nowIso();
   const [record] = await db
     .insert(l4ProxyHosts)
-    .values({
-      name: input.name.trim(),
-      description: normalizeHostDescription(input.description) ?? null,
-      tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
-      protocol: input.protocol,
-      listenAddress: input.listenAddress.trim(),
-      upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
-      matcherType: input.matcherType ?? "none",
-      matcherValue: input.matcherValue
-        ? JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean))
-        : null,
-      tlsTermination: input.tlsTermination ?? false,
-      proxyProtocolVersion: input.proxyProtocolVersion ?? null,
-      proxyProtocolReceive: input.proxyProtocolReceive ?? false,
-      accessListId: input.accessListId ?? null,
-      ownerUserId: actorUserId,
-      meta: (() => {
-        const meta: L4ProxyHostMeta = { ...(input.meta ?? {}) };
-        if (input.loadBalancer) meta.load_balancer = dehydrateL4LoadBalancer(input.loadBalancer);
-        if (input.dnsResolver) meta.dns_resolver = dehydrateL4DnsResolver(input.dnsResolver);
-        if (input.upstreamDnsResolution)
-          meta.upstream_dns_resolution = dehydrateL4UpstreamDnsResolution(
-            input.upstreamDnsResolution,
-          );
-        if (input.geoblock) meta.geoblock = input.geoblock;
-        if (input.geoblockMode && input.geoblockMode !== "merge")
-          meta.geoblock_mode = input.geoblockMode;
-        const crowdsec =
-          input.crowdsec !== undefined
-            ? storedHostCrowdSec(input.crowdsec !== false)
-            : sanitizeHostCrowdSec(meta.crowdsec);
-        if (crowdsec) meta.crowdsec = crowdsec;
-        else delete meta.crowdsec;
-        // What was validated, not a raw `meta` passed through.
-        if (input.upstreamPortMode === "same") meta.upstream_port_mode = "same";
-        else delete meta.upstream_port_mode;
-        return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
-      })(),
-      enabled: input.enabled ?? true,
-      createdAt: now,
-      updatedAt: now,
-    })
+    .values({ ...values, createdAt: now, updatedAt: now })
     .returning();
 
   if (!record) {
@@ -801,15 +871,19 @@ export async function getL4ProxyHost(id: number): Promise<L4ProxyHost | null> {
   return host ? parseL4ProxyHost(host) : null;
 }
 
-export async function updateL4ProxyHost(
+/** Every check an update runs, and the columns it would set; nothing is written. */
+async function prepareL4ProxyHostUpdate(
   id: number,
   input: Partial<L4ProxyHostInput>,
   actorUserId: number,
-) {
-  const existing = await getL4ProxyHost(id);
-  if (!existing) {
+): Promise<{ existing: L4ProxyHost; row: L4ProxyHostRow; set: Partial<L4ProxyHostRow> }> {
+  const row = await db.query.l4ProxyHosts.findFirst({
+    where: (table, { eq }) => eq(table.id, id),
+  });
+  if (!row) {
     throw domainError("l4ProxyHostNotFound", {}, { status: 404 });
   }
+  const existing = parseL4ProxyHost(row);
 
   // Merged so cross-field constraints see the stored values.
   const merged = {
@@ -865,10 +939,10 @@ export async function updateL4ProxyHost(
   // API on this host's listen port - the same hole the HTTP host model closes.
   await assertNoNewAdminDialTargets(existing.upstreams, input.upstreams ?? [], actorUserId);
 
-  const now = nowIso();
-  await db
-    .update(l4ProxyHosts)
-    .set({
+  return {
+    existing,
+    row,
+    set: {
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
       ...(input.description !== undefined
         ? { description: normalizeHostDescription(input.description) }
@@ -976,8 +1050,19 @@ export async function updateL4ProxyHost(
 
         return { meta: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null };
       })(),
-      updatedAt: now,
-    })
+    },
+  };
+}
+
+export async function updateL4ProxyHost(
+  id: number,
+  input: Partial<L4ProxyHostInput>,
+  actorUserId: number,
+) {
+  const { existing, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
+  await db
+    .update(l4ProxyHosts)
+    .set({ ...set, updatedAt: nowIso() })
     .where(eq(l4ProxyHosts.id, id));
 
   if (input.agentIds !== undefined) {

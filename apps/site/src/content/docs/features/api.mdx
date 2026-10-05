@@ -61,6 +61,29 @@ writes nothing. Each host is audited on its own, and Caddy is applied once, or n
 Both host types carry `tags` as a field, and take them as `tags` in a create or update input,
 where they are normalised the way the editor stores them.
 
+## Previewing a change
+
+`previewProxyHost` and `previewL4ProxyHost` take the input `createProxyHost` or `updateProxyHost`
+would (no `id` for a create) and run every check the save runs, then answer what the save would
+do without storing, auditing or applying anything: each changed field with its before and after
+(nested settings as one line per changed path, secret-looking values as `[masked]`), the agents
+that would be sent a new config, whether the host is pinned, the names Caddy would request a
+certificate for, and warnings as codes with values, such as `domainInUse` or
+`protectionRemoved`. `revert` names fields to leave as stored, the way the editor's Undo does.
+
+```graphql
+mutation {
+  previewProxyHost(id: 4, input: { domains: ["app.example.com", "www.example.com"] }) {
+    changes { field before after }
+    impact { reload agents { name connected } certificates warnings }
+  }
+}
+```
+
+A refusal is the same error the save would return. The REST routes beside the host routes do the
+same: `POST /api/v1/proxy-hosts/preview` and `POST /api/v1/proxy-hosts/{id}/preview`, and the
+`l4-proxy-hosts` pair, with `?revert=<field>` repeatable.
+
 ## Upstream health
 
 `proxyHostUpstreamHealth(id)` asks Caddy on every agent serving the host for its upstreams' state,

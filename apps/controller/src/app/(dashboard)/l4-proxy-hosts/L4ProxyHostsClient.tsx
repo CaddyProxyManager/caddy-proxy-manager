@@ -36,6 +36,8 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
+import { clearEditorLink } from "@/components/host-review/section-link";
+import { type L4EditorSection, isL4EditorSection } from "@/src/lib/l4/editor-sections";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -56,6 +58,8 @@ type Props = {
   canCreate?: boolean;
   /** This page's hosts the viewer may change; the rest get a disabled checkbox. */
   manageableIds?: number[];
+  /** A host to open the editor on, from an `?edit=` link. */
+  editTarget?: L4ProxyHost | null;
 };
 
 function formatMatcher(
@@ -164,11 +168,13 @@ export default function L4ProxyHostsClient({
   agentAssignments,
   canCreate = true,
   manageableIds = [],
+  editTarget = null,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
-  const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
+  const [editHost, setEditHost] = useState<L4ProxyHost | null>(editTarget);
+  const [editSection, setEditSection] = useState<L4EditorSection | null>(null);
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
   // Bumped on every open so CreateL4HostDialog remounts and its useActionState starts clean -
   // otherwise the previous save's "success" state closes the freshly reopened dialog (#241).
@@ -192,6 +198,29 @@ export default function L4ProxyHostsClient({
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
+
+  // The section rides in the hash, which the server never sees.
+  useEffect(() => {
+    if (!editTarget) return;
+    const hash = window.location.hash.slice(1);
+    setEditSection(isL4EditorSection(hash) ? hash : null);
+    setEditHost(editTarget);
+  }, [editTarget]);
+
+  function closeEditor() {
+    setEditHost(null);
+    setEditSection(null);
+    if (searchParams.has("edit")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("edit");
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+      return;
+    }
+    clearEditorLink();
+    // revalidatePath alone leaves this client tree on its old props (#241).
+    router.refresh();
+  }
 
   function handleSearchChange(value: string) {
     setSearchTerm(value);
@@ -474,10 +503,10 @@ export default function L4ProxyHostsClient({
         <EditL4HostDialog
           open={!!editHost}
           host={editHost}
+          initialSection={editSection}
           onClose={() => {
-            setEditHost(null);
             signalBannerRefresh();
-            router.refresh();
+            closeEditor();
           }}
           agents={agents ?? []}
           accessLists={accessLists}

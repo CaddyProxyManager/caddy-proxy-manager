@@ -62,6 +62,52 @@ export const typeDefs = /* GraphQL */ `
   }
 
   """
+  One changed field of a host, as the editor's review step lists it. Secret-looking values read
+  "[masked]". A nested field lists its changed settings in leaves, with before and after null.
+  """
+  type HostFieldChange {
+    field: String!
+    """The editor section the field sits in."""
+    section: String!
+    before: JSON
+    after: JSON
+    """[{ path, before, after }], one per changed setting inside a nested field."""
+    leaves: JSON
+    masked: Boolean!
+    """False for what a new host cannot be saved without."""
+    revertible: Boolean!
+  }
+
+  type HostImpactAgent {
+    id: Int!
+    name: String!
+    connected: Boolean!
+  }
+
+  """What saving would set off. Warnings are codes with values, e.g. domainInUse { domain, host }."""
+  type HostChangeImpact {
+    """False when nothing that reaches Caddy changed."""
+    reload: Boolean!
+    """The agents sent a new config: those serving the host before or after."""
+    agents: [HostImpactAgent!]!
+    everyAgent: Boolean!
+    pinned: Boolean!
+    pinChanged: Boolean!
+    """[{ domain, wildcard }]: names Caddy will request a certificate for."""
+    certificates: JSON!
+    """[{ code, severity, values }]"""
+    warnings: JSON!
+  }
+
+  type HostChangePreview {
+    """http or l4."""
+    kind: String!
+    hostId: Int
+    changes: [HostFieldChange!]!
+    impact: HostChangeImpact!
+  }
+
+  """
   A certificate. The PEM bodies and the private key are deliberately absent: they are write-only
   over the REST API too, and a field that returns a private key is a field somebody will select.
   """
@@ -782,6 +828,11 @@ export const typeDefs = /* GraphQL */ `
     updateProxyHost(id: Int!, input: JSON!): ProxyHost!
     deleteProxyHost(id: Int!): Boolean!
     """
+    Validates input as createProxyHost (no id) or updateProxyHost would, and returns the field diff
+    and impact without storing anything. revert names fields to leave as stored.
+    """
+    previewProxyHost(id: Int, input: JSON!, revert: [String!]): HostChangePreview!
+    """
     As POST /api/v1/proxy-hosts/bulk: { action, ids, certificateId?, accessListId?, tag? }, all
     or nothing. Returns how many hosts changed.
     """
@@ -790,6 +841,8 @@ export const typeDefs = /* GraphQL */ `
     createL4ProxyHost(input: JSON!): L4ProxyHost!
     updateL4ProxyHost(id: Int!, input: JSON!): L4ProxyHost!
     deleteL4ProxyHost(id: Int!): Boolean!
+    """As previewProxyHost, for a layer 4 host."""
+    previewL4ProxyHost(id: Int, input: JSON!, revert: [String!]): HostChangePreview!
     """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids, tag? }, all or nothing."""
     bulkL4ProxyHosts(input: JSON!): Int!
 

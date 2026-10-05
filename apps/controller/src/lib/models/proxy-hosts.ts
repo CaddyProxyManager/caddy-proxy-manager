@@ -3554,7 +3554,13 @@ async function assertDialTargetsAllowed(
   );
 }
 
-export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
+type ProxyHostInsert = typeof proxyHosts.$inferInsert;
+
+/** Every check a create runs, and the row it would insert; nothing is written. */
+async function prepareProxyHostCreate(
+  input: ProxyHostInput,
+  actorUserId: number,
+): Promise<Omit<ProxyHostInsert, "createdAt" | "updatedAt">> {
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
   if (!input.upstreams || input.upstreams.length === 0) {
@@ -3567,7 +3573,6 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   await assertCertificateServable(input.certificateId ?? null, input.agentIds ?? []);
   await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
-  const now = nowIso();
   const meta = buildMeta({}, input, input.waf ? await getWafSettings() : null);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
@@ -3578,28 +3583,92 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     undefined,
     parseMeta(meta).waf,
   );
-  const [record] = await db
-    .insert(proxyHosts)
-    .values({
-      name: input.name.trim(),
-      description: normalizeHostDescription(input.description) ?? null,
-      tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
-      domains: JSON.stringify(domains),
-      upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
-      certificateId: input.certificateId ?? null,
-      accessListId: input.accessListId ?? null,
+  return {
+    name: input.name.trim(),
+    description: normalizeHostDescription(input.description) ?? null,
+    tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
+    domains: JSON.stringify(domains),
+    upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
+    certificateId: input.certificateId ?? null,
+    accessListId: input.accessListId ?? null,
+    ownerUserId: actorUserId,
+    sslForced: input.sslForced ?? true,
+    hstsEnabled: input.hstsEnabled ?? true,
+    hstsSubdomains: input.hstsSubdomains ?? false,
+    allowWebsocket: input.allowWebsocket ?? true,
+    preserveHostHeader: input.preserveHostHeader ?? true,
+    meta,
+    skipHttpsHostnameValidation: input.skipHttpsHostnameValidation ?? false,
+    enabled: input.enabled ?? true,
+  };
+}
+
+/** A new host as the defaults leave it, for diffing a create against. */
+export function blankProxyHost(): ProxyHost {
+  const now = nowIso();
+  return parseProxyHost({
+    id: 0,
+    name: "",
+    description: null,
+    tags: "[]",
+    domains: "[]",
+    upstreams: "[]",
+    certificateId: null,
+    accessListId: null,
+    ownerUserId: null,
+    sslForced: true,
+    hstsEnabled: true,
+    hstsSubdomains: false,
+    allowWebsocket: true,
+    preserveHostHeader: true,
+    meta: null,
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+    skipHttpsHostnameValidation: false,
+  });
+}
+
+/**
+ * The host a create or update would leave, after every check the save runs - but nothing stored,
+ * audited or applied. The review step's source, so what it shows is what the save writes.
+ */
+export async function planProxyHostChange(
+  id: number | null,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+): Promise<{ before: ProxyHost | null; after: ProxyHost; agentIdsBefore: number[] }> {
+  const now = nowIso();
+  if (id === null) {
+    const values = await prepareProxyHostCreate(input as ProxyHostInput, actorUserId);
+    const after = parseProxyHost({
+      ...values,
+      id: 0,
+      description: values.description ?? null,
+      tags: values.tags ?? "[]",
+      certificateId: values.certificateId ?? null,
+      accessListId: values.accessListId ?? null,
       ownerUserId: actorUserId,
-      sslForced: input.sslForced ?? true,
-      hstsEnabled: input.hstsEnabled ?? true,
-      hstsSubdomains: input.hstsSubdomains ?? false,
-      allowWebsocket: input.allowWebsocket ?? true,
-      preserveHostHeader: input.preserveHostHeader ?? true,
-      meta,
-      skipHttpsHostnameValidation: input.skipHttpsHostnameValidation ?? false,
-      enabled: input.enabled ?? true,
+      meta: values.meta ?? null,
       createdAt: now,
       updatedAt: now,
-    })
+    } as ProxyHostRow);
+    return { before: null, after, agentIdsBefore: [] };
+  }
+  const { existing, row, set } = await prepareProxyHostUpdate(id, input, actorUserId);
+  return {
+    before: existing,
+    after: parseProxyHost({ ...row, ...set } as ProxyHostRow),
+    agentIdsBefore: await agentIdsForHost("http", id),
+  };
+}
+
+export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
+  const values = await prepareProxyHostCreate(input, actorUserId);
+  const now = nowIso();
+  const [record] = await db
+    .insert(proxyHosts)
+    .values({ ...values, createdAt: now, updatedAt: now })
     .returning();
 
   if (!record) {
@@ -3641,15 +3710,19 @@ export async function getProxyHost(id: number): Promise<ProxyHost | null> {
   return host ? parseProxyHost(host) : null;
 }
 
-export async function updateProxyHost(
+/** Every check an update runs, and the columns it would set; nothing is written. */
+async function prepareProxyHostUpdate(
   id: number,
   input: Partial<ProxyHostInput>,
   actorUserId: number,
-) {
-  const existing = await getProxyHost(id);
-  if (!existing) {
+): Promise<{ existing: ProxyHost; row: ProxyHostRow; set: Partial<ProxyHostRow> }> {
+  const row = await db.query.proxyHosts.findFirst({
+    where: (table, { eq }) => eq(table.id, id),
+  });
+  if (!row) {
     throw domainError("proxyHostNotFound");
   }
+  const existing = parseProxyHost(row);
   const tags = normalizeHostTags(input.tags);
   await assertRawConfigChangeAllowed(existing, input, actorUserId);
   await assertDialTargetsAllowed(existing, input, actorUserId);
@@ -3746,10 +3819,10 @@ export async function updateProxyHost(
     parseMeta(meta).waf,
   );
 
-  const now = nowIso();
-  await db
-    .update(proxyHosts)
-    .set({
+  return {
+    existing,
+    row,
+    set: {
       name: input.name ?? existing.name,
       description:
         input.description !== undefined
@@ -3769,8 +3842,19 @@ export async function updateProxyHost(
       skipHttpsHostnameValidation:
         input.skipHttpsHostnameValidation ?? existing.skipHttpsHostnameValidation,
       enabled: input.enabled ?? existing.enabled,
-      updatedAt: now,
-    })
+    },
+  };
+}
+
+export async function updateProxyHost(
+  id: number,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+) {
+  const { existing, set } = await prepareProxyHostUpdate(id, input, actorUserId);
+  await db
+    .update(proxyHosts)
+    .set({ ...set, updatedAt: nowIso() })
     .where(eq(proxyHosts.id, id));
 
   if (input.agentIds !== undefined) {

@@ -1,0 +1,38 @@
+/** E2E: the L4 editor's review step, opened from an `?edit=` link with its section in the hash. */
+import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
+
+const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
+const ORIGIN = 'http://localhost:3000';
+
+test('L4 review shows the listen change and the port apply it needs', async ({ page }) => {
+  const response = await page.request.post(API_L4_HOSTS, {
+    headers: { Origin: ORIGIN },
+    data: {
+      name: 'L4 Review E2E',
+      protocol: 'tcp',
+      listenAddress: ':19871',
+      upstreams: ['10.0.0.1:5432'],
+    },
+  });
+  expect(response.ok(), `create failed: ${response.status()}`).toBe(true);
+  const id = ((await response.json()) as { id: number }).id;
+  try {
+    await page.goto(`/l4-proxy-hosts?edit=${id}#listener`);
+    await waitForHydration(page);
+    const editor = page.getByRole('dialog', { name: 'Edit L4 Proxy Host' });
+    await expect(editor).toBeVisible({ timeout: 10_000 });
+
+    await editor.getByLabel('Listen Address').fill(':19872');
+    await editor.getByRole('button', { name: 'Review changes' }).click();
+
+    const review = page.getByRole('dialog', { name: 'Review changes' });
+    await expect(review.getByText(':19871 to :19872')).toBeVisible({ timeout: 15_000 });
+    await expect(review.getByText(/apply the ports from the banner/i)).toBeVisible();
+    await review.getByRole('button', { name: 'Back to editor' }).click();
+    await expect(review).not.toBeVisible();
+    await expect(editor).toBeVisible();
+  } finally {
+    await page.request.delete(`${API_L4_HOSTS}/${id}`, { headers: { Origin: ORIGIN } });
+  }
+});

@@ -19,6 +19,8 @@ type AppDialogProps = {
   isSubmitting?: boolean;
   /** Gates the submit button on form validity, independent of isSubmitting. */
   isSubmitDisabled?: boolean;
+  /** Left of the buttons, such as an unsaved-changes count. */
+  footerStart?: ReactNode;
 };
 
 const DIALOG_WIDTH: Record<NonNullable<AppDialogProps["maxWidth"]>, number> = {
@@ -67,9 +69,25 @@ export function AppDialog({
   onSubmit,
   isSubmitting = false,
   isSubmitDisabled = false,
+  footerStart,
 }: AppDialogProps) {
   const t = useTranslations("ui");
   useReturnFocus(open);
+  const buttons = actions ?? (
+    <>
+      <Button variant="secondary" label={t("cancel")} onClick={onClose} />
+      {onSubmit && (
+        <Button
+          // Astryx defaults to secondary, the same grey as Cancel beside it.
+          variant="primary"
+          label={submitLabel ?? t("save")}
+          onClick={onSubmit}
+          isLoading={isSubmitting}
+          isDisabled={isSubmitting || isSubmitDisabled}
+        />
+      )}
+    </>
+  );
   return (
     <Dialog
       isOpen={open}
@@ -83,23 +101,18 @@ export function AppDialog({
         content={<LayoutContent>{children}</LayoutContent>}
         footer={
           <LayoutFooter>
-            <HStack gap={2} justify="end">
-              {actions ?? (
-                <>
-                  <Button variant="secondary" label={t("cancel")} onClick={onClose} />
-                  {onSubmit && (
-                    <Button
-                      // Astryx defaults to secondary, the same grey as Cancel beside it.
-                      variant="primary"
-                      label={submitLabel ?? t("save")}
-                      onClick={onSubmit}
-                      isLoading={isSubmitting}
-                      isDisabled={isSubmitting || isSubmitDisabled}
-                    />
-                  )}
-                </>
-              )}
-            </HStack>
+            {footerStart ? (
+              <HStack gap={2} justify="between" vAlign="center" wrap="wrap">
+                {footerStart}
+                <HStack gap={2} justify="end">
+                  {buttons}
+                </HStack>
+              </HStack>
+            ) : (
+              <HStack gap={2} justify="end">
+                {buttons}
+              </HStack>
+            )}
           </LayoutFooter>
         }
       />

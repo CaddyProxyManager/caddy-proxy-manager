@@ -50,11 +50,16 @@ import type { HostAnubisConfig } from "@/src/lib/proxy-hosts/anubis";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
+  parseAccessListId,
+  parseCertificateId,
   parseCheckbox,
   parseCsv,
+  parseHostTags,
   parseOptionalNumber,
   parseOptionalText,
+  parseUpstreams,
 } from "@/src/lib/forms/form-parse";
+import { parseAgentIds } from "@/src/lib/models/host-agents";
 
 export async function validateAndSanitizeCertificateId(certificateId: number | null): Promise<{
   certificateId: number | null;
@@ -900,5 +905,135 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     pathBlocks: formData.has("pathBlocksJson") ? parsePathBlocksConfig(formData) : undefined,
     pathRewrites: formData.has("pathRewritesJson") ? parsePathRewritesConfig(formData) : undefined,
     errorPages: formData.has("errorPagesJson") ? parseErrorPagesConfig(formData) : undefined,
+  };
+}
+
+export type ForwardAuthAccessInput = { userIds: number[]; groupIds: number[] };
+
+/** The editor's whole form, as the save action and the review step both read it. */
+export type ParsedProxyHostForm<T> = {
+  input: T;
+  /** Who may sign in through CPM's portal; undefined leaves the stored grants alone. */
+  forwardAuthAccess?: ForwardAuthAccessInput;
+  /** A picked certificate that no longer exists, so the host falls back to automatic TLS. */
+  missingCertificate?: { id: number; cloudflareConfigured: boolean };
+};
+
+function parseForwardAuthAccess(formData: FormData): ForwardAuthAccessInput {
+  const ids = (key: string) =>
+    formData
+      .getAll(key)
+      .map((v) => Number(v))
+      .filter((n) => n > 0);
+  return { userIds: ids("cpmFaUserId"), groupIds: ids("cpmFaGroupId") };
+}
+
+export async function parseProxyHostCreateForm(
+  formData: FormData,
+): Promise<ParsedProxyHostForm<ProxyHostInput>> {
+  const boolField = (key: string) =>
+    formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
+  const { certificateId, warning, missing } = await validateAndSanitizeCertificateId(
+    parseCertificateId(formData.get("certificateId")),
+  );
+  if (warning) console.warn(`[proxy host form] ${warning}`);
+
+  const input: ProxyHostInput = {
+    name: String(formData.get("name") ?? "Untitled"),
+    description: formData.has("description") ? String(formData.get("description")) : undefined,
+    tags: parseHostTags(formData),
+    domains: parseCsv(formData.get("domains")),
+    upstreams: parseUpstreams(formData.get("upstreams")),
+    // Empty means every agent, as an absent field does, so older clients keep working.
+    agentIds: parseAgentIds(formData.getAll("agentId")),
+    certificateId,
+    accessListId: parseAccessListId(formData.get("accessListId")),
+    // An absent marker takes the model's default, so a form without a toggle keeps it on.
+    sslForced: boolField("sslForced"),
+    hstsEnabled: boolField("hstsEnabled"),
+    hstsSubdomains: parseCheckbox(formData.get("hstsSubdomains")),
+    allowWebsocket: boolField("allowWebsocket"),
+    preserveHostHeader: boolField("preserveHostHeader"),
+    skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
+    discourageIndexing: boolField("discourageIndexing"),
+    enabled: parseCheckbox(formData.get("enabled")),
+    customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
+    customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),
+    customCaddyfile: parseOptionalText(formData.get("customCaddyfile")),
+    authentik: parseAuthentikConfig(formData),
+    forwardAuth: parseForwardAuthConfig(formData),
+    cpmForwardAuth: parseCpmForwardAuthConfig(formData),
+    tailscale: parseTailscaleConfig(formData),
+    loadBalancer: parseLoadBalancerConfig(formData),
+    dnsResolver: parseDnsResolverConfig(formData),
+    upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),
+    ...parseGeoBlockConfig(formData),
+    ...parseWafConfig(formData),
+    mtls: parseMtlsConfig(formData),
+    redirects: parseRedirectsConfig(formData),
+    rewrite: parseRewriteConfig(formData),
+    cache: parseCacheConfig(formData) ?? null,
+    compression: parseCompressionMode(formData),
+    maintenance: parseMaintenanceConfig(formData),
+    upstreamTimeouts: parseUpstreamTimeoutsConfig(formData),
+    rateLimit: parseRateLimitConfig(formData),
+    crowdsec: parseCrowdSecEnabled(formData),
+    anubis: parseAnubisConfig(formData),
+    locationRules: parseLocationRulesConfig(formData),
+    pathAllows: parsePathAllowsConfig(formData),
+    pathBlocks: parsePathBlocksConfig(formData),
+    pathRewrites: parsePathRewritesConfig(formData),
+    errorPages: parseErrorPagesConfig(formData),
+  };
+  const access = parseForwardAuthAccess(formData);
+  const hasAccess = access.userIds.length > 0 || access.groupIds.length > 0;
+  return {
+    input,
+    forwardAuthAccess: input.cpmForwardAuth?.enabled && hasAccess ? access : undefined,
+    missingCertificate: missing,
+  };
+}
+
+/** Every field gated on presence: a partial form changes only what it carries. */
+export async function parseProxyHostUpdateForm(
+  formData: FormData,
+): Promise<ParsedProxyHostForm<Partial<ProxyHostInput>>> {
+  const boolField = (key: string) =>
+    formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
+
+  let certificateId: number | null | undefined;
+  let missing: ParsedProxyHostForm<unknown>["missingCertificate"];
+  if (formData.has("certificateId")) {
+    const validation = await validateAndSanitizeCertificateId(
+      parseCertificateId(formData.get("certificateId")),
+    );
+    certificateId = validation.certificateId;
+    missing = validation.missing;
+    if (validation.warning) console.warn(`[proxy host form] ${validation.warning}`);
+  }
+
+  const input: Partial<ProxyHostInput> = {
+    name: formData.get("name") ? String(formData.get("name")) : undefined,
+    description: formData.has("description") ? String(formData.get("description")) : undefined,
+    tags: parseHostTags(formData),
+    domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
+    upstreams: formData.get("upstreams") ? parseUpstreams(formData.get("upstreams")) : undefined,
+    // Gated on the marker: an empty list is a real edit ("everywhere"), not an absent field.
+    agentIds: formData.has("agentAssignmentPresent")
+      ? parseAgentIds(formData.getAll("agentId"))
+      : undefined,
+    certificateId,
+    accessListId: formData.has("accessListId")
+      ? parseAccessListId(formData.get("accessListId"))
+      : undefined,
+    ...parseProxyHostOptionUpdates(formData),
+    enabled: boolField("enabled"),
+  };
+  return {
+    input,
+    forwardAuthAccess: formData.has("cpmForwardAuthPresent")
+      ? parseForwardAuthAccess(formData)
+      : undefined,
+    missingCertificate: missing,
   };
 }

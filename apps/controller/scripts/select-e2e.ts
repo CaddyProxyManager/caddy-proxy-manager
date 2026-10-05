@@ -219,6 +219,11 @@ export const RULES: readonly Rule[] = [
     ],
     specs: L4,
   },
+  // The review step both host editors share.
+  {
+    match: [`${LIB}host-review/`, `${SRC}components/host-review/`],
+    specs: [...PROXY_HOSTS, ...L4],
+  },
   {
     match: [
       `${LIB}access-lists/`,
@@ -410,6 +415,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   commandPalette: NAV,
   email: NOTIFICATIONS,
   groups: GROUPS,
+  hostReview: [...PROXY_HOSTS, ...L4],
   l4ProxyHosts: L4,
   logs: LOGS,
   mtlsRoles: CERTIFICATES,

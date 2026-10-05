@@ -9,7 +9,7 @@ import {
 } from "@cpm/controller/src/components/l4-proxy-hosts/L4HostDialogs";
 import type { L4ProxyHost } from "@cpm/controller/src/lib/models/l4-proxy-hosts";
 import { DemoSurface } from "../DemoSurface";
-import { onL4HostSaved } from "../shims/l4-actions";
+import { onL4HostSaved, registerL4DemoHosts } from "../shims/l4-actions";
 
 const AGENTS = [
   { id: 1, name: "bundled", connected: true, hasOwnBuildSettings: false },
@@ -101,6 +101,8 @@ const SHOWN = [
 export default function L4HostEditorDemo() {
   const [open, setOpen] = useState<"create" | "postgres" | "games" | null>(null);
   const [posted, setPosted] = useState<string | null>(null);
+
+  useEffect(() => registerL4DemoHosts([POSTGRES, GAME_SERVERS], AGENTS), []);
 
   useEffect(
     () =>

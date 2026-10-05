@@ -4,8 +4,16 @@ import { type ReactNode, useActionState, useEffect, useRef, useState } from "rea
 import {
   createL4ProxyHostAction,
   deleteL4ProxyHostAction,
+  previewL4ProxyHostAction,
   updateL4ProxyHostAction,
 } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
+import { HostEditorShell } from "@/components/host-review/HostEditorShell";
+import { linkEditorSection } from "@/components/host-review/section-link";
+import {
+  L4_EDITOR_SECTIONS,
+  type L4EditorSection,
+  l4EditorSectionAnchor,
+} from "@/lib/l4/editor-sections";
 import { INITIAL_ACTION_STATE } from "@/lib/errors/action-error";
 import type { L4ProxyHost } from "@/lib/models/l4-proxy-hosts";
 import type { L4AccessListOption } from "@/lib/models/access-lists";
@@ -46,6 +54,10 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
 }
 
 type Translator = ReturnType<typeof useTranslations<"l4ProxyHosts">>;
+
+function l4SectionLinks(prefix: string) {
+  return L4_EDITOR_SECTIONS.map((id) => ({ id, anchor: `${prefix}${l4EditorSectionAnchor(id)}` }));
+}
 
 const PROTOCOL_OPTIONS = [
   { value: "tcp", label: "TCP" },
@@ -230,7 +242,10 @@ function L4HostForm({
   agents = [],
   accessLists = [],
   assignedAgentIds = [],
+  anchorPrefix = "",
 }: {
+  /** The create dialog's anchors differ: it stays mounted beside an open editor. */
+  anchorPrefix?: string;
   formId: string;
   formAction: (formData: FormData) => void;
   state: { status: string; message?: string };
@@ -240,6 +255,7 @@ function L4HostForm({
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
+  const anchor = (section: L4EditorSection) => `${anchorPrefix}${l4EditorSectionAnchor(section)}`;
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
@@ -292,478 +308,488 @@ function L4HostForm({
           <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
         )}
 
-        <input type="hidden" name="enabledPresent" value="1" />
-        {/* Empty, not "off": the parser reads anything but on/true/1 as false. */}
-        <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
+        <VStack gap={5} id={anchor("general")}>
+          <input type="hidden" name="enabledPresent" value="1" />
+          {/* Empty, not "off": the parser reads anything but on/true/1 as false. */}
+          <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
 
-        <Card variant={enabled ? "muted" : "default"} padding={4}>
-          <HStack justify="between" vAlign="center" gap={4}>
-            <VStack gap={0}>
-              <Text type="body" size="sm" weight="semibold">
-                {enabled ? t("hostEnabledTitle") : t("hostPausedTitle")}
-              </Text>
-              <Text type="body" size="sm" color="secondary">
-                {enabled ? t("hostEnabledDescription") : t("hostPausedDescription")}
-              </Text>
-            </VStack>
-            <Switch
-              label={t("enableHostLabel")}
-              isLabelHidden
-              value={enabled}
-              onChange={setEnabled}
-            />
-          </HStack>
-        </Card>
+          <Card variant={enabled ? "muted" : "default"} padding={4}>
+            <HStack justify="between" vAlign="center" gap={4}>
+              <VStack gap={0}>
+                <Text type="body" size="sm" weight="semibold">
+                  {enabled ? t("hostEnabledTitle") : t("hostPausedTitle")}
+                </Text>
+                <Text type="body" size="sm" color="secondary">
+                  {enabled ? t("hostEnabledDescription") : t("hostPausedDescription")}
+                </Text>
+              </VStack>
+              <Switch
+                label={t("enableHostLabel")}
+                isLabelHidden
+                value={enabled}
+                onChange={setEnabled}
+              />
+            </HStack>
+          </Card>
 
-        <TextInput
-          {...NATIVE_REQUIRED}
-          label={t("name")}
-          htmlName="name"
-          placeholder={t("namePlaceholder")}
-          value={text.name}
-          onChange={set("name")}
-          isRequired
-        />
-
-        <HostNotesField value={text.description} onChange={set("description")} />
-
-        <HostTagsField initial={initialData?.tags} />
-
-        <Selector
-          label={t("protocol")}
-          htmlName="protocol"
-          options={PROTOCOL_OPTIONS}
-          value={protocol}
-          onChange={(v) => setProtocol(v as "tcp" | "udp")}
-        />
-
-        <TextInput
-          startIcon={Network}
-          {...NATIVE_REQUIRED}
-          label={t("listenAddress")}
-          htmlName="listenAddress"
-          placeholder=":5432"
-          value={text.listenAddress}
-          onChange={set("listenAddress")}
-          isRequired
-          description={t("listenAddressHelp")}
-        />
-
-        <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
-
-        <input type="hidden" name="upstreamPortMode" value={samePort ? "same" : "fixed"} />
-        <Switch
-          label={t("samePortUpstream")}
-          description={t("samePortUpstreamHelp")}
-          value={samePort}
-          onChange={setSamePort}
-        />
-
-        <TextArea
-          {...NATIVE_REQUIRED}
-          {...NO_SPELLCHECK}
-          label={t("upstreams")}
-          htmlName="upstreams"
-          placeholder={samePort ? "10.0.0.1\n10.0.0.2" : "10.0.0.1:5432\n10.0.0.2:5432"}
-          value={text.upstreams}
-          onChange={set("upstreams")}
-          rows={2}
-          isRequired
-          description={samePort ? t("upstreamsSamePortHelp") : t("upstreamsHelp")}
-        />
-
-        <Selector
-          label={t("matcher")}
-          htmlName="matcherType"
-          options={matcherOptions(t)}
-          value={matcherType}
-          onChange={(v) => setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")}
-          description={t("matcherHelp")}
-        />
-
-        {(matcherType === "tls_sni" || matcherType === "http_host") && (
           <TextInput
-            startIcon={Globe}
             {...NATIVE_REQUIRED}
-            label={matcherType === "tls_sni" ? t("sniHostnames") : t("httpHostnames")}
-            htmlName="matcherValue"
-            placeholder={t("matcherHostnamesPlaceholder")}
-            value={text.matcherValue}
-            onChange={set("matcherValue")}
+            label={t("name")}
+            htmlName="name"
+            placeholder={t("namePlaceholder")}
+            value={text.name}
+            onChange={set("name")}
             isRequired
-            description={t("matcherHostnamesHelp")}
           />
-        )}
 
-        {/* Unconditional: over UDP the switch is gone and the update must read that as off. */}
-        <input type="hidden" name="tlsTerminationPresent" value="1" />
-        {protocol === "tcp" && (
-          <Switch
-            label={t("tlsTermination")}
-            htmlName="tlsTermination"
-            value={tlsTermination}
-            onChange={setTlsTermination}
-          />
-        )}
+          <HostNotesField value={text.description} onChange={set("description")} />
 
-        <input type="hidden" name="proxyProtocolReceivePresent" value="1" />
-        <Switch
-          label={t("acceptInboundProxyProtocol")}
-          htmlName="proxyProtocolReceive"
-          value={proxyProtocolReceive}
-          onChange={setProxyProtocolReceive}
-        />
+          <HostTagsField initial={initialData?.tags} />
+        </VStack>
 
-        <Selector
-          label={t("upstreamProxyProtocolLabel")}
-          htmlName="proxyProtocolVersion"
-          options={proxyProtocolOptions(t)}
-          value={proxyProtocolVersion}
-          onChange={setProxyProtocolVersion}
-        />
-
-        <Selector
-          label={t("accessList")}
-          htmlName="accessListId"
-          options={accessListOptions(t, accessLists, initialData?.accessListId ?? null)}
-          value={accessListId}
-          onChange={setAccessListId}
-          description={t("accessListHelp")}
-        />
-
-        <Section
-          icon={Layers}
-          title={t("loadBalancer")}
-          defaultIsOpen={initialData?.loadBalancer?.enabled ?? false}
-        >
-          <input type="hidden" name="lbPresent" value="1" />
-          <input type="hidden" name="lbEnabledPresent" value="1" />
-          <Switch
-            label={t("enableLoadBalancing")}
-            htmlName="lbEnabled"
-            value={lbEnabled}
-            onChange={setLbEnabled}
-          />
+        <VStack gap={5} id={anchor("listener")}>
           <Selector
-            label={t("policy")}
-            htmlName="lbPolicy"
-            options={lbPolicyOptions(t)}
-            value={lbPolicy}
-            onChange={setLbPolicy}
+            label={t("protocol")}
+            htmlName="protocol"
+            options={PROTOCOL_OPTIONS}
+            value={protocol}
+            onChange={(v) => setProtocol(v as "tcp" | "udp")}
           />
-          {lbPolicy === "random_choose" && (
+
+          <TextInput
+            startIcon={Network}
+            {...NATIVE_REQUIRED}
+            label={t("listenAddress")}
+            htmlName="listenAddress"
+            placeholder=":5432"
+            value={text.listenAddress}
+            onChange={set("listenAddress")}
+            isRequired
+            description={t("listenAddressHelp")}
+          />
+
+          <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
+
+          <Selector
+            label={t("matcher")}
+            htmlName="matcherType"
+            options={matcherOptions(t)}
+            value={matcherType}
+            onChange={(v) =>
+              setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")
+            }
+            description={t("matcherHelp")}
+          />
+
+          {(matcherType === "tls_sni" || matcherType === "http_host") && (
             <TextInput
-              label={t("lbChoose")}
-              isOptional
-              htmlName="lbPolicyChoose"
-              placeholder="2"
-              value={text.lbPolicyChoose}
-              onChange={set("lbPolicyChoose")}
+              startIcon={Globe}
+              {...NATIVE_REQUIRED}
+              label={matcherType === "tls_sni" ? t("sniHostnames") : t("httpHostnames")}
+              htmlName="matcherValue"
+              placeholder={t("matcherHostnamesPlaceholder")}
+              value={text.matcherValue}
+              onChange={set("matcherValue")}
+              isRequired
+              description={t("matcherHostnamesHelp")}
             />
           )}
-          {lbPolicy === "weighted_round_robin" && (
-            <TextInput
-              label={t("lbWeights")}
-              isOptional
-              htmlName="lbPolicyWeights"
-              placeholder="3, 2, 1"
-              value={text.lbPolicyWeights}
-              onChange={set("lbPolicyWeights")}
+
+          {/* Unconditional: over UDP the switch is gone and the update must read that as off. */}
+          <input type="hidden" name="tlsTerminationPresent" value="1" />
+          {protocol === "tcp" && (
+            <Switch
+              label={t("tlsTermination")}
+              htmlName="tlsTermination"
+              value={tlsTermination}
+              onChange={setTlsTermination}
             />
           )}
-          <TextInput
-            startIcon={Clock}
-            label={t("tryDuration")}
-            isOptional
-            htmlName="lbTryDuration"
-            placeholder="5s"
-            value={text.lbTryDuration}
-            onChange={set("lbTryDuration")}
+
+          <input type="hidden" name="proxyProtocolReceivePresent" value="1" />
+          <Switch
+            label={t("acceptInboundProxyProtocol")}
+            htmlName="proxyProtocolReceive"
+            value={proxyProtocolReceive}
+            onChange={setProxyProtocolReceive}
           />
-          <TextInput
-            startIcon={Clock}
-            label={t("tryInterval")}
-            isOptional
-            htmlName="lbTryInterval"
-            placeholder="250ms"
-            value={text.lbTryInterval}
-            onChange={set("lbTryInterval")}
+        </VStack>
+
+        <VStack gap={5} id={anchor("upstreams")}>
+          <input type="hidden" name="upstreamPortMode" value={samePort ? "same" : "fixed"} />
+          <Switch
+            label={t("samePortUpstream")}
+            description={t("samePortUpstreamHelp")}
+            value={samePort}
+            onChange={setSamePort}
           />
 
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
-            {t("activeHealthCheck")}
-          </Text>
-          <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
-          {/* Disabled, it posts nothing and saves as off. */}
-          <Switch
-            label={t("enableActiveHealthCheck")}
-            htmlName="lbActiveHealthEnabled"
-            value={lbActiveHealthEnabled && !samePort}
-            onChange={setLbActiveHealthEnabled}
-            isDisabled={samePort}
-            description={samePort ? t("activeHealthCheckSamePort") : undefined}
-          />
-          <TextInput
-            label={t("healthCheckPort")}
-            isOptional
-            htmlName="lbActiveHealthPort"
-            value={text.lbActiveHealthPort}
-            onChange={set("lbActiveHealthPort")}
-          />
-          <TextInput
-            startIcon={Clock}
-            label={t("interval")}
-            isOptional
-            htmlName="lbActiveHealthInterval"
-            placeholder="30s"
-            value={text.lbActiveHealthInterval}
-            onChange={set("lbActiveHealthInterval")}
-          />
-          <TextInput
-            startIcon={Clock}
-            label={t("timeout")}
-            isOptional
-            htmlName="lbActiveHealthTimeout"
-            placeholder="5s"
-            value={text.lbActiveHealthTimeout}
-            onChange={set("lbActiveHealthTimeout")}
-          />
-
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
-            {t("passiveHealthCheck")}
-          </Text>
-          <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
-          <Switch
-            label={t("enablePassiveHealthCheck")}
-            htmlName="lbPassiveHealthEnabled"
-            value={lbPassiveHealthEnabled}
-            onChange={setLbPassiveHealthEnabled}
-          />
-          <TextInput
-            startIcon={Clock}
-            label={t("failDuration")}
-            isOptional
-            htmlName="lbPassiveHealthFailDuration"
-            placeholder="30s"
-            value={text.lbPassiveHealthFailDuration}
-            onChange={set("lbPassiveHealthFailDuration")}
-          />
-          <TextInput
-            label={t("maxFails")}
-            isOptional
-            htmlName="lbPassiveHealthMaxFails"
-            value={text.lbPassiveHealthMaxFails}
-            onChange={set("lbPassiveHealthMaxFails")}
-          />
-        </Section>
-
-        <Section
-          icon={Globe}
-          title={t("customDnsResolvers")}
-          defaultIsOpen={initialData?.dnsResolver?.enabled ?? false}
-        >
-          <input type="hidden" name="dnsPresent" value="1" />
-          <input type="hidden" name="dnsEnabledPresent" value="1" />
-          <Switch
-            label={t("enableCustomDns")}
-            htmlName="dnsEnabled"
-            value={dnsEnabled}
-            onChange={setDnsEnabled}
-          />
           <TextArea
-            label={t("dnsResolvers")}
-            isOptional
-            htmlName="dnsResolvers"
-            placeholder={"1.1.1.1\n9.9.9.9"}
-            value={text.dnsResolvers}
-            onChange={set("dnsResolvers")}
+            {...NATIVE_REQUIRED}
+            {...NO_SPELLCHECK}
+            label={t("upstreams")}
+            htmlName="upstreams"
+            placeholder={samePort ? "10.0.0.1\n10.0.0.2" : "10.0.0.1:5432\n10.0.0.2:5432"}
+            value={text.upstreams}
+            onChange={set("upstreams")}
             rows={2}
-            description={t("dnsResolversHelp")}
+            isRequired
+            description={samePort ? t("upstreamsSamePortHelp") : t("upstreamsHelp")}
           />
-          <TextArea
-            label={t("fallbackResolvers")}
-            isOptional
-            htmlName="dnsFallbacks"
-            placeholder={"1.0.0.1\n149.112.112.112"}
-            value={text.dnsFallbacks}
-            onChange={set("dnsFallbacks")}
-            rows={1}
-            description={t("fallbackResolversHelp")}
-          />
-          <TextInput
-            startIcon={Clock}
-            label={t("timeout")}
-            isOptional
-            htmlName="dnsTimeout"
-            placeholder="5s"
-            value={text.dnsTimeout}
-            onChange={set("dnsTimeout")}
-          />
-        </Section>
 
-        {/* Open when the host has opted out, so that choice is visible without a click. */}
-        <Section icon={ShieldBan} title={t("crowdsec")} defaultIsOpen={!crowdsecEnabled}>
-          <input type="hidden" name="crowdsecPresent" value="1" />
-          <Switch
-            label={t("enableCrowdsec")}
-            description={t("crowdsecHelp")}
-            htmlName="crowdsecEnabled"
-            value={crowdsecEnabled}
-            onChange={setCrowdsecEnabled}
-          />
-        </Section>
-
-        <Section
-          icon={MapPin}
-          title={t("geoBlocking")}
-          defaultIsOpen={initialData?.geoblock?.enabled ?? false}
-        >
-          <input type="hidden" name="geoblockPresent" value="1" />
-          <Switch
-            label={t("enableGeoBlocking")}
-            htmlName="geoblockEnabled"
-            value={geoblockEnabled}
-            onChange={setGeoblockEnabled}
-          />
           <Selector
-            label={t("mode")}
-            htmlName="geoblockMode"
-            options={geoblockModeOptions(t)}
-            value={geoblockMode}
-            onChange={setGeoblockMode}
+            label={t("upstreamProxyProtocolLabel")}
+            htmlName="proxyProtocolVersion"
+            options={proxyProtocolOptions(t)}
+            value={proxyProtocolVersion}
+            onChange={setProxyProtocolVersion}
           />
 
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
-            {t("blockRules")}
-          </Text>
-          <TextInput
-            startIcon={Earth}
-            label={t("blockCountries")}
-            isOptional
-            htmlName="geoblockBlockCountries"
-            placeholder={t("blockedCountriesPlaceholder")}
-            value={text.geoblockBlockCountries}
-            onChange={set("geoblockBlockCountries")}
-            description={t("countryCodesHelp")}
-          />
-          <TextInput
-            startIcon={Earth}
-            label={t("blockContinents")}
-            isOptional
-            htmlName="geoblockBlockContinents"
-            placeholder={t("blockedContinentsPlaceholder")}
-            value={text.geoblockBlockContinents}
-            onChange={set("geoblockBlockContinents")}
-            description={t("continentCodesHelp")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("blockAsns")}
-            isOptional
-            htmlName="geoblockBlockAsns"
-            placeholder="12345, 67890"
-            value={text.geoblockBlockAsns}
-            onChange={set("geoblockBlockAsns")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("blockCidrs")}
-            isOptional
-            htmlName="geoblockBlockCidrs"
-            placeholder="192.0.2.0/24"
-            value={text.geoblockBlockCidrs}
-            onChange={set("geoblockBlockCidrs")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("blockIps")}
-            isOptional
-            htmlName="geoblockBlockIps"
-            placeholder="203.0.113.1"
-            value={text.geoblockBlockIps}
-            onChange={set("geoblockBlockIps")}
-          />
+          <Section
+            icon={Layers}
+            title={t("loadBalancer")}
+            defaultIsOpen={initialData?.loadBalancer?.enabled ?? false}
+          >
+            <input type="hidden" name="lbPresent" value="1" />
+            <input type="hidden" name="lbEnabledPresent" value="1" />
+            <Switch
+              label={t("enableLoadBalancing")}
+              htmlName="lbEnabled"
+              value={lbEnabled}
+              onChange={setLbEnabled}
+            />
+            <Selector
+              label={t("policy")}
+              htmlName="lbPolicy"
+              options={lbPolicyOptions(t)}
+              value={lbPolicy}
+              onChange={setLbPolicy}
+            />
+            {lbPolicy === "random_choose" && (
+              <TextInput
+                label={t("lbChoose")}
+                isOptional
+                htmlName="lbPolicyChoose"
+                placeholder="2"
+                value={text.lbPolicyChoose}
+                onChange={set("lbPolicyChoose")}
+              />
+            )}
+            {lbPolicy === "weighted_round_robin" && (
+              <TextInput
+                label={t("lbWeights")}
+                isOptional
+                htmlName="lbPolicyWeights"
+                placeholder="3, 2, 1"
+                value={text.lbPolicyWeights}
+                onChange={set("lbPolicyWeights")}
+              />
+            )}
+            <TextInput
+              startIcon={Clock}
+              label={t("tryDuration")}
+              isOptional
+              htmlName="lbTryDuration"
+              placeholder="5s"
+              value={text.lbTryDuration}
+              onChange={set("lbTryDuration")}
+            />
+            <TextInput
+              startIcon={Clock}
+              label={t("tryInterval")}
+              isOptional
+              htmlName="lbTryInterval"
+              placeholder="250ms"
+              value={text.lbTryInterval}
+              onChange={set("lbTryInterval")}
+            />
 
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
-            {t("allowRulesOverrideBlocks")}
-          </Text>
-          <TextInput
-            startIcon={Earth}
-            label={t("allowCountries")}
-            isOptional
-            htmlName="geoblockAllowCountries"
-            placeholder={t("allowedCountriesPlaceholder")}
-            value={text.geoblockAllowCountries}
-            onChange={set("geoblockAllowCountries")}
-          />
-          <TextInput
-            startIcon={Earth}
-            label={t("allowContinents")}
-            isOptional
-            htmlName="geoblockAllowContinents"
-            placeholder={t("allowedContinentsPlaceholder")}
-            value={text.geoblockAllowContinents}
-            onChange={set("geoblockAllowContinents")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("allowAsns")}
-            isOptional
-            htmlName="geoblockAllowAsns"
-            placeholder="11111"
-            value={text.geoblockAllowAsns}
-            onChange={set("geoblockAllowAsns")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("allowCidrs")}
-            isOptional
-            htmlName="geoblockAllowCidrs"
-            placeholder="10.0.0.0/8"
-            value={text.geoblockAllowCidrs}
-            onChange={set("geoblockAllowCidrs")}
-          />
-          <TextInput
-            startIcon={Network}
-            label={t("allowIps")}
-            isOptional
-            htmlName="geoblockAllowIps"
-            placeholder="1.2.3.4"
-            value={text.geoblockAllowIps}
-            onChange={set("geoblockAllowIps")}
-          />
+            <Text type="label" size="xsm" weight="semibold" color="secondary">
+              {t("activeHealthCheck")}
+            </Text>
+            <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
+            {/* Disabled, it posts nothing and saves as off. */}
+            <Switch
+              label={t("enableActiveHealthCheck")}
+              htmlName="lbActiveHealthEnabled"
+              value={lbActiveHealthEnabled && !samePort}
+              onChange={setLbActiveHealthEnabled}
+              isDisabled={samePort}
+              description={samePort ? t("activeHealthCheckSamePort") : undefined}
+            />
+            <TextInput
+              label={t("healthCheckPort")}
+              isOptional
+              htmlName="lbActiveHealthPort"
+              value={text.lbActiveHealthPort}
+              onChange={set("lbActiveHealthPort")}
+            />
+            <TextInput
+              startIcon={Clock}
+              label={t("interval")}
+              isOptional
+              htmlName="lbActiveHealthInterval"
+              placeholder="30s"
+              value={text.lbActiveHealthInterval}
+              onChange={set("lbActiveHealthInterval")}
+            />
+            <TextInput
+              startIcon={Clock}
+              label={t("timeout")}
+              isOptional
+              htmlName="lbActiveHealthTimeout"
+              placeholder="5s"
+              value={text.lbActiveHealthTimeout}
+              onChange={set("lbActiveHealthTimeout")}
+            />
 
-          <Banner
-            status="info"
-            title={t("geoblockClientIpTitle")}
-            description={t("geoblockClientIpDescription")}
-          />
-        </Section>
+            <Text type="label" size="xsm" weight="semibold" color="secondary">
+              {t("passiveHealthCheck")}
+            </Text>
+            <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
+            <Switch
+              label={t("enablePassiveHealthCheck")}
+              htmlName="lbPassiveHealthEnabled"
+              value={lbPassiveHealthEnabled}
+              onChange={setLbPassiveHealthEnabled}
+            />
+            <TextInput
+              startIcon={Clock}
+              label={t("failDuration")}
+              isOptional
+              htmlName="lbPassiveHealthFailDuration"
+              placeholder="30s"
+              value={text.lbPassiveHealthFailDuration}
+              onChange={set("lbPassiveHealthFailDuration")}
+            />
+            <TextInput
+              label={t("maxFails")}
+              isOptional
+              htmlName="lbPassiveHealthMaxFails"
+              value={text.lbPassiveHealthMaxFails}
+              onChange={set("lbPassiveHealthMaxFails")}
+            />
+          </Section>
 
-        <Section
-          icon={Pin}
-          title={t("upstreamDnsPinning")}
-          defaultIsOpen={initialData?.upstreamDnsResolution?.enabled === true}
-        >
-          <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
-          <Text type="body" size="sm" color="secondary">
-            {t("dnsPinningDescription")}
-          </Text>
+          <Section
+            icon={Globe}
+            title={t("customDnsResolvers")}
+            defaultIsOpen={initialData?.dnsResolver?.enabled ?? false}
+          >
+            <input type="hidden" name="dnsPresent" value="1" />
+            <input type="hidden" name="dnsEnabledPresent" value="1" />
+            <Switch
+              label={t("enableCustomDns")}
+              htmlName="dnsEnabled"
+              value={dnsEnabled}
+              onChange={setDnsEnabled}
+            />
+            <TextArea
+              label={t("dnsResolvers")}
+              isOptional
+              htmlName="dnsResolvers"
+              placeholder={"1.1.1.1\n9.9.9.9"}
+              value={text.dnsResolvers}
+              onChange={set("dnsResolvers")}
+              rows={2}
+              description={t("dnsResolversHelp")}
+            />
+            <TextArea
+              label={t("fallbackResolvers")}
+              isOptional
+              htmlName="dnsFallbacks"
+              placeholder={"1.0.0.1\n149.112.112.112"}
+              value={text.dnsFallbacks}
+              onChange={set("dnsFallbacks")}
+              rows={1}
+              description={t("fallbackResolversHelp")}
+            />
+            <TextInput
+              startIcon={Clock}
+              label={t("timeout")}
+              isOptional
+              htmlName="dnsTimeout"
+              placeholder="5s"
+              value={text.dnsTimeout}
+              onChange={set("dnsTimeout")}
+            />
+          </Section>
+
+          <Section
+            icon={Pin}
+            title={t("upstreamDnsPinning")}
+            defaultIsOpen={initialData?.upstreamDnsResolution?.enabled === true}
+          >
+            <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
+            <Text type="body" size="sm" color="secondary">
+              {t("dnsPinningDescription")}
+            </Text>
+            <Selector
+              label={t("resolutionMode")}
+              htmlName="upstreamDnsResolutionMode"
+              options={upstreamDnsModeOptions(t)}
+              value={upstreamDnsMode}
+              onChange={setUpstreamDnsMode}
+            />
+            <Selector
+              label={t("addressFamilyPreference")}
+              htmlName="upstreamDnsResolutionFamily"
+              options={upstreamDnsFamilyOptions(t)}
+              value={upstreamDnsFamily}
+              onChange={setUpstreamDnsFamily}
+            />
+          </Section>
+        </VStack>
+
+        <VStack gap={5} id={anchor("protection")}>
           <Selector
-            label={t("resolutionMode")}
-            htmlName="upstreamDnsResolutionMode"
-            options={upstreamDnsModeOptions(t)}
-            value={upstreamDnsMode}
-            onChange={setUpstreamDnsMode}
+            label={t("accessList")}
+            htmlName="accessListId"
+            options={accessListOptions(t, accessLists, initialData?.accessListId ?? null)}
+            value={accessListId}
+            onChange={setAccessListId}
+            description={t("accessListHelp")}
           />
-          <Selector
-            label={t("addressFamilyPreference")}
-            htmlName="upstreamDnsResolutionFamily"
-            options={upstreamDnsFamilyOptions(t)}
-            value={upstreamDnsFamily}
-            onChange={setUpstreamDnsFamily}
-          />
-        </Section>
+
+          {/* Open when the host has opted out, so that choice is visible without a click. */}
+          <Section icon={ShieldBan} title={t("crowdsec")} defaultIsOpen={!crowdsecEnabled}>
+            <input type="hidden" name="crowdsecPresent" value="1" />
+            <Switch
+              label={t("enableCrowdsec")}
+              description={t("crowdsecHelp")}
+              htmlName="crowdsecEnabled"
+              value={crowdsecEnabled}
+              onChange={setCrowdsecEnabled}
+            />
+          </Section>
+
+          <Section
+            icon={MapPin}
+            title={t("geoBlocking")}
+            defaultIsOpen={initialData?.geoblock?.enabled ?? false}
+          >
+            <input type="hidden" name="geoblockPresent" value="1" />
+            <Switch
+              label={t("enableGeoBlocking")}
+              htmlName="geoblockEnabled"
+              value={geoblockEnabled}
+              onChange={setGeoblockEnabled}
+            />
+            <Selector
+              label={t("mode")}
+              htmlName="geoblockMode"
+              options={geoblockModeOptions(t)}
+              value={geoblockMode}
+              onChange={setGeoblockMode}
+            />
+
+            <Text type="label" size="xsm" weight="semibold" color="secondary">
+              {t("blockRules")}
+            </Text>
+            <TextInput
+              startIcon={Earth}
+              label={t("blockCountries")}
+              isOptional
+              htmlName="geoblockBlockCountries"
+              placeholder={t("blockedCountriesPlaceholder")}
+              value={text.geoblockBlockCountries}
+              onChange={set("geoblockBlockCountries")}
+              description={t("countryCodesHelp")}
+            />
+            <TextInput
+              startIcon={Earth}
+              label={t("blockContinents")}
+              isOptional
+              htmlName="geoblockBlockContinents"
+              placeholder={t("blockedContinentsPlaceholder")}
+              value={text.geoblockBlockContinents}
+              onChange={set("geoblockBlockContinents")}
+              description={t("continentCodesHelp")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("blockAsns")}
+              isOptional
+              htmlName="geoblockBlockAsns"
+              placeholder="12345, 67890"
+              value={text.geoblockBlockAsns}
+              onChange={set("geoblockBlockAsns")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("blockCidrs")}
+              isOptional
+              htmlName="geoblockBlockCidrs"
+              placeholder="192.0.2.0/24"
+              value={text.geoblockBlockCidrs}
+              onChange={set("geoblockBlockCidrs")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("blockIps")}
+              isOptional
+              htmlName="geoblockBlockIps"
+              placeholder="203.0.113.1"
+              value={text.geoblockBlockIps}
+              onChange={set("geoblockBlockIps")}
+            />
+
+            <Text type="label" size="xsm" weight="semibold" color="secondary">
+              {t("allowRulesOverrideBlocks")}
+            </Text>
+            <TextInput
+              startIcon={Earth}
+              label={t("allowCountries")}
+              isOptional
+              htmlName="geoblockAllowCountries"
+              placeholder={t("allowedCountriesPlaceholder")}
+              value={text.geoblockAllowCountries}
+              onChange={set("geoblockAllowCountries")}
+            />
+            <TextInput
+              startIcon={Earth}
+              label={t("allowContinents")}
+              isOptional
+              htmlName="geoblockAllowContinents"
+              placeholder={t("allowedContinentsPlaceholder")}
+              value={text.geoblockAllowContinents}
+              onChange={set("geoblockAllowContinents")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("allowAsns")}
+              isOptional
+              htmlName="geoblockAllowAsns"
+              placeholder="11111"
+              value={text.geoblockAllowAsns}
+              onChange={set("geoblockAllowAsns")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("allowCidrs")}
+              isOptional
+              htmlName="geoblockAllowCidrs"
+              placeholder="10.0.0.0/8"
+              value={text.geoblockAllowCidrs}
+              onChange={set("geoblockAllowCidrs")}
+            />
+            <TextInput
+              startIcon={Network}
+              label={t("allowIps")}
+              isOptional
+              htmlName="geoblockAllowIps"
+              placeholder="1.2.3.4"
+              value={text.geoblockAllowIps}
+              onChange={set("geoblockAllowIps")}
+            />
+
+            <Banner
+              status="info"
+              title={t("geoblockClientIpTitle")}
+              description={t("geoblockClientIpDescription")}
+            />
+          </Section>
+        </VStack>
       </VStack>
     </form>
   );
@@ -783,22 +809,29 @@ export function CreateL4HostDialog({
   accessLists?: L4AccessListOption[];
 }) {
   const t = useTranslations("l4ProxyHosts");
-  const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
+  const [state, formAction, isPending] = useActionState(
+    createL4ProxyHostAction,
+    INITIAL_ACTION_STATE,
+  );
 
   useCloseOnSuccess(state, onClose);
 
   return (
-    <AppDialog
+    <HostEditorShell
       open={open}
       onClose={onClose}
       title={initialData ? t("duplicateL4ProxyHost") : t("createL4ProxyHost")}
-      maxWidth="lg"
+      kind="l4"
+      isCreate
+      formId="create-l4-host-form"
       submitLabel={t("create")}
-      onSubmit={() => {
-        (document.getElementById("create-l4-host-form") as HTMLFormElement)?.requestSubmit();
-      }}
+      state={state}
+      isPending={isPending}
+      preview={(data) => previewL4ProxyHostAction(null, data)}
+      sections={l4SectionLinks("create-")}
     >
       <L4HostForm
+        anchorPrefix="create-"
         formId="create-l4-host-form"
         formAction={formAction}
         state={state}
@@ -810,7 +843,7 @@ export function CreateL4HostDialog({
         agents={agents}
         accessLists={accessLists}
       />
-    </AppDialog>
+    </HostEditorShell>
   );
 }
 
@@ -821,32 +854,49 @@ export function EditL4HostDialog({
   agents = [],
   accessLists = [],
   assignedAgentIds = [],
+  initialSection = null,
 }: {
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
+  /** Scrolled to on open, from the hash of an `?edit=` link. */
+  initialSection?: L4EditorSection | null;
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
-  const [state, formAction] = useActionState(
+  const [state, formAction, isPending] = useActionState(
     updateL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
   );
 
   useCloseOnSuccess(state, onClose);
 
+  useEffect(() => {
+    if (!open || !initialSection) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .getElementById(l4EditorSectionAnchor(initialSection))
+        ?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, initialSection]);
+
   return (
-    <AppDialog
+    <HostEditorShell
       open={open}
       onClose={onClose}
       title={t("editL4ProxyHost")}
-      maxWidth="lg"
+      kind="l4"
+      isCreate={false}
+      formId="edit-l4-host-form"
       submitLabel={t("saveChanges")}
-      onSubmit={() => {
-        (document.getElementById("edit-l4-host-form") as HTMLFormElement)?.requestSubmit();
-      }}
+      state={state}
+      isPending={isPending}
+      preview={(data) => previewL4ProxyHostAction(host.id, data)}
+      sections={l4SectionLinks("")}
+      onSectionLink={(section) => linkEditorSection(host.id, section)}
     >
       <L4HostForm
         formId="edit-l4-host-form"
@@ -857,7 +907,7 @@ export function EditL4HostDialog({
         accessLists={accessLists}
         assignedAgentIds={assignedAgentIds}
       />
-    </AppDialog>
+    </HostEditorShell>
   );
 }
 
