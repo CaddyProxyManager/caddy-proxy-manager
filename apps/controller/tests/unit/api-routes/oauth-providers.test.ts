@@ -9,7 +9,7 @@ vi.mock('@/src/lib/models/oauth-providers', () => ({
   deleteOAuthProvider: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => ({
+vi.mock('@/src/lib/api/auth', () => ({
   requireApiAdmin: vi.fn().mockResolvedValue({
     userId: 1,
     role: 'admin',
@@ -28,7 +28,7 @@ vi.mock('@/src/lib/models/audit', () => ({
   createAuditEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/src/lib/auth-server', () => ({
+vi.mock('@/src/lib/auth/server', () => ({
   invalidateProviderCache: vi.fn(),
 }));
 
@@ -40,7 +40,7 @@ import {
   listOAuthProviders,
   updateOAuthProvider,
 } from '@/src/lib/models/oauth-providers';
-import { toOAuthProviderView } from '@/src/lib/oauth-provider-view';
+import { toOAuthProviderView } from '@/src/lib/auth/oidc/provider-view';
 
 const SECRET_SENTINEL = 'route-oauth-secret-sentinel';
 const rawProvider = {

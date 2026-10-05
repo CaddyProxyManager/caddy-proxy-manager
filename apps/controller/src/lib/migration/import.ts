@@ -10,7 +10,7 @@ import db from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
-import { sealSecretColumn } from "../secret";
+import { sealSecretColumn } from "../secrets";
 import { forwardAuthSequentialUserIds } from "../settings/registry";
 import { invalidateSettingsCache } from "../settings/resolve";
 import {

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { HStack } from "@astryxdesign/core/Stack";
@@ -29,6 +29,33 @@ const DIALOG_WIDTH: Record<NonNullable<AppDialogProps["maxWidth"]>, number> = {
   xl: 960,
 };
 
+/**
+ * Astryx's DialogHeader focuses its title in a mount effect. A dialog mounted already open (keyed,
+ * or rendered conditionally) runs that before Dialog records the trigger, so Dialog would hand focus
+ * back to its own closed title and a keyboard user would land on <body>. A layout effect sees the
+ * trigger first; focus already in a dialog is StrictMode's second run, so the first one's stands.
+ */
+function useReturnFocus(open: boolean) {
+  const trigger = useRef<Element | null>(null);
+  useLayoutEffect(() => {
+    if (open && !document.activeElement?.closest("dialog"))
+      trigger.current = document.activeElement;
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      // Passive, so the timer starts in the same flush as Dialog's own close and fires after it.
+      setTimeout(() => {
+        // A closed dialog stays painted through its exit animation, keeping its title focused.
+        const active = document.activeElement;
+        const lost = !active || active === document.body || !!active.closest("dialog:not([open])");
+        const target = trigger.current;
+        if (lost && target instanceof HTMLElement && target.isConnected) target.focus();
+      });
+    };
+  }, [open]);
+}
+
 export function AppDialog({
   open,
   onClose,
@@ -42,6 +69,7 @@ export function AppDialog({
   isSubmitDisabled = false,
 }: AppDialogProps) {
   const t = useTranslations("ui");
+  useReturnFocus(open);
   return (
     <Dialog
       isOpen={open}

@@ -5,10 +5,10 @@ import db, { nowIso } from "../db";
 import { settings, settingsRevisions } from "../db/schema";
 import { desc, sql } from "drizzle-orm";
 import { applyCaddyConfig, buildCaddyDocument } from "../caddy";
-import { withSettingsUpdateLock } from "../settings-update-lock";
+import { withSettingsUpdateLock } from "./update-lock";
 import { discardAllStaged, listStagedSettings, stagedOverlay, storedValues } from "./staging";
 import { withStagedReads } from "./staging-context";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 
 export type RevisionRow = {
   id: number;
@@ -84,7 +84,7 @@ export async function applyStagedSettings(
     try {
       await applyCaddyConfig();
     } catch (cause) {
-      // A non-Error, or caddy.ts's error with this very sentence: use the code so it translates.
+      // A non-Error, or caddy/index.ts's error with this very sentence: use the code so it translates.
       failure = cause instanceof Error && cause.message !== fallback.message ? cause : fallback;
     }
     // The managed crowdsec container is desired state, which no Caddy load carries.

@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { assertCanManage, requireAccess } from "@/src/lib/permissions";
+import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
 import { getTranslations } from "next-intl/server";
 import {
   actionError,
   actionSuccess,
   INITIAL_ACTION_STATE,
   type ActionState,
-} from "@/src/lib/actions";
+} from "@/src/lib/errors/action-error";
 import {
   createL4ProxyHost,
   deleteL4ProxyHost,
@@ -39,7 +39,7 @@ import {
   parseOptionalText,
   parseOptionalNumber,
   parseAccessListId,
-} from "@/src/lib/form-parse";
+} from "@/src/lib/forms/form-parse";
 
 const VALID_PROTOCOLS: L4Protocol[] = ["tcp", "udp"];
 const VALID_MATCHER_TYPES: L4MatcherType[] = ["none", "tls_sni", "http_host", "proxy_protocol"];

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/src/lib/auth";
 import { logReadableAgents } from "@/src/lib/agent/client";
-import { isLogView } from "@/src/lib/log-view";
+import { isLogView } from "@/src/lib/analytics/log-view";
 import { getLoggingSettings } from "@/src/lib/settings";
 import LogsClient from "./LogsClient";
 

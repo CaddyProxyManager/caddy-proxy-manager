@@ -1,16 +1,16 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import UsersClient from "./UsersClient";
-import { isDemoAdmin } from "@/src/lib/demo-mode";
+import { isDemoAdmin } from "@/src/lib/demo/mode";
 import { lastSessionByUser, listUsers, usersWithPassword } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { requireAdmin } from "@/src/lib/auth";
-import { resolveAvatar } from "@/src/lib/avatar";
+import { resolveAvatar } from "@/src/lib/users/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { emailReady } from "@/src/lib/email/config";
-import { passkeyCountsByUser } from "@/src/lib/passkeys";
-import { disabledByFailedSignIns } from "@/src/lib/account-failures";
+import { passkeyCountsByUser } from "@/src/lib/auth/passkeys";
+import { disabledByFailedSignIns } from "@/src/lib/auth/account-failures";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");

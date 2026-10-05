@@ -8,7 +8,7 @@ import {
   extractErrorMessage,
   storedErrorMessage,
   type ActionState,
-} from "@/src/lib/actions";
+} from "@/src/lib/errors/action-error";
 import { createWafPreset, deleteWafPreset, updateWafPreset } from "@/src/lib/models/waf-presets";
 import {
   type CrsRegistryListing as CrsRegistryRow,
@@ -26,12 +26,12 @@ import {
   type CrsRegistrySettingsInput,
   getCrsRegistrySettings,
   saveCrsRegistrySettings,
-} from "@/src/lib/crs-plugins/settings";
+} from "@/src/lib/waf/crs-plugins/settings";
 import {
   type CrsRegistryState,
   getCrsRegistryState,
   runCrsRegistrySync,
-} from "@/src/lib/crs-plugins/sync";
+} from "@/src/lib/waf/crs-plugins/sync";
 
 type FallbackKey =
   | "presetSaveFailed"

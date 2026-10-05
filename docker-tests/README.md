@@ -258,9 +258,9 @@ text. The `not vars … ""` guard around each copy then matched the empty string
 the route was skipped, and nothing was set at all - so every application behind
 CPM forward auth saw an anonymous request.
 
-Fixed in `apps/controller/src/lib/caddy.ts` by canonicalising the placeholder for
+Fixed in `apps/controller/src/lib/caddy/index.ts` by canonicalising the placeholder for
 both the CPM and Authentik copy lists, and pinned at the unit level in
-`apps/controller/tests/unit/caddy-forward-auth-copy-headers.test.ts`.
+`apps/controller/tests/unit/caddy/caddy-forward-auth-copy-headers.test.ts`.
 
 **The bot challenge sent the page's query to Anubis.** Caddy's `rewrite` keeps
 the original query string unless the new URI names one, so every check went to
@@ -268,7 +268,7 @@ the original query string unless the new URI names one, so every check went to
 passing check whose query holds `redir` with a redirect of its own, which Caddy
 passed through: with a valid pass, `/login?redir=/account` never reached the
 site. The check now rewrites to the endpoint with an empty query, pinned in
-`apps/controller/tests/unit/caddy-anubis.test.ts`.
+`apps/controller/tests/unit/caddy/caddy-anubis.test.ts`.
 
 **A rig that cannot start catches nothing.** Between the compiled-binary change
 and 2026-09-04 this one could not come up at all: `web`'s healthcheck ran `bun`,
@@ -303,31 +303,31 @@ the name it writes, so the controller looked accounts up by the delegation's tar
 account's own fulldomain, which no account is keyed by. A delegation given its CNAME target next to
 a registered account quietly dropped DNS-01, and a wildcard under it could not be issued. The
 account registered for the delegation's domain now answers for its target
-(`apps/controller/src/lib/dns-challenge-delegation.ts`), pinned in
-`apps/controller/tests/unit/dns-challenge-delegation.test.ts`.
+(`apps/controller/src/lib/dns/challenge-delegation.ts`), pinned in
+`apps/controller/tests/unit/dns/dns-challenge-delegation.test.ts`.
 
 **GraphQL could not list agents.** `Agent.connected` is non-null in the schema and had no
-resolver, so `{ agents { connected } }` failed the whole query. It now asks the registry, pinned in
-`apps/controller/tests/integration/graphql-api.test.ts`; `90-certificate-files` reads the agent's
-id through it.
+resolver, so `{ agents { connected } }` failed the whole query. It now asks the registry, pinned
+in `apps/controller/tests/integration/graphql/graphql-api.test.ts`; `90-certificate-files` reads
+the agent's id through it.
 
 **A managed certificate's DNS provider was ignored.** Its `providerOptions` column is JSON text, and
 the TLS automation build read it as an object, so the provider a certificate named was never seen:
 it fell back to the global default, or with none to HTTP-01, which cannot issue the wildcard it was
-chosen for. The column is now parsed (`apps/controller/src/lib/caddy.ts`), pinned in
-`apps/controller/tests/unit/caddy-acme.test.ts`.
+chosen for. The column is now parsed (`apps/controller/src/lib/caddy/index.ts`), pinned in
+`apps/controller/tests/unit/caddy/caddy-acme.test.ts`.
 
 **Unusable raw JSON replaced a host's handlers with nothing.** Custom pre-handler and reverse_proxy
 JSON were stored unchecked, and the config builder drops what it cannot parse. A typo saved over
 working handlers removed them without a word, and the host went on serving without them. Both are
 now parsed on save and refused with a 400 (`apps/controller/src/lib/models/proxy-hosts.ts`), pinned
-in `apps/controller/tests/unit/proxy-hosts-raw-config-admin-only.test.ts`.
+in `apps/controller/tests/unit/proxy-hosts/proxy-hosts-raw-config-admin-only.test.ts`.
 
 **An imported certificate with the wrong key stopped every config.** The pair was stored as
 given, and Caddy refuses a config holding a key that does not match its certificate - the whole
 config, so after one such save no host could be changed until the certificate was found and fixed.
 The pair is now checked before it is written (`apps/controller/src/lib/models/certificates.ts`),
-pinned in `apps/controller/tests/integration/certificates-model.test.ts`.
+pinned in `apps/controller/tests/integration/certificates/certificates-model.test.ts`.
 
 ### Known limits
 
@@ -355,7 +355,7 @@ pinned in `apps/controller/tests/integration/certificates-model.test.ts`.
 - **First-run setup and migration** are not reachable: `web` is given
   `ADMIN_USERNAME`/`ADMIN_PASSWORD`, so the setup flow is marked complete at
   startup, which is what every pre-3.0 deployment does. Those flows are covered
-  in a browser instead - `apps/controller/tests/e2e/setup.spec.ts` and
+  in a browser instead - `apps/controller/tests/e2e/setup/setup.spec.ts` and
   `setup-migrate.spec.ts`, each against its own empty database.
 
 ## How a test file is written

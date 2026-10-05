@@ -2,7 +2,7 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     // The standalone build dies earlier, while linking; scripts/inject-runtime-guard.mjs covers it.
-    const { assertBunRuntime } = await import("./lib/runtime-guard");
+    const { assertBunRuntime } = await import("./lib/runtime/runtime-guard");
     assertBunRuntime();
 
     const { validateProductionConfig } = await import("./lib/config");
@@ -15,14 +15,14 @@ export async function register() {
       }
     }
 
-    const { isDemoMode } = await import("./lib/demo-mode");
+    const { isDemoMode } = await import("./lib/demo/mode");
     const demoMode = isDemoMode();
     if (demoMode) {
       (await import("./lib/demo/start")).installDemoCaddy();
       console.log("Demo mode: no Caddy server is configured and no DNS records are changed");
     }
 
-    const { ensureAdminUser } = await import("./lib/init-db");
+    const { ensureAdminUser } = await import("./lib/db/init");
     try {
       await ensureAdminUser();
       console.log("Database initialization complete");
@@ -106,7 +106,7 @@ export async function register() {
     }
 
     // Before anything decrypts to build the Caddy config, so a rotation costs one restart.
-    const { reencryptStoredSecrets } = await import("./lib/secret-rotation");
+    const { reencryptStoredSecrets } = await import("./lib/secrets/rotation");
     try {
       const { reencrypted, failed, clearedOAuthTokens } = await reencryptStoredSecrets();
       rewroteSecrets ||= reencrypted > 0 || clearedOAuthTokens > 0;
@@ -147,7 +147,7 @@ export async function register() {
 
     // A controller down for days must not load a stale answer as an allow before its first lookup.
     const { expireStaleHostnames, startAccessListDnsRefresher } = await import(
-      "./lib/access-list-dns"
+      "./lib/access-lists/dns"
     );
     try {
       await expireStaleHostnames();
@@ -161,10 +161,10 @@ export async function register() {
       await applyCaddyConfig();
       console.log("Caddy configuration applied successfully");
       // So the monitor's first pass does not build and load the same document again.
-      (await import("./lib/caddy-monitor")).noteStartupApply();
+      (await import("./lib/caddy/monitor")).noteStartupApply();
     } catch (error) {
       // Caddy may not be ready yet; the monitor applies it later.
-      const { CaddyApplyError } = await import("./lib/caddy-apply-error");
+      const { CaddyApplyError } = await import("./lib/caddy/apply-error");
       if (error instanceof CaddyApplyError && error.code === "CADDY_UNREACHABLE") {
         // The usual first start: the agent has not paired yet, so it has not started Caddy.
         console.log("Caddy is not reachable yet - its configuration is applied once it comes up");
@@ -178,7 +178,7 @@ export async function register() {
       }
     }
 
-    const { startCaddyMonitoring } = await import("./lib/caddy-monitor");
+    const { startCaddyMonitoring } = await import("./lib/caddy/monitor");
     try {
       startCaddyMonitoring();
       console.log("Caddy health monitoring started");
@@ -239,7 +239,7 @@ export async function register() {
       console.error("Failed to start the access-list hostname refresher:", error);
     }
 
-    const { startCrsRegistryUpdater } = await import("./lib/crs-plugins/sync");
+    const { startCrsRegistryUpdater } = await import("./lib/waf/crs-plugins/sync");
     const { installedCrsPluginRepositories } = await import("./lib/models/crs-plugins");
     try {
       startCrsRegistryUpdater(installedCrsPluginRepositories);

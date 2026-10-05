@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   getCertificate,
   updateCertificate,
   deleteCertificate,
 } from "@/src/lib/models/certificates";
-import { toCertificateApiResponse } from "@/src/lib/certificate-api";
+import { toCertificateApiResponse } from "@/src/lib/certificates/api";
 
 const PRIVATE_RESPONSE_INIT = { headers: { "Cache-Control": "no-store" } };
 

@@ -3,7 +3,7 @@
 /**
  * Migration and setup both leave a process running on answers resolved at boot (settings, OAuth
  * providers, the env backfill), and only a restart applies the new Caddy config. The wait is in
- * restart-wait.ts. No supervisor is valid: it says so.
+ * runtime/restart-wait.ts. No supervisor is valid: it says so.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -17,8 +17,8 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
-import { loadPage } from "@/src/lib/browser-navigation";
-import { type Health, waitForRestart } from "@/src/lib/restart-wait";
+import { loadPage } from "@/src/lib/browser/navigation";
+import { type Health, waitForRestart } from "@/src/lib/runtime/restart-wait";
 
 const POLL_INTERVAL_MS = 1000;
 const SHUTDOWN_BUDGET_MS = 20_000;

@@ -4,7 +4,7 @@
  * readable so a restore can say what it will do before asking for the passphrase.
  */
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 
 const MAGIC = "CPMBAK1";
 /** 32 MiB of scrypt: costly to brute-force, affordable on a small controller. */

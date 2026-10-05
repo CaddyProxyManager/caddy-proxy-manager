@@ -1,5 +1,5 @@
 /** The GitHub endpoints the CRS plugin client calls; records every URL so tests can assert on them. */
-import type { Fetcher } from '../../src/lib/crs-plugins/registry';
+import type { Fetcher } from '../../src/lib/waf/crs-plugins/registry';
 
 export type FakeRepo = {
   /** A tag, or null for a repository with no releases. */

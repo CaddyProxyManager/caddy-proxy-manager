@@ -1,15 +1,15 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { randomBytes } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { hashPassword, verifyPassword } from "@/src/lib/password";
+import { hashPassword, verifyPassword } from "@/src/lib/auth/password";
 import db from "@/src/lib/db";
-import { getClientIp } from "@/src/lib/client-ip";
-import { isPublicOrigin } from "@/src/lib/public-url";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { isPublicOrigin } from "@/src/lib/http/public-url";
 import { hasLiveRedirectIntent, redirectIntentWantsCaptcha } from "@/src/lib/models/forward-auth";
-import { completePortalLogin } from "@/src/lib/forward-auth-portal-login";
-import { beginPortalLoginAttempt } from "@/src/lib/forward-auth-login-limiter";
-import { issuePortalChallenge } from "@/src/lib/portal-two-factor";
+import { completePortalLogin } from "@/src/lib/forward-auth/portal-login";
+import { beginPortalLoginAttempt } from "@/src/lib/forward-auth/login-limiter";
+import { issuePortalChallenge } from "@/src/lib/forward-auth/portal-two-factor";
 import {
   CAPTCHA_PASS_CLEAR_COOKIE,
   captchaPassFromCookieHeader,
@@ -17,12 +17,12 @@ import {
 } from "@/src/lib/captcha/pass";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { logAuditEvent } from "@/src/lib/audit";
-import { accountKey, accountRetryAfterMs, isRateLimited } from "@/src/lib/rate-limit";
-import { authPolicy } from "@/src/lib/auth-policy";
-import { getAuth } from "@/src/lib/auth-server";
+import { accountKey, accountRetryAfterMs, isRateLimited } from "@/src/lib/auth/rate-limit";
+import { authPolicy } from "@/src/lib/auth/policy";
+import { getAuth } from "@/src/lib/auth/server";
 import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import { resolveSignInDirectory, signInWithDirectory } from "@/src/lib/ldap/sign-in";
-import { ACCOUNT_LOCKED } from "@/src/lib/sign-in-error";
+import { ACCOUNT_LOCKED } from "@/src/lib/auth/sign-in-error";
 
 // The form posts a username, a password and a rid; anything larger is not a login.
 const MAX_BODY_BYTES = 16 * 1024;
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user || !isValid) {
-      // Only a picked directory skips the local account; see account-failures.ts.
+      // Only a picked directory skips the local account; see auth/account-failures.ts.
       await attempt.fail(directoryId || localDisabled ? "directory" : "local");
       await logAuditEvent({
         userId: user?.id ?? null,

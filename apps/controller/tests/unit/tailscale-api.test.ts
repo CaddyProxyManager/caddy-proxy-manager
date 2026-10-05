@@ -1,8 +1,8 @@
 /** Each branch is a different fix for the operator, so the reasons must stay distinguishable. */
 import { describe, it, expect } from 'bun:test';
 
-import { checkTailscaleAuthKey } from '@/src/lib/tailscale-api';
-import { isCaddyPlaceholder, tailscaleKeyId } from '@/src/lib/caddy-tailscale';
+import { checkTailscaleAuthKey } from '@/src/lib/caddy/tailscale-api';
+import { isCaddyPlaceholder, tailscaleKeyId } from '@/src/lib/caddy/tailscale';
 
 const KEY = 'tskey-auth-abcDEF1CNTRL-091234567890ABCDEF';
 const TOKEN = 'tskey-api-zzzYYY2CNTRL-000000000000000000';

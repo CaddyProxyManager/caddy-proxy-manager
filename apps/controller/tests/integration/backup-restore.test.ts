@@ -19,7 +19,7 @@ vi.mock('../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import * as schema from '../../src/lib/db/schema';
 import { config } from '../../src/lib/config';
-import { decryptSecret, encryptSecret } from '../../src/lib/secret';
+import { decryptSecret, encryptSecret } from '../../src/lib/secrets';
 import { describeTables } from '../../src/lib/migration/import';
 import {
   BACKUP_NEVER,

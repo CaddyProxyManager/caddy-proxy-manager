@@ -6,11 +6,11 @@
  */
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { extractErrorMessage } from "@/src/lib/actions";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { createOAuthProvider } from "@/src/lib/models/oauth-providers";
 import { createUser, findUserByEmail } from "@/src/lib/models/user";
-import { hashPassword } from "@/src/lib/password";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { hashPassword } from "@/src/lib/auth/password";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 import {
   SETUP_ACCOUNT_CLAIM,
   claimSetupStep,

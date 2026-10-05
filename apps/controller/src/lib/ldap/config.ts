@@ -3,7 +3,7 @@
  * bind DN in `clientId`, bind password in `clientSecret`). Stored as JSON in `ldapConfig`.
  */
 import { X509Certificate } from "node:crypto";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import { parseBindNameTemplate } from "./bind-name";
 import { DN_PLACEHOLDER, USERNAME_PLACEHOLDER, isValidFilterTemplate } from "./escape";
 import {

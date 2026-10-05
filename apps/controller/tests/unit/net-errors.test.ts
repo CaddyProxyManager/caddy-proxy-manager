@@ -1,7 +1,7 @@
 /** Bun 1.4 changed fetch rejections and duplicate headers; these shapes come from live fetches. */
 import { describe, expect, it } from 'bun:test';
-import { isConnectionError } from '@/src/lib/net-errors';
-import { lastHeaderValue } from '@/src/lib/request-headers';
+import { isConnectionError } from '@/src/lib/errors/net-errors';
+import { lastHeaderValue } from '@/src/lib/http/request-headers';
 
 const coded = (code: string, message = 'failed'): Error => {
   const error = new TypeError(message);

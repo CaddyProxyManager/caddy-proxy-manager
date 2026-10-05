@@ -4,7 +4,7 @@ import {
   countProxyHosts,
   countProxyHostsByState,
 } from "@/src/lib/models/proxy-hosts";
-import { getTrafficByProxyHost } from "@/src/lib/analytics-db";
+import { getTrafficByProxyHost } from "@/src/lib/analytics/db";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
@@ -19,14 +19,14 @@ import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-cer
 import { listUsers } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
-import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
+import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/waf/WafPresetOptions";
 import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
+import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
-import { toCertificatePickerOption } from "@/src/lib/certificate-api";
+import { toCertificatePickerOption } from "@/src/lib/certificates/api";
 import { getTranslations } from "next-intl/server";
 
 const PER_PAGE = 25;

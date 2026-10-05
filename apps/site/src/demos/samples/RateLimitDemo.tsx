@@ -1,4 +1,4 @@
-import { RateLimitFields } from "@cpm/controller/src/components/proxy-hosts/RateLimitFields";
+import { RateLimitFields } from "@cpm/controller/src/components/proxy-hosts/protection/RateLimitFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** A tight limit on the sign-in form and a looser one on the API, the usual pair. */

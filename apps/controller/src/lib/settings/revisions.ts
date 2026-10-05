@@ -8,7 +8,7 @@ import db from "../db";
 import { settingsRevisions } from "../db/schema";
 import { and, asc, count, desc, eq, gt, isNull, lt, lte, max } from "drizzle-orm";
 import { buildCaddyDocument } from "../caddy";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import { type RevisionChange, parseRevisionChanges } from "./apply";
 import { type ConfigDiff, diffConfigDocuments } from "./config-diff";
 import { sectionForStorageKey } from "./section-keys";

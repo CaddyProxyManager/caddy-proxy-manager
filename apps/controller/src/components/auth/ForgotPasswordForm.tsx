@@ -48,7 +48,7 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
   }
 
   return (
-    <Center minHeight="100vh" padding={4}>
+    <Center role="main" minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">

@@ -1,6 +1,6 @@
 /** One source for the staged bar and review sheet, so no two pages disagree on what is pending. */
 
-import { isDemoMode } from "../demo-mode";
+import { isDemoMode } from "../demo/mode";
 import db from "../db";
 import { listStagedSettings } from "./staging";
 import { recentRevisions } from "./apply";

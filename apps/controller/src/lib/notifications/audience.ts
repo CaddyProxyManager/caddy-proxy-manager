@@ -7,7 +7,7 @@
  * administrator's choice, so they can turn their own email off.
  */
 
-import { isEmailAddress } from "../email-address";
+import { isEmailAddress } from "../email/address";
 import { allNotificationPreferences } from "../models/notification-preferences";
 import { adminPushTargets, type PushTarget } from "../models/push-subscriptions";
 import type { NotificationCategory } from "./events";

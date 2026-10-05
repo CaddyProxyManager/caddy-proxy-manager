@@ -8,7 +8,7 @@ type DbModule = typeof import('../../src/lib/db');
  * dbModuleMock(() => ctx.db))`. The preload has already loaded the real module, so Bun patches
  * its exports in place and a name a factory leaves out keeps the real one - whose
  * `runInTransaction` writes to the app's own connection, not the test's. Typed as the module, so
- * a new export fails typecheck here; tests/unit/db-module-mock.test.ts checks the runtime names.
+ * a new export fails typecheck here; tests/unit/db/db-module-mock.test.ts checks the runtime names.
  */
 export function dbModuleMock(current: () => TestDb, overrides: Partial<DbModule> = {}): DbModule {
   const db = currentDb(current);

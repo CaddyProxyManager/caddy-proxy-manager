@@ -12,7 +12,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList, AccessListIpRule } from "@/lib/models/access-lists";
-import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/forms/row-id";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
 

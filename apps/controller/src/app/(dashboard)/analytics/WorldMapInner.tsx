@@ -25,7 +25,7 @@ import {
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { regionName } from "@/src/lib/region-names";
+import { regionName } from "@/src/lib/locale/region-names";
 
 // maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling -
 // the worker never starts and the map is empty ocean. `?worker&url` bundles its module graph into

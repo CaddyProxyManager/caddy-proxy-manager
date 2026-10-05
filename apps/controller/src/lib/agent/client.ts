@@ -26,7 +26,7 @@ import {
   type LogReadRequest,
   type LogReadResponse,
 } from "@cpm/shared";
-import { type DomainErrorCode, domainErrorMessage } from "../domain-error";
+import { type DomainErrorCode, domainErrorMessage } from "../errors/domain-error";
 import { pushDesiredState } from "./desired-state";
 import {
   AgentCommandError,

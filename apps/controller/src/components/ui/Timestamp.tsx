@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The zone is next-intl's, which server and browser both set from the cookie (`lib/time-zone.ts`),
+ * The zone is next-intl's, which server and browser both set from the cookie (`lib/locale/time-zone.ts`),
  * so the two renders agree. The UTC tooltip is for matching logs.
  */
 
 import type { ReactNode } from "react";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useFormatter, useNow } from "next-intl";
-import { formatUtc, toDate } from "@/src/lib/date-format";
+import { formatUtc, toDate } from "@/src/lib/locale/date-format";
 
 export type TimestampStyle = "dateTime" | "dateTimeShort" | "date" | "time";
 

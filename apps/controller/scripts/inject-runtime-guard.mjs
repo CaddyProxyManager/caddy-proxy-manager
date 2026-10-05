@@ -1,16 +1,16 @@
 /**
  * vinext gives dist/standalone/server.js a `node` shebang, which fails on `bun:sqlite` while
- * linking, before runtime-guard.ts can run - so the check is planted atop it. Re-run each build.
+ * linking, before runtime/runtime-guard.ts can run - so the check is planted atop it. Re-run each build.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { BUN_REQUIRED_MESSAGE } from "../src/lib/runtime-guard.ts";
+import { BUN_REQUIRED_MESSAGE } from "../src/lib/runtime/runtime-guard.ts";
 
 const entry = resolve(import.meta.dirname, "..", "dist", "standalone", "server.js");
 const MARKER = "// caddy-proxy-manager:runtime-guard";
 
 const guard = `${MARKER}
-// Injected by scripts/inject-runtime-guard.mjs - keep in sync with src/lib/runtime-guard.ts.
+// Injected by scripts/inject-runtime-guard.mjs - keep in sync with src/lib/runtime/runtime-guard.ts.
 if (!process.versions.bun) {
   const runtime = process.versions.node ? \`Node.js \${process.versions.node}\` : "an unknown runtime";
   console.error(${JSON.stringify(BUN_REQUIRED_MESSAGE)}.replace("{runtime}", runtime));

@@ -10,7 +10,7 @@ import { LocaleProvider } from "@/src/components/locale/LocaleProvider";
 import { TimeZoneSync } from "@/src/components/locale/TimeZoneSync";
 import { ThemeModeProvider } from "@/src/components/theme/ThemeModeProvider";
 import type { Locale, LocalePreference } from "@/src/lib/locale";
-import type { ThemeMode } from "@/src/lib/theme-mode";
+import type { ThemeMode } from "@/src/lib/users/theme-mode";
 
 export default function Providers({
   children,

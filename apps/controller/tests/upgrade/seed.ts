@@ -5,7 +5,7 @@
  *
  * Writes into UPGRADE_OUT: tables.json, document.json and backup.cpmbak.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { symmetricEncrypt } from 'better-auth/crypto';
 import { createSelfSignedServerCertificate } from '../helpers/certs';
@@ -17,9 +17,15 @@ if (!out) throw new Error('UPGRADE_OUT is not set; run tests/upgrade/run.ts');
 mkdirSync(out, { recursive: true });
 
 // Typed loosely on purpose: these are another version's modules.
-const load = (path: string): Promise<any> => import(resolve(root, 'src/lib', path));
+// Several paths for a module that moved: the first one this version has wins.
+const load = (...paths: string[]): Promise<any> => {
+  const found = paths
+    .map((path) => resolve(root, 'src/lib', path))
+    .find((path) => existsSync(path));
+  return import(found ?? resolve(root, 'src/lib', paths[0]));
+};
 
-const { default: db, client } = await load('db.ts');
+const { default: db, client } = await load('db/index.ts', 'db.ts');
 const schema = await load('db/schema.ts');
 const { installDemoCaddy } = await load('demo/start.ts');
 // Every model applies on write; this keeps that in memory instead of dialing a Caddy.
@@ -42,7 +48,7 @@ const { createProxyHost } = await load('models/proxy-hosts.ts');
 const { createL4ProxyHost } = await load('models/l4-proxy-hosts.ts');
 const { createOAuthProvider } = await load('models/oauth-providers.ts');
 const { createAuditEvent } = await load('models/audit.ts');
-const settingsModule = await load('settings.ts');
+const settingsModule = await load('settings/index.ts', 'settings.ts');
 const { saveSettings } = await load('settings/resolve.ts');
 const { config } = await load('config.ts');
 
@@ -329,7 +335,7 @@ await createAuditEvent({
 
 // ── What the next version must reproduce ────────────────────────────────────
 
-const { buildCaddyDocument } = await load('caddy.ts');
+const { buildCaddyDocument } = await load('caddy/index.ts', 'caddy.ts');
 const { createBackup } = await load('backup/service.ts');
 writeFileSync(resolve(out, 'document.json'), JSON.stringify(await buildCaddyDocument(), null, 2));
 writeFileSync(

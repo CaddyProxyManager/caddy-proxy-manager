@@ -14,8 +14,8 @@ import {
   rereadCertificateFile,
 } from "@/src/lib/models/certificate-files";
 import type { CertificateFileEntry } from "@cpm/shared";
-import { parseCsv } from "@/src/lib/form-parse";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { parseCsv } from "@/src/lib/forms/form-parse";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { getTranslations } from "next-intl/server";
 
 export async function createCertificateAction(formData: FormData) {

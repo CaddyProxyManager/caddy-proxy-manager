@@ -23,14 +23,14 @@ import { type SignInProvider, SignInProviders } from "@/src/components/auth/Sign
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
 import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
-import { accountLockSeconds, lockLiftsIn } from "@/src/lib/sign-in-error";
-import { twoFactorError } from "@/src/lib/two-factor-error";
+import { accountLockSeconds, lockLiftsIn } from "@/src/lib/auth/sign-in-error";
+import { twoFactorError } from "@/src/lib/auth/two-factor/error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME_WEBAUTHN,
 } from "@/components/ui/native-input-attrs";
-import { authClient } from "@/src/lib/auth-client";
+import { authClient } from "@/src/lib/auth/client";
 import { useFormatter, useTranslations } from "next-intl";
 
 interface PortalLoginFormProps {
@@ -64,7 +64,7 @@ function PortalCard({
   children?: ReactNode;
 }) {
   return (
-    <Center minHeight="100vh" padding={4}>
+    <Center role="main" minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">

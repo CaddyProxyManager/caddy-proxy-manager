@@ -6,7 +6,7 @@
 
 import { UPSTREAM_ERROR_STATUSES, type UpstreamErrorRow } from "@cpm/shared";
 import db from "../db";
-import { hostMatchesPattern } from "../host-pattern-priority";
+import { hostMatchesPattern } from "../proxy-hosts/pattern-priority";
 import {
   notificationCategoryEnabled,
   notificationChannelReady,
@@ -166,7 +166,7 @@ export function parseUpstreamErrorRow(value: unknown): UpstreamErrorRow | null {
 
 /** What the agents are told: counting costs a parse of the access log, so only when wanted. */
 export async function upstreamErrorsWanted(): Promise<boolean> {
-  const { isDemoMode } = await import("../demo-mode");
+  const { isDemoMode } = await import("../demo/mode");
   if (isDemoMode()) return false;
   return (
     (await notificationCategoryEnabled("upstreamErrors")) && (await notificationChannelReady())

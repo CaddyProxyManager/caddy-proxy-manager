@@ -6,7 +6,7 @@ import { dbModuleMock } from '@/tests/helpers/db-module';
 // Settings resolve through the database: its own, not the app's connection every file shares.
 const testDb = await createTestDb();
 vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
-import * as mod from '@/src/lib/rate-limit';
+import * as mod from '@/src/lib/auth/rate-limit';
 
 const { registerFailedAttempt, isRateLimited, resetAttempts } = mod;
 

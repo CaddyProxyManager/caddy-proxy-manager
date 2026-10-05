@@ -18,8 +18,8 @@ import {
   AUTOFILL_ONE_TIME_CODE,
   NO_SPELLCHECK,
 } from "@/components/ui/native-input-attrs";
-import { authClient } from "@/src/lib/auth-client";
-import { twoFactorError } from "@/src/lib/two-factor-error";
+import { authClient } from "@/src/lib/auth/client";
+import { twoFactorError } from "@/src/lib/auth/two-factor/error";
 
 type Flow =
   | { kind: "closed" }

@@ -1,5 +1,5 @@
 import { config } from "../config";
-import { APP_ROLES, type AppRole } from "../oidc-groups";
+import { APP_ROLES, type AppRole } from "../auth/oidc/groups";
 import {
   getOAuthProviderByName,
   createOAuthProvider,

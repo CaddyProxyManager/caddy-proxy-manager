@@ -4,7 +4,7 @@
  * applies before its agent has started Caddy at all.
  */
 
-import { CaddyApplyError } from "../caddy-apply-error";
+import { CaddyApplyError } from "../caddy/apply-error";
 import { openProblemKeys, raiseProblem, resolveProblem } from "./index";
 
 const PREFIX = "caddy-apply:";

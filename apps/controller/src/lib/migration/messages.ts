@@ -1,7 +1,7 @@
 /**
  * The migration screen's `setup.migrationGroups.*` lookups. selection.ts keeps the English, as the
  * importer and API share it with no translator; keys are runtime ids, so
- * tests/unit/migration-messages.test.ts checks coverage.
+ * tests/unit/migration/migration-messages.test.ts checks coverage.
  */
 
 import type { useTranslations } from "next-intl";

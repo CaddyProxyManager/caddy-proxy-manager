@@ -1,6 +1,6 @@
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
-import { validateCaddyfileSnippet } from "../caddy-caddyfile";
+import { validateCaddyfileSnippet } from "../caddy/caddyfile";
 import { logAuditEvent } from "../audit";
 import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
@@ -11,8 +11,8 @@ import {
   getTailscaleSettings,
   getWafSettings,
 } from "../settings";
-import { normalizeProxyHostDomains } from "../proxy-host-domains";
-import { isPlainObject, stripCaddyPlaceholders } from "../caddy-utils";
+import { normalizeProxyHostDomains } from "../proxy-hosts/domains";
+import { isPlainObject, stripCaddyPlaceholders } from "../caddy/utils";
 import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
 import {
   CORAZA_MAX_BODY_LIMIT,
@@ -23,59 +23,59 @@ import {
   normalizeWafPluginIds,
   normalizeWafPresetIds,
   wafDirectiveSource,
-} from "../caddy-waf";
-import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
-import { domainError } from "../domain-error";
-import { assertCertificateServable } from "../certificate-placement";
-import { seclangErrors } from "../seclang";
-import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf-dry-run";
+} from "../waf/caddy";
+import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy/tailscale";
+import { domainError } from "../errors/domain-error";
+import { assertCertificateServable } from "../certificates/placement";
+import { seclangErrors } from "../waf/seclang";
+import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf/dry-run";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
-import { normalizeHostDescription } from "../host-description";
+import { normalizeHostDescription } from "../proxy-hosts/description";
 import {
   type HostCacheConfig,
   type HostCacheMeta,
   hydrateHostCache,
   sanitizeHostCache,
-} from "../host-cache";
-import { type HostCompressionMode, sanitizeHostCompression } from "../host-compression";
+} from "../proxy-hosts/cache";
+import { type HostCompressionMode, sanitizeHostCompression } from "../proxy-hosts/compression";
 import {
   type HostMaintenanceConfig,
   type HostMaintenanceMeta,
   hydrateHostMaintenance,
   normalizeHostMaintenanceInput,
   sanitizeHostMaintenance,
-} from "../host-maintenance";
-import { isCaddyDuration } from "../caddy-duration";
+} from "../proxy-hosts/maintenance";
+import { isCaddyDuration } from "../caddy/duration";
 import {
   type HostUpstreamTimeoutsConfig,
   type HostUpstreamTimeoutsMeta,
   hydrateHostUpstreamTimeouts,
   normalizeHostUpstreamTimeoutsInput,
   sanitizeHostUpstreamTimeouts,
-} from "../host-upstream-timeouts";
-import { hasDnsChallengeFor } from "../dns-challenge-delegation";
+} from "../proxy-hosts/upstream-timeouts";
+import { hasDnsChallengeFor } from "../dns/challenge-delegation";
 import {
   type HostRateLimitConfig,
   type HostRateLimitMeta,
   hydrateHostRateLimit,
   normalizeHostRateLimitInput,
   sanitizeHostRateLimit,
-} from "../host-rate-limit";
+} from "../proxy-hosts/rate-limit";
 import {
   type HostAnubisConfig,
   type HostAnubisMeta,
   hydrateHostAnubis,
   normalizeHostAnubisInput,
   sanitizeHostAnubis,
-} from "../host-anubis";
+} from "../proxy-hosts/anubis";
 import {
   type HostCrowdSecMeta,
   hostCrowdSecEnabled,
   sanitizeHostCrowdSec,
   storedHostCrowdSec,
-} from "../crowdsec";
+} from "../caddy/crowdsec";
 
 /** A wildcard needs DNS-01: without a DNS provider, auto-managed TLS silently gets no cert. */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {

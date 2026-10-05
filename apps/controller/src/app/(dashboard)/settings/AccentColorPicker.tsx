@@ -9,7 +9,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
-import { ACCENT_COLORS, type AccentColor, isAccentColor } from "@/src/lib/accent-colors";
+import { ACCENT_COLORS, type AccentColor, isAccentColor } from "@/src/lib/branding/accent-colors";
 import type { RegistryField } from "./RegistrySettingsBlock";
 
 // Whole class names, so Tailwind's scan finds them.

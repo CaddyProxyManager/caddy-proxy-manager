@@ -4,8 +4,8 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { derivePurposeKey } from "../derived-key";
-import { accountKey } from "../rate-limit";
+import { derivePurposeKey } from "../secrets/derived-key";
+import { accountKey } from "../auth/rate-limit";
 
 export const CAPTCHA_PASS_COOKIE = "cpm-captcha-pass";
 /** How long a pass may sit unused. */

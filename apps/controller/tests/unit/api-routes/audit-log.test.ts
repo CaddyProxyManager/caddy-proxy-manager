@@ -6,7 +6,7 @@ vi.mock('@/src/lib/models/audit', () => ({
   countAuditEvents: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -34,7 +34,7 @@ vi.mock('@/src/lib/api-auth', () => {
 
 import { GET } from '@/src/app/api/v1/audit-log/route';
 import { listAuditEvents, countAuditEvents } from '@/src/lib/models/audit';
-import { requireApiAdmin } from '@/src/lib/api-auth';
+import { requireApiAdmin } from '@/src/lib/api/auth';
 
 const mockListAuditEvents = vi.mocked(listAuditEvents);
 const mockCountAuditEvents = vi.mocked(countAuditEvents);
@@ -142,7 +142,7 @@ describe('GET /api/v1/audit-log', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await GET(createMockRequest());

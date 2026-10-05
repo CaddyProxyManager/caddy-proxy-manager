@@ -8,7 +8,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useFormatter, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
-import { formatUtc } from "@/src/lib/date-format";
+import { formatUtc } from "@/src/lib/locale/date-format";
 import type { CertExpiryStatus } from "../page";
 
 function formatRelative(

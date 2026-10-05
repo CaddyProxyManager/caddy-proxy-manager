@@ -37,8 +37,8 @@ import {
   stableAccountId,
 } from '@/src/lib/ldap/client';
 import { findTwoFactorAfterHook, ldapSignIn } from '@/src/lib/ldap/plugin';
-import { CREDENTIAL_SIGN_IN_PATHS, isCredentialSignInPath } from '@/src/lib/auth-sign-in-paths';
-import { DomainError } from '@/src/lib/domain-error';
+import { CREDENTIAL_SIGN_IN_PATHS, isCredentialSignInPath } from '@/src/lib/auth/sign-in-paths';
+import { DomainError } from '@/src/lib/errors/domain-error';
 import { toLdapDirectoryView } from '@/src/lib/models/ldap-directories';
 
 describe('filter escaping (RFC 4515)', () => {

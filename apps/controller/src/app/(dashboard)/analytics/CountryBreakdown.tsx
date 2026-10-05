@@ -15,7 +15,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { X } from "lucide-react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { regionName } from "@/src/lib/region-names";
+import { regionName } from "@/src/lib/locale/region-names";
 
 export type CountryBreakdownData = {
   countryCode: string;
@@ -142,7 +142,7 @@ export function CountryBreakdownView({
       <VStack gap={4}>
         <HStack gap={3} vAlign="center" justify="between">
           <HStack gap={3} vAlign="center" wrap="wrap">
-            <Text type="body" weight="semibold">
+            <Text as="h2" type="body" weight="semibold">
               {name}
             </Text>
             {data && (

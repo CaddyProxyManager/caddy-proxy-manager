@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { emailReady } from "@/src/lib/email/config";
 import ResetPasswordForm from "@/src/components/auth/ResetPasswordForm";
 

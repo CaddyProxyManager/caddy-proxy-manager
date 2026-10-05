@@ -57,24 +57,24 @@ import type {
   TwoFactorPolicySettings,
   DefaultResponseSettings,
 } from "@/lib/settings";
-import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
-import { dnsProviderDescription, dnsProviderFieldText } from "@/src/lib/dns-provider-messages";
+import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns/providers";
+import { dnsProviderDescription, dnsProviderFieldText } from "@/src/lib/dns/provider-messages";
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
-import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
+import type { TailscaleSettingsView } from "@/src/lib/caddy/tailscale";
 import type { DashboardHostSettings } from "@/src/lib/dashboard-host";
-import { pairingHostFor } from "@/src/lib/dashboard-host-address";
+import { pairingHostFor } from "@/src/lib/dashboard-host/address";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
-import type { UpdateStatus } from "@/src/lib/updates";
+import type { UpdateStatus } from "@/src/lib/runtime/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
-import { dnsModuleId } from "@/src/lib/caddy-modules";
+import { dnsModuleId } from "@/src/lib/caddy/image-build/modules";
 import {
   ModuleGated,
   useDisabledReason,
   useModuleGate,
 } from "@/components/caddy-modules/ModuleGate";
-import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
-import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
+import { GeoBlockFields } from "@/components/proxy-hosts/protection/GeoBlockFields";
+import { ErrorPagesFields } from "@/components/proxy-hosts/routing/ErrorPagesFields";
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import LdapDirectoriesSection from "./LdapDirectoriesSection";
 import type { LdapDirectoryView } from "@/src/lib/models/ldap-directories";
@@ -82,7 +82,7 @@ import SettingsFrame from "./SettingsFrame";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
-import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
+import type { OAuthProviderView } from "@/src/lib/auth/oidc/provider-view";
 import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
@@ -145,9 +145,9 @@ import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
 import { EmailServerSection, NotificationsSection } from "./EmailSection";
 import type { EmailSettingsView } from "@/src/lib/email/view";
-import type { HttpCacheSettingsView } from "@/src/lib/http-cache-options";
+import type { HttpCacheSettingsView } from "@/src/lib/proxy-hosts/http-cache-options";
 import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
-import type { CrowdSecSettingsView } from "@/src/lib/crowdsec";
+import type { CrowdSecSettingsView } from "@/src/lib/caddy/crowdsec";
 import type { ManagedServiceView } from "@/src/lib/agent/managed-services";
 
 // ─── Props ───────────────────────────────────────────────────────────────────

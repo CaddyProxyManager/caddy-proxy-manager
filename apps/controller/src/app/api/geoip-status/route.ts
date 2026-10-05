@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { geoipDatabasePath, geoipEnabled } from "@/src/lib/agent/geoip";
 
 export async function GET(request: NextRequest) {

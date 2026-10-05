@@ -5,8 +5,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { getClientIp } from '@/src/lib/client-ip';
-import { PEER_ADDRESS_HEADER, installPeerAddressStamp } from '@/src/lib/peer-address';
+import { getClientIp } from '@/src/lib/http/client-ip';
+import { PEER_ADDRESS_HEADER, installPeerAddressStamp } from '@/src/lib/http/peer-address';
 
 const STAMPED = Symbol.for('cpm.peer-address-stamped');
 const TRUSTED = ['127.0.0.0/8', '::1/128', '172.16.0.0/12'];

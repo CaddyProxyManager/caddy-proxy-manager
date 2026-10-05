@@ -1,4 +1,4 @@
-import { LocationRulesFields } from "@cpm/controller/src/components/proxy-hosts/LocationRulesFields";
+import { LocationRulesFields } from "@cpm/controller/src/components/proxy-hosts/routing/LocationRulesFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** The lists a host editor would offer; with none passed, the per-path choice is not shown. */

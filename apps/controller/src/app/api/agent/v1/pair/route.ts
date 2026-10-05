@@ -24,8 +24,8 @@ import {
   insertPairedAgent,
   replaceAgentSecret,
 } from "@/src/lib/models/agents";
-import { getClientIp } from "@/src/lib/client-ip";
-import { isDemoMode } from "@/src/lib/demo-mode";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { isDemoMode } from "@/src/lib/demo/mode";
 import { controllerDisplayName } from "@/src/lib/agent/controller-name";
 
 /** Four short fields; anything larger is not a pairing. */

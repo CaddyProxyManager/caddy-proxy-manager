@@ -17,10 +17,10 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_OFF, nativeAttrs } from "@/components/ui/native-input-attrs";
 import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
-import { authClient } from "@/src/lib/auth-client";
-import { TRANSLATED_PASSKEY_CODES, passkeyError } from "@/src/lib/passkey-error";
-import { PASSKEY_NAME_MAX_LENGTH } from "@/src/lib/passkey-relying-party";
-import type { PasskeySummary } from "@/src/lib/passkeys";
+import { authClient } from "@/src/lib/auth/client";
+import { TRANSLATED_PASSKEY_CODES, passkeyError } from "@/src/lib/auth/passkeys/error";
+import { PASSKEY_NAME_MAX_LENGTH } from "@/src/lib/auth/passkeys/relying-party";
+import type { PasskeySummary } from "@/src/lib/auth/passkeys";
 
 type Result = { error: { status?: number; code?: string; message?: string } | null };
 /** The plugin client's actions, whose inferred types do not survive the plugin-list cast. */
@@ -51,7 +51,7 @@ type Dialog =
   | { kind: "remove"; passkey: PasskeySummary };
 
 /**
- * List, rename, remove and add. Adding needs a sign-in minutes old (auth-server.ts); removing the
+ * List, rename, remove and add. Adding needs a sign-in minutes old (auth/server.ts); removing the
  * last way into the account is refused there too, so this page only relays what it is told.
  */
 export function PasskeySection({

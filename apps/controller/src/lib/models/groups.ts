@@ -2,7 +2,7 @@ import db, { nowIso, toIso } from "../db";
 import { logAuditEvent } from "../audit";
 import { groups, groupMembers, users } from "../db/schema";
 import { asc, eq, inArray, count } from "drizzle-orm";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 
 export type Group = {
   id: number;

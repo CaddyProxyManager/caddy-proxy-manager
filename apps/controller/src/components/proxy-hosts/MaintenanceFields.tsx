@@ -10,8 +10,8 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
-import type { HostMaintenanceConfig } from "@/lib/host-maintenance";
-import { MAINTENANCE_RETRY_AFTER_MAX } from "@/lib/host-maintenance-limits";
+import type { HostMaintenanceConfig } from "@/lib/proxy-hosts/maintenance";
+import { MAINTENANCE_RETRY_AFTER_MAX } from "@/lib/proxy-hosts/maintenance-limits";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 /** The fields stay mounted while off, so switching it off in the editor keeps the rest. */

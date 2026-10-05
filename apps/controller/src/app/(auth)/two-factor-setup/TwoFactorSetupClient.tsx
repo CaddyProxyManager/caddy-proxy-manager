@@ -16,7 +16,7 @@ import { TwoFactorSection } from "@/src/app/(dashboard)/profile/TwoFactorSection
 export function TwoFactorSetupClient() {
   const t = useTranslations("auth.twoFactorSetup");
   return (
-    <Center minHeight="100vh" padding={4}>
+    <Center role="main" minHeight="100vh" padding={4}>
       <Card width={480}>
         <VStack gap={4}>
           <VStack gap={1}>

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { bulkProxyHostsAction } from "@/src/app/(dashboard)/proxy-hosts/actions";
 import { BulkActionBar, BulkConfirmDialog } from "@/components/ui/BulkActionBar";
 import type { AccessList } from "@/lib/models/access-lists";
-import type { CertificatePickerOption } from "@/lib/certificate-api";
+import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHostBulkAction } from "@/lib/models/bulk-hosts";
 import { NONE_VALUE, accessListOptions, accessListStatus, toOptions } from "./HostDialogs";
 

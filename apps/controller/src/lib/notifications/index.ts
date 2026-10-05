@@ -9,7 +9,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { isDemoMode } from "../demo-mode";
+import { isDemoMode } from "../demo/mode";
 import { emailReady } from "../email/config";
 import { sendEmail } from "../email/transport";
 import { hasAdminPushTarget } from "../models/push-subscriptions";

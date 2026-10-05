@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { revokeUserSession } from "@/src/lib/models/sessions";
 
 /** DELETE /api/v1/sessions/[id] - revoke one of the user's own sessions. */

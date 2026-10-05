@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { apiErrorResponse, requireApiAdmin } from "@/src/lib/api-auth";
+import { apiErrorResponse, requireApiAdmin } from "@/src/lib/api/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { createBackup } from "@/src/lib/backup/service";
 import { backupDownload } from "@/src/lib/backup/respond";

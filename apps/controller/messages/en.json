@@ -4684,6 +4684,7 @@
       "revealLabel": "Show password"
     },
     "viewDetails": "View details",
+    "actionsColumn": "Actions",
     "statusChip": {
       "active": "Active",
       "inactive": "Paused",

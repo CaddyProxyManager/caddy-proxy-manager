@@ -6,8 +6,8 @@
 import { type AgentDesiredState, expandL4PortMappings } from "@cpm/shared";
 import { desiredManagedServices } from "./managed-services";
 import { currentFleetConfig } from "./fleet-config";
-import { getRequiredL4Ports } from "../l4-ports";
-import { getCaddyBuildDiff } from "../caddy-build";
+import { getRequiredL4Ports } from "../l4/ports";
+import { getCaddyBuildDiff } from "../caddy/image-build";
 import { isSetupCompleted } from "../setup";
 import { broadcastDesiredState, connectedAgents, sendDesiredState } from "./registry";
 import { certificateFileSources } from "./certificate-file-sources";

@@ -1,15 +1,15 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
-import { hashPassword } from "@/src/lib/password";
-import { DomainError, domainErrorMessage } from "@/src/lib/domain-error";
-import { isEmailAddress } from "@/src/lib/email-address";
+import { hashPassword } from "@/src/lib/auth/password";
+import { DomainError, domainErrorMessage } from "@/src/lib/errors/domain-error";
+import { isEmailAddress } from "@/src/lib/email/address";
 import {
   assertAcceptablePassword,
   isUserRole,
   signInUsernameRulesMessage,
-} from "@/src/lib/user-admin";
+} from "@/src/lib/users/admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;

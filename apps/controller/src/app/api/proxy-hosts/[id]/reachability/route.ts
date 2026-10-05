@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
-import { checkDomainReachability, isCheckableDomain } from "@/src/lib/domain-reachability";
-import { askLetsDebug } from "@/src/lib/letsdebug";
+import { checkDomainReachability, isCheckableDomain } from "@/src/lib/reachability/domain";
+import { askLetsDebug } from "@/src/lib/reachability/letsdebug";
 import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 
 /**

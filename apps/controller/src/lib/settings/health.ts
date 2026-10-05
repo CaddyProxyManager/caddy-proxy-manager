@@ -14,7 +14,7 @@ import type {
   TrustedProxiesSettings,
   CaddyBuildSettings,
   DefaultResponseSettings,
-} from "../settings";
+} from "./index";
 
 export type SectionStatus = "ok" | "attention" | "unset" | "env";
 

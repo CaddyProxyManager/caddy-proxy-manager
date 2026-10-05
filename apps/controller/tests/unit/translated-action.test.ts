@@ -6,8 +6,8 @@ import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
 import messages from '../../messages/en.json';
-import { DomainError, domainError } from '@/src/lib/domain-error';
-import { withTranslatedErrors } from '@/src/lib/translated-action';
+import { DomainError, domainError } from '@/src/lib/errors/domain-error';
+import { withTranslatedErrors } from '@/src/lib/errors/translated-action';
 
 describe('withTranslatedErrors', () => {
   it('returns what the action returned', async () => {

@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
-import { localUsersDisabled } from "@/src/lib/auth-policy";
-import { getAppName } from "@/src/lib/app-name";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
+import { getAppName } from "@/src/lib/branding/app-name";
 import { emailReady } from "@/src/lib/email/config";
 import ForgotPasswordForm from "@/src/components/auth/ForgotPasswordForm";
 

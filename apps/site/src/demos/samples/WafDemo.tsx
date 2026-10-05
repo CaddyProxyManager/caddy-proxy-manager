@@ -1,5 +1,5 @@
-import { WafFields } from "@cpm/controller/src/components/proxy-hosts/WafFields";
-import { WafPresetOptionsProvider } from "@cpm/controller/src/components/proxy-hosts/WafPresetOptions";
+import { WafFields } from "@cpm/controller/src/components/proxy-hosts/waf/WafFields";
+import { WafPresetOptionsProvider } from "@cpm/controller/src/components/proxy-hosts/waf/WafPresetOptions";
 import { DemoSurface } from "../DemoSurface";
 
 const PRESETS = [

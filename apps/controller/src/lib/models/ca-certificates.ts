@@ -8,8 +8,8 @@ import {
   proxyHosts,
 } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
-import { domainError } from "../domain-error";
-import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
+import { domainError } from "../errors/domain-error";
+import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secrets";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;

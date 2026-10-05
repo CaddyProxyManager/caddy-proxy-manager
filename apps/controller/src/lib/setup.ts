@@ -7,7 +7,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
 import db, { nowIso } from "./db";
 import { accounts, settings, users } from "./db/schema";
-import { claimRow, releaseRow } from "./db-claim";
+import { claimRow, releaseRow } from "./db/claim";
 import { getUserCount } from "./models/user";
 import { listEnabledOAuthProviders } from "./models/oauth-providers";
 import { listEnabledLdapDirectories } from "./models/ldap-directories";
@@ -222,7 +222,7 @@ const SETUP_PROMOTION_CLAIM = "setup_admin_promotion";
 /** Only a crash leaves a claim behind; after this long it can be taken over. */
 const SETUP_CLAIM_TTL_MS = 10 * 60_000;
 
-/** A claim on a setup step; see `db-claim.ts`. Null when someone else holds it. */
+/** A claim on a setup step; see `db/claim.ts`. Null when someone else holds it. */
 export function claimSetupStep(key: string, now = Date.now()): Promise<string | null> {
   return claimRow(key, SETUP_CLAIM_TTL_MS, now);
 }

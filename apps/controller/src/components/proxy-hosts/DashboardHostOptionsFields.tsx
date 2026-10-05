@@ -12,37 +12,37 @@ import type { AccessList } from "@/lib/models/access-lists";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
-import type { CertificatePickerOption } from "@/lib/certificate-api";
-import type { DashboardHostFormView } from "@/lib/dashboard-host-options";
+import type { CertificatePickerOption } from "@/lib/certificates/api";
+import type { DashboardHostFormView } from "@/lib/dashboard-host/options";
 import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { AdvancedConfigFields } from "./AdvancedConfigFields";
-import { AuthentikFields } from "./AuthentikFields";
-import { ForwardAuthFields } from "./ForwardAuthFields";
-import { DnsResolverFields } from "./DnsResolverFields";
-import { UpstreamTimeoutsFields } from "./UpstreamTimeoutsFields";
-import { ErrorPagesFields } from "./ErrorPagesFields";
-import { GeoBlockFields } from "./GeoBlockFields";
+import { AuthentikFields } from "./forward-auth/AuthentikFields";
+import { ForwardAuthFields } from "./forward-auth/ForwardAuthFields";
+import { DnsResolverFields } from "./upstreams/DnsResolverFields";
+import { UpstreamTimeoutsFields } from "./upstreams/UpstreamTimeoutsFields";
+import { ErrorPagesFields } from "./routing/ErrorPagesFields";
+import { GeoBlockFields } from "./protection/GeoBlockFields";
 import { accessListOptions, accessListStatus, NONE_VALUE, toOptions } from "./HostDialogs";
-import { LoadBalancerFields } from "./LoadBalancerFields";
-import { LocationRulesFields } from "./LocationRulesFields";
-import { MtlsFields } from "./MtlsConfig";
-import { PathAllowsFields } from "./PathAllowsFields";
-import { PathBlocksFields } from "./PathBlocksFields";
-import { PathRewritesFields } from "./PathRewritesFields";
-import { RedirectsFields } from "./RedirectsFields";
-import { RewriteFields } from "./RewriteFields";
+import { LoadBalancerFields } from "./upstreams/LoadBalancerFields";
+import { LocationRulesFields } from "./routing/LocationRulesFields";
+import { MtlsFields } from "./protection/MtlsConfig";
+import { PathAllowsFields } from "./routing/PathAllowsFields";
+import { PathBlocksFields } from "./routing/PathBlocksFields";
+import { PathRewritesFields } from "./routing/PathRewritesFields";
+import { RedirectsFields } from "./routing/RedirectsFields";
+import { RewriteFields } from "./routing/RewriteFields";
 import { SettingsToggles } from "./SettingsToggles";
 import { TailscaleFields, type TailscaleHostDefaults } from "./TailscaleFields";
-import { UpstreamDnsResolutionFields } from "./UpstreamDnsResolutionFields";
-import { WafFields } from "./WafFields";
-import { RateLimitFields } from "./RateLimitFields";
-import { CrowdSecFields } from "./CrowdSecFields";
+import { UpstreamDnsResolutionFields } from "./upstreams/UpstreamDnsResolutionFields";
+import { WafFields } from "./waf/WafFields";
+import { RateLimitFields } from "./protection/RateLimitFields";
+import { CrowdSecFields } from "./protection/CrowdSecFields";
 import {
   type WafPluginOption,
   type WafPresetOption,
   WafPresetOptionsProvider,
-} from "./WafPresetOptions";
+} from "./waf/WafPresetOptions";
 
 export type DashboardHostOptionsData = {
   view: DashboardHostFormView;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { strictId } from '@/src/lib/strict-id';
+import { strictId } from '@/src/lib/http/strict-id';
 
 describe('strictId', () => {
   it('reads a plain id', () => {

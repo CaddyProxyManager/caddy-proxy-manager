@@ -9,7 +9,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
-import type { HostCompressionMode } from "@/lib/host-compression";
+import type { HostCompressionMode } from "@/lib/proxy-hosts/compression";
 
 type ToggleKey =
   | "sslForced"

@@ -16,11 +16,11 @@ import db, { nowIso } from "../db";
 import { logAuditEvent } from "../audit";
 import { applyCaddyConfigToAgent } from "../caddy";
 import { certificates } from "../db/schema";
-import { domainError } from "../domain-error";
-import { CERTIFICATE_FILE_ERROR_MESSAGES } from "../certificate-file-errors";
-import { encryptSecret } from "../secret";
-import { chainFingerprint, checkCertificatePair } from "../certificate-pem";
-import { AGENT_FILE_SOURCE } from "../certificate-placement";
+import { domainError } from "../errors/domain-error";
+import { CERTIFICATE_FILE_ERROR_MESSAGES } from "../certificates/file-errors";
+import { encryptSecret } from "../secrets";
+import { chainFingerprint, checkCertificatePair } from "../certificates/pem";
+import { AGENT_FILE_SOURCE } from "../certificates/placement";
 import {
   AgentUnavailableError,
   certificateFileAgents,

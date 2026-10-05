@@ -3,14 +3,14 @@
  * default, gone ones drop); a newer one is refused, since this build would drop columns it needs.
  */
 import { mkdir, writeFile } from "node:fs/promises";
-import { isNewer } from "../updates";
+import { isNewer } from "../runtime/updates";
 import { join } from "node:path";
 import { getTableColumns } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import pkg from "../../../package.json";
 import db, { runInTransaction } from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import { type Described, describeTables, inFkOrder, resyncSequence } from "../migration/import";
 import { type BackupPayload, openBackup, readBackupHeader, sealBackup } from "./format";
 import { exportRow, importRow } from "./secrets";

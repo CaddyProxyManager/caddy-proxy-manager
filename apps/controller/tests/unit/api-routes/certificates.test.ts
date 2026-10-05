@@ -9,7 +9,7 @@ vi.mock('@/src/lib/models/certificates', () => ({
   deleteCertificate: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -44,7 +44,7 @@ import {
   updateCertificate,
   deleteCertificate,
 } from '@/src/lib/models/certificates';
-import { requireApiAdmin } from '@/src/lib/api-auth';
+import { requireApiAdmin } from '@/src/lib/api/auth';
 
 const mockList = vi.mocked(listCertificates);
 const mockCreate = vi.mocked(createCertificate);
@@ -118,7 +118,7 @@ describe('GET /api/v1/certificates', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await listGET(createMockRequest());

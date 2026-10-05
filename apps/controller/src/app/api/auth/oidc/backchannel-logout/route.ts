@@ -7,8 +7,8 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { listEnabledOAuthProviders } from "@/src/lib/models/oauth-providers";
-import { decodeJwtPayload } from "@/src/lib/oidc-claims";
-import { rememberLogoutJti, verifyLogoutToken } from "@/src/lib/oidc-logout-token";
+import { decodeJwtPayload } from "@/src/lib/auth/oidc/claims";
+import { rememberLogoutJti, verifyLogoutToken } from "@/src/lib/auth/oidc/logout-token";
 import { revokeSessionsForLogoutToken } from "@/src/lib/services/oidc-logout";
 
 export const dynamic = "force-dynamic";

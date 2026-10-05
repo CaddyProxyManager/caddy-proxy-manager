@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
-import { toCertificateApiResponse, toCertificatePickerOption } from '@/src/lib/certificate-api';
+import { toCertificateApiResponse, toCertificatePickerOption } from '@/src/lib/certificates/api';
 
 const certificate = {
   id: 7,

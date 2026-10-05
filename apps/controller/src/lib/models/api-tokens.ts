@@ -2,8 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import db, { nowIso, toIso } from "../db";
 import { apiTokens } from "../db/schema";
 import { and, count, eq } from "drizzle-orm";
-import { NotFoundError } from "../api-auth";
-import { domainError } from "../domain-error";
+import { NotFoundError } from "../api/auth";
+import { domainError } from "../errors/domain-error";
 
 export type ApiToken = {
   id: number;

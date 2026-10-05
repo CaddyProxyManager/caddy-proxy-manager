@@ -9,8 +9,8 @@ import {
 } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
-import { strictId } from "@/src/lib/strict-id";
-import { auditSummaryText } from "@/src/lib/audit-summary";
+import { strictId } from "@/src/lib/http/strict-id";
+import { auditSummaryText } from "@/src/lib/audit/summary";
 import type { Metadata } from "next";
 import { getFormatter, getTranslations } from "next-intl/server";
 

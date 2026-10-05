@@ -3,7 +3,7 @@
  * these render them in the settings page reader's language.
  */
 
-import { storedErrorMessage } from "../actions";
+import { storedErrorMessage } from "../errors/action-error";
 import type { GeoipDownloadFailure, GeoipUpdateResult } from "./updater";
 
 type Translator = Parameters<typeof storedErrorMessage>[0];

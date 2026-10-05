@@ -3,10 +3,10 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { proxyHosts, wafPresets } from "../db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
-import { domainError } from "../domain-error";
-import { customDirectivesError, normalizeWafPresetIds, seclangErrorDetails } from "../caddy-waf";
-import { seclangErrors } from "../seclang";
-import { assertWafLoads, wafCandidatesSelecting } from "../waf-dry-run";
+import { domainError } from "../errors/domain-error";
+import { customDirectivesError, normalizeWafPresetIds, seclangErrorDetails } from "../waf/caddy";
+import { seclangErrors } from "../waf/seclang";
+import { assertWafLoads, wafCandidatesSelecting } from "../waf/dry-run";
 import { getDashboardSettings, getWafSettings } from "../settings";
 
 // ── Types ────────────────────────────────────────────────────────────

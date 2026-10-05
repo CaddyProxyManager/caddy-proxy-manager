@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { ApiValidationError } from "@/src/lib/api-errors";
-import { getAnalyticsCountryBreakdown, resolveAnalyticsRange } from "@/src/lib/analytics-db";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { ApiValidationError } from "@/src/lib/api/errors";
+import { getAnalyticsCountryBreakdown, resolveAnalyticsRange } from "@/src/lib/analytics/db";
 
 /**
  * One country's breakdown. Anything but two capitals is a 400, not a query matching nothing; "XX"

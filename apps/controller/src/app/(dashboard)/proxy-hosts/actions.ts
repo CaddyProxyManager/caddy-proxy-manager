@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { assertCanManage, requireAccess } from "@/src/lib/permissions";
+import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
 import {
   actionError,
   actionSuccess,
   INITIAL_ACTION_STATE,
   type ActionState,
-} from "@/src/lib/actions";
+} from "@/src/lib/errors/action-error";
 import {
   createProxyHost,
   deleteProxyHost,
@@ -30,7 +30,7 @@ import {
   parseOptionalText,
   parseCertificateId,
   parseAccessListId,
-} from "@/src/lib/form-parse";
+} from "@/src/lib/forms/form-parse";
 import {
   parseAuthentikConfig,
   parseCpmForwardAuthConfig,
@@ -58,7 +58,7 @@ import {
   parseUpstreamDnsResolutionConfig,
   parseWafConfig,
   validateAndSanitizeCertificateId,
-} from "@/src/lib/proxy-host-form";
+} from "@/src/lib/proxy-hosts/form";
 
 export async function createProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,

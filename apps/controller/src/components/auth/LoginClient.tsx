@@ -30,11 +30,11 @@ import {
   AUTOFILL_USERNAME_WEBAUTHN,
   NO_SPELLCHECK,
 } from "@/src/components/ui/native-input-attrs";
-import { authClient } from "@/src/lib/auth-client";
-import { formatAppVersion } from "@/src/lib/app-version";
+import { authClient } from "@/src/lib/auth/client";
+import { formatAppVersion } from "@/src/lib/runtime/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
-import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/sign-in-error";
-import { twoFactorError } from "@/src/lib/two-factor-error";
+import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/auth/sign-in-error";
+import { twoFactorError } from "@/src/lib/auth/two-factor/error";
 
 interface LoginClientProps {
   enabledProviders: SignInProvider[];
@@ -250,7 +250,7 @@ export default function LoginClient({
   );
 
   return (
-    <Center minHeight="100vh" padding={4}>
+    <Center role="main" minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">

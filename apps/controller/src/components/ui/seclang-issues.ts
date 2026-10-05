@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useMemo } from "react";
-import { type SeclangLintOptions, lintSeclang } from "@/lib/seclang";
+import { type SeclangLintOptions, lintSeclang } from "@/lib/waf/seclang";
 import type { CodeEditorIssue } from "./CodeEditor";
 
 /**

@@ -8,10 +8,10 @@ import {
   keepStoredSecrets,
   normalizeHttpCacheSettings,
   redactHttpCacheSettings,
-} from '@/src/lib/http-cache';
-import { isEncryptedSecret } from '@/src/lib/secret';
-import { validateSettingsGroup } from '@/src/lib/settings-validation';
-import { CADDY_MODULES } from '@/src/lib/caddy-modules';
+} from '@/src/lib/proxy-hosts/http-cache';
+import { isEncryptedSecret } from '@/src/lib/secrets';
+import { validateSettingsGroup } from '@/src/lib/settings/validation';
+import { CADDY_MODULES } from '@/src/lib/caddy/image-build/modules';
 
 const settings = (patch: Record<string, unknown>): HttpCacheSettings =>
   normalizeHttpCacheSettings({ ...DEFAULT_HTTP_CACHE_SETTINGS, ...patch });

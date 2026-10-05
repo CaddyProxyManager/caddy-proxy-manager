@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
 import { setTableDensity } from "@/src/lib/models/table-density";
-import { isTableDensity } from "@/src/lib/table-density";
+import { isTableDensity } from "@/src/lib/users/table-density";
 
 export type SaveDensityResult = { ok: true } | { ok: false; error: string };
 

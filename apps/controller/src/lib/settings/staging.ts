@@ -6,7 +6,7 @@
 import db, { nowIso } from "../db";
 import { settings, settingsStaged } from "../db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { getSetting } from "../settings";
+import { getSetting } from "./index";
 import { withStagedReads } from "./staging-context";
 
 export type StagedEntry = {

@@ -32,7 +32,7 @@ export default function SetupDoneClient({
 }) {
   const t = useTranslations("setup");
   return (
-    <Center>
+    <Center role="main">
       <VStack gap={5} padding={5}>
         {/* Reached after setup completes, so every step is behind the operator. The migrate step
             is always present here: this page only exists because a migration happened. */}

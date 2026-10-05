@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { extractErrorMessage, storedErrorMessage } from "@/src/lib/actions";
+import { extractErrorMessage, storedErrorMessage } from "@/src/lib/errors/action-error";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { domainError } from "@/src/lib/domain-error";
-import { isEmailAddress } from "@/src/lib/email-address";
-import { dnsProviderFieldText } from "@/src/lib/dns-provider-messages";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { isEmailAddress } from "@/src/lib/email/address";
+import { dnsProviderFieldText } from "@/src/lib/dns/provider-messages";
 import { applyCaddyConfig } from "@/src/lib/caddy";
-import { validateSettingsGroup } from "@/src/lib/settings-validation";
-import { readDashboardHostOptions } from "@/src/lib/dashboard-host-options";
+import { validateSettingsGroup } from "@/src/lib/settings/validation";
+import { readDashboardHostOptions } from "@/src/lib/dashboard-host/options";
 import {
   type DashboardDnsCheck,
   type DashboardHostSettings,
@@ -21,8 +21,8 @@ import {
   normalizeWafPresetIds,
   parseWafIdListJson,
   parseBodyLimitMib,
-} from "@/src/lib/caddy-waf";
-import { parseDefaultResponseHeaders } from "@/src/lib/caddy-default-response";
+} from "@/src/lib/waf/caddy";
+import { parseDefaultResponseHeaders } from "@/src/lib/caddy/default-response";
 import {
   getSetting,
   saveCloudflareSettings,
@@ -59,7 +59,7 @@ import {
   getCrowdSecSettings,
   saveCrowdSecSettings,
 } from "@/src/lib/settings";
-import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/crowdsec";
+import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/caddy/crowdsec";
 import {
   listProxyHosts,
   updateProxyHost,
@@ -68,46 +68,46 @@ import {
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
 import { assertCrsPluginIdsExist } from "@/src/lib/models/crs-plugins";
-import { CADDY_MODULES, type CaddyCustomModule } from "@/src/lib/caddy-modules";
+import { CADDY_MODULES, type CaddyCustomModule } from "@/src/lib/caddy/image-build/modules";
 import {
   applyCaddyBuild,
   getCaddyBuildDiff,
   sanitizeCaddyBuildSettings,
-} from "@/src/lib/caddy-build";
+} from "@/src/lib/caddy/image-build";
 import {
   describeCaddyfileSnippetWarning,
   findModuleConflicts,
-} from "@/src/lib/caddy-build-conflicts";
-import { moduleConflictMessage } from "@/src/lib/caddy-module-messages";
+} from "@/src/lib/caddy/image-build/conflicts";
+import { moduleConflictMessage } from "@/src/lib/caddy/image-build/module-messages";
 import type {
   CloudflareSettings,
   DnsProviderSettings,
   GeoBlockSettings,
   WafSettings,
 } from "@/src/lib/settings";
-import { getProviderDefinition, isValidDnsDuration } from "@/src/lib/dns-providers";
-import { encryptProviderCredentials } from "@/src/lib/dns-provider-credentials";
+import { getProviderDefinition, isValidDnsDuration } from "@/src/lib/dns/providers";
+import { encryptProviderCredentials } from "@/src/lib/dns/provider-credentials";
 import {
   ACMEDNS_PROVIDER,
   MAX_DNS_DELEGATIONS,
   challengeBaseName,
   challengeRecordName,
   normalizeDnsName,
-} from "@/src/lib/dns-challenge-delegation";
-import { registerAcmeDnsAccount } from "@/src/lib/acme-dns";
-import { type DelegationCheck, checkDelegations } from "@/src/lib/dns-delegation-check";
+} from "@/src/lib/dns/challenge-delegation";
+import { registerAcmeDnsAccount } from "@/src/lib/dns/acme-dns";
+import { type DelegationCheck, checkDelegations } from "@/src/lib/dns/delegation-check";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
-import { parseCheckbox, parseCsv } from "@/src/lib/form-parse";
-import { checkTailscaleAuthKey } from "@/src/lib/tailscale-api";
+import { parseCheckbox, parseCsv } from "@/src/lib/forms/form-parse";
+import { checkTailscaleAuthKey } from "@/src/lib/caddy/tailscale-api";
 import { isCaptchaProvider } from "@/src/lib/captcha/providers";
 import { getCaptchaSettings, saveCaptchaSettings } from "@/src/lib/captcha/settings";
-import { hasForbiddenControlCharacter } from "@/src/lib/settings-validation";
-import { decryptSecret } from "@/src/lib/secret";
-import { checkForUpdates } from "@/src/lib/updates";
+import { hasForbiddenControlCharacter } from "@/src/lib/settings/validation";
+import { decryptSecret } from "@/src/lib/secrets";
+import { checkForUpdates } from "@/src/lib/runtime/updates";
 import { config } from "@/src/lib/config";
-import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
+import { toOAuthProviderView } from "@/src/lib/auth/oidc/provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
-import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
+import { withSettingsUpdateLock } from "@/src/lib/settings/update-lock";
 import {
   discardAllStaged,
   discardStagedKey,
@@ -133,7 +133,7 @@ import { detach } from "@/src/lib/agent/registry";
 import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/models/agents";
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
-import type { AppRole } from "@/src/lib/oidc-groups";
+import type { AppRole } from "@/src/lib/auth/oidc/groups";
 
 type ActionResult = {
   success: boolean;
@@ -1055,7 +1055,7 @@ async function updateRegistrySettingsActionUnlocked(
     }
 
     // The auth instance caches these; drop it or the old policy stays live.
-    const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+    const { invalidateProviderCache } = await import("@/src/lib/auth/server");
     invalidateProviderCache();
     // The agents count upstream errors only while that notification is on.
     if (keys.some((key) => key.startsWith("config:notify_upstream"))) {
@@ -2059,7 +2059,7 @@ export async function createOAuthProviderAction(data: {
 }) {
   const session = await requireAdmin();
   const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
-  const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
   const provider = await createOAuthProvider({ ...data, source: "ui" });
   invalidateProviderCache();
   const { createAuditEvent } = await import("@/src/lib/models/audit");
@@ -2121,7 +2121,7 @@ export async function updateOAuthProviderAction(
 ) {
   const session = await requireAdmin();
   const { updateOAuthProvider } = await import("@/src/lib/models/oauth-providers");
-  const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
   const updated = await updateOAuthProvider(id, data);
   invalidateProviderCache();
   const { createAuditEvent } = await import("@/src/lib/models/audit");
@@ -2142,7 +2142,7 @@ export async function deleteOAuthProviderAction(id: string) {
   const { getOAuthProvider, deleteOAuthProvider } = await import(
     "@/src/lib/models/oauth-providers"
   );
-  const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
   const existing = await getOAuthProvider(id);
   await deleteOAuthProvider(id);
   invalidateProviderCache();

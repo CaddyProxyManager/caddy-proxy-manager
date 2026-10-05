@@ -29,7 +29,7 @@ const argv = yargs(hideBin(process.argv))
 const HERE = import.meta.dir;
 const CONTROLLER = resolve(HERE, '../..');
 const PREVIOUS = resolve(argv.from, 'apps/controller');
-if (!existsSync(resolve(PREVIOUS, 'src/lib/db.ts'))) {
+if (!existsSync(resolve(PREVIOUS, 'src/lib/db/schema.ts'))) {
   throw new Error(`${argv.from} is not a checkout of this repository`);
 }
 

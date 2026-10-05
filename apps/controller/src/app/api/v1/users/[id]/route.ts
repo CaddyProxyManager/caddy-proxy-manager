@@ -4,7 +4,7 @@ import {
   requireApiAdmin,
   apiErrorResponse,
   ApiAuthError,
-} from "@/src/lib/api-auth";
+} from "@/src/lib/api/auth";
 import {
   getUserById,
   updateUserAccount,
@@ -13,9 +13,9 @@ import {
   deleteUser,
 } from "@/src/lib/models/user";
 import { logAuditEvent } from "@/src/lib/audit";
-import { domainErrorMessage } from "@/src/lib/domain-error";
-import { isEmailAddress } from "@/src/lib/email-address";
-import { isUserRole, isUserStatus, signInUsernameRulesMessage } from "@/src/lib/user-admin";
+import { domainErrorMessage } from "@/src/lib/errors/domain-error";
+import { isEmailAddress } from "@/src/lib/email/address";
+import { isUserRole, isUserStatus, signInUsernameRulesMessage } from "@/src/lib/users/admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;

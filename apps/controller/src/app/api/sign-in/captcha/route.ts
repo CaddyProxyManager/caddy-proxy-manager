@@ -3,7 +3,7 @@
  * A route, not an action: the docs site renders `LoginClient` and cannot bundle the database.
  */
 
-import { getClientIp } from "@/src/lib/client-ip";
+import { getClientIp } from "@/src/lib/http/client-ip";
 import {
   CAPTCHA_PASS_COOKIE,
   CAPTCHA_PASS_PATH,
@@ -12,8 +12,8 @@ import {
 } from "@/src/lib/captcha/pass";
 import { activeCaptcha, captchaSecret, getCaptchaSettings } from "@/src/lib/captcha/settings";
 import { verifyCaptchaToken } from "@/src/lib/captcha/verify";
-import { getPublicBaseUrl } from "@/src/lib/public-url";
-import { takeFromWindow } from "@/src/lib/rate-limit";
+import { getPublicBaseUrl } from "@/src/lib/http/public-url";
+import { takeFromWindow } from "@/src/lib/auth/rate-limit";
 
 export const dynamic = "force-dynamic";
 

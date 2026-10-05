@@ -8,13 +8,13 @@ import { startProdServer } from "vinext/server/prod-server";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import pkg from "../package.json";
-import { installPeerAddressStamp } from "../src/lib/peer-address";
+import { installPeerAddressStamp } from "../src/lib/http/peer-address";
 import {
   CONSOLE_ENABLE_USER_PATH,
   CONSOLE_RESET_TWO_FACTOR_PATH,
   type ConsoleCommandPurpose,
   signConsoleCommand,
-} from "../src/lib/console-command";
+} from "../src/lib/users/console-command";
 
 function resolveAppRoot(): string {
   return process.env.CPM_APP_ROOT?.trim() || dirname(process.execPath);

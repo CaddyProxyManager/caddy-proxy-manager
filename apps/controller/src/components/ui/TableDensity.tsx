@@ -5,7 +5,7 @@
  * so Profile can change it and every table follows before the save round trip returns.
  */
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { DEFAULT_TABLE_DENSITY, type TableDensity } from "@/src/lib/table-density";
+import { DEFAULT_TABLE_DENSITY, type TableDensity } from "@/src/lib/users/table-density";
 
 type DensityState = { density: TableDensity; setDensity: (next: TableDensity) => void };
 

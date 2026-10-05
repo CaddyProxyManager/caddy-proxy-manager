@@ -3,7 +3,7 @@ import type { CertificateFileSource } from "@cpm/shared";
 import { and, eq } from "drizzle-orm";
 import db from "../db";
 import { certificates } from "../db/schema";
-import { AGENT_FILE_SOURCE } from "../certificate-placement";
+import { AGENT_FILE_SOURCE } from "../certificates/placement";
 
 /** What the agent is asked to keep reading. Only its own rows: the list names paths on its host. */
 export async function certificateFileSources(agentRowId: number): Promise<CertificateFileSource[]> {

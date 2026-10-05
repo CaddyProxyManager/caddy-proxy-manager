@@ -5,8 +5,8 @@
  */
 
 import { applyCaddyConfig as applyCaddy } from "../caddy";
-import { DNS_PROVIDERS } from "../dns-providers";
-import { getCaddyModuleAvailability } from "../caddy-build";
+import { DNS_PROVIDERS } from "../dns/providers";
+import { getCaddyModuleAvailability } from "../caddy/image-build";
 import {
   listAccessLists,
   getAccessList,
@@ -53,9 +53,9 @@ import {
   parseProxyHostBulkRequest,
 } from "../models/bulk-hosts";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
-import { ApiAuthError, NotFoundError } from "../api-auth";
-import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings-api";
-import { assertNotSelf, assertUserRole } from "../user-admin";
+import { ApiAuthError, NotFoundError } from "../api/auth";
+import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
+import { assertNotSelf, assertUserRole } from "../users/admin";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 

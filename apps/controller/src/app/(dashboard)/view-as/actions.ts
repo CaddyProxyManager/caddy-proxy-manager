@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { type ActionState, actionError, actionSuccess } from "@/src/lib/actions";
+import { type ActionState, actionError, actionSuccess } from "@/src/lib/errors/action-error";
 import { logAuditEvent } from "@/src/lib/audit";
 import { getCurrentSessionId, requireUser } from "@/src/lib/auth";
-import { domainError } from "@/src/lib/domain-error";
-import { startViewAs, stopViewAs } from "@/src/lib/view-as";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { startViewAs, stopViewAs } from "@/src/lib/users/view-as";
 
 async function startViewAsActionUntranslated(role: string, groupIds: number[]) {
   const session = await requireUser();

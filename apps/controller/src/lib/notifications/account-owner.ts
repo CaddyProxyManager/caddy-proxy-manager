@@ -17,11 +17,11 @@ export async function tellOwnerAccountDisabled(
   try {
     const [{ isDemoMode }, registry, { getSetting }, { emailReady }, { isEmailAddress }] =
       await Promise.all([
-        import("../demo-mode"),
+        import("../demo/mode"),
         import("../settings/registry"),
         import("../settings/resolve"),
         import("../email/config"),
-        import("../email-address"),
+        import("../email/address"),
       ]);
     if (isDemoMode() || !(await getSetting(registry.notifyDisabledAccountOwner))) return;
     if (!isEmailAddress(user.email, "public") || !(await emailReady())) return;

@@ -110,7 +110,7 @@ function merge(into: Map<number, GrantCapability>, id: number, capability: Grant
   into.set(id, capability);
 }
 
-/** Ignores role, so `lib/permissions.ts` alone decides what a role does with grants. */
+/** Ignores role, so `lib/users/permissions.ts` alone decides what a role does with grants. */
 export async function grantsForUser(userId: number): Promise<EffectiveGrants> {
   const memberships = await db
     .select({ groupId: groupMembers.groupId })

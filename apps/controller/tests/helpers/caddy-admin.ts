@@ -6,8 +6,8 @@ import type {
   CaddyAdminRequest,
   CaddyAdminResponse,
   CaddyAdminTransport,
-} from '../../src/lib/caddy-admin';
-import { setCaddyAdminTransport } from '../../src/lib/caddy-admin';
+} from '../../src/lib/caddy/admin';
+import { setCaddyAdminTransport } from '../../src/lib/caddy/admin';
 
 export type RecordedRequest = {
   path: string;

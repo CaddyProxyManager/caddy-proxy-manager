@@ -13,7 +13,7 @@ WORKDIR /build
 COPY docker/caddy/go.mod docker/caddy/go.sum docker/caddy/build.sh ./
 
 # Overridden from Settings - Caddy Build. Must match SHIPPED_CADDY_MODULES in
-# packages/shared/src/caddy-modules.ts (tests/unit/caddy-modules.test.ts checks).
+# packages/shared/src/caddy-modules.ts (tests/unit/caddy/caddy-modules.test.ts checks).
 ARG CADDY_MODULES="\
 github.com/caddy-dns/cloudflare \
 github.com/caddy-dns/route53 \

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { type Health, waitForRestart } from '../../src/lib/restart-wait';
+import { type Health, waitForRestart } from '../../src/lib/runtime/restart-wait';
 
 /** Health answers in order (the last one repeats), on a clock that only moves when polled. */
 function scripted(answers: Health[]) {

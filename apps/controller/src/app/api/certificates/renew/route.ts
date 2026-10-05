@@ -6,8 +6,8 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { listAgentCertificates } from "@/src/lib/agent/client";
 import { connectedAgents } from "@/src/lib/agent/registry";
 import { applyCaddyConfig } from "@/src/lib/caddy";
-import { requestRenewal, withEviction } from "@/src/lib/certificate-renewals";
-import { isCheckableDomain } from "@/src/lib/domain-reachability";
+import { requestRenewal, withEviction } from "@/src/lib/certificates/renewals";
+import { isCheckableDomain } from "@/src/lib/reachability/domain";
 
 /** The newest certificate for a name in one agent's storage. */
 function currentCertificate(stored: CaddyCertificate[], name: string) {

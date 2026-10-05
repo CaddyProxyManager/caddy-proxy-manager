@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
-import { isPublicOrigin } from "@/src/lib/public-url";
+import { isPublicOrigin } from "@/src/lib/http/public-url";
 import {
   createForwardAuthSession,
   createExchangeCode,

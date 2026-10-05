@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import AgentsClient, { type AgentRow } from "./AgentsClient";
-import { storedErrorMessage } from "@/src/lib/actions";
+import { storedErrorMessage } from "@/src/lib/errors/action-error";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { logAccessFixes } from "@/src/lib/agent/log-access";
 import { connectedAgents } from "@/src/lib/agent/registry";
 import { listAgents } from "@/src/lib/models/agents";
 import { listHostAssignments } from "@/src/lib/models/host-agents";
-import { canManage, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
+import { canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");

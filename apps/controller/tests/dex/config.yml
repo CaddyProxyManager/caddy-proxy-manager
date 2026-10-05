@@ -34,7 +34,7 @@ staticPasswords:
     hash: "$2a$10$95mdmT5F.icxrUmXEC9Jf.pX2RWgMO0FD6.yqrrVnRwTzA/UrT7g2"
     username: "bob"
     userID: "bob-002"
-  # Signs in only through Dex; tests/e2e/account-security.spec.ts gives it a password and removes it
+  # Signs in only through Dex; tests/e2e/auth/account-security.spec.ts gives it a password and removes it
   - email: "carol@test.local"
     # password: "password"
     hash: "$2a$10$95mdmT5F.icxrUmXEC9Jf.pX2RWgMO0FD6.yqrrVnRwTzA/UrT7g2"

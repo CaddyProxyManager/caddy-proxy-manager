@@ -16,7 +16,7 @@ const store = vi.hoisted(() => ({
   repository: 'ghcr.io/owner/name',
 }));
 
-// lib/updates imports lib/settings for its cache, which reaches the database at module load.
+// lib/runtime/updates imports lib/settings for its cache, which reaches the database at module load.
 vi.mock('@/src/lib/settings', () => ({
   getSetting: async () => store.cache,
   setSetting: async (_key: string, value: unknown) => {
@@ -40,7 +40,7 @@ const {
   parseRepository,
   parseSemver,
   tokenRealmUrl,
-} = await import('@/src/lib/updates');
+} = await import('@/src/lib/runtime/updates');
 
 beforeEach(() => {
   store.cache = null;

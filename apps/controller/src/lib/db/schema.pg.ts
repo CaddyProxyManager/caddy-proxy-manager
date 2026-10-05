@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
-import { uuidv7 } from "../uuidv7";
+import { uuidv7 } from "./uuidv7";
 import { isoTimestamp } from "./columns.pg";
 
 export const users = pgTable(
@@ -355,7 +355,7 @@ export const accessListIpRules = pgTable(
 
 /**
  * What the hostnames in IP rules last resolved to, so a restart keeps the last known set. A cache:
- * never backed up, and rebuilt by the refresher (lib/access-list-dns.ts).
+ * never backed up, and rebuilt by the refresher (lib/access-lists/dns.ts).
  */
 export const accessListDnsCache = pgTable("access_list_dns_cache", {
   hostname: text("hostname").primaryKey(),

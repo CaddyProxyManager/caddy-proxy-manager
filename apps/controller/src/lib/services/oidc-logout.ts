@@ -7,8 +7,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import db from "../db";
 import { accounts, sessions } from "../db/schema";
 import { logAuditEvent } from "../audit";
-import { decodeJwtPayload } from "../oidc-claims";
-import { decryptSecret, isEncryptedSecret } from "../secret";
+import { decodeJwtPayload } from "../auth/oidc/claims";
+import { decryptSecret, isEncryptedSecret } from "../secrets";
 import { deleteUserForwardAuthSessions } from "../models/forward-auth";
 
 export type PendingSessionBinding = {

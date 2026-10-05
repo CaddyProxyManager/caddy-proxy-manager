@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { getMigrationSource, getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupAccountClient from "./SetupAccountClient";
-import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
+import { sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.account");

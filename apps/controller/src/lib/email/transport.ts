@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import { getAppName } from "../app-name";
-import { domainError } from "../domain-error";
+import { getAppName } from "../branding/app-name";
+import { domainError } from "../errors/domain-error";
 import { readSmtpConfig, type SmtpConfig } from "./config";
 
 export type EmailMessage = {

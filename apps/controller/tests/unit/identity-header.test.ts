@@ -3,7 +3,10 @@
  * a non-Latin-1 name made Headers throw, 500ing every verify for that user.
  */
 import { describe, expect, it } from 'bun:test';
-import { encodeGroupsHeaderValue, encodeIdentityHeaderValue } from '@/src/lib/identity-header';
+import {
+  encodeGroupsHeaderValue,
+  encodeIdentityHeaderValue,
+} from '@/src/lib/forward-auth/identity-header';
 
 describe('identity header values', () => {
   it('leaves a plain ASCII value unchanged', () => {

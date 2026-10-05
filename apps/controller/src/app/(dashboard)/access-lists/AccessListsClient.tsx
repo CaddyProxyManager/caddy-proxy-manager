@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessList, AccessListUsage } from "@/lib/models/access-lists";
-import { withRowId, type WithRowId } from "@/lib/row-id";
+import { withRowId, type WithRowId } from "@/lib/forms/row-id";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -53,13 +53,14 @@ import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTableDensity } from "@/components/ui/TableDensity";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { useTranslations } from "next-intl";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { NetworkTab } from "./NetworkTab";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
 import { PanelResizeHandle, usePersistedPanelWidth } from "@/components/ui/PanelResizeHandle";
-import { generatePassword } from "@/src/lib/password-generator";
+import { generatePassword } from "@/src/lib/auth/password/generator";
 import {
   createAccessListAction,
   updateAccessListAction,
@@ -142,6 +143,7 @@ function MembersTab({
   onListUpdated: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const tUi = useTranslations("ui");
   const emptyValue = useEmptyValue();
   const density = useTableDensity();
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -266,7 +268,7 @@ function MembersTab({
     },
     {
       key: "__remove",
-      header: "",
+      header: <VisuallyHidden>{tUi("actionsColumn")}</VisuallyHidden>,
       width: pixel(48),
       align: "end",
       resizable: false,
@@ -679,6 +681,7 @@ function DetailPane({
   if (!list) {
     return (
       <EmptyState
+        headingLevel={2}
         icon={<KeyRound />}
         title={t("selectionEmptyTitle")}
         description={t("selectionEmptyDescription")}
@@ -1018,6 +1021,7 @@ function ListsRail({
 
       {lists.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           title={t("noListsTitle")}
           description={t("noListsDescription")}
           isCompact
@@ -1025,6 +1029,7 @@ function ListsRail({
         />
       ) : filtered.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           title={t("noListsMatch", { query })}
           isCompact
           actions={

@@ -66,20 +66,20 @@ import {
   type DroppedWafDirectiveReport,
   MAX_BODY_LIMIT_MIB,
   MIN_BODY_LIMIT_MIB,
-} from "@/src/lib/caddy-waf";
-import { fromZonedWallTime, toZonedWallTime } from "@/src/lib/date-format";
+} from "@/src/lib/waf/caddy";
+import { fromZonedWallTime, toZonedWallTime } from "@/src/lib/locale/date-format";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
-import { withRowIds } from "@/lib/row-id";
+import { withRowIds } from "@/lib/forms/row-id";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
-import { WafPresetPicker } from "@/components/proxy-hosts/WafPresetPicker";
-import { WafPluginPicker } from "@/components/proxy-hosts/WafPluginPicker";
-import { WafQuickTemplates } from "@/components/proxy-hosts/WafQuickTemplates";
+import { WafPresetPicker } from "@/components/proxy-hosts/waf/WafPresetPicker";
+import { WafPluginPicker } from "@/components/proxy-hosts/waf/WafPluginPicker";
+import { WafQuickTemplates } from "@/components/proxy-hosts/waf/WafQuickTemplates";
 import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import { WafPluginsPanel, type WafPluginRow } from "./WafPluginsPanel";
 import {

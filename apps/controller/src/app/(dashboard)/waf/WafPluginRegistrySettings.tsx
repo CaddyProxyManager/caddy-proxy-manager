@@ -12,7 +12,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
-import type { CrsRegistrySettings } from "@/lib/crs-plugins/settings";
+import type { CrsRegistrySettings } from "@/lib/waf/crs-plugins/settings";
 import { saveCrsRegistrySettingsAction } from "./actions";
 
 // Repeated here rather than imported: the settings module pulls the server's secret handling in.

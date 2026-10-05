@@ -1,9 +1,9 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
-import { redactHttpCacheSettings } from "@/src/lib/http-cache";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
+import { redactHttpCacheSettings } from "@/src/lib/proxy-hosts/http-cache";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
 import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
-import { LEGACY_SECTION_PAGES } from "../sections";
+import { findSettingsItem, LEGACY_SECTION_PAGES, settingsSectionName } from "../sections";
 import {
   getGeneralSettings,
   getAcmeSettings,
@@ -31,21 +31,21 @@ import {
   defaultTailscaleSettings,
   getCrowdSecSettings,
 } from "@/src/lib/settings";
-import { redactCrowdSecSettings } from "@/src/lib/crowdsec";
+import { redactCrowdSecSettings } from "@/src/lib/caddy/crowdsec";
 import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listLdapDirectories } from "@/src/lib/models/ldap-directories";
 import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { autoPairingDisabled } from "@/src/lib/agent/bootstrap";
 import { getFavicon } from "@/src/lib/branding";
-import { getUpdateStatus } from "@/src/lib/updates";
+import { getUpdateStatus } from "@/src/lib/runtime/updates";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
 import { emailSettingsView } from "@/src/lib/email/view";
-import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
-import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
+import { DNS_PROVIDERS } from "@/src/lib/dns/providers";
+import { redactTailscaleSettingsForApi } from "@/src/lib/caddy/tailscale";
 import { config } from "@/src/lib/config";
-import { getPublicBaseUrl } from "@/src/lib/public-url";
-import { anyPasskeysExist } from "@/src/lib/passkeys";
+import { getPublicBaseUrl } from "@/src/lib/http/public-url";
+import { anyPasskeysExist } from "@/src/lib/auth/passkeys";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { registryFields } from "../registry-fields";
@@ -53,25 +53,31 @@ import { forwardAuthSequentialUserIds } from "@/src/lib/settings/registry";
 import { captchaSettingsView, getCaptchaSettings } from "@/src/lib/captcha/settings";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
-import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
+import { redactDnsProviderSettingsForApi } from "@/src/lib/dns/providers";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { storedErrorMessage } from "@/src/lib/actions";
-import { dashboardHostFormView } from "@/src/lib/dashboard-host-options";
+import { storedErrorMessage } from "@/src/lib/errors/action-error";
+import { dashboardHostFormView } from "@/src/lib/dashboard-host/options";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
 import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
 import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
-import { toCertificatePickerOption } from "@/src/lib/certificate-api";
+import { toCertificatePickerOption } from "@/src/lib/certificates/api";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 import { managedServiceView } from "@/src/lib/agent/managed-services";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("nav");
-  return { title: t("settings") };
+/** The section's own name: a screen reader announces the title on every switch between them. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ section: string }>;
+}): Promise<Metadata> {
+  const item = findSettingsItem((await params).section);
+  if (!item) return { title: (await getTranslations("nav"))("settings") };
+  return { title: settingsSectionName(await getTranslations("settings"), item) };
 }
 
 /**

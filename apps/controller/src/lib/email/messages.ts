@@ -5,9 +5,9 @@
 
 import type { AccountDisabledReason } from "../notifications/account-owner";
 import { createTranslator } from "next-intl";
-import { getAppName } from "../app-name";
+import { getAppName } from "../branding/app-name";
 import { DEFAULT_LOCALE, type Locale } from "../locale";
-import { getPublicBaseUrl } from "../public-url";
+import { getPublicBaseUrl } from "../http/public-url";
 import type { EmailMessage } from "./transport";
 
 type Catalog = typeof import("../../../messages/en.json");

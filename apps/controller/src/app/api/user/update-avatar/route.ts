@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { updateUserProfile } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
-import { MAX_AVATAR_DATA_URL_LENGTH } from "@/src/lib/avatar-limits";
+import { MAX_AVATAR_DATA_URL_LENGTH } from "@/src/lib/users/avatar-limits";
 
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);

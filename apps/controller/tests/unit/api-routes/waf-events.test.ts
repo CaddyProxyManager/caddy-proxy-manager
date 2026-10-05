@@ -6,7 +6,7 @@ vi.mock('@/src/lib/models/waf-events', () => ({
   countWafEvents: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {

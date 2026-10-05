@@ -1,5 +1,5 @@
 import { CaddyBuildFields } from "@cpm/controller/src/components/caddy-modules/CaddyBuildFields";
-import { CADDY_MODULES } from "@cpm/controller/src/lib/caddy-modules";
+import { CADDY_MODULES } from "@cpm/controller/src/lib/caddy/image-build/modules";
 import { DemoSurface } from "../DemoSurface";
 import { json, serveApi } from "../fake-api";
 

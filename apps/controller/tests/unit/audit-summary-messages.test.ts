@@ -1,5 +1,5 @@
 /**
- * Summaries are stored in English and parsed back (src/lib/audit-summary.ts), with runtime keys
+ * Summaries are stored in English and parsed back (src/lib/audit/summary.ts), with runtime keys
  * tsc cannot check. Each pattern must round-trip through its English catalog message.
  */
 import { describe, expect, it } from 'bun:test';
@@ -9,7 +9,7 @@ import {
   AUDIT_SUMMARY_PATTERNS,
   auditSummaryText,
   matchAuditSummary,
-} from '@/src/lib/audit-summary';
+} from '@/src/lib/audit/summary';
 
 type Translator = Parameters<typeof auditSummaryText>[0];
 

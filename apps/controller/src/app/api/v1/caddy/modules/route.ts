@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getCaddyBuildDiff, sanitizeCaddyBuildSettings } from "@/src/lib/caddy-build";
-import { describeModuleConflicts } from "@/src/lib/caddy-build-conflicts";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { getCaddyBuildDiff, sanitizeCaddyBuildSettings } from "@/src/lib/caddy/image-build";
+import { describeModuleConflicts } from "@/src/lib/caddy/image-build/conflicts";
 import { applyCaddyConfig } from "@/src/lib/caddy";
-import { CADDY_MODULES } from "@/src/lib/caddy-modules";
+import { CADDY_MODULES } from "@/src/lib/caddy/image-build/modules";
 import { getCaddyBuildSettings, saveCaddyBuildSettings } from "@/src/lib/settings";
 
 // Fixed at build time.

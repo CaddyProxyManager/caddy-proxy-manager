@@ -1,4 +1,4 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
@@ -9,14 +9,14 @@ import {
   redirectIntentWantsCaptcha,
 } from "@/src/lib/models/forward-auth";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
-import { cspNonce } from "@/src/lib/csp";
+import { cspNonce } from "@/src/lib/http/csp";
 import PortalLoginForm from "./PortalLoginForm";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { oauthCallbackErrorMessage } from "@/src/lib/oauth-callback-error";
+import { oauthCallbackErrorMessage } from "@/src/lib/auth/oauth-callback-error";
 import { headers } from "next/headers";
-import { getClientIp } from "@/src/lib/client-ip";
-import { takeFromWindow } from "@/src/lib/rate-limit";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { takeFromWindow } from "@/src/lib/auth/rate-limit";
 
 /** A person opens a handful of protected tabs in ten minutes; a GET loop opens thousands. */
 const INTENTS_PER_CLIENT = 30;

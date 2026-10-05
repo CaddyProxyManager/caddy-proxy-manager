@@ -1,4 +1,4 @@
-import { LoadBalancerFields } from "@cpm/controller/src/components/proxy-hosts/LoadBalancerFields";
+import { LoadBalancerFields } from "@cpm/controller/src/components/proxy-hosts/upstreams/LoadBalancerFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** Least-connections with both health checks on - the shape most people end up at. */

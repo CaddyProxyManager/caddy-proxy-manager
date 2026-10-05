@@ -30,12 +30,12 @@ import { MoreDrawer } from "@/src/components/mobile/MoreDrawer";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
 import { ACCENTS } from "@/src/components/ui/accent";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
-import { formatAppVersion } from "@/src/lib/app-version";
+import { formatAppVersion } from "@/src/lib/runtime/app-version";
 import {
   SQLITE_NOTICE_COOKIE,
   SQLITE_NOTICE_DISMISS_SECONDS,
-} from "@/src/lib/sqlite-notice-cookie";
-import type { ResolvedAvatar } from "@/src/lib/avatar";
+} from "@/src/lib/db/sqlite-notice-cookie";
+import type { ResolvedAvatar } from "@/src/lib/users/avatar";
 import {
   type Destination,
   type DestinationId,
@@ -156,7 +156,7 @@ export default function DashboardLayoutClient({
   stagedKeys: readonly string[];
   /** Null if the user never customized the More drawer. */
   morePins: readonly DestinationId[] | null;
-  /** See lib/view-as.ts. */
+  /** See lib/users/view-as.ts. */
   viewAs?: { role: string; groupNames: string[] } | null;
   children: ReactNode;
 }) {
@@ -219,7 +219,7 @@ export default function DashboardLayoutClient({
   ) : null;
   const content = <div className="cpm-mobile-content">{children}</div>;
   // View-as first: the way back must be on every page. The demo banner is not dismissable; the
-  // SQLite one is, for a while (src/lib/sqlite-notice.ts).
+  // SQLite one is, for a while (src/lib/db/sqlite-notice.ts).
   const banner = viewAs ? (
     <Banner
       status="warning"

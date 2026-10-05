@@ -11,10 +11,10 @@ import { fileURLToPath } from 'node:url';
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const read = (relative: string) => readFileSync(resolve(moduleDir, '../..', relative), 'utf-8');
 
-const geoBlockFields = read('src/components/proxy-hosts/GeoBlockFields.tsx');
-const wafFields = read('src/components/proxy-hosts/WafFields.tsx');
+const geoBlockFields = read('src/components/proxy-hosts/protection/GeoBlockFields.tsx');
+const wafFields = read('src/components/proxy-hosts/waf/WafFields.tsx');
 const wafEventsClient = read('src/app/(dashboard)/waf/WafEventsClient.tsx');
-const proxyHostActions = read('src/lib/proxy-host-form.ts');
+const proxyHostActions = read('src/lib/proxy-hosts/form.ts');
 const settingsActions = read('src/app/(dashboard)/settings/actions.ts');
 
 describe('the parsers these components feed', () => {

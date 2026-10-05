@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/src/lib/auth";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import {
   type LdapDirectoryInput,
@@ -16,7 +16,7 @@ import {
   updateLdapDirectory,
 } from "@/src/lib/models/ldap-directories";
 import { testLdapConnection } from "@/src/lib/ldap/client";
-import { mapGroupsToRole, toGroupMappingConfig } from "@/src/lib/oidc-groups";
+import { mapGroupsToRole, toGroupMappingConfig } from "@/src/lib/auth/oidc/groups";
 
 async function audit(userId: number, action: string, summary: string, directoryId: string) {
   await createAuditEvent({

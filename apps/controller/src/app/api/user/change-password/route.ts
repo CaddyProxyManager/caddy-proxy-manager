@@ -1,4 +1,4 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   auth,
@@ -10,11 +10,11 @@ import {
 import { getUserById, getUserPasswordHash, updateUserPassword } from "@/src/lib/models/user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { createAuditEvent } from "@/src/lib/models/audit";
-import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
-import { hashPassword, verifyPassword } from "@/src/lib/password";
+import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/auth/rate-limit";
+import { hashPassword, verifyPassword } from "@/src/lib/auth/password";
 import { getTranslations } from "next-intl/server";
-import { isDemoAdmin } from "@/src/lib/demo-mode";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { isDemoAdmin } from "@/src/lib/demo/mode";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 import { hasDirectoryAccount } from "@/src/lib/models/ldap-directories";
 
 export async function POST(request: NextRequest) {

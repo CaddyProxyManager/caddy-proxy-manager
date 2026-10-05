@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { resolveAnalyticsRange } from "@/src/lib/analytics-db";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { resolveAnalyticsRange } from "@/src/lib/analytics/db";
 import {
   countWafEventsInRange,
   getTopWafRulesWithHosts,

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
-import { mustEnrollTwoFactor } from "@/src/lib/two-factor-policy";
+import { mustEnrollTwoFactor } from "@/src/lib/auth/two-factor/policy";
 import { TwoFactorSetupClient } from "./TwoFactorSetupClient";
 
 export async function generateMetadata(): Promise<Metadata> {

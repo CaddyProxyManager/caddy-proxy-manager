@@ -7,7 +7,7 @@
 import { eq, isNull, or } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { groupIdpMappings, groups } from "../db/schema";
-import { normalizeGroupName } from "../oidc-groups";
+import { normalizeGroupName } from "../auth/oidc/groups";
 
 export type GroupIdpMapping = {
   id: number;

@@ -15,7 +15,7 @@ import { ReachabilityDialog } from "@/components/certificates/ReachabilityDialog
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Timestamp } from "@/components/ui/Timestamp";
-import { downloadText } from "@/src/lib/download-text";
+import { downloadText } from "@/src/lib/browser/download-text";
 import type { AcmeHost } from "../page";
 import { useTranslations } from "next-intl";
 

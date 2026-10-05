@@ -58,6 +58,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
 
       {filtered.length === 0 && !createOpen && (
         <EmptyState
+          headingLevel={2}
           icon={<ShieldCheck />}
           title={search ? t("noRolesMatchSearch") : t("noRolesYet")}
           description={t("pageDescription")}

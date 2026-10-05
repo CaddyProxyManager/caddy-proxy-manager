@@ -10,7 +10,7 @@ vi.mock('@/src/lib/settings', () => ({
   saveCaddyBuildSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/src/lib/caddy-build', () => ({
+vi.mock('@/src/lib/caddy/image-build', () => ({
   sanitizeCaddyBuildSettings: vi.fn((input: unknown) => input),
   getCaddyBuildDiff: vi.fn().mockResolvedValue({
     appliedSpecs: [],
@@ -21,7 +21,7 @@ vi.mock('@/src/lib/caddy-build', () => ({
   }),
 }));
 
-vi.mock('@/src/lib/caddy-build-conflicts', () => ({
+vi.mock('@/src/lib/caddy/image-build/conflicts', () => ({
   describeModuleConflicts: vi.fn().mockResolvedValue(null),
 }));
 
@@ -29,7 +29,7 @@ vi.mock('@/src/lib/caddy', () => ({
   applyCaddyConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -52,7 +52,7 @@ vi.mock('@/src/lib/api-auth', () => {
 });
 
 import { PUT } from '@/src/app/api/v1/caddy/modules/route';
-import { describeModuleConflicts } from '@/src/lib/caddy-build-conflicts';
+import { describeModuleConflicts } from '@/src/lib/caddy/image-build/conflicts';
 import { saveCaddyBuildSettings } from '@/src/lib/settings';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 

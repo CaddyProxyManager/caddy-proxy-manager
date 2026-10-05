@@ -6,7 +6,7 @@ import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import { probeLegacySecrets } from "@/src/lib/migration/legacy-secrets";
 import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupMigrateClient from "./SetupMigrateClient";
-import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
+import { sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.migrate");

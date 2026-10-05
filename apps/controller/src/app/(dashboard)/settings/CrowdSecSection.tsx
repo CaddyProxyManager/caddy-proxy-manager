@@ -16,7 +16,7 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { FormCard, InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
 // Types only: both modules import server-side code.
 import type { ManagedServiceView } from "@/src/lib/agent/managed-services";
-import type { CrowdSecMode, CrowdSecSettingsView } from "@/src/lib/crowdsec";
+import type { CrowdSecMode, CrowdSecSettingsView } from "@/src/lib/caddy/crowdsec";
 import { testCrowdSecConnectionAction } from "./actions";
 
 type Result = { success: boolean; message?: string } | null;

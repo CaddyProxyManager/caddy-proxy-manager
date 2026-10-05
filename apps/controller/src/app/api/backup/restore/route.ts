@@ -8,7 +8,7 @@ import {
   requireAdmin,
 } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
-import { invalidateProviderCache } from "@/src/lib/auth-server";
+import { invalidateProviderCache } from "@/src/lib/auth/server";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { describeBackup, restoreBackup } from "@/src/lib/backup/service";
 import { backupErrorMessage } from "@/src/lib/backup/errors";

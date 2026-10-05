@@ -1,5 +1,5 @@
 /**
- * The SMTP settings as one object. Imported lazily, like app-name.ts: the registry reads
+ * The SMTP settings as one object. Imported lazily, like branding/app-name.ts: the registry reads
  * process.env on first load, which a static import would freeze before a test sets it.
  */
 

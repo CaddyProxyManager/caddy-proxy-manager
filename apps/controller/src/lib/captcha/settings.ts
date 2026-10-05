@@ -1,4 +1,4 @@
-import { decryptSecret, encryptSecret } from "../secret";
+import { decryptSecret, encryptSecret } from "../secrets";
 import { getSetting, setSetting } from "../settings";
 import {
   type CaptchaProvider,

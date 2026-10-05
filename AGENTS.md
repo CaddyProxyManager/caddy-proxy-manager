@@ -20,6 +20,10 @@ reading a path off `process.cwd()` inside the controller now resolves against `a
 the e2e suite is the exception and pins `COMPOSE_CWD` to the repo root, because Compose anchors
 every relative path in every `-f` file to the first one's directory.
 
+`apps/controller/src/lib` is grouped by feature (`auth/`, `caddy/`, `waf/`, `proxy-hosts/`...),
+and the test suites mirror it. A new module goes in the folder it belongs to, not the root; a
+module named after its folder is that folder's `index.ts`, so `@/src/lib/caddy` still reads short.
+
 `bunfig.toml` pins the **isolated** installer, Bun 1.4's workspace default: a package sees only what
 its own `package.json` declares. Import something a package depends on transitively and it fails at
 typecheck rather than at runtime on a machine that hoisted differently - so an import that stops
@@ -41,7 +45,7 @@ them. Three things make that work, and all three live in `apps/site/astro.config
   first (`useTranslations`, `useLocale`, `useFormatter`), which `use-intl` provides
   framework-agnostically; the second is reached by `DataTable`
   alone, and the shim makes the query string reactive so a demo can sort and page for real. The
-  controller's `src/lib/auth-client` is shimmed too, so the sign-in demo never posts to
+  controller's `src/lib/auth/client` is shimmed too, so the sign-in demo never posts to
   `/api/auth/*` on the docs site; every attempt fails the way a wrong password does.
 - **Astryx's global reset is not loaded.** It would strip Starlight's prose, so `src/demos/demo.css`
   carries the rules its components need, scoped to `.cpm-demo`. For the same reason `DemoSurface`
@@ -89,7 +93,7 @@ consequences worth knowing before touching either side:
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
   Six are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
-  Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
+  Coraza (`lib/waf/dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
   Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
   `certificates`: `certificate-list` and `certificate-read` look into Caddy's storage from a
   throwaway container mounting its volumes read-only (`apps/agent/src/certificates.ts`).
@@ -199,12 +203,12 @@ Only on request - each module grows the Caddy image. It must build against libdn
 2.10+), which many `caddy-dns/*` repositories still don't; check that before anything else. Then,
 in one commit:
 
-- the entry in `apps/controller/src/lib/dns-providers.ts` (`password` fields are encrypted at rest)
+- the entry in `apps/controller/src/lib/dns/providers.ts` (`password` fields are encrypted at rest)
   and its `settings.dnsProviders.<name>` labels in `en.json`;
 - the module path in `SHIPPED_CADDY_MODULES` (`packages/shared/src/caddy-modules.ts`), the
   `CADDY_MODULES` ARG in `docker/caddy/Dockerfile`, and the import in `docker/caddy/tools.go`, with
   its pin in `docker/caddy/go.mod` from `go get`;
-- a test in `tests/unit/dns-providers.test.ts` for the challenge JSON it emits;
+- a test in `tests/unit/dns/dns-providers.test.ts` for the challenge JSON it emits;
 - its name in the provider list, and the count, in `apps/site/src/content/docs/features/certificates.mdx`
   and `index.mdx`.
 
@@ -212,7 +216,7 @@ in one commit:
 
 Every string a person reads comes from `apps/controller/messages/en.json` through next-intl. English
 is the source catalog; adding a language is one more file there plus an entry in `LOCALES`
-(`src/lib/locale.ts`), and nothing else.
+(`src/lib/locale/index.ts`), and nothing else.
 
 - Client components: `const t = useTranslations("<namespace>")`. Server components and route
   handlers: `const t = await getTranslations("<namespace>")` - the hook throws outside a component.
@@ -221,11 +225,11 @@ is the source catalog; adding a language is one more file there plus an entry in
 - `src/types/next-intl.d.ts` types the keys off `en.json`, so a typo is a build error rather than a
   key rendered to a user. That only works for literal keys - where a key is composed at runtime
   (a setting name, a validation code) a test asserts the catalog covers it instead. See
-  `tests/unit/settings-messages.test.ts`.
+  `tests/unit/settings/settings-messages.test.ts`.
 - **Never build a sentence by concatenation.** `` `${label} must be a number` `` cannot be
   translated, because not every language puts the subject first. Return a code and let the catalog
-  hold the whole sentence - `password-policy.ts`, the settings registry and `domain-error.ts` all
-  do this, and their headers explain the shape.
+  hold the whole sentence - `auth/password/policy.ts`, the settings registry and
+  `errors/domain-error.ts` all do this, and their headers explain the shape.
 - Models raise `domainError("code")` rather than `new Error("sentence")`. They run for a server
   action, for `/api/v1/*` and for the agent's sync, and only the first has a reader with a language:
   the code is rendered by `actionError`, and the English `message` the error still carries is what
@@ -238,10 +242,10 @@ from `navigator.languages` - Chrome trims the header to one language, so the cli
 server cannot.
 
 Timestamps render in the reader's time zone, which the browser writes to a cookie (`cpm-tz`,
-`src/lib/time-zone.ts`) and `src/i18n/request.ts` hands to next-intl, so the server render and the
-browser's agree. Show one with `components/ui/Timestamp.tsx`: local text, and the UTC instant in a
-tooltip for searching logs. Never `toLocaleString()` - it formats in whatever zone and locale the
-runtime has, which differs between the container and the browser.
+`src/lib/locale/time-zone.ts`) and `src/i18n/request.ts` hands to next-intl, so the server render
+and the browser's agree. Show one with `components/ui/Timestamp.tsx`: local text, and the UTC
+instant in a tooltip for searching logs. Never `toLocaleString()` - it formats in whatever zone and
+locale the runtime has, which differs between the container and the browser.
 
 Two things that are not obvious and will cost an afternoon:
 
@@ -287,6 +291,10 @@ Three constraints are not obvious from reading the suites:
   preload has already loaded the real module, so Bun patches its exports in place and a name a
   factory leaves out stays real - a `runInTransaction` left out wrote to the app's own connection.
   That connection is never migrated under test, so such a miss fails loudly instead of sharing data.
+- **A PR labelled `e2e` runs only the specs its files map to**
+  (`apps/controller/scripts/select-e2e.ts`); `e2e-full` runs them all, as main does on merge. An
+  unmapped path runs everything, so a new source folder needs a rule to stay cheap, and a new spec
+  must be named by one - `tests/unit/ci/select-e2e.test.ts` fails if not.
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
   unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
   `bun` - see `tests/helpers/build-legacy-db.ts`.

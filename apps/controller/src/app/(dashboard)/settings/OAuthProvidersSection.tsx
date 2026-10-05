@@ -22,7 +22,7 @@ import {
   oidcBackchannelLogoutUrl,
   withOAuthClientSecretRotation,
   type OAuthProviderView,
-} from "@/src/lib/oauth-provider-view";
+} from "@/src/lib/auth/oidc/provider-view";
 import { type AppRole, GroupMappingFields } from "./GroupMappingFields";
 import {
   createOAuthProviderAction,

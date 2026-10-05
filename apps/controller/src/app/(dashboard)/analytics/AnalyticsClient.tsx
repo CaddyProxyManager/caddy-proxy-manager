@@ -36,7 +36,7 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
-import { toSafeChartLabel } from "@/src/lib/chart-labels";
+import { toSafeChartLabel } from "@/src/lib/analytics/chart-labels";
 
 import { useChartTheme } from "./chart-theme";
 import { settingsHref } from "../settings/sections";
@@ -1066,7 +1066,7 @@ export default function AnalyticsClient() {
 
           <Card padding={5}>
             <VStack gap={4}>
-              <Text type="body" size="sm" weight="semibold">
+              <Text as="h2" type="body" size="sm" weight="semibold">
                 {t("requestsOverTime")}
               </Text>
               {timeline.length === 0 ? (
@@ -1089,7 +1089,7 @@ export default function AnalyticsClient() {
               {/* Full height, so the map grows to match the country table beside it. */}
               <VStack gap={2} minHeight={280} height="100%">
                 <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
-                  <Text type="body" size="sm" weight="semibold">
+                  <Text as="h2" type="body" size="sm" weight="semibold">
                     {t("trafficByCountry")}
                   </Text>
                   {/* The ramp normalises per metric, so Blocked lights up the most-blocked. */}
@@ -1139,7 +1139,7 @@ export default function AnalyticsClient() {
             </Card>
             <Card padding={4}>
               <VStack gap={3}>
-                <Text type="body" size="sm" weight="semibold">
+                <Text as="h2" type="body" size="sm" weight="semibold">
                   {t("topCountries")}
                 </Text>
                 {countries.length === 0 ? (
@@ -1175,7 +1175,7 @@ export default function AnalyticsClient() {
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
             <Card padding={5}>
               <VStack gap={4}>
-                <Text type="body" size="sm" weight="semibold">
+                <Text as="h2" type="body" size="sm" weight="semibold">
                   {t("httpProtocols")}
                 </Text>
                 {protocols.length === 0 ? (
@@ -1202,7 +1202,7 @@ export default function AnalyticsClient() {
             </Card>
             <Card padding={5}>
               <VStack gap={4}>
-                <Text type="body" size="sm" weight="semibold">
+                <Text as="h2" type="body" size="sm" weight="semibold">
                   {t("topUserAgents")}
                 </Text>
                 {userAgents.length === 0 ? (
@@ -1223,7 +1223,7 @@ export default function AnalyticsClient() {
 
           <Card padding={5}>
             <VStack gap={4}>
-              <Text type="body" size="sm" weight="semibold">
+              <Text as="h2" type="body" size="sm" weight="semibold">
                 {t("recentBlockedRequests")}
               </Text>
               {!blocked || blocked.events.length === 0 ? (
