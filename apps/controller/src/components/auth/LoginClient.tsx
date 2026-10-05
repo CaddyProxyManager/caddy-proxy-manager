@@ -35,6 +35,7 @@ import { formatAppVersion } from "@/src/lib/runtime/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/auth/sign-in-error";
 import { twoFactorError } from "@/src/lib/auth/two-factor/error";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 interface LoginClientProps {
   enabledProviders: SignInProvider[];
@@ -63,6 +64,7 @@ export default function LoginClient({
   passwordResetEnabled = false,
   directories = [],
 }: LoginClientProps) {
+  const frame = usePageFrame();
   const t = useTranslations("auth.login");
   const tCommon = useTranslations("common");
   const tAuth = useTranslations("auth");
@@ -252,11 +254,11 @@ export default function LoginClient({
   );
 
   return (
-    <Center role="main" minHeight="100vh" padding={4}>
+    <Center role={frame.role} minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">
-            <Heading level={1}>{appName}</Heading>
+            <Heading level={frame.titleLevel}>{appName}</Heading>
             <Text type="body" size="sm" color="secondary">
               {subtitle}
             </Text>
@@ -311,7 +313,7 @@ export default function LoginClient({
                         value={username}
                         onChange={setUsername}
                         isRequired
-                        hasAutoFocus
+                        hasAutoFocus={frame.autoFocus}
                         isDisabled={disabled}
                         width="100%"
                       />

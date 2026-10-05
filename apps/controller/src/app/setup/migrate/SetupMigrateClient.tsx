@@ -32,6 +32,7 @@ import RestartDialog from "@/src/components/setup/RestartDialog";
 import { useFormatter, useTranslations } from "next-intl";
 import type { LegacyRejection } from "@/src/lib/migration/legacy-database";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 export type Candidate = {
   path: string;
@@ -73,6 +74,7 @@ export default function SetupMigrateClient({
   rejected: LegacyRejection[];
   sqliteWarning?: boolean;
 }) {
+  const frame = usePageFrame();
   const t = useTranslations("setup");
   const tCommon = useTranslations("common");
   const format = useFormatter();
@@ -208,12 +210,12 @@ export default function SetupMigrateClient({
   }
 
   return (
-    <Center role="main">
+    <Center role={frame.role}>
       <VStack gap={5} padding={5}>
         <SetupSteps stage="migrate" hasMigrateStep />
         {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
-          <Heading level={1}>{t("migrate.heading")}</Heading>
+          <Heading level={frame.titleLevel}>{t("migrate.heading")}</Heading>
           <Text color="secondary">{t("migrationDescription")}</Text>
         </VStack>
 

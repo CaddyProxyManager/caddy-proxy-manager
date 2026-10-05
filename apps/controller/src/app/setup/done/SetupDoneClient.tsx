@@ -17,6 +17,7 @@ import { FormCard } from "@/src/components/ui/FormLayout";
 import { useTranslations } from "next-intl";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 export default function SetupDoneClient({
   source,
@@ -30,16 +31,17 @@ export default function SetupDoneClient({
   dashboardOrigin: string | null;
   sqliteWarning?: boolean;
 }) {
+  const frame = usePageFrame();
   const t = useTranslations("setup");
   return (
-    <Center role="main">
+    <Center role={frame.role}>
       <VStack gap={5} padding={5}>
         {/* Reached after setup completes, so every step is behind the operator. The migrate step
             is always present here: this page only exists because a migration happened. */}
         <SetupSteps stage="complete" hasMigrateStep />
         {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
-          <Heading level={1}>{t("done.heading")}</Heading>
+          <Heading level={frame.titleLevel}>{t("done.heading")}</Heading>
           <Text color="secondary">{t("migrationCompleteDescription")}</Text>
         </VStack>
 

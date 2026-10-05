@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth/client";
 import { useFormatter, useTranslations } from "next-intl";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 interface PortalLoginFormProps {
   rid: string;
@@ -68,13 +69,14 @@ function PortalCard({
   hasShield?: boolean;
   children?: ReactNode;
 }) {
+  const frame = usePageFrame();
   return (
-    <Center role="main" minHeight="100vh" padding={4}>
+    <Center role={frame.role} minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">
             {hasShield && <Icon icon={Shield} size="lg" color="secondary" />}
-            <Heading level={1}>{title}</Heading>
+            <Heading level={frame.titleLevel}>{title}</Heading>
             <Text type="body" size="sm" color="secondary" justify="center">
               {description}
             </Text>
@@ -99,6 +101,7 @@ export default function PortalLoginForm({
   cspNonce,
   directories = [],
 }: PortalLoginFormProps) {
+  const frame = usePageFrame();
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
@@ -418,7 +421,7 @@ export default function PortalLoginForm({
                     value={username}
                     onChange={setUsername}
                     isRequired
-                    hasAutoFocus
+                    hasAutoFocus={frame.autoFocus}
                     isDisabled={disabled}
                     width="100%"
                   />

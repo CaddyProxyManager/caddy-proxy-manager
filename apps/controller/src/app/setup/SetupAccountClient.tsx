@@ -25,6 +25,7 @@ import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/na
 import { configureFirstOAuthProvider, createFirstAdmin } from "./actions";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 const AGENT_DOCS = "https://caddyproxy.com/features/agent/";
 
@@ -40,6 +41,7 @@ export default function SetupAccountClient({
   hasMigrateStep: boolean;
   sqliteWarning?: boolean;
 }) {
+  const frame = usePageFrame();
   const t = useTranslations();
   const ta = useTranslations("setup.account");
   const tSettings = useTranslations("settings");
@@ -61,12 +63,12 @@ export default function SetupAccountClient({
   const [oauthState, submitOAuth] = useActionState(configureFirstOAuthProvider, { error: null });
 
   return (
-    <Center role="main">
+    <Center role={frame.role}>
       <VStack gap={5} padding={5}>
         <SetupSteps stage="account" hasMigrateStep={hasMigrateStep} />
         {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
-          <Heading level={1}>{ta("heading")}</Heading>
+          <Heading level={frame.titleLevel}>{ta("heading")}</Heading>
           <Text color="secondary">{ta("subtitle")}</Text>
         </VStack>
 

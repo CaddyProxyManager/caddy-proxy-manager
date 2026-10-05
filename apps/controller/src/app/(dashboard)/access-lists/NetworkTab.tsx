@@ -424,7 +424,6 @@ function DenyResponseEditor({
   onSave: (deny: { status?: number; body?: string; redirectUrl?: string } | null) => Promise<void>;
 }) {
   const t = useTranslations("accessLists");
-  const tCommon = useTranslations("common");
   const saved = list.denyResponse;
   const initialMode: DenyMode = saved?.redirectUrl ? "redirect" : saved ? "status" : "default";
   const [mode, setMode] = useState<DenyMode>(initialMode);
@@ -510,7 +509,7 @@ function DenyResponseEditor({
         />
       )}
       <HStack>
-        <Button size="sm" label={tCommon("saveChanges")} onClick={save} isLoading={saving} />
+        <Button size="sm" label={t("saveDenyResponse")} onClick={save} isLoading={saving} />
       </HStack>
     </VStack>
   );

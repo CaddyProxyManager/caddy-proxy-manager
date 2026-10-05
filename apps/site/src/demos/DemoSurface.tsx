@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useMemo, useSyncExternalStore } from "react";
 import { ThemeContext, registerTheme } from "@astryxdesign/core/theme";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import { LinkProvider } from "@astryxdesign/core/Link";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { StandalonePage } from "@cpm/controller/src/components/ui/standalone-page";
 import { IntlProvider } from "use-intl";
 import { messages } from "./catalog";
 import { DemoLink } from "./DemoLink";
@@ -15,22 +16,22 @@ type Mode = "light" | "dark";
 
 /** Whatever Starlight's theme select last chose. It writes `data-theme` on <html>, as Astryx does. */
 function readMode(): Mode {
-  if (typeof document === "undefined") return "dark";
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
+
+/**
+ * Dark on the server, then the reader's mode right after hydrating. Read straight into the first
+ * client render, a light reader's demo kept the server's `data-theme="dark"`: React leaves a
+ * mismatched attribute as the server wrote it, so light pages showed dark-mode text.
+ */
 function useStarlightMode(): Mode {
-  const [mode, setMode] = useState<Mode>(readMode);
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => setMode(readMode()));
-    observer.observe(document.documentElement, {
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return mode;
+  return useSyncExternalStore(subscribe, readMode, () => "dark");
 }
 
 /**
@@ -55,7 +56,9 @@ export function DemoSurface({ children }: { children: ReactNode }) {
             style={{ colorScheme: mode }}
           >
             {/* Every Astryx link renders through DemoLink, as next/link does by alias. */}
-            <LinkProvider component={DemoLink}>{children}</LinkProvider>
+            <LinkProvider component={DemoLink}>
+              <StandalonePage value={false}>{children}</StandalonePage>
+            </LinkProvider>
           </div>
         </InternationalizationProvider>
       </IntlProvider>

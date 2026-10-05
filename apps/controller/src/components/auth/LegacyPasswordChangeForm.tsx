@@ -18,8 +18,10 @@ import {
   AUTOFILL_NEW_PASSWORD,
 } from "@/components/ui/native-input-attrs";
 import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 export default function LegacyPasswordChangeForm() {
+  const frame = usePageFrame();
   const t = useTranslations();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -76,11 +78,11 @@ export default function LegacyPasswordChangeForm() {
   }
 
   return (
-    <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
+    <Center role={frame.role} minHeight="100vh" padding={4} className="cpm-auth-page">
       <VStack as="form" width="100%" maxWidth={400} onSubmit={handleSubmit}>
         <VStack gap={3}>
           <VStack gap={1}>
-            <Heading level={1}>{t("auth.passwordChange.heading")}</Heading>
+            <Heading level={frame.titleLevel}>{t("auth.passwordChange.heading")}</Heading>
             <Text type="body" size="sm" color="secondary">
               {t("auth.passwordChange.subtitle")}
             </Text>

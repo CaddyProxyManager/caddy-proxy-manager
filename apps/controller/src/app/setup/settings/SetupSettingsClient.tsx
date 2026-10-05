@@ -28,6 +28,7 @@ import type { DomainClaim } from "@/src/lib/dashboard-host/options";
 import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 export type SettingField = {
   key: string;
@@ -120,6 +121,7 @@ export default function SetupSettingsClient({
   hasMigrateStep: boolean;
   sqliteWarning?: boolean;
 }) {
+  const frame = usePageFrame();
   const t = useTranslations("setup");
   const tSettings = useTranslations("settings");
   const [error, setError] = useState<string | null>(null);
@@ -211,12 +213,12 @@ export default function SetupSettingsClient({
   };
 
   return (
-    <Center role="main">
+    <Center role={frame.role}>
       <VStack gap={5} padding={5}>
         <SetupSteps stage="settings" hasMigrateStep={hasMigrateStep} />
         {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
-          <Heading level={1}>{t("settingsStep.heading")}</Heading>
+          <Heading level={frame.titleLevel}>{t("settingsStep.heading")}</Heading>
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
           {/* The badges' text colours, so each line keys its badges; inline as Text has no hues. */}
           <Text style={{ color: "var(--color-text-purple)" }}>{t("envBadgeLegend")}</Text>

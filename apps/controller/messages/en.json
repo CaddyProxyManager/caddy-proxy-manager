@@ -159,6 +159,7 @@
     "failClosed": "Fail closed",
     "failClosedHelp": "Refuse a request whose client cannot be told apart from a trusted proxy, for example one arriving through a proxy without X-Forwarded-For, before any rule or password is checked. Needs the Geo Blocking module and trusted proxies to be set.",
     "denyResponse": "Deny response",
+    "saveDenyResponse": "Save deny response",
     "denyResponseHelp": "What a request the rules refuse gets back. With Satisfy set to Any, a refused visitor is asked for a password instead. Lists with a country, continent or ASN rule answer a visitor who sends credentials on the password alone.",
     "denyMode": "Respond with",
     "denyModes": {

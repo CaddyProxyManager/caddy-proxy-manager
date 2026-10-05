@@ -11,6 +11,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { TwoFactorSection } from "@/src/app/(dashboard)/profile/TwoFactorSection";
 import { PasskeySection } from "@/src/app/(dashboard)/profile/PasskeySection";
 import type { PasskeySummary } from "@/src/lib/auth/passkeys";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 /**
  * The one thing an account caught by the policy can do: an authenticator app or a passkey. Either
@@ -25,14 +26,15 @@ export function TwoFactorSetupClient({
   rpId: string | null;
   locked: boolean;
 }) {
+  const frame = usePageFrame();
   const t = useTranslations("auth.twoFactorSetup");
   const tCommon = useTranslations("common");
   return (
-    <Center role="main" minHeight="100vh" padding={4}>
+    <Center role={frame.role} minHeight="100vh" padding={4}>
       <Card width={480}>
         <VStack gap={4}>
           <VStack gap={1}>
-            <Heading level={1}>{t("title")}</Heading>
+            <Heading level={frame.titleLevel}>{t("title")}</Heading>
             <Text type="body" size="sm" color="secondary">
               {t("description")}
             </Text>

@@ -1,0 +1,39 @@
+/*
+ * Catppuccin Latte's text greys, lavender accent and aside titles all fall short of WCAG AA on its
+ * own backgrounds. Unlayered, so it wins over the plugin's `catppuccin` layer. Mocha passes as is.
+ */
+:root[data-theme="light"] {
+  --sl-color-gray-1: #4f5269;
+  --sl-color-gray-2: #5a5d74;
+  --sl-color-gray-3: #676a80;
+
+  /* Links, the current page in the sidebar (light text on it) and the hero button. */
+  --sl-color-accent: hsl(231, 70%, 48%);
+  /* Darker than the accent, as Starlight's own light theme has it; Latte has it lighter. */
+  --sl-color-accent-high: hsl(231, 80%, 32%);
+
+  /* Asides: their titles and links take the -high shade, on the -low one. */
+  --sl-color-orange-low: hsl(22, 69%, 92%);
+  --sl-color-orange-high: hsl(22, 99%, 28%);
+  --sl-color-green-low: hsl(109, 27%, 90%);
+  --sl-color-green-high: hsl(109, 58%, 24%);
+  --sl-color-blue-low: hsl(220, 61%, 92%);
+  --sl-color-blue-high: hsl(220, 91%, 30%);
+  --sl-color-purple-low: hsl(266, 55%, 92%);
+  --sl-color-purple-high: hsl(266, 85%, 30%);
+  --sl-color-red-low: hsl(347, 56%, 92%);
+  --sl-color-red-high: hsl(347, 87%, 30%);
+}
+
+/* The plugin puts the shortcut on gray-5, where no Latte grey reads at this size. */
+:root[data-theme="light"] site-search kbd {
+  background-color: var(--sl-color-gray-6);
+}
+
+/* A table scrolling sideways is out of reach without a pointer; at phone width, less padding
+   keeps the widest one (the roles table) inside the column. Breaking words instead split "Viewer". */
+@media (max-width: 30rem) {
+  .sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+    padding-inline: 0.375rem;
+  }
+}

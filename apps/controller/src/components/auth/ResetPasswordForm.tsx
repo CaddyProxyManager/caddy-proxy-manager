@@ -16,6 +16,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { PasswordPolicyChecklist } from "@/src/components/auth/PasswordPolicyChecklist";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 
 type EmailedLink = { purpose: "reset" | "invite"; username: string };
@@ -27,6 +28,7 @@ type Stage =
 
 /** The token arrives in the fragment, which no server sees; it is dropped from the address bar. */
 export default function ResetPasswordForm({ canRequestAnother }: { canRequestAnother: boolean }) {
+  const frame = usePageFrame();
   const t = useTranslations();
   const [stage, setStage] = useState<Stage>({ kind: "checking" });
   const [password, setPassword] = useState("");
@@ -109,11 +111,11 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
     (stage.kind === "done" && stage.purpose === "invite");
 
   return (
-    <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
+    <Center role={frame.role} minHeight="100vh" padding={4} className="cpm-auth-page">
       <VStack as="form" width="100%" maxWidth={400} onSubmit={handleSubmit}>
         <VStack gap={3}>
           <VStack gap={1}>
-            <Heading level={1}>
+            <Heading level={frame.titleLevel}>
               {invite ? t("auth.passwordReset.inviteHeading") : t("auth.passwordReset.heading")}
             </Heading>
             {stage.kind === "form" && (
@@ -180,7 +182,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                     value={password}
                     onChange={setPassword}
                     isRequired
-                    hasAutoFocus
+                    hasAutoFocus={frame.autoFocus}
                     width="100%"
                   />
                   <TextInput

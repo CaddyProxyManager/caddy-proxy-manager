@@ -29,11 +29,12 @@
 
 .cpm-demo-badge {
   background: var(--sl-color-accent-low);
+  border: 0;
   border-radius: 999px;
   color: var(--sl-color-accent-high);
   cursor: help;
+  font: inherit;
   font-size: var(--sl-text-xs);
-  font-style: normal;
   letter-spacing: 0.02em;
   margin-inline-start: auto;
   padding: 0.125rem 0.5rem;

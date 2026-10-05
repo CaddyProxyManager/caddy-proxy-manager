@@ -137,6 +137,7 @@ export default function BlockedSourcesClient({
 
       {sources.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           icon={<Ban />}
           title={t("blockedSourcesEmptyTitle")}
           description={t("blockedSourcesEmptyDescription")}

@@ -34,7 +34,7 @@ the host's name, the search box finds them, and the tag filter beside the tabs n
 the hosts carrying one. They label hosts and nothing more: Caddy's configuration never sees them,
 so tagging a host does not reload anything.
 
-### The list and its traffic
+## The list and its traffic
 
 With [analytics](../analytics/) on, the list shows each host's last 24 hours beside its
 configuration, busiest first:
@@ -58,7 +58,7 @@ page; **Edit** stays in the row menu.
   <ProxyHostsTableDemo client:visible />
 </Demo>
 
-### A host's page
+## A host's page
 
 Each host has a page at `/proxy-hosts/<id>`:
 
@@ -82,7 +82,7 @@ need a manage grant.
   <HostTagsDemo client:visible />
 </Demo>
 
-### Reviewing a change before saving
+## Reviewing a change before saving
 
 The editor is grouped into the same parts as the host's page, with tabs under the title that jump
 to each and follow the scroll. In an existing host's editor a jump also lands in the address bar,
@@ -114,7 +114,7 @@ first. Notes and tags reach no Caddy config, so a change to only those reloads n
 
 The same preview is in the [API](../api/#previewing-a-change).
 
-### Duplicating a host
+## Duplicating a host
 
 **Duplicate** in a host's row menu opens a new host's editor filled in from that one, named with
 "(Copy)" on the end. The domains are left empty, since two hosts cannot answer for the same name,
@@ -122,7 +122,7 @@ and so is a sticky-session cookie secret: a secret is not copied into a new host
 shares with others by reference - its certificate, access list, mTLS roles - stays selected. Like
 creating a host, it is for administrators.
 
-### Changing many hosts at once
+## Changing many hosts at once
 
 Tick hosts in the list and a bar replaces the filters: enable, disable or delete them, turn
 maintenance mode on or off, give them all one certificate (automatic included) or one access list

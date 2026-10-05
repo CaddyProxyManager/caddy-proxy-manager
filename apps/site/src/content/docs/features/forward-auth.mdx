@@ -37,7 +37,7 @@ serves to machines. Excluded paths bypass the portal while the rest of the host 
   <ForwardAuthDemo client:visible />
 </Demo>
 
-:::caution
+:::caution[An excluded path is open]
 An excluded path is genuinely open. It is the right tool for a webhook that authenticates itself,
 and the wrong one for a page you merely think nobody will find.
 :::
@@ -82,7 +82,7 @@ Where the application has its own API credential - Moonraker's `X-Api-Key`, say 
 under **Bypass headers**. A request carrying it skips forward auth entirely and the application
 checks the credential itself.
 
-:::caution
+:::caution[The upstream must check the header]
 A bypass header only says "this request is the application's business". Anyone can send the header
 with a wrong value, so the upstream must reject it - list a header only if you know it does.
 :::

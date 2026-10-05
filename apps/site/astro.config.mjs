@@ -98,7 +98,12 @@ export default defineConfig({
           light: { flavor: "latte", accent: "lavender" },
         }),
       ],
-      customCss: ["./src/styles/demo.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demo.css"],
+      /*
+       * Wrapped: a block that scrolls gets an unnamed role="region" from Expressive Code, and a
+       * page with two of them has landmarks nobody can tell apart.
+       */
+      expressiveCode: { defaultProps: { wrap: true } },
       // Hand-ordered: the order a newcomer should meet the pages, not the directory's.
       sidebar: [
         {

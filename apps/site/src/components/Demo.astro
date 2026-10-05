@@ -28,9 +28,9 @@ const hintID = `cpm-demo-hint-${crypto.randomUUID().slice(0, 8)}`;
   <figcaption>
     <strong>{title}</strong>
     {note && <span>{note}</span>}
-    {/* Focusable, so the tooltip is reachable without a pointer, and described-by rather than
+    {/* A button, so the tooltip is reachable without a pointer, and described-by rather than
         labelled-by so a screen reader reads the badge and then the caveat. */}
-    <em class="cpm-demo-badge" tabindex="0" aria-describedby={hintID}>Demo</em>
+    <button type="button" class="cpm-demo-badge" aria-describedby={hintID}>Demo</button>
     <span class="cpm-demo-hint" id={hintID} role="tooltip">Nothing you change here is saved</span>
   </figcaption>
   <slot />

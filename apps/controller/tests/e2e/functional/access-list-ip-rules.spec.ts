@@ -67,10 +67,7 @@ test.describe
       await page.getByRole('option', { name: /status and body/i }).click();
       await page.getByRole('spinbutton', { name: /^status/i }).fill('451');
       await page.getByRole('textbox', { name: /^body/i }).fill('Not from here {braces}');
-      await page
-        .getByRole('button', { name: /save changes/i })
-        .last()
-        .click();
+      await page.getByRole('button', { name: 'Save deny response' }).click();
       await expect(page.getByText(/saved/i).first()).toBeVisible();
       await expect(async () => {
         const res = await httpGet('func-ipdeny.test');

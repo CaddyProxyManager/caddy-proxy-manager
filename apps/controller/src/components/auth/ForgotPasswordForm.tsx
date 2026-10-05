@@ -13,8 +13,10 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { AUTOFILL_USERNAME, NO_SPELLCHECK } from "@/src/components/ui/native-input-attrs";
+import { usePageFrame } from "@/src/components/ui/standalone-page";
 
 export default function ForgotPasswordForm({ appName }: { appName: string }) {
+  const frame = usePageFrame();
   const t = useTranslations("auth.passwordReset");
   const [identifier, setIdentifier] = useState("");
   const [pending, setPending] = useState(false);
@@ -48,11 +50,11 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
   }
 
   return (
-    <Center role="main" minHeight="100vh" padding={4}>
+    <Center role={frame.role} minHeight="100vh" padding={4}>
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">
-            <Heading level={1}>{appName}</Heading>
+            <Heading level={frame.titleLevel}>{appName}</Heading>
             <Text type="body" size="sm" color="secondary" justify="center">
               {t("requestSubtitle")}
             </Text>
@@ -75,7 +77,7 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
                   value={identifier}
                   onChange={setIdentifier}
                   isRequired
-                  hasAutoFocus
+                  hasAutoFocus={frame.autoFocus}
                   isDisabled={pending}
                   width="100%"
                 />
