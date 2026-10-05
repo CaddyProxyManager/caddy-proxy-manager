@@ -106,7 +106,7 @@ export const CONFIG_NEUTRAL_FIELDS: readonly string[] = [
   "cpmForwardAuthAccess",
 ];
 
-const SECRET_KEY =
+export const SECRET_KEY =
   /secret|password|passwd|token|api[_-]?key|auth[_-]?key|private[_-]?key|credential/i;
 
 const JSON_SECRET =
@@ -238,6 +238,17 @@ function diffField(
   }
   if (leaves.length === 0) return null;
   return { field, section: spec.section, before: null, after: null, leaves, masked, revertible };
+}
+
+/** One value outside the host field lists, as the audit log's generic diffs need. */
+export function diffValue(
+  field: string,
+  section: string,
+  before: unknown,
+  after: unknown,
+  options: { rawText?: boolean } = {},
+): FieldChange | null {
+  return diffField(field, { section, rawText: options.rawText }, before, after, false);
 }
 
 /**

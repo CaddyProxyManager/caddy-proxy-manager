@@ -769,7 +769,13 @@ export function resolveEffectiveGeoBlock(
   if (!hostConfig?.enabled && !globalConfig?.enabled) return null;
 
   if (hostConfig && host.geoblock_mode === "override") {
-    return hostConfig.enabled ? hostConfig : null;
+    return hostConfig.enabled
+      ? {
+          ...hostConfig,
+          response_status: hostConfig.response_status ?? 403,
+          response_body: hostConfig.response_body ?? "Forbidden",
+        }
+      : null;
   }
 
   // Host merge mode: only enabled host config alters global behavior - a disabled host

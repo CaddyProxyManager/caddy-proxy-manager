@@ -297,13 +297,14 @@ starts their count over - the way back in when that user is the only administrat
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
 - **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`. Restores onto a new machine with a different `SESSION_SECRET`, and saves what it replaces first
+- **Portable Configuration** - Export hosts, access lists, certificates, groups, WAF rules and settings to a readable JSON file with each secret sealed under a passphrase, and import it into another instance after a dry run that lists what it would create, update or skip. Rows match by name, users by email; a domain another host already serves is reported, never overwritten
 - **Global Caddyfile** - Raw Caddyfile, global options and site blocks on their own ports, added to every agent's config. Adapted by each agent's Caddy and checked with `caddy validate` on save; anything that would replace CPM's own config (admin API, storage, certificate automation, ports 80/443) is refused by name
 - **Log Viewer** - Tail access, WAF, Caddy and certificate logs from any agent, following new lines, with a Logs action on each proxy host. Admin only
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
 - **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported - accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. An apply that any host refuses fails and names it
 - **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. It can be switched off; the only other requests the app makes to the internet on its own are the CRS plugin registry check and the GeoIP downloads, each with a switch of its own
-- **Audit Log** - Searchable configuration change history with user attribution and pagination
+- **Audit Log** - Searchable configuration change history with user attribution, field-level before and after for each change (secrets masked, unified or side by side), and a SHA-256 hash chain an administrator can verify to find the first altered, removed or inserted event
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
 - **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie - no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
@@ -587,6 +588,8 @@ disagree about what a write does. New integrations should use GraphQL.
 
 Backup is the exception: `POST /api/v1/backup` takes a passphrase and returns the encrypted file,
 for scripts and cron, and has no GraphQL counterpart. Restoring stays in **Settings → Backup**.
+The portable configuration is GraphQL only: `exportConfig`, `previewConfigImport` and
+`applyConfigImport` carry the file as base64, and `verifyAuditChain` checks the audit log.
 
 ---
 
@@ -822,6 +825,23 @@ converts the whole file before writing anything, saves the current configuration
 transaction, and signs everyone out. A backup from an older release restores onto a newer one; one
 from a newer release is refused. Turn off **Keep the agent pairings** when moving to a new machine:
 its agents then pair afresh.
+
+### Portable configuration
+
+Below the backup, **Export configuration** writes a JSON file instead: proxy and L4 hosts (with
+their agent pins, mTLS rules and sign-in grants), access lists, certificates (imported ones with
+their keys), CAs, client certificates and mTLS roles, groups with their members and grants, WAF
+presets, CRS plugins, WAF exclusions, blocked sources and settings, by section. It leaves out
+users, API tokens, sessions, agents, the audit log, saved analytics views and the dashboard host.
+The file stays readable; each secret in it is sealed on its own under the passphrase, with the
+backup's scrypt and AES-256-GCM.
+
+**Import configuration** merges rather than replaces. Rows match by name (users by email, agents
+by name), ids are remapped, including the ones inside host settings, and the dry run lists what
+would be created, updated or skipped before anything is written. A host whose domain another host
+here already serves is skipped and named, as is anything pointing at a user, agent or list this
+instance lacks rather than losing that reference. Files are limited to 50 MiB; admin only, and
+both directions are audited.
 
 ---
 

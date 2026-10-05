@@ -474,11 +474,17 @@ export function parseGeoBlockConfig(formData: FormData): {
     allow_ips: parseStringList("geoblockAllowIps"),
     trusted_proxies: parseStringList("geoblockTrustedProxies"),
     fail_closed: formData.get("geoblockFailClosed") === "on",
-    response_status: (() => {
-      const s = parseOptionalNumber(formData.get("geoblockResponseStatus")) ?? 403;
-      return s >= 100 && s <= 599 ? s : 403;
+    // Blank stays unset rather than pinning 403, so an edit leaves an inheriting host inheriting.
+    ...(() => {
+      const status = parseOptionalNumber(formData.get("geoblockResponseStatus"));
+      return status !== null && status !== undefined && status >= 100 && status <= 599
+        ? { response_status: status }
+        : {};
     })(),
-    response_body: parseOptionalText(formData.get("geoblockResponseBody")) ?? "Forbidden",
+    ...(() => {
+      const body = parseOptionalText(formData.get("geoblockResponseBody"));
+      return body ? { response_body: body } : {};
+    })(),
     response_headers: parseResponseHeaders(formData),
     redirect_url: parseRedirectUrl(formData.get("geoblockRedirectUrl")),
   };

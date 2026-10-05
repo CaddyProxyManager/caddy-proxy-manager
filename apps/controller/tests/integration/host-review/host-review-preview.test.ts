@@ -153,6 +153,58 @@ describe('previewProxyHostAction', () => {
     expect(preview.impact.agents).toEqual([]);
   });
 
+  it('finds nothing to save for a host stored without the defaults the editor fills in', async () => {
+    const row = await seedHost();
+    // As the API stores them: no WAF merge mode and no geo-block response of its own.
+    await db
+      .update(schema.proxyHosts)
+      .set({
+        meta: JSON.stringify({
+          waf: { enabled: true, mode: 'DetectionOnly', load_owasp_crs: true },
+          geoblock: {
+            enabled: true,
+            block_countries: ['CN'],
+            block_continents: [],
+            block_asns: [],
+            block_cidrs: [],
+            block_ips: [],
+            allow_countries: [],
+            allow_continents: [],
+            allow_asns: [],
+            allow_cidrs: [],
+            allow_ips: [],
+          },
+        }),
+      })
+      .where(eq(schema.proxyHosts.id, row.id));
+    // What the editor posts back for it, untouched.
+    const preview = previewOf(
+      await previewProxyHostAction(
+        row.id,
+        form({
+          ...BASIC,
+          tagsPresent: '1',
+          wafPresent: '1',
+          wafEnabled: 'on',
+          wafMode: 'merge',
+          wafEngineMode: 'DetectionOnly',
+          wafLoadOwaspCrs: 'on',
+          wafCustomDirectives: '',
+          wafPresetIds: '[]',
+          wafPluginIds: '[]',
+          geoblockPresent: '1',
+          geoblockEnabled: 'on',
+          geoblockMode: 'merge',
+          geoblockBlockCountries: 'CN',
+          geoblockResponseStatus: '',
+          geoblockResponseBody: '',
+          geoblockRedirectUrl: '',
+        }),
+      ),
+    );
+    expect(preview.changes).toEqual([]);
+  });
+
   it('reloads nothing when only notes and tags change', async () => {
     const row = await seedHost();
     const preview = previewOf(
@@ -309,6 +361,50 @@ describe('previewProxyHostAction', () => {
   });
 });
 
+describe('the audit diff a save records', () => {
+  const changesLogged = () =>
+    (audit.mock.calls.at(-1)?.[0] as { changes?: { field: string }[] } | undefined)?.changes ?? [];
+
+  it('is the field diff the review showed, secrets masked', async () => {
+    const row = await seedHost();
+    const entries = {
+      name: 'app renamed',
+      lbPresent: '1',
+      lbEnabledPresent: '1',
+      lbEnabled: 'on',
+      lbPolicy: 'cookie',
+      lbPolicyCookieName: 'sticky',
+      lbPolicyCookieSecret: 'hunter2-very-secret',
+    };
+    const preview = previewOf(await previewProxyHostAction(row.id, form(entries)));
+    expect((await updateProxyHostAction(row.id, undefined, form(entries))).status).toBe('success');
+    const logged = changesLogged();
+    expect(logged.map((c) => c.field)).toEqual(preview.changes.map((c) => c.field));
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('hunter2-very-secret');
+  });
+
+  it('records nothing changed for a save of the stored values', async () => {
+    const row = await seedHost();
+    expect((await updateProxyHostAction(row.id, undefined, form({ name: 'app' }))).status).toBe(
+      'success',
+    );
+    expect(changesLogged()).toEqual([]);
+  });
+
+  it('names the access list a create sets, not its id', async () => {
+    const list = await createAccessList({ name: 'office' }, users.admin);
+    audit.mockClear();
+    expect(
+      (await createProxyHostAction(undefined, form({ ...BASIC, accessListId: String(list.id) })))
+        .status,
+    ).toBe('success');
+    const created = (audit.mock.calls.find((call) => call[0].action === 'create')?.[0] ?? {}) as {
+      changes?: { field: string; after: unknown }[];
+    };
+    expect(created.changes?.find((c) => c.field === 'accessListId')?.after).toBe('office');
+  });
+});
+
 describe('previewL4ProxyHostAction', () => {
   const L4 = {
     name: 'db',
@@ -375,6 +471,8 @@ describe('previewL4ProxyHostAction', () => {
     const host = await getL4ProxyHost(row.id);
     expect(host?.name).toBe('database');
     expect(host?.listenAddress).toBe(':15432');
+    const logged = audit.mock.calls.at(-1)?.[0] as { changes?: { field: string }[] };
+    expect(logged.changes?.map((c) => c.field)).toEqual(['name']);
   });
 });
 

@@ -28,6 +28,8 @@ import {
   describeBackup,
   restoreBackup,
 } from '../../src/lib/backup/service';
+import { auditEventRow, insertAuditRows } from '../../src/lib/audit';
+import { reanchorAuditChain, verifyAuditChain } from '../../src/lib/audit/chain';
 
 const PASSPHRASE = 'correct horse battery staple';
 const NOW = new Date().toISOString();
@@ -291,5 +293,47 @@ describe('restore', () => {
     await expect(
       restoreBackup(Buffer.from(text, 'utf8'), PASSPHRASE, { keepAgents: true }),
     ).rejects.toMatchObject({ code: 'backupFromNewerVersion' });
+  });
+});
+
+describe('the audit hash chain across a restore', () => {
+  const log = (summary: string) =>
+    insertAuditRows([auditEventRow({ action: 'update', entityType: 'proxy_host', summary })]);
+
+  beforeEach(async () => {
+    await ctx.db.delete(schema.auditEvents);
+    await reanchorAuditChain();
+  });
+
+  it('stays verifiable when the backup brings its own audit log', async () => {
+    await log('one');
+    await log('two');
+    const file = await createBackup(PASSPHRASE, { auditLog: true });
+    await log('three, made after the backup');
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    expect(await ctx.db.select().from(schema.auditEvents)).toHaveLength(2);
+    await log('after the restore');
+    expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 3 });
+  });
+
+  it('leaves the local chain alone when the backup has no audit log', async () => {
+    await log('one');
+    const file = await createBackup(PASSPHRASE);
+    await log('two');
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    await log('three');
+    expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 3 });
+  });
+
+  it('adopts the hashless events of a backup made before the chain existed', async () => {
+    await ctx.db.insert(schema.auditEvents).values({
+      action: 'create',
+      entityType: 'user',
+      createdAt: NOW,
+    });
+    const file = await createBackup(PASSPHRASE, { auditLog: true });
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    await log('after');
+    expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 1, legacy: 1 });
   });
 });

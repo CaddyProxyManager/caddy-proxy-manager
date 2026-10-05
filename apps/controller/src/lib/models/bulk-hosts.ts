@@ -7,8 +7,8 @@
 import { eq, inArray } from "drizzle-orm";
 import db, { nowIso, runInTransaction } from "../db";
 import { applyCaddyConfig } from "../caddy";
-import { auditEventRow, type AuditEventParams } from "../audit";
-import { accessLists, auditEvents, certificates, l4ProxyHosts, proxyHosts } from "../db/schema";
+import { auditEventRow, chainedAuditInsert, type AuditEventParams } from "../audit";
+import { accessLists, certificates, l4ProxyHosts, proxyHosts } from "../db/schema";
 import { domainError } from "../errors/domain-error";
 import { assertCertificatesServable } from "../certificates/placement";
 import { assertL4PortPlan } from "../l4/port-plan";
@@ -260,7 +260,7 @@ export async function bulkUpdateProxyHosts(
           );
       }
     })();
-    return [...writes, tx.insert(auditEvents).values(audits.map(auditEventRow))];
+    return [...writes, chainedAuditInsert(tx, audits.map(auditEventRow))];
   });
 
   // Tags never reach the config, so there is nothing to reload.
@@ -341,7 +341,7 @@ export async function bulkUpdateL4ProxyHosts(
               .set({ enabled: request.action === "enable", updatedAt: now })
               .where(where),
           ]),
-    tx.insert(auditEvents).values(audits),
+    chainedAuditInsert(tx, audits),
   ]);
 
   // Published ports are derived from the enabled hosts: the ports banner picks this up unaided.

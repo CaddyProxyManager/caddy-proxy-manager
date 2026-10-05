@@ -1,4 +1,5 @@
 import AuditLogClient from "./AuditLogClient";
+import { verifyAuditChainAction } from "./actions";
 import {
   listAuditEvents,
   countAuditEvents,
@@ -86,6 +87,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
       events={events.map((event) => ({
         id: event.id,
         createdAt: event.createdAt,
+        changes: event.changes,
         action: event.action,
         entityType: event.entityType,
         summary:
@@ -108,6 +110,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
       }}
       activity={buckets}
       summary={summary}
+      verifyChain={verifyAuditChainAction}
     />
   );
 }

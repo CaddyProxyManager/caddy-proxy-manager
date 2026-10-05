@@ -7,6 +7,7 @@ import { Database } from "bun:sqlite";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { is, sql } from "drizzle-orm";
 import db from "../db";
+import { reanchorAuditChain } from "../audit/chain";
 import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
@@ -304,6 +305,10 @@ export async function importLegacyDatabase(
         })
         .onConflictDoNothing();
       invalidateSettingsCache();
+    }
+
+    if (results.some((result) => result.table === "audit_events" && result.copied > 0)) {
+      await reanchorAuditChain({ adoptUnchained: true });
     }
 
     return {

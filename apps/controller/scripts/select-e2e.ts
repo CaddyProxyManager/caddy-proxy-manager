@@ -297,7 +297,11 @@ export const RULES: readonly Rule[] = [
   { match: [`${LIB}secrets/`], specs: ["functional/secret-rotation", "settings/backup"] },
   {
     match: [`${LIB}backup/`, `${APP}api/backup/`, `${V1}backup/`, `${DASH}settings/backup/`],
-    specs: ["settings/backup", "setup/setup-migrate"],
+    specs: ["settings/backup", "settings/config-transfer", "setup/setup-migrate"],
+  },
+  {
+    match: [`${LIB}config-transfer/`, `${APP}api/config/`],
+    specs: ["settings/config-transfer"],
   },
   {
     match: [`${LIB}branding/`, `${APP}api/branding/`, `${DASH}settings/AccentColorPicker.tsx`],
@@ -354,7 +358,13 @@ export const RULES: readonly Rule[] = [
     specs: USERS,
   },
   {
-    match: [`${LIB}audit/`, `${DASH}audit-log/`, `${V1}audit-log/`, `${MODELS}audit.ts`],
+    match: [
+      `${LIB}audit/`,
+      `${DASH}audit-log/`,
+      `${V1}audit-log/`,
+      `${MODELS}audit.ts`,
+      `${SRC}components/audit/`,
+    ],
     specs: ["audit-log"],
   },
   {

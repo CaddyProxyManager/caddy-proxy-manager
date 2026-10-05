@@ -9,6 +9,7 @@ import {
 import { applyCaddyConfig } from "../caddy";
 import { getMetricsSettings } from "../settings";
 import { logAuditEvent } from "../audit";
+import { hostAuditChanges } from "../host-review/audit";
 import { accessListIpRules, accessLists, l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../errors/domain-error";
@@ -857,7 +858,12 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     entityType: "l4_proxy_host",
     entityId: record.id,
     summary: `Created L4 proxy host ${input.name}`,
-    data: input,
+    changes: await hostAuditChanges(
+      "l4",
+      null,
+      { host: parseL4ProxyHost(record), agentIds: input.agentIds ?? [] },
+      blankL4ProxyHost(),
+    ),
   });
 
   await applyCaddyConfig();
@@ -1059,7 +1065,8 @@ export async function updateL4ProxyHost(
   input: Partial<L4ProxyHostInput>,
   actorUserId: number,
 ) {
-  const { existing, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
+  const { existing, row, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
+  const agentIdsBefore = await agentIdsForHost("l4", id);
   await db
     .update(l4ProxyHosts)
     .set({ ...set, updatedAt: nowIso() })
@@ -1075,7 +1082,12 @@ export async function updateL4ProxyHost(
     entityType: "l4_proxy_host",
     entityId: id,
     summary: `Updated L4 proxy host ${input.name ?? existing.name}`,
-    data: input,
+    changes: await hostAuditChanges(
+      "l4",
+      { host: existing, agentIds: agentIdsBefore },
+      { host: parseL4ProxyHost({ ...row, ...set }), agentIds: input.agentIds ?? agentIdsBefore },
+      blankL4ProxyHost(),
+    ),
   });
 
   await applyCaddyConfig();
@@ -1088,6 +1100,7 @@ export async function deleteL4ProxyHost(id: number, actorUserId: number) {
     throw domainError("l4ProxyHostNotFound", {}, { status: 404 });
   }
 
+  const agentIdsBefore = await agentIdsForHost("l4", id);
   await db.delete(l4ProxyHosts).where(eq(l4ProxyHosts.id, id));
   await logAuditEvent({
     userId: actorUserId,
@@ -1095,6 +1108,12 @@ export async function deleteL4ProxyHost(id: number, actorUserId: number) {
     entityType: "l4_proxy_host",
     entityId: id,
     summary: `Deleted L4 proxy host ${existing.name}`,
+    changes: await hostAuditChanges(
+      "l4",
+      { host: existing, agentIds: agentIdsBefore },
+      null,
+      blankL4ProxyHost(),
+    ),
   });
   await applyCaddyConfig();
 }

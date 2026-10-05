@@ -2,6 +2,7 @@ import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { validateCaddyfileSnippet } from "../caddy/caddyfile";
 import { logAuditEvent } from "../audit";
+import { hostAuditChanges } from "../host-review/audit";
 import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import {
@@ -3217,7 +3218,8 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
     upstreamDnsResolution: hydrateUpstreamDnsResolution(meta.upstream_dns_resolution),
     geoblock: hydrateGeoBlock(meta.geoblock),
     geoblockMode: meta.geoblock_mode ?? "merge",
-    waf: meta.waf ?? null,
+    // Absent is merge, and the editor always sends one: filled here so the two read alike.
+    waf: meta.waf ? { ...meta.waf, waf_mode: meta.waf.waf_mode ?? "merge" } : null,
     mtls: meta.mtls ?? null,
     forwardAuth: hydrateForwardAuth(meta.forward_auth),
     cpmForwardAuth: meta.cpm_forward_auth?.enabled
@@ -3680,13 +3682,19 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     await setHostAgents("http", record.id, input.agentIds);
   }
 
+  const created = (await getProxyHost(record.id))!;
   await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "proxy_host",
     entityId: record.id,
     summary: `Created proxy host ${input.name}`,
-    data: input,
+    changes: await hostAuditChanges(
+      "http",
+      null,
+      { host: created, agentIds: input.agentIds ?? [] },
+      blankProxyHost(),
+    ),
   });
 
   await applyCaddyConfig();
@@ -3851,7 +3859,8 @@ export async function updateProxyHost(
   input: Partial<ProxyHostInput>,
   actorUserId: number,
 ) {
-  const { existing, set } = await prepareProxyHostUpdate(id, input, actorUserId);
+  const { existing, row, set } = await prepareProxyHostUpdate(id, input, actorUserId);
+  const agentIdsBefore = await agentIdsForHost("http", id);
   await db
     .update(proxyHosts)
     .set({ ...set, updatedAt: nowIso() })
@@ -3867,7 +3876,15 @@ export async function updateProxyHost(
     entityType: "proxy_host",
     entityId: id,
     summary: `Updated proxy host ${input.name ?? existing.name}`,
-    data: input,
+    changes: await hostAuditChanges(
+      "http",
+      { host: existing, agentIds: agentIdsBefore },
+      {
+        host: parseProxyHost({ ...row, ...set } as ProxyHostRow),
+        agentIds: input.agentIds ?? agentIdsBefore,
+      },
+      blankProxyHost(),
+    ),
   });
 
   await applyCaddyConfig();
@@ -3916,6 +3933,7 @@ export async function deleteProxyHost(id: number, actorUserId: number) {
     throw domainError("proxyHostNotFound");
   }
 
+  const agentIdsBefore = await agentIdsForHost("http", id);
   await db.delete(proxyHosts).where(eq(proxyHosts.id, id));
   await logAuditEvent({
     userId: actorUserId,
@@ -3923,6 +3941,12 @@ export async function deleteProxyHost(id: number, actorUserId: number) {
     entityType: "proxy_host",
     entityId: id,
     summary: `Deleted proxy host ${existing.name}`,
+    changes: await hostAuditChanges(
+      "http",
+      { host: existing, agentIds: agentIdsBefore },
+      null,
+      blankProxyHost(),
+    ),
   });
   await applyCaddyConfig();
 }

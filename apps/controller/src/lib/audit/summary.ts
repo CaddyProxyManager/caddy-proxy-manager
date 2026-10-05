@@ -532,6 +532,31 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Restored the configuration from a backup$/,
   },
   {
+    entityType: "settings",
+    action: "update",
+    message: "settingsApplied",
+    pattern: /^Applied settings revision (?<revision>\S+)$/,
+  },
+  {
+    entityType: "audit_log",
+    action: "audit_verified",
+    message: "auditChainVerified",
+    pattern: /^Verified the audit log's hash chain$/,
+  },
+  {
+    entityType: "config",
+    action: "config_exported",
+    message: "configExported",
+    pattern: /^Exported the configuration$/,
+  },
+  {
+    entityType: "config",
+    action: "config_imported",
+    message: "configImported",
+    pattern:
+      /^Imported a configuration \((?<created>\S+) created, (?<updated>\S+) updated, (?<skipped>\S+) skipped\)$/,
+  },
+  {
     entityType: "session",
     action: "view_as_started",
     message: "viewAsStarted",

@@ -66,3 +66,42 @@ describe('resolveEffectiveGeoBlock', () => {
     expect(buildBlockerHandler(result!).response_body).toBe('Blocked by host');
   });
 });
+
+describe('a host geo-block with no response of its own', () => {
+  const bare: GeoBlockSettings = {
+    enabled: true,
+    block_countries: ['CN'],
+    block_continents: [],
+    block_asns: [],
+    block_cidrs: [],
+    block_ips: [],
+    allow_countries: [],
+    allow_continents: [],
+    allow_asns: [],
+    allow_cidrs: [],
+    allow_ips: [],
+    trusted_proxies: [],
+    fail_closed: false,
+    response_headers: {},
+    redirect_url: '',
+  };
+
+  it('takes the global response in merge mode', () => {
+    const result = resolveEffectiveGeoBlock(globalGeoBlock, {
+      geoblock_mode: 'merge',
+      geoblock: bare,
+    });
+    expect(result?.response_body).toBe(globalGeoBlock.response_body);
+  });
+
+  it('answers 403 "Forbidden" in override mode', () => {
+    const result = resolveEffectiveGeoBlock(globalGeoBlock, {
+      geoblock_mode: 'override',
+      geoblock: bare,
+    });
+    expect(buildBlockerHandler(result!)).toMatchObject({
+      response_status: 403,
+      response_body: 'Forbidden',
+    });
+  });
+});

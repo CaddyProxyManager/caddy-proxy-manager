@@ -155,8 +155,9 @@ export type GeoBlockSettings = {
   // Block when the real client IP cannot be determined. Off (fail-open) by default.
   fail_closed: boolean;
 
-  response_status: number; // default 403
-  response_body: string; // default "Forbidden"
+  // Absent on a host inherits: the global geo-block's in merge mode, else 403 "Forbidden".
+  response_status?: number;
+  response_body?: string;
   response_headers: Record<string, string>;
   redirect_url: string; // if set, 302 redirect instead of status/body
 };

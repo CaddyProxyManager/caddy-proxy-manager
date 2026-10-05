@@ -63,6 +63,7 @@ import { assertNotSelf, assertUserRole } from "../users/admin";
 import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics";
 import { attentionMutationResolvers, attentionQueryResolvers } from "./attention";
 import { securityMutationResolvers, securityQueryResolvers } from "./security";
+import { auditMutationResolvers } from "./audit";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -496,5 +497,6 @@ export const resolvers = {
     ...analyticsMutationResolvers,
     ...attentionMutationResolvers,
     ...securityMutationResolvers,
+    ...auditMutationResolvers,
   },
 };

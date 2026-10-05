@@ -25,12 +25,16 @@ test('downloads an encrypted backup, and previews it for restoring', async ({ pa
   // Sealed: the admin's own email is in the users table, and must not be readable in the file.
   expect(contents).not.toContain('@localhost');
 
-  // Downloads are saved under a random name; the picker only takes .cpmbak files.
-  await page.locator('input[type="file"]').setInputFiles({
-    name: file.suggestedFilename(),
-    mimeType: 'application/octet-stream',
-    buffer: readFileSync(path),
-  });
+  // Downloads are saved under a random name; the picker only takes .cpmbak files. The first picker
+  // is the restore's; the configuration import's comes after it.
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles({
+      name: file.suggestedFilename(),
+      mimeType: 'application/octet-stream',
+      buffer: readFileSync(path),
+    });
   await expect(page.getByText(/made by version/i)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: /^restore$/i })).toBeDisabled();
 });

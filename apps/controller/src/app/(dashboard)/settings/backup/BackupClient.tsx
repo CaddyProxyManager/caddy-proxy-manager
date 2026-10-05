@@ -18,6 +18,7 @@ import { AUTOFILL_NEW_PASSWORD, AUTOFILL_OFF } from "@/components/ui/native-inpu
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "../SettingsFrame";
+import { ConfigTransfer } from "./ConfigTransfer";
 
 type Preview = {
   createdAt: string;
@@ -270,6 +271,7 @@ export default function BackupClient({ staged }: { staged: StagedView }) {
       <VStack gap={6}>
         <DownloadCard />
         <RestoreCard />
+        <ConfigTransfer />
       </VStack>
     </SettingsFrame>
   );

@@ -39,6 +39,7 @@ export const {
   proxyHosts,
   apiTokens,
   auditEvents,
+  auditChain,
   mtlsRoles,
   mtlsCertificateRoles,
   mtlsAccessRules,

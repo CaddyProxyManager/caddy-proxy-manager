@@ -411,7 +411,7 @@ describe('parseGeoBlockConfig', () => {
     });
   });
 
-  it('falls back to a 403 "Forbidden" and merge for missing or out-of-range values', () => {
+  it('leaves a blank or out-of-range response unset, so the host keeps inheriting it', () => {
     const { geoblock, geoblockMode } = parseGeoBlockConfig(
       form({
         geoblockPresent: '1',
@@ -426,11 +426,12 @@ describe('parseGeoBlockConfig', () => {
       enabled: false,
       block_countries: [],
       fail_closed: false,
-      response_status: 403,
-      response_body: 'Forbidden',
       response_headers: {},
       redirect_url: '',
     });
+    // Present as 403 "Forbidden" would pin them, and an untouched edit would read as a change.
+    expect(geoblock).not.toHaveProperty('response_status');
+    expect(geoblock).not.toHaveProperty('response_body');
   });
 
   it('reads a header with no value as empty', () => {

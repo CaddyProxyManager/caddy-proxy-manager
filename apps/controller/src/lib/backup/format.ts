@@ -8,7 +8,7 @@ import { domainError } from "../errors/domain-error";
 
 const MAGIC = "CPMBAK1";
 /** 32 MiB of scrypt: costly to brute-force, affordable on a small controller. */
-const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
+export const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
 export const MIN_PASSPHRASE_LENGTH = 12;
 
 export type BackupHeader = {
@@ -49,7 +49,7 @@ function headerAad(
   );
 }
 
-function deriveKey(
+export function deriveKey(
   passphrase: string,
   salt: Buffer,
   kdf: { N: number; r: number; p: number } = SCRYPT,

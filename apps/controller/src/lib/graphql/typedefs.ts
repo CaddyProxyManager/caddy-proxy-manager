@@ -263,6 +263,65 @@ export const typeDefs = /* GraphQL */ `
     entityId: Int
     summary: String
     createdAt: DateTime!
+    """Field-level before and after, secrets masked; null when the event recorded none."""
+    changes: [AuditChange!]
+  }
+
+  type AuditChange {
+    field: String!
+    """The host editor section, for host fields."""
+    section: String
+    """A scalar, a list of scalars, or null; null for a nested field, which lists leaves."""
+    before: JSON
+    after: JSON
+    leaves: [AuditLeafChange!]
+    masked: Boolean!
+  }
+
+  type AuditLeafChange {
+    path: String!
+    before: JSON
+    after: JSON
+  }
+
+  """
+  The first place the audit log's hash chain does not hold. reason: missing, link, content, head
+  (the newest events were removed or rewritten) or unchained (an event added outside the chain).
+  """
+  type AuditChainBreak {
+    reason: String!
+    seq: Int
+    eventId: Int
+  }
+
+  type AuditChainVerification {
+    ok: Boolean!
+    checked: Int!
+    """Events written before the chain existed, which it does not cover."""
+    legacy: Int!
+    firstBroken: AuditChainBreak
+    verifiedAt: DateTime!
+  }
+
+  """One row a config import would create, update or skip. reason and values explain a skip."""
+  type ConfigImportItem {
+    table: String!
+    label: String!
+    action: String!
+    reason: String
+    values: JSON!
+    fields: [String!]!
+  }
+
+  type ConfigImportPreview {
+    appVersion: String!
+    exportedAt: String!
+    sections: [String!]!
+    items: [ConfigImportItem!]!
+    """{ create, update, skip }"""
+    counts: JSON!
+    """{ code, values }: rows dropped because what they named is not on this instance."""
+    warnings: [JSON!]!
   }
 
   type Agent {
@@ -845,6 +904,18 @@ export const typeDefs = /* GraphQL */ `
     previewL4ProxyHost(id: Int, input: JSON!, revert: [String!]): HostChangePreview!
     """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids, tag? }, all or nothing."""
     bulkL4ProxyHosts(input: JSON!): Int!
+
+    """Recomputes the audit log's hash chain and reports the first broken link."""
+    verifyAuditChain: AuditChainVerification!
+    """
+    The portable config, sealed under passphrase, as base64 of the JSON file. sections: hosts,
+    accessLists, certificates, groups, security, settings; all when omitted.
+    """
+    exportConfig(passphrase: String!, sections: [String!]): String!
+    """What importing file (base64) would create, update or skip. Writes nothing."""
+    previewConfigImport(file: String!, passphrase: String!): ConfigImportPreview!
+    """Imports file (base64), planned afresh against the current state. A domain in use is skipped."""
+    applyConfigImport(file: String!, passphrase: String!): ConfigImportPreview!
 
     createAccessList(input: JSON!): AccessList!
     updateAccessList(id: Int!, input: JSON!): AccessList!

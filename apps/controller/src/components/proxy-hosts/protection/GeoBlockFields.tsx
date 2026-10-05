@@ -392,10 +392,14 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
   const [initial, setInitial] = useState<GeoBlockSettings | null>(rawInitial);
   const [activeTab, setActiveTab] = useState("block");
 
+  // A host may leave these blank to inherit; the global settings always hold a value.
+  const inherits = showModeSelector;
+  const statusDefault = inherits ? null : 403;
+  const bodyDefault = inherits ? "" : "Forbidden";
   const [responseStatus, setResponseStatus] = useState<number | null>(
-    rawInitial?.response_status ?? 403,
+    rawInitial?.response_status ?? statusDefault,
   );
-  const [responseBody, setResponseBody] = useState(rawInitial?.response_body ?? "Forbidden");
+  const [responseBody, setResponseBody] = useState(rawInitial?.response_body ?? bodyDefault);
   const [redirectUrl, setRedirectUrl] = useState(rawInitial?.redirect_url ?? "");
   const [failClosed, setFailClosed] = useState(rawInitial?.fail_closed ?? false);
 
@@ -405,12 +409,12 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
     setEnabled(rawInitial?.enabled ?? false);
     setMode(initialValues?.geoblock_mode ?? "merge");
     setInitial(rawInitial);
-    setResponseStatus(rawInitial?.response_status ?? 403);
-    setResponseBody(rawInitial?.response_body ?? "Forbidden");
+    setResponseStatus(rawInitial?.response_status ?? statusDefault);
+    setResponseBody(rawInitial?.response_body ?? bodyDefault);
     setRedirectUrl(rawInitial?.redirect_url ?? "");
     setFailClosed(rawInitial?.fail_closed ?? false);
     setResetKey((k) => k + 1);
-  }, [rawInitial, initialValues?.geoblock_mode]);
+  }, [rawInitial, initialValues?.geoblock_mode, statusDefault, bodyDefault]);
 
   const headers = useMemo(() => initial?.response_headers ?? {}, [initial]);
 
@@ -569,14 +573,22 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                     isIntegerOnly
                     value={responseStatus}
                     onChange={setResponseStatus}
-                    description={t("geoblockStatusCodeHelp")}
+                    placeholder={inherits ? "403" : undefined}
+                    description={
+                      inherits ? t("geoblockStatusCodeInheritHelp") : t("geoblockStatusCodeHelp")
+                    }
                   />
                   <TextInput
                     label={t("responseBody")}
                     htmlName="geoblockResponseBody"
                     value={responseBody}
                     onChange={setResponseBody}
-                    description={t("geoblockResponseBodyHelp")}
+                    placeholder={inherits ? "Forbidden" : undefined}
+                    description={
+                      inherits
+                        ? t("geoblockResponseBodyInheritHelp")
+                        : t("geoblockResponseBodyHelp")
+                    }
                   />
                   <TextInput
                     startIcon={Link}

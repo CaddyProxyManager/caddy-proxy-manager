@@ -7,12 +7,12 @@ import { hashBcrypt } from "../auth/password";
 const ACCESS_LIST_COST = 10;
 import db, { nowIso, runInTransaction, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
-import { auditEventRow, logAuditEvent } from "../audit";
+import { auditEventRow, chainedAuditInsert, logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 import {
   accessListEntries,
   accessListIpRules,
   accessLists,
-  auditEvents,
   l4ProxyHosts,
   proxyHosts,
 } from "../db/schema";
@@ -363,6 +363,20 @@ function ipRuleRows(accessListId: number, rules: IpRule[], now: string) {
   }));
 }
 
+/** A rule as the audit diff shows it: what it matches, not its row bookkeeping. */
+function auditedRule(rule: IpRule) {
+  return {
+    action: rule.action,
+    cidr: rule.cidr ?? null,
+    hostname: rule.hostname ?? null,
+    country: rule.country ?? null,
+    continent: rule.continent ?? null,
+    asn: rule.asn ?? null,
+    note: rule.note ?? null,
+    expiresAt: rule.expiresAt ?? null,
+  };
+}
+
 export async function updateAccessList(
   id: number,
   input: AccessListSettingsInput,
@@ -393,12 +407,14 @@ export async function updateAccessList(
     })
     .where(eq(accessLists.id, id));
 
+  const updated = (await getAccessList(id))!;
   await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "access_list",
     entityId: id,
     summary: `Updated access list ${input.name ?? existing.name}`,
+    changes: diffAuditRecords(existing, updated, { omit: ["entries", "ipRules"] }),
   });
 
   await applyCaddyConfig();
@@ -446,6 +462,7 @@ export async function setAccessListIpRules(id: number, rules: unknown, actorUser
     throw domainError("accessListNotFound");
   }
   const sanitized = sanitizeIpRules(rules);
+  const rulesBefore = (await getAccessList(id))?.ipRules ?? [];
   if (sanitized.length === 0) {
     // At layer 4 the rules are all of the list, so emptying them would close every connection.
     const l4Hosts = (await getAccessListUsageMap()).get(id)?.filter((h) => h.kind === "l4") ?? [];
@@ -473,6 +490,10 @@ export async function setAccessListIpRules(id: number, rules: unknown, actorUser
     entityType: "access_list",
     entityId: id,
     summary: `Updated access list ${existing.name}`,
+    changes: diffAuditRecords(
+      { ipRules: rulesBefore.map(auditedRule) },
+      { ipRules: sanitized.map(auditedRule) },
+    ),
   });
   await applyCaddyConfig();
   return (await getAccessList(id))!;
@@ -536,7 +557,8 @@ export async function removeAccessListEntries(
 
   await runInTransaction((tx) => [
     tx.delete(accessListEntries).where(scoped),
-    tx.insert(auditEvents).values(
+    chainedAuditInsert(
+      tx,
       ids.map((entryId) =>
         auditEventRow({
           userId: actorUserId,
@@ -707,7 +729,8 @@ export async function pruneExpiredAccessListRules(
         expired.map((row) => row.id),
       ),
     ),
-    tx.insert(auditEvents).values(
+    chainedAuditInsert(
+      tx,
       [...byList].map(([listId, { name, count }]) =>
         auditEventRow({
           userId: null,

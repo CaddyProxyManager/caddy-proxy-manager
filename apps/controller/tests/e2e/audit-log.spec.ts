@@ -46,4 +46,34 @@ test.describe('Audit Log', () => {
       (await page.getByLabel(/search/i).count()) > 0;
     expect(hasSearch).toBe(true);
   });
+
+  test('verifies the hash chain on request', async ({ page }) => {
+    await page.goto('/audit-log');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /verify integrity/i }).click();
+    await expect(page.getByText(/the audit log is intact/i)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("shows a host change's before and after, unified or side by side", async ({ page }) => {
+    await page.goto('/proxy-hosts');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /create host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByLabel('Name').fill('Audit Diff Host');
+    await page.getByLabel(/^domains/i).fill('audit-diff.local');
+    await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:8889');
+    await page.getByRole('button', { name: /^create$/i }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+
+    await page.goto('/audit-log?search=Audit%20Diff%20Host');
+    await waitForHydration(page);
+    await page
+      .getByRole('button', { name: /\d+ changes?/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('audit-diff.local')).toBeVisible();
+    await dialog.getByRole('radio', { name: /side by side/i }).click();
+    await expect(dialog.getByRole('columnheader', { name: /before/i })).toBeVisible();
+  });
 });

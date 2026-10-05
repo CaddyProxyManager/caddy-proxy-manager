@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import db, { nowIso, runInTransaction, toIso } from "../db";
-import { auditEventRow, logAuditEvent } from "../audit";
+import { auditEventRow, chainedAuditInsert, logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 import { applyCaddyConfig } from "../caddy";
-import { auditEvents, certificates, proxyHosts } from "../db/schema";
+import { certificates, proxyHosts } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 import { getDashboardSettings } from "../settings";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secrets";
@@ -144,6 +146,15 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
   return (await getCertificate(record.id))!;
 }
 
+/** PEM bodies are long and the key secret: the diff compares a short digest of each instead. */
+function auditedCertificate(cert: Certificate | null) {
+  if (!cert) return null;
+  const digest = (pem: string | null) =>
+    pem ? `sha256:${createHash("sha256").update(pem).digest("hex").slice(0, 16)}` : null;
+  const { certificatePem, privateKeyPem, ...rest } = cert;
+  return { ...rest, certificate: digest(certificatePem), keyDigest: digest(privateKeyPem) };
+}
+
 export async function updateCertificate(
   id: number,
   input: Partial<CertificateInput>,
@@ -200,6 +211,10 @@ export async function updateCertificate(
     entityType: "certificate",
     entityId: id,
     summary: `Updated certificate ${merged.name}`,
+    changes: diffAuditRecords(
+      auditedCertificate(existing),
+      auditedCertificate(await getCertificate(id)),
+    ),
   });
   await applyCaddyConfig();
   return (await getCertificate(id))!;
@@ -270,7 +285,8 @@ export async function deleteUnusedCertificates(
 
   await runInTransaction((tx) => [
     tx.delete(certificates).where(inArray(certificates.id, unique)),
-    tx.insert(auditEvents).values(
+    chainedAuditInsert(
+      tx,
       rows.map((row) =>
         auditEventRow({
           userId: actorUserId,

@@ -84,6 +84,23 @@ A refusal is the same error the save would return. The REST routes beside the ho
 same: `POST /api/v1/proxy-hosts/preview` and `POST /api/v1/proxy-hosts/{id}/preview`, and the
 `l4-proxy-hosts` pair, with `?revert=<field>` repeatable.
 
+## Audit integrity and portable configuration
+
+`auditLog` events carry `changes`, each field's before and after with secrets masked, and
+`verifyAuditChain` recomputes the [audit log](../audit-log/#tamper-evidence)'s hash chain,
+answering `ok`, how many events it `checked` and the `firstBroken` link.
+
+`exportConfig(passphrase, sections)` returns the [portable configuration](../settings/#portable-configuration)
+as base64 of its JSON file. `previewConfigImport(file, passphrase)` answers what importing it
+would create, update or skip, writing nothing; `applyConfigImport` takes the same arguments and
+plans again before it writes. All three are admin only and audited.
+
+```graphql
+mutation {
+  verifyAuditChain { ok checked firstBroken { reason seq eventId } }
+}
+```
+
 ## Upstream health
 
 `proxyHostUpstreamHealth(id)` asks Caddy on every agent serving the host for its upstreams' state,

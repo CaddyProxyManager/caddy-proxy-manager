@@ -17,7 +17,7 @@ import {
   mapTextColumn,
 } from "../secrets/walk";
 
-const MARKER = "cpmbak-secret:";
+export const MARKER = "cpmbak-secret:";
 
 const toMarker = (plaintext: string) => `${MARKER}${Buffer.from(plaintext).toString("base64")}`;
 const fromMarker = (text: string) => Buffer.from(text.slice(MARKER.length), "base64").toString();

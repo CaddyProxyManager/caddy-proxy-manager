@@ -1,7 +1,12 @@
 "use client";
 
+import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { ShieldCheck } from "lucide-react";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -11,6 +16,10 @@ import { StatTiles } from "@/components/ui/StatTiles";
 import { ActivityStrip, type ActivityBucket } from "@/components/ui/ActivityStrip";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useTranslations } from "next-intl";
+import { AppDialog } from "@/components/ui/AppDialog";
+import { AuditChanges, type DiffLayout } from "@/components/audit/AuditChanges";
+import type { AuditChange } from "@/lib/audit/changes";
+import type { AuditChainVerification } from "@/lib/audit/chain";
 
 type EventRow = {
   id: number;
@@ -19,7 +28,13 @@ type EventRow = {
   action: string;
   entityType: string;
   summary: string;
+  /** Field-level before and after, when the event recorded them. */
+  changes?: AuditChange[] | null;
 };
+
+export type VerifyChainResult =
+  | { ok: true; verification: AuditChainVerification }
+  | { ok: false; message: string };
 
 type Props = {
   events: EventRow[];
@@ -33,7 +48,69 @@ type Props = {
   /** 24 hourly buckets covering the last day of the whole log, search or no search. */
   activity: ActivityBucket[];
   summary: { events: number; actors: number; entityTypes: number };
+  /** The server action, passed in so this component stays free of server imports. */
+  verifyChain?: () => Promise<VerifyChainResult>;
 };
+
+const LAYOUT_KEY = "cpm-audit-diff-layout";
+
+/** Per browser: a reader's preference, not the log's state. */
+function useDiffLayout(): [DiffLayout, (layout: DiffLayout) => void] {
+  const [layout, setLayout] = useState<DiffLayout>("unified");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LAYOUT_KEY) === "split") setLayout("split");
+    } catch {
+      // Storage blocked: the default stands.
+    }
+  }, []);
+  return [
+    layout,
+    (next) => {
+      setLayout(next);
+      try {
+        localStorage.setItem(LAYOUT_KEY, next);
+      } catch {
+        // As above.
+      }
+    },
+  ];
+}
+
+function ChainResult({ result }: { result: VerifyChainResult }) {
+  const t = useTranslations("auditLog");
+  if (!result.ok)
+    return <Banner status="error" title={t("verifyFailed")} description={result.message} />;
+  const { verification } = result;
+  const legacy =
+    verification.legacy > 0 ? t("chainLegacy", { count: verification.legacy }) : undefined;
+  if (verification.ok) {
+    return (
+      <Banner
+        status="success"
+        title={t("chainIntact")}
+        description={[t("chainIntactDetail", { count: verification.checked }), legacy]
+          .filter(Boolean)
+          .join(" ")}
+      />
+    );
+  }
+  const broken = verification.firstBroken;
+  return (
+    <Banner
+      status="error"
+      title={t("chainBroken")}
+      description={
+        broken
+          ? t(`chainBreaks.${broken.reason}`, {
+              seq: String(broken.seq ?? ""),
+              eventId: String(broken.eventId ?? ""),
+            })
+          : undefined
+      }
+    />
+  );
+}
 
 export default function AuditLogClient({
   events,
@@ -41,8 +118,18 @@ export default function AuditLogClient({
   filterOptions,
   activity,
   summary,
+  verifyChain,
 }: Props) {
   const t = useTranslations("auditLog");
+  const [open, setOpen] = useState<EventRow | null>(null);
+  const [layout, setLayout] = useDiffLayout();
+  const [verification, setVerification] = useState<VerifyChainResult | null>(null);
+  const [verifying, startVerify] = useTransition();
+  const verify = () =>
+    startVerify(async () => {
+      if (!verifyChain) return;
+      setVerification(await verifyChain());
+    });
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
@@ -84,6 +171,20 @@ export default function AuditLogClient({
         </Text>
       ),
     },
+    {
+      id: "changes",
+      label: t("changes"),
+      width: 140,
+      render: (r) =>
+        r.changes && r.changes.length > 0 ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("showChanges", { count: r.changes.length })}
+            onClick={() => setOpen(r)}
+          />
+        ) : null,
+    },
   ];
 
   const mobileCard = (r: EventRow) => (
@@ -98,6 +199,14 @@ export default function AuditLogClient({
         <Text type="body" size="sm">
           {r.summary}
         </Text>
+        {r.changes && r.changes.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("showChanges", { count: r.changes.length })}
+            onClick={() => setOpen(r)}
+          />
+        )}
       </VStack>
     </Card>
   );
@@ -167,6 +276,25 @@ export default function AuditLogClient({
         }
       />
 
+      {verifyChain && (
+        <VStack gap={3}>
+          <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
+            <Text type="body" size="sm" color="secondary">
+              {t("verifyChainHelp")}
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ShieldCheck />}
+              label={t("verifyChain")}
+              onClick={verify}
+              isLoading={verifying}
+            />
+          </HStack>
+          {verification && <ChainResult result={verification} />}
+        </VStack>
+      )}
+
       <DataTable
         columns={columns}
         data={events}
@@ -175,6 +303,31 @@ export default function AuditLogClient({
         pagination={pagination}
         mobileCard={mobileCard}
       />
+
+      <AppDialog
+        open={open !== null}
+        onClose={() => setOpen(null)}
+        title={open?.summary ?? ""}
+        maxWidth="xl"
+      >
+        <VStack gap={3}>
+          <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
+            <Text type="body" size="sm" color="secondary">
+              {open?.changes?.some((change) => change.masked) ? t("maskedNote") : t("changesNote")}
+            </Text>
+            <SegmentedControl
+              label={t("diffView")}
+              size="sm"
+              value={layout}
+              onChange={(value) => setLayout(value as DiffLayout)}
+            >
+              <SegmentedControlItem value="unified" label={t("diffUnified")} />
+              <SegmentedControlItem value="split" label={t("diffSideBySide")} />
+            </SegmentedControl>
+          </HStack>
+          {open?.changes && <AuditChanges changes={open.changes} layout={layout} />}
+        </VStack>
+      </AppDialog>
     </VStack>
   );
 }

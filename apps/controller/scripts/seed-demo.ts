@@ -22,6 +22,7 @@ const { createAccessList } = await import("../src/lib/models/access-lists");
 const { createCertificate } = await import("../src/lib/models/certificates");
 const { createGroup, addGroupMember } = await import("../src/lib/models/groups");
 const { createUser } = await import("../src/lib/models/user");
+const { reanchorAuditChain } = await import("../src/lib/audit/chain");
 
 installDemoCaddy();
 
@@ -52,6 +53,7 @@ async function reset(actor: number): Promise<void> {
   await db.delete(schema.groups);
   await db.delete(schema.users).where(ne(schema.users.id, actor));
   await db.delete(schema.auditEvents);
+  await reanchorAuditChain();
   console.log("Cleared the previous demo data");
 }
 

@@ -11,6 +11,7 @@ import pkg from "../../../package.json";
 import db, { runInTransaction } from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
 import { domainError } from "../errors/domain-error";
+import { reanchorAuditChain } from "../audit/chain";
 import { type Described, describeTables, inFkOrder, resyncSequence } from "../migration/import";
 import { type BackupPayload, openBackup, readBackupHeader, sealBackup } from "./format";
 import { exportRow, importRow } from "./secrets";
@@ -27,6 +28,8 @@ export const BACKUP_NEVER = [
   "settings_staged",
   // Re-resolved within a minute of starting, and a name's answer may differ on the new host.
   "access_list_dns_cache",
+  // Re-derived from the restored audit events (reanchorAuditChain), whichever side they came from.
+  "audit_chain",
 ] as const;
 
 /** History rather than configuration: large, and only included when asked for. */
@@ -192,6 +195,10 @@ export async function restoreBackup(
     for (const { table } of prepared) {
       if (table.serialColumn) await resyncSequence(table.name, table.serialColumn);
     }
+  }
+  if (prepared.some(({ table }) => table.name === BACKUP_OPTIONAL.auditLog)) {
+    // A backup from before the chain brings events without hashes: they predate it, as here.
+    await reanchorAuditChain({ adoptUnchained: true });
   }
 
   return {

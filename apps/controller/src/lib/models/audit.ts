@@ -1,5 +1,7 @@
 import db, { toIso, nowIso } from "../db";
 import { auditEvents } from "../db/schema";
+import { insertAuditRows } from "../audit";
+import { type AuditChange, parseAuditChanges } from "../audit/changes";
 import { and, asc, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
 
 export type AuditEvent = {
@@ -10,6 +12,8 @@ export type AuditEvent = {
   entityId: number | null;
   summary: string | null;
   createdAt: string;
+  /** Field-level before and after, when the event recorded them. */
+  changes: AuditChange[] | null;
 };
 
 function escapeLikePattern(input: string): string {
@@ -93,6 +97,7 @@ export async function listAuditEvents(
     entityId: event.entityId,
     summary: event.summary,
     createdAt: toIso(event.createdAt)!,
+    changes: parseAuditChanges(event.data),
   }));
 }
 
@@ -104,15 +109,17 @@ export async function createAuditEvent(data: {
   summary?: string | null;
   data?: string | null;
 }): Promise<void> {
-  await db.insert(auditEvents).values({
-    userId: data.userId,
-    action: data.action,
-    entityType: data.entityType,
-    entityId: data.entityId ?? null,
-    summary: data.summary ?? null,
-    data: data.data ?? null,
-    createdAt: nowIso(),
-  });
+  await insertAuditRows([
+    {
+      userId: data.userId,
+      action: data.action,
+      entityType: data.entityType,
+      entityId: data.entityId ?? null,
+      summary: data.summary ?? null,
+      data: data.data ?? null,
+      createdAt: nowIso(),
+    },
+  ]);
 }
 
 export type AuditActivityBucket = {

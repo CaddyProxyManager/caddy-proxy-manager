@@ -140,7 +140,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     label: "Audit log",
     description:
       "The history of who changed what. Usually the largest table, and never load-bearing.",
-    tables: ["audit_events", "waf_event_reviews"],
+    tables: ["audit_events", "audit_chain", "waf_event_reviews"],
     requires: [],
   },
 ];

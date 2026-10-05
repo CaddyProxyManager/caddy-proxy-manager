@@ -19,9 +19,41 @@ lists, users, groups, WAF presets, CRS plugins and OAuth providers - the operati
 the proxy does - plus sign-ins, forward-auth logins and denials, password changes, two-factor
 turned on, off or reset, backups made and restored, certificate renewals asked for and private
 keys downloaded, saved [analytics views](../analytics/#saved-views) created, changed and deleted,
-and an administrator starting and ending [View as](../users-and-groups/#viewing-as-a-role). Settings applies are recorded in
-[Settings → History](../settings/) instead, with their diffs. Reads are not logged, key and backup
-downloads aside; the log exists to answer "why is this host configured like this", not to track browsing.
+and an administrator starting and ending [View as](../users-and-groups/#viewing-as-a-role). Each settings
+apply is logged too, with [Settings → History](../settings/) keeping the full revisions. Reads are
+not logged, key, backup and configuration exports aside; the log exists to answer "why is this
+host configured like this", not to track browsing.
+
+## What changed
+
+A change to a host, an access list, a certificate, a group, a user's role, status or profile, a WAF
+exclusion, a blocked source or a setting records each field before and after. The row's
+**Changes** button opens them, as a unified list or side by side, and the choice is remembered in
+your browser. Host fields read as the editor names them, with certificates, access lists and agents
+by name rather than id; anything secret-looking (passwords, tokens, keys, credentials inside
+custom JSON or Caddyfile snippets, and every value encrypted at rest) is masked on both sides
+before it is stored, so the log never holds it.
+
+## Tamper evidence
+
+Every event stores a SHA-256 hash of the event before it plus its own content, so the log is a
+chain: changing an event, removing one or slipping one in breaks it from that point on. **Verify
+integrity** recomputes the chain and reports the first broken link - which event changed, which is
+missing, or that the newest events are gone. The check is itself logged.
+
+- Events logged before the upgrade that introduced the chain have no hash. They are counted as
+  older history and not covered; the chain starts from a genesis marker after them.
+- Concurrent writes cannot fork the chain: each write takes the chain's head in its own
+  transaction, a row lock on PostgreSQL and the single writer on SQLite.
+- A [restore](../settings/#backup-and-restore) that includes the audit log brings its chain along and
+  carries on from it; one without leaves the chain here as it was. Removing old events on purpose
+  anchors the chain at the oldest event kept, so pruning is not reported as tampering.
+- The chain shows that the log was altered, not who altered it. Someone with write access to the
+  database can rebuild a consistent chain; keep backups that include the audit log somewhere they
+  cannot reach if that matters to you.
+
+`verifyAuditChain` in [GraphQL](../api/) runs the same check, and each event's `changes` field
+carries its diff.
 
 ## Reading it
 

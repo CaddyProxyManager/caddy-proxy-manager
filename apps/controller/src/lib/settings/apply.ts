@@ -9,6 +9,8 @@ import { withSettingsUpdateLock } from "./update-lock";
 import { discardAllStaged, listStagedSettings, stagedOverlay, storedValues } from "./staging";
 import { withStagedReads } from "./staging-context";
 import { domainError } from "../errors/domain-error";
+import { logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 
 export type RevisionRow = {
   id: number;
@@ -117,10 +119,33 @@ export async function applyStagedSettings(
       .returning({ id: settingsRevisions.id });
 
     const revision = row?.id ?? 0;
+    await logAuditEvent({
+      userId,
+      action: "update",
+      entityType: "settings",
+      entityId: revision,
+      summary: `Applied settings revision ${revision}`,
+      // The values the revision records, as the history's own diff reads them.
+      changes: diffAuditRecords(
+        Object.fromEntries(
+          staged.map((entry) => [entry.key, parseStored(previous.get(entry.key) ?? null)]),
+        ),
+        Object.fromEntries(staged.map((entry) => [entry.key, parseStored(entry.value)])),
+      ),
+    });
     return failure
       ? { ok: false, error: failure.message, cause: failure, revision }
       : { ok: true, revision };
   });
+}
+
+function parseStored(value: string | null): unknown {
+  if (value === null) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 }
 
 /** Newest first. */

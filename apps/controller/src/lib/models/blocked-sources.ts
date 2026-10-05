@@ -8,6 +8,7 @@ import { asc, count, eq, isNotNull, lte, and } from "drizzle-orm";
 import db, { nowIso, toIso } from "../db";
 import { blockedSources, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 import { domainError } from "../errors/domain-error";
 import { normalizeCidr } from "../access-lists/rules";
 import {
@@ -183,6 +184,12 @@ export async function createBlockedSource(
     entityId: record.id,
     summary: existing ? `Changed the block on ${kind} ${value}` : `Blocked ${kind} ${value}`,
     data: { kind, value, reason, expiresAt },
+    changes: existing
+      ? diffAuditRecords(
+          { reason: existing.reason, expiresAt: existing.expiresAt },
+          { reason, expiresAt },
+        )
+      : null,
   });
   await apply();
   return toBlockedSource(record, null);

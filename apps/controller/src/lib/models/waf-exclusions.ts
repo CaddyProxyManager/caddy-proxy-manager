@@ -7,6 +7,7 @@ import { asc, eq } from "drizzle-orm";
 import db, { nowIso, toIso } from "../db";
 import { proxyHosts, users, wafExclusions } from "../db/schema";
 import { logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 import { applyCaddyConfig } from "../caddy";
 import { CaddyApplyError } from "../caddy/apply-error";
 import { domainError } from "../errors/domain-error";
@@ -198,6 +199,7 @@ export async function updateWafExclusion(
     entityId: id,
     summary: `Changed the exclusion for WAF rule ${next.ruleId}`,
     data: { before: toRule(existingRow), after: next },
+    changes: diffAuditRecords(toRule(existingRow), next),
   });
   return (await listWafExclusions()).find((row) => row.id === id)!;
 }

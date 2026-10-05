@@ -1,0 +1,831 @@
+/**
+ * Portable config export and import: hosts, access lists, certificates, groups, WAF and block
+ * lists and settings, moved between instances by natural key rather than restored by id. Distinct
+ * from backup/restore, which replaces a whole instance. An import is planned in full first (the
+ * dry run shows exactly that plan) and applied in one transaction; a host whose domain another host
+ * already serves is skipped and reported, never overwritten.
+ */
+import { eq, getTableColumns } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
+import pkg from "../../../package.json";
+import { logAuditEvent } from "../audit";
+import { exportRow, importRow } from "../backup/secrets";
+import { applyCaddyConfig } from "../caddy";
+import db, { nowIso, runInTransaction } from "../db";
+import { activeSchema, schemaDialect } from "../db/schema";
+import { domainError } from "../errors/domain-error";
+import { type Described, describeTables, resyncSequence } from "../migration/import";
+import { isNewer } from "../runtime/updates";
+import { invalidateSettingsCache } from "../settings/resolve";
+import {
+  CONFIG_SECTIONS,
+  type ConfigFile,
+  type ConfigSection,
+  openConfigFile,
+  readConfigFile,
+  sealConfigFile,
+} from "./format";
+import {
+  CONFIG_TABLES,
+  type EmbeddedRef,
+  NOT_COMPARED,
+  PORTABLE_SETTING_KEYS,
+  type RefKey,
+  type Row,
+  SPEC_BY_TABLE,
+  type TableSpec,
+  itemLabel,
+  naturalKey,
+} from "./spec";
+
+export { CONFIG_SECTIONS, MAX_CONFIG_BYTES, type ConfigSection } from "./format";
+
+export type ImportAction = "create" | "update" | "skip";
+export type SkipReason =
+  | "unchanged"
+  | "domainConflict"
+  | "listenerConflict"
+  | "missingReference"
+  | "unkeyable";
+
+export type ConfigImportItem = {
+  table: string;
+  label: string;
+  action: ImportAction;
+  reason: SkipReason | null;
+  /** For the reason's sentence: the domain and host in conflict, the kind and name missing. */
+  values: Record<string, string>;
+  /** Columns that differ, for an update. */
+  fields: string[];
+};
+
+export type ConfigImportWarning = {
+  code: "rowDropped";
+  values: Record<string, string>;
+};
+
+export type ConfigImportPreview = {
+  appVersion: string;
+  exportedAt: string;
+  sections: ConfigSection[];
+  items: ConfigImportItem[];
+  counts: Record<ImportAction, number>;
+  warnings: ConfigImportWarning[];
+};
+
+// ── Tables and rows ─────────────────────────────────────────────────────────
+
+const described = new Map<string, Described>();
+function tableInfo(name: string): Described {
+  if (described.size === 0) for (const table of describeTables()) described.set(table.name, table);
+  const info = described.get(name);
+  if (!info) throw new Error(`Unknown table ${name}`);
+  return info;
+}
+
+function drizzleTable(name: string): PgTable {
+  return activeSchema[tableInfo(name).key as keyof typeof activeSchema] as PgTable;
+}
+
+/** column name -> drizzle field name. */
+function fieldsOf(name: string): Map<string, string> {
+  return new Map(
+    Object.entries(getTableColumns(drizzleTable(name))).map(([field, column]) => [
+      column.name,
+      field,
+    ]),
+  );
+}
+
+/** Where a column points: from the foreign keys, so a new reference needs no list here. */
+function referencesOf(name: string): Map<string, { target: string; required: boolean }> {
+  const out = new Map<string, { target: string; required: boolean }>();
+  for (const reference of tableInfo(name).references) {
+    for (const column of reference.columns) {
+      out.set(column, { target: reference.target, required: reference.required });
+    }
+  }
+  return out;
+}
+
+/** Rows keyed by column name with secrets as backup markers, as the file carries them. */
+async function readLocal(name: string): Promise<Row[]> {
+  const fields = fieldsOf(name);
+  const columnOf = new Map([...fields].map(([column, field]) => [field, column]));
+  const rows = (await db.select().from(drizzleTable(name))) as Row[];
+  return await Promise.all(
+    rows.map((row) =>
+      exportRow(
+        name,
+        Object.fromEntries(Object.entries(row).map(([f, v]) => [columnOf.get(f) ?? f, v])),
+      ),
+    ),
+  );
+}
+
+/** Tables a reference can reach that the file never carries, keyed by what identifies them. */
+const REFERENCE_ONLY = ["users", "agents", "oauth_providers"] as const;
+
+function sectionTables(sections: readonly ConfigSection[]): TableSpec[] {
+  return CONFIG_TABLES.filter((spec) => sections.includes(spec.section));
+}
+
+// ── Embedded ids ────────────────────────────────────────────────────────────
+
+function mapPath(value: unknown, segments: string[], map: (id: unknown) => unknown): unknown {
+  if (segments.length === 0) return map(value);
+  const [head, ...rest] = segments as [string, ...string[]];
+  const isArray = head.endsWith("[]");
+  const name = isArray ? head.slice(0, -2) : head;
+  const inner = name ? (value as Row | null)?.[name] : value;
+  if (inner === undefined || inner === null) return value;
+  const next = isArray
+    ? Array.isArray(inner)
+      ? inner.map((item) => mapPath(item, rest, map))
+      : inner
+    : mapPath(inner, rest, map);
+  if (!name) return next;
+  return value && typeof value === "object" ? { ...(value as Row), [name]: next } : value;
+}
+
+/** The ids `refs` name inside a JSON column, remapped; `missing` lists those that did not resolve. */
+function remapEmbedded(
+  row: Row,
+  column: string,
+  refs: readonly EmbeddedRef[],
+  resolve: (target: string, id: unknown) => number | string | null,
+): { value: unknown; missing: { target: string; id: unknown }[] } {
+  const raw = row[column];
+  const applicable = refs.filter((ref) => !ref.when || ref.when(row));
+  if (typeof raw !== "string" || applicable.length === 0) return { value: raw, missing: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { value: raw, missing: [] };
+  }
+  const missing: { target: string; id: unknown }[] = [];
+  for (const ref of applicable) {
+    const segments = ref.path === "[]" ? ["[]"] : ref.path.split(".");
+    parsed = mapPath(parsed, segments, (id) => {
+      if (id === null || id === undefined) return id;
+      const local = resolve(ref.target, id);
+      if (local === null) missing.push({ target: ref.target, id });
+      return local ?? id;
+    });
+  }
+  return { value: JSON.stringify(parsed), missing };
+}
+
+/** Equal JSON text in any key order or spacing compares equal. */
+function canonical(value: unknown): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return canonical(JSON.parse(trimmed));
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .filter((key) => (value as Row)[key] !== undefined)
+      .map((key) => `${JSON.stringify(key)}:${canonical((value as Row)[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+// ── Export ──────────────────────────────────────────────────────────────────
+
+export type ExportOptions = { sections?: readonly ConfigSection[] };
+
+/** Keys repeated within one set get #2, #3 in id order, so duplicate names still pair up. */
+function keyIndex(
+  table: string,
+  rows: Row[],
+  ref: RefKey,
+): { byKey: Map<string, Row>; keyOf: Map<unknown, string> } {
+  const byKey = new Map<string, Row>();
+  const keyOf = new Map<unknown, string>();
+  const seen = new Map<string, number>();
+  const sorted = [...rows].sort((a, b) => Number(a.id ?? 0) - Number(b.id ?? 0));
+  for (const row of sorted) {
+    const base = naturalKey(table, row, ref);
+    if (base === null) continue;
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    const key = count === 1 ? base : `${base}#${count}`;
+    byKey.set(key, row);
+    keyOf.set(row.id ?? row.key, key);
+  }
+  return { byKey, keyOf };
+}
+
+/** Local rows and their keys, loaded once per table on demand. */
+class LocalIndex {
+  private rows = new Map<string, Row[]>();
+  private indexes = new Map<string, ReturnType<typeof keyIndex>>();
+
+  async load(tables: Iterable<string>): Promise<void> {
+    for (const table of tables) {
+      if (this.rows.has(table)) continue;
+      this.rows.set(table, await readLocal(table));
+    }
+  }
+
+  all(table: string): Row[] {
+    return this.rows.get(table) ?? [];
+  }
+
+  index(table: string): ReturnType<typeof keyIndex> {
+    let index = this.indexes.get(table);
+    if (!index) {
+      index = keyIndex(table, this.all(table), this.ref);
+      this.indexes.set(table, index);
+    }
+    return index;
+  }
+
+  ref: RefKey = (table, id) =>
+    id === null || id === undefined ? null : (this.index(table).keyOf.get(id) ?? null);
+}
+
+function allTargets(specs: TableSpec[]): Set<string> {
+  const targets = new Set<string>(REFERENCE_ONLY);
+  for (const spec of specs) {
+    for (const { target } of referencesOf(spec.table).values()) targets.add(target);
+    for (const refs of Object.values(spec.embedded ?? {})) {
+      for (const ref of refs) targets.add(ref.target);
+    }
+    if (spec.table === "waf_exclusions") targets.add("proxy_hosts");
+  }
+  return targets;
+}
+
+export async function exportConfig(
+  passphrase: string,
+  options: ExportOptions = {},
+): Promise<Buffer> {
+  const sections = (options.sections ?? CONFIG_SECTIONS).filter((s) => CONFIG_SECTIONS.includes(s));
+  if (sections.length === 0) throw domainError("configNothingSelected", {}, { status: 400 });
+  const specs = sectionTables(sections);
+  const included = new Set(specs.map((spec) => spec.table));
+  const local = new LocalIndex();
+  await local.load([...included, ...allTargets(specs)]);
+
+  const tables: Record<string, Row[]> = {};
+  const refs: Record<string, Record<string, string>> = {};
+  const note = (target: string, id: unknown) => {
+    if (included.has(target) || id === null || id === undefined) return;
+    const key = local.ref(target, id);
+    if (key === null) return;
+    refs[target] ??= {};
+    refs[target][String(id)] = key;
+  };
+  for (const spec of specs) {
+    const references = referencesOf(spec.table);
+    let rows = local.all(spec.table);
+    if (spec.table === "settings")
+      rows = rows.filter((row) => PORTABLE_SETTING_KEYS.has(String(row.key)));
+    tables[spec.table] = rows;
+    for (const row of rows) {
+      for (const [column, { target }] of references) note(target, row[column]);
+      for (const [column, embedded] of Object.entries(spec.embedded ?? {})) {
+        remapEmbedded(row, column, embedded, (target, id) => {
+          note(target, id);
+          return 0;
+        });
+      }
+      if (spec.table === "waf_exclusions") note("proxy_hosts", row.proxyHostId);
+    }
+  }
+  return await sealConfigFile({ appVersion: pkg.version, sections, refs, tables }, passphrase);
+}
+
+// ── Plan ────────────────────────────────────────────────────────────────────
+
+type PlannedRow = {
+  spec: TableSpec;
+  item: ConfigImportItem;
+  fileId: unknown;
+  key: string;
+  /** The local id it becomes or updates; the settings key for settings. */
+  targetId: number | string | null;
+  values: Row;
+  children: Map<string, Row[]>;
+};
+
+type Plan = {
+  file: ConfigFile;
+  rows: PlannedRow[];
+  warnings: ConfigImportWarning[];
+};
+
+async function planImport(file: ConfigFile): Promise<Plan> {
+  if (isNewer(pkg.version, file.appVersion)) {
+    throw domainError("configFromNewerVersion", {}, { status: 400 });
+  }
+  const specs = CONFIG_TABLES.filter((spec) => Array.isArray(file.tables[spec.table]));
+  const local = new LocalIndex();
+  await local.load([...specs.map((spec) => spec.table), ...allTargets(specs)]);
+
+  // The file's own keys, the same way: a referenced row is in the file or named in `refs`.
+  const fileIndexes = new Map<string, ReturnType<typeof keyIndex>>();
+  const fileRef: RefKey = (table, id) => {
+    if (id === null || id === undefined) return null;
+    const rows = file.tables[table];
+    if (Array.isArray(rows)) {
+      let index = fileIndexes.get(table);
+      if (!index) {
+        index = keyIndex(table, rows, fileRef);
+        fileIndexes.set(table, index);
+      }
+      return index.keyOf.get(id) ?? null;
+    }
+    return file.refs[table]?.[String(id)] ?? null;
+  };
+
+  // Natural key -> the local id it ends up as, for this instance's rows and the plan's creates.
+  const resolved = new Map<string, Map<string, number | string>>();
+  const resolvedFor = (table: string) => {
+    let map = resolved.get(table);
+    if (!map) {
+      map = new Map();
+      for (const [key, row] of local.index(table).byKey)
+        map.set(key, (row.id ?? row.key) as number);
+      resolved.set(table, map);
+    }
+    return map;
+  };
+  const resolveRef = (table: string, fileId: unknown): number | string | null => {
+    const key = fileRef(table, fileId);
+    return key === null ? null : (resolvedFor(table).get(key) ?? null);
+  };
+  const nextId = new Map<string, number>();
+  const allocate = (table: string) => {
+    const next =
+      nextId.get(table) ?? Math.max(0, ...local.all(table).map((row) => Number(row.id) || 0)) + 1;
+    nextId.set(table, next + 1);
+    return next;
+  };
+
+  const rows: PlannedRow[] = [];
+  const warnings: ConfigImportWarning[] = [];
+  const byParent = new Map<string, Map<unknown, PlannedRow>>();
+  const skip = (planned: PlannedRow, reason: SkipReason, values: Record<string, string> = {}) => {
+    planned.item.action = "skip";
+    planned.item.reason = reason;
+    planned.item.values = values;
+    // Anything planned later that points at it finds nothing, rather than a same-named local row.
+    resolvedFor(planned.spec.table).delete(planned.key);
+  };
+
+  /** A file row with its references turned into local ids, or what it is missing. */
+  const translate = (spec: TableSpec, raw: Row, skipColumn?: string) => {
+    const references = referencesOf(spec.table);
+    const columns = new Set(tableInfo(spec.table).columns.map((column) => column.name));
+    const values: Row = {};
+    let missing: { target: string; name: string } | null = null;
+    for (const [column, value] of Object.entries(raw)) {
+      if (!columns.has(column) || column === "id" || column === skipColumn) continue;
+      const reference = references.get(column);
+      if (!reference || value === null || value === undefined) {
+        values[column] = value;
+        continue;
+      }
+      const localId = resolveRef(reference.target, value);
+      if (localId !== null) {
+        values[column] = localId;
+      } else if (reference.required || spec.mustResolve?.includes(column)) {
+        missing ??= {
+          target: reference.target,
+          name: fileRef(reference.target, value) ?? `#${String(value)}`,
+        };
+      } else {
+        values[column] = null;
+      }
+    }
+    for (const [column, embedded] of Object.entries(spec.embedded ?? {})) {
+      const { value, missing: lost } = remapEmbedded(raw, column, embedded, resolveRef);
+      if (lost.length > 0) {
+        const [first] = lost;
+        missing ??= {
+          target: first?.target ?? "",
+          name: fileRef(first?.target ?? "", first?.id) ?? `#${String(first?.id)}`,
+        };
+      } else if (value !== undefined) {
+        values[column] = value;
+      }
+    }
+    return { values, missing };
+  };
+
+  const differing = (localRow: Row, values: Row) =>
+    Object.keys(values).filter(
+      (column) =>
+        !NOT_COMPARED.has(column) && canonical(localRow[column]) !== canonical(values[column]),
+    );
+
+  for (const spec of specs) {
+    const fileRows = [...(file.tables[spec.table] ?? [])].sort(
+      (a, b) => Number(a.id ?? 0) - Number(b.id ?? 0),
+    );
+
+    if (spec.parent) {
+      const { table: parentTable, column: parentColumn, onMissing } = spec.parent;
+      const parents = byParent.get(parentTable) ?? new Map<unknown, PlannedRow>();
+      const grouped = new Map<unknown, Row[]>();
+      for (const row of fileRows) {
+        const list = grouped.get(row[parentColumn]) ?? [];
+        list.push(row);
+        grouped.set(row[parentColumn], list);
+      }
+      const localChildren = local.all(spec.table);
+      const normalize = (row: Row) =>
+        canonical(
+          Object.fromEntries(
+            Object.entries(row).filter(
+              ([column]) => column !== parentColumn && !NOT_COMPARED.has(column),
+            ),
+          ),
+        );
+      for (const [fileParentId, parent] of parents) {
+        if (parent.item.action === "skip" && parent.item.reason !== "unchanged") continue;
+        const incoming: Row[] = [];
+        for (const raw of grouped.get(fileParentId) ?? []) {
+          const { values, missing } = translate(spec, raw, parentColumn);
+          if (!missing) {
+            incoming.push(values);
+            continue;
+          }
+          if (onMissing === "skipParent") {
+            skip(parent, "missingReference", { kind: missing.target, name: missing.name });
+            break;
+          }
+          warnings.push({
+            code: "rowDropped",
+            values: {
+              kind: spec.table,
+              parent: parent.item.label,
+              missingKind: missing.target,
+              missingName: missing.name,
+            },
+          });
+        }
+        if (parent.item.action === "skip" && parent.item.reason !== "unchanged") continue;
+        const existing =
+          parent.item.action === "create"
+            ? []
+            : localChildren.filter((row) => row[parentColumn] === parent.targetId);
+        const before = existing.map(normalize).sort();
+        const after = incoming.map(normalize).sort();
+        if (parent.item.action !== "create" && canonical(before) === canonical(after)) continue;
+        parent.children.set(spec.table, incoming);
+        if (parent.item.reason === "unchanged") {
+          parent.item.action = "update";
+          parent.item.reason = null;
+        }
+        if (parent.item.action === "update") parent.item.fields.push(spec.table);
+      }
+      continue;
+    }
+
+    const index = keyIndex(spec.table, fileRows, fileRef);
+    const planned = new Map<unknown, PlannedRow>();
+    for (const raw of fileRows) {
+      const key = index.keyOf.get(raw.id ?? raw.key);
+      if (spec.table === "settings" && !PORTABLE_SETTING_KEYS.has(String(raw.key))) continue;
+      const item: ConfigImportItem = {
+        table: spec.table,
+        label: itemLabel(spec.table, key ?? String(raw.name ?? raw.id ?? "")),
+        action: "create",
+        reason: null,
+        values: {},
+        fields: [],
+      };
+      const entry: PlannedRow = {
+        spec,
+        item,
+        fileId: raw.id ?? raw.key,
+        key: key ?? "",
+        targetId: null,
+        values: {},
+        children: new Map(),
+      };
+      rows.push(entry);
+      planned.set(entry.fileId, entry);
+      if (!key) {
+        skip(entry, "unkeyable");
+        continue;
+      }
+      const { values, missing } = translate(spec, raw);
+      entry.values = values;
+      if (missing) {
+        skip(entry, "missingReference", { kind: missing.target, name: missing.name });
+        continue;
+      }
+      const match = local.index(spec.table).byKey.get(key);
+      const conflict = findConflict(spec.table, values, match?.id, local);
+      if (conflict) {
+        skip(entry, conflict.reason, conflict.values);
+        continue;
+      }
+      if (match) {
+        entry.targetId = (match.id ?? match.key) as number | string;
+        const fields = differing(match, values);
+        if (fields.length === 0) {
+          item.action = "skip";
+          item.reason = "unchanged";
+        } else {
+          item.action = "update";
+          item.fields = fields;
+        }
+      } else {
+        entry.targetId = spec.table === "settings" ? String(raw.key) : allocate(spec.table);
+      }
+      resolvedFor(spec.table).set(key, entry.targetId);
+    }
+    byParent.set(spec.table, planned);
+  }
+  return { file, rows, warnings };
+}
+
+function hostDomains(value: unknown): string[] {
+  try {
+    const parsed = JSON.parse(String(value ?? "[]"));
+    return Array.isArray(parsed) ? parsed.map((d) => String(d).toLowerCase()) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Another local host already answering for one of its names, or listening where it would. */
+function findConflict(
+  table: string,
+  values: Row,
+  matchedId: unknown,
+  local: LocalIndex,
+): { reason: SkipReason; values: Record<string, string> } | null {
+  if (table === "proxy_hosts") {
+    const wanted = new Set(hostDomains(values.domains));
+    for (const host of local.all("proxy_hosts")) {
+      if (host.id === matchedId) continue;
+      const clash = hostDomains(host.domains).find((domain) => wanted.has(domain));
+      if (clash)
+        return { reason: "domainConflict", values: { domain: clash, host: String(host.name) } };
+    }
+  }
+  if (table === "l4_proxy_hosts") {
+    for (const host of local.all("l4_proxy_hosts")) {
+      if (host.id === matchedId) continue;
+      if (
+        host.protocol === values.protocol &&
+        host.listenAddress === values.listenAddress &&
+        (host.matcherType ?? "none") === (values.matcherType ?? "none") &&
+        (host.matcherValue ?? null) === (values.matcherValue ?? null)
+      ) {
+        return {
+          reason: "listenerConflict",
+          values: { listen: String(values.listenAddress), host: String(host.name) },
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function summarize(plan: Plan): ConfigImportPreview {
+  const items = plan.rows.map((row) => row.item);
+  const counts: Record<ImportAction, number> = { create: 0, update: 0, skip: 0 };
+  for (const item of items) counts[item.action] += 1;
+  return {
+    appVersion: plan.file.appVersion,
+    exportedAt: plan.file.exportedAt,
+    sections: plan.file.sections,
+    items,
+    counts,
+    warnings: plan.warnings,
+  };
+}
+
+/** The dry run: everything the import would do, nothing written. */
+export async function previewConfigImport(
+  bytes: Buffer,
+  passphrase: string,
+): Promise<ConfigImportPreview> {
+  return summarize(await planImport(await openConfigFile(bytes, passphrase)));
+}
+
+/** Header fields only, before a passphrase is asked for. */
+export function describeConfigFile(bytes: Buffer) {
+  const file = readConfigFile(bytes);
+  return {
+    appVersion: file.appVersion,
+    exportedAt: file.exportedAt,
+    sections: file.sections,
+    counts: Object.fromEntries(
+      Object.entries(file.tables).map(([table, rows]) => [
+        table,
+        Array.isArray(rows) ? rows.length : 0,
+      ]),
+    ),
+  };
+}
+
+// ── Apply ───────────────────────────────────────────────────────────────────
+
+async function toFields(table: string, row: Row): Promise<Row> {
+  const fields = fieldsOf(table);
+  const booleans = new Set(
+    tableInfo(table)
+      .columns.filter((c) => c.isBoolean)
+      .map((c) => c.name),
+  );
+  const sealed = await importRow(table, row);
+  const out: Row = {};
+  for (const [column, value] of Object.entries(sealed)) {
+    const field = fields.get(column);
+    if (!field) continue;
+    out[field] = booleans.has(column) && typeof value === "number" ? value === 1 : value;
+  }
+  return out;
+}
+
+function hasColumn(table: string, column: string): boolean {
+  return tableInfo(table).columns.some((c) => c.name === column);
+}
+
+/** Re-plans against the current state, so a stale preview is never what gets written. */
+export async function applyConfigImport(
+  bytes: Buffer,
+  passphrase: string,
+  actorUserId: number,
+): Promise<ConfigImportPreview> {
+  const plan = await planImport(await openConfigFile(bytes, passphrase));
+  const now = nowIso();
+  type Write =
+    | { kind: "insert"; table: string; values: Row }
+    | { kind: "update"; table: string; id: number; values: Row }
+    | { kind: "setting"; values: Row }
+    | { kind: "replace"; table: string; parentColumn: string; parentId: number; rows: Row[] };
+  const writes: Write[] = [];
+  // After every parent: a group's grants name hosts planned after the group.
+  const childWrites: Extract<Write, { kind: "replace" }>[] = [];
+  const created = new Set<string>();
+
+  for (const planned of plan.rows) {
+    const { spec, item } = planned;
+    if (item.action === "skip") continue;
+    const table = spec.table;
+    const stamp = (row: Row, isCreate: boolean): Row => ({
+      ...row,
+      ...(hasColumn(table, "updatedAt") ? { updatedAt: now } : {}),
+      ...(isCreate && hasColumn(table, "createdAt") ? { createdAt: now } : {}),
+    });
+    if (table === "settings") {
+      writes.push({
+        kind: "setting",
+        values: await toFields(table, {
+          key: planned.targetId,
+          value: planned.values.value,
+          updatedAt: now,
+        }),
+      });
+      continue;
+    }
+    const id = planned.targetId as number;
+    if (item.action === "create") {
+      const values = { ...planned.values };
+      if (hasColumn(table, "createdBy") && values.createdBy == null) values.createdBy = actorUserId;
+      writes.push({
+        kind: "insert",
+        table,
+        values: await toFields(table, { ...stamp(values, true), id }),
+      });
+      created.add(table);
+    } else {
+      const values = Object.fromEntries(
+        Object.entries(planned.values).filter(
+          ([column]) => !["createdAt", "createdBy", "ownerUserId"].includes(column),
+        ),
+      );
+      writes.push({
+        kind: "update",
+        table,
+        id,
+        values: await toFields(table, stamp(values, false)),
+      });
+    }
+    for (const [childTable, children] of planned.children) {
+      const childSpec = SPEC_BY_TABLE.get(childTable);
+      if (!childSpec?.parent) continue;
+      const parentColumn = childSpec.parent.column;
+      childWrites.push({
+        kind: "replace",
+        table: childTable,
+        parentColumn,
+        parentId: id,
+        rows: await Promise.all(
+          children.map((child) =>
+            toFields(childTable, {
+              ...child,
+              [parentColumn]: id,
+              ...(hasColumn(childTable, "createdAt") ? { createdAt: now } : {}),
+              ...(hasColumn(childTable, "updatedAt") ? { updatedAt: now } : {}),
+            }),
+          ),
+        ),
+      });
+    }
+  }
+
+  const order = (table: string) => CONFIG_TABLES.findIndex((spec) => spec.table === table);
+  writes.push(...childWrites.sort((a, b) => order(a.table) - order(b.table)));
+
+  if (writes.length > 0) {
+    await runInTransaction((tx) =>
+      writes.flatMap((write) => {
+        if (write.kind === "setting") {
+          const settings = drizzleTable("settings") as unknown as typeof activeSchema.settings;
+          return [
+            tx
+              .insert(settings)
+              .values(write.values)
+              .onConflictDoUpdate({
+                target: settings.key,
+                set: { value: write.values.value, updatedAt: write.values.updatedAt },
+              }),
+          ];
+        }
+        // biome-ignore lint/suspicious/noExplicitAny: the columns are per-table, the loop is generic
+        const target = drizzleTable(write.table) as any;
+        if (write.kind === "insert") return [tx.insert(target).values(write.values)];
+        if (write.kind === "update") {
+          return [tx.update(target).set(write.values).where(eq(target.id, write.id))];
+        }
+        const field = fieldsOf(write.table).get(write.parentColumn) as string;
+        return [
+          tx.delete(target).where(eq(target[field], write.parentId)),
+          ...(write.rows.length > 0 ? [tx.insert(target).values(write.rows)] : []),
+        ];
+      }),
+    );
+    if (schemaDialect === "postgres") {
+      for (const table of created) {
+        const serial = tableInfo(table).serialColumn;
+        if (serial) await resyncSequence(table, serial);
+      }
+    }
+    invalidateSettingsCache();
+    await applyCaddyConfig().catch((error) => {
+      // The rows are in: a failed reload is retried by the next apply, as after any save.
+      console.error("Config import: applying the new configuration failed:", error);
+    });
+  }
+
+  const preview = summarize(plan);
+  await logAuditEvent({
+    userId: actorUserId,
+    action: "config_imported",
+    entityType: "config",
+    summary: `Imported a configuration (${preview.counts.create} created, ${preview.counts.update} updated, ${preview.counts.skip} skipped)`,
+    data: {
+      exportedAt: preview.exportedAt,
+      appVersion: preview.appVersion,
+      sections: preview.sections,
+      items: preview.items
+        .filter((item) => item.action !== "skip" || item.reason !== "unchanged")
+        .map(({ table, label, action, reason, fields }) => ({
+          table,
+          label,
+          action,
+          reason,
+          fields,
+        })),
+    },
+  });
+  return preview;
+}
+
+/** Audited by the caller, who knows whether it was the UI or the API. */
+export async function exportConfigAudited(
+  passphrase: string,
+  options: ExportOptions,
+  actorUserId: number,
+): Promise<Buffer> {
+  const file = await exportConfig(passphrase, options);
+  await logAuditEvent({
+    userId: actorUserId,
+    action: "config_exported",
+    entityType: "config",
+    summary: "Exported the configuration",
+    data: { sections: options.sections ?? CONFIG_SECTIONS },
+  });
+  return file;
+}

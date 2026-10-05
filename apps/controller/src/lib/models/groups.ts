@@ -1,5 +1,6 @@
 import db, { nowIso, toIso } from "../db";
 import { logAuditEvent } from "../audit";
+import { diffAuditRecords } from "../audit/changes";
 import { groups, groupMembers, users } from "../db/schema";
 import { asc, eq, inArray, count } from "drizzle-orm";
 import { domainError } from "../errors/domain-error";
@@ -161,6 +162,13 @@ export async function updateGroup(
     entityType: "group",
     entityId: id,
     summary: `Updated group ${input.name ?? existing.name}`,
+    changes: diffAuditRecords(
+      { name: existing.name, description: existing.description },
+      {
+        name: input.name ?? existing.name,
+        description: input.description !== undefined ? input.description : existing.description,
+      },
+    ),
   });
 
   return (await getGroup(id))!;

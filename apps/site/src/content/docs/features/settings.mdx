@@ -79,3 +79,38 @@ setting. The audit log and the settings history can be included too.
 For a scheduled backup, `POST /api/v1/backup` with an admin API token and `{"passphrase": "..."}`
 returns the same file; add `"auditLog": true` or `"settingsHistory": true` to include those.
 Restoring is only in the dashboard.
+
+## Portable configuration
+
+Under the backup on the same page, **Export configuration** writes the configuration as a JSON
+file you can read, review or keep in a repository, rather than one sealed blob. Pick the parts:
+
+- proxy and L4 hosts, with their agent pins, mTLS rules and sign-in grants;
+- access lists, their users and their rules;
+- certificates (imported ones with their keys), CAs, client certificates and mTLS roles;
+- groups, their members, IdP mappings and grants;
+- WAF presets, CRS plugins, WAF exclusions and blocked sources;
+- settings, except the dashboard host, which is this instance's own address.
+
+Users, API tokens, sessions, agents, the audit log and saved analytics views stay behind. Each
+secret in the file (certificate keys, access-list password hashes, credentials in settings and
+host options) is sealed on its own with the passphrase, by the same scrypt and AES-256-GCM scheme
+as a backup.
+
+**Import configuration** merges instead of replacing:
+
+- **A dry run comes first.** It lists every row it would create, update or skip and why, and
+  writes nothing. Importing plans again against what is there by then.
+- **Rows match by what identifies them**: hosts, lists, certificates and groups by name, client
+  certificates by fingerprint, exclusions by rule and scope, settings by key. Ids are remapped,
+  including those inside host options (WAF presets, CRS plugins, location rules' access lists,
+  trusted mTLS roles and certificates).
+- **Grants map to users by email**, and agent pins to agents by name.
+- **Nothing is overwritten silently.** A host whose domain another host here already serves is
+  skipped and named. So is a host pinned to an agent, or protected by a list, this instance does
+  not have: dropping the reference would widen where it is served or who gets in. A group member
+  or grant naming someone missing is left out and listed.
+- **Limits**: 50 MiB, administrators only, and both the export and the import are audited.
+
+GraphQL has the same operations: `exportConfig`, `previewConfigImport` and `applyConfigImport`,
+with the file as base64.

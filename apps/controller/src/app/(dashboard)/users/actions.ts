@@ -17,6 +17,7 @@ import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { resetTwoFactor } from "@/src/lib/forward-auth/two-factor";
 import { deleteUserPasskeys } from "@/src/lib/auth/passkeys";
 import { logAuditEvent } from "@/src/lib/audit";
+import { diffAuditRecords } from "@/src/lib/audit/changes";
 import { hashPassword } from "@/src/lib/auth/password";
 import { getLocale, getTranslations } from "next-intl/server";
 import { sendEmailedLink } from "@/src/lib/services/emailed-links";
@@ -97,6 +98,7 @@ async function updateUserRoleActionUntranslated(userId: number, requestedRole: U
   // A server action is a public endpoint: the type annotation is not a check on what arrives.
   const role = assertUserRole(requestedRole);
 
+  const before = await getUserById(userId);
   await updateUserRole(userId, role);
 
   await logAuditEvent({
@@ -105,6 +107,7 @@ async function updateUserRoleActionUntranslated(userId: number, requestedRole: U
     entityType: "user",
     entityId: userId,
     summary: `Changed user ${userId} role to ${role}`,
+    changes: diffAuditRecords({ role: before?.role ?? null }, { role }),
   });
 
   revalidatePath("/users");
@@ -117,6 +120,7 @@ async function updateUserStatusActionUntranslated(userId: number, requestedStatu
   assertNotSelf(actorId, userId, "cannotChangeOwnStatus");
   const status = assertUserStatus(requestedStatus);
 
+  const before = await getUserById(userId);
   await updateUserStatus(userId, status);
 
   await logAuditEvent({
@@ -125,6 +129,7 @@ async function updateUserStatusActionUntranslated(userId: number, requestedStatu
     entityType: "user",
     entityId: userId,
     summary: `Changed user ${userId} status to ${status}`,
+    changes: diffAuditRecords({ status: before?.status ?? null }, { status }),
   });
 
   revalidatePath("/users");
@@ -140,16 +145,20 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
   // A form without the field leaves the username alone.
   const username = formData.has("username") ? String(formData.get("username")) : undefined;
 
+  const before = await getUserById(userId);
   // All or nothing: a refused username or email leaves the name unchanged too.
   const changed = await updateUserAccount(userId, { name, email, username });
   if (!changed) throw domainError("userNotFound");
 
+  const profile = (user: User | null) =>
+    user ? { name: user.name, email: user.email, username: user.username } : null;
   await logAuditEvent({
     userId: actorId,
     action: "update",
     entityType: "user",
     entityId: userId,
     summary: `Updated user ${userId} profile`,
+    changes: diffAuditRecords(profile(before), profile(changed.user)),
   });
   if (changed.user.username !== changed.previousUsername) {
     await logAuditEvent({

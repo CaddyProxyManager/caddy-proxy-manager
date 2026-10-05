@@ -1,5 +1,7 @@
 import { useMemo } from "react";
-import AuditLogClient from "@cpm/controller/src/app/(dashboard)/audit-log/AuditLogClient";
+import AuditLogClient, {
+  type VerifyChainResult,
+} from "@cpm/controller/src/app/(dashboard)/audit-log/AuditLogClient";
 import { useSearchParams } from "../shims/next-navigation";
 import { DemoSurface } from "../DemoSurface";
 
@@ -14,6 +16,19 @@ const EVENTS = [
     createdAt: "2026-02-11T16:42:07.000Z",
     user: "avery",
     summary: "Enabled the WAF on grafana.example.com",
+    changes: [
+      {
+        field: "waf",
+        section: "protection",
+        before: null,
+        after: null,
+        leaves: [
+          { path: "enabled", before: false, after: true },
+          { path: "mode", before: null, after: "On" },
+        ],
+        masked: false,
+      },
+    ],
   },
   {
     id: 8,
@@ -30,6 +45,27 @@ const EVENTS = [
     createdAt: "2026-02-11T11:20:31.000Z",
     user: "sam",
     summary: "Added upstream http://app-2:8080 to app.example.com",
+    changes: [
+      {
+        field: "upstreams",
+        section: "upstreams",
+        before: ["http://app-1:8080"],
+        after: ["http://app-1:8080", "http://app-2:8080"],
+        leaves: null,
+        masked: false,
+      },
+      {
+        field: "loadBalancer",
+        section: "upstreams",
+        before: null,
+        after: null,
+        leaves: [
+          { path: "policy", before: "random", after: "cookie" },
+          { path: "policyCookieSecret", before: null, after: "[masked]" },
+        ],
+        masked: true,
+      },
+    ],
   },
   {
     id: 6,
@@ -105,6 +141,20 @@ const FILTER_OPTIONS = {
   actions: distinct(EVENTS.map((event) => event.action)),
 };
 
+/** The demo's log is intact; the check is answered here, where the app's server would. */
+async function verifyChain(): Promise<VerifyChainResult> {
+  return {
+    ok: true,
+    verification: {
+      ok: true,
+      checked: EVENTS.length,
+      legacy: 0,
+      firstBroken: null,
+      verifiedAt: new Date(NEWEST).toISOString(),
+    },
+  };
+}
+
 /** This component answers each query string off the rows above, where the app's server would. */
 export default function AuditLogDemo() {
   const params = useSearchParams();
@@ -133,6 +183,7 @@ export default function AuditLogDemo() {
         filterOptions={FILTER_OPTIONS}
         activity={ACTIVITY}
         summary={SUMMARY}
+        verifyChain={verifyChain}
       />
     </DemoSurface>
   );

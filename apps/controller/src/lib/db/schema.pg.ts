@@ -491,12 +491,31 @@ export const auditEvents = pgTable(
     summary: text("summary"),
     data: text("data"),
     createdAt: text("createdAt").notNull(),
+    // The hash chain (lib/audit/chain.ts); all null on events written before it existed.
+    // actorId copies userId without the foreign key, which nulls it when the user is deleted.
+    actorId: integer("actorId"),
+    seq: integer("seq"),
+    prevHash: text("prevHash"),
+    hash: text("hash"),
   },
   // The Overview's newest-first list and its server-events line both range over this.
   (table) => ({
     createdAtIdx: index("audit_events_created_at_idx").on(table.createdAt),
+    seqIdx: uniqueIndex("audit_events_seq_idx").on(table.seq),
   }),
 );
+
+/** One row (id 1): the chain's head, locked by every chained insert, and where it starts. */
+export const auditChain = pgTable("audit_chain", {
+  id: integer("id").primaryKey(),
+  headSeq: integer("headSeq").notNull(),
+  headHash: text("headHash").notNull(),
+  anchorSeq: integer("anchorSeq").notNull(),
+  anchorHash: text("anchorHash").notNull(),
+  // Events up to this id predate the chain and are not covered by it.
+  legacyMaxId: integer("legacyMaxId").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
 
 // traffic_events and waf_events live in ClickHouse (src/lib/clickhouse/client.ts); their parsers
 // and offsets live in the agent, which is where the Caddy log file is.
