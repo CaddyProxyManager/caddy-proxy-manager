@@ -5,7 +5,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 
-const INSTALL_GUIDE = "https://silentspud.github.io/caddy-proxy-manager/start/install/";
+const INSTALL_GUIDE = "https://caddyproxy.com/start/install/";
 
 /** Not dismissable here: setup is the one moment switching databases costs nothing. */
 export function SqliteSetupWarning() {

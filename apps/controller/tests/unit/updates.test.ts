@@ -2,7 +2,7 @@
  * Release comparison, registry-path parsing, and what the check reports. Prerelease rules are
  * easy to get backwards: 3.0.0-beta.2 precedes 3.0.0, or the beta just left reads as an update.
  */
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { version as DECLARED_VERSION } from '@/package.json';
 import { vi } from '@/tests/helpers/vi';
 
@@ -32,6 +32,8 @@ vi.mock('@/src/lib/settings/resolve', () => ({
 }));
 
 const {
+  canonicalRepository,
+  checkForUpdates,
   compareSemver,
   getUpdateStatus,
   isNewer,
@@ -42,10 +44,19 @@ const {
   tokenRealmUrl,
 } = await import('@/src/lib/runtime/updates');
 
+// getUpdateStatus refreshes in the background, which reached the real registry before this.
+const realFetch = globalThis.fetch;
+const unpublished = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+
 beforeEach(() => {
   store.cache = null;
   store.enabled = true;
   store.repository = 'ghcr.io/owner/name';
+  globalThis.fetch = unpublished;
+});
+
+afterAll(() => {
+  globalThis.fetch = realFetch;
 });
 
 /** The tag list ghcr.io actually returns for this project, verified against the live registry. */
@@ -144,6 +155,82 @@ describe('the repository setting', () => {
     for (const bad of ['', 'ghcr.io', 'file:///etc/passwd', 'ghcr.io/UPPER/case', 'a b/c']) {
       expect(parseRepository(bad)).toBeNull();
     }
+  });
+});
+
+describe('the move to the org namespace', () => {
+  const LEGACY = 'ghcr.io/silentspud/caddy-proxy-manager';
+  const ORG = 'ghcr.io/caddyproxymanager/caddy-proxy-manager';
+
+  /** Answers per namespace; a namespace left out is a 404, as an unpublished one is. */
+  function registry(tagsByNamespace: Record<string, string[]>) {
+    const asked: string[] = [];
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = String(input);
+      asked.push(url);
+      const namespace = Object.keys(tagsByNamespace).find((n) =>
+        url.includes(`/v2/${n.slice('ghcr.io/'.length)}/web/`),
+      );
+      return namespace
+        ? Response.json({ tags: tagsByNamespace[namespace] })
+        : new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+    return asked;
+  }
+
+  // A check another test started in the background would otherwise answer for this one.
+  beforeEach(async () => {
+    await checkForUpdates();
+  });
+
+  it('reads the old namespace as the org one, however it is written', () => {
+    for (const legacy of [LEGACY, `https://${LEGACY}`, `${LEGACY}/`]) {
+      expect(canonicalRepository(legacy)).toBe(ORG);
+    }
+  });
+
+  it('leaves a fork, and the org namespace itself, alone', () => {
+    expect(canonicalRepository('ghcr.io/somerandomuser/caddy-proxy-manager')).toBe(
+      'ghcr.io/somerandomuser/caddy-proxy-manager',
+    );
+    expect(canonicalRepository(`${LEGACY}-fork`)).toBe(`${LEGACY}-fork`);
+    expect(canonicalRepository(ORG)).toBe(ORG);
+  });
+
+  it('finds the last release in the old namespace while the org has none', async () => {
+    store.repository = LEGACY;
+    registry({ [LEGACY]: ['3.0.0', 'latest'] });
+
+    expect(await checkForUpdates()).toMatchObject({
+      repository: ORG,
+      latest: '3.0.0',
+      error: null,
+    });
+  });
+
+  it('takes the newest release across both namespaces', async () => {
+    store.repository = ORG;
+    registry({ [LEGACY]: ['3.0.0'], [ORG]: ['3.0.1', '3.0.0-rc.1'] });
+
+    expect(await checkForUpdates()).toMatchObject({ latest: '3.0.1' });
+  });
+
+  it('fails only when neither namespace answers', async () => {
+    store.repository = ORG;
+    registry({});
+
+    expect(await checkForUpdates()).toMatchObject({
+      latest: null,
+      errorCode: { code: 'registryRepositoryNotFound' },
+    });
+  });
+
+  it('asks a fork only of its own namespace', async () => {
+    store.repository = 'ghcr.io/somerandomuser/caddy-proxy-manager';
+    const asked = registry({ 'ghcr.io/somerandomuser/caddy-proxy-manager': ['3.0.0'] });
+
+    await checkForUpdates();
+    expect(asked.every((url) => url.includes('/somerandomuser/'))).toBe(true);
   });
 });
 

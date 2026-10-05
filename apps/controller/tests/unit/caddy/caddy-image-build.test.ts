@@ -81,6 +81,12 @@ describe('the build command', () => {
     expect(caddyImageTag('ghcr.io/silentspud/caddy-proxy-manager/caddy:3.3.0')).toBe(
       SUGGESTED_CADDY_IMAGE,
     );
+    expect(caddyImageTag('ghcr.io/caddyproxymanager/caddy-proxy-manager/caddy:3.6.1')).toBe(
+      SUGGESTED_CADDY_IMAGE,
+    );
+    expect(caddyImageTag('ghcr.io/somerandomuser/caddy-proxy-manager/caddy:3.6.1')).toBe(
+      'ghcr.io/somerandomuser/caddy-proxy-manager/caddy:3.6.1',
+    );
     expect(caddyImageTag(null)).toBe(SUGGESTED_CADDY_IMAGE);
     expect(caddyImageTag('localhost:5000/cpm/caddy:v2')).toBe('localhost:5000/cpm/caddy:v2');
   });

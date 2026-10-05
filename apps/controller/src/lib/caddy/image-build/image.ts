@@ -12,7 +12,9 @@ export const CADDY_IMAGE_DOCKERFILE = "docker/caddy/Dockerfile";
 export const SUGGESTED_CADDY_IMAGE = "caddy-proxy-manager-caddy:custom";
 const DEFAULT_ID = "10000";
 
-const SHIPPED_IMAGE = /^ghcr\.io\/silentspud\/caddy-proxy-manager\/caddy(?:[:@]|$)/;
+// Both owners: installs from before the move to the org still run the first.
+const SHIPPED_IMAGE =
+  /^ghcr\.io\/(?:silentspud|caddyproxymanager)\/caddy-proxy-manager\/caddy(?:[:@]|$)/;
 /**
  * name[:tag], registry host allowed. The agent reports it, and an agent is less trusted: anything
  * else would be pasted into a shell, so it falls back to the suggestion rather than being quoted.

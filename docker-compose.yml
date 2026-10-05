@@ -127,7 +127,7 @@ services:
 
       # First-start defaults of Settings fields. A fork sets the repository to its own namespace.
       UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-true}
-      UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/silentspud/caddy-proxy-manager}
+      UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/caddyproxymanager/caddy-proxy-manager}
 
       # Settings toggles; the agent starts ClickHouse to match, so these matter only for a first
       # start or a deployment with no agent. Unset decides from whether the credentials are set.

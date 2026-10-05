@@ -26,7 +26,7 @@ import { configureFirstOAuthProvider, createFirstAdmin } from "./actions";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 
-const AGENT_DOCS = "https://github.com/SilentSpud/caddy-proxy-manager/wiki/Agent-setup";
+const AGENT_DOCS = "https://caddyproxy.com/features/agent/";
 
 type Role = "controller" | "agent";
 type Method = "local" | "oauth";
