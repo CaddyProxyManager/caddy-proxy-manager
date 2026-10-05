@@ -287,7 +287,6 @@ export const agents = sqliteTable(
     /** JSON, or null to keep tracking the fleet default rather than a stale copy of it. */
     buildSettings: text("buildSettings"),
     lastSeenAt: text("lastSeenAt"),
-    lastError: text("lastError"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),
   },

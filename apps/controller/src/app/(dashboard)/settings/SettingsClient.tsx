@@ -2661,7 +2661,7 @@ function AgentSection({
                     key={agent.id}
                     name={agent.name}
                     status={entry?.ok ? entry.value : null}
-                    error={entry && !entry.ok ? entry.error : agent.lastError}
+                    error={entry && !entry.ok ? entry.error : null}
                     lastSeenAt={agent.lastSeenAt}
                     onRemove={repairControls(agent)}
                   />

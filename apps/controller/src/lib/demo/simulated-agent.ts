@@ -196,7 +196,7 @@ export async function startSimulatedAgent(
 
   const heartbeat = setInterval(() => {
     report();
-    void recordAgentContact(row.id, { ok: true });
+    void recordAgentContact(row.id);
   }, AGENT_STATUS_HEARTBEAT_MS);
 
   const quiesce = () => {
@@ -214,7 +214,7 @@ export async function startSimulatedAgent(
       switch (event.type) {
         case "hello":
           report();
-          await recordAgentContact(row.id, { ok: true });
+          await recordAgentContact(row.id);
           break;
         case "desired-state":
           reconcile(event.state);

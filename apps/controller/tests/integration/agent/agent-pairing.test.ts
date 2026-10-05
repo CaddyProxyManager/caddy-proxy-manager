@@ -27,9 +27,8 @@ const {
   redeemRepairCode,
   resetPairingCodes,
 } = await import('../../../src/lib/agent/pairing-codes');
-const { deleteAgent, listAgents, findAgentByAgentId, renameAgent } = await import(
-  '../../../src/lib/models/agents'
-);
+const { deleteAgent, listAgents, findAgentByAgentId, recordAgentContact, renameAgent } =
+  await import('../../../src/lib/models/agents');
 const bootstrap = await import('../../../src/lib/agent/bootstrap');
 const { POST } = await import('../../../src/app/api/agent/v1/pair/route');
 const { POST: PREVIEW } = await import('../../../src/app/api/agent/v1/pair/preview/route');
@@ -521,5 +520,20 @@ describe('POST /api/agent/v1/pair/preview', () => {
   it('does not preview a bootstrap token', async () => {
     const response = await preview('f'.repeat(64));
     expect(response.status).toBe(400);
+  });
+});
+
+describe('agent contact', () => {
+  it('stamps lastSeenAt and carries no error field nothing would ever set', async () => {
+    const { code } = ensurePairingCode();
+    expect((await pair(code)).status).toBe(200);
+    const [before] = await listAgents();
+    expect(before.lastSeenAt).toBeNull();
+
+    await recordAgentContact(before.id);
+    const [after] = await listAgents();
+    expect(after.lastSeenAt).not.toBeNull();
+    expect(after).not.toHaveProperty('lastError');
+    expect(Object.keys(schema.agents)).not.toContain('lastError');
   });
 });

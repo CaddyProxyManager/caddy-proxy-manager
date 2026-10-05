@@ -149,7 +149,7 @@ export const agentResolvers = {
       if (shapesState(status) !== shapesState(previous)) {
         void pushDesiredStateTo({ agentId: agent.agentId, agentRowId: agent.id });
       }
-      await recordAgentContact(agent.id, { ok: true });
+      await recordAgentContact(agent.id);
       return true;
     },
 

@@ -32,7 +32,6 @@ export type AgentRow = {
   enabled: boolean;
   connected: boolean;
   lastSeenAt: string | null;
-  lastError: string | null;
   version: string | null;
   buildState: string;
   buildMessage: string | null;
@@ -249,7 +248,6 @@ export default function AgentsClient({
                 {t("unassignedHint")}
               </Text>
 
-              {agent.lastError && <Banner status="warning" title={agent.lastError} />}
               {agent.logAccessFixes.length > 0 && (
                 <Banner status="warning" title={t("logAccessTitle")}>
                   <VStack gap={3}>

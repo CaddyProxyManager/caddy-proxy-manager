@@ -53,7 +53,6 @@ export default async function AgentsPage() {
         enabled: agent.enabled,
         connected: live.has(agent.id),
         lastSeenAt: agent.lastSeenAt,
-        lastError: agent.lastError,
         version: status?.version ?? null,
         buildState: status?.caddyBuild.status.state ?? "idle",
         buildMessage:

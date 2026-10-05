@@ -20,7 +20,6 @@ export type PairedAgent = {
   /** Its own Caddy build selection rather than the fleet default. */
   hasOwnBuildSettings: boolean;
   lastSeenAt: string | null;
-  lastError: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -39,7 +38,6 @@ function toView(row: Row): PairedAgent {
     enabled: row.enabled,
     hasOwnBuildSettings: row.buildSettings !== null,
     lastSeenAt: row.lastSeenAt,
-    lastError: row.lastError,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -92,7 +90,7 @@ export async function replaceAgentSecret(input: {
 }): Promise<void> {
   await db
     .update(agents)
-    .set({ secret: encryptSecret(input.secret), lastError: null, updatedAt: nowIso() })
+    .set({ secret: encryptSecret(input.secret), updatedAt: nowIso() })
     .where(eq(agents.agentId, input.agentId));
 }
 
@@ -166,19 +164,12 @@ export async function deleteAgent(id: number): Promise<string | null> {
   return row?.agentId ?? null;
 }
 
-/** Best-effort: it runs on every status read, and a failed timestamp must not fail the page. */
-export async function recordAgentContact(
-  id: number,
-  result: { ok: boolean; error?: string },
-): Promise<void> {
+/** Best-effort: it runs on every status report, and a failed timestamp must not fail the call. */
+export async function recordAgentContact(id: number): Promise<void> {
   try {
     await db
       .update(agents)
-      .set(
-        result.ok
-          ? { lastSeenAt: nowIso(), lastError: null, updatedAt: nowIso() }
-          : { lastError: (result.error ?? "Unreachable").slice(0, 500), updatedAt: nowIso() },
-      )
+      .set({ lastSeenAt: nowIso(), updatedAt: nowIso() })
       .where(eq(agents.id, id));
   } catch (error) {
     console.warn("Failed to record agent contact:", error);
