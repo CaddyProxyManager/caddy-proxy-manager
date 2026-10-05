@@ -292,7 +292,7 @@ Three constraints are not obvious from reading the suites:
   factory leaves out stays real - a `runInTransaction` left out wrote to the app's own connection.
   That connection is never migrated under test, so such a miss fails loudly instead of sharing data.
 - **A PR labelled `e2e` runs only the specs its files map to**
-  (`apps/controller/scripts/select-e2e.ts`); `e2e-full` runs them all, as main does on merge. An
+  (`apps/controller/scripts/select-e2e.ts`); `e2e-full` runs them all, as a dispatch does. Nothing runs on merge. An
   unmapped path runs everything, so a new source folder needs a rule to stay cheap, and a new spec
   must be named by one - `tests/unit/ci/select-e2e.test.ts` fails if not.
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
