@@ -37,7 +37,7 @@ update_flag() {  # what the dashboard layout was told: true or false
     | grep -oE 'updateAvailable\\?":(true|false)' | head -n1 | grep -oE 'true|false'
 }
 # The shipped default; saving it checks ghcr.io, which the rig cannot reach, and records that.
-restore() { settings ghcr.io/caddyproxymanager/caddy-proxy-manager >/dev/null 2>&1; }
+restore() { settings ghcr.io/caddyproxymanager >/dev/null 2>&1; }
 trap 'restore; cleanup_tracked' EXIT
 
 for tag in 3.1.0 v3.2.0 latest nightly sha-0123abc 3.3; do

@@ -10,7 +10,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # ghcr.io/<owner>/<service>; metadata-action lowercases it.
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
 
 # A newer run on the same ref supersedes the older; distinct tags never cancel each other.
 concurrency:
@@ -127,19 +128,19 @@ jobs:
           # The default leaves the multi-arch index bare, and GHCR reads its package page from it.
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           # Otherwise all three images take the repository's title and description. The
           # Dockerfiles repeat these for local builds.
           labels: |
             org.opencontainers.image.title=${{ matrix.title }}
             org.opencontainers.image.description=${{ matrix.description }}
-            org.opencontainers.image.vendor=SilentSpud
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
+            org.opencontainers.image.vendor=CaddyProxyManager
+            org.opencontainers.image.documentation=https://caddyproxy.com/
           annotations: |
             org.opencontainers.image.title=${{ matrix.title }}
             org.opencontainers.image.description=${{ matrix.description }}
-            org.opencontainers.image.vendor=SilentSpud
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
+            org.opencontainers.image.vendor=CaddyProxyManager
+            org.opencontainers.image.documentation=https://caddyproxy.com/
           # The gate decides floating tags: latest=auto would move :latest for a re-dispatched old tag.
           flavor: |
             latest=false
@@ -173,3 +174,17 @@ jobs:
           platforms: linux/amd64,linux/arm64
           sbom: true
           provenance: true
+
+      # 3.6.1 looks for releases at the repository-named path, before images moved to the owner's
+      # root. The version tag alone, pointing at the same index, keeps it finding them.
+      - name: Tag the release where 3.6.1 looks for it
+        if: matrix.service == 'web'
+        env:
+          SOURCE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web@${{ steps.build.outputs.digest }}
+          LEGACY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/caddy-proxy-manager/web
+          VERSION: ${{ steps.app-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          source="${SOURCE,,}"
+          legacy="${LEGACY,,}"
+          docker buildx imagetools create --tag "${legacy}:${VERSION}" "$source"

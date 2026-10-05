@@ -43,7 +43,7 @@ describe('the build command', () => {
         '    github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \\',
         '  --build-arg PUID=1000 --build-arg PGID=1000 \\',
         '  -t registry.example/caddy:custom \\',
-        '  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.3.0',
+        '  https://github.com/CaddyProxyManager/caddy-proxy-manager.git#v3.3.0',
       ].join('\n'),
     );
   });
@@ -83,6 +83,10 @@ describe('the build command', () => {
     );
     expect(caddyImageTag('ghcr.io/caddyproxymanager/caddy-proxy-manager/caddy:3.6.1')).toBe(
       SUGGESTED_CADDY_IMAGE,
+    );
+    expect(caddyImageTag('ghcr.io/caddyproxymanager/caddy:3.7.0')).toBe(SUGGESTED_CADDY_IMAGE);
+    expect(caddyImageTag('ghcr.io/caddyproxymanager/caddy-custom:1')).toBe(
+      'ghcr.io/caddyproxymanager/caddy-custom:1',
     );
     expect(caddyImageTag('ghcr.io/somerandomuser/caddy-proxy-manager/caddy:3.6.1')).toBe(
       'ghcr.io/somerandomuser/caddy-proxy-manager/caddy:3.6.1',

@@ -87,11 +87,11 @@ COPY --chown=caddy:caddy docker/caddy/Caddyfile /etc/caddy/Caddyfile
 # not a label since the UI overrides it; caddy-modules.txt records the real one.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Caddy Handler" \
       org.opencontainers.image.description="Caddy built with xcaddy, bundling the DNS, layer-4 and WAF plugins Caddy Proxy Manager configures." \
-      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.vendor="CaddyProxyManager" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.url="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://caddyproxy.com/" \
       org.opencontainers.image.base.name="docker.io/library/alpine:3.24"
 
 EXPOSE 80 443 2019

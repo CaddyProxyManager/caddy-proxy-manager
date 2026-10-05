@@ -82,11 +82,11 @@ RUN chmod +x /entrypoint.sh
 # Static facts only: docker-build-trusted.yml's metadata-action supplies version and revision.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
       org.opencontainers.image.description="Web UI and API for managing Caddy reverse proxies, certificates and routes." \
-      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.vendor="CaddyProxyManager" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.url="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://caddyproxy.com/" \
       org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
 
 EXPOSE 3000

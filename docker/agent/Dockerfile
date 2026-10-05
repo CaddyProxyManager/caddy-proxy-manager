@@ -67,11 +67,11 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
 # Static facts only: version, revision and timestamp come from docker-build-trusted.yml's labels.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
       org.opencontainers.image.description="Host-side agent that rebuilds the Caddy image and recreates its container on behalf of Caddy Proxy Manager." \
-      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.vendor="CaddyProxyManager" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
-      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.url="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://caddyproxy.com/" \
       org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
 
 ENV DATA_DIR=/data

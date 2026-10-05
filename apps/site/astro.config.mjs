@@ -64,11 +64,11 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/SilentSpud/caddy-proxy-manager",
+          href: "https://github.com/CaddyProxyManager/caddy-proxy-manager",
         },
       ],
       editLink: {
-        baseUrl: "https://github.com/SilentSpud/caddy-proxy-manager/edit/main/apps/site/",
+        baseUrl: "https://github.com/CaddyProxyManager/caddy-proxy-manager/edit/main/apps/site/",
       },
       /*
        * Its CSS is appended after demo.css, which only reads --sl-color-*. It depends on Starlight

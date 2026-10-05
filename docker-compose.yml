@@ -1,7 +1,7 @@
 services:
   web:
     container_name: caddy-proxy-manager-web
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     build:
       context: .
       dockerfile: docker/web/Dockerfile
@@ -127,7 +127,7 @@ services:
 
       # First-start defaults of Settings fields. A fork sets the repository to its own namespace.
       UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-true}
-      UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/caddyproxymanager/caddy-proxy-manager}
+      UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/caddyproxymanager}
 
       # Settings toggles; the agent starts ClickHouse to match, so these matter only for a first
       # start or a deployment with no agent. Unset decides from whether the credentials are set.
@@ -210,7 +210,7 @@ services:
   caddy:
     container_name: caddy-proxy-manager-caddy
     # An image you build yourself, with the agent's CADDY_BUILD_MODE=external. See the README.
-    image: ${CADDY_IMAGE:-ghcr.io/silentspud/caddy-proxy-manager/caddy:latest}
+    image: ${CADDY_IMAGE:-ghcr.io/caddyproxymanager/caddy:latest}
     build:
       context: .
       dockerfile: docker/caddy/Dockerfile
@@ -302,7 +302,7 @@ services:
 
   agent:
     container_name: caddy-proxy-manager-agent
-    image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
+    image: ghcr.io/caddyproxymanager/agent:latest
     # It allows stopping Caddy 40s on exit; Docker's default 10s would kill it part-way.
     stop_grace_period: 1m
     build:

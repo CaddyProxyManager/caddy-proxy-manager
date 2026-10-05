@@ -159,20 +159,22 @@ describe('the repository setting', () => {
 });
 
 describe('the move to the org namespace', () => {
-  const LEGACY = 'ghcr.io/silentspud/caddy-proxy-manager';
-  const ORG = 'ghcr.io/caddyproxymanager/caddy-proxy-manager';
+  const ORG = 'ghcr.io/caddyproxymanager';
+  // Where 3.6.0 and earlier published, and where 3.6.1 went looking.
+  const LEGACY = [
+    'ghcr.io/silentspud/caddy-proxy-manager',
+    'ghcr.io/caddyproxymanager/caddy-proxy-manager',
+  ];
 
-  /** Answers per namespace; a namespace left out is a 404, as an unpublished one is. */
-  function registry(tagsByNamespace: Record<string, string[]>) {
+  /** Answers per image path; anything else is a 404, as an unpublished namespace is. */
+  function registry(tagsByImage: Record<string, string[]>) {
     const asked: string[] = [];
     globalThis.fetch = (async (input: string | URL) => {
       const url = String(input);
       asked.push(url);
-      const namespace = Object.keys(tagsByNamespace).find((n) =>
-        url.includes(`/v2/${n.slice('ghcr.io/'.length)}/web/`),
-      );
-      return namespace
-        ? Response.json({ tags: tagsByNamespace[namespace] })
+      const image = Object.keys(tagsByImage).find((path) => url.includes(`/v2/${path}/tags/`));
+      return image
+        ? Response.json({ tags: tagsByImage[image] })
         : new Response('', { status: 404 });
     }) as unknown as typeof fetch;
     return asked;
@@ -183,9 +185,11 @@ describe('the move to the org namespace', () => {
     await checkForUpdates();
   });
 
-  it('reads the old namespace as the org one, however it is written', () => {
-    for (const legacy of [LEGACY, `https://${LEGACY}`, `${LEGACY}/`]) {
-      expect(canonicalRepository(legacy)).toBe(ORG);
+  it('reads either old namespace as the org one, however it is written', () => {
+    for (const legacy of LEGACY) {
+      for (const written of [legacy, `https://${legacy}`, `${legacy}/`]) {
+        expect(canonicalRepository(written)).toBe(ORG);
+      }
     }
   });
 
@@ -193,43 +197,27 @@ describe('the move to the org namespace', () => {
     expect(canonicalRepository('ghcr.io/somerandomuser/caddy-proxy-manager')).toBe(
       'ghcr.io/somerandomuser/caddy-proxy-manager',
     );
-    expect(canonicalRepository(`${LEGACY}-fork`)).toBe(`${LEGACY}-fork`);
+    expect(canonicalRepository(`${LEGACY[0]}-fork`)).toBe(`${LEGACY[0]}-fork`);
     expect(canonicalRepository(ORG)).toBe(ORG);
   });
 
-  it('finds the last release in the old namespace while the org has none', async () => {
-    store.repository = LEGACY;
-    registry({ [LEGACY]: ['3.0.0', 'latest'] });
+  it('checks the org image for an install still set to an old namespace', async () => {
+    store.repository = LEGACY[0];
+    const asked = registry({ 'caddyproxymanager/web': ['3.0.0', 'latest'] });
 
     expect(await checkForUpdates()).toMatchObject({
       repository: ORG,
       latest: '3.0.0',
       error: null,
     });
-  });
-
-  it('takes the newest release across both namespaces', async () => {
-    store.repository = ORG;
-    registry({ [LEGACY]: ['3.0.0'], [ORG]: ['3.0.1', '3.0.0-rc.1'] });
-
-    expect(await checkForUpdates()).toMatchObject({ latest: '3.0.1' });
-  });
-
-  it('fails only when neither namespace answers', async () => {
-    store.repository = ORG;
-    registry({});
-
-    expect(await checkForUpdates()).toMatchObject({
-      latest: null,
-      errorCode: { code: 'registryRepositoryNotFound' },
-    });
+    expect(asked.every((url) => url.includes('/v2/caddyproxymanager/web/'))).toBe(true);
   });
 
   it('asks a fork only of its own namespace', async () => {
     store.repository = 'ghcr.io/somerandomuser/caddy-proxy-manager';
-    const asked = registry({ 'ghcr.io/somerandomuser/caddy-proxy-manager': ['3.0.0'] });
+    const asked = registry({ 'somerandomuser/caddy-proxy-manager/web': ['3.0.0'] });
 
-    await checkForUpdates();
+    expect(await checkForUpdates()).toMatchObject({ latest: '3.0.0' });
     expect(asked.every((url) => url.includes('/somerandomuser/'))).toBe(true);
   });
 });

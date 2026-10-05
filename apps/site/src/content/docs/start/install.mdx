@@ -13,21 +13,25 @@ One compose file and two generated secrets. Everything else is entered in the br
 
 <Steps>
 
-1. Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
-   [latest release](https://github.com/SilentSpud/caddy-proxy-manager/releases/latest) and unpack
-   it into a directory of its own:
+1. Clone the [deploy repository](https://github.com/CaddyProxyManager/deploy) into a directory
+   named `caddy-proxy-manager`:
 
    ```bash
-   VERSION=v3.6.1   # the release you downloaded
-   mkdir caddy-proxy-manager && cd caddy-proxy-manager
-   tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
+   git clone https://github.com/CaddyProxyManager/deploy.git caddy-proxy-manager
+   cd caddy-proxy-manager
    ```
 
-   The archive is flat - `docker-compose.yml`, `.env.example` and the few files they mount, all
-   at the top level - so it runs from where it lands. Its compose file pins the images to that
-   release, so what you deploy stays on it until you choose to move. No clone of the repository is
-   needed. The [managed CrowdSec](/features/crowdsec/#managed) container is included too, but
-   stays off until you turn it on.
+   Keep that name. Compose names the project after the directory and the volumes after the
+   project, so a different directory is a different, empty installation.
+
+   It holds `docker-compose.yml`, `.env.example` and the few files they mount, one commit per
+   release, with the images pinned to that release - what you deploy stays on it until you pull.
+   The [managed CrowdSec](/features/crowdsec/#managed) container is included too, but stays off
+   until you turn it on.
+
+   Without git, download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
+   [latest release](https://source.caddyproxy.com/releases/latest) instead and unpack it into
+   that directory: it holds the same files.
 
 2. Generate the two values Compose has no default for, straight into `.env`:
 
@@ -97,20 +101,65 @@ rest.
 
 ## Upgrading
 
-Unpack the new release's archive over the old one, in the same directory, then restart. `.env` is
-not in the archive, so it is left alone; the compose file is replaced with one naming the new
-images.
+Pull, then restart on the images the new compose file names:
 
 ```bash
-VERSION=v3.6.1   # the release you are moving to
-tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
+git pull
 docker compose pull
 docker compose up -d
 ```
 
+`main` carries stable releases only. To follow prereleases as well, `git checkout next` once; every
+release is also a tag, so `git checkout v3.6.1` pins one.
+
 Settings reports when a newer release is published to the registry you pull from. It can be switched
 off; the only other requests the app makes to the internet on its own are the CRS plugin registry
 check and the GeoIP downloads, each with a switch of its own.
+
+### Your own changes
+
+Put them in `docker-compose.override.yml` beside `docker-compose.yml`, never in the tracked files.
+Compose merges it over the base file, the agent applies it when it starts Caddy, and git ignores it
+along with `.env` - so `git pull` never stops on a conflict.
+
+```yaml
+# docker-compose.override.yml
+services:
+  web:
+    ports: !override
+      - "127.0.0.1:3000:3000"
+```
+
+### From an archive install
+
+An install unpacked from a release archive becomes a clone in place, keeping its directory and so
+its data. Fetch first, and diff your compose file against the release you are on to find what you
+changed:
+
+```bash
+git init -b main
+git remote add origin https://github.com/CaddyProxyManager/deploy.git
+git fetch origin --tags
+git show v3.6.1:docker-compose.yml | diff - docker-compose.yml   # your release
+```
+
+Move every difference into `docker-compose.override.yml`, then take the repository's files:
+
+```bash
+git checkout -f -B main origin/main
+docker compose pull
+docker compose up -d
+```
+
+`.env` and the override are untouched: neither is tracked. Every release from 3.0.0 on is a tag.
+
+### From ghcr.io/silentspud
+
+Up to 3.6.1 the images were published as `ghcr.io/silentspud/caddy-proxy-manager/{web,caddy,agent}`;
+later releases are `ghcr.io/caddyproxymanager/{web,caddy,agent}`. The old images stay where they are, so
+nothing stops working - but an install older than 3.6.1 is never told about a newer release, since
+it checks the old namespace. Moving to the deploy repository, as above, changes every image name at
+once.
 
 ### From PostgreSQL 17
 

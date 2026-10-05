@@ -104,19 +104,23 @@ export function newestRelease(tags: string[]): string | null {
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
-const LEGACY_REPOSITORY = "ghcr.io/silentspud/caddy-proxy-manager";
-const REPOSITORY = "ghcr.io/caddyproxymanager/caddy-proxy-manager";
+const REPOSITORY = "ghcr.io/caddyproxymanager";
+/** Where releases were published before; 3.6.1 stored the second as its default. */
+const LEGACY_REPOSITORIES = [
+  "ghcr.io/silentspud/caddy-proxy-manager",
+  "ghcr.io/caddyproxymanager/caddy-proxy-manager",
+];
 
 /**
- * Releases moved to the org's namespace, but a deployed compose file sets the old one, outranking
- * the default - left alone, those installs would never hear of a release again.
+ * A deployed compose file sets the old namespace, outranking the default - left alone, those
+ * installs would never hear of a release again.
  */
 export function canonicalRepository(repository: string): string {
   const bare = repository
     .trim()
     .replace(/^https?:\/\//, "")
     .replace(/\/+$/, "");
-  return bare === LEGACY_REPOSITORY ? REPOSITORY : repository;
+  return LEGACY_REPOSITORIES.includes(bare) ? REPOSITORY : repository;
 }
 
 /** Must look like a registry reference and is forced to https: the server fetches it. */
@@ -257,23 +261,6 @@ async function settings(): Promise<{ enabled: boolean; repository: string }> {
   return { enabled, repository: canonicalRepository(repository) };
 }
 
-/**
- * Ours is read in both namespaces: the org's holds nothing until its first release, and until
- * then a check of it alone would fail. Throws only when every namespace does.
- */
-async function listReleaseTags(repository: string, signal: AbortSignal): Promise<string[]> {
-  const sources = repository === REPOSITORY ? [REPOSITORY, LEGACY_REPOSITORY] : [repository];
-  const results = await Promise.allSettled(
-    sources.map((source) => {
-      const { host, path } = parseRepository(source) as { host: string; path: string };
-      return listTags(host, `${path}/${VERSIONED_IMAGE}`, signal);
-    }),
-  );
-  const listed = results.filter((r) => r.status === "fulfilled");
-  if (listed.length === 0) throw (results[0] as PromiseRejectedResult).reason;
-  return listed.flatMap((r) => r.value);
-}
-
 /** Several readers finding the cache stale at once ask only once. */
 let inFlight: Promise<CachedCheck> | null = null;
 
@@ -296,7 +283,11 @@ export async function checkForUpdates(): Promise<CachedCheck> {
       recordFailure(result, domainError("updateRepositoryInvalid", { repository }));
     } else {
       try {
-        const tags = await listReleaseTags(repository, AbortSignal.timeout(REQUEST_TIMEOUT_MS));
+        const tags = await listTags(
+          parsed.host,
+          `${parsed.path}/${VERSIONED_IMAGE}`,
+          AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        );
         result.latest = newestRelease(tags);
         if (!result.latest) recordFailure(result, domainError("updateNoReleases"));
         else if (isNewer(APP_VERSION, result.latest)) {

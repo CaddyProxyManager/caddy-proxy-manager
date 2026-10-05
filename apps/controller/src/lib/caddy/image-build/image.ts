@@ -6,15 +6,15 @@
 
 import { APP_VERSION } from "../../runtime/app-version";
 
-export const CADDY_IMAGE_SOURCE = "https://github.com/SilentSpud/caddy-proxy-manager.git";
+export const CADDY_IMAGE_SOURCE = "https://github.com/CaddyProxyManager/caddy-proxy-manager.git";
 export const CADDY_IMAGE_DOCKERFILE = "docker/caddy/Dockerfile";
 /** A tag of the operator's own: building under the shipped name, the load's pull would replace it. */
 export const SUGGESTED_CADDY_IMAGE = "caddy-proxy-manager-caddy:custom";
 const DEFAULT_ID = "10000";
 
-// Both owners: installs from before the move to the org still run the first.
+// The org's, and the two paths an install from before the move may still run.
 const SHIPPED_IMAGE =
-  /^ghcr\.io\/(?:silentspud|caddyproxymanager)\/caddy-proxy-manager\/caddy(?:[:@]|$)/;
+  /^ghcr\.io\/(?:caddyproxymanager|(?:silentspud|caddyproxymanager)\/caddy-proxy-manager)\/caddy(?:[:@]|$)/;
 /**
  * name[:tag], registry host allowed. The agent reports it, and an agent is less trusted: anything
  * else would be pasted into a shell, so it falls back to the suggestion rather than being quoted.

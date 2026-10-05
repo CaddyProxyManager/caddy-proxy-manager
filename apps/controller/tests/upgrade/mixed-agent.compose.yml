@@ -18,4 +18,4 @@ services:
       # Never a rebuild: which modules Caddy has is read off the image, so both agents agree.
       CADDY_BUILD_MODE: external
   caddy:
-    image: ${CADDY_IMAGE:-ghcr.io/silentspud/caddy-proxy-manager/caddy:latest}
+    image: ${CADDY_IMAGE:-ghcr.io/caddyproxymanager/caddy:latest}

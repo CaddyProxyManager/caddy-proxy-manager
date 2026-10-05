@@ -51,7 +51,7 @@ services:
 
   web-registration-enabled:
     container_name: caddy-proxy-manager-web-registration-enabled
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     ports:
       - "3001:3000"
     environment:
@@ -94,7 +94,7 @@ services:
   # database, so neither its counters nor its lockouts reach another spec.
   web-ratelimit:
     container_name: caddy-proxy-manager-web-ratelimit
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     ports:
       - "3006:3000"
     environment:
@@ -132,7 +132,7 @@ services:
   # DEMO_MODE: an in-memory Caddy and a simulated agent. The seeded admin is every visitor's.
   web-demo:
     container_name: caddy-proxy-manager-web-demo
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     ports:
       - "3008:3000"
     environment:
@@ -204,7 +204,7 @@ services:
   # stack's. It idles, unpaired, until that spec runs.
   agent-remote:
     container_name: caddy-proxy-manager-agent-remote
-    image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
+    image: ghcr.io/caddyproxymanager/agent:latest
     environment:
       DATA_DIR: /data
       DOCKER_HOST: tcp://127.0.0.1:9
@@ -221,7 +221,7 @@ services:
   # startup apply would wipe the routes the other tests created.
   web-setup:
     container_name: caddy-proxy-manager-web-setup
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     # Finishing setup exits on purpose, to restart from the stored configuration.
     restart: unless-stopped
     ports:
@@ -258,7 +258,7 @@ services:
 
   web-migrate:
     container_name: caddy-proxy-manager-web-migrate
-    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    image: ghcr.io/caddyproxymanager/web:latest
     # Like web-setup: finishing a migration exits on purpose.
     restart: unless-stopped
     ports:

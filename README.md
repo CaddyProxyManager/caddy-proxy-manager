@@ -2,6 +2,11 @@
 
 Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible.
 
+> **Moved to the CaddyProxyManager org.** Images are now `ghcr.io/caddyproxymanager/{web,caddy,agent}`
+> and deployments come from the [deploy repository](https://github.com/CaddyProxyManager/deploy).
+> An install older than 3.6.1 is not told about new releases:
+> [move it over](https://caddyproxy.com/start/install/#from-ghcriosilentspud).
+
 > **3.0 changes how this is configured.** Most settings now live in the database and are entered
 > through a first-run setup flow in the browser, not in `.env`. PostgreSQL is the default database
 > (SQLite remains available), and an existing pre-3.0 installation is migrated in-app rather than by
@@ -17,18 +22,18 @@ This project provides a web UI for Caddy Server, eliminating the need to manuall
 
 ## Installation
 
-Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
-[latest release](https://github.com/SilentSpud/caddy-proxy-manager/releases/latest). It holds
-`docker-compose.yml`, `.env.example` and the files they mount, flat, with the images pinned to that
-release - so it runs from wherever it is unpacked, and no clone is needed.
+Clone the [deploy repository](https://github.com/CaddyProxyManager/deploy) into a directory named
+`caddy-proxy-manager` - Compose names the volumes after it, so the name is what keeps your data. It
+holds `docker-compose.yml`, `.env.example` and the files they mount, one commit per release, with the
+images pinned to that release. Without git, the same files are in
+`caddy-proxy-manager-<version>-deploy.tar.gz` on each [release](https://github.com/CaddyProxyManager/caddy-proxy-manager/releases/latest).
 
 It includes the [managed CrowdSec](#crowdsec) container, behind its Compose profile: it does not
 run until **Settings → CrowdSec** turns managed mode on.
 
 ```bash
-VERSION=v3.6.1   # the release you downloaded
-mkdir caddy-proxy-manager && cd caddy-proxy-manager
-tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
+git clone https://github.com/CaddyProxyManager/deploy.git caddy-proxy-manager
+cd caddy-proxy-manager
 
 # The only two values a fresh install has to have. That is the whole .env --
 # everything else is entered in the browser on first run. See .env.example for
@@ -39,6 +44,11 @@ chmod 600 .env
 
 docker compose up -d
 ```
+
+To upgrade: `git pull && docker compose pull && docker compose up -d`. Keep your own changes in
+`docker-compose.override.yml`, which git ignores, so a pull never conflicts; the
+[install guide](https://caddyproxy.com/start/install/#upgrading) covers moving an archive install to
+git.
 
 That also starts the bundled `postgres` service the app keeps its data in, so there is no database
 server to run yourself. Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
@@ -405,7 +415,7 @@ it win even then.
 | Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
 | Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
-| Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/caddyproxymanager/caddy-proxy-manager` |
+| Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/caddyproxymanager` |
 | Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
@@ -474,7 +484,7 @@ it win even then.
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
 | `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
 | `DEMO_MODE` | Run with no Caddy at all: admin calls go to an in-memory Caddy, a simulated agent reports builds, ports and services as done, and real agents are refused pairing and connection. No certificate is ordered and no DNS provider is called. Environment-only so a demo's visitors cannot turn it off | `false` | No |
-| `CADDY_IMAGE` | The image the `caddy` service runs. Set it to an image you built with the agent in external mode (`CADDY_BUILD_MODE`) - never the shipped name, or loading it would pull the registry's copy over yours. Forwarded to the agent, which runs Compose | `ghcr.io/silentspud/caddy-proxy-manager/caddy:latest` | No |
+| `CADDY_IMAGE` | The image the `caddy` service runs. Set it to an image you built with the agent in external mode (`CADDY_BUILD_MODE`) - never the shipped name, or loading it would pull the registry's copy over yours. Forwarded to the agent, which runs Compose | `ghcr.io/caddyproxymanager/caddy:latest` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 
 ### The agent's environment
@@ -1443,7 +1453,7 @@ fork](#the-plugin-is-on-a-fork).
 You can see exactly what an image was built with, without rebuilding it:
 
 ```bash
-docker run --rm ghcr.io/silentspud/caddy-proxy-manager/caddy:latest cat /etc/caddy/caddy-modules.resolved.txt
+docker run --rm ghcr.io/caddyproxymanager/caddy:latest cat /etc/caddy/caddy-modules.resolved.txt
 ```
 
 ### Custom modules
@@ -1502,7 +1512,7 @@ docker build \
   --build-arg CADDY_MODULES="github.com/caddy-dns/cloudflare github.com/mholt/caddy-l4" \
   --build-arg PUID=10000 --build-arg PGID=10000 \
   -t caddy-proxy-manager-caddy:custom \
-  https://github.com/SilentSpud/caddy-proxy-manager.git#v3.5.1
+  https://github.com/CaddyProxyManager/caddy-proxy-manager.git#v3.6.1
 ```
 
 Build it on the agent's host, or elsewhere and push it to a registry. The first time,
@@ -2036,7 +2046,7 @@ Each forward-auth-protected host has its own access list of allowed users and/or
 
 ## Roadmap
 
-[Open an issue](https://github.com/silentspud/caddy-proxy-manager/issues) for feature requests.
+[Open an issue](https://github.com/CaddyProxyManager/caddy-proxy-manager/issues) for feature requests.
 
 ---
 
@@ -2060,7 +2070,7 @@ Contributions welcome:
 ## Support
 
 - **Documentation:** [caddyproxy.com](https://caddyproxy.com/)
-- **Issues:** [GitHub Issues](https://github.com/silentspud/caddy-proxy-manager/issues) for bugs and feature requests
+- **Issues:** [GitHub Issues](https://github.com/CaddyProxyManager/caddy-proxy-manager/issues) for bugs and feature requests
 
 ---
 

@@ -30,8 +30,7 @@ if (!existsSync(resolve(PREVIOUS, 'docker/agent/Dockerfile'))) {
 
 const PROJECT = 'cpm-upgrade';
 const BASE = 'http://localhost:3000';
-const CADDY_IMAGE =
-  process.env.CADDY_IMAGE || 'ghcr.io/silentspud/caddy-proxy-manager/caddy:latest';
+const CADDY_IMAGE = process.env.CADDY_IMAGE || 'ghcr.io/caddyproxymanager/caddy:latest';
 const IMAGES = {
   previousAgent: 'cpm-upgrade/agent:previous',
   agent: 'cpm-upgrade/agent:current',

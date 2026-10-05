@@ -471,7 +471,7 @@ export const SETTING_FIELDS: Array<{
     env: "UPDATE_IMAGE_REPOSITORY",
     group: "application",
     kind: "string",
-    value: "ghcr.io/caddyproxymanager/caddy-proxy-manager",
+    value: "ghcr.io/caddyproxymanager",
   },
   {
     key: "config:auth_allow_self_registration",

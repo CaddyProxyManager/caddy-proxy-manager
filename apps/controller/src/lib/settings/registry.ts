@@ -345,10 +345,10 @@ export const updateImageRepository = stringSetting({
     "Where this deployment's images come from, without the image name - the update check reads " +
     "its tags. Point it at your own namespace if you run a fork, or it will report releases you " +
     "cannot pull.",
-  default: "ghcr.io/caddyproxymanager/caddy-proxy-manager",
+  default: "ghcr.io/caddyproxymanager",
   // Lowercase because the registry API requires it; no scheme because the check forces https.
   pattern: /^[a-z0-9][a-z0-9.-]*(:\d{1,5})?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$/,
-  patternHint: "must look like ghcr.io/owner/name, with no scheme and no image name",
+  patternHint: "must look like ghcr.io/owner, with no scheme and no image name",
   maxLength: 256,
 });
 
