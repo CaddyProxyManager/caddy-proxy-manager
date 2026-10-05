@@ -379,4 +379,4 @@ replace cel.dev/cel-go => cel.dev/cel-go v0.32.0
 // every container stop into a non-zero exit.
 //
 //	https://github.com/tailscale/caddy-tailscale/pull/142
-replace github.com/tailscale/caddy-tailscale => github.com/SilentSpud/caddy-tailscale v0.0.0-20260906124601-619eb744217e
+replace github.com/tailscale/caddy-tailscale => github.com/CaddyProxyManager/caddy-tailscale v0.0.0-20260906124601-619eb744217e
