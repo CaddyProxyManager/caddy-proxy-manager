@@ -36,6 +36,11 @@ const validGroups: Record<string, Record<string, unknown>> = {
   },
   'upstream-dns': { enabled: true, family: 'both' },
   geoblock,
+  'rate-limit': {
+    enabled: true,
+    zones: [{ maxEvents: 60, window: '1m', key: 'header', header: 'X-Api-Key' }],
+    allowlist: ['10.0.0.0/8'],
+  },
   waf: {
     enabled: true,
     mode: 'On',
@@ -83,6 +88,13 @@ describe('REST settings runtime validation', () => {
         trusted_proxies: ['not-a-network'],
       }),
     ).toThrow(/IP address or CIDR/);
+    expect(() =>
+      validateSettingsGroup('rate-limit', {
+        enabled: true,
+        zones: [{ maxEvents: 60, window: '1m', key: 'header', header: '{http.request.host}' }],
+        allowlist: [],
+      }),
+    ).toThrow(SettingsValidationError);
   });
 
   // Coraza rejects a body limit above 1 GiB while Caddy loads the config, which

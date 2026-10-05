@@ -99,6 +99,14 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Cleared the review of WAF event (?<key>\S+)$/,
   },
 
+  // models/access-lists.ts
+  {
+    entityType: "access_list",
+    action: "update",
+    message: "accessListRulesExpired",
+    pattern: /^Expired rules removed from access list (?<name>.+) \((?<count>[^()]+)\)$/s,
+  },
+
   // models/blocked-sources.ts
   {
     entityType: "blocked_source",

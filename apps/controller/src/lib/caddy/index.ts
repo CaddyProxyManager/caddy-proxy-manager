@@ -48,6 +48,7 @@ import {
   getDnsProviderSettings,
   getUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
+  getRateLimitSettings,
   getWafSettings,
   getErrorPagesSettings,
   getDefaultResponseSettings,
@@ -147,7 +148,9 @@ import {
   buildAccessListHandlers,
   expandIpRules,
   type IpRule,
-  ipDenyMatcherSets,
+  isGeoRule,
+  isRuleActive,
+  l4DenyMatcherSets,
 } from "../access-lists/rules";
 import {
   type CaddyModuleAvailability,
@@ -178,7 +181,11 @@ import {
   sanitizeHostUpstreamTimeouts,
   transportTimeoutFields,
 } from "../proxy-hosts/upstream-timeouts";
-import { buildRateLimitHandler, type HostRateLimitMeta } from "../proxy-hosts/rate-limit";
+import {
+  buildRateLimitHandlers,
+  type GlobalRateLimitSettings,
+  type HostRateLimitMeta,
+} from "../proxy-hosts/rate-limit";
 import { instrumentOutcomes, tagOutcome } from "./outcome-markers";
 import {
   buildAppSecHandler,
@@ -962,6 +969,8 @@ type CaddyBuildContext = {
   wafExclusions?: readonly WafExclusionRule[];
   /** The global deny list, unexpired entries only. */
   blockedSources?: readonly ActiveBlockedSource[];
+  /** Zones a host may inherit, and the addresses no zone counts. */
+  globalRateLimit?: GlobalRateLimitSettings | null;
   /** Where the blocker finds the client behind a proxy, for the deny list's geo entries. */
   blockedSourcesTrustedProxies?: readonly string[];
   /**
@@ -1248,24 +1257,38 @@ function appendForwardAuthPathModeRoutes(options: {
   bypassHeaders?: string[];
   cacheHandler?: Record<string, unknown> | null;
   upstreamTimeouts?: HostUpstreamTimeoutsMeta;
+  /**
+   * Run once the caller is known: right after the auth handler, and on routes left open, where
+   * the identity header is stripped and so reads as absent.
+   */
+  postAuthHandlers?: Record<string, unknown>[];
 }) {
+  const { postAuthHandlers = [] } = options;
   const {
     hostRoutes,
     domainGroups,
     authMode,
-    baseHandlers,
-    authHandler,
+    baseHandlers: sharedHandlers,
+    authHandler: bareAuthHandler,
     reverseProxyHandler,
     locationRules,
     skipHttpsHostnameValidation,
     preserveHostHeader,
     preDomainRoute,
     protectedModePreRoutePlacement = "before",
-    apiAuthHandler = null,
     bypassHeaders = [],
     cacheHandler = null,
     upstreamTimeouts,
   } = options;
+  // Open routes carry the post-auth handlers after the shared chain; gated ones after the auth.
+  const baseHandlers = [...sharedHandlers, ...postAuthHandlers];
+  const gatedBase = sharedHandlers;
+  const withPostAuth = (handler: Record<string, unknown>) =>
+    postAuthHandlers.length > 0
+      ? { handler: "subroute", routes: [{ handle: [handler, ...postAuthHandlers] }] }
+      : handler;
+  const authHandler = withPostAuth(bareAuthHandler);
+  const apiAuthHandler = options.apiAuthHandler ? withPostAuth(options.apiAuthHandler) : null;
 
   /**
    * Browser route first: Caddy takes the first match, and the fallback has no matcher of its
@@ -1275,19 +1298,19 @@ function appendForwardAuthPathModeRoutes(options: {
     if (!apiAuthHandler) {
       hostRoutes.push({
         match: [matcher],
-        handle: [...baseHandlers, authHandler, proxy],
+        handle: [...gatedBase, authHandler, proxy],
         terminal: true,
       });
       return;
     }
     hostRoutes.push({
       match: [{ ...matcher, ...BROWSER_REQUEST_MATCHER }],
-      handle: [...baseHandlers, authHandler, proxy],
+      handle: [...gatedBase, authHandler, proxy],
       terminal: true,
     });
     hostRoutes.push({
       match: [{ ...matcher }],
-      handle: [...baseHandlers, apiAuthHandler, cloneJson(proxy)],
+      handle: [...gatedBase, apiAuthHandler, cloneJson(proxy)],
       terminal: true,
     });
   };
@@ -1375,7 +1398,7 @@ function appendForwardAuthPathModeRoutes(options: {
         preserveHostHeader,
         cacheHandler,
         upstreamTimeouts,
-        handlers: baseHandlers,
+        handlers: gatedBase,
         extraHandlers: [authHandler],
       });
     }
@@ -1648,10 +1671,21 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const crowdsecOn = Boolean(context.crowdsec) && hostCrowdSecEnabled(meta.crowdsec);
     if (crowdsecOn) handlers.push(buildCrowdSecHandler());
 
-    const rateLimit = buildRateLimitHandler(row.id, meta.rate_limit);
-    if (rateLimit && rateLimitUsable) {
-      handlers.push(rateLimit);
-    } else if (rateLimit) {
+    // The dashboard never takes the global zones, only the allowlist: a tight global zone could
+    // keep out the administrator who has to loosen it.
+    const globalRateLimit =
+      row.id === DASHBOARD_HOST_ID && context.globalRateLimit
+        ? { ...context.globalRateLimit, enabled: false }
+        : context.globalRateLimit;
+    const rateLimit = buildRateLimitHandlers(row.id, meta.rate_limit, {
+      global: globalRateLimit,
+      identityHeader: forwardAuthIdentityHeader({ authentik, forwardAuth, cpmForwardAuth }),
+    });
+    // Counted after sign-in, so it sees the verified user; see appendForwardAuthPathModeRoutes.
+    const postAuthHandlers = rateLimit.postAuth && rateLimitUsable ? [rateLimit.postAuth] : [];
+    if (rateLimit.pre && rateLimitUsable) {
+      handlers.push(rateLimit.pre);
+    } else if (rateLimit.pre || rateLimit.postAuth) {
       console.warn(
         `Skipping rate limiting on proxy host "${row.name}": the Rate Limit module is not in ` +
           "Caddy. Enable it in Settings → Caddy Build and rebuild Caddy.",
@@ -2072,6 +2106,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         upstreamTimeouts: hostTimeouts,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
+        postAuthHandlers,
         preDomainRoute: outpostRoute,
         protectedModePreRoutePlacement: "after",
       });
@@ -2101,6 +2136,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         upstreamTimeouts: hostTimeouts,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
+        postAuthHandlers,
       });
     } else if (cpmForwardAuth) {
       // ── CPM Forward Auth ────────────────────────────────────────────
@@ -2227,6 +2263,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           upstreamTimeouts: hostTimeouts,
           skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
           preserveHostHeader: Boolean(row.preserveHostHeader),
+          postAuthHandlers,
           preDomainRoute: cpmCallbackRoute,
           protectedModePreRoutePlacement: "before",
         });
@@ -3057,7 +3094,7 @@ async function buildL4Servers(
           // Deleted mid-build, or no rules left to admit by: fail closed, as HTTP does.
           guards.push([]);
         } else {
-          const denySets = ipDenyMatcherSets(list, "remote_ip");
+          const denySets = l4DenyMatcherSets(list);
           // Only allow rules over a default of allow deny nobody.
           if (denySets.length > 0) guards.push(denySets);
         }
@@ -3178,6 +3215,10 @@ export async function buildCaddyDocument(
         ipDefault: accessLists.ipDefault,
         satisfy: accessLists.satisfy,
         passAuth: accessLists.passAuth,
+        denyStatus: accessLists.denyStatus,
+        denyBody: accessLists.denyBody,
+        denyRedirectUrl: accessLists.denyRedirectUrl,
+        failClosed: accessLists.failClosed,
       })
       .from(accessLists),
     db
@@ -3186,6 +3227,10 @@ export async function buildCaddyDocument(
         action: accessListIpRules.action,
         cidr: accessListIpRules.cidr,
         hostname: accessListIpRules.hostname,
+        country: accessListIpRules.country,
+        continent: accessListIpRules.continent,
+        asn: accessListIpRules.asn,
+        expiresAt: accessListIpRules.expiresAt,
       })
       .from(accessListIpRules)
       .orderBy(asc(accessListIpRules.accessListId), asc(accessListIpRules.sortOrder)),
@@ -3432,6 +3477,7 @@ export async function buildCaddyDocument(
     crowdsecSettings,
     wafExclusions,
     blockedSources,
+    globalRateLimit,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3459,6 +3505,7 @@ export async function buildCaddyDocument(
     getCrowdSecSettings(),
     listWafExclusionRules(),
     listActiveBlockedSources(),
+    getRateLimitSettings(),
   ]);
 
   if (
@@ -3557,17 +3604,40 @@ export async function buildCaddyDocument(
     mTlsOptionalAuthDomains,
   });
 
-  // Grouped once; the query already orders each list's rules.
-  const ipRulesByList = new Map<number, Pick<IpRule, "action" | "cidr" | "hostname">[]>();
+  // Grouped once; the query already orders each list's rules. An expired rule is gone at once,
+  // ahead of the housekeeping pass that deletes it.
+  const ipRulesByList = new Map<
+    number,
+    Pick<IpRule, "action" | "cidr" | "hostname" | "country" | "continent" | "asn">[]
+  >();
+  const buildNow = Date.now();
   for (const rule of accessListIpRuleRecords) {
+    if (!isRuleActive(rule, buildNow)) continue;
     const rules = ipRulesByList.get(rule.accessListId) ?? [];
     rules.push({
       action: rule.action === "allow" ? "allow" : "deny",
       cidr: rule.cidr,
       hostname: rule.hostname,
+      country: rule.country,
+      continent: rule.continent,
+      asn: rule.asn,
     });
     ipRulesByList.set(rule.accessListId, rules);
   }
+  const blockerUsable = isFeatureUsable(moduleAvailability, "geoblock");
+  const skippedGeoLists = [...ipRulesByList.values()].filter((rules) => rules.some(isGeoRule));
+  if (!blockerUsable && skippedGeoLists.length > 0) {
+    console.warn(
+      `Access-list rules by country, continent or ASN are skipped on ${skippedGeoLists.length} ` +
+        "list(s): they need the Geo Blocking module. Enable it in Settings → Caddy Build and " +
+        "rebuild Caddy.",
+    );
+  }
+  const accessListTrustedProxies = expandPrivateRanges(
+    effectiveGlobalGeoBlock?.trusted_proxies?.length
+      ? effectiveGlobalGeoBlock.trusted_proxies
+      : (trustedProxiesSettings?.ranges ?? []).map((r) => r.trim()).filter(Boolean),
+  );
   const resolvedHostnames = new Map<string, string[]>();
   for (const entry of accessListDnsRecords) {
     const addresses = parseJson<unknown>(entry.addresses, []);
@@ -3581,13 +3651,23 @@ export async function buildCaddyDocument(
         list.id,
         {
           accounts: accessMap.get(list.id) ?? [],
-          ipRules: expandIpRules(ipRulesByList.get(list.id) ?? [], (name) =>
-            resolvedHostnames.get(name),
+          ipRules: expandIpRules(
+            ipRulesByList.get(list.id) ?? [],
+            (name) => resolvedHostnames.get(name),
+            { geoUsable: blockerUsable },
           ),
           ipDefault: list.ipDefault === "allow" ? ("allow" as const) : ("deny" as const),
           satisfy: list.satisfy === "any" ? ("any" as const) : ("all" as const),
           passAuth: list.passAuth,
-        },
+          deny: list.denyRedirectUrl
+            ? { status: 302, body: null, redirectUrl: list.denyRedirectUrl }
+            : list.denyStatus != null || list.denyBody
+              ? { status: list.denyStatus ?? 403, body: list.denyBody, redirectUrl: null }
+              : undefined,
+          failClosed: list.failClosed,
+          trustedProxies: accessListTrustedProxies,
+          blockerUsable,
+        } satisfies AccessListRuntime,
       ]),
     ),
     tlsReadyCertificates: readyCertificates,
@@ -3601,11 +3681,8 @@ export async function buildCaddyDocument(
     crsPlugins: crsPluginRules,
     wafExclusions,
     blockedSources,
-    blockedSourcesTrustedProxies: expandPrivateRanges(
-      effectiveGlobalGeoBlock?.trusted_proxies?.length
-        ? effectiveGlobalGeoBlock.trusted_proxies
-        : (trustedProxiesSettings?.ranges ?? []).map((r) => r.trim()).filter(Boolean),
-    ),
+    blockedSourcesTrustedProxies: accessListTrustedProxies,
+    globalRateLimit,
     moduleAvailability,
     tailscale: tailscaleRuntime,
     crowdsec: crowdsec && crowdsecUsable ? { appsec: Boolean(crowdsec.appsecUrl) } : null,
@@ -4018,6 +4095,26 @@ function getCpmDialAddress(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Where the host's forward auth leaves the verified user, for rate limiting by user. Each is
+ * stripped from what the client sent on every route, so only the auth server can set it.
+ */
+export function forwardAuthIdentityHeader(auth: {
+  authentik: { copyHeaders: string[] } | null;
+  forwardAuth: { copyHeaders: string[] } | null;
+  cpmForwardAuth: unknown;
+}): string | null {
+  const copied = (headers: string[], wanted: string[]) =>
+    wanted.find((name) => headers.some((header) => header.toLowerCase() === name.toLowerCase())) ??
+    null;
+  if (auth.authentik) {
+    return copied(auth.authentik.copyHeaders, ["X-Authentik-Uid", "X-Authentik-Username"]);
+  }
+  if (auth.forwardAuth) return copied(auth.forwardAuth.copyHeaders, ["Remote-User"]);
+  if (auth.cpmForwardAuth) return "X-Cpm-User-Id";
+  return null;
 }
 
 function parseAuthentikConfig(

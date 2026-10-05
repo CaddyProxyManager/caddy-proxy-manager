@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { AccessList, AccessListUsage } from "@/lib/models/access-lists";
+import type { AccessList, AccessListStats, AccessListUsage } from "@/lib/models/access-lists";
 import { withRowId, type WithRowId } from "@/lib/forms/row-id";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -54,7 +54,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { NetworkTab } from "./NetworkTab";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -69,6 +69,7 @@ import {
   deleteAccessEntryAction,
   bulkDeleteEntriesAction,
   regeneratePasswordAction,
+  getAccessListStatsAction,
 } from "./actions";
 
 type Props = {
@@ -615,7 +616,43 @@ function SettingsTab({
 
 // --- Usage Tab ---
 
-function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
+/** What the list did over the last day; null while loading or when it could not be read. */
+function UsageStats({ listId }: { listId: number }) {
+  const t = useTranslations("accessLists");
+  const format = useFormatter();
+  const [stats, setStats] = useState<AccessListStats | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    getAccessListStatsAction(listId)
+      .then((next) => {
+        if (live) setStats(next);
+      })
+      .catch(() => {
+        if (live) setStats(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [listId]);
+
+  if (!stats) return null;
+  return (
+    <Card padding={3}>
+      <MetadataList>
+        <MetadataListItem label={t("stats.hosts")}>{format.number(stats.hosts)}</MetadataListItem>
+        <MetadataListItem label={t("stats.stopped")}>
+          {stats.traffic ? format.number(stats.traffic.stopped) : t("stats.analyticsOff")}
+        </MetadataListItem>
+        <MetadataListItem label={t("stats.failedSignIns")}>
+          {stats.traffic ? format.number(stats.traffic.failedSignIns) : t("stats.analyticsOff")}
+        </MetadataListItem>
+      </MetadataList>
+    </Card>
+  );
+}
+
+function UsageTab({ listId, hosts }: { listId: number; hosts: AccessListUsage[] }) {
   const t = useTranslations("accessLists");
   if (hosts.length === 0) {
     return (
@@ -629,6 +666,7 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
 
   return (
     <VStack gap={3}>
+      <UsageStats listId={listId} />
       <Text type="body" size="sm" color="secondary">
         {t("usageSummary", { count: hosts.length })}
       </Text>
@@ -749,7 +787,7 @@ function DetailPane({
 
       {tab === "members" && <MembersTab list={list} onListUpdated={onListUpdated} />}
       {tab === "network" && <NetworkTab list={list} onListUpdated={onListUpdated} />}
-      {tab === "usage" && <UsageTab hosts={usage} />}
+      {tab === "usage" && <UsageTab listId={list.id} hosts={usage} />}
       {tab === "settings" && (
         <SettingsTab
           list={list}

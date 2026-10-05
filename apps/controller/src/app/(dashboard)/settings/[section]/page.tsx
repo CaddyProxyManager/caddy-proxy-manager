@@ -15,6 +15,7 @@ import {
   getDnsProviderSettings,
   getUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
+  getRateLimitSettings,
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
@@ -153,6 +154,7 @@ export default async function SettingsSectionPage({
       geoip,
       favicon,
       updates,
+      globalRateLimit,
     ],
     pairedAgents,
     agentStatuses,
@@ -197,6 +199,7 @@ export default async function SettingsSectionPage({
         geoipView(tRoot),
         getFavicon(),
         getUpdateStatus(),
+        getRateLimitSettings(),
       ]),
     ),
     listAgents(),
@@ -279,6 +282,7 @@ export default async function SettingsSectionPage({
       twoFactorPolicy={twoFactorPolicy}
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
+      globalRateLimit={globalRateLimit}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       ldapDirectories={ldapDirectories}

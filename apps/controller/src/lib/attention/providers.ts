@@ -574,6 +574,27 @@ const geoip: AttentionProvider = {
 
 // ── Security ────────────────────────────────────────────────────────────────
 
+/** Access lists with a country, continent or ASN rule in force. */
+async function listsWithGeoRules(now = Date.now()): Promise<number> {
+  const [{ default: db }, { accessListIpRules }, { isGeoRule, isRuleActive }] = await Promise.all([
+    import("../db"),
+    import("../db/schema"),
+    import("../access-lists/rules"),
+  ]);
+  const rules = await db
+    .select({
+      accessListId: accessListIpRules.accessListId,
+      country: accessListIpRules.country,
+      continent: accessListIpRules.continent,
+      asn: accessListIpRules.asn,
+      expiresAt: accessListIpRules.expiresAt,
+    })
+    .from(accessListIpRules);
+  return new Set(
+    rules.filter((rule) => isGeoRule(rule) && isRuleActive(rule, now)).map((r) => r.accessListId),
+  ).size;
+}
+
 const security: AttentionProvider = {
   id: "security",
   adminOnly: true,
@@ -599,9 +620,26 @@ const security: AttentionProvider = {
       });
     }
     const geo = blocked.filter((source) => source.kind !== "ip" && source.kind !== "cidr");
+    const geoRuleLists = await listsWithGeoRules();
+    const geoUsable =
+      geo.length > 0 || geoRuleLists > 0
+        ? imageBuild.isFeatureUsable(await imageBuild.getCaddyModuleAvailability(), "geoblock")
+        : true;
+    // A deny rule by country left out lets that country in, so it is a warning like the deny list.
+    if (geoRuleLists > 0 && !geoUsable) {
+      items.push({
+        id: "access-lists:geo-unenforced",
+        provider: "security",
+        code: "accessListGeoUnenforced",
+        severity: "warning",
+        values: { count: geoRuleLists },
+        href: "/access-lists",
+        at: null,
+        scope: {},
+      });
+    }
     if (geo.length > 0) {
-      const availability = await imageBuild.getCaddyModuleAvailability();
-      if (!imageBuild.isFeatureUsable(availability, "geoblock")) {
+      if (!geoUsable) {
         items.push({
           id: "blocked-sources:unenforced",
           provider: "security",

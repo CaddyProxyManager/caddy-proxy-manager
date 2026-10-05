@@ -41,6 +41,7 @@ export const ATTENTION_CODES = [
   "geoipFailing",
   "wafDetectionOnly",
   "blockedSourcesUnenforced",
+  "accessListGeoUnenforced",
 ] as const;
 export type AttentionCode = (typeof ATTENTION_CODES)[number];
 

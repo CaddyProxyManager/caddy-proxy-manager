@@ -13,6 +13,8 @@ import {
   createAccessList,
   updateAccessList,
   deleteAccessList,
+  getAccessListStats,
+  setAccessListIpRules,
 } from "../models/access-lists";
 import { isConnected } from "../agent/registry";
 import { type PairedAgent, listAgents } from "../models/agents";
@@ -157,6 +159,9 @@ export const resolvers = {
   L4ProxyHost: {
     config: (host: Record<string, unknown>) => remainder(host, L4_SCALAR_FIELDS),
   },
+  AccessList: {
+    rules: (list: { ipRules: unknown[] }) => list.ipRules,
+  },
   Agent: {
     // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
     connected: (agent: PairedAgent) => isConnected(agent.agentId),
@@ -211,6 +216,16 @@ export const resolvers = {
     accessList: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
       await requireAdmin(context);
       return await getAccessList(args.id);
+    },
+    accessListStats: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
+      await requireAdmin(context);
+      if (!(await getAccessList(args.id))) throw new NotFoundError("Access list not found");
+      const stats = await getAccessListStats(args.id);
+      return {
+        hosts: stats.hosts,
+        stopped: stats.traffic?.stopped ?? null,
+        failedSignIns: stats.traffic?.failedSignIns ?? null,
+      };
     },
     users: async (_: unknown, __: unknown, context: GraphQLContext) => {
       await requireAdmin(context);
@@ -342,6 +357,14 @@ export const resolvers = {
       const { userId } = await requireAdmin(context);
       await deleteAccessList(args.id, userId);
       return true;
+    },
+    setAccessListRules: async (
+      _: unknown,
+      args: { id: number; rules: unknown },
+      context: GraphQLContext,
+    ) => {
+      const { userId } = await requireAdmin(context);
+      return await setAccessListIpRules(args.id, args.rules, userId);
     },
 
     createGroup: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {

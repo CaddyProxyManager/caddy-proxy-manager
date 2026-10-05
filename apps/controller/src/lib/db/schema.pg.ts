@@ -1,6 +1,7 @@
 // Source of truth for both backends. After editing, run `bun scripts/generate-sqlite-schema.ts`,
 // then `bun run db:generate` once per dialect (see drizzle.config.ts).
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -309,6 +310,12 @@ export const accessLists = pgTable("access_lists", {
   satisfy: text("satisfy").notNull().default("all"),
   // Forward the basic-auth Authorization header to the upstream.
   passAuth: boolean("passAuth").notNull().default(false),
+  // What a denied request gets: null keeps 403. A redirect URL wins over the status and body.
+  denyStatus: integer("denyStatus"),
+  denyBody: text("denyBody"),
+  denyRedirectUrl: text("denyRedirectUrl"),
+  // Deny when the client address cannot be told apart from a trusted proxy's.
+  failClosed: boolean("failClosed").notNull().default(false),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
@@ -331,7 +338,7 @@ export const accessListEntries = pgTable(
   }),
 );
 
-/** Ordered allow/deny rules on client IPs; the first that matches decides. */
+/** Ordered allow/deny rules on the client; the first that matches decides. */
 export const accessListIpRules = pgTable(
   "access_list_ip_rules",
   {
@@ -340,10 +347,16 @@ export const accessListIpRules = pgTable(
       .references(() => accessLists.id, { onDelete: "cascade" })
       .notNull(),
     action: text("action").notNull(),
-    // Exactly one of the two. A hostname may end in /N, the IPv6 prefix its AAAA answers widen to.
+    // Exactly one target. A hostname may end in /N, the IPv6 prefix its AAAA answers widen to.
     cidr: text("cidr"),
     hostname: text("hostname"),
+    country: text("country"),
+    continent: text("continent"),
+    // Up to 2^32 - 1, past a PostgreSQL integer.
+    asn: bigint("asn", { mode: "number" }),
     note: text("note"),
+    // Past it the rule is left out of the config, then deleted.
+    expiresAt: text("expiresAt"),
     sortOrder: integer("sortOrder").notNull(),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),

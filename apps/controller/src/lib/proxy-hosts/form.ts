@@ -734,9 +734,11 @@ export function parseRateLimitConfig(formData: FormData): HostRateLimitConfig | 
   } catch {
     zones = [];
   }
+  const mode = formData.get("rateLimitMode");
   return {
     enabled: parseCheckbox(formData.get("rateLimitEnabled")),
     zones: (Array.isArray(zones) ? zones : []) as HostRateLimitConfig["zones"],
+    ...(typeof mode === "string" && mode ? { mode: mode as HostRateLimitConfig["mode"] } : {}),
   };
 }
 

@@ -5,6 +5,7 @@ import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
 
+const NO_GEO = { country: null, continent: null, asn: null, expiresAt: null };
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../../helpers/db');
@@ -90,8 +91,8 @@ describe('IP rules', () => {
       1,
     );
     expect((await getAccessList(list.id))?.ipRules).toEqual([
-      { action: 'deny', cidr: '10.0.0.9/32', hostname: null, note: null },
-      { action: 'allow', cidr: '10.0.0.0/8', hostname: null, note: 'LAN' },
+      { action: 'deny', cidr: '10.0.0.9/32', hostname: null, note: null, ...NO_GEO },
+      { action: 'allow', cidr: '10.0.0.0/8', hostname: null, note: 'LAN', ...NO_GEO },
     ]);
 
     await setAccessListIpRules(list.id, [{ action: 'allow', cidr: '192.168.0.0/16' }], 1);

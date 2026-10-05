@@ -7,6 +7,7 @@
 import {
   BarChart2,
   Cloud,
+  Gauge,
   Cpu,
   KeyRound,
   Mail,
@@ -370,6 +371,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         ],
       },
       {
+        id: "rate-limit",
+        name: "Rate Limiting",
+        desc: "Limits every host can inherit, and addresses never limited",
+        icon: Gauge,
+        blocks: [
+          {
+            id: "rate-limit",
+            name: "Rate Limiting",
+          },
+        ],
+      },
+      {
         id: "crowdsec",
         name: "CrowdSec",
         desc: "Refuse addresses your CrowdSec Local API has decided to block",
@@ -452,6 +465,7 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   authentication: "yellow",
   "forward-auth": "purple",
   geo: "teal",
+  "rate-limit": "orange",
   crowdsec: "red",
   observability: "blue",
 };

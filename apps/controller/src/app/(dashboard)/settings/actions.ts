@@ -47,6 +47,7 @@ import {
   saveDnsSettings,
   saveUpstreamDnsResolutionSettings,
   saveGeoBlockSettings,
+  saveRateLimitSettings,
   saveWafSettings,
   getWafSettings,
   saveErrorPagesSettings,
@@ -68,6 +69,7 @@ import {
   saveCrowdSecSettings,
 } from "@/src/lib/settings";
 import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/caddy/crowdsec";
+import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
 import { sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
@@ -1866,6 +1868,47 @@ async function updateGeoBlockSettingsActionUnlocked(
   }
 }
 
+async function updateRateLimitSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const zonesRaw = formData.get("rateLimitZonesJson");
+    let zones: unknown = [];
+    try {
+      zones = typeof zonesRaw === "string" && zonesRaw ? JSON.parse(zonesRaw) : [];
+    } catch {
+      zones = [];
+    }
+    const allowlistRaw = formData.get("rateLimitAllowlist");
+    // Validated, normalised and stored in one place, which refuses what Caddy would.
+    await saveRateLimitSettings({
+      enabled: parseCheckbox(formData.get("rateLimitEnabled")),
+      zones: zones as GlobalRateLimitSettings["zones"],
+      allowlist:
+        typeof allowlistRaw === "string" ? allowlistRaw.split(/[\s,]+/).filter(Boolean) : [],
+    });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.rateLimitSaved") };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = await errorText(error, t("results.unknownError"));
+      return { success: true, message: t("results.applyFailed", { error: errorMsg }) };
+    }
+  } catch (error) {
+    console.error("Failed to save rate limit settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.rateLimitFailed")),
+    };
+  }
+}
+
 async function updateErrorPagesSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -2447,6 +2490,9 @@ export const updateUpstreamDnsResolutionSettingsAction = stagedSettingsAction(
 );
 export const updateGeoBlockSettingsAction = stagedSettingsAction(
   updateGeoBlockSettingsActionUnlocked,
+);
+export const updateRateLimitSettingsAction = stagedSettingsAction(
+  updateRateLimitSettingsActionUnlocked,
 );
 export const updateErrorPagesSettingsAction = stagedSettingsAction(
   updateErrorPagesSettingsActionUnlocked,

@@ -16,16 +16,18 @@ import {
   l4ProxyHosts,
   proxyHosts,
 } from "../db/schema";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import { domainError } from "../errors/domain-error";
 import { getDashboardSettings } from "../settings";
 import {
   ACCESS_LIST_SATISFY,
   type AccessListSatisfy,
+  type DenyResponse,
   IP_RULE_ACTIONS,
   type IpRule,
   type IpRuleAction,
   hostnameRanges,
+  sanitizeDenyResponse,
   sanitizeIpRules,
   splitRuleHostname,
 } from "../access-lists/rules";
@@ -65,6 +67,9 @@ export type AccessList = {
   ipDefault: IpRuleAction;
   satisfy: AccessListSatisfy;
   passAuth: boolean;
+  /** Null is the plain 403. */
+  denyResponse: DenyResponse | null;
+  failClosed: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -77,6 +82,8 @@ export type AccessListInput = {
   ipDefault?: unknown;
   satisfy?: unknown;
   passAuth?: unknown;
+  denyResponse?: unknown;
+  failClosed?: unknown;
 };
 
 export type AccessListSettingsInput = {
@@ -85,6 +92,9 @@ export type AccessListSettingsInput = {
   ipDefault?: unknown;
   satisfy?: unknown;
   passAuth?: unknown;
+  /** Null restores the plain 403. */
+  denyResponse?: unknown;
+  failClosed?: unknown;
 };
 
 type AccessListRow = typeof accessLists.$inferSelect;
@@ -122,7 +132,11 @@ function toIpRule(
     action: rule.action === "allow" ? "allow" : "deny",
     cidr: rule.cidr,
     hostname: rule.hostname,
+    country: rule.country,
+    continent: rule.continent,
+    asn: rule.asn,
     note: rule.note,
+    expiresAt: rule.expiresAt,
   };
   if (!rule.hostname) return base;
   const { name, ipv6Prefix } = splitRuleHostname(rule.hostname);
@@ -135,6 +149,20 @@ function toIpRule(
       lastError: found?.lastError ?? null,
       lastErrorAt: found?.lastErrorAt ?? null,
     },
+  };
+}
+
+function denyResponseOf(row: AccessListRow): DenyResponse | null {
+  if (row.denyRedirectUrl) return { status: 302, body: null, redirectUrl: row.denyRedirectUrl };
+  if (row.denyStatus == null && !row.denyBody) return null;
+  return { status: row.denyStatus ?? 403, body: row.denyBody, redirectUrl: null };
+}
+
+function denyColumns(deny: DenyResponse | null) {
+  return {
+    denyStatus: deny && !deny.redirectUrl ? deny.status : null,
+    denyBody: deny?.body ?? null,
+    denyRedirectUrl: deny?.redirectUrl ?? null,
   };
 }
 
@@ -159,6 +187,8 @@ function toAccessList(
     ipDefault: row.ipDefault === "allow" ? "allow" : "deny",
     satisfy: row.satisfy === "any" ? "any" : "all",
     passAuth: row.passAuth,
+    denyResponse: denyResponseOf(row),
+    failClosed: row.failClosed,
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!,
   };
@@ -207,7 +237,7 @@ export async function listAccessLists(): Promise<AccessList[]> {
   );
 }
 
-/** What the L4 host editor offers: at layer 4 only IP rules apply, so it needs their count. */
+/** What the L4 host editor offers: at layer 4 only the rules apply, so it needs their count. */
 export type L4AccessListOption = { id: number; name: string; ipRuleCount: number };
 
 export async function listL4AccessListOptions(): Promise<L4AccessListOption[]> {
@@ -265,6 +295,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
   const ipRules = input.ipRules === undefined ? [] : sanitizeIpRules(input.ipRules);
   const ipDefault = input.ipDefault === undefined ? "deny" : parseIpDefault(input.ipDefault);
   const satisfy = input.satisfy === undefined ? "all" : parseSatisfy(input.satisfy);
+  const deny = sanitizeDenyResponse(input.denyResponse);
 
   const [accessList] = await db
     .insert(accessLists)
@@ -274,6 +305,8 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
       ipDefault,
       satisfy,
       passAuth: input.passAuth === true,
+      ...denyColumns(deny),
+      failClosed: input.failClosed === true,
       createdBy: actorUserId,
       createdAt: now,
       updatedAt: now,
@@ -319,7 +352,11 @@ function ipRuleRows(accessListId: number, rules: IpRule[], now: string) {
     action: rule.action,
     cidr: rule.cidr,
     hostname: rule.hostname,
+    country: rule.country ?? null,
+    continent: rule.continent ?? null,
+    asn: rule.asn ?? null,
     note: rule.note,
+    expiresAt: rule.expiresAt ?? null,
     sortOrder: index,
     createdAt: now,
     updatedAt: now,
@@ -337,6 +374,8 @@ export async function updateAccessList(
   }
 
   const now = nowIso();
+  const deny =
+    input.denyResponse === undefined ? undefined : sanitizeDenyResponse(input.denyResponse);
   await db
     .update(accessLists)
     .set({
@@ -348,6 +387,8 @@ export async function updateAccessList(
         input.ipDefault === undefined ? existing.ipDefault : parseIpDefault(input.ipDefault),
       satisfy: input.satisfy === undefined ? existing.satisfy : parseSatisfy(input.satisfy),
       passAuth: input.passAuth === undefined ? existing.passAuth : input.passAuth === true,
+      ...(deny === undefined ? {} : denyColumns(deny)),
+      failClosed: input.failClosed === undefined ? existing.failClosed : input.failClosed === true,
       updatedAt: now,
     })
     .where(eq(accessLists.id, id));
@@ -631,4 +672,85 @@ export async function getAccessListUsageMap(): Promise<Map<number, AccessListUsa
     map.set(row.accessListId, bucket);
   }
   return map;
+}
+
+/** Deletes rules past their expiry, one audit event per list, and applies once. */
+export async function pruneExpiredAccessListRules(
+  now = Date.now(),
+  applyConfig: () => Promise<void> = applyCaddyConfig,
+): Promise<number> {
+  const expired = await db
+    .select({
+      id: accessListIpRules.id,
+      accessListId: accessListIpRules.accessListId,
+      name: accessLists.name,
+    })
+    .from(accessListIpRules)
+    .innerJoin(accessLists, eq(accessLists.id, accessListIpRules.accessListId))
+    .where(
+      and(
+        isNotNull(accessListIpRules.expiresAt),
+        lte(accessListIpRules.expiresAt, new Date(now).toISOString()),
+      ),
+    );
+  if (expired.length === 0) return 0;
+  const byList = new Map<number, { name: string; count: number }>();
+  for (const row of expired) {
+    const entry = byList.get(row.accessListId) ?? { name: row.name, count: 0 };
+    entry.count += 1;
+    byList.set(row.accessListId, entry);
+  }
+  await runInTransaction((tx) => [
+    tx.delete(accessListIpRules).where(
+      inArray(
+        accessListIpRules.id,
+        expired.map((row) => row.id),
+      ),
+    ),
+    tx.insert(auditEvents).values(
+      [...byList].map(([listId, { name, count }]) =>
+        auditEventRow({
+          userId: null,
+          action: "update",
+          entityType: "access_list",
+          entityId: listId,
+          summary: `Expired rules removed from access list ${name} (${count})`,
+          data: { expiredRules: count },
+        }),
+      ),
+    ),
+  ]);
+  await applyConfig();
+  return expired.length;
+}
+
+export type AccessListStats = {
+  /** Proxy and L4 hosts naming the list, location rules included. */
+  hosts: number;
+  /** Null with analytics off or unreachable. */
+  traffic: { stopped: number; failedSignIns: number } | null;
+};
+
+/** Over the last 24 hours. */
+export async function getAccessListStats(id: number, now = Date.now()): Promise<AccessListStats> {
+  const usage = (await getAccessListUsageMap()).get(id) ?? [];
+  const [{ isAnalyticsEnabled }, { queryAccessListTraffic }, { hostTrafficNames }] =
+    await Promise.all([
+      import("../clickhouse/client"),
+      import("../clickhouse/access-list-stats"),
+      import("../proxy-hosts/traffic-status"),
+    ]);
+  let traffic: AccessListStats["traffic"] = null;
+  try {
+    if (await isAnalyticsEnabled()) {
+      const to = Math.floor(now / 1000);
+      const names = hostTrafficNames(
+        usage.filter((host) => host.kind === "proxy").flatMap((host) => host.domains),
+      );
+      traffic = await queryAccessListTraffic({ from: to - 86400, to }, names);
+    }
+  } catch (error) {
+    console.warn("[access-lists] could not read a list's traffic:", error);
+  }
+  return { hosts: usage.length, traffic };
 }

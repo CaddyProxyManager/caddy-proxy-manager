@@ -16,7 +16,7 @@ vi.mock('../../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { buildCaddyDocument } from '../../../src/lib/caddy';
 import { CADDY_MODULES } from '../../../src/lib/caddy/image-build/modules';
-import { saveCaddyBuildSettings } from '../../../src/lib/settings';
+import { saveCaddyBuildSettings, saveRateLimitSettings } from '../../../src/lib/settings';
 import { createProxyHost } from '../../../src/lib/models/proxy-hosts';
 import { startFakeAgent } from '../../helpers/fake-agent';
 import { chainLabels, chainsTo, type Handler } from '../../helpers/host-chains';
@@ -220,5 +220,83 @@ describe('module gating', () => {
     await withModules(ALL_MODULE_PATHS, ['caddy-ratelimit']);
     await create('deselected.example.com');
     expect(JSON.stringify(await buildCaddyDocument())).not.toContain('"rate_limit"');
+  });
+});
+
+describe('global zones and keys', () => {
+  it('reach a host that inherits, never counting the allowlisted addresses', async () => {
+    await withModules(ALL_MODULE_PATHS);
+    await saveRateLimitSettings({
+      enabled: true,
+      zones: [{ max_events: 500, window: '1m', key: 'ip', methods: ['POST'] }],
+      allowlist: ['10.0.0.0/8'],
+    });
+    const host = await create('inherit.example.com', { rateLimit: null });
+    const handlers = rateLimitHandlers(await buildCaddyDocument());
+    expect(handlers.length).toBeGreaterThan(0);
+    for (const handler of handlers) {
+      expect(handler.rate_limits).toEqual({
+        [`h${host.id}_g0`]: {
+          key: '{http.vars.client_ip}',
+          window: '1m',
+          max_events: 500,
+          match: [{ method: ['POST'], not: [{ client_ip: { ranges: ['10.0.0.0/8'] } }] }],
+        },
+      });
+    }
+  });
+
+  it('counts the signed-in user after forward auth, on open paths by address', async () => {
+    await withModules(ALL_MODULE_PATHS);
+    await create('user.example.com', {
+      rateLimit: {
+        enabled: true,
+        mode: 'override',
+        zones: [{ paths: [], maxEvents: 100, window: '1h', key: 'user', ipv6Prefix: null }],
+      },
+      forwardAuth: {
+        enabled: true,
+        provider: 'authelia',
+        authUpstream: 'http://authelia:9091',
+        excludedPaths: ['/public/*'],
+      },
+    });
+    const chains = chainsTo(await buildCaddyDocument(), UPSTREAM);
+    expect(chains.length).toBeGreaterThan(0);
+    let gated = 0;
+    for (const chain of chains) {
+      // Nothing keyed on the user runs before sign-in, where the header is only what the client sent.
+      expect(
+        chain.some((h) => h.handler === 'rate_limit' && JSON.stringify(h).includes('Remote-User')),
+      ).toBe(chain.some((h) => h.handler === 'rate_limit'));
+      const wrapper = chain.find(
+        (h) => h.handler === 'subroute' && JSON.stringify(h).includes('"rate_limit"'),
+      );
+      if (wrapper) {
+        gated += 1;
+        const inner = (wrapper.routes as { handle: Handler[] }[])[0]!.handle.filter(
+          (h) => !String(h.handler).startsWith('vars'),
+        );
+        expect(inner.map((h) => h.handler)).toEqual(['reverse_proxy', 'rate_limit']);
+        expect(JSON.stringify(inner[1])).toContain('{http.request.header.Remote-User}');
+      } else {
+        // An open path: the post-auth handler sits in the chain itself, the header stripped.
+        const labels = chain.map((h) => h.handler);
+        expect(labels).toContain('rate_limit');
+        expect(labels.indexOf('rate_limit')).toBeLessThan(labels.lastIndexOf('reverse_proxy'));
+      }
+    }
+    expect(gated).toBeGreaterThan(0);
+  });
+
+  it("answers over the limit with the host's own 429 page", async () => {
+    await withModules(ALL_MODULE_PATHS);
+    await create('page.example.com', {
+      errorPages: [{ statuses: [429], body: '<h1>Slow down</h1>' }],
+    });
+    const json = JSON.stringify(await buildCaddyDocument());
+    expect(json).toContain('"rate_limit"');
+    expect(json).toContain('{http.error.status_code} == 429');
+    expect(json).toContain('Slow down');
   });
 });

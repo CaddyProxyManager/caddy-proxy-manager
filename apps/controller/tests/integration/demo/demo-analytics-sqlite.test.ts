@@ -21,11 +21,33 @@ const { generateTraffic, trafficShares } = await import('../../../src/lib/demo/t
 const { queryHostTraffic, HOST_TRAFFIC_BUCKET_SECONDS } = await import(
   '../../../src/lib/clickhouse/host-traffic'
 );
+const { queryAccessListTraffic } = await import('../../../src/lib/clickhouse/access-list-stats');
 
 const NOW = Math.floor(Date.now() / 1000);
 const FROM = NOW - 2 * 86400;
 const HOSTS = ['jellyfin.example.com', 'photos.example.com', 'new.example.com'];
 const { traffic, waf } = generateTraffic(FROM, NOW, trafficShares(HOSTS));
+// The generator has no access-list refusals; a few, so the per-list counts have something to find.
+for (const [host, status] of [
+  ['photos.example.com', 403],
+  ['photos.example.com', 401],
+  ['jellyfin.example.com', 403],
+] as const) {
+  traffic.push({
+    ts: NOW - 600,
+    client_ip: '198.51.100.9',
+    country_code: 'PT',
+    host,
+    method: 'GET',
+    uri: '/private',
+    status,
+    proto: 'HTTP/2.0',
+    bytes_sent: 13,
+    user_agent: 'curl/8.0',
+    is_blocked: false,
+    outcome: 'access',
+  });
+}
 
 beforeAll(async () => {
   process.env.DEMO_MODE = 'true';
@@ -169,6 +191,20 @@ describe("a proxy host's traffic in SQLite", () => {
     const totals = await client.queryHostTotals(FROM, NOW);
     const row = totals.find((t) => t.host === name);
     expect(row?.serverErrors).toBe(count(traffic, (r) => r.host === name && r.status >= 500));
+  });
+
+  it("counts an access list's refusals and failed sign-ins on its hosts' names", async () => {
+    const mine = traffic.filter((r) => r.host === name && r.ts >= NOW - 86400);
+    const stats = await queryAccessListTraffic({ from: NOW - 86400, to: NOW }, [name]);
+    expect(stats.stopped).toBe(count(mine, (r) => outcome(r) === 'access' && r.status !== 401));
+    expect(stats.failedSignIns).toBe(
+      count(mine, (r) => r.status === 401 && ['access', 'auth'].includes(outcome(r))),
+    );
+    expect(stats.stopped).toBeGreaterThan(0);
+    expect(await queryAccessListTraffic({ from: NOW - 86400, to: NOW }, [])).toEqual({
+      stopped: 0,
+      failedSignIns: 0,
+    });
   });
 
   it('totals, buckets, paths and statuses agree with the rows', async () => {

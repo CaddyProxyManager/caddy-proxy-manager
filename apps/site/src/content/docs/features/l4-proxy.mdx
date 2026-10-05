@@ -70,10 +70,12 @@ the country is looked up for the client address in the header, not the load bala
 
 ## IP rules from an access list
 
-An L4 host can use an [access list](../access-control/#ip-rules), and its IP rules decide who gets
-a connection: one from an address the list denies is closed before anything is proxied. Only the IP
-rules apply - there is no request at this layer to ask a password in - so the editor offers only
-lists that have some, and a list an L4 host uses keeps at least one rule. Behind a load balancer,
+An L4 host can use an [access list](../access-control/#ip-rules), and its rules decide who gets
+a connection: one from a client the list denies is closed before anything is proxied. Address,
+hostname, country, continent and ASN rules all apply (the last three need the Geo Blocking module,
+as on HTTP). Only the rules apply - there is no request at this layer to ask a password in or send
+a deny response to - so the editor offers only lists that have some, and a list an L4 host uses
+keeps at least one rule. Behind a load balancer,
 turn on **Accept inbound PROXY protocol**: the rules, like geo blocking, then check the client in
 the header rather than the balancer.
 

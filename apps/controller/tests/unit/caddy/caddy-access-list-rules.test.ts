@@ -40,14 +40,24 @@ async function seedList(
   opts: {
     users?: string[];
     cidrs?: string[];
-    rules?: { action: string; cidr?: string; hostname?: string }[];
+    rules?: {
+      action: string;
+      cidr?: string;
+      hostname?: string;
+      country?: string;
+      continent?: string;
+      asn?: number;
+      expiresAt?: string;
+    }[];
     satisfy?: string;
+    list?: Partial<typeof schema.accessLists.$inferInsert>;
   },
 ) {
   await ctx.db.insert(schema.accessLists).values({
     id,
     name: `list-${id}`,
     satisfy: opts.satisfy ?? 'all',
+    ...opts.list,
     createdAt: NOW,
     updatedAt: NOW,
   });
@@ -188,5 +198,50 @@ describe('access lists in the config', () => {
     const routes = routesFor(await buildCaddyDocument(), 'gone.example.com');
     const admin = routes.find((r) => r.match?.some((m) => m.path?.includes('/admin/*')));
     expect(JSON.stringify(admin)).toContain('"status_code":403');
+  });
+});
+
+describe('country, continent and ASN rules in the config', () => {
+  it('decide through blocker handlers tagged access, in rule order', async () => {
+    await seedList(1, {
+      rules: [
+        { action: 'deny', cidr: '192.0.2.7/32' },
+        { action: 'allow', country: 'PT' },
+        { action: 'deny', continent: 'EU' },
+      ],
+      list: { denyStatus: 451, denyBody: 'Not from here' },
+    });
+    await seedHost('geo.example.com', 1);
+    const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'geo.example.com'));
+    expect(json).toContain('"block_cidrs":["192.0.2.7/32"]');
+    expect(json).toContain('"block_continents":["EU"],"allow_countries":["PT"]');
+    expect(json).toContain('"response_status":451,"response_body":"Not from here"');
+    expect(json).toContain('"access"');
+    expect(json).not.toContain('"client_ip":{"ranges":["192.0.2.7/32"]}');
+  });
+
+  it('leave out a rule past its expiry', async () => {
+    await seedList(1, {
+      rules: [
+        { action: 'allow', country: 'PT', expiresAt: '2000-01-01T00:00:00.000Z' },
+        { action: 'allow', cidr: '10.0.0.0/8' },
+      ],
+    });
+    await seedHost('expired.example.com', 1);
+    const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'expired.example.com'));
+    expect(json).not.toContain('"PT"');
+    expect(json).toContain('"client_ip":{"ranges":["10.0.0.0/8"]}');
+  });
+
+  it('answers an address list with its own redirect', async () => {
+    await seedList(1, {
+      cidrs: ['10.0.0.0/8'],
+      list: { denyRedirectUrl: 'https://example.com/denied' },
+    });
+    await seedHost('redirect.example.com', 1);
+    const json = JSON.stringify(routesFor(await buildCaddyDocument(), 'redirect.example.com'));
+    expect(json).toContain(
+      '{"handler":"static_response","status_code":302,"headers":{"Location":["https://example.com/denied"]}}',
+    );
   });
 });

@@ -81,6 +81,8 @@ export type HealthInput = {
   authentikOutpost: string;
   forwardAuth: { provider: "authelia" | "custom"; upstream: string } | null;
   crowdsec: { enabled: boolean; mode: "external" | "managed" };
+  /** Counts only. Optional for callers that predate it. */
+  rateLimit?: { enabled: boolean; zones: number; allowlist: number };
   logging: { enabled: boolean; format: "json" | "console" };
   stagedKeys: ReadonlySet<string>;
   /** Injected so staleness is a pure function of the input. */
@@ -540,6 +542,16 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     input.crowdsec.enabled
       ? t("health.crowdsec.valueMode", { mode: input.crowdsec.mode })
       : t("health.off"),
+  );
+
+  const globalZones = input.rateLimit?.enabled ? input.rateLimit.zones : 0;
+  push(
+    "rate-limit",
+    "rateLimit",
+    globalZones > 0 ? "ok" : "unset",
+    globalZones > 0
+      ? t("health.rateLimit.valueZones", { count: globalZones })
+      : t("health.rateLimit.valueNone"),
   );
 
   // Off is worth knowing about: upstream-error notifications and CrowdSec both read this log.

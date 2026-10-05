@@ -28,6 +28,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   compression: { label: "Compression", keys: ["compression"] },
   tailscale: { label: "Tailscale", keys: ["tailscale"] },
   geoblock: { label: "Geo-Block", keys: ["geoblock"] },
+  "rate-limit": { label: "Rate Limiting", keys: ["rate_limit"] },
   crowdsec: { label: "CrowdSec", keys: ["crowdsec"] },
   "error-pages": { label: "Error Pages", keys: ["error_pages"] },
   authentik: { label: "Authentik", keys: ["authentik"] },

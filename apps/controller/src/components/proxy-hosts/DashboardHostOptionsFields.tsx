@@ -106,7 +106,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
       <DnsResolverFields dnsResolver={view.dnsResolver} />
       <UpstreamTimeoutsFields upstreamTimeouts={view.upstreamTimeouts} />
       <UpstreamDnsResolutionFields upstreamDnsResolution={view.upstreamDnsResolution} />
-      <RateLimitFields rateLimit={view.rateLimit} />
+      <RateLimitFields rateLimit={view.rateLimit} hasModes={false} />
       <GeoBlockFields
         initialValues={{
           geoblock: view.geoblock,

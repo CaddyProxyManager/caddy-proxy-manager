@@ -73,19 +73,29 @@ export function HostProtectionBadges({ protections }: { protections: HostProtect
   }
   return (
     <HStack gap={1} wrap="wrap">
-      {protections.active.map((key) => (
-        <Badge
-          key={key}
-          icon={
-            key === "signIn" && protections.signIn === "authentik" ? (
-              <UserCheck />
-            ) : (
-              PROTECTION_ICON[key]
-            )
-          }
-          label={t(protectionLabelKey(key, protections))}
-        />
-      ))}
+      {protections.active.map((key) => {
+        const badge = (
+          <Badge
+            key={key}
+            icon={
+              key === "signIn" && protections.signIn === "authentik" ? (
+                <UserCheck />
+              ) : (
+                PROTECTION_ICON[key]
+              )
+            }
+            label={t(protectionLabelKey(key, protections))}
+          />
+        );
+        // "ACL" is short for the column's sake; the hover spells it out.
+        return key === "accessList" ? (
+          <Tooltip key={key} content={t("insights.protection.accessListTitle")}>
+            {badge}
+          </Tooltip>
+        ) : (
+          badge
+        );
+      })}
     </HStack>
   );
 }

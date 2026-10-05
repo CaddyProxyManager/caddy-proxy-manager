@@ -109,8 +109,50 @@ export const typeDefs = /* GraphQL */ `
     name: String!
     description: String
     entries: [AccessListEntry!]!
+    """In the order they are checked: the first that matches the client decides."""
+    rules: [AccessListRule!]!
+    """allow or deny: what a client no rule matches gets."""
+    ipDefault: String!
+    """all (rules and a password) or any (either)."""
+    satisfy: String!
+    passAuth: Boolean!
+    """Null is the plain 403."""
+    denyResponse: AccessListDenyResponse
+    """Refuse a request whose client cannot be told apart from a trusted proxy."""
+    failClosed: Boolean!
     createdAt: DateTime!
     updatedAt: DateTime!
+  }
+
+  """
+  One target per rule: an address or range, a hostname, a country (ISO 3166 alpha-2), a continent
+  (AF AN AS EU NA OC SA) or an ASN.
+  """
+  type AccessListRule {
+    action: String!
+    cidr: String
+    hostname: String
+    country: String
+    continent: String
+    """Up to 4294967295, past Int's range."""
+    asn: Float
+    note: String
+    """Past it the rule no longer applies, and is deleted within a minute."""
+    expiresAt: DateTime
+  }
+
+  """A status (400-599) and body, or a 302 to redirectUrl."""
+  type AccessListDenyResponse {
+    status: Int!
+    body: String
+    redirectUrl: String
+  }
+
+  """Traffic is null with analytics off or unreachable; it covers the last 24 hours."""
+  type AccessListStats {
+    hosts: Int!
+    stopped: Int
+    failedSignIns: Int
   }
 
   """An account in an access list. The password hash is never exposed."""
@@ -683,6 +725,7 @@ export const typeDefs = /* GraphQL */ `
     mtlsRoles: [MtlsRole!]!
     accessLists: [AccessList!]!
     accessList(id: Int!): AccessList
+    accessListStats(id: Int!): AccessListStats!
     users: [User!]!
     user(id: Int!): User
     groups: [Group!]!
@@ -753,6 +796,8 @@ export const typeDefs = /* GraphQL */ `
     createAccessList(input: JSON!): AccessList!
     updateAccessList(id: Int!, input: JSON!): AccessList!
     deleteAccessList(id: Int!): Boolean!
+    """As PUT /api/v1/access-lists/{id}/ip-rules: the whole ordered set, replacing what was there."""
+    setAccessListRules(id: Int!, rules: JSON!): AccessList!
 
     createGroup(input: JSON!): Group!
     updateGroup(id: Int!, input: JSON!): Group!

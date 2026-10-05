@@ -92,12 +92,16 @@
       "blockedSourcesUnenforced": {
         "title": "{count, plural, one {# blocked source is} other {# blocked sources are}} not enforced",
         "detail": "Countries, continents and provider networks need the Geo Blocking module, which this Caddy does not have."
+      },
+      "accessListGeoUnenforced": {
+        "title": "Country, continent and ASN rules are skipped on {count, plural, one {# access list} other {# access lists}}",
+        "detail": "They need the Geo Blocking module, which this Caddy does not have. Until it is back, an allow rule of this kind admits nobody and a deny rule denies nobody."
       }
     }
   },
   "accessLists": {
     "network": "Network",
-    "ipRuleCount": "{count, plural, one {# IP rule} other {# IP rules}}",
+    "ipRuleCount": "{count, plural, one {# rule} other {# rules}}",
     "ipRulesHelp": "Allow or deny by the client's IP address, checked top to bottom - the first rule that matches decides. Addresses are read after Settings > Network > Trusted Proxies, so a CDN or load balancer in front is seen through. A hostname, such as a dynamic-DNS name, is looked up again as its record expires and stands for every address it resolves to: an IPv4 address exactly, an IPv6 one with its /64 (end the name in /56, /128 and so on to change that).",
     "ipAction": "Action",
     "ipAllow": "Allow",
@@ -120,6 +124,63 @@
     "ipDefaultDeny": "Deny",
     "ipDefaultAllow": "Allow",
     "ipRulesSaveFailed": "Could not save",
+    "geoRulesHelp": "A rule can also match the client's country, continent or network (ASN), looked up in the GeoIP databases. Mixed with address rules, the first match still decides. Each rule can carry a note and an expiry; an expired rule stops applying at once and is removed within a minute.",
+    "geoRulesSkippedTitle": "Country, continent and ASN rules are not being enforced",
+    "geoRulesSkippedHelp": "They need the Geo Blocking module: {reason} Until it is back, an allow rule of this kind admits nobody and a deny rule denies nobody.",
+    "ruleKind": "Match",
+    "ruleKinds": {
+      "address": "Address or hostname",
+      "country": "Country",
+      "continent": "Continent",
+      "asn": "Network (ASN)"
+    },
+    "ruleTarget": "Value",
+    "rulePlaceholders": {
+      "address": "192.168.1.0/24 or home.example.com",
+      "country": "DE",
+      "continent": "EU",
+      "asn": "AS13335"
+    },
+    "ruleContinentPlaceholder": "Choose a continent",
+    "continents": {
+      "af": "Africa",
+      "an": "Antarctica",
+      "as": "Asia",
+      "eu": "Europe",
+      "na": "North America",
+      "oc": "Oceania",
+      "sa": "South America"
+    },
+    "ruleExpiryLabel": "Expires",
+    "ruleExpiresAt": "At {at}",
+    "ruleExpiry": {
+      "oneHour": "In 1 hour",
+      "oneDay": "In 24 hours",
+      "sevenDays": "In 7 days",
+      "thirtyDays": "In 30 days",
+      "never": "Never"
+    },
+    "failClosed": "Fail closed",
+    "failClosedHelp": "Refuse a request whose client cannot be told apart from a trusted proxy, for example one arriving through a proxy without X-Forwarded-For, before any rule or password is checked. Needs the Geo Blocking module and trusted proxies to be set.",
+    "denyResponse": "Deny response",
+    "denyResponseHelp": "What a request the rules refuse gets back. With Satisfy set to Any, a refused visitor is asked for a password instead. Lists with a country, continent or ASN rule answer a visitor who sends credentials on the password alone.",
+    "denyMode": "Respond with",
+    "denyModes": {
+      "default": "403 Access denied",
+      "status": "A status and body of my own",
+      "redirect": "A redirect"
+    },
+    "denyStatus": "Status",
+    "denyBody": "Body",
+    "denyBodyHelp": "Plain text or HTML, sent as written, up to {max} characters. Empty sends \"Access denied\".",
+    "denyRedirect": "Redirect to",
+    "denyRedirectHelp": "An absolute http or https URL, answered with 302 Found.",
+    "stats": {
+      "hosts": "Hosts using this list",
+      "stopped": "Requests stopped (24 h)",
+      "failedSignIns": "Failed sign-ins (24 h)",
+      "analyticsOff": "Needs analytics"
+    },
     "satisfy": "Satisfy",
     "satisfyAll": "All - the IP rules and a password",
     "satisfyAny": "Any - an allowed address, or a password",
@@ -509,6 +570,7 @@
       "accessListEntryAdded": "Added user {username} to access list {list}",
       "accessListEntryRemoved": "Removed entry from access list {list}",
       "accessListUpdated": "Updated access list {name}",
+      "accessListRulesExpired": "Expired rules removed from access list {name} ({count})",
       "analyticsViewCreated": "Created analytics view {name}",
       "analyticsViewDeleted": "Deleted analytics view {name}",
       "analyticsViewRenamed": "Renamed analytics view {from} to {to}",
@@ -1276,10 +1338,15 @@
     "viewAsForbidden": "Not while viewing as another role. Return to your own view first.",
     "viewAsAlreadyActive": "Already viewing as another role. Return to your own view first.",
     "ipRulesInvalid": "IP rules must be a list",
-    "ipRulesTooMany": "An access list can have at most {max} IP rules",
-    "ipRuleInvalid": "IP rule {index} needs an action of allow or deny and one of an IP address, a CIDR range or a hostname (optionally ending in /48 to /128 for its IPv6 prefix)",
+    "ipRulesTooMany": "An access list can have at most {max} rules",
+    "ipRuleInvalid": "Rule {index} needs an action of allow or deny and one of an IP address, a CIDR range, a hostname (optionally ending in /48 to /128 for its IPv6 prefix), a country code, a continent code or an ASN",
     "accessListSatisfyInvalid": "Satisfy must be all or any",
     "accessListIpDefaultInvalid": "The default must be allow or deny",
+    "ipRuleExpiryInvalid": "Rule {index} has an expiry that is not a date and time",
+    "accessListDenyInvalid": "The deny response must be a status and body, or a redirect URL",
+    "accessListDenyRedirectInvalid": "The redirect must be an absolute http or https URL without spaces or braces",
+    "accessListDenyStatusInvalid": "The deny status must be between {min} and {max}",
+    "accessListDenyBodyInvalid": "The deny body can be at most {max} characters, without control characters",
     "backupPassphraseTooShort": "Use a passphrase of at least {min} characters. It is the only thing protecting the backup",
     "backupNotRecognised": "That file is not a Caddy Proxy Manager backup",
     "backupPassphraseWrong": "Wrong passphrase, or the file has been changed since it was made",
@@ -1338,6 +1405,11 @@
     "hostRateLimitWindowInvalid": "Rate limit window \"{value}\" is not a duration above zero, such as 10s, 1m or 1h",
     "hostRateLimitMaxEventsInvalid": "A rate limit allows a whole number of requests from 1 to {max}",
     "hostRateLimitIpv6PrefixInvalid": "The IPv6 prefix of a rate limit is a whole number from {min} to {max}",
+    "hostRateLimitMethodInvalid": "\"{value}\" is not a method a rate limit can filter on. Use GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS",
+    "hostRateLimitHeaderInvalid": "A rate limit keyed by a header needs a header name of at most {max} letters, digits and - (no braces or spaces)",
+    "hostRateLimitModeInvalid": "A host's rate limits inherit, merge with or override the global ones",
+    "rateLimitAllowlistTooLong": "The never-limited list can hold at most {max} addresses or ranges",
+    "rateLimitAllowlistEntryInvalid": "\"{value}\" is not an IP address or CIDR range",
     "hostRateLimitPathInvalid": "Rate limit path \"{value}\" cannot contain spaces or braces",
     "hostRateLimitTooManyPaths": "A rate limit zone takes at most {max} paths",
     "hostRateLimitTooManyZones": "A proxy host takes at most {max} rate limit zones",
@@ -1668,8 +1740,8 @@
     "acceptInboundProxyProtocol": "Accept inbound PROXY protocol",
     "accessList": "Access list",
     "accessListNone": "None",
-    "accessListOption": "{name} ({count, plural, one {# IP rule} other {# IP rules}})",
-    "accessListHelp": "Connections from addresses the list denies are closed. Only its IP rules apply here - there is no request to ask a password in - so lists without any are not offered.",
+    "accessListOption": "{name} ({count, plural, one {# rule} other {# rules}})",
+    "accessListHelp": "Connections from clients the list denies are closed. Only its rules apply here, by address, country, continent or ASN - there is no request to ask a password in or answer, so lists without rules are not offered and the list's deny response does not apply.",
     "ipRulesBadge": "IP rules",
     "ipRulesBadgeTooltip": "IP rules from the access list {name}",
     "activeHealthCheck": "Active Health Check",
@@ -2229,7 +2301,8 @@
         "signInCpm": "Sign-in",
         "signInAuthentik": "Authentik",
         "signInForwardAuth": "Forward auth",
-        "accessList": "Access list",
+        "accessList": "ACL",
+        "accessListTitle": "Access list",
         "mtls": "mTLS",
         "rateLimit": "Rate limit",
         "geo": "Geo",
@@ -2796,8 +2869,28 @@
     "rateLimitKey": "Count per",
     "rateLimitKeyIp": "Client IP",
     "rateLimitKeyIpPath": "Client IP and path",
+    "rateLimitKeyHeader": "Request header",
+    "rateLimitKeyUser": "Signed-in user",
+    "rateLimitHeader": "Header",
+    "rateLimitHeaderInvalid": "A header name has no spaces or braces",
+    "rateLimitKeyHeaderHelp": "Counts per value of this header, such as an API key. A request without it is counted by its client IP. Clients choose their own header values, so pair it with a per-IP zone if that matters.",
+    "rateLimitKeyUserHelp": "Counts per user that forward auth signed in (CPM, Authentik or another forward-auth server that sends Remote-User), checked after sign-in. Requests with no signed-in user, and hosts without forward auth, are counted by client IP.",
+    "rateLimitMethods": "Methods",
+    "rateLimitMethodsHelp": "Only these methods count. None selected counts every method.",
+    "rateLimitMethodsAll": "Every method",
+    "rateLimitMode": "Global zones",
+    "rateLimitModes": {
+      "inherit": "Inherit the global zones",
+      "merge": "Global zones and this host's own",
+      "override": "Only this host's own zones"
+    },
+    "rateLimitModeHelp": {
+      "inherit": "This host is limited by the zones in Settings > Rate Limiting, and has none of its own.",
+      "merge": "The zones in Settings > Rate Limiting apply, and so do the ones below. Each keeps its own count.",
+      "override": "Only the zones below apply. Turn it off to have no rate limiting on this host at all."
+    },
     "rateLimitIpv6Prefix": "IPv6 prefix",
-    "rateLimitHelp": "Each zone allows a number of requests per client in a sliding window. A request over the limit gets a 429 with Retry-After, rendered by this host's error pages. The client IP honours trusted proxies. An IPv6 prefix such as 64 counts a whole network as one client.",
+    "rateLimitHelp": "Each zone allows a number of requests per client in a sliding window. A request over the limit gets a 429 with Retry-After, rendered by this host's 429 error page when it has one. The client IP honours trusted proxies. An IPv6 prefix such as 64 counts a whole network as one client. Addresses on the never-limited list in Settings > Rate Limiting are never counted.",
     "crowdsec": "CrowdSec",
     "crowdsecDescription": "Refuse clients your CrowdSec Local API has a decision against, before rate limiting, geo blocking and the WAF. Applies once CrowdSec is set up under Settings > CrowdSec.",
     "enableCrowdsec": "Check clients against CrowdSec",
@@ -3737,6 +3830,10 @@
         "name": "Geo-blocking",
         "desc": "Country lookups, and the default rules every host merges with"
       },
+      "rateLimit": {
+        "name": "Rate Limiting",
+        "desc": "Limits every host can inherit, and addresses never limited"
+      },
       "crowdsec": {
         "name": "CrowdSec",
         "desc": "Refuse addresses your CrowdSec Local API has decided to block"
@@ -3834,6 +3931,9 @@
       },
       "geoblock": {
         "name": "Global Geoblocking"
+      },
+      "rateLimit": {
+        "name": "Rate Limiting"
       },
       "crowdsec": {
         "name": "CrowdSec"
@@ -4271,6 +4371,10 @@
       "crowdsec": {
         "valueMode": "{mode, select, managed {Managed} other {External}} bouncer"
       },
+      "rateLimit": {
+        "valueZones": "{count, plural, one {# global zone} other {# global zones}}",
+        "valueNone": "No global zones"
+      },
       "logging": {
         "valueFormat": "{format, select, console {Console format} other {JSON}}"
       },
@@ -4355,6 +4459,7 @@
       "twoFactor": "Two-factor Sign-in",
       "tailscale": "Tailscale",
       "geoblock": "Geo-Block",
+      "rateLimit": "Rate Limiting",
       "crowdsec": "CrowdSec",
       "errorPages": "Error Pages",
       "authentik": "Authentik",
@@ -4468,6 +4573,8 @@
       "upstreamDnsSaved": "Upstream DNS resolution settings saved and applied successfully",
       "upstreamDnsFailed": "Failed to save upstream DNS resolution settings",
       "geoblockSaved": "Geoblocking settings saved and applied successfully",
+      "rateLimitSaved": "Rate limiting settings saved and applied successfully",
+      "rateLimitFailed": "Failed to save rate limiting settings",
       "geoblockFailed": "Failed to save geoblocking settings",
       "errorPagesInvalid": "Invalid error pages payload",
       "errorPagesSaved": "Error pages saved and applied successfully",
@@ -4599,6 +4706,14 @@
       "capInstanceUrlHelp": "Where your Cap Standalone server is reached by browsers and by this server, without the site key.",
       "oidcOnlyTitle": "Not shown in OIDC-only mode",
       "oidcOnlyBody": "There is no username step while local accounts are disabled, so the CAPTCHA only applies once they are enabled again."
+    },
+    "rateLimit": {
+      "help": "Zones here apply to every proxy host left to inherit them, and to hosts that merge them with their own. Each host keeps its own count, so a zone of 100 requests a minute allows 100 on every host. The dashboard host never takes them.",
+      "enabled": "Apply the global zones",
+      "enabledHelp": "Off, hosts that inherit have no rate limiting; the never-limited list still applies.",
+      "allowlist": "Never limited",
+      "allowlistHelp": "IP addresses and CIDR ranges no zone ever counts, on any host, one per line, up to {max}. Read after trusted proxies.",
+      "unavailable": "Rate limiting is not in Caddy"
     },
     "crowdsec": {
       "enabled": "Check clients against CrowdSec",

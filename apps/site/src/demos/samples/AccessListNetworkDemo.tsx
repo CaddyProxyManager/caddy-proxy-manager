@@ -5,8 +5,8 @@ import { DemoSurface } from "../DemoSurface";
 import { rememberAccessList } from "../shims/access-list-actions";
 
 /**
- * An office allowlist with one address carved out of it - order is what makes the deny win - and
- * a dynamic-DNS name for someone working from home.
+ * An office allowlist with one address carved out of it - order is what makes the deny win - a
+ * dynamic-DNS name for someone working from home, and a country for a team abroad until a date.
  */
 const OFFICE: AccessList = {
   id: 1,
@@ -29,10 +29,20 @@ const OFFICE: AccessList = {
         lastErrorAt: null,
       },
     },
+    {
+      action: "allow",
+      cidr: null,
+      hostname: null,
+      country: "PT",
+      note: "Lisbon offsite",
+      expiresAt: "2026-12-31T18:00:00Z",
+    },
   ],
   ipDefault: "deny",
   satisfy: "all",
   passAuth: false,
+  denyResponse: { status: 403, body: "This site is for the office network.", redirectUrl: null },
+  failClosed: false,
   createdAt: "2026-09-01T09:00:00Z",
   updatedAt: "2026-09-01T09:00:00Z",
 };

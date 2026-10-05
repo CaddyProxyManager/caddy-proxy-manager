@@ -143,6 +143,27 @@ answers with Coraza's reason. `reviewWafEvent(key, verdict)` marks an event `int
 `false_positive`, and null clears it. `blockedSources` and `deleteBlockedSource` round out the
 deny list.
 
+## Access lists
+
+An `AccessList` carries its `rules` in order (each with one of `cidr`, `hostname`, `country`,
+`continent` or `asn`, plus `note` and `expiresAt`), `ipDefault`, `satisfy`, `failClosed` and
+`denyResponse`. `setAccessListRules(id, rules)` replaces the rules as a whole, as the REST
+`ip-rules` route does, and `updateAccessList` takes `denyResponse` (null for the plain 403) and
+`failClosed`. `accessListStats(id)` answers the hosts using a list and, with analytics on, what it
+stopped and the failed sign-ins over the last 24 hours.
+
+```graphql
+mutation {
+  setAccessListRules(id: 2, rules: [
+    { action: "deny", cidr: "192.0.2.7" },
+    { action: "allow", country: "PT", note: "Offsite", expiresAt: "2026-12-31T18:00:00Z" }
+  ]) { rules { action cidr country expiresAt } }
+}
+```
+
+Global rate-limit zones and the never-limited list are the `rate-limit` settings group:
+`{ enabled, zones, allowlist }`.
+
 ## Authentication
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an

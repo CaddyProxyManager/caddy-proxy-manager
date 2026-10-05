@@ -36,7 +36,15 @@ import { DomainError } from '../../../src/lib/errors/domain-error';
 import * as schema from '../../../src/lib/db/schema';
 
 const NOW = new Date().toISOString();
-const ZONE = { paths: ['/login'], maxEvents: 10, window: '1m', key: 'ip', ipv6Prefix: 64 };
+const ZONE = {
+  paths: ['/login'],
+  maxEvents: 10,
+  window: '1m',
+  key: 'ip' as const,
+  ipv6Prefix: 64,
+};
+/** ZONE read back: the fields it left out filled in. */
+const READ = { ...ZONE, methods: [], header: null };
 
 function refusal(value: unknown): string | undefined {
   try {
@@ -167,10 +175,7 @@ describe('input and stored values', () => {
   it('hydrates the API shape back', () => {
     expect(
       hydrateHostRateLimit(normalizeHostRateLimitInput({ enabled: true, zones: [ZONE] })),
-    ).toEqual({
-      enabled: true,
-      zones: [{ paths: ['/login'], maxEvents: 10, window: '1m', key: 'ip', ipv6Prefix: 64 }],
-    });
+    ).toEqual({ enabled: true, zones: [READ], mode: 'merge' });
     expect(hydrateHostRateLimit(undefined)).toBeNull();
   });
 });
@@ -205,12 +210,14 @@ describe('the model', () => {
       },
       1,
     );
-    expect(host.rateLimit).toEqual({ enabled: true, zones: [ZONE] as never });
+    // No mode: a host's own zones, as before global zones existed.
+    expect(host.rateLimit).toEqual({ enabled: true, zones: [READ] as never, mode: 'merge' });
 
     await updateProxyHost(host.id, { rateLimit: { enabled: false, zones: [ZONE] as never } }, 1);
     expect((await getProxyHost(host.id))?.rateLimit).toEqual({
       enabled: false,
-      zones: [ZONE] as never,
+      zones: [READ] as never,
+      mode: 'merge',
     });
 
     // An unrelated edit keeps them.

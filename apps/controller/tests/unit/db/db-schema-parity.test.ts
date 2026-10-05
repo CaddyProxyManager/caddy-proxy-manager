@@ -26,8 +26,12 @@ type Shape = {
   foreignKeys: Array<{ columns: string[]; target: string; onDelete: string | undefined }>;
 };
 
-/** SQLite stores booleans and serials as integers and a bounded string as text(n). */
-const TYPE_ALIASES: Record<string, string> = { boolean: 'integer', PgSerial: 'integer' };
+/** SQLite stores booleans, serials and 64-bit numbers as integers and a bounded string as text(n). */
+const TYPE_ALIASES: Record<string, string> = {
+  boolean: 'integer',
+  PgSerial: 'integer',
+  PgBigInt53: 'integer',
+};
 
 function shape(config: any): Shape {
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);

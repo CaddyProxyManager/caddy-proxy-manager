@@ -285,20 +285,53 @@ limits and Caddy's log says so.
 A host has one or more zones, and each counts on its own:
 
 - **Paths** - Caddy path patterns such as `/login` or `/api/*`. Empty covers every request.
+- **Methods** - only these methods count, such as `POST` on a sign-in form. None selected counts
+  every method.
 - **Requests** and **Per** - how many requests one client may make within a sliding window, such
   as 100 per `1m`.
-- **Count per** - the client IP, or the client IP and path together, so each path gets its own
-  allowance.
+- **Count per** - who "one client" is:
+  - **Client IP**, or **client IP and path** together, so each path gets its own allowance.
+  - **Request header** - each value of a header you name, such as `X-Api-Key`, gets its own
+    allowance. A request without the header is counted by its client IP, so leaving it off never
+    escapes the limit. Clients choose their own header values, so pair it with a per-IP zone where
+    that matters.
+  - **Signed-in user** - the user [forward auth](/features/forward-auth/) signed in: CPM's own,
+    Authentik (`X-Authentik-Uid` or `X-Authentik-Username`) or another forward-auth server sending
+    `Remote-User`. It is counted after sign-in, from the header the auth server set - one a client
+    sends itself is stripped first - so one person on many addresses shares one allowance.
+    Requests with no signed-in user, on paths forward auth leaves open or on a host without it,
+    are counted by client IP.
 - **IPv6 prefix** - counts a whole IPv6 network, such as a `/64`, as one client, since one
   household or server usually holds far more addresses than it needs. Only with the client IP.
 
+A header name is a plain token: braces, and so any placeholder of your own, are refused. Header
+and user values are never logged and never become metric labels.
+
 The client IP is the one Caddy resolves through **Settings → Network → Trusted Proxies**, so a
 load balancer in front does not make every visitor look like one client. The limit is checked
-before geo blocking and the WAF, so a flood never costs a WAF inspection. The 429 is rendered by
-the host's custom error page for it, or the global one from **Settings → Responses → Error Pages**.
-Counters are kept per Caddy and survive a configuration reload; each agent counts on its own.
+before geo blocking and the WAF, so a flood never costs a WAF inspection. The 429 keeps its
+`Retry-After` and is rendered by the host's custom error page for it, or the global one from
+**Settings → Responses → Error Pages**. Counters are kept per Caddy and survive a configuration
+reload; each agent counts on its own.
 
-<Demo title="Rate limiting" note="Switch a zone to client IP and path to see the IPv6 prefix step aside.">
+### Global zones
+
+**Settings → Rate Limiting** holds zones every host can take. Each host chooses under **Global
+zones**:
+
+- **Inherit** (the default for a new host) - only the global zones, none of its own.
+- **Merge** - the global zones and its own.
+- **Override** - only its own. Switched off, the host has no rate limiting at all.
+
+A global zone counts per host: 100 requests a minute means 100 on each host, not 100 across all of
+them. Hosts saved before global zones existed keep their own zones and merge, which changes nothing
+until global zones are added. The dashboard host never takes global zones, so a tight one cannot
+keep out the administrator who has to loosen it.
+
+The same page holds **Never limited**: addresses and CIDR ranges no zone counts, on any host, the
+host's own zones included. A host and the global settings hold up to 20 zones each.
+
+<Demo title="Rate limiting" note="Switch the key to a header or the signed-in user, or the global zones to inherit.">
   <RateLimitDemo client:visible />
 </Demo>
 

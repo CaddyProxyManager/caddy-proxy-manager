@@ -3124,9 +3124,15 @@ const spec = {
       HostRateLimitConfig: {
         type: "object",
         description:
-          "Per-client request limits, answered with 429 and Retry-After. Needs the opt-in caddy-ratelimit module; without it the host is served unlimited. Zones are replaced as a whole and kept while disabled",
+          "Per-client request limits, answered with 429 and Retry-After (and the host's 429 error page when it has one). Needs the opt-in caddy-ratelimit module; without it the host is served unlimited. Zones are replaced as a whole and kept while disabled. Addresses on the global never-limited list (settings group rate-limit) are never counted",
         properties: {
-          enabled: { type: "boolean" },
+          enabled: { type: "boolean", description: "Whether this host's own zones apply" },
+          mode: {
+            type: "string",
+            enum: ["inherit", "merge", "override"],
+            description:
+              "inherit: only the global zones. merge: the global zones and this host's. override: only this host's. Omitted on a host stored before global zones, which keeps its own zones (merge)",
+          },
           zones: {
             type: "array",
             maxItems: 20,
@@ -3140,6 +3146,14 @@ const spec = {
                   description: "Caddy path matchers; empty covers every request",
                   example: ["/login", "/api/*"],
                 },
+                methods: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                    enum: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+                  },
+                  description: "Only these methods count; empty counts every method",
+                },
                 maxEvents: { type: "integer", minimum: 1, maximum: 1000000, example: 100 },
                 window: {
                   type: "string",
@@ -3148,8 +3162,15 @@ const spec = {
                 },
                 key: {
                   type: "string",
-                  enum: ["ip", "ip+path"],
-                  description: "Count per client IP, or per client IP and path",
+                  enum: ["ip", "ip+path", "header", "user"],
+                  description:
+                    "Count per client IP, per client IP and path, per value of a request header, or per user forward auth signed in. A header or user zone counts a request without one by its client IP",
+                },
+                header: {
+                  type: ["string", "null"],
+                  maxLength: 64,
+                  description: "The header a header zone counts by: an RFC 7230 token, no braces",
+                  example: "X-Api-Key",
                 },
                 ipv6Prefix: {
                   type: ["integer", "null"],
@@ -3923,6 +3944,14 @@ const spec = {
             type: "boolean",
             description: "Forward the basic-auth Authorization header to the upstream.",
           },
+          denyResponse: {
+            oneOf: [{ $ref: "#/components/schemas/AccessListDenyResponse" }, { type: "null" }],
+          },
+          failClosed: {
+            type: "boolean",
+            description:
+              "Refuse a request whose client cannot be told apart from a trusted proxy. Needs the Geo Blocking module.",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -3934,9 +3963,25 @@ const spec = {
           "ipDefault",
           "satisfy",
           "passAuth",
+          "denyResponse",
+          "failClosed",
           "createdAt",
           "updatedAt",
         ],
+      },
+      AccessListDenyResponse: {
+        type: "object",
+        description:
+          "What a denied request gets. Null (or omitted on create) is 403 Access denied. A redirectUrl answers 302 and wins over status and body.",
+        properties: {
+          status: { type: "integer", minimum: 400, maximum: 599, example: 403 },
+          body: { type: ["string", "null"], maxLength: 8192 },
+          redirectUrl: {
+            type: ["string", "null"],
+            maxLength: 2048,
+            description: "An absolute http or https URL, without spaces or braces",
+          },
+        },
       },
       AccessListIpRule: {
         type: "object",
@@ -3946,7 +3991,7 @@ const spec = {
             type: ["string", "null"],
             example: "192.168.1.0/24",
             description:
-              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128. Exactly one of cidr and hostname.",
+              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128. Exactly one of cidr, hostname, country, continent and asn.",
           },
           hostname: {
             type: ["string", "null"],
@@ -3954,7 +3999,30 @@ const spec = {
             description:
               "A hostname the controller resolves (A and AAAA) and re-resolves as its TTL expires, clamped to 60 s-1 h. It stands for each IPv4 address as a /32 and each IPv6 address widened to its /64; end the name in /48 to /128 to set that prefix. Up to 16 addresses per name. On a failed lookup the last answer is kept for 24 h. A name with no answer stands for no addresses: an allow rule admits nobody, a deny rule denies nobody.",
           },
+          country: {
+            type: ["string", "null"],
+            example: "DE",
+            description:
+              "An ISO 3166-1 alpha-2 code, looked up in GeoLite2-Country. Needs the Geo Blocking module.",
+          },
+          continent: {
+            type: ["string", "null"],
+            enum: ["AF", "AN", "AS", "EU", "NA", "OC", "SA", null],
+            description: "Needs the Geo Blocking module.",
+          },
+          asn: {
+            type: ["integer", "null"],
+            minimum: 1,
+            maximum: 4294967295,
+            description:
+              "An autonomous system number (AS13335 is accepted too), looked up in GeoLite2-ASN. Needs the Geo Blocking module.",
+          },
           note: { type: ["string", "null"] },
+          expiresAt: {
+            type: ["string", "null"],
+            format: "date-time",
+            description: "Past it the rule no longer applies, and it is deleted within a minute.",
+          },
           resolved: {
             type: "object",
             readOnly: true,
@@ -3991,6 +4059,12 @@ const spec = {
             type: "boolean",
             description: "Forward the basic-auth Authorization header to the upstream.",
           },
+          denyResponse: {
+            oneOf: [{ $ref: "#/components/schemas/AccessListDenyResponse" }, { type: "null" }],
+            description:
+              "On update, null restores 403 Access denied and an omitted field keeps it.",
+          },
+          failClosed: { type: "boolean" },
           users: {
             type: "array",
             description: "Seed members (only used during creation)",

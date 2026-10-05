@@ -17,6 +17,7 @@ import { MAX_ANOMALY_THRESHOLD, MIN_ANOMALY_THRESHOLD } from "../waf/tuning";
 import { normalizeDefaultResponseSettings } from "../caddy/default-response";
 import { normalizeTailscaleSettings } from "../caddy/tailscale";
 import { normalizeCrowdSecSettings } from "../caddy/crowdsec";
+import { normalizeGlobalRateLimitInput } from "../proxy-hosts/rate-limit-global";
 import { getProviderDefinition, isValidDnsDuration } from "../dns/providers";
 import {
   ACMEDNS_PROVIDER,
@@ -851,6 +852,15 @@ export function validateSettingsGroup(
       break;
     case "waf":
       validateWaf(value, previousWaf);
+      break;
+    case "rate-limit":
+      onlyKeys(value, ["enabled", "zones", "allowlist"], "rate limit settings");
+      booleanValue(required(value, "enabled", "rate limit settings"), "enabled");
+      try {
+        normalizeGlobalRateLimitInput(value);
+      } catch (error) {
+        invalid(error instanceof Error ? error.message : "Invalid rate limit settings");
+      }
       break;
     case "error-pages":
       validateErrorPages(value);

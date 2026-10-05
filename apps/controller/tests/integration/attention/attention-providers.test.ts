@@ -191,6 +191,52 @@ describe('accounts', () => {
   });
 });
 
+describe('security', () => {
+  it('warns about access-list geo rules the running Caddy cannot enforce', async () => {
+    const { saveCaddyBuildSettings } = await import('../../../src/lib/settings');
+    const { CADDY_MODULES } = await import('../../../src/lib/caddy/image-build/modules');
+    await ctx.db.delete(schema.accessListIpRules);
+    await ctx.db.delete(schema.accessLists);
+    const [list] = await ctx.db
+      .insert(schema.accessLists)
+      .values({ name: 'travel', createdAt: NOW, updatedAt: NOW })
+      .returning();
+    await ctx.db.insert(schema.accessListIpRules).values([
+      {
+        accessListId: list!.id,
+        action: 'deny',
+        country: 'RU',
+        sortOrder: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      // Expired, so it no longer counts.
+      {
+        accessListId: list!.id,
+        action: 'deny',
+        asn: 1,
+        sortOrder: 1,
+        expiresAt: '2000-01-01T00:00:00.000Z',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ]);
+    const items = async () =>
+      (await collectAttention(access('admin'), { providers: only('security') })).items.filter(
+        (item) => item.code === 'accessListGeoUnenforced',
+      );
+    expect(await items()).toEqual([]);
+
+    await saveCaddyBuildSettings({
+      modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, m.id !== 'caddy-blocker'])),
+      customModules: [],
+    });
+    expect(await items()).toMatchObject([
+      { severity: 'warning', values: { count: 1 }, href: '/access-lists' },
+    ]);
+  });
+});
+
 describe('without agents, ClickHouse or directories', () => {
   it('answers nothing rather than reporting everything as broken', async () => {
     const list = await collectAttention(access('admin'), {

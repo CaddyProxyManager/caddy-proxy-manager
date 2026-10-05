@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/errors/domain-error";
 import { normalizeCidr } from "@/src/lib/access-lists/rules";
+import type { AccessRuleKind } from "@/src/lib/access-lists/limits";
 import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { getTranslations } from "next-intl/server";
 import {
@@ -11,11 +12,13 @@ import {
   createAccessList,
   deleteAccessList,
   getAccessList,
+  getAccessListStats,
   removeAccessListEntries,
   removeAccessListEntry,
   setAccessListIpRules,
   updateAccessList,
   type AccessListSettingsInput,
+  type AccessListStats,
 } from "@/src/lib/models/access-lists";
 
 export async function createAccessListAction(input: {
@@ -46,20 +49,38 @@ export async function updateAccessListAction(id: number, input: AccessListSettin
   });
 }
 
-/** The whole ordered set, replacing what was there. A target that is no address is a hostname. */
+/**
+ * The whole ordered set, replacing what was there. An `address` that is no IP or range is a
+ * hostname; the model checks every value.
+ */
 export async function setAccessListIpRulesAction(
   id: number,
-  rules: { action: string; target: string; note?: string | null }[],
+  rules: {
+    action: string;
+    kind: AccessRuleKind;
+    target: string;
+    note?: string | null;
+    expiresAt?: string | null;
+  }[],
 ) {
   return withTranslatedErrors(async () => {
     const session = await requireAdmin();
-    const typed = rules.map(({ target, ...rule }) =>
-      normalizeCidr(target) ? { ...rule, cidr: target } : { ...rule, hostname: target },
-    );
+    const typed = rules.map(({ kind, target, ...rule }) => {
+      if (kind === "address") {
+        return normalizeCidr(target) ? { ...rule, cidr: target } : { ...rule, hostname: target };
+      }
+      return { ...rule, [kind]: target };
+    });
     const list = await setAccessListIpRules(id, typed, Number(session.user.id));
     revalidatePath("/access-lists");
     return list;
   });
+}
+
+/** Hosts using the list, and what it stopped over the last day when analytics are on. */
+export async function getAccessListStatsAction(id: number): Promise<AccessListStats> {
+  await requireAdmin();
+  return getAccessListStats(id);
 }
 
 export async function deleteAccessListAction(

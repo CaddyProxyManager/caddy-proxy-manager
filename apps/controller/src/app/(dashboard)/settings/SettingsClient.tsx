@@ -111,6 +111,7 @@ import {
   updateDnsSettingsAction,
   updateUpstreamDnsResolutionSettingsAction,
   updateGeoBlockSettingsAction,
+  updateRateLimitSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
@@ -141,6 +142,8 @@ import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { CrowdSecSection } from "./CrowdSecSection";
+import { RateLimitSection } from "./RateLimitSection";
+import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
 import { EmailServerSection, NotificationsSection } from "./EmailSection";
@@ -174,6 +177,7 @@ type Props = {
   twoFactorPolicy: TwoFactorPolicySettings;
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
+  globalRateLimit?: GlobalRateLimitSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProviderView[];
   ldapDirectories: LdapDirectoryView[];
@@ -254,6 +258,7 @@ export default function SettingsClient({
   twoFactorPolicy,
   defaultResponse,
   globalGeoBlock,
+  globalRateLimit = null,
   globalErrorPages,
   oauthProviders,
   ldapDirectories,
@@ -344,6 +349,7 @@ export default function SettingsClient({
     null,
   );
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
+  const [rateLimitState, rateLimitFormAction] = useActionState(updateRateLimitSettingsAction, null);
   const [errorPagesState, errorPagesFormAction] = useActionState(
     updateErrorPagesSettingsAction,
     null,
@@ -636,6 +642,13 @@ export default function SettingsClient({
         globalGeoBlock={globalGeoBlock}
         geoBlockState={geoBlockState}
         geoBlockFormAction={geoBlockFormAction}
+      />
+    ),
+    "rate-limit": (
+      <RateLimitSection
+        rateLimit={globalRateLimit}
+        state={rateLimitState}
+        formAction={rateLimitFormAction}
       />
     ),
     analytics: (

@@ -35,6 +35,8 @@ import {
   saveUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
   saveGeoBlockSettings,
+  getRateLimitSettings,
+  saveRateLimitSettings,
   getWafSettings,
   saveWafSettings,
   getErrorPagesSettings,
@@ -147,6 +149,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     get: getGeoBlockSettings,
     save: saveGeoBlockSettings as (data: never) => Promise<void>,
     storageKey: "geoblock",
+    applyCaddy: true,
+  },
+  "rate-limit": {
+    get: getRateLimitSettings,
+    save: saveRateLimitSettings as (data: never) => Promise<void>,
+    storageKey: "rate_limit",
     applyCaddy: true,
   },
   waf: {

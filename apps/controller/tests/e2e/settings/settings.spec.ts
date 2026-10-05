@@ -67,6 +67,7 @@ test.describe('Settings - page load & layout', () => {
       'Authentication',
       'Forward Auth',
       'Geo-blocking',
+      'Rate Limiting',
       'Observability',
     ];
     for (const name of expectedItems) {
@@ -121,6 +122,7 @@ test.describe('Settings - sidebar navigation', () => {
       'Authentication',
       'Forward Auth',
       'Geo-blocking',
+      'Rate Limiting',
       'Observability',
     ];
 
@@ -556,6 +558,21 @@ test.describe('Settings - Tailscale', () => {
 
     await goToSection(page, 'Tailscale');
     await expect(page.getByLabel('Serve HTTP/3 on tailnet listeners')).toBeChecked();
+  });
+});
+
+// ─── Rate Limiting ───────────────────────────────────────────────────────────
+
+test.describe('Settings - Rate Limiting', () => {
+  test('a never-limited range reaches the REST API once applied', async ({ page }) => {
+    await goToSection(page, 'Rate Limiting');
+    await expect(page.getByRole('button', { name: /add zone/i })).toBeVisible();
+    await saveSetting(page, page.getByLabel(/never limited/i), '10.0.0.0/8');
+    await expectStaged(page, 15_000);
+    await applyStagedChanges(page);
+
+    const res = await page.request.get(`${SETTINGS_ORIGIN}/api/v1/settings/rate-limit`);
+    expect((await res.json()).allowlist).toEqual(['10.0.0.0/8']);
   });
 });
 

@@ -153,7 +153,13 @@ describe('L4 geo blocking', () => {
 });
 
 async function insertList(
-  rules: { action: 'allow' | 'deny'; cidr?: string; hostname?: string }[],
+  rules: {
+    action: 'allow' | 'deny';
+    cidr?: string;
+    hostname?: string;
+    country?: string;
+    asn?: number;
+  }[],
   ipDefault: 'allow' | 'deny' = 'deny',
 ): Promise<number> {
   const now = new Date().toISOString();
@@ -224,6 +230,35 @@ describe('L4 access lists', () => {
     });
     expect(Object.keys(inner[1].match?.[0] ?? {})).toEqual(['blocker']);
     expect(inner[2].handle.map((h) => h.handler)).toEqual(['proxy']);
+  });
+
+  it('closes by country and ASN through the blocker matcher, keeping rule order', async () => {
+    const listId = await insertList(
+      [
+        { action: 'allow', cidr: '10.0.0.0/8' },
+        { action: 'deny', country: 'RU' },
+        { action: 'deny', asn: 64500 },
+      ],
+      'allow',
+    );
+    await insertL4Host({ accessListId: listId });
+    const routes = await l4Routes();
+    expect(routes).toHaveLength(2);
+    expect(routes[0]).toEqual({
+      match: [
+        {
+          blocker: {
+            geoip_db: '/usr/share/GeoIP/GeoLite2-Country.mmdb',
+            asn_db: '/usr/share/GeoIP/GeoLite2-ASN.mmdb',
+            block_countries: ['RU'],
+            block_asns: [64500],
+            allow_cidrs: ['10.0.0.0/8'],
+          },
+        },
+      ],
+      handle: CLOSE,
+    });
+    expect(routes[1].handle.map((h) => h.handler)).toEqual(['proxy']);
   });
 
   it('adds nothing when the rules deny nobody', async () => {

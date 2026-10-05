@@ -5,6 +5,7 @@
 import type {
   AccessList,
   AccessListSettingsInput,
+  AccessListStats,
 } from "@cpm/controller/src/lib/models/access-lists";
 
 const lists = new Map<number, AccessList>();
@@ -26,7 +27,17 @@ export async function updateAccessListAction(
   id: number,
   input: AccessListSettingsInput,
 ): Promise<AccessList> {
-  return save(id, input as Partial<AccessList>);
+  const { denyResponse, ...rest } = input;
+  const change = rest as Partial<AccessList>;
+  if (denyResponse !== undefined) {
+    const deny = denyResponse as { status?: number; body?: string; redirectUrl?: string } | null;
+    change.denyResponse = deny?.redirectUrl
+      ? { status: 302, body: null, redirectUrl: deny.redirectUrl }
+      : deny
+        ? { status: deny.status ?? 403, body: deny.body || null, redirectUrl: null }
+        : null;
+  }
+  return save(id, change);
 }
 
 /** Digits, dots and slashes, or any colon, is an address; the server tells them apart with `isIP`. */
@@ -34,7 +45,13 @@ const looksLikeAddress = (target: string) => /^[\d./]+$|:/.test(target);
 
 export async function setAccessListIpRulesAction(
   id: number,
-  rules: { action: string; target: string; note?: string | null }[],
+  rules: {
+    action: string;
+    kind: "address" | "country" | "continent" | "asn";
+    target: string;
+    note?: string | null;
+    expiresAt?: string | null;
+  }[],
 ): Promise<AccessList> {
   // A name saved before keeps its answer; a new one has nothing to look it up with, so it shows as
   // not looked up yet.
@@ -46,10 +63,15 @@ export async function setAccessListIpRulesAction(
   return save(id, {
     ipRules: rules.map((rule) => {
       const action = rule.action === "deny" ? "deny" : "allow";
-      const note = rule.note ?? null;
-      if (looksLikeAddress(rule.target)) {
-        return { action, cidr: rule.target, hostname: null, note };
+      const base = { action, cidr: null, hostname: null, note: rule.note ?? null } as const;
+      const expiresAt = rule.expiresAt ?? null;
+      if (rule.kind === "country")
+        return { ...base, country: rule.target.toUpperCase(), expiresAt };
+      if (rule.kind === "continent") return { ...base, continent: rule.target, expiresAt };
+      if (rule.kind === "asn") {
+        return { ...base, asn: Number(rule.target.replace(/^as/i, "")), expiresAt };
       }
+      if (looksLikeAddress(rule.target)) return { ...base, cidr: rule.target, expiresAt };
       const hostname = rule.target.toLowerCase();
       const resolved = known.get(hostname) ?? {
         ranges: [],
@@ -57,7 +79,12 @@ export async function setAccessListIpRulesAction(
         lastError: null,
         lastErrorAt: null,
       };
-      return { action, cidr: null, hostname, note, resolved };
+      return { ...base, hostname, expiresAt, resolved };
     }),
   });
+}
+
+/** The docs site has no analytics, so traffic reads as switched off. */
+export async function getAccessListStatsAction(id: number): Promise<AccessListStats> {
+  return { hosts: lists.get(id) ? 2 : 0, traffic: null };
 }

@@ -1,5 +1,6 @@
 /**
- * Functional: access-list IP rules, "Satisfy Any" and "Pass auth to host", through a real Caddy.
+ * Functional: access-list IP rules, the deny response, "Satisfy Any" and "Pass auth to host",
+ * through a real Caddy.
  * Domains: func-ipdeny.test, func-ipany.test, func-strip.test
  */
 import { test, expect, type Page } from '@playwright/test';
@@ -58,6 +59,24 @@ test.describe
 
     test('a denied address is refused, password or not', async () => {
       expect((await httpGet('func-ipdeny.test')).status).toBe(403);
+    });
+
+    test("a denied address gets the list's own deny response", async ({ page }) => {
+      await openList(page, 'IP Deny All', /^network/i);
+      await page.getByRole('combobox', { name: /respond with/i }).click();
+      await page.getByRole('option', { name: /status and body/i }).click();
+      await page.getByRole('spinbutton', { name: /^status/i }).fill('451');
+      await page.getByRole('textbox', { name: /^body/i }).fill('Not from here {braces}');
+      await page
+        .getByRole('button', { name: /save changes/i })
+        .last()
+        .click();
+      await expect(page.getByText(/saved/i).first()).toBeVisible();
+      await expect(async () => {
+        const res = await httpGet('func-ipdeny.test');
+        expect(res.status).toBe(451);
+        expect(res.body).toContain('Not from here {braces}');
+      }).toPass({ timeout: 20_000 });
     });
 
     test('setup: Satisfy Any with every address allowed', async ({ page }) => {

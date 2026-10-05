@@ -109,6 +109,21 @@ const VALID_SAVES: Array<{
     expected: { enabled: true, port: 9090 },
   },
   {
+    name: 'rate limiting, with the allowlist normalised',
+    action: actions.updateRateLimitSettingsAction,
+    fields: {
+      rateLimitEnabled: 'on',
+      rateLimitZonesJson: JSON.stringify([{ maxEvents: 60, window: '1m', key: 'ip' }]),
+      rateLimitAllowlist: '10.0.0.1 192.168.0.0/16',
+    },
+    key: 'rate_limit',
+    expected: {
+      enabled: true,
+      zones: [{ max_events: 60, window: '1m', key: 'ip' }],
+      allowlist: ['10.0.0.1/32', '192.168.0.0/16'],
+    },
+  },
+  {
     name: 'logging',
     action: actions.updateLoggingSettingsAction,
     fields: { enabled: 'on', format: 'console' },
@@ -299,6 +314,12 @@ describe('a refused staged save', () => {
       action: actions.updateForwardAuthSettingsAction,
       fields: { forwardAuthProvider: 'custom' },
       message: results.forwardAuthRequired,
+    },
+    {
+      name: 'a never-limited entry that is no address',
+      action: actions.updateRateLimitSettingsAction,
+      fields: { rateLimitEnabled: 'on', rateLimitAllowlist: 'office' },
+      message: domainErrorMessage('rateLimitAllowlistEntryInvalid', { value: 'office' }),
     },
     {
       name: 'an unknown log format',

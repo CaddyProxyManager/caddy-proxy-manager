@@ -26,6 +26,11 @@ import {
   normalizeHttpCacheSettings,
 } from "../proxy-hosts/http-cache";
 import { currentStagingScope } from "./staging-context";
+import type { GlobalRateLimitSettings } from "../proxy-hosts/rate-limit";
+import {
+  normalizeGlobalRateLimitInput,
+  sanitizeGlobalRateLimit,
+} from "../proxy-hosts/rate-limit-global";
 import { type CompressionSettings, normalizeCompressionSettings } from "../proxy-hosts/compression";
 import {
   assertCrowdSecComplete,
@@ -495,6 +500,15 @@ export async function saveUpstreamDnsResolutionSettings(
   settings: UpstreamDnsResolutionSettings,
 ): Promise<void> {
   await setSetting("upstream_dns_resolution", settings);
+}
+
+/** Global rate-limit zones and the never-limited allowlist; see proxy-hosts/rate-limit-global. */
+export async function getRateLimitSettings(): Promise<GlobalRateLimitSettings | null> {
+  return sanitizeGlobalRateLimit(await getSetting<unknown>("rate_limit"));
+}
+
+export async function saveRateLimitSettings(settings: GlobalRateLimitSettings): Promise<void> {
+  await setSetting("rate_limit", normalizeGlobalRateLimitInput(settings));
 }
 
 export async function getGeoBlockSettings(): Promise<GeoBlockSettings | null> {

@@ -24,6 +24,8 @@ export function toSqliteSchema(source: string): string {
     "integer($1).primaryKey({ autoIncrement: true })",
   );
   out = out.replace(/\bboolean\((".*?")\)/g, 'integer($1, { mode: "boolean" })');
+  // SQLite's INTEGER is 64-bit already.
+  out = out.replace(/\bbigint\((".*?"), \{ mode: "number" \}\)/g, "integer($1)");
   out = out.replace(/\bvarchar\((".*?"), \{ length: (\d+) \}\)/g, "text($1, { length: $2 })");
   out = out.replace(/\bpgTable\(/g, "sqliteTable(");
   out = out.replace(/from "\.\/columns\.pg"/g, 'from "./columns.sqlite"');
@@ -35,7 +37,7 @@ export function toSqliteSchema(source: string): string {
   const importLine = `import { ${used.join(", ")} } from "drizzle-orm/sqlite-core";`;
   out = out.replace(/^import \{[^}]*\} from "drizzle-orm\/pg-core";\n/m, `${importLine}\n`);
 
-  for (const leftover of ["serial(", "boolean(", "varchar(", "pgTable(", "pg-core"]) {
+  for (const leftover of ["serial(", "bigint(", "boolean(", "varchar(", "pgTable(", "pg-core"]) {
     if (out.includes(leftover)) {
       throw new Error(`schema.pg.ts uses ${leftover} in a shape this generator does not handle.`);
     }

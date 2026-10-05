@@ -88,6 +88,7 @@ async function remainingBlocks() {
     forwardAuth,
     crowdsec,
     logging,
+    rateLimit,
   ] = await Promise.all([
     stored.getGeneralSettings(),
     getUpdateStatus().catch(() => null),
@@ -117,6 +118,7 @@ async function remainingBlocks() {
     stored.getForwardAuthSettings(),
     stored.getCrowdSecSettings(),
     stored.getLoggingSettings(),
+    stored.getRateLimitSettings(),
   ]);
   const caddyfile = globalCaddy.caddyfile.trim();
   return {
@@ -158,6 +160,11 @@ async function remainingBlocks() {
       ? { provider: forwardAuth.provider, upstream: withoutCredentials(forwardAuth.authUpstream) }
       : null,
     crowdsec: { enabled: crowdsec.enabled, mode: crowdsec.mode },
+    rateLimit: {
+      enabled: rateLimit?.enabled ?? false,
+      zones: rateLimit?.zones.length ?? 0,
+      allowlist: rateLimit?.allowlist.length ?? 0,
+    },
     logging: { enabled: logging?.enabled ?? false, format: logging?.format ?? "json" },
   };
 }

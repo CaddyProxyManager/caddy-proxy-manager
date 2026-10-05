@@ -29,14 +29,15 @@ is chosen.
 
 ### IP rules
 
-A list's **Network** tab holds allow and deny rules on client addresses - single IPs, CIDR ranges
-or hostnames, IPv4 or IPv6 - checked from the top, where the first rule that matches decides. **When no rule
+A list's **Network** tab holds allow and deny rules on the client - single IPs, CIDR ranges or
+hostnames, IPv4 or IPv6, and countries, continents or networks (below) - checked from the top, where the first rule that matches decides. **When no rule
 matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
 The address is the one Caddy resolves after [trusted proxies](../geo-blocking/#trusted-proxies), so
 a CDN or load balancer in front is seen through rather than allowed or denied as a whole.
 
 The same rules can guard an [L4 host](../l4-proxy/#ip-rules-from-an-access-list), where only they
-apply - a list's users and passwords have no meaning below HTTP. Either way the rules can only see
+apply - a list's users, passwords and deny response have no meaning below HTTP. Country, continent
+and ASN rules apply there too, through the blocker module's layer 4 matcher. Either way the rules can only see
 the address that reaches Caddy: with Docker's userland proxy in the path, some setups show every
 client as the bridge gateway, which the L4 page explains.
 
@@ -63,7 +64,27 @@ currently stands for, or why it stands for nothing.
   to the controller's own resolver otherwise - so a name that only resolves inside a network needs
   a controller that can see that network's DNS.
 
-<Demo title="An access list's Network tab" note="Reorder, add or remove rules and save; nothing leaves the page.">
+#### Countries, continents and networks
+
+A rule can also match where the client is: a **country** (`DE`), a **continent** (`EU`) or a
+provider network by its **ASN** (`AS13335`), looked up in the GeoIP databases from
+[GeoIP settings](../geo-blocking/). They mix freely with address and hostname rules and keep the
+same order, so "deny `192.0.2.7`, allow `PT`, deny `EU`" lets Portugal in except that one address,
+and refuses the rest of Europe. They need the Geo Blocking module; without it they are skipped -
+an allow of this kind admits nobody, a deny denies nobody - and the Network tab and Needs attention
+both say so.
+
+A list with one of these rules is decided by the blocker module rather than Caddy's own IP
+matcher. It reads the client from `X-Forwarded-For` behind the same trusted proxies as geo
+blocking, and a client it cannot place counts as matching no rule.
+
+#### Notes and expiry
+
+Every rule takes a note, and an optional expiry: in an hour, a day, a week or a month. Past it the
+rule stops applying at once and is deleted within a minute, recorded in the audit log. Useful for a
+contractor's address or a team travelling.
+
+<Demo title="An access list's Network tab" note="Reorder, add or remove rules, set an expiry or a deny response and save; nothing leaves the page.">
   <AccessListNetworkDemo client:visible />
 </Demo>
 
@@ -73,6 +94,25 @@ combine:
 - **All** (the default): the address has to be allowed *and* the password right.
 - **Any**: an allowed address gets straight in, and everyone else - a denied address included - is
   asked for the password. The office network walks in; working from home means logging in.
+
+With **Any** and a country, continent or ASN rule, a visitor who sends credentials is checked on
+them alone, and everyone else on the rules - a refused visitor is asked for the password.
+
+### Deny response and failing closed
+
+By default a refused request gets `403 Access denied`. The Network tab's **Deny response** sets a
+status from 400 to 599 with a body of your own (sent as written, up to 8 KiB), or a `302` redirect
+to an absolute URL - a page explaining how to get access, say.
+
+**Fail closed** refuses a request whose client cannot be told apart from a trusted proxy - one that
+arrives through your load balancer without an `X-Forwarded-For`, for instance - before any rule or
+password is checked. It needs the Geo Blocking module and trusted proxies to be set.
+
+### What a list did
+
+The **Usage** tab counts the hosts using the list and, with [analytics](../analytics/) on, the
+requests it stopped and the failed sign-ins (401s) over the last 24 hours, counted on the hosts
+using it. A host whose location rules use another list counts towards both.
 
 ### Per-path lists
 

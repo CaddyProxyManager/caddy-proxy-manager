@@ -3,37 +3,81 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Network, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList, AccessListIpRule } from "@/lib/models/access-lists";
+import {
+  type AccessRuleKind,
+  DEFAULT_DENY_STATUS,
+  DENY_STATUS_MAX,
+  DENY_STATUS_MIN,
+  MAX_DENY_BODY_LENGTH,
+} from "@/lib/access-lists/limits";
+import { BLOCK_EXPIRY_PRESETS, CONTINENT_CODES } from "@/lib/blocked-sources/types";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/forms/row-id";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
+import { Switch } from "@/components/ui/FormBooleanControls";
+import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
 
-/** `target` is an address, a range or a hostname; the server tells them apart. */
-type Rule = { action: "allow" | "deny"; target: string; note: string };
+type Rule = {
+  action: "allow" | "deny";
+  kind: AccessRuleKind;
+  /** An address, range or hostname; a country or continent code; or an ASN. */
+  target: string;
+  note: string;
+  expiresAt: string | null;
+};
 
-const targetOf = (rule: AccessListIpRule) => rule.cidr ?? rule.hostname ?? "";
+function kindOf(rule: AccessListIpRule): AccessRuleKind {
+  if (rule.country) return "country";
+  if (rule.continent) return "continent";
+  if (rule.asn) return "asn";
+  return "address";
+}
+
+function targetOf(rule: AccessListIpRule): string {
+  return rule.cidr ?? rule.hostname ?? rule.country ?? rule.continent ?? String(rule.asn ?? "");
+}
 
 function toRules(list: AccessList): WithRowId<Rule>[] {
   return withRowIds(
     list.ipRules.map((rule) => ({
       action: rule.action,
+      kind: kindOf(rule),
       target: targetOf(rule),
       note: rule.note ?? "",
+      expiresAt: rule.expiresAt ?? null,
     })),
   );
 }
 
+const fingerprint = (rules: Rule[]) =>
+  JSON.stringify(
+    rules.map(({ action, kind, target, note, expiresAt }) => [
+      action,
+      kind,
+      target.trim(),
+      note.trim(),
+      expiresAt,
+    ]),
+  );
+
+type DenyMode = "default" | "status" | "redirect";
+
 /**
- * The list's IP rules, checked top to bottom: the first one matching the client decides. Saved as
- * a whole, since the order is the meaning.
+ * The list's rules, checked top to bottom: the first one matching the client decides. Saved as a
+ * whole, since the order is the meaning. Below them, what a refused request gets.
  */
 export function NetworkTab({
   list,
@@ -43,6 +87,8 @@ export function NetworkTab({
   onListUpdated: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const format = useFormatter();
+  const geoUnavailable = useDisabledReason("geoblock");
   const [rules, setRules] = useState(() => toRules(list));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +103,16 @@ export function NetworkTab({
     { value: "allow", label: t("ipAllow") },
     { value: "deny", label: t("ipDeny") },
   ];
+  const kindOptions = [
+    { value: "address", label: t("ruleKinds.address") },
+    { value: "country", label: t("ruleKinds.country") },
+    { value: "continent", label: t("ruleKinds.continent") },
+    { value: "asn", label: t("ruleKinds.asn") },
+  ];
+  const continentOptions = CONTINENT_CODES.map((code) => ({
+    value: code,
+    label: t(`continents.${code.toLowerCase() as Lowercase<typeof code>}`),
+  }));
 
   const patch = (rowId: string, change: Partial<Rule>) =>
     setRules((current) =>
@@ -79,10 +135,12 @@ export function NetworkTab({
         list.id,
         rules
           .filter((rule) => rule.target.trim())
-          .map(({ action, target, note }) => ({
+          .map(({ action, kind, target, note, expiresAt }) => ({
             action,
+            kind,
             target: target.trim(),
             note: note.trim() || null,
+            expiresAt,
           })),
       );
       onListUpdated(updated);
@@ -94,21 +152,16 @@ export function NetworkTab({
     }
   };
 
-  const saveDefault = async (value: string) => {
+  const saveSetting = async (input: Parameters<typeof updateAccessListAction>[1]) => {
     try {
-      onListUpdated(await updateAccessListAction(list.id, { ipDefault: value }));
+      onListUpdated(await updateAccessListAction(list.id, input));
+      toast.success(t("saved"));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
     }
   };
 
-  const savedRules = JSON.stringify(
-    list.ipRules.map((rule) => [rule.action, targetOf(rule), rule.note ?? ""]),
-  );
-  const editedRules = JSON.stringify(
-    rules.map(({ action, target, note }) => [action, target.trim(), note.trim()]),
-  );
-  const dirty = savedRules !== editedRules;
+  const dirty = fingerprint(toRules(list)) !== fingerprint(rules);
 
   // Keyed by what was saved, so a status never shows beside a name edited since.
   const statusByTarget = new Map(
@@ -119,8 +172,10 @@ export function NetworkTab({
   const failingOpen = list.ipRules.some(
     (rule) => rule.action === "deny" && rule.resolved && rule.resolved.ranges.length === 0,
   );
+  const hasGeoRules = list.ipRules.some((rule) => rule.country || rule.continent || rule.asn);
 
   const hostnameStatus = (rule: Rule) => {
+    if (rule.kind !== "address") return null;
     const status = statusByTarget.get(`${rule.action} ${rule.target.trim()}`);
     if (!status) return null;
     if (status.ranges.length > 0) {
@@ -141,12 +196,79 @@ export function NetworkTab({
     );
   };
 
+  const expiryOptions = (rule: Rule) => [
+    ...(rule.expiresAt
+      ? [
+          {
+            value: "keep",
+            label: t("ruleExpiresAt", {
+              at: format.dateTime(new Date(rule.expiresAt), {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }),
+            }),
+          },
+        ]
+      : []),
+    ...BLOCK_EXPIRY_PRESETS.map((preset) => ({
+      value: preset.id,
+      label: t(`ruleExpiry.${preset.labelKey}`),
+    })),
+  ];
+
+  const setExpiry = (rule: WithRowId<Rule>, value: string) => {
+    if (value === "keep") return;
+    const seconds = BLOCK_EXPIRY_PRESETS.find((preset) => preset.id === value)?.seconds ?? null;
+    patch(rule.rowId, {
+      expiresAt: seconds === null ? null : new Date(Date.now() + seconds * 1000).toISOString(),
+    });
+  };
+
+  const targetInput = (rule: WithRowId<Rule>, index: number) => {
+    if (rule.kind === "continent") {
+      return (
+        <Selector
+          label={t("ruleTarget")}
+          isLabelHidden={index > 0}
+          size="sm"
+          width={200}
+          options={continentOptions}
+          value={rule.target || undefined}
+          placeholder={t("ruleContinentPlaceholder")}
+          onChange={(next) => patch(rule.rowId, { target: String(next ?? "") })}
+        />
+      );
+    }
+    return (
+      <TextInput
+        startIcon={Network}
+        {...NO_SPELLCHECK}
+        label={rule.kind === "address" ? t("ipCidr") : t("ruleTarget")}
+        isLabelHidden={index > 0}
+        size="sm"
+        placeholder={t(`rulePlaceholders.${rule.kind}`)}
+        value={rule.target}
+        onChange={(next) => patch(rule.rowId, { target: next })}
+      />
+    );
+  };
+
   return (
-    <VStack gap={4} maxWidth={720}>
+    <VStack gap={4} maxWidth={880}>
       <Text type="body" size="sm" color="secondary">
         {t("ipRulesHelp")}
       </Text>
+      <Text type="body" size="sm" color="secondary">
+        {t("geoRulesHelp")}
+      </Text>
       {error && <Banner status="error" title={t("ipRulesSaveFailed")} description={error} />}
+      {hasGeoRules && geoUnavailable && (
+        <Banner
+          status="warning"
+          title={t("geoRulesSkippedTitle")}
+          description={t("geoRulesSkippedHelp", { reason: geoUnavailable })}
+        />
+      )}
       {failingOpen && (
         <Banner
           status="warning"
@@ -164,27 +286,38 @@ export function NetworkTab({
                   label={t("ipAction")}
                   isLabelHidden={index > 0}
                   size="sm"
-                  width={110}
+                  width={100}
                   options={actionOptions}
                   value={rule.action}
                   onChange={(next) => patch(rule.rowId, { action: next as Rule["action"] })}
                 />
-                <TextInput
-                  startIcon={Network}
-                  {...NO_SPELLCHECK}
-                  label={t("ipCidr")}
+                <Selector
+                  label={t("ruleKind")}
                   isLabelHidden={index > 0}
                   size="sm"
-                  placeholder={t("ipTargetPlaceholder")}
-                  value={rule.target}
-                  onChange={(next) => patch(rule.rowId, { target: next })}
+                  width={150}
+                  options={kindOptions}
+                  value={rule.kind}
+                  onChange={(next) =>
+                    patch(rule.rowId, { kind: next as AccessRuleKind, target: "" })
+                  }
                 />
+                {targetInput(rule, index)}
                 <TextInput
                   label={t("ipNote")}
                   isLabelHidden={index > 0}
                   size="sm"
                   value={rule.note}
                   onChange={(next) => patch(rule.rowId, { note: next })}
+                />
+                <Selector
+                  label={t("ruleExpiryLabel")}
+                  isLabelHidden={index > 0}
+                  size="sm"
+                  width={190}
+                  options={expiryOptions(rule)}
+                  value={rule.expiresAt ? "keep" : "never"}
+                  onChange={(next) => setExpiry(rule, String(next ?? "never"))}
                 />
                 <IconButton
                   variant="ghost"
@@ -227,7 +360,13 @@ export function NetworkTab({
           onClick={() =>
             setRules((current) => [
               ...current,
-              withRowId({ action: "allow", target: "", note: "" }),
+              withRowId({
+                action: "allow",
+                kind: "address",
+                target: "",
+                note: "",
+                expiresAt: null,
+              }),
             ])
           }
         />
@@ -258,8 +397,119 @@ export function NetworkTab({
           { value: "allow", label: t("ipDefaultAllow") },
         ]}
         value={list.ipDefault}
-        onChange={(next) => saveDefault(next as string)}
+        onChange={(next) => saveSetting({ ipDefault: next as string })}
       />
+
+      <Switch
+        label={t("failClosed")}
+        description={t("failClosedHelp")}
+        labelPosition="start"
+        labelSpacing="spread"
+        value={list.failClosed}
+        onChange={(next) => saveSetting({ failClosed: next })}
+      />
+
+      <Divider />
+      <DenyResponseEditor list={list} onSave={(denyResponse) => saveSetting({ denyResponse })} />
+    </VStack>
+  );
+}
+
+function DenyResponseEditor({
+  list,
+  onSave,
+}: {
+  list: AccessList;
+  onSave: (deny: { status?: number; body?: string; redirectUrl?: string } | null) => Promise<void>;
+}) {
+  const t = useTranslations("accessLists");
+  const saved = list.denyResponse;
+  const initialMode: DenyMode = saved?.redirectUrl ? "redirect" : saved ? "status" : "default";
+  const [mode, setMode] = useState<DenyMode>(initialMode);
+  const [status, setStatus] = useState<number | null>(saved?.status ?? DEFAULT_DENY_STATUS);
+  const [body, setBody] = useState(saved?.body ?? "");
+  const [redirectUrl, setRedirectUrl] = useState(saved?.redirectUrl ?? "");
+  const [saving, setSaving] = useState(false);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a different list resets the editor
+  useEffect(() => {
+    setMode(initialMode);
+    setStatus(saved?.status ?? DEFAULT_DENY_STATUS);
+    setBody(saved?.body ?? "");
+    setRedirectUrl(saved?.redirectUrl ?? "");
+  }, [list.id, list.updatedAt]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSave(
+        mode === "default"
+          ? null
+          : mode === "redirect"
+            ? { redirectUrl: redirectUrl.trim() }
+            : { status: status ?? DEFAULT_DENY_STATUS, body },
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <VStack gap={3}>
+      <Heading level={4}>{t("denyResponse")}</Heading>
+      <Text type="body" size="sm" color="secondary">
+        {t("denyResponseHelp")}
+      </Text>
+      <Selector
+        label={t("denyMode")}
+        size="sm"
+        width={320}
+        options={[
+          { value: "default", label: t("denyModes.default") },
+          { value: "status", label: t("denyModes.status") },
+          { value: "redirect", label: t("denyModes.redirect") },
+        ]}
+        value={mode}
+        onChange={(next) => setMode((next as DenyMode) ?? "default")}
+      />
+      {mode === "status" && (
+        <>
+          <NumberInput
+            hasNumberSteppers
+            label={t("denyStatus")}
+            size="sm"
+            width={160}
+            min={DENY_STATUS_MIN}
+            max={DENY_STATUS_MAX}
+            isIntegerOnly
+            value={status}
+            onChange={setStatus}
+          />
+          <TextArea
+            label={t("denyBody")}
+            description={t("denyBodyHelp", { max: MAX_DENY_BODY_LENGTH })}
+            isOptional
+            size="sm"
+            rows={4}
+            value={body}
+            onChange={setBody}
+          />
+        </>
+      )}
+      {mode === "redirect" && (
+        <TextInput
+          {...NO_SPELLCHECK}
+          label={t("denyRedirect")}
+          description={t("denyRedirectHelp")}
+          size="sm"
+          placeholder="https://example.com/denied"
+          value={redirectUrl}
+          onChange={setRedirectUrl}
+        />
+      )}
+      <HStack>
+        <Button size="sm" label={t("saveChanges")} onClick={save} isLoading={saving} />
+      </HStack>
     </VStack>
   );
 }
