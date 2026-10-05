@@ -31,6 +31,8 @@ const IMPORT_FORM = "ca-cert-import-form";
 
 export function CaCertDrawer({ open, cert, onClose }: Props) {
   const t = useTranslations("certificates");
+  const tSettings = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const isEdit = cert !== null;
   const [tab, setTab] = useState<"generate" | "import">("generate");
   const [isPending, startTransition] = useTransition();
@@ -92,7 +94,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
 
   const activeForm = isEdit ? EDIT_FORM : tab === "generate" ? GENERATE_FORM : IMPORT_FORM;
   const submitLabel = isEdit
-    ? t("save")
+    ? tCommon("save")
     : tab === "generate"
       ? t("generateCaCertificate")
       : t("addCaCertificate");
@@ -107,7 +109,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
         <>
           <Button
             variant="secondary"
-            label={t("cancel")}
+            label={tCommon("cancel")}
             onClick={handleClose}
             isDisabled={isPending}
           />
@@ -128,7 +130,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
           <VStack gap={4}>
             <TextInput
               {...NATIVE_REQUIRED}
-              label={t("name")}
+              label={tCommon("name")}
               htmlName="name"
               value={editName}
               onChange={setEditName}
@@ -164,7 +166,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
               <VStack gap={4}>
                 <TextInput
                   {...NATIVE_REQUIRED}
-                  label={t("name")}
+                  label={tCommon("name")}
                   htmlName="name"
                   value={genName}
                   onChange={setGenName}
@@ -191,7 +193,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   min={1}
                   max={3650}
                   isIntegerOnly
-                  units={t("days")}
+                  units={tSettings("units.days")}
                 />
               </VStack>
             </form>
@@ -202,7 +204,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
               <VStack gap={4}>
                 <TextInput
                   {...NATIVE_REQUIRED}
-                  label={t("name")}
+                  label={tCommon("name")}
                   htmlName="name"
                   value={impName}
                   onChange={setImpName}

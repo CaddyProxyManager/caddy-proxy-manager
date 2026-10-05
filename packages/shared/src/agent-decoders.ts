@@ -5,10 +5,13 @@
  */
 import {
   AGENT_CAPABILITIES,
+  AGENT_STATUS_MESSAGES,
   type AgentCapability,
   type AgentCommandResult,
   type AgentErrorCode,
   type AgentStatus,
+  type AgentStatusMessageCode,
+  type AgentStatusMessageParams,
   type CaddyAdminProxyResponse,
   type CaddyCertificate,
   CERTIFICATE_FILE_ERRORS,
@@ -90,11 +93,39 @@ const MESSAGE = 4096;
 const OPERATION_STATES = ["idle", "pending", "applying", "applied", "failed"] as const;
 const BUILD_STATES = ["idle", "pending", "building", "applied", "failed"] as const;
 
+const MAX_MESSAGE_PARAMS = 8;
+
+/** A code this controller does not know is dropped, not refused: a newer agent may send one. */
+function messageCode(value: unknown, path: string): AgentStatusMessageCode | undefined {
+  const code = optionalString(value, path, SHORT);
+  return (AGENT_STATUS_MESSAGES as readonly string[]).includes(code ?? "")
+    ? (code as AgentStatusMessageCode)
+    : undefined;
+}
+
+function messageParams(value: unknown, path: string): AgentStatusMessageParams | undefined {
+  if (value === undefined || value === null) return undefined;
+  const raw = object(value, path);
+  const entries = Object.entries(raw);
+  if (entries.length > MAX_MESSAGE_PARAMS) throw new AgentDecodeError(path);
+  const params: AgentStatusMessageParams = {};
+  for (const [key, param] of entries) {
+    if (!/^[A-Za-z][A-Za-z0-9]{0,31}$/.test(key)) throw new AgentDecodeError(path);
+    params[key] =
+      typeof param === "number" && Number.isFinite(param)
+        ? param
+        : string(param, `${path}.${key}`, MESSAGE);
+  }
+  return params;
+}
+
 function operation<S extends string>(value: unknown, path: string, states: readonly S[]) {
   const raw = object(value, path);
   return {
     state: oneOf(raw.state, `${path}.state`, states),
     message: optionalString(raw.message, `${path}.message`, MESSAGE),
+    messageCode: messageCode(raw.messageCode, `${path}.messageCode`),
+    messageParams: messageParams(raw.messageParams, `${path}.messageParams`),
     appliedAt: optionalString(raw.appliedAt, `${path}.appliedAt`, SHORT),
     triggeredAt: optionalString(raw.triggeredAt, `${path}.triggeredAt`, SHORT),
     error: optionalString(raw.error, `${path}.error`, MESSAGE),

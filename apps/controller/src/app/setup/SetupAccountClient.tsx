@@ -42,6 +42,9 @@ export default function SetupAccountClient({
 }) {
   const t = useTranslations();
   const ta = useTranslations("setup.account");
+  const tSettings = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const tUsers = useTranslations("users");
   const [role, setRole] = useState<Role>("controller");
   const [method, setMethod] = useState<Method>("local");
 
@@ -109,7 +112,7 @@ export default function SetupAccountClient({
           <>
             <FormCard title={ta("methodCardTitle")}>
               <SegmentedControl
-                label={ta("methodLabel")}
+                label={tUsers("signInMethod")}
                 value={method}
                 onChange={(value) => setMethod(value as Method)}
                 layout="fill"
@@ -127,7 +130,7 @@ export default function SetupAccountClient({
                     <TextInput
                       startIcon={User}
                       {...AUTOFILL_USERNAME}
-                      label={ta("username")}
+                      label={tCommon("username")}
                       htmlName="username"
                       value={username}
                       onChange={setUsername}
@@ -135,7 +138,7 @@ export default function SetupAccountClient({
                       width="100%"
                     />
                     <GeneratedPasswordField
-                      label={ta("password")}
+                      label={tCommon("password")}
                       htmlName="password"
                       description={passwordPolicyHint(t)}
                       value={password}
@@ -173,7 +176,7 @@ export default function SetupAccountClient({
                       description={ta("redirectUriDescription")}
                     />
                     <TextInput
-                      label={ta("displayName")}
+                      label={tUsers("displayName")}
                       htmlName="providerName"
                       description={ta("displayNameHelp")}
                       value={providerName}
@@ -183,7 +186,7 @@ export default function SetupAccountClient({
                     />
                     <TextInput
                       startIcon={LinkIcon}
-                      label={ta("issuer")}
+                      label={tSettings("issuerUrl")}
                       htmlName="issuer"
                       description={ta("issuerHelp")}
                       value={issuer}
@@ -192,7 +195,7 @@ export default function SetupAccountClient({
                       width="100%"
                     />
                     <TextInput
-                      label={ta("clientId")}
+                      label={tSettings("clientId")}
                       htmlName="clientId"
                       value={clientId}
                       onChange={setClientId}
@@ -201,7 +204,7 @@ export default function SetupAccountClient({
                     />
                     <TextInput
                       startIcon={KeyRound}
-                      label={ta("secretLabel")}
+                      label={tSettings("secretLabel")}
                       htmlName="clientSecret"
                       type="password"
                       value={clientSecret}

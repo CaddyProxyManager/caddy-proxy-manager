@@ -24,8 +24,8 @@ export type SetupActionState = { error: string | null };
 /** `hasAnySignIn`, not the completion flag, which would leave this open for the rest of setup. */
 async function assertAccountStepOpen(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
-    const t = await getTranslations("setup.errors");
-    throw new Error(t("alreadyCompleted"));
+    const tErrors = await getTranslations("errors");
+    throw new Error(tErrors("setupAlreadyCompleted"));
   }
 }
 
@@ -35,8 +35,9 @@ async function assertAccountStepOpen(): Promise<void> {
  */
 async function withAccountStep(create: () => Promise<string | null>): Promise<string | null> {
   const t = await getTranslations("setup.errors");
+  const tErrors = await getTranslations("errors");
   const claim = await claimSetupStep(SETUP_ACCOUNT_CLAIM);
-  if (!claim) return t("alreadyCompleted");
+  if (!claim) return tErrors("setupAlreadyCompleted");
   try {
     await assertAccountStepOpen();
     return await create();

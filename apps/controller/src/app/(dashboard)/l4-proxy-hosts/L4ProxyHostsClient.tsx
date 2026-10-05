@@ -130,24 +130,25 @@ function HostActions({
   /** Duplicating makes a new host, so it follows Create, not Edit. */
   canCreate: boolean;
 }) {
-  const t = useTranslations("l4ProxyHosts");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   return (
     <HStack gap={2} vAlign="center" justify="end">
       <Switch
-        label={t("enableHostNamed", { name: host.name })}
+        label={tProxyHosts("enableHostLabel", { name: host.name })}
         isLabelHidden
         value={host.enabled}
         onChange={onToggle}
       />
       <MoreMenu
-        label={t("actionsForHost", { name: host.name })}
+        label={tCommon("actionsFor", { name: host.name })}
         size="sm"
         alignment="end"
         items={[
-          { label: t("edit"), onClick: onEdit },
-          ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
+          { label: tCommon("edit"), onClick: onEdit },
+          ...(canCreate ? [{ label: tCommon("duplicate"), onClick: onDuplicate }] : []),
           { type: "divider" },
-          { label: t("delete"), variant: "destructive", onClick: onDelete },
+          { label: tCommon("delete"), variant: "destructive", onClick: onDelete },
         ]}
       />
     </HStack>
@@ -171,6 +172,9 @@ export default function L4ProxyHostsClient({
   editTarget = null,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<L4ProxyHost | null>(editTarget);
@@ -309,7 +313,7 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "protocol",
-      label: t("protocol"),
+      label: tProxyHosts("protocol"),
       sortKey: "protocol",
       width: 90,
       render: (host) => <ProtocolBadge protocol={host.protocol} />,
@@ -336,7 +340,7 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "upstreams",
-      label: t("upstreams"),
+      label: tProxyHosts("upstreams"),
       render: (host) => (
         <HStack gap={2} vAlign="center">
           <Icon icon={ArrowRight} size="xsm" color="secondary" />
@@ -352,7 +356,7 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "status",
-      label: t("status"),
+      label: tCommon("status"),
       sortKey: "enabled",
       width: 110,
       render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
@@ -407,7 +411,7 @@ export default function L4ProxyHostsClient({
       {!l4DisabledReason && <L4PortsApplyBanner refreshSignal={bannerRefresh} />}
 
       <ListPageHeader
-        title={t("l4ProxyHosts")}
+        title={tNav("l4ProxyHosts")}
         action={
           canCreate
             ? {
@@ -422,7 +426,7 @@ export default function L4ProxyHostsClient({
             tiles={[
               {
                 id: "hosts",
-                label: t("l4ProxyHosts"),
+                label: tNav("l4ProxyHosts"),
                 value: counts.total,
                 note: t("enabledNote", { count: counts.enabled }),
               },
@@ -430,7 +434,7 @@ export default function L4ProxyHostsClient({
               { id: "udp", label: t("udpStreams"), value: counts.udp, note: t("udpNote") },
               {
                 id: "agents",
-                label: t("listeners"),
+                label: tNav("agents"),
                 value: agents?.length ?? 0,
                 note: t("listenersNote"),
               },

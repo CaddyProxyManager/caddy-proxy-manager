@@ -59,6 +59,7 @@ export function WafPluginFiles({
   onUninstall: () => void;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const files = pluginFiles(plugin);
   const [selected, setSelected] = useState(
@@ -187,7 +188,7 @@ export function WafPluginFiles({
                       </Text>
                       <Button
                         size="sm"
-                        label={t("pluginRetry")}
+                        label={tCommon("retry")}
                         isLoading={retrying}
                         onClick={() => void retry()}
                       />
@@ -240,7 +241,7 @@ export function WafPluginFiles({
                     <Button
                       variant="primary"
                       size="sm"
-                      label={t("save")}
+                      label={tCommon("save")}
                       isLoading={saving}
                       isDisabled={config === savedConfig}
                       onClick={() => void save(config)}

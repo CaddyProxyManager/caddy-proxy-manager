@@ -17,6 +17,7 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 /** The fields stay mounted while off, so switching it off in the editor keeps the rest. */
 export function MaintenanceFields({ maintenance }: { maintenance?: HostMaintenanceConfig | null }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const [enabled, setEnabled] = useState(maintenance?.enabled ?? false);
   const [retryAfter, setRetryAfter] = useState<number | null>(maintenance?.retryAfter ?? null);
   const [bypass, setBypass] = useState((maintenance?.bypassCidrs ?? []).join("\n"));
@@ -36,7 +37,7 @@ export function MaintenanceFields({ maintenance }: { maintenance?: HostMaintenan
             </Text>
           </VStack>
           <Switch
-            label={t("enableMaintenance")}
+            label={t("turnOnMaintenance")}
             isLabelHidden
             htmlName="maintenanceEnabled"
             value={enabled}
@@ -64,7 +65,7 @@ export function MaintenanceFields({ maintenance }: { maintenance?: HostMaintenan
         <NumberInput
           startIcon={Clock}
           hasNumberSteppers
-          units={t("maintenanceRetryAfterUnit")}
+          units={tSettings("units.seconds")}
           label={t("maintenanceRetryAfter")}
           isOptional
           htmlName="maintenanceRetryAfter"

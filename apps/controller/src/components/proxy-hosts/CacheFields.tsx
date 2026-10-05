@@ -21,6 +21,7 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 export function CacheFields({ cache }: { cache?: HostCacheConfig | null }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const moduleDisabledReason = useDisabledReason("cache");
   const [enabled, setEnabled] = useState(Boolean(cache));
   const [mode, setMode] = useState<HostCacheMode>(cache?.mode ?? "browser");
@@ -86,7 +87,7 @@ export function CacheFields({ cache }: { cache?: HostCacheConfig | null }) {
             <NumberInput
               startIcon={Clock}
               hasNumberSteppers
-              units={t("cacheMaxAgeUnit")}
+              units={tSettings("units.seconds")}
               label={t("cacheMaxAge")}
               htmlName="cacheMaxAge"
               min={MIN_CACHE_MAX_AGE}

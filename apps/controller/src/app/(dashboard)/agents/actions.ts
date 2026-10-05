@@ -13,6 +13,7 @@ import {
   actionError,
   actionSuccess,
 } from "@/src/lib/errors/action-error";
+import { agentStatusMessage } from "@/src/lib/agent/status-message";
 import { applyCaddyBuild } from "@/src/lib/caddy/image-build";
 import { renameAgent } from "@/src/lib/models/agents";
 import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
@@ -27,8 +28,8 @@ export async function rebuildAgentCaddyAction(
     assertCanManage(access, "agent", agentRowId);
     const status = await applyCaddyBuild(agentRowId);
     revalidatePath("/agents");
-    const t = await getTranslations("agents");
-    return actionSuccess(status.message ?? t("rebuildTriggered"));
+    const t = await getTranslations();
+    return actionSuccess(agentStatusMessage(t, status) ?? t("settings.results.rebuildTriggered"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to trigger a Caddy rebuild for agent:", agentRowId, error);

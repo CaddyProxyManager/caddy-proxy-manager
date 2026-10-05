@@ -281,6 +281,7 @@ function ComparisonCard({
 
 function ComparisonBody({ comparison }: { comparison: RevisionComparison }) {
   const t = useTranslations("settings");
+  const tNav = useTranslations("nav");
   if (comparison.keys === null) {
     return <Banner status="warning" title={t("history.notComparable")} />;
   }
@@ -290,7 +291,7 @@ function ComparisonBody({ comparison }: { comparison: RevisionComparison }) {
 
   return (
     <VStack gap={4}>
-      <Heading level={4}>{t("history.settingsTitle")}</Heading>
+      <Heading level={4}>{tNav("settings")}</Heading>
       {comparison.keys.map((entry) => (
         <VStack key={entry.key} gap={2}>
           <DiffHeading title={stagedChangeLabel(t, entry)} diff={entry.diff} code={entry.key} />
@@ -303,7 +304,7 @@ function ComparisonBody({ comparison }: { comparison: RevisionComparison }) {
         <Banner status="warning" title={t("history.configFailed")} />
       ) : (
         <VStack gap={2}>
-          <DiffHeading title={t("history.configTitle")} diff={comparison.config} />
+          <DiffHeading title={t("reviewTabConfig")} diff={comparison.config} />
           {comparison.config.unchanged ? (
             <Banner status="info" title={t("reviewNoConfigChange")} />
           ) : (

@@ -18,6 +18,7 @@ export function DnsResolverFields({
   dnsResolver?: ProxyHost["dnsResolver"] | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const initial = dnsResolver ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [resolvers, setResolvers] = useState(initial?.resolvers?.join("\n") ?? "");
@@ -40,7 +41,7 @@ export function DnsResolverFields({
             </Text>
           </VStack>
           <Switch
-            label={t("enableCustomDnsResolvers")}
+            label={tSettings("enableCustomDnsResolvers")}
             isLabelHidden
             htmlName="dnsEnabled"
             value={enabled}

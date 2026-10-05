@@ -62,6 +62,7 @@ function agentBreakdown(upstream: UpstreamHealth, t: T): string | null {
 /** Read when the editor opens and on demand: Caddy's counters move by the second. */
 export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
   const t = useTranslations("proxyHosts.upstreamHealth");
+  const tCommon = useTranslations("common");
   const [health, setHealth] = useState<HostUpstreamHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -101,7 +102,7 @@ export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
           <IconButton
             variant="ghost"
             size="sm"
-            label={t("refresh")}
+            label={tCommon("checkAgain")}
             icon={<RefreshCw />}
             onClick={load}
             isDisabled={isPending}

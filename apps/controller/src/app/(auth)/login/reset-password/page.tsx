@@ -7,7 +7,7 @@ import ResetPasswordForm from "@/src/components/auth/ResetPasswordForm";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.passwordReset");
-  return { title: t("metaTitle") };
+  return { title: t("heading") };
 }
 
 /** Open while signed in too: an invitation may be opened in a browser someone else is using. */

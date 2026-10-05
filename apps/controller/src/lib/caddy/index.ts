@@ -204,9 +204,11 @@ import {
   FORWARD_AUTH_PROXY_PROOF_HEADER,
   getForwardAuthProxyProof,
 } from "../forward-auth/trust";
+import { domainError } from "../errors/domain-error";
 import { decryptSecret } from "../secrets";
 import {
   CaddyApplyError,
+  caddyRejection,
   describeCaddyRejection,
   describeWafRejection,
   logCaddyApplyFailure,
@@ -3902,11 +3904,8 @@ function assertCaddyAccepted(
     responseBytes: Buffer.byteLength(response.text),
     knownReason: reason !== null,
   });
-  const where = who ? ` on ${who}` : "";
   throw new CaddyApplyError(
-    reason
-      ? `Caddy rejected configuration${where}: ${reason}`
-      : `Caddy rejected configuration${where}`,
+    caddyRejection(response.text, who),
     "CADDY_REJECTED",
     describeWafRejection(response.text),
     agent,
@@ -4021,7 +4020,7 @@ async function loadEveryAgent(): Promise<void> {
       unreachableAgents: unreachable.length,
     });
     throw new CaddyApplyError(
-      `Unable to reach Caddy API on ${unreachable.map((r) => r.agent).join(", ")}`,
+      domainError("caddyUnreachableOn", { agents: unreachable.map((r) => r.agent) }),
       "CADDY_UNREACHABLE",
     );
   }
@@ -4064,9 +4063,9 @@ async function loadOne(agent: ConnectedAgentRef | null, who: string): Promise<vo
   } catch (requestError) {
     logCaddyApplyFailure("Caddy admin request failed", requestError);
     if (isConnectionError(requestError)) {
-      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
+      throw new CaddyApplyError(domainError("caddyUnreachable"), "CADDY_UNREACHABLE");
     }
-    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+    throw new CaddyApplyError(domainError("applyCaddyConfigFailed"), "CADDY_REQUEST_FAILED");
   }
   assertCaddyAccepted(response, who, agent && { agentId: agent.agentId, name: agent.name });
   await noteAppliedConfig(agent?.agentId);

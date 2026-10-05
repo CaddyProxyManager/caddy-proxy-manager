@@ -121,6 +121,7 @@ export default function SetupSettingsClient({
   sqliteWarning?: boolean;
 }) {
   const t = useTranslations("setup");
+  const tSettings = useTranslations("settings");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState<{
@@ -229,13 +230,13 @@ export default function SetupSettingsClient({
           <VStack gap={4}>
             {error && <StatusAlert message={error} success={false} />}
 
-            <FormCard title={t("defaults")}>
+            <FormCard title={tSettings("defaults")}>
               <VStack gap={3}>
                 <TextInput
                   startIcon={Globe}
                   // isRequired only marks the field; the native attribute stops an empty post.
                   {...NATIVE_REQUIRED}
-                  label={t("defaultDomain")}
+                  label={tSettings("defaultDomain")}
                   description={t("defaultDomainHelp")}
                   htmlName="defaultDomain"
                   value={defaultDomain}
@@ -245,7 +246,7 @@ export default function SetupSettingsClient({
                 />
                 <EmailInput
                   domain="public"
-                  label={t("acmeContactEmail")}
+                  label={tSettings("acmeContactEmail")}
                   description={t("acmeEmailHelp")}
                   htmlName="acmeEmail"
                   value={acmeEmail}
@@ -255,11 +256,11 @@ export default function SetupSettingsClient({
               </VStack>
             </FormCard>
 
-            <FormCard title={t("dashboardHost")}>
+            <FormCard title={tSettings("dashboardHostTitle")}>
               <VStack gap={4}>
                 <VStack gap={2}>
                   <Switch
-                    label={t("dashboardEnabledLabel")}
+                    label={tSettings("dashboardEnabledLabel")}
                     description={t("dashboardEnabledHelp")}
                     htmlName="dashboardEnabled"
                     value={dashboardEnabled}
@@ -272,7 +273,7 @@ export default function SetupSettingsClient({
                 {dashboardEnabled && (
                   <LabeledTextInput
                     {...NATIVE_REQUIRED}
-                    label={t("dashboardDomainLabel")}
+                    label={tSettings("dashboardDomainLabel")}
                     env="DASHBOARD_DOMAIN"
                     fromEnvironment={dashboard.fromEnvironment}
                     description={t("dashboardDomainHelp")}
@@ -596,6 +597,8 @@ function IdentityProviderCard({
   onChange: (next: OAuthPrefill) => void;
 }) {
   const t = useTranslations("setup");
+  const tSettings = useTranslations("settings");
+  const tUsers = useTranslations("users");
   const set =
     <K extends keyof OAuthPrefill>(key: K) =>
     (next: OAuthPrefill[K]) =>
@@ -629,7 +632,7 @@ function IdentityProviderCard({
         )}
 
         <LabeledTextInput
-          label={t("displayName")}
+          label={tUsers("displayName")}
           env={OAUTH_ENV.providerName}
           description={t("providerNameHelp")}
           htmlName="idpName"
@@ -637,7 +640,7 @@ function IdentityProviderCard({
           onChange={set("providerName")}
         />
         <LabeledTextInput
-          label={t("issuerUrl")}
+          label={tSettings("issuerUrl")}
           env={OAUTH_ENV.issuer}
           description={t("issuerUrlHelp")}
           htmlName="idpIssuer"
@@ -646,7 +649,7 @@ function IdentityProviderCard({
         />
         <LabeledTextInput
           {...AUTOFILL_OFF}
-          label={t("clientId")}
+          label={tSettings("clientId")}
           env={OAUTH_ENV.clientId}
           htmlName="idpClientId"
           value={value.clientId}
@@ -654,7 +657,7 @@ function IdentityProviderCard({
         />
         <LabeledTextInput
           {...AUTOFILL_OFF}
-          label={t("secretLabel")}
+          label={tSettings("secretLabel")}
           env={OAUTH_ENV.clientSecret}
           type="password"
           htmlName="idpClientSecret"
@@ -675,28 +678,28 @@ function IdentityProviderCard({
               {t("manualEndpointsHelp")}
             </Text>
             <LabeledTextInput
-              label={t("authorizationUrl")}
+              label={tSettings("authorizationUrl")}
               env={OAUTH_ENV.authorizationUrl}
               htmlName="idpAuthorizationUrl"
               value={value.authorizationUrl}
               onChange={set("authorizationUrl")}
             />
             <LabeledTextInput
-              label={t("tokenUrl")}
+              label={tSettings("tokenUrl")}
               env={OAUTH_ENV.tokenUrl}
               htmlName="idpTokenUrl"
               value={value.tokenUrl}
               onChange={set("tokenUrl")}
             />
             <LabeledTextInput
-              label={t("userinfoUrl")}
+              label={tSettings("userinfoUrl")}
               env={OAUTH_ENV.userinfoUrl}
               htmlName="idpUserinfoUrl"
               value={value.userinfoUrl}
               onChange={set("userinfoUrl")}
             />
             <LabeledTextInput
-              label={t("scopes")}
+              label={tSettings("scopes")}
               env={OAUTH_ENV.scopes}
               description={t("scopesHelp")}
               htmlName="idpScopes"
@@ -725,7 +728,7 @@ function IdentityProviderCard({
             {value.roleMappingEnabled && (
               <>
                 <LabeledTextInput
-                  label={t("groupsClaim")}
+                  label={tSettings("groupsClaim")}
                   env={OAUTH_ENV.groupsClaim}
                   description={t("groupsClaimHelp")}
                   htmlName="idpGroupsClaim"
@@ -733,7 +736,7 @@ function IdentityProviderCard({
                   onChange={set("groupsClaim")}
                 />
                 <LabeledTextInput
-                  label={t("groupPrefix")}
+                  label={tSettings("groupPrefix")}
                   env={OAUTH_ENV.groupPrefix}
                   description={t("groupPrefixHelp")}
                   htmlName="idpGroupPrefix"
@@ -786,9 +789,9 @@ function IdentityProviderCard({
                 value={value.defaultRole}
                 onChange={(next: string) => set("defaultRole")(next)}
                 options={[
-                  { value: "viewer", label: t("roleViewer") },
-                  { value: "user", label: t("roleUser") },
-                  { value: "admin", label: t("roleAdmin") },
+                  { value: "viewer", label: tUsers("roles.viewer") },
+                  { value: "user", label: tUsers("roles.user") },
+                  { value: "admin", label: tUsers("roles.admin") },
                 ]}
               />
             </VStack>

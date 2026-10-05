@@ -216,7 +216,8 @@ export default async function SettingsSectionPage({
     listLdapDirectories(),
   ]);
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
-  const crowdsecManaged = section === "crowdsec" ? await managedServiceView("crowdsec") : null;
+  const crowdsecManaged =
+    section === "crowdsec" ? await managedServiceView("crowdsec", tRoot) : null;
 
   // Only on the dashboard section, so other sections don't pay for the host form's pickers.
   let dashboardOptions: DashboardHostOptionsData | null = null;

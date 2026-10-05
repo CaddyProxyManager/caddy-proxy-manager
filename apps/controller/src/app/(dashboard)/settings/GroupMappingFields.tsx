@@ -23,12 +23,7 @@ export type GroupMappingForm = {
   syncGroups: boolean;
 };
 
-const ROLE_OPTIONS = [
-  { value: "admin", labelKey: "roleAdmin" },
-  { value: "operator", labelKey: "roleOperator" },
-  { value: "user", labelKey: "roleUser" },
-  { value: "viewer", labelKey: "roleViewer" },
-] as const;
+const ROLE_OPTIONS = ["admin", "operator", "user", "viewer"] as const;
 
 /** Shared by OIDC providers and LDAP directories; a directory has no claim to name. */
 export function GroupMappingFields({
@@ -46,6 +41,7 @@ export function GroupMappingFields({
   description?: string;
 }) {
   const t = useTranslations("settings");
+  const tUsers = useTranslations("users");
   return (
     <Card variant="muted" padding={3}>
       <VStack gap={3}>
@@ -127,9 +123,9 @@ export function GroupMappingFields({
             <Selector
               label={t("defaultRoleLabel")}
               size="sm"
-              options={ROLE_OPTIONS.map(({ value: role, labelKey }) => ({
+              options={ROLE_OPTIONS.map((role) => ({
                 value: role,
-                label: t(labelKey),
+                label: tUsers(`roles.${role}`),
               }))}
               value={value.defaultRole}
               onChange={(v) => onChange({ defaultRole: v as AppRole })}

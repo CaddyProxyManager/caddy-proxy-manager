@@ -93,7 +93,7 @@ export default function LegacyPasswordChangeForm() {
               <TextInput
                 startIcon={KeyRound}
                 {...AUTOFILL_CURRENT_PASSWORD}
-                label={t("auth.passwordChange.currentPassword")}
+                label={t("common.currentPassword")}
                 type="password"
                 value={currentPassword}
                 onChange={setCurrentPassword}
@@ -103,7 +103,7 @@ export default function LegacyPasswordChangeForm() {
               <TextInput
                 startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
-                label={t("auth.passwordChange.newPassword")}
+                label={t("common.newPassword")}
                 type="password"
                 value={newPassword}
                 onChange={setNewPassword}
@@ -113,7 +113,7 @@ export default function LegacyPasswordChangeForm() {
               <TextInput
                 startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
-                label={t("auth.passwordChange.confirmPassword")}
+                label={t("common.confirmNewPassword")}
                 type="password"
                 value={confirmPassword}
                 onChange={setConfirmPassword}

@@ -64,6 +64,8 @@ export function ForwardAuthFields({
   defaults: ForwardAuthSettings | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const initial = forwardAuth ?? null;
   const [enabled, setEnabled] = useState(false);
   const [provider, setProvider] = useState<ForwardAuthProvider>("authelia");
@@ -127,7 +129,7 @@ export function ForwardAuthFields({
         {enabled && (
           <VStack gap={4}>
             <Selector
-              label={t("forwardAuthProvider")}
+              label={tCommon("provider")}
               htmlName="forwardAuthProvider"
               options={[
                 { value: "authelia", label: t("forwardAuthProviderAuthelia") },
@@ -138,7 +140,7 @@ export function ForwardAuthFields({
             />
             <TextInput
               startIcon={Link}
-              label={t("forwardAuthUpstream")}
+              label={tSettings("forwardAuthUpstream")}
               htmlName="forwardAuthUpstream"
               placeholder="http://authelia:9091"
               value={authUpstream}
@@ -148,7 +150,7 @@ export function ForwardAuthFields({
             />
             <TextInput
               startIcon={Route}
-              label={t("authEndpoint")}
+              label={tSettings("authEndpoint")}
               htmlName="forwardAuthEndpoint"
               isOptional={provider === "authelia"}
               isRequired={provider === "custom"}

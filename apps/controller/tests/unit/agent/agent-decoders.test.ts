@@ -49,6 +49,31 @@ describe('agent status', () => {
     expect(decoded.services.applied).toEqual({ clickhouse: true, crowdsec: false });
   });
 
+  it('keeps a status message code it knows and drops one it does not', () => {
+    const decode = (messageCode: string) =>
+      decodeAgentStatus({
+        ...status,
+        l4Ports: {
+          applied: [],
+          status: { state: 'applying', messageCode, messageParams: { count: 2 } },
+        },
+      }).l4Ports.status;
+    expect(decode('l4Applying')).toMatchObject({
+      messageCode: 'l4Applying',
+      messageParams: { count: 2 },
+    });
+    expect(decode('fromTheFuture').messageCode).toBeUndefined();
+  });
+
+  it('refuses status message params that are not flat strings and numbers', () => {
+    expect(() =>
+      decodeAgentStatus({
+        ...status,
+        l4Ports: { applied: [], status: { state: 'failed', messageParams: { detail: { a: 1 } } } },
+      }),
+    ).toThrow(AgentDecodeError);
+  });
+
   it('keeps crowdsec from an agent that runs it', () => {
     const decoded = decodeAgentStatus({
       ...status,

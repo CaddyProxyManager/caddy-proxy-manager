@@ -23,6 +23,7 @@ import { updateProxyHost } from "@/src/lib/models/proxy-hosts";
 // Not the registry's SettingValidationError: this is the JSON groups', and the route uses both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings/validation";
 import { isEmailAddress } from "@/src/lib/email/address";
+import { settingValidationMessage } from "@/src/lib/settings/messages";
 import {
   getMigrationSource,
   isSetupCompleted,
@@ -58,12 +59,13 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (originCheck) return originCheck;
 
   const t = await getTranslations("setup.errors");
+  const tErrors = await getTranslations("errors");
   const session = await auth(request);
   if (!session?.user) {
     return json({ ok: false, error: t("signInToFinish") }, 401);
   }
   if (await isSetupCompleted()) {
-    return json({ ok: false, error: t("alreadyCompleted") }, 409);
+    return json({ ok: false, error: tErrors("setupAlreadyCompleted") }, 409);
   }
 
   const formData = await request.formData();
@@ -156,7 +158,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     await saveGeneralSettings(general);
   } catch (error) {
     if (error instanceof SettingValidationError) {
-      return json({ ok: false, error: error.message }, 400);
+      return json(
+        { ok: false, error: settingValidationMessage(await getTranslations(), error) },
+        400,
+      );
     }
     console.error("Setup: failed to save settings", error);
     return json({ ok: false, error: t("settingsSaveFailed") }, 500);

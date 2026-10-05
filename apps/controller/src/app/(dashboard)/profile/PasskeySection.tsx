@@ -66,6 +66,7 @@ export function PasskeySection({
   locked: boolean;
 }) {
   const t = useTranslations("profile.passkeys");
+  const tCommon = useTranslations("common");
   const tPasskey = useTranslations("auth.passkey");
   const format = useFormatter();
   const router = useRouter();
@@ -182,15 +183,15 @@ export function PasskeySection({
                       variant="ghost"
                       size="sm"
                       label={t("renameNamed", { name: labelOf(passkey) })}
-                      tooltip={t("rename")}
+                      tooltip={tCommon("rename")}
                       icon={<Pencil />}
                       onClick={() => open({ kind: "rename", passkey })}
                     />
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      label={t("removeNamed", { name: labelOf(passkey) })}
-                      tooltip={t("remove")}
+                      label={tCommon("removeNamed", { name: labelOf(passkey) })}
+                      tooltip={tCommon("remove")}
                       icon={<Trash2 />}
                       onClick={() => open({ kind: "remove", passkey })}
                     />
@@ -221,7 +222,7 @@ export function PasskeySection({
         open={dialog.kind === "add" || dialog.kind === "rename"}
         onClose={close}
         title={dialog.kind === "rename" ? t("renameTitle") : t("addTitle")}
-        submitLabel={dialog.kind === "rename" ? t("rename") : t("add")}
+        submitLabel={dialog.kind === "rename" ? tCommon("rename") : t("add")}
         isSubmitting={busy}
         isSubmitDisabled={dialog.kind === "rename" && !trimmed}
         onSubmit={() => {
@@ -248,7 +249,7 @@ export function PasskeySection({
           <TextInput
             {...AUTOFILL_OFF}
             {...nativeAttrs({ maxLength: PASSKEY_NAME_MAX_LENGTH })}
-            label={t("name")}
+            label={tCommon("name")}
             value={name}
             onChange={setName}
             isRequired={dialog.kind === "rename"}
@@ -265,7 +266,7 @@ export function PasskeySection({
         description={
           dialog.kind === "remove" ? t("removeConfirm", { name: labelOf(dialog.passkey) }) : ""
         }
-        actionLabel={t("remove")}
+        actionLabel={tCommon("remove")}
         onAction={async () => {
           if (dialog.kind !== "remove") return;
           const id = String(dialog.passkey.id);

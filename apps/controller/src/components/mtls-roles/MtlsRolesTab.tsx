@@ -81,6 +81,8 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
 
 function CreateRoleCard({ onClose }: { onClose: () => void }) {
   const t = useTranslations("mtlsRoles");
+  const tCommon = useTranslations("common");
+  const tErrors = useTranslations("errors");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +90,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
 
   async function handleCreate() {
     if (!name.trim()) {
-      setError(t("nameRequired"));
+      setError(tErrors("nameRequired"));
       return;
     }
     setSubmitting(true);
@@ -101,14 +103,14 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setError(d.error || t("requestFailed", { status: res.status }));
+        setError(d.error || tCommon("requestFailed", { status: res.status }));
         setSubmitting(false);
         return;
       }
       onClose();
       window.location.reload();
     } catch {
-      setError(t("networkError"));
+      setError(tCommon("networkError"));
       setSubmitting(false);
     }
   }
@@ -119,7 +121,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
         {error && <Banner status="error" title={t("couldNotCreateRole")} description={error} />}
         <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
           <TextInput
-            label={t("name")}
+            label={tCommon("name")}
             size="sm"
             value={name}
             onChange={setName}
@@ -127,7 +129,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
             hasAutoFocus
           />
           <TextInput
-            label={t("description")}
+            label={tCommon("description")}
             isOptional
             size="sm"
             value={description}
@@ -136,7 +138,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
           />
         </Grid>
         <HStack justify="end" gap={2}>
-          <Button variant="ghost" size="sm" label={t("cancel")} onClick={onClose} />
+          <Button variant="ghost" size="sm" label={tCommon("cancel")} onClick={onClose} />
           <Button
             variant="primary"
             size="sm"
@@ -163,6 +165,8 @@ function RoleCard({
   activeCerts: IssuedClientCertificate[];
 }) {
   const t = useTranslations("mtlsRoles");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const [assignedIds, setAssignedIds] = useState<Set<number>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
@@ -225,7 +229,7 @@ function RoleCard({
     window.location.reload();
   }
 
-  const certCountLabel = t("certificateCount", { count: assignedIds.size });
+  const certCountLabel = tCommon("certificateCount", { count: assignedIds.size });
 
   return (
     <Card variant={variant} padding={5}>
@@ -249,9 +253,9 @@ function RoleCard({
         {editing ? (
           <VStack gap={3}>
             <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
-              <TextInput label={t("name")} size="sm" value={name} onChange={setName} />
+              <TextInput label={tCommon("name")} size="sm" value={name} onChange={setName} />
               <TextInput
-                label={t("description")}
+                label={tCommon("description")}
                 isOptional
                 size="sm"
                 value={description}
@@ -263,10 +267,10 @@ function RoleCard({
               <Button
                 variant="ghost"
                 size="sm"
-                label={t("cancel")}
+                label={tCommon("cancel")}
                 onClick={() => setEditing(false)}
               />
-              <Button variant="secondary" size="sm" label={t("save")} onClick={handleSave} />
+              <Button variant="secondary" size="sm" label={tCommon("save")} onClick={handleSave} />
             </HStack>
           </VStack>
         ) : (
@@ -274,7 +278,7 @@ function RoleCard({
             <Button
               variant="secondary"
               size="sm"
-              label={t("edit")}
+              label={tCommon("edit")}
               onClick={() => setEditing(true)}
             />
             <Button
@@ -290,7 +294,7 @@ function RoleCard({
 
         <VStack gap={2}>
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            {t("certificates")}{" "}
+            {tNav("certificates")}{" "}
           </Text>
 
           {!loaded ? (
@@ -340,6 +344,7 @@ function CertAssignmentRow({
   onToggle: () => void;
 }) {
   const t = useTranslations("mtlsRoles");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const checkboxRef = useRef<HTMLInputElement>(null);
 
@@ -359,7 +364,7 @@ function CertAssignmentRow({
         />
       }
       label={cert.commonName}
-      description={t("expiresOn", {
+      description={tCommon("expiresOnInline", {
         date: format.dateTime(new Date(cert.validTo), TIMESTAMP_STYLES.date),
       })}
       endContent={isAssigned ? <Badge label={t("assigned")} /> : undefined}

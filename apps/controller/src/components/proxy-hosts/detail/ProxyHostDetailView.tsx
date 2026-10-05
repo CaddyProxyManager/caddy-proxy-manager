@@ -103,6 +103,12 @@ export function ProxyHostDetailView({
   logsHref: string | null;
 }) {
   const t = useTranslations("proxyHosts.detail");
+  const tOverview = useTranslations("overview");
+  const tAttention = useTranslations("attention");
+  const tNav = useTranslations("nav");
+  const tAuditLog = useTranslations("auditLog");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const tFacts = useTranslations("proxyHosts.detail.facts") as unknown as DynamicTranslate;
   const format = useAppFormatter();
   const density = useTableDensity();
@@ -114,7 +120,7 @@ export function ProxyHostDetailView({
   const pathColumns: TableColumn<HostPathRow & { id: string }>[] = [
     {
       key: "path",
-      header: t("path"),
+      header: tProxyHosts("path"),
       width: proportional(3),
       renderCell: (row) => (
         <Text type="code" size="sm" maxLines={1}>
@@ -124,7 +130,7 @@ export function ProxyHostDetailView({
     },
     {
       key: "requests",
-      header: t("requests"),
+      header: tCommon("requests"),
       width: pixel(110),
       align: "end",
       renderCell: (row) => (
@@ -160,7 +166,7 @@ export function ProxyHostDetailView({
     },
     {
       key: "requests",
-      header: t("requests"),
+      header: tCommon("requests"),
       width: pixel(110),
       align: "end",
       renderCell: (row) => (
@@ -192,7 +198,7 @@ export function ProxyHostDetailView({
             {row.summary}
           </Text>
           <Text type="body" size="xsm" color="secondary">
-            {row.actor ?? t("actorSystem")}
+            {row.actor ?? tAuditLog("systemActor")}
           </Text>
         </VStack>
       ),
@@ -207,7 +213,7 @@ export function ProxyHostDetailView({
             variant="ghost"
             size="sm"
             icon={<ArrowLeft />}
-            label={t("backToList")}
+            label={tNav("proxyHosts")}
             href="/proxy-hosts"
           />
         </HStack>
@@ -224,14 +230,14 @@ export function ProxyHostDetailView({
           </VStack>
           <HStack gap={2} wrap="wrap">
             {analyticsHref && (
-              <Button variant="secondary" label={t("viewAnalytics")} href={analyticsHref} />
+              <Button variant="secondary" label={tNav("analytics")} href={analyticsHref} />
             )}
-            {logsHref && <Button variant="secondary" label={t("viewLogs")} href={logsHref} />}
+            {logsHref && <Button variant="secondary" label={tNav("logs")} href={logsHref} />}
             {canManage && (
               <Button
                 variant="primary"
                 icon={<Pencil />}
-                label={t("edit")}
+                label={tCommon("edit")}
                 href={editorSectionHref(host.id)}
               />
             )}
@@ -239,7 +245,7 @@ export function ProxyHostDetailView({
         </HStack>
       </VStack>
 
-      <SectionCard icon={TriangleAlert} title={t("attentionTitle")}>
+      <SectionCard icon={TriangleAlert} title={tAttention("title")}>
         <AttentionList list={detail.attention} emptyTitle={t("attentionEmpty")} />
       </SectionCard>
 
@@ -255,9 +261,9 @@ export function ProxyHostDetailView({
               },
               {
                 id: "serverErrors",
-                label: t("tileServerErrors"),
+                label: tOverview("metricServerErrors"),
                 value: format.number(traffic.totals.serverErrors),
-                note: t("tileShare", {
+                note: tCommon("shareOfRequests", {
                   share: formatShare(format, traffic.totals.serverErrors, traffic.totals.requests),
                 }),
                 hue: traffic.totals.serverErrors > 0 ? "red" : "green",
@@ -291,13 +297,13 @@ export function ProxyHostDetailView({
       <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
         <SectionCard
           icon={Server}
-          title={t("upstreamsTitle")}
+          title={tProxyHosts("upstreams")}
           action={
             canManage ? (
               <Button
                 variant="ghost"
                 size="sm"
-                label={t("editSection")}
+                label={tCommon("edit")}
                 href={editorSectionHref(host.id, "upstreams")}
               />
             ) : undefined
@@ -362,7 +368,7 @@ export function ProxyHostDetailView({
         <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
           <SectionCard icon={BarChart2} title={t("pathsTitle")}>
             {traffic.paths.length === 0 ? (
-              <EmptyState title={t("noTraffic")} isCompact />
+              <EmptyState title={t("chartEmpty")} isCompact />
             ) : (
               <Table
                 data={traffic.paths.map((row) => ({ ...row, id: row.path }))}
@@ -372,9 +378,9 @@ export function ProxyHostDetailView({
               />
             )}
           </SectionCard>
-          <SectionCard icon={BarChart2} title={t("statusesTitle")}>
+          <SectionCard icon={BarChart2} title={tProxyHosts("statusCodes")}>
             {traffic.statuses.length === 0 ? (
-              <EmptyState title={t("noTraffic")} isCompact />
+              <EmptyState title={t("chartEmpty")} isCompact />
             ) : (
               <Table
                 data={traffic.statuses.map((row) => ({ ...row, id: String(row.status) }))}

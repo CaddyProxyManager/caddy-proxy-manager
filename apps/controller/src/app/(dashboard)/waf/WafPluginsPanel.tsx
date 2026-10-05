@@ -80,6 +80,8 @@ export function WafPluginsPanel({
   storedUpdates: Record<number, string>;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
+  const tSettings = useTranslations("settings");
   const emptyValue = useEmptyValue();
   const router = useRouter();
   const [registry, setRegistry] = useState<CrsRegistryOverview | null>(null);
@@ -187,8 +189,8 @@ export function WafPluginsPanel({
   const usageLabels = (row: WafPluginRow) => {
     const parts: string[] = [];
     if (row.usedGlobally) parts.push(t("presetUsedGlobally"));
-    if (row.usedByDashboard) parts.push(t("presetUsedByDashboard"));
-    if (row.hostCount > 0) parts.push(t("presetUsedByHosts", { count: row.hostCount }));
+    if (row.usedByDashboard) parts.push(tSettings("dashboardHostTitle"));
+    if (row.hostCount > 0) parts.push(tCommon("hostCount", { count: row.hostCount }));
     return parts;
   };
 
@@ -211,7 +213,7 @@ export function WafPluginsPanel({
     },
     {
       id: "version",
-      label: t("pluginVersion"),
+      label: tCommon("version"),
       width: 200,
       render: (row) => (
         <HStack gap={1} wrap="wrap">
@@ -236,13 +238,13 @@ export function WafPluginsPanel({
     },
     {
       id: "usage",
-      label: t("presetUsedBy"),
+      label: tCommon("usedBy"),
       width: 220,
       render: (row) => {
         const labels = usageLabels(row);
         return labels.length === 0 ? (
           <Text type="body" size="xsm" color="secondary">
-            {t("pluginUnused")}
+            {t("presetUnused")}
           </Text>
         ) : (
           <HStack gap={1} wrap="wrap">
@@ -294,7 +296,7 @@ export function WafPluginsPanel({
     },
     {
       id: "status",
-      label: t("pluginStatusColumn"),
+      label: tCommon("status"),
       width: 140,
       render: (row) => (
         <Token
@@ -327,7 +329,7 @@ export function WafPluginsPanel({
     },
     {
       id: "install",
-      label: t("actions"),
+      label: tCommon("actions"),
       width: 120,
       align: "right",
       render: (row) =>
@@ -424,7 +426,7 @@ export function WafPluginsPanel({
             <HStack gap={2}>
               <Button
                 icon={<RefreshCw />}
-                label={t("pluginRegistryCheckNow")}
+                label={tCommon("checkNow")}
                 isLoading={checkingRegistry}
                 isDisabled={!registry}
                 onClick={() => void checkRegistryNow()}
@@ -456,11 +458,7 @@ export function WafPluginsPanel({
               status="error"
               title={registryError}
               endContent={
-                <Button
-                  size="sm"
-                  label={t("pluginRegistryRetry")}
-                  onClick={() => void loadRegistry()}
-                />
+                <Button size="sm" label={tCommon("retry")} onClick={() => void loadRegistry()} />
               }
             />
           ) : registry === null ? (

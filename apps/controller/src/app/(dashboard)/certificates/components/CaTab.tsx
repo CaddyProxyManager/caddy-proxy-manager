@@ -128,6 +128,7 @@ function CaActionsMenu({
   onDelete: () => void;
 }) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const [issuedOpen, setIssuedOpen] = useState(false);
 
   return (
@@ -140,8 +141,8 @@ function CaActionsMenu({
           ...(ca.hasPrivateKey
             ? [{ label: t("issueClientCert"), onClick: () => setIssuedOpen(true) }]
             : []),
-          { label: t("edit"), onClick: onEdit },
-          { label: t("delete"), variant: "destructive" as const, onClick: onDelete },
+          { label: tCommon("edit"), onClick: onEdit },
+          { label: tCommon("delete"), variant: "destructive" as const, onClick: onDelete },
         ]}
       />
       <IssueClientCertDialog open={issuedOpen} cert={ca} onClose={() => setIssuedOpen(false)} />
@@ -155,6 +156,7 @@ function activeCount(ca: CaCertificateView) {
 
 export function CaTab({ caCertificates, search, statusFilter }: Props) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
   const [drawerCert, setDrawerCert] = useState<CaCertificateView | null | false>(false);
   const [deleteCert, setDeleteCert] = useState<CaCertificateView | null>(null);
@@ -168,7 +170,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
   const columns: Column<CaCertificateView>[] = [
     {
       id: "name",
-      label: t("name"),
+      label: tCommon("name"),
       render: (ca) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={ShieldCheck} size="sm" color="accent" />

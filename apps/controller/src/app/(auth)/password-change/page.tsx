@@ -7,7 +7,7 @@ import LegacyPasswordChangeForm from "@/src/components/auth/LegacyPasswordChange
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.passwordChange");
-  return { title: t("metaTitle") };
+  return { title: t("heading") };
 }
 
 /** Outside the dashboard route group on purpose: the dashboard layout redirects here. */

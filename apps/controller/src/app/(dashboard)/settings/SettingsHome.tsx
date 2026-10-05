@@ -51,6 +51,8 @@ function SectionStatusDot({ status }: { status: SectionHealth["status"] }) {
 
 export default function SettingsHome({ sections, attention, staged }: Props) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const tAttention = useTranslations("attention");
 
   // In the rail's order and groups, each tile in its section's colour.
   const byId = new Map(sections.map((section) => [section.id, section]));
@@ -79,7 +81,7 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
                 paddingInline={4}
                 className="rounded-t-lg bg-warning-muted"
               >
-                <Text type="label">{t("homeAttentionTitle")}</Text>
+                <Text type="label">{tAttention("title")}</Text>
                 <Text type="supporting" color="secondary">
                   {t("homeAttentionCount", { count: attention.length })}
                 </Text>
@@ -98,7 +100,7 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
                     </StackItem>
                     <Link href={settingsHref(section.id)} className="shrink-0">
                       <Text type="body" color="accent">
-                        {t("homeConfigure")}
+                        {tCommon("configure")}
                       </Text>
                     </Link>
                   </HStack>

@@ -183,6 +183,7 @@ export function CodeEditor({
   issues = [],
 }: CodeEditorProps) {
   const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const inputID = useId();
   const descriptionID = useId();
 
@@ -213,7 +214,7 @@ export function CodeEditor({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const scrollbarWidth = useScrollbarWidth(scrollerRef);
-  const { copy, isCopied } = useClipboard({ announce: t("codeEditor.copied") });
+  const { copy, isCopied } = useClipboard({ announce: tCommon("copied") });
   // No clipboard API over plain http; the text stays selectable there.
   const [canCopy, setCanCopy] = useState(false);
   useEffect(() => setCanCopy(window.isSecureContext), []);
@@ -337,7 +338,7 @@ export function CodeEditor({
               size="sm"
               icon={isCopied ? <Check /> : <Copy />}
               tooltip={t("codeEditor.copy")}
-              label={isCopied ? t("codeEditor.copied") : t("codeEditor.copy")}
+              label={isCopied ? tCommon("copied") : t("codeEditor.copy")}
               onClick={() => void copy(value)}
             />
           </div>

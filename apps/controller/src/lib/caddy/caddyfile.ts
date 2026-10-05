@@ -4,6 +4,7 @@
  */
 
 import { connectedAgents } from "../agent/registry";
+import { type DomainError, domainError } from "../errors/domain-error";
 import { caddyAdminRequest } from "./admin";
 
 export type AdaptedCaddyfile = {
@@ -120,7 +121,7 @@ export function buildCaddyfileSubrouteHandler(
 export async function validateCaddyfileSnippet(
   snippet: string,
   agentRowIds: readonly number[] = [],
-): Promise<string | null> {
+): Promise<DomainError | null> {
   if (!snippet.trim()) return null;
   // Each agent loading the host is asked, since one's verdict must not pass what another rejects;
   // an agent that never loads it has no say, as its Caddy may lack the host agent's modules.
@@ -129,14 +130,16 @@ export async function validateCaddyfileSnippet(
   );
   const targets = agents.length > 0 ? agents.map((agent) => agent.agentId) : [undefined];
   const verdicts = await Promise.all(
-    targets.map(async (agentId): Promise<string | null> => {
+    targets.map(async (agentId): Promise<DomainError | null> => {
       try {
         const { ignoredApps } = await adaptCaddyfileSnippet(snippet, agentId);
         if (ignoredApps.length > 0) {
-          return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+          return domainError("customCaddyfileOutsideHttp", { apps: ignoredApps }, { status: 400 });
         }
       } catch (error) {
-        if (error instanceof CaddyfileAdaptError) return error.message;
+        if (error instanceof CaddyfileAdaptError) {
+          return domainError("customCaddyfileInvalid", { error: error.message }, { status: 400 });
+        }
         // A transport failure is not a syntax error: let the save through and the build warn.
         console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
       }

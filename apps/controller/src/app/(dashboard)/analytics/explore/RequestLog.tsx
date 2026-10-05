@@ -32,6 +32,7 @@ export function RequestLog({
   onMitigatedOnlyChange: (value: boolean) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const format = useAppFormatter();
   const density = useTableDensity();
   const emptyValue = useEmptyValue();
@@ -46,7 +47,7 @@ export function RequestLog({
   const columns: TableColumn<Row>[] = [
     {
       key: "ts",
-      header: t("time"),
+      header: tCommon("time"),
       width: pixel(170),
       renderCell: (row) => (
         <Text type="body" size="sm" color="secondary">
@@ -56,7 +57,7 @@ export function RequestLog({
     },
     {
       key: "clientIp",
-      header: t("client"),
+      header: tCommon("client"),
       width: pixel(170),
       renderCell: (row) => (
         <Tooltip content={row.asn ? `AS${row.asn} ${row.asnOrg ?? ""}`.trim() : row.clientIp}>
@@ -79,7 +80,7 @@ export function RequestLog({
     },
     {
       key: "uri",
-      header: t("request"),
+      header: tCommon("request"),
       width: proportional(1),
       renderCell: (row) => (
         <Tooltip content={`${row.method} ${row.uri}`}>

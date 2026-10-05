@@ -11,7 +11,7 @@ import { TwoFactorSetupClient } from "./TwoFactorSetupClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.twoFactorSetup");
-  return { title: t("metaTitle") };
+  return { title: t("title") };
 }
 
 /** Outside the dashboard group on purpose: the proxy redirects here, and nothing else loads. */

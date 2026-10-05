@@ -53,6 +53,7 @@ export function GeneratedPasswordField({
   "data-testid": testId,
 }: GeneratedPasswordFieldProps) {
   const t = useTranslations("ui.passwordField");
+  const tCommon = useTranslations("common");
   const [isRevealed, setIsRevealed] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   // No clipboard API on plain http, so the button explains instead. Read after mount.
@@ -138,8 +139,8 @@ export function GeneratedPasswordField({
       >
         <IconButton
           variant="secondary"
-          label={hasCopied ? t("copiedLabel") : t("copyLabel")}
-          tooltip={hasCopied ? t("copiedLabel") : t("copyLabel")}
+          label={hasCopied ? tCommon("copied") : t("copyLabel")}
+          tooltip={hasCopied ? tCommon("copied") : t("copyLabel")}
           icon={hasCopied ? <Check /> : <Copy />}
           isDisabled={isDisabled || !value}
           onClick={copy}

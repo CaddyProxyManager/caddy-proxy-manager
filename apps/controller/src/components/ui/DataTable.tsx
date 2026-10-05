@@ -178,13 +178,13 @@ function SortableHeader<T>({
   col: Column<T>;
   sort?: { sortBy: string; sortDir: "asc" | "desc" };
 }) {
-  const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // A column with no visible title still needs one for a screen reader.
-  if (!col.label) return <VisuallyHidden>{t("actionsColumn")}</VisuallyHidden>;
+  if (!col.label) return <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>;
   if (!col.sortKey) return <>{col.label}</>;
 
   const isActive = sort?.sortBy === col.sortKey;
@@ -227,6 +227,7 @@ export function DataTable<T>({
   selection,
 }: DataTableProps<T>) {
   const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const emptyTitle = emptyMessage ?? t("noDataAvailable");
   const isEmpty = data.length === 0 && !loading;
   // A query rather than CSS, so only one of the two views is ever mounted.
@@ -352,7 +353,7 @@ export function DataTable<T>({
     // A focusable control: a bare row click is unreachable from the keyboard.
     tableColumns.push({
       key: "__open",
-      header: <VisuallyHidden>{t("actionsColumn")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       width: pixel(48),
       align: "end",
       resizable: false,

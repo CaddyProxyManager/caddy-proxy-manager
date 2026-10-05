@@ -41,6 +41,7 @@ const ACTION_COLOR = { create: "green", update: "blue", skip: "gray" } as const;
 
 function ExportCard() {
   const t = useTranslations("settings.configTransfer");
+  const tErrors = useTranslations("errors");
   const tBackup = useTranslations("settings.backup");
   const [sections, setSections] = useState<string[]>(SECTIONS);
   const [passphrase, setPassphrase] = useState("");
@@ -62,7 +63,9 @@ function ExportCard() {
         body: JSON.stringify({ passphrase, sections }),
       });
       if (!response.ok) {
-        setError(((await response.json()) as { error?: string }).error ?? t("exportFailed"));
+        setError(
+          ((await response.json()) as { error?: string }).error ?? tErrors("configExportFailed"),
+        );
         return;
       }
       const name =
@@ -77,7 +80,7 @@ function ExportCard() {
       setPassphrase("");
       setConfirmation("");
     } catch {
-      setError(t("exportFailed"));
+      setError(tErrors("configExportFailed"));
     } finally {
       setBusy(false);
     }
@@ -92,7 +95,9 @@ function ExportCard() {
         <Text type="body" size="sm" color="secondary">
           {t("exportHelp")}
         </Text>
-        {error && <Banner status="error" title={t("exportFailed")} description={error} />}
+        {error && (
+          <Banner status="error" title={tErrors("configExportFailed")} description={error} />
+        )}
         <CheckboxList label={t("sectionsLabel")} value={sections} onChange={setSections}>
           {SECTIONS.map((section) => (
             <CheckboxListItem key={section} value={section} label={t(`sections.${section}`)} />
@@ -161,6 +166,7 @@ function ItemLine({ item }: { item: ConfigImportItem }) {
 
 function ImportCard() {
   const t = useTranslations("settings.configTransfer");
+  const tErrors = useTranslations("errors");
   const [file, setFile] = useState<File | null>(null);
   const [described, setDescribed] = useState<Described | null>(null);
   const [passphrase, setPassphrase] = useState("");
@@ -178,7 +184,7 @@ function ImportCard() {
     form.set("passphrase", passphrase);
     const response = await fetch("/api/config/import", { method: "POST", body: form });
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error ?? t("importFailed"));
+    if (!response.ok) throw new Error(body.error ?? tErrors("configImportFailed"));
     return body;
   };
 
@@ -228,7 +234,9 @@ function ImportCard() {
         <Text type="body" size="sm" color="secondary">
           {t("importHelp")}
         </Text>
-        {error && <Banner status="error" title={t("importFailed")} description={error} />}
+        {error && (
+          <Banner status="error" title={tErrors("configImportFailed")} description={error} />
+        )}
         {done && (
           <Banner
             status="success"

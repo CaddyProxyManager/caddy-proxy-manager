@@ -73,6 +73,9 @@ export function IssueClientCertDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
+  const tSettings = useTranslations("settings");
+  const tCertificates = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
   const router = useRouter();
@@ -135,12 +138,12 @@ export function IssueClientCertDialog({
   }
 
   const actions = issued ? (
-    <Button label={t("done")} onClick={handleClose} />
+    <Button label={tCommon("done")} onClick={handleClose} />
   ) : (
     <>
       <Button
         variant="secondary"
-        label={t("cancel")}
+        label={tCommon("cancel")}
         onClick={handleClose}
         isDisabled={isPending}
       />
@@ -195,7 +198,7 @@ export function IssueClientCertDialog({
           <VStack gap={4}>
             <TextInput
               {...NATIVE_REQUIRED}
-              label={t("commonNameCn")}
+              label={tCertificates("commonNameCn")}
               htmlName="common_name"
               value={commonName}
               onChange={setCommonName}
@@ -207,14 +210,14 @@ export function IssueClientCertDialog({
             <NumberInput
               startIcon={CalendarDays}
               hasNumberSteppers
-              label={t("validity")}
+              label={tCertificates("validity")}
               htmlName="validity_days"
               value={validityDays}
               onChange={setValidityDays}
               min={1}
               max={3650}
               isIntegerOnly
-              units={t("days")}
+              units={tSettings("units.days")}
             />
             <GeneratedPasswordField
               label={t("exportPassword")}
@@ -246,6 +249,8 @@ export function ManageIssuedClientCertsDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
+  const tCommon = useTranslations("common");
+  const tCertificates = useTranslations("certificates");
   const format = useFormatter();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -287,10 +292,15 @@ export function ManageIssuedClientCertsDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={t("issuedClientCertificates")}
+      title={tCertificates("issuedClientCertificates")}
       maxWidth="md"
       actions={
-        <Button variant="secondary" label={t("close")} onClick={onClose} isDisabled={isPending} />
+        <Button
+          variant="secondary"
+          label={tCommon("close")}
+          onClick={onClose}
+          isDisabled={isPending}
+        />
       }
     >
       <VStack gap={4}>
@@ -338,8 +348,8 @@ export function ManageIssuedClientCertsDialog({
                           variant={expired ? "error" : "neutral"}
                           label={
                             expired
-                              ? t("expiredOn", { date: formatDateTime(format, item.validTo) })
-                              : t("expiresOn", { date: formatDateTime(format, item.validTo) })
+                              ? tCommon("expiredOn", { date: formatDateTime(format, item.validTo) })
+                              : tCommon("expiresOn", { date: formatDateTime(format, item.validTo) })
                           }
                         />
                       </UtcTooltip>
@@ -392,6 +402,7 @@ export function DeleteCaCertDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
+  const tCommon = useTranslations("common");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -417,13 +428,13 @@ export function DeleteCaCertDialog({
         <>
           <Button
             variant="secondary"
-            label={t("cancel")}
+            label={tCommon("cancel")}
             onClick={onClose}
             isDisabled={isPending}
           />
           <Button
             variant="destructive"
-            label={t("delete")}
+            label={tCommon("delete")}
             onClick={handleDelete}
             isLoading={isPending}
             isDisabled={isPending}

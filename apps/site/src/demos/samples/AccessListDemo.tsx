@@ -98,6 +98,7 @@ const MEMBER_COLUMNS: Column<Member>[] = [
 /** Passwords are bcrypt-hashed on save, so nothing here shows one. */
 function AccessListDemoContent() {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const [selectedId, setSelectedId] = useState(1);
   const [tab, setTab] = useState("members");
   const selected = LISTS.find((list) => list.id === selectedId) ?? LISTS[0];
@@ -166,13 +167,13 @@ function AccessListDemoContent() {
       <TabList value={tab} onChange={setTab} size="sm" hasDivider>
         <Tab
           value="members"
-          label={t("members")}
+          label={tCommon("members")}
           icon={<Users />}
           endContent={<Badge label={selected.members.length} />}
         />
         <Tab
           value="usedBy"
-          label={t("usedBy")}
+          label={tCommon("usedBy")}
           icon={<Globe />}
           endContent={<Badge label={selected.usedBy.length} />}
         />
@@ -182,7 +183,7 @@ function AccessListDemoContent() {
         isEmpty ? (
           <EmptyState
             icon={<Users />}
-            title={t("membersEmptyTitle")}
+            title={tCommon("noMembersYet")}
             description={t("membersEmptyDescription")}
           />
         ) : (

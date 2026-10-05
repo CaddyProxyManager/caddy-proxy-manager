@@ -85,10 +85,11 @@ export function RateLimitZonesEditor({
   isDisabled?: boolean;
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [zones, setZones] = useState<WithRowId<ZoneState>[]>(() => toState(initialZones));
 
   const keyOptions = [
-    { value: "ip", label: t("rateLimitKeyIp") },
+    { value: "ip", label: tCommon("clientIp") },
     { value: "ip+path", label: t("rateLimitKeyIpPath") },
     { value: "header", label: t("rateLimitKeyHeader") },
     { value: "user", label: t("rateLimitKeyUser") },
@@ -164,7 +165,7 @@ export function RateLimitZonesEditor({
             <Grid columns={{ minWidth: 160, max: 4 }} gap={3}>
               <NumberInput
                 hasNumberSteppers
-                label={t("rateLimitMaxEvents")}
+                label={tCommon("requests")}
                 size="sm"
                 min={1}
                 max={RATE_LIMIT_MAX_EVENTS}
@@ -199,7 +200,7 @@ export function RateLimitZonesEditor({
               {zone.key === "header" ? (
                 <TextInput
                   {...NO_SPELLCHECK}
-                  label={t("rateLimitHeader")}
+                  label={t("header")}
                   size="sm"
                   placeholder="X-Api-Key"
                   value={zone.header}
@@ -263,6 +264,7 @@ export function RateLimitFields({
   hasModes?: boolean;
 }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const moduleDisabledReason = useDisabledReason("ratelimit");
   const [enabled, setEnabled] = useState(rateLimit?.enabled ?? false);
   const [mode, setMode] = useState<RateLimitMode>(
@@ -301,7 +303,7 @@ export function RateLimitFields({
         {moduleDisabledReason && (
           <Banner
             status="warning"
-            title={t("rateLimitUnavailable")}
+            title={tSettings("rateLimit.unavailable")}
             description={moduleDisabledReason}
           />
         )}

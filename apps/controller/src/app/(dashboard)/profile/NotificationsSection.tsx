@@ -51,6 +51,7 @@ export function NotificationsSection({
   browsers,
 }: NotificationsSectionProps) {
   const t = useTranslations("profile.notifications");
+  const tCommon = useTranslations("common");
   const tRoot = useTranslations();
   const [preferences, setPreferences] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function NotificationsSection({
       {error && <StatusAlert message={error} success={false} />}
 
       <Switch
-        label={t("email")}
+        label={tCommon("email")}
         description={
           emailState === "off"
             ? t("emailOff")
@@ -103,7 +104,7 @@ export function NotificationsSection({
       {preferences.push && <PushBrowserForm publicKey={pushPublicKey} />}
       {browsers.length > 0 && <SubscribedBrowsers browsers={browsers} />}
 
-      <Heading level={3}>{t("events")}</Heading>
+      <Heading level={3}>{tCommon("events")}</Heading>
       <VStack gap={3}>
         {categories.map(({ category, settingKey, enabled, unavailable }) => (
           <Switch
@@ -136,6 +137,7 @@ export function NotificationsSection({
 /** Removing one here stops pushes to it at once, from any browser: one lost or left signed in. */
 function SubscribedBrowsers({ browsers }: { browsers: NotificationsSectionProps["browsers"] }) {
   const t = useTranslations("profile.notifications");
+  const tCommon = useTranslations("common");
   const tProfile = useTranslations("profile");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -162,7 +164,7 @@ function SubscribedBrowsers({ browsers }: { browsers: NotificationsSectionProps[
           <Button
             variant="ghost"
             size="sm"
-            label={t("browserRemove")}
+            label={tCommon("remove")}
             isDisabled={pending}
             onClick={() =>
               startTransition(async () => {

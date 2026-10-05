@@ -227,7 +227,7 @@ describe('fetch hardening', () => {
     });
     const url = 'https://registry.example.test/huge.json';
     expect(await codeOf(fetchCrsRegistry(async () => new Response(endless), url))).toBe(
-      'crsPluginFetchFailed',
+      'crsPluginFetchTooLarge',
     );
     // Cut off just past the 2 MiB limit, not read to the end.
     expect(sent).toBeLessThan(3 * 1024 * 1024);

@@ -230,6 +230,9 @@ is the source catalog; adding a language is one more file there plus an entry in
   handlers: `const t = await getTranslations("<namespace>")` - the hook throws outside a component.
 - Namespaces mirror the route or component folder (`waf`, `proxyHosts`, `settings`), with `common`,
   `nav`, `ui` and `passwordPolicy` shared across screens.
+- Say a thing once. "Cancel" or "Name" is `common.*`, a page's name is `nav.*`; a value that repeats
+  another fails `message-catalog.test.ts` unless `tests/unit/message-duplicates.ts` lists the pair
+  with its reason (an adjective that agrees with different nouns, a family keyed at runtime...).
 - `src/types/next-intl.d.ts` types the keys off `en.json`, so a typo is a build error rather than a
   key rendered to a user. That only works for literal keys - where a key is composed at runtime
   (a setting name, a validation code) a test asserts the catalog covers it instead. See

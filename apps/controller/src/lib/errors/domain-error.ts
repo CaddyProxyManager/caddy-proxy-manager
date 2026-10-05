@@ -44,9 +44,19 @@ export function domainError(
   return new DomainError(code, params, domainErrorMessage(code, params), options.status);
 }
 
+/** The DomainError an error is, or carries in `localized` beside codes of its own. */
+export function domainErrorOf(error: unknown): DomainError | null {
+  if (error instanceof DomainError) return error;
+  if (error instanceof Error && "localized" in error && error.localized instanceof DomainError) {
+    return error.localized;
+  }
+  return null;
+}
+
 /** Stored by background jobs beside the English, to render later; see `storedErrorMessage`. */
 export type StoredErrorCode = { code: DomainErrorCode; params: DomainErrorParams };
 
 export function storedErrorCode(error: unknown): StoredErrorCode | null {
-  return error instanceof DomainError ? { code: error.code, params: error.params } : null;
+  const domain = domainErrorOf(error);
+  return domain ? { code: domain.code, params: domain.params } : null;
 }

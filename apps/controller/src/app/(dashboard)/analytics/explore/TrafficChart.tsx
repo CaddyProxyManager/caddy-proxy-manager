@@ -72,6 +72,7 @@ export function TrafficChart({
   Chart: ApexChartComponent;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const theme = useChartTheme();
 
@@ -104,7 +105,7 @@ export function TrafficChart({
   const series = useMemo(() => {
     const out: { name: string; type: "area" | "bar" | "line"; data: number[] }[] = grouped
       ? groups.map((g, i) => ({ name: describe(g.key, i).label, type: "bar", data: g.counts }))
-      : [{ name: t("seriesRequests"), type: "area", data: timeline.map((b) => b.requests) }];
+      : [{ name: tCommon("requests"), type: "area", data: timeline.map((b) => b.requests) }];
     if (ghost) {
       out.push({
         name: t("seriesPrevious"),
@@ -113,7 +114,7 @@ export function TrafficChart({
       });
     }
     return out;
-  }, [grouped, groups, timeline, ghost, t, describe]);
+  }, [grouped, groups, timeline, ghost, t, describe, tCommon]);
 
   const options = useMemo<ApexOptions>(() => {
     const colors = grouped ? groups.map((g, i) => describe(g.key, i).color) : [theme.series.blue];

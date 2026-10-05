@@ -9,6 +9,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
+import { agentStatusMessage, type AgentStatusWords } from "@/src/lib/agent/status-message";
 
 type PortsDiff = {
   currentPorts: string[];
@@ -18,10 +19,9 @@ type PortsDiff = {
 
 type PortsStatus = {
   state: "idle" | "pending" | "applying" | "applied" | "failed";
-  message?: string;
   appliedAt?: string;
   error?: string;
-};
+} & AgentStatusWords;
 
 type PortsResponse = {
   diff: PortsDiff;
@@ -37,6 +37,7 @@ function portLabel(mapping: string): string {
 
 export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }) {
   const t = useTranslations("l4ProxyHosts");
+  const tRoot = useTranslations();
   const [data, setData] = useState<PortsResponse | null>(null);
   const [applying, setApplying] = useState(false);
 
@@ -108,7 +109,11 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
       // Banner supplies its own status icon; only the in-flight spinner needs
       // to replace it.
       icon={isSpinning ? <Spinner size="sm" /> : undefined}
-      title={diff.needsApply ? t("portsChangesPending") : (status.message ?? t("portsStatus"))}
+      title={
+        diff.needsApply
+          ? t("portsChangesPending")
+          : (agentStatusMessage(tRoot, status) ?? t("portsStatus"))
+      }
       description={
         <VStack gap={1}>
           {diff.needsApply && (

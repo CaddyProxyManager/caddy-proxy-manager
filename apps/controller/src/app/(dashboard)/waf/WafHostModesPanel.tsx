@@ -33,6 +33,7 @@ const SOURCE_KEY = {
 
 export function WafHostModesPanel({ hosts }: { hosts: WafHostMode[] }) {
   const t = useTranslations("waf");
+  const tNav = useTranslations("nav");
   const format = useAppFormatter();
   const emptyValue = useEmptyValue();
 
@@ -85,7 +86,7 @@ export function WafHostModesPanel({ hosts }: { hosts: WafHostMode[] }) {
   return (
     <VStack gap={6}>
       <VStack gap={1}>
-        <Heading level={2}>{t("hostModes")}</Heading>
+        <Heading level={2}>{tNav("hosts")}</Heading>
         <Text type="body" size="sm" color="secondary">
           {t("hostModesDescription")}
         </Text>

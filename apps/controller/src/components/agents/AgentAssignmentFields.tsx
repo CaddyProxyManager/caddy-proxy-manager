@@ -26,6 +26,7 @@ export function AgentAssignmentFields({
   selected?: number[];
 }) {
   const t = useTranslations("agents");
+  const tNav = useTranslations("nav");
   const [selectedIds, setSelectedIds] = useState<number[]>(selected);
 
   // No card, but still the marker: without it a cleared list looks like a form without the field.
@@ -44,7 +45,7 @@ export function AgentAssignmentFields({
       <VStack gap={4}>
         <VStack gap={1}>
           <Text type="body" size="sm" weight="semibold">
-            {t("assignment")}
+            {tNav("agents")}
           </Text>
           <Text type="body" size="sm" color="secondary">
             {t("assignmentDescription")}

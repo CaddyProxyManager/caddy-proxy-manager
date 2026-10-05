@@ -792,7 +792,7 @@ describe('findCrsPluginRejections', () => {
       'crsPluginDirectiveNotAllowed',
       'crsPluginDirectiveNotAllowed',
       'crsPluginDirectiveNotAllowed',
-      'crsPluginCtlRuleEngine',
+      'wafDirectiveDroppedCtlRuleEngine',
     ]);
   });
 
@@ -827,7 +827,7 @@ describe('findCrsPluginRejections', () => {
   it('refuses a directive left open, which would swallow what follows it', () => {
     expect(
       findCrsPluginRejections('SecRule ARGS "@rx x" \\', range).map((entry) => entry.reason),
-    ).toEqual(['crsPluginUnterminated']);
+    ).toEqual(['wafDirectiveDroppedUnterminated']);
   });
 });
 

@@ -63,6 +63,7 @@ export function defaultCertificatePath(entries: CertificateFileEntry[]): string 
 
 export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const isEdit = cert !== null;
   const isFileCert = cert?.file != null;
@@ -236,7 +237,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
           <IconButton
             variant="ghost"
             label={showKey ? t("hidePrivateKey") : t("showPrivateKey")}
-            tooltip={showKey ? t("hide") : t("show")}
+            tooltip={showKey ? tCommon("hide") : t("show")}
             icon={showKey ? <EyeOff /> : <Eye />}
             onClick={() => setShowKey((v) => !v)}
           />
@@ -260,7 +261,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
     ) : (
       <>
         <Selector
-          label={t("fileAgent")}
+          label={tCommon("agent")}
           description={t("fileAgentHelp")}
           placeholder={t("fileAgentPlaceholder")}
           options={fileAgents.map((agent) => ({ value: String(agent.id), label: agent.name }))}
@@ -315,7 +316,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
         <>
           <Button
             variant="secondary"
-            label={t("cancel")}
+            label={tCommon("cancel")}
             onClick={handleClose}
             isDisabled={isPending}
           />
@@ -324,7 +325,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
           <Button
             type="submit"
             form={FORM_ID}
-            label={isEdit ? t("saveChanges") : t("importCertificate")}
+            label={isEdit ? tCommon("saveChanges") : t("importCertificate")}
             isLoading={isPending}
             isDisabled={isPending || !canSubmit}
           />
@@ -356,7 +357,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
 
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("name")}
+            label={tCommon("name")}
             htmlName="name"
             value={name}
             onChange={setName}

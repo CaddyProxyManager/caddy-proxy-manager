@@ -64,6 +64,8 @@ export function CrowdSecSection({
   formAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings.crowdsec");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const moduleDisabledReason = useDisabledReason("crowdsec");
   const [enabled, setEnabled] = useState(crowdsec.enabled);
   const [mode, setMode] = useState<CrowdSecMode>(crowdsec.mode);
@@ -101,7 +103,7 @@ export function CrowdSecSection({
             </WarnAlert>
           )}
           <Switch
-            label={t("enabled")}
+            label={tProxyHosts("enableCrowdsec")}
             description={t("enabledHelp")}
             htmlName="crowdsecEnabled"
             value={enabled}
@@ -195,7 +197,7 @@ export function CrowdSecSection({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  label={testing ? t("testing") : t("test")}
+                  label={testing ? tCommon("testing") : tCommon("testConnection")}
                   isDisabled={testing || !apiUrl.trim()}
                   onClick={runTest}
                 />

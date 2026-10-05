@@ -19,14 +19,15 @@ import {
 } from "@/src/lib/nav/destinations";
 import { saveMoreDrawerPinsAction } from "../actions";
 
+/** Under `nav`, where the rail's groups are named too. */
 const GROUP_LABEL: Record<
   MoreGroup,
-  "groupAccess" | "groupSecurity" | "groupReference" | "groupInstance"
+  "railGroupAccess" | "security" | "more.groupReference" | "more.groupInstance"
 > = {
-  access: "groupAccess",
-  security: "groupSecurity",
-  reference: "groupReference",
-  instance: "groupInstance",
+  access: "railGroupAccess",
+  security: "security",
+  reference: "more.groupReference",
+  instance: "more.groupInstance",
 };
 
 /**
@@ -42,6 +43,7 @@ export default function CustomizeDrawerClient({
 }) {
   const t = useTranslations("nav");
   const tMore = useTranslations("nav.more");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const [chosen, setChosen] = useState<DestinationId[]>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function CustomizeDrawerClient({
         </Text>
         <Button
           variant="primary"
-          label={isSaving ? tMore("saving") : tMore("done")}
+          label={isSaving ? tMore("saving") : tCommon("done")}
           isLoading={isSaving}
           onClick={save}
         />
@@ -102,7 +104,7 @@ export default function CustomizeDrawerClient({
         return (
           <VStack key={group} gap={2}>
             <Text type="label" size="sm" color="secondary">
-              {tMore(GROUP_LABEL[group])}
+              {t(GROUP_LABEL[group])}
             </Text>
             <Card>
               <VStack gap={3}>

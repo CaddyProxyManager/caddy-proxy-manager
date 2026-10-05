@@ -40,6 +40,7 @@ type Props = {
 
 export function WafFields({ value, showModeSelector = true }: Props) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   // Without Coraza compiled in, rules are inert, so the switch says why instead.
   const moduleDisabledReason = useDisabledReason("waf");
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
@@ -170,7 +171,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 <NumberInput
                   startIcon={HardDrive}
                   hasNumberSteppers
-                  units={t("maxBodySizeMibUnit")}
+                  units={tCommon("unitMib")}
                   label={t("maxBodySizeMib", { max: MAX_BODY_LIMIT_MIB })}
                   value={bodyLimitMb}
                   onChange={setBodyLimitMb}
@@ -184,7 +185,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 <NumberInput
                   startIcon={HardDrive}
                   hasNumberSteppers
-                  units={t("bufferedInMemoryMibUnit")}
+                  units={tCommon("unitMib")}
                   label={t("bufferedInMemoryMib")}
                   value={inMemoryLimitMb}
                   onChange={setInMemoryLimitMb}

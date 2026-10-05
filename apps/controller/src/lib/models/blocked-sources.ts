@@ -147,7 +147,7 @@ export async function createBlockedSource(
   const value = normalizeBlockedValue(kind, String(input.value ?? ""));
   const reason = (input.reason ?? "").trim();
   if (reason.length > MAX_BLOCK_REASON) {
-    throw domainError("blockedSourceReasonTooLong", {}, { status: 400 });
+    throw domainError("wafExclusionReasonTooLong", {}, { status: 400 });
   }
   const expiresAt = normalizeExpiry(input.expiresAt, now);
 

@@ -20,6 +20,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_NEW_PASSWORD, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
+import { isAppRole } from "@/src/lib/auth/oidc/groups";
 import { parseBindNameTemplate } from "@/src/lib/ldap/bind-name";
 import {
   ACTIVE_DIRECTORY_PRESET,
@@ -67,13 +68,6 @@ const emptyForm: Form = {
   syncGroups: false,
 };
 
-const ROLE_LABELS: Record<string, "roleAdmin" | "roleOperator" | "roleUser" | "roleViewer"> = {
-  admin: "roleAdmin",
-  operator: "roleOperator",
-  user: "roleUser",
-  viewer: "roleViewer",
-};
-
 function toForm(directory: LdapDirectoryView): Form {
   return {
     name: directory.name,
@@ -119,7 +113,10 @@ export default function LdapDirectoriesSection({
   initialDirectories: LdapDirectoryView[];
 }) {
   const t = useTranslations("settings.ldap");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const tSettings = useTranslations("settings");
+  const tUsers = useTranslations("users");
   const format = useFormatter();
   const [directories, setDirectories] = useState(initialDirectories);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -279,7 +276,7 @@ export default function LdapDirectoriesSection({
                 {!directory.config.tlsVerify && (
                   <Badge variant="warning" label={t("badgeTlsUnverified")} />
                 )}
-                {directory.roleMappingEnabled && <Badge label={t("badgeGroupRoles")} />}
+                {directory.roleMappingEnabled && <Badge label={tSettings("groupRoles")} />}
                 {!directory.enabled && <Badge variant="warning" label={t("badgeDisabled")} />}
               </HStack>
               <Text type="body" size="xsm" color="secondary">
@@ -295,7 +292,7 @@ export default function LdapDirectoriesSection({
               <IconButton
                 variant="secondary"
                 size="sm"
-                label={t("editNamed", { name: directory.name })}
+                label={tCommon("editNamed", { name: directory.name })}
                 tooltip={t("edit")}
                 icon={<Pencil />}
                 onClick={() => openDialog(directory)}
@@ -303,7 +300,7 @@ export default function LdapDirectoriesSection({
               <IconButton
                 variant="secondary"
                 size="sm"
-                label={t("deleteNamed", { name: directory.name })}
+                label={tCommon("deleteNamed", { name: directory.name })}
                 tooltip={t("delete")}
                 icon={<Trash2 />}
                 onClick={() => setDeleteConfirm(directory)}
@@ -337,7 +334,7 @@ export default function LdapDirectoriesSection({
         onClose={closeDialog}
         title={editing ? t("editTitle") : t("addTitle")}
         maxWidth="lg"
-        submitLabel={editing ? t("save") : t("create")}
+        submitLabel={editing ? tCommon("save") : t("add")}
         onSubmit={handleSave}
         isSubmitting={saving}
       >
@@ -345,7 +342,7 @@ export default function LdapDirectoriesSection({
           {error && <Banner status="error" title={t("saveFailed")} description={error} />}
 
           <TextInput
-            label={t("name")}
+            label={tCommon("name")}
             isRequired
             size="sm"
             value={form.name}
@@ -618,7 +615,7 @@ export default function LdapDirectoriesSection({
                   variant="secondary"
                   size="sm"
                   icon={<Plug />}
-                  label={testing ? t("test.running") : t("test.run")}
+                  label={testing ? tCommon("testing") : tCommon("testConnection")}
                   isLoading={testing}
                   onClick={handleTest}
                 />
@@ -633,17 +630,19 @@ export default function LdapDirectoriesSection({
               {testResult?.identity && (
                 <MetadataList>
                   <MetadataListItem label={t("test.dn")}>{testResult.identity.dn}</MetadataListItem>
-                  <MetadataListItem label={t("test.email")}>
+                  <MetadataListItem label={tCommon("email")}>
                     {testResult.identity.email ?? t("test.none")}
                   </MetadataListItem>
-                  <MetadataListItem label={t("test.groups")}>
+                  <MetadataListItem label={tNav("groups")}>
                     {testResult.identity.groups.length > 0
                       ? format.list(testResult.identity.groups, { type: "unit" })
                       : t("test.none")}
                   </MetadataListItem>
                   {testResult.identity.role && (
-                    <MetadataListItem label={t("test.role")}>
-                      {tSettings(ROLE_LABELS[testResult.identity.role] ?? "roleUser")}
+                    <MetadataListItem label={tCommon("role")}>
+                      {tUsers(
+                        `roles.${isAppRole(testResult.identity.role) ? testResult.identity.role : "user"}`,
+                      )}
                     </MetadataListItem>
                   )}
                 </MetadataList>

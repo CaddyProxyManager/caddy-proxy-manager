@@ -26,6 +26,7 @@ export function TwoFactorSetupClient({
   locked: boolean;
 }) {
   const t = useTranslations("auth.twoFactorSetup");
+  const tCommon = useTranslations("common");
   return (
     <Center role="main" minHeight="100vh" padding={4}>
       <Card width={480}>
@@ -46,7 +47,7 @@ export function TwoFactorSetupClient({
           </VStack>
           <PasskeySection passkeys={passkeys} rpId={rpId} locked={locked} />
           <form action="/api/auth/logout" method="post">
-            <Button type="submit" variant="ghost" label={t("signOut")} width="100%" />
+            <Button type="submit" variant="ghost" label={tCommon("signOut")} width="100%" />
           </form>
         </VStack>
       </Card>

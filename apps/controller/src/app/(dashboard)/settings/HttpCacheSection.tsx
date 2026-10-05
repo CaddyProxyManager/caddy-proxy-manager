@@ -39,6 +39,7 @@ export function HttpCacheSection({
   formAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings.httpCache");
+  const tCommon = useTranslations("common");
   const cacheDisabledReason = useDisabledReason("cache");
   const [storage, setStorage] = useState<CacheStorage>(httpCache.storage);
   const [otterSize, setOtterSize] = useState<number | null>(httpCache.otterSize);
@@ -120,7 +121,7 @@ export function HttpCacheSection({
               <TextInput
                 startIcon={User}
                 {...AUTOFILL_OFF}
-                label={t("redisUsername")}
+                label={tCommon("username")}
                 description={t("redisUsernameHelp")}
                 htmlName="redisUsername"
                 isOptional
@@ -130,7 +131,7 @@ export function HttpCacheSection({
               <TextInput
                 startIcon={KeyRound}
                 {...AUTOFILL_NEW_PASSWORD}
-                label={t("redisPassword")}
+                label={tCommon("password")}
                 type="password"
                 isOptional
                 description={

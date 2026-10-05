@@ -87,6 +87,7 @@ export function NetworkTab({
   onListUpdated: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const geoUnavailable = useDisabledReason("geoblock");
   const [rules, setRules] = useState(() => toRules(list));
@@ -356,7 +357,7 @@ export function NetworkTab({
           variant="ghost"
           size="sm"
           icon={<Plus />}
-          label={t("ipAddRule")}
+          label={tCommon("addRule")}
           onClick={() =>
             setRules((current) => [
               ...current,
@@ -372,7 +373,7 @@ export function NetworkTab({
         />
         <Button
           size="sm"
-          label={t("saveChanges")}
+          label={tCommon("saveChanges")}
           onClick={save}
           isLoading={saving}
           isDisabled={!dirty || saving}
@@ -381,7 +382,7 @@ export function NetworkTab({
           <Button
             variant="ghost"
             size="sm"
-            label={t("discard")}
+            label={tCommon("discard")}
             onClick={() => setRules(toRules(list))}
           />
         )}
@@ -393,8 +394,8 @@ export function NetworkTab({
         size="sm"
         width={320}
         options={[
-          { value: "deny", label: t("ipDefaultDeny") },
-          { value: "allow", label: t("ipDefaultAllow") },
+          { value: "deny", label: t("ipDeny") },
+          { value: "allow", label: t("ipAllow") },
         ]}
         value={list.ipDefault}
         onChange={(next) => saveSetting({ ipDefault: next as string })}
@@ -423,6 +424,7 @@ function DenyResponseEditor({
   onSave: (deny: { status?: number; body?: string; redirectUrl?: string } | null) => Promise<void>;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const saved = list.denyResponse;
   const initialMode: DenyMode = saved?.redirectUrl ? "redirect" : saved ? "status" : "default";
   const [mode, setMode] = useState<DenyMode>(initialMode);
@@ -508,7 +510,7 @@ function DenyResponseEditor({
         />
       )}
       <HStack>
-        <Button size="sm" label={t("saveChanges")} onClick={save} isLoading={saving} />
+        <Button size="sm" label={tCommon("saveChanges")} onClick={save} isLoading={saving} />
       </HStack>
     </VStack>
   );

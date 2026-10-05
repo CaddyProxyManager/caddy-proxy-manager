@@ -1015,6 +1015,7 @@ function DnsProvidersSection({
   configuredProviders: string[];
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const { enabledModuleIds } = useModuleGate();
   // Each provider is its own caddy-dns module; one switched off would make Caddy reject the config,
   // so it is refused here rather than at issuance time.
@@ -1081,7 +1082,12 @@ function DnsProvidersSection({
                       <form action={dnsProviderFormAction}>
                         <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
-                        <Button type="submit" variant="destructive" size="sm" label={t("remove")} />
+                        <Button
+                          type="submit"
+                          variant="destructive"
+                          size="sm"
+                          label={tCommon("remove")}
+                        />
                       </form>
                     </HStack>
                   </HStack>
@@ -1111,7 +1117,7 @@ function DnsProvidersSection({
             form="dnsp-add-form"
             variant="primary"
             size="sm"
-            label={hasProvider && isUpdate ? t("updateDnsProvider") : t("addDnsProvider")}
+            label={hasProvider && isUpdate ? t("updateOauthProvider") : t("addProvider")}
             isDisabled={!hasProvider}
           />
         }
@@ -1120,7 +1126,7 @@ function DnsProvidersSection({
           <VStack gap={3}>
             <input type="hidden" name="action" value="save" />
             <Selector
-              label={t("provider")}
+              label={tCommon("provider")}
               description={
                 unavailableCount > 0
                   ? t("dnsProvidersSupportedWithUnavailable", {
@@ -1244,9 +1250,9 @@ function DnsResolversSection({
 // ─── Section: Upstream DNS Pinning ───────────────────────────────────────────
 
 const FAMILY_OPTIONS = [
-  { value: "both", labelKey: "addressFamilyBoth" },
-  { value: "ipv6", labelKey: "addressFamilyIpv6" },
-  { value: "ipv4", labelKey: "addressFamilyIpv4" },
+  { value: "both", labelKey: "optDnsFamilyBoth" },
+  { value: "ipv6", labelKey: "optDnsFamilyIpv6" },
+  { value: "ipv4", labelKey: "optDnsFamilyIpv4" },
 ] as const;
 
 function UpstreamDnsSection({
@@ -1259,6 +1265,7 @@ function UpstreamDnsSection({
   upstreamDnsResolutionFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const tProxyHosts = useTranslations("proxyHosts");
   const [enabled, setEnabled] = useState(upstreamDnsResolution?.enabled ?? false);
   const [family, setFamily] = useState<string>(upstreamDnsResolution?.family ?? "both");
 
@@ -1284,7 +1291,10 @@ function UpstreamDnsSection({
               label={t("addressFamily")}
               description={t("dnsAddressFamilyHelp")}
               htmlName="family"
-              options={FAMILY_OPTIONS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))}
+              options={FAMILY_OPTIONS.map(({ value, labelKey }) => ({
+                value,
+                label: tProxyHosts(labelKey),
+              }))}
               value={family}
               onChange={setFamily}
               width={280}
@@ -1770,6 +1780,7 @@ function ForwardAuthSection({
   forwardAuthFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [provider, setProvider] = useState<string>(forwardAuth?.provider ?? "authelia");
   const [authUpstream, setAuthUpstream] = useState(forwardAuth?.authUpstream ?? "");
   const [authEndpoint, setAuthEndpoint] = useState(forwardAuth?.authEndpoint ?? "");
@@ -1782,7 +1793,7 @@ function ForwardAuthSection({
             <StatusAlert message={forwardAuthState.message} success={forwardAuthState.success} />
           )}
           <Selector
-            label={t("forwardAuthProvider")}
+            label={tCommon("provider")}
             htmlName="forwardAuthProvider"
             options={[
               { value: "authelia", label: "Authelia" },
@@ -2105,6 +2116,7 @@ function UpdatesSection({
   updatesFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const now = useNow();
   const [enabled, setEnabled] = useState(updates.enabled);
@@ -2144,7 +2156,7 @@ function UpdatesSection({
           <EnvLabelledField
             label={t("checkForUpdates")}
             env={["UPDATE_CHECK_ENABLED"]}
-            description={t("updateCheckHelp")}
+            description={t("registry.update_check_enabled.description")}
             layout="inline"
           >
             <Switch
@@ -2155,11 +2167,14 @@ function UpdatesSection({
             />
           </EnvLabelledField>
 
-          <EnvLabelledField label={t("imageRepository")} env={["UPDATE_IMAGE_REPOSITORY"]}>
+          <EnvLabelledField
+            label={t("registry.update_image_repository.label")}
+            env={["UPDATE_IMAGE_REPOSITORY"]}
+          >
             <TextInput
               startIcon={Container}
               {...AUTOFILL_OFF}
-              label={t("imageRepository")}
+              label={t("registry.update_image_repository.label")}
               description={t("imageRepositoryHelp")}
               placeholder={t("imageRepositoryPlaceholder")}
               htmlName="updateImageRepository"
@@ -2192,7 +2207,7 @@ function UpdatesSection({
               type="button"
               size="sm"
               variant="secondary"
-              label={checking ? t("dashboardDnsChecking") : t("geoipCheckNow")}
+              label={checking ? tCommon("checking") : tCommon("checkNow")}
               isDisabled={!enabled || checking}
               onClick={async () => {
                 setChecking(true);
@@ -2288,30 +2303,33 @@ function AnalyticsSection({
           {/* Tells the action a password already exists, so "enabled with an empty field" is a
               keep-what-is-stored rather than a misconfiguration to refuse. */}
           <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
-          <EnvLabelledField label={t("clickhouseUrl")} env={["CLICKHOUSE_URL"]}>
+          <EnvLabelledField label={t("registry.clickhouse_url.label")} env={["CLICKHOUSE_URL"]}>
             <TextInput
               startIcon={LinkIcon}
               {...AUTOFILL_OFF}
-              label={t("clickhouseUrl")}
-              description={t("clickhouseUrlHelp")}
+              label={t("registry.clickhouse_url.label")}
+              description={t("registry.clickhouse_url.description")}
               htmlName="clickhouseUrl"
               value={url}
               onChange={setUrl}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("clickhouseUser")} env={["CLICKHOUSE_USER"]}>
+          <EnvLabelledField label={t("registry.clickhouse_user.label")} env={["CLICKHOUSE_USER"]}>
             <TextInput
               startIcon={User}
               {...AUTOFILL_OFF}
-              label={t("clickhouseUser")}
+              label={t("registry.clickhouse_user.label")}
               htmlName="clickhouseUser"
               value={user}
               onChange={setUser}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("clickhousePassword")} env={["CLICKHOUSE_PASSWORD"]}>
+          <EnvLabelledField
+            label={t("registry.clickhouse_password.label")}
+            env={["CLICKHOUSE_PASSWORD"]}
+          >
             <GeneratedPasswordField
-              label={t("clickhousePassword")}
+              label={t("registry.clickhouse_password.label")}
               isOptional={analytics.hasPassword}
               description={
                 analytics.hasPassword
@@ -2323,10 +2341,10 @@ function AnalyticsSection({
               onChange={setPassword}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("clickhouseDatabase")} env={["CLICKHOUSE_DB"]}>
+          <EnvLabelledField label={t("registry.clickhouse_db.label")} env={["CLICKHOUSE_DB"]}>
             <TextInput
               {...AUTOFILL_OFF}
-              label={t("clickhouseDatabase")}
+              label={t("registry.clickhouse_db.label")}
               htmlName="clickhouseDb"
               value={database}
               onChange={setDatabase}
@@ -2336,7 +2354,7 @@ function AnalyticsSection({
             <NumberInput
               startIcon={CalendarDays}
               hasNumberSteppers
-              units={t("retentionDaysUnit")}
+              units={t("units.days")}
               label={t("retentionDays")}
               description={t("analyticsRetentionHelp")}
               htmlName="clickhouseRetentionDays"
@@ -2361,6 +2379,7 @@ function AnalyticsSection({
  */
 function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
@@ -2393,7 +2412,7 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
         <Button
           variant="secondary"
           size="sm"
-          label={pending ? t("geoipChecking") : t("geoipCheckNow")}
+          label={pending ? tCommon("checking") : tCommon("checkNow")}
           onClick={checkNow}
           isDisabled={pending}
         />
@@ -2463,10 +2482,13 @@ function GeoipSection({
           </Text>
           <GeoipUpdateCheckLine geoip={geoip} />
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
-          <EnvLabelledField label={t("maxmindAccountId")} env={["GEOIPUPDATE_ACCOUNT_ID"]}>
+          <EnvLabelledField
+            label={t("registry.geoipupdate_account_id.label")}
+            env={["GEOIPUPDATE_ACCOUNT_ID"]}
+          >
             <TextInput
               {...AUTOFILL_OFF}
-              label={t("maxmindAccountId")}
+              label={t("registry.geoipupdate_account_id.label")}
               isOptional
               description={t("maxmindCredentialsHelp")}
               htmlName="geoipAccountId"
@@ -2474,15 +2496,20 @@ function GeoipSection({
               onChange={setAccountId}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("maxmindLicenceKey")} env={["GEOIPUPDATE_LICENSE_KEY"]}>
+          <EnvLabelledField
+            label={t("registry.geoipupdate_license_key.label")}
+            env={["GEOIPUPDATE_LICENSE_KEY"]}
+          >
             <TextInput
               startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
-              label={t("maxmindLicenceKey")}
+              label={t("registry.geoipupdate_license_key.label")}
               type="password"
               isOptional
               description={
-                geoip.hasLicenseKey ? t("maxmindLicenceKeyStored") : t("maxmindLicenceKeyHelp")
+                geoip.hasLicenseKey
+                  ? t("maxmindLicenceKeyStored")
+                  : t("registry.geoipupdate_license_key.description")
               }
               htmlName="geoipLicenseKey"
               value={licenseKey}
@@ -2498,7 +2525,7 @@ function GeoipSection({
               onChange={setIntervalHours}
               isIntegerOnly
               hasNumberSteppers
-              units={t("geoipUpdateIntervalUnit")}
+              units={t("units.hours")}
               startIcon={Clock}
               min={1}
               max={168}
@@ -2591,6 +2618,7 @@ function AgentSection({
   pairingHost: { host: string; insecure: boolean } | null;
 }) {
   const t = useTranslations("settings");
+  const tNav = useTranslations("nav");
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [repair, setRepair] = useState<{ name: string; result: RepairAgentResult } | null>(null);
@@ -2623,7 +2651,7 @@ function AgentSection({
 
   return (
     <>
-      <FormCard title={usingPaired ? t("agentsTitle") : t("currentAgentTitle")}>
+      <FormCard title={usingPaired ? tNav("agents") : t("currentAgentTitle")}>
         <VStack gap={3}>
           <Text size="sm" color="secondary">
             {t("agentsDescription")}
@@ -2818,6 +2846,7 @@ function MetricsSection({
   metricsFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [enabled, setEnabled] = useState(metrics?.enabled ?? false);
   const [port, setPort] = useState(metrics?.port ?? 9090);
 
@@ -2839,7 +2868,7 @@ function MetricsSection({
             <NumberInput
               startIcon={EthernetPort}
               hasNumberSteppers
-              label={t("port")}
+              label={tCommon("port")}
               description={t("metricsPortHelp")}
               htmlName="port"
               value={port}

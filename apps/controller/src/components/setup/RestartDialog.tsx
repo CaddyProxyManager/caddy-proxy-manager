@@ -100,6 +100,7 @@ export default function RestartDialog({
   preferredOrigin?: string | null;
 }) {
   const t = useTranslations("setup");
+  const tCommon = useTranslations("common");
   const [phase, setPhase] = useState<Phase>("stopping");
   // Translated at render: `t` in the effect's deps would re-run it and cancel the restart.
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -266,7 +267,7 @@ export default function RestartDialog({
                 <Button
                   variant={phase === "stalled" ? "primary" : "secondary"}
                   label={
-                    phase === "stalled" ? t("restartContinue") : t("restartContinueWithoutWaiting")
+                    phase === "stalled" ? tCommon("continue") : t("restartContinueWithoutWaiting")
                   }
                   onClick={() => goOn()}
                 />

@@ -479,6 +479,7 @@ export function PageSaveBar({
   children: ReactNode;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const container = useRef<HTMLDivElement>(null);
   // A stable set: the effect that marks the labels depends on it.
   const staged = useMemo(() => new Set(stagedFields), [stagedFields]);
@@ -515,7 +516,7 @@ export function PageSaveBar({
             <Card padding={2}>
               <HStack gap={3} vAlign="center">
                 <Text type="body" size="sm">
-                  {t("pageUnsaved", { count: dirty.length })}
+                  {tCommon("unsavedChanges", { count: dirty.length })}
                 </Text>
                 <Button
                   type="button"
@@ -523,14 +524,14 @@ export function PageSaveBar({
                   size="sm"
                   // A DOM reset would desync from the React state these fields hold.
                   onClick={guard.discard}
-                  label={t("pageDiscard")}
+                  label={tCommon("discard")}
                 />
                 <Button
                   type="button"
                   variant="primary"
                   size="sm"
                   onClick={save}
-                  label={t("save")}
+                  label={tCommon("save")}
                   // Other Save buttons exist on the page (e.g. the favicon card).
                   data-testid="settings-page-save"
                 />

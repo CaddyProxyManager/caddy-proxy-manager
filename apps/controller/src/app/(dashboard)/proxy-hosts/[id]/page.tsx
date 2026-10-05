@@ -41,7 +41,8 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
   const { audit, ...detail } = await getProxyHostDetail(host, access);
 
   // See the audit log page: summaries are stored in English and translated on the way out.
-  const [t, tSummaries] = await Promise.all([getTranslations("overview"), getTranslations()]);
+  const tSummaries = await getTranslations();
+  const tAuditLog = await getTranslations("auditLog");
   const actorIds = [...new Set(audit.flatMap((e) => (e.userId === null ? [] : [e.userId])))];
   const actors =
     actorIds.length === 0
@@ -78,7 +79,10 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
               action: event.action,
               summary:
                 auditSummaryText(tSummaries, event) ??
-                t("eventSummaryFallback", { action: event.action, entityType: event.entityType }),
+                tAuditLog("summaryFallback", {
+                  action: event.action,
+                  entityType: event.entityType,
+                }),
               actor: event.userId === null ? null : (actorNames.get(event.userId) ?? null),
               createdAt: event.createdAt,
             }))

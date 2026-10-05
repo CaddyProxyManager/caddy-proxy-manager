@@ -123,6 +123,9 @@ export default function ProfileClient({
   displayPreferences,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
+  const tUsers = useTranslations("users");
+  const tCommon = useTranslations("common");
+  const tAuth = useTranslations("auth");
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
   // `now` is passed explicitly, or next-intl reports an environment fallback on every call.
@@ -200,7 +203,7 @@ export default function ProfileClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || t("passwordChangeFailed"));
+        setError(data.error || tAuth("passwordChange.failed"));
         setLoading(false);
         return;
       }
@@ -395,7 +398,7 @@ export default function ProfileClient({
   };
 
   const formatDate = (iso: string | null): string => {
-    if (!iso) return t("never");
+    if (!iso) return tCommon("never");
     return format.dateTime(new Date(iso), TIMESTAMP_STYLES.dateTimeShort);
   };
 
@@ -410,7 +413,7 @@ export default function ProfileClient({
       {error && (
         <Banner
           status="error"
-          title={t("errorTitle")}
+          title={tCommon("somethingWentWrong")}
           description={error}
           isDismissable
           onDismiss={() => setError(null)}
@@ -462,14 +465,16 @@ export default function ProfileClient({
             <Divider />
 
             <MetadataList>
-              <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
-              <MetadataListItem label={t("name")}>{user.name || t("notSet")}</MetadataListItem>
+              <MetadataListItem label={tCommon("email")}>{user.email}</MetadataListItem>
+              <MetadataListItem label={tCommon("name")}>
+                {user.name || t("notSet")}
+              </MetadataListItem>
               {user.signInUsername && (
-                <MetadataListItem label={t("signInUsername")}>
+                <MetadataListItem label={tUsers("signInUsername")}>
                   {user.signInUsername}
                 </MetadataListItem>
               )}
-              <MetadataListItem label={t("role")}>
+              <MetadataListItem label={tCommon("role")}>
                 <Badge label={user.role} />
               </MetadataListItem>
               <MetadataListItem label={t("authenticationMethod")}>
@@ -479,7 +484,7 @@ export default function ProfileClient({
                 />
               </MetadataListItem>
               {hasPassword && (
-                <MetadataListItem label={t("password")}>
+                <MetadataListItem label={tCommon("password")}>
                   <Badge variant="success" label={t("passwordIsSet")} />
                 </MetadataListItem>
               )}
@@ -536,7 +541,10 @@ export default function ProfileClient({
                   description={t("oauthPasswordDescription")}
                 />
                 <HStack>
-                  <Button label={t("setPassword")} onClick={() => setPasswordDialogOpen(true)} />
+                  <Button
+                    label={tCommon("setPassword")}
+                    onClick={() => setPasswordDialogOpen(true)}
+                  />
                 </HStack>
               </VStack>
             )}
@@ -544,7 +552,7 @@ export default function ProfileClient({
         )}
 
         {localPasswordsEnabled && (
-          <ProfileSection id="two-factor" icon={ShieldCheck} title={t("twoFactor.title")}>
+          <ProfileSection id="two-factor" icon={ShieldCheck} title={tCommon("twoFactorSignIn")}>
             <TwoFactorSection
               enabled={user.twoFactorEnabled}
               hasPassword={hasPassword}
@@ -610,7 +618,7 @@ export default function ProfileClient({
                       {withUtc(
                         s.expiresAt,
                         <Text type="body" size="xsm" color="secondary">
-                          {t("expiresOn", { date: formatDate(s.expiresAt) })}
+                          {tCommon("expiresOn", { date: formatDate(s.expiresAt) })}
                         </Text>,
                       )}
                     </HStack>
@@ -726,9 +734,9 @@ export default function ProfileClient({
       <AppDialog
         open={passwordDialogOpen}
         onClose={() => setPasswordDialogOpen(false)}
-        title={hasPassword ? t("changePassword") : t("setPassword")}
+        title={hasPassword ? t("changePassword") : tCommon("setPassword")}
         maxWidth="sm"
-        submitLabel={hasPassword ? t("changePassword") : t("setPassword")}
+        submitLabel={hasPassword ? t("changePassword") : tCommon("setPassword")}
         onSubmit={handlePasswordChange}
         isSubmitting={loading}
       >
@@ -737,14 +745,14 @@ export default function ProfileClient({
             <TextInput
               startIcon={KeyRound}
               {...AUTOFILL_CURRENT_PASSWORD}
-              label={t("currentPassword")}
+              label={tCommon("currentPassword")}
               type="password"
               value={currentPassword}
               onChange={setCurrentPassword}
             />
           )}
           <GeneratedPasswordField
-            label={t("newPassword")}
+            label={tCommon("newPassword")}
             value={newPassword}
             onChange={setNewPassword}
             // Fill the confirmation too: nobody can retype a generated value from memory.
@@ -757,7 +765,7 @@ export default function ProfileClient({
           <TextInput
             startIcon={KeyRound}
             {...AUTOFILL_NEW_PASSWORD}
-            label={t("confirmNewPassword")}
+            label={tCommon("confirmNewPassword")}
             type="password"
             value={confirmPassword}
             onChange={setConfirmPassword}
@@ -784,7 +792,7 @@ export default function ProfileClient({
           <TextInput
             startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
-            label={t("currentPassword")}
+            label={tCommon("currentPassword")}
             type="password"
             value={unlinkCurrentPassword}
             onChange={setUnlinkCurrentPassword}
@@ -812,7 +820,7 @@ export default function ProfileClient({
           <TextInput
             startIcon={KeyRound}
             {...AUTOFILL_CURRENT_PASSWORD}
-            label={t("currentPassword")}
+            label={tCommon("currentPassword")}
             type="password"
             value={removePasswordCurrent}
             onChange={setRemovePasswordCurrent}

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { type DomainError, type DomainErrorCode, domainError } from "../errors/domain-error";
 
 export type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
 
@@ -15,15 +16,18 @@ export class CaddyApplyError extends Error {
   readonly waf: WafRejection;
   /** The agent whose Caddy refused, when known: a fleet apply still fails on one host. */
   readonly agent: { agentId: string; name: string } | null;
+  /** What a reader is shown; `code` above is what callers branch on. */
+  readonly localized: DomainError | null;
 
   constructor(
-    message: string,
+    message: string | DomainError,
     code: CaddyApplyErrorCode,
     waf: WafRejection = { wafFailed: false, ruleIds: [] },
     agent: { agentId: string; name: string } | null = null,
   ) {
-    super(message);
+    super(typeof message === "string" ? message : message.message);
     this.name = "CaddyApplyError";
+    this.localized = typeof message === "string" ? null : message;
     this.code = code;
     this.waf = waf;
     this.agent = agent;
@@ -52,23 +56,37 @@ export function safeSystemErrorCode(error: unknown): string | null {
  * The /load error body quotes the config, so it is never surfaced verbatim; these give an
  * app-authored reason instead. A Coraza error rejects the whole document, so every host stops.
  */
-const KNOWN_CADDY_REJECTIONS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
+const KNOWN_CADDY_REJECTIONS = [
   {
     pattern: /request body limit should be at most 1GiB/i,
     reason: "a WAF request body limit exceeds Coraza's maximum of 1 GiB",
+    codes: ["caddyRejectedWafBodyLimitAboveMax", "caddyRejectedOnWafBodyLimitAboveMax"],
   },
   {
     pattern: /request body limit should be at least the memory limit/i,
     reason: "a WAF in-memory body limit is larger than its request body limit",
+    codes: ["caddyRejectedWafMemoryAboveBodyLimit", "caddyRejectedOnWafMemoryAboveBodyLimit"],
   },
   {
     pattern: /body limit should be bigger than 0/i,
     reason: "a WAF body limit is zero",
+    codes: ["caddyRejectedWafBodyLimitZero", "caddyRejectedOnWafBodyLimitZero"],
   },
-];
+] as const satisfies ReadonlyArray<{
+  pattern: RegExp;
+  reason: string;
+  codes: readonly [DomainErrorCode, DomainErrorCode];
+}>;
 
 export function describeCaddyRejection(responseBody: string): string | null {
   return KNOWN_CADDY_REJECTIONS.find(({ pattern }) => pattern.test(responseBody))?.reason ?? null;
+}
+
+/** One code per reason and per "on an agent or not", since a reader's language words both. */
+export function caddyRejection(responseBody: string, who: string): DomainError {
+  const known = KNOWN_CADDY_REJECTIONS.find(({ pattern }) => pattern.test(responseBody));
+  if (known) return who ? domainError(known.codes[1], { agent: who }) : domainError(known.codes[0]);
+  return who ? domainError("caddyRejectedOn", { agent: who }) : domainError("caddyRejected");
 }
 
 /** Log diagnostic metadata without exception messages, response bodies, URLs, or stacks. */

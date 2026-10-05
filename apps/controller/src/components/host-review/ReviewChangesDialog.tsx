@@ -99,6 +99,9 @@ export function ReviewChangesDialog({
   onSave,
 }: ReviewChangesDialogProps) {
   const t = useTranslations("hostReview");
+  const tAgents = useTranslations("agents");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const sectionLabel = (section: string) => t(key(`sections.${kind}.${section}`));
   const fieldLabel = (field: string) => t(key(`fields.${field}`));
 
@@ -118,7 +121,7 @@ export function ReviewChangesDialog({
           <Button variant="secondary" label={t("backToEditor")} onClick={onBack} />
           <Button
             variant="primary"
-            label={isCreate ? t("createHost") : t("saveChanges")}
+            label={isCreate ? tProxyHosts("createHost") : tCommon("saveChanges")}
             onClick={onSave}
             isLoading={isSaving}
             isDisabled={isSaving || isLoading || preview === null || nothingToSave}
@@ -134,7 +137,7 @@ export function ReviewChangesDialog({
         {!isLoading && changes.length > 0 && (
           <VStack gap={3}>
             <Text type="label" size="lg">
-              {t("changesHeading", { count: changes.length })}
+              {tCommon("changeCount", { count: changes.length })}
             </Text>
             {changes.some((change) => change.masked) && (
               <Text type="supporting" size="sm">
@@ -170,7 +173,7 @@ export function ReviewChangesDialog({
                           <Button
                             variant="ghost"
                             size="sm"
-                            label={t("undo")}
+                            label={tCommon("undo")}
                             tooltip={t("undoLabel", { field: fieldLabel(change.field) })}
                             onClick={() => onUndo(change.field)}
                             isDisabled={isSaving}
@@ -237,7 +240,7 @@ export function ReviewChangesDialog({
                 }
               />
               <ListItem
-                label={impact.pinned ? t("pinned") : t("servedEverywhere")}
+                label={impact.pinned ? t("pinned") : tAgents("assignedToAll")}
                 description={impact.pinChanged ? t("pinnedChanged") : undefined}
               />
               {kind === "http" && (

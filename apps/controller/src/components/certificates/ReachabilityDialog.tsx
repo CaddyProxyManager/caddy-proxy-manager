@@ -24,6 +24,7 @@ const VARIANT = {
 /** Each of a host's domains, checked the way an HTTP-01 challenge would reach it. */
 export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
   const t = useTranslations("certificates.reachability");
+  const tCommon = useTranslations("common");
   const [results, setResults] = useState<DomainReachability[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [outside, setOutside] = useState<Record<string, LetsDebugResult | "pending">>({});
@@ -73,7 +74,7 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
         {error && <Banner status="error" title={t("failed")} description={error} />}
         {!results && !error && (
           <Text type="body" size="sm" color="secondary">
-            {t("checking")}
+            {tCommon("checking")}
           </Text>
         )}
         {results?.map((result) => {

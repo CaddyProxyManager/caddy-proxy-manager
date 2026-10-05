@@ -91,6 +91,7 @@ export default function OAuthProvidersSection({
   localUsersDisabled = false,
 }: OAuthProvidersSectionProps) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [providers, setProviders] = useState(initialProviders);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<OAuthProviderView | null>(null);
@@ -343,7 +344,7 @@ export default function OAuthProvidersSection({
                   <IconButton
                     variant="secondary"
                     size="sm"
-                    label={t("editProviderNamed", { name: provider.name })}
+                    label={tCommon("editNamed", { name: provider.name })}
                     icon={<Pencil />}
                     isDisabled={isFromEnv}
                     tooltip={isFromEnv ? t("envProviderCannotEdit") : t("editProvider")}
@@ -352,7 +353,7 @@ export default function OAuthProvidersSection({
                   <IconButton
                     variant="secondary"
                     size="sm"
-                    label={t("deleteProviderNamed", { name: provider.name })}
+                    label={tCommon("deleteNamed", { name: provider.name })}
                     icon={<Trash2 />}
                     isDisabled={isFromEnv}
                     tooltip={isFromEnv ? t("envProviderCannotDelete") : t("deleteProvider")}
@@ -404,7 +405,7 @@ export default function OAuthProvidersSection({
           {error && <Banner status="error" title={t("couldNotSaveProvider")} description={error} />}
 
           <TextInput
-            label={t("name")}
+            label={tCommon("name")}
             isRequired
             size="sm"
             value={form.name}

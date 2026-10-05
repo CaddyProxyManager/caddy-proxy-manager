@@ -50,9 +50,53 @@ export type L4PortsState = "idle" | "pending" | "applying" | "applied" | "failed
 export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
 export type ManagedServicesState = "idle" | "pending" | "applying" | "applied" | "failed";
 
+/**
+ * What an operation status says, as a code the controller words in its reader's language;
+ * `message` stays the English for an older controller, and for a code it does not know.
+ */
+export const AGENT_STATUS_MESSAGES = [
+  "l4Interrupted",
+  "l4Refused",
+  "l4Applying",
+  "l4RecreateFailed",
+  "l4AppliedHealthy",
+  "l4AppliedStarting",
+  "l4Failed",
+  "buildInterrupted",
+  "imageLoading",
+  "imagePullFailed",
+  "imageModulesUnreadable",
+  "imageNarrowing",
+  "imageRecreateFailed",
+  "imageModulesUnreadableAfter",
+  "imageUnhealthy",
+  "imageLoaded",
+  "imageLoadedNoList",
+  "imageLoadFailed",
+  "buildRefused",
+  "building",
+  "buildTimedOut",
+  "buildFailedOutput",
+  "buildRecreateFailed",
+  "buildUnhealthy",
+  "buildApplied",
+  "buildFailed",
+  "servicesInterrupted",
+  "servicesStarting",
+  "servicesStopping",
+  "servicesPartial",
+  "servicesRunning",
+  "servicesOff",
+  "servicesFailed",
+] as const;
+export type AgentStatusMessageCode = (typeof AGENT_STATUS_MESSAGES)[number];
+export type AgentStatusMessageParams = Record<string, string | number>;
+
 export type AgentOperationStatus<TState extends string> = {
   state: TState;
   message?: string;
+  messageCode?: AgentStatusMessageCode;
+  messageParams?: AgentStatusMessageParams;
   appliedAt?: string;
   triggeredAt?: string;
   error?: string;

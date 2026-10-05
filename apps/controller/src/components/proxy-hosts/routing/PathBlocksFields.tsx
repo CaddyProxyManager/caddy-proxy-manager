@@ -40,6 +40,7 @@ type Props = { initialData?: PathBlockRule[] };
 
 export function PathBlocksFields({ initialData = [] }: Props) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   const addRule = () =>
@@ -72,7 +73,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "path", next)}
               />
               <Selector
-                label={t("status")}
+                label={tCommon("status")}
                 isLabelHidden={i > 0}
                 size="sm"
                 width={120}

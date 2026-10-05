@@ -12,7 +12,7 @@ import type { StatCard } from "./OverviewClient";
 import { getTranslations } from "next-intl/server";
 
 async function loadStats(): Promise<StatCard[]> {
-  const t = await getTranslations("overview");
+  const tNav = await getTranslations("nav");
   const [
     proxyHostCountResult,
     proxyHostEnabledResult,
@@ -81,7 +81,7 @@ async function loadStats(): Promise<StatCard[]> {
   // server/client boundary, and an element would carry its styling with it.
   return [
     {
-      label: t("statProxyHosts"),
+      label: tNav("proxyHosts"),
       icon: "proxyHosts",
       // A disabled host still holds its domain and still shows in the list, so the
       // headline is what is actually being served and the total sits beside it.
@@ -90,13 +90,13 @@ async function loadStats(): Promise<StatCard[]> {
       href: "/proxy-hosts",
     },
     {
-      label: t("statCertificates"),
+      label: tNav("certificates"),
       icon: "certificates",
       count: certificatesCount,
       href: "/certificates",
     },
     {
-      label: t("statAccessLists"),
+      label: tNav("accessLists"),
       icon: "accessLists",
       count: accessListsCount,
       href: "/access-lists",
@@ -113,6 +113,7 @@ export default async function OverviewPage() {
   const session = await requireUser();
   const isAdmin = session.user.role === "admin";
   const t = await getTranslations("overview");
+  const tAuditLog = await getTranslations("auditLog");
 
   // Non-admin users see a minimal welcome page
   if (!isAdmin) {
@@ -175,7 +176,7 @@ export default async function OverviewPage() {
         actor: event.userId === null ? null : (actorNames.get(event.userId) ?? null),
         summary:
           auditSummaryText(tSummaries, event) ??
-          t("eventSummaryFallback", { action: event.action, entityType: event.entityType }),
+          tAuditLog("summaryFallback", { action: event.action, entityType: event.entityType }),
         createdAt: toIso(event.createdAt)!,
       }))}
     />

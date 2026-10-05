@@ -32,6 +32,7 @@ export function TwoFactorStep({
   onCancel: () => void;
 }) {
   const t = useTranslations("auth.twoFactor");
+  const tCommon = useTranslations("common");
   const [method, setMethod] = useState<"totp" | "backup">("totp");
   const [code, setCode] = useState("");
   const [trustDevice, setTrustDevice] = useState(false);
@@ -75,7 +76,7 @@ export function TwoFactorStep({
         <Button
           type="submit"
           variant="primary"
-          label={pending ? t("verifying") : t("verify")}
+          label={pending ? tCommon("verifying") : t("verify")}
           isLoading={pending}
           isDisabled={pending}
           width="100%"

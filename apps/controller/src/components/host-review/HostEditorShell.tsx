@@ -118,7 +118,7 @@ export function HostEditorShell({
   children: ReactNode;
 }) {
   const t = useTranslations("hostReview");
-  const tUi = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const sectionKey = (id: string) => `sections.${kind}.${id}` as Parameters<typeof t>[0];
   const unsaved = useUnsavedChanges(formId, open);
 
@@ -260,12 +260,12 @@ export function HostEditorShell({
         }
         footerStart={
           <Text type="supporting" size="sm" color={unsaved > 0 ? "primary" : "secondary"}>
-            {unsaved > 0 ? t("unsaved", { count: unsaved }) : t("noUnsaved")}
+            {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
           </Text>
         }
         actions={
           <>
-            <Button variant="secondary" label={tUi("cancel")} onClick={requestClose} />
+            <Button variant="secondary" label={tCommon("cancel")} onClick={requestClose} />
             <Button
               variant="secondary"
               label={t("reviewChanges")}

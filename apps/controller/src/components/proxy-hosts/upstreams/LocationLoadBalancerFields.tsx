@@ -96,6 +96,7 @@ type Props = {
 /** LoadBalancerFields for one location rule, driven through onChange. */
 export function LocationLoadBalancerFields({ value, onChange }: Props) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const lb = value;
   const enabled = Boolean(lb?.enabled);
   const policy = lb?.policy ?? "random";
@@ -254,7 +255,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                     <NumberInput
                       startIcon={EthernetPort}
                       hasNumberSteppers
-                      label={t("port")}
+                      label={tCommon("port")}
                       size="sm"
                       min={1}
                       max={65535}

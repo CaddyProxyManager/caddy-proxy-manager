@@ -105,7 +105,7 @@ describe('first-run account step', () => {
       outcome(createFirstAdmin({ error: null }, adminForm('attacker'))),
     ]);
     expect(results.filter((result) => result === 'won')).toHaveLength(1);
-    expect(results).toContain(testTranslator('setup.errors')('alreadyCompleted'));
+    expect(results).toContain(testTranslator('errors')('setupAlreadyCompleted'));
     expect(await ctx.db.select().from(schemaModule.users)).toHaveLength(1);
   });
 

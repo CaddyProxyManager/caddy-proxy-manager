@@ -30,6 +30,7 @@ import {
 
 export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
   const t = useTranslations("overview.checklist");
+  const tCommon = useTranslations("common");
   const [checklist, setChecklist] = useState<SetupChecklist | null>(preview ?? null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -96,7 +97,7 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
           <Button
             variant="ghost"
             size="sm"
-            label={t("hide")}
+            label={tCommon("hide")}
             onClick={hide}
             isDisabled={isPending}
           />
@@ -135,7 +136,7 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      label={step.markedDone ? t("undo") : t("markDone")}
+                      label={step.markedDone ? tCommon("undo") : t("markDone")}
                       onClick={() => markDone(step.step, !step.markedDone)}
                       isDisabled={isPending}
                     />

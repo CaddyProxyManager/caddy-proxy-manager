@@ -97,6 +97,7 @@ export function TopListTable({
   onFilter?: (dimension: TopDimension, value: string, op: FilterOp) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const format = useAppFormatter();
   const density = useTableDensity();
   const label = useTopRowLabel(dimension);
@@ -122,7 +123,7 @@ export function TopListTable({
     },
     {
       key: "requests",
-      header: dimension === "rule" ? t("hits") : t("metricRequests"),
+      header: dimension === "rule" ? t("hits") : tCommon("requests"),
       align: "end",
       width: pixel(80),
       renderCell: (row) => (
@@ -146,7 +147,7 @@ export function TopListTable({
   if (onFilter) {
     columns.push({
       key: "actions",
-      header: <VisuallyHidden>{t("rowActions")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       align: "end",
       width: pixel(72),
       renderCell: (row) => (
@@ -202,6 +203,7 @@ export function TopListCard({
   onExport?: (dimension: TopDimension) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const label = useTopRowLabel(dimension);
   const title = t(`top.${TOP_TITLE_KEY[dimension]}`);
   return (
@@ -236,7 +238,7 @@ export function TopListCard({
           </HStack>
         </HStack>
         {rows.length === 0 ? (
-          <EmptyState title={t("noData")} isCompact />
+          <EmptyState title={tCommon("noData")} isCompact />
         ) : (
           <TopListTable dimension={dimension} rows={rows} total={total} onFilter={onFilter} />
         )}

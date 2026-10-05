@@ -14,6 +14,7 @@ import { decryptSecret } from "../secrets";
 import { bundledAgentId } from "./bootstrap";
 import { pushDesiredState } from "./desired-state";
 import { connectedAgents } from "./registry";
+import { agentStatusMessage } from "./status-message";
 
 /**
  * Whether this agent runs the controller's services. With no bundled agent recorded, every agent
@@ -70,12 +71,13 @@ export type ManagedServiceView = {
   agent: string;
   running: boolean;
   state: ManagedServicesState;
-  /** The agent's own words, in English like the rest of its status. */
+  /** The agent's error, or what its status says in the reader's language. */
   message: string | null;
 };
 
 export async function managedServiceView(
   name: ManagedServiceName,
+  t: Parameters<typeof agentStatusMessage>[0],
 ): Promise<ManagedServiceView | null> {
   for (const agent of connectedAgents()) {
     if (!agent.status || !(await runsControllerServices(agent.agentRowId))) continue;
@@ -84,7 +86,7 @@ export async function managedServiceView(
       agent: agent.name,
       running: applied?.[name] === true,
       state: status.state,
-      message: status.error ?? status.message ?? null,
+      message: status.error ?? agentStatusMessage(t, status),
     };
   }
   return null;

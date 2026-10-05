@@ -25,6 +25,7 @@ export function CaptchaSection({
   captchaFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings.captcha");
+  const tCommon = useTranslations("common");
   const [provider, setProvider] = useState<ProviderChoice>(captcha.provider);
   const [siteKey, setSiteKey] = useState(captcha.siteKey);
   const [secretKey, setSecretKey] = useState("");
@@ -43,7 +44,7 @@ export function CaptchaSection({
             <InfoAlert title={t("oidcOnlyTitle")}>{t("oidcOnlyBody")}</InfoAlert>
           )}
           <Selector
-            label={t("provider")}
+            label={tCommon("provider")}
             description={t("providerHelp")}
             htmlName="captchaProvider"
             options={(["none", ...CAPTCHA_PROVIDERS] as const).map((value) => ({

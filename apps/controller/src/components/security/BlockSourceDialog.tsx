@@ -29,6 +29,7 @@ export function BlockSourceDialog({
   onSaved: (message: string) => void;
 }) {
   const t = useTranslations("security");
+  const tCommon = useTranslations("common");
   const [kind, setKind] = useState<BlockedSourceKind>("ip");
   const [value, setValue] = useState("");
   const [reason, setReason] = useState("");
@@ -90,7 +91,7 @@ export function BlockSourceDialog({
           onChange={setValue}
           isRequired
         />
-        <TextInput label={t("reason")} value={reason} onChange={setReason} isOptional />
+        <TextInput label={tCommon("reason")} value={reason} onChange={setReason} isOptional />
         <Selector
           label={t("expiry")}
           description={t("expiryHelp")}

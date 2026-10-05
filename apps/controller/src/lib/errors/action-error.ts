@@ -1,5 +1,5 @@
 import type { useFormatter, useTranslations } from "next-intl";
-import { DomainError, type StoredErrorCode } from "./domain-error";
+import { DomainError, domainErrorOf, type StoredErrorCode } from "./domain-error";
 
 export type ActionState = {
   status: "idle" | "success" | "error";
@@ -21,8 +21,8 @@ type Translator = ReturnType<typeof useTranslations>;
 type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
 
 /**
- * Only a `DomainError` is translated; another Error keeps its English and a non-Error gets the
- * fallback. Pass `t` from `await getTranslations()`.
+ * Only a `DomainError`, or one an error carries, is translated; another Error keeps its English
+ * and a non-Error gets the fallback. Pass `t` from `await getTranslations()`.
  */
 export function actionError(t: Translator, error: unknown, fallbackMessage: string): ActionState {
   return {
@@ -41,10 +41,11 @@ export function extractErrorMessage(
   fallbackMessage: string,
   format?: ListFormatter,
 ): string {
-  if (error instanceof DomainError) {
+  const domain = domainErrorOf(error);
+  if (domain) {
     // `params` has to come along: without it a code carrying placeholders renders them raw.
     const values: Record<string, string | number> = {};
-    for (const [name, value] of Object.entries(error.params)) {
+    for (const [name, value] of Object.entries(domain.params)) {
       values[name] =
         typeof value !== "object"
           ? value
@@ -52,7 +53,7 @@ export function extractErrorMessage(
             ? format.list(value, { type: "unit" })
             : value.join(", ");
     }
-    return (t as unknown as DynamicTranslate)(`errors.${error.code}`, values);
+    return (t as unknown as DynamicTranslate)(`errors.${domain.code}`, values);
   }
   return error instanceof Error ? error.message : fallbackMessage;
 }

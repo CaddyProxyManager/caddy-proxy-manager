@@ -51,6 +51,8 @@ export function GroupAccessDialog({
   onSave: (access: GroupAccess) => void;
 }) {
   const t = useTranslations("groups");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
 
   // One provider for the whole list; nobody asked to mix them per row.
   const [providerId, setProviderId] = useState<string>(
@@ -101,7 +103,7 @@ export function GroupAccessDialog({
             </VStack>
             {providers.length > 0 && (
               <Selector
-                label={t("idpProvider")}
+                label={tCommon("provider")}
                 options={[
                   { value: ANY_PROVIDER, label: t("anyProvider") },
                   ...providers.map((p) => ({ value: p.id, label: p.name })),
@@ -145,7 +147,7 @@ export function GroupAccessDialog({
 
             {proxyHosts.length > 0 && (
               <CheckboxList
-                label={t("proxyHosts")}
+                label={tNav("proxyHosts")}
                 hasDividers
                 value={proxyHostIds.map(String)}
                 onChange={(values) => setProxyHostIds(values.map(Number))}
@@ -158,7 +160,7 @@ export function GroupAccessDialog({
 
             {l4ProxyHosts.length > 0 && (
               <CheckboxList
-                label={t("l4ProxyHosts")}
+                label={tNav("l4ProxyHosts")}
                 hasDividers
                 value={l4Ids.map(String)}
                 onChange={(values) => setL4Ids(values.map(Number))}
@@ -171,7 +173,7 @@ export function GroupAccessDialog({
 
             {agents.length > 0 && (
               <CheckboxList
-                label={t("agents")}
+                label={tNav("agents")}
                 hasDividers
                 value={agentIds.map(String)}
                 onChange={(values) => setAgentIds(values.map(Number))}

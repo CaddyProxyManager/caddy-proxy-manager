@@ -171,6 +171,7 @@ function SecurityChart({ report, onShowPeak }: { report: SecurityReport; onShowP
 
 function RuleSetCard({ report }: { report: SecurityReport }) {
   const t = useTranslations("security");
+  const tNav = useTranslations("nav");
   const tWaf = useTranslations("waf");
   const rules = report.ruleSet;
   return (
@@ -210,7 +211,7 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
               </Text>
             </MetadataListItem>
           )}
-          <MetadataListItem label={t("hostsByMode")}>
+          <MetadataListItem label={tNav("hosts")}>
             <Text type="body" size="sm">
               {t("hostModeCounts", {
                 blocking: rules.hosts.On,
@@ -219,7 +220,7 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
               })}
             </Text>
           </MetadataListItem>
-          <MetadataListItem label={t("exclusions")}>
+          <MetadataListItem label={tWaf("exclusions")}>
             <Link href="/waf">{t("exclusionCount", { count: rules.exclusions })}</Link>
           </MetadataListItem>
           <MetadataListItem label={t("blockedSources")}>
@@ -235,6 +236,7 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
 
 function MitigatedCard({ report }: { report: SecurityReport }) {
   const t = useTranslations("security");
+  const tCommon = useTranslations("common");
   const format = useAppFormatter();
   const outcomeName = useOutcomeName();
   const { totals } = report;
@@ -254,7 +256,7 @@ function MitigatedCard({ report }: { report: SecurityReport }) {
           </Text>
           {totals.requests > 0 && (
             <Text type="body" size="sm" color="secondary">
-              {t("shareOfRequests", {
+              {tCommon("shareOfRequests", {
                 share: formatShare(format, totals.mitigated, totals.requests),
               })}
             </Text>
@@ -323,7 +325,9 @@ export default function SecurityClient({
   hosts: HostOption[];
 }) {
   const t = useTranslations("security");
+  const tCommon = useTranslations("common");
   const tWaf = useTranslations("waf");
+  const tProxyHosts = useTranslations("proxyHosts");
   const format = useAppFormatter();
   const timeZone = useTimeZone() ?? "UTC";
   const emptyValue = useEmptyValue();
@@ -356,7 +360,7 @@ export default function SecurityClient({
   const ruleColumns: Column<SecurityRule>[] = [
     {
       id: "rule",
-      label: tWaf("ruleId"),
+      label: tProxyHosts("ruleId"),
       render: (row) => (
         <VStack gap={0}>
           <Text type="code" size="sm" weight="semibold">
@@ -370,7 +374,7 @@ export default function SecurityClient({
     },
     {
       id: "events",
-      label: t("events"),
+      label: tCommon("events"),
       width: 100,
       align: "right",
       render: (row) => (
@@ -392,7 +396,7 @@ export default function SecurityClient({
     },
     {
       id: "actions",
-      label: tWaf("actions"),
+      label: tCommon("actions"),
       width: 200,
       align: "right",
       render: (row) => (
@@ -413,7 +417,7 @@ export default function SecurityClient({
               variant="secondary"
               size="sm"
               icon={<ShieldOff />}
-              label={t("addExclusion")}
+              label={tWaf("exclusionNew")}
               onClick={() =>
                 setExclusion({
                   ruleId: row.ruleId,
@@ -479,7 +483,7 @@ export default function SecurityClient({
     },
     {
       id: "requests",
-      label: t("requests"),
+      label: tCommon("requests"),
       width: 100,
       align: "right",
       render: (row) => (
@@ -490,7 +494,7 @@ export default function SecurityClient({
     },
     {
       id: "lastSeen",
-      label: t("lastSeen"),
+      label: tCommon("lastSeen"),
       width: 180,
       render: (row) => (
         <Text type="body" size="xsm" color="secondary">
@@ -500,7 +504,7 @@ export default function SecurityClient({
     },
     {
       id: "block",
-      label: tWaf("actions"),
+      label: tCommon("actions"),
       width: 120,
       align: "right",
       render: (row) =>
@@ -521,7 +525,7 @@ export default function SecurityClient({
   const eventColumns: Column<EventRow>[] = [
     {
       id: "ts",
-      label: tWaf("time"),
+      label: tCommon("time"),
       width: 200,
       render: (row) => (
         <Text type="code" size="xsm" color="secondary">
@@ -551,7 +555,7 @@ export default function SecurityClient({
     },
     {
       id: "clientIp",
-      label: tWaf("clientIp"),
+      label: tCommon("clientIp"),
       width: 170,
       render: (row) => (
         <Text type="code" size="xsm">
@@ -561,7 +565,7 @@ export default function SecurityClient({
     },
     {
       id: "request",
-      label: tWaf("request"),
+      label: tCommon("request"),
       render: (row) => (
         <Text type="code" size="xsm" color="secondary" maxLines={1}>
           {`${row.method} ${row.uri}`}
@@ -570,7 +574,7 @@ export default function SecurityClient({
     },
     {
       id: "rule",
-      label: tWaf("ruleId"),
+      label: tProxyHosts("ruleId"),
       width: 110,
       render: (row) => (
         <Text type="code" size="xsm">
@@ -622,7 +626,7 @@ export default function SecurityClient({
       <VStack gap={3}>
         <HStack>
           <SegmentedControl
-            label={t("range")}
+            label={tCommon("timeRange")}
             value={rangeValue}
             onChange={(next) => {
               if (next === "custom") {
@@ -646,20 +650,20 @@ export default function SecurityClient({
         {showCustom && (
           <HStack gap={2} vAlign="end" wrap="wrap">
             <DateTimeInput
-              label={t("rangeFrom")}
+              label={tCommon("rangeFrom")}
               size="sm"
               value={(customFrom || undefined) as ISODateTimeString | undefined}
               onChange={(v) => setCustomFrom(v ?? "")}
             />
             <DateTimeInput
-              label={t("rangeTo")}
+              label={tCommon("rangeTo")}
               size="sm"
               value={(customTo || undefined) as ISODateTimeString | undefined}
               onChange={(v) => setCustomTo(v ?? "")}
             />
             <Button
               size="sm"
-              label={t("applyRange")}
+              label={tCommon("applyRange")}
               onClick={() => {
                 const from = fromZonedWallTime(customFrom, timeZone);
                 const to = fromZonedWallTime(customTo, timeZone);

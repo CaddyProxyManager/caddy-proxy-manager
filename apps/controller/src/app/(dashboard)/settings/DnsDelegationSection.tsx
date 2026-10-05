@@ -35,12 +35,13 @@ type Row = {
 
 function CheckStatus({ check, checking }: { check?: DelegationCheck; checking: boolean }) {
   const t = useTranslations("settings.dnsDelegation");
+  const tCommon = useTranslations("common");
   if (checking && !check) {
     return (
       <HStack gap={2} vAlign="center">
-        <StatusDot variant="neutral" label={t("statusChecking")} />
+        <StatusDot variant="neutral" label={tCommon("checking")} />
         <Text type="body" size="xsm" color="secondary">
-          {t("statusChecking")}
+          {tCommon("checking")}
         </Text>
       </HStack>
     );
@@ -85,7 +86,7 @@ export function DnsDelegationSection({
   isProviderAvailable: (name: string) => boolean;
 }) {
   const t = useTranslations("settings.dnsDelegation");
-  const tUi = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const density = useTableDensity();
   const [registerState, registerFormAction, registering] = useActionState(
     registerAcmeDnsAccountAction,
@@ -160,7 +161,7 @@ export function DnsDelegationSection({
     },
     {
       key: "provider",
-      header: t("columnProvider"),
+      header: tCommon("provider"),
       width: pixel(140),
       renderCell: (row) => (
         <Text type="body" size="sm">
@@ -176,7 +177,7 @@ export function DnsDelegationSection({
     },
     {
       key: "__remove",
-      header: <VisuallyHidden>{tUi("actionsColumn")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       width: pixel(100),
       align: "end",
       resizable: false,
@@ -188,7 +189,7 @@ export function DnsDelegationSection({
             type="submit"
             variant="ghost"
             size="sm"
-            label={t("remove")}
+            label={tCommon("remove")}
             tooltip={t("removeNamed", { domain: row.domain })}
           />
         </form>
@@ -221,7 +222,7 @@ export function DnsDelegationSection({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  label={checking ? t("checking") : t("checkAgain")}
+                  label={checking ? tCommon("checking") : tCommon("checkAgain")}
                   isDisabled={checking}
                   onClick={() => void runCheck()}
                 />
@@ -252,7 +253,7 @@ export function DnsDelegationSection({
             <TextInput
               startIcon={Globe}
               {...AUTOFILL_OFF}
-              label={t("domainLabel")}
+              label={t("columnDomain")}
               description={t("domainHelp")}
               htmlName="domain"
               value={domain}
@@ -272,7 +273,7 @@ export function DnsDelegationSection({
               isOptional
             />
             <Selector
-              label={t("providerLabel")}
+              label={tCommon("provider")}
               description={t("providerHelp")}
               htmlName="delegationProvider"
               options={providerOptions}
@@ -331,7 +332,7 @@ export function DnsDelegationSection({
             <TextInput
               startIcon={Globe}
               {...AUTOFILL_OFF}
-              label={t("domainLabel")}
+              label={t("columnDomain")}
               description={t("registerDomainHelp")}
               htmlName="domain"
               value={registerDomain}

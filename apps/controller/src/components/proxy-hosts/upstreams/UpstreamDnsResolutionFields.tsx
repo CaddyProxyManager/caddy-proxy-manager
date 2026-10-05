@@ -15,7 +15,7 @@ type ResolutionMode = "inherit" | "enabled" | "disabled";
 type FamilyMode = "inherit" | "ipv6" | "ipv4" | "both";
 
 const MODE_OPTIONS = [
-  { value: "inherit", key: "optDnsInherit" },
+  { value: "inherit", key: "optDnsFamilyInherit" },
   { value: "enabled", key: "optDnsEnabled" },
   { value: "disabled", key: "optDnsDisabled" },
 ] as const;
@@ -46,6 +46,7 @@ export function UpstreamDnsResolutionFields({
   upstreamDnsResolution?: ProxyHost["upstreamDnsResolution"] | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const mode = toResolutionMode(upstreamDnsResolution?.enabled);
   const family = toFamilyMode(upstreamDnsResolution?.family);
   const [currentMode, setCurrentMode] = useState<ResolutionMode>(mode);
@@ -89,7 +90,7 @@ export function UpstreamDnsResolutionFields({
             options={FAMILY_OPTIONS.map((o) => ({ value: o.value, label: t(o.key) }))}
             value={currentFamily}
             onChange={(next) => setCurrentFamily(next as FamilyMode)}
-            description={t("dnsAddressFamilyHelp")}
+            description={tSettings("dnsAddressFamilyHelp")}
           />
 
           <Banner

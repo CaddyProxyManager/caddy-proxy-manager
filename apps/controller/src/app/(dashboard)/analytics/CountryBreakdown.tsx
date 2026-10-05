@@ -120,6 +120,7 @@ export function CountryBreakdownView({
   onClose: () => void;
 }) {
   const t = useTranslations("analytics");
+  const tNav = useTranslations("nav");
   const locale = useLocale();
   const format = useAppFormatter();
 
@@ -168,7 +169,7 @@ export function CountryBreakdownView({
         ) : (
           <Grid columns={{ minWidth: 220, max: 3 }} gap={6}>
             <RankedList
-              title={t("breakdownHosts")}
+              title={tNav("hosts")}
               rows={data.hosts.map((h) => ({ label: h.host, count: h.count }))}
               color="var(--color-data-blue-3)"
             />

@@ -164,8 +164,7 @@ function failed(url: string, response: Response): never {
  * is any URL an admin adds, so an endless body must not reach memory whole.
  */
 async function readText(url: string, response: Response): Promise<string> {
-  const tooLarge = () =>
-    domainError("crsPluginFetchFailed", { url, reason: "too large" }, { status: 400 });
+  const tooLarge = () => domainError("crsPluginFetchTooLarge", { url }, { status: 400 });
   if (Number(response.headers.get("content-length") ?? 0) > MAX_FILE_BYTES) {
     await response.body?.cancel();
     throw tooLarge();
@@ -200,7 +199,7 @@ export async function fetchCrsRegistry(
   try {
     json = JSON.parse(text);
   } catch {
-    throw domainError("crsPluginFetchFailed", { url, reason: "not JSON" }, { status: 400 });
+    throw domainError("crsPluginFetchNotJson", { url }, { status: 400 });
   }
   return parseCrsRegistry(json);
 }
@@ -231,11 +230,7 @@ export async function resolveCrsPluginVersion(
     failed(releaseUrl, release);
   }
   if (typeof ref !== "string" || !SAFE_REF.test(ref) || ref.includes("..")) {
-    throw domainError(
-      "crsPluginFetchFailed",
-      { url: releaseUrl, reason: "no usable release" },
-      { status: 400 },
-    );
+    throw domainError("crsPluginNoUsableRelease", { url: releaseUrl }, { status: 400 });
   }
   return ref;
 }
@@ -367,11 +362,11 @@ const REJECTION_REASON: [string, CrsUnsupportedReason][] = [
   ["crsPluginNeedsFile", "files"],
   ["crsPluginPersistentCollection", "compile"],
   ["crsPluginUnbalancedQuotes", "compile"],
-  ["crsPluginUnterminated", "compile"],
+  ["wafDirectiveDroppedUnterminated", "compile"],
   ["crsPluginInvalidSeclang", "compile"],
   ["crsPluginRuleIdOutOfRange", "ruleIds"],
   ["crsPluginDirectiveNotAllowed", "directives"],
-  ["crsPluginCtlRuleEngine", "directives"],
+  ["wafDirectiveDroppedCtlRuleEngine", "directives"],
 ];
 
 export type CrsPluginSupport =

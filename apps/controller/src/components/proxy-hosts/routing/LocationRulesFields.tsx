@@ -231,7 +231,7 @@ export function LocationRulesFields({ initialData = [], accessLists }: Props) {
 
                 {accessListChoices && (
                   <Selector
-                    label={t("locationAccessList")}
+                    label={t("accessList")}
                     size="sm"
                     options={accessListChoices}
                     value={

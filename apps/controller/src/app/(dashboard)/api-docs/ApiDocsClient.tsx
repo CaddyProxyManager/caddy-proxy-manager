@@ -18,10 +18,11 @@ const SwaggerPanel = lazy(() => import("./SwaggerPanel"));
  */
 export default function ApiDocsClient() {
   const t = useTranslations("apiDocs");
+  const tNav = useTranslations("nav");
 
   return (
     <VStack gap={4}>
-      <PageHeader title={t("title")} />
+      <PageHeader title={tNav("apiDocs")} />
 
       <Card padding={4}>
         <HStack gap={4} vAlign="center" wrap="wrap" justify="between">

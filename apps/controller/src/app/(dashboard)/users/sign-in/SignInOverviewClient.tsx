@@ -47,6 +47,9 @@ export function SignInOverviewClient({
   appName: string;
 }) {
   const t = useTranslations("signInOverview");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
+  const tGroups = useTranslations("groups");
 
   const methods: MethodRow[] = [
     {
@@ -117,7 +120,7 @@ export function SignInOverviewClient({
     ),
     ...overview.groupMappings.map((mapping, index) => ({
       id: `group:${index}`,
-      source: mapping.provider ?? t("anyProvider"),
+      source: mapping.provider ?? tGroups("anyProvider"),
       external: mapping.externalName,
       becomes: t("becomesGroup", { group: mapping.group }),
     })),
@@ -147,7 +150,7 @@ export function SignInOverviewClient({
             variant="ghost"
             size="sm"
             icon={<ArrowLeft />}
-            label={t("backToUsers")}
+            label={tNav("users")}
             href="/users"
           />
         </HStack>
@@ -183,7 +186,7 @@ export function SignInOverviewClient({
                   <Button
                     variant="ghost"
                     size="sm"
-                    label={t("configure")}
+                    label={tCommon("configure")}
                     aria-label={t("configureNamed", { name: row.name })}
                     href={row.href}
                   />
@@ -309,7 +312,7 @@ function LoginPreview({
   providers: { id: string; name: string; isPrimary: boolean }[];
 }) {
   const t = useTranslations("signInOverview");
-  const tLogin = useTranslations("auth.login");
+  const tCommon = useTranslations("common");
   const tPasskey = useTranslations("auth.passkey");
   return (
     <Card padding={4}>
@@ -318,7 +321,7 @@ function LoginPreview({
         {passwordForm && (
           <VStack gap={2}>
             <TextInput
-              label={tLogin("username")}
+              label={tCommon("username")}
               startIcon={User}
               value=""
               onChange={() => {}}
@@ -329,7 +332,7 @@ function LoginPreview({
                 {t("previewDirectories", { names: directories.join(", ") })}
               </Text>
             )}
-            <Button variant="primary" label={tLogin("continueStep")} width="100%" isDisabled />
+            <Button variant="primary" label={tCommon("continue")} width="100%" isDisabled />
           </VStack>
         )}
         {passkey && (

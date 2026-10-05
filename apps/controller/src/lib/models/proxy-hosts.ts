@@ -523,7 +523,7 @@ function validateWafMeta(
   });
   if (lintErrors.length > 0) {
     throw domainError(
-      "hostWafDirectivesInvalid",
+      "wafDirectivesInvalid",
       { count: lintErrors.length, details: seclangErrorDetails(lintErrors) },
       { status: 400 },
     );
@@ -3493,9 +3493,7 @@ async function assertCaddyfileAdapts(
 ): Promise<void> {
   if (!snippet?.trim()) return;
   const error = await validateCaddyfileSnippet(snippet, agentRowIds);
-  if (error) {
-    throw domainError("customCaddyfileInvalid", { error }, { status: 400 });
-  }
+  if (error) throw error;
 }
 
 const RAW_CONFIG_FIELDS = [

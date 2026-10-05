@@ -58,7 +58,7 @@ export function FormCard({
 
 /** Plain "Save" unless a form does more: the card title already says what is saved. */
 export function SaveButton({ label, isDisabled }: { label?: string; isDisabled?: boolean }) {
-  const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   const anchor = useRef<HTMLInputElement>(null);
   const isDirty = useFormDirty(anchor);
   return (
@@ -68,7 +68,7 @@ export function SaveButton({ label, isDisabled }: { label?: string; isDisabled?:
       <Button
         type="submit"
         variant={isDirty ? "primary" : "secondary"}
-        label={label ?? t("save")}
+        label={label ?? tCommon("save")}
         isDisabled={isDisabled}
       />
     </HStack>

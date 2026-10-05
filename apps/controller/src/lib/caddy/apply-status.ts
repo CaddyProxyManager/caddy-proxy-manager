@@ -4,6 +4,7 @@
  * left out, as the notifications leave it out: that is an agent down, reported as one.
  */
 
+import { type StoredErrorCode, storedErrorCode } from "../errors/domain-error";
 import { CaddyApplyError } from "./apply-error";
 
 const STATE_KEY = "caddy_apply_failures";
@@ -12,6 +13,8 @@ export type ApplyFailure = {
   /** The agent's name, or null for a whole-fleet apply. */
   agent: string | null;
   error: string;
+  /** Renders `error` in the reader's language; absent on failures stored before it was kept. */
+  errorCode?: StoredErrorCode | null;
   at: string;
 };
 
@@ -55,6 +58,7 @@ export function recordApplyFailure(
     [agent?.agentId ?? "all"]: {
       agent: agent?.name ?? null,
       error: error.message,
+      errorCode: storedErrorCode(error),
       at: new Date(now).toISOString(),
     },
   }));

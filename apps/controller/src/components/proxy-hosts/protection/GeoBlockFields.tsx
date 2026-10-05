@@ -383,6 +383,7 @@ const BLOCK_ALL_CIDR = "0.0.0.0/0";
 
 export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBlockFieldsProps) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const rawInitial = initialValues?.geoblock ?? null;
   // Rules without the caddy-blocker plugin would never be emitted, so the switch is locked.
   const moduleDisabledReason = useDisabledReason("geoblock");
@@ -566,7 +567,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                 <Grid columns={3} gap={4}>
                   <NumberInput
                     hasNumberSteppers
-                    label={t("statusCode")}
+                    label={tSettings("statusCode")}
                     htmlName="geoblockResponseStatus"
                     min={100}
                     max={599}
@@ -579,7 +580,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                     }
                   />
                   <TextInput
-                    label={t("responseBody")}
+                    label={tSettings("responseBody")}
                     htmlName="geoblockResponseBody"
                     value={responseBody}
                     onChange={setResponseBody}

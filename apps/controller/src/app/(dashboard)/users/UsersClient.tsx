@@ -160,6 +160,9 @@ export default function UsersClient({
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const [noMfaOnly, setNoMfaOnly] = useState(false);
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
+  const tSignInOverview = useTranslations("signInOverview");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(users[0]?.id ?? null);
   const [search, setSearch] = useState("");
@@ -221,7 +224,7 @@ export default function UsersClient({
     <VStack gap={3} padding={3}>
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
-          <Heading level={1}>{t("users")}</Heading>
+          <Heading level={1}>{tNav("users")}</Heading>
           <IconButton
             variant="secondary"
             size="lg"
@@ -311,7 +314,7 @@ export default function UsersClient({
           variant="ghost"
           size="sm"
           icon={<LogIn />}
-          label={t("signInOverview")}
+          label={tSignInOverview("title")}
           href="/users/sign-in"
         />
       </HStack>
@@ -326,7 +329,7 @@ export default function UsersClient({
   return (
     <SplitPage
       storageKey="users-rail"
-      railLabel={t("users")}
+      railLabel={tNav("users")}
       resizeLabel={t("resizeRail")}
       backLabel={t("backToUsers")}
       hasSelection={selected !== null}
@@ -338,7 +341,9 @@ export default function UsersClient({
       }
       detail={
         <VStack gap={4}>
-          {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+          {error && (
+            <Banner status="error" title={tCommon("somethingWentWrong")} description={error} />
+          )}
           {adminsWithoutMfa.length > 0 && (
             <AdminsWithoutMfaBanner
               admins={adminsWithoutMfa}
@@ -369,7 +374,7 @@ export default function UsersClient({
             <EmptyState
               icon={<UserCog />}
               title={t("selectionEmptyTitle")}
-              description={t("selectionEmptyDescription")}
+              description={tCommon("selectionEmptyDescription")}
             />
           )}
         </VStack>
@@ -408,6 +413,8 @@ function UserDetail({
   onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
+  const tProfile = useTranslations("profile");
+  const tCommon = useTranslations("common");
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<
     "disable" | "delete" | "reset2fa" | "removePasskeys" | null
@@ -438,7 +445,7 @@ function UserDetail({
             variant="secondary"
             size="sm"
             icon={<Pencil />}
-            label={t("edit")}
+            label={tCommon("edit")}
             aria-label={t("editUserNamed", { name })}
             onClick={() => setEditOpen(true)}
           />
@@ -493,11 +500,11 @@ function UserDetail({
         <VStack gap={3}>
           <Heading level={3}>{t("details")}</Heading>
           <MetadataList>
-            <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
+            <MetadataListItem label={tCommon("email")}>{user.email}</MetadataListItem>
             <MetadataListItem label={t("signInUsername")}>
               {isUsableSignInUsername(user.username) ? user.username : t("signInUsernameNone")}
             </MetadataListItem>
-            <MetadataListItem label={t("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
+            <MetadataListItem label={tCommon("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
             <MetadataListItem label={t("accountSource.label")}>
               {t(`accountSource.${user.accountSource}`)}
             </MetadataListItem>
@@ -575,7 +582,7 @@ function UserDetail({
               </HStack>
             </MetadataListItem>
             {user.hasPassword && (
-              <MetadataListItem label={t("twoFactor")}>
+              <MetadataListItem label={tCommon("twoFactorSignIn")}>
                 <HStack gap={2} vAlign="center">
                   <Text type="body" size="sm">
                     {user.twoFactorEnabled ? t("twoFactorOn") : t("twoFactorOff")}
@@ -591,7 +598,7 @@ function UserDetail({
                 </HStack>
               </MetadataListItem>
             )}
-            <MetadataListItem label={t("passkeys")}>
+            <MetadataListItem label={tProfile("passkeys.title")}>
               <HStack gap={2} vAlign="center">
                 <Text type="body" size="sm">
                   {t("passkeyCount", { count: user.passkeyCount })}
@@ -723,6 +730,8 @@ function GroupsCard({
   onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const memberOf = groups.filter((g) => g.memberIds.includes(user.id));
   const available = groups.filter((g) => !g.memberIds.includes(user.id));
   const [adding, setAdding] = useState("");
@@ -731,7 +740,7 @@ function GroupsCard({
     <Card>
       <VStack gap={3}>
         <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
-          <Heading level={3}>{t("groupsTitle")}</Heading>
+          <Heading level={3}>{tNav("groups")}</Heading>
           <Badge label={t("groupCount", { count: memberOf.length })} />
         </HStack>
         {memberOf.length === 0 ? (
@@ -750,7 +759,7 @@ function GroupsCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    label={t("removeFromGroup")}
+                    label={tCommon("remove")}
                     aria-label={t("removeFromGroupNamed", { group: group.name })}
                     onClick={async () => {
                       try {
@@ -779,7 +788,7 @@ function GroupsCard({
             <Button
               size="sm"
               variant="secondary"
-              label={t("add")}
+              label={tCommon("add")}
               isDisabled={adding === ""}
               onClick={async () => {
                 try {
@@ -814,6 +823,7 @@ function CreateUserDialog({
   onCreated: (email: string) => void;
 }) {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
   const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
   const [role, setRole] = useState<Role>("user");
   const [email, setEmail] = useState("");
@@ -843,7 +853,7 @@ function CreateUserDialog({
       onClose={onClose}
       title={t("createUser")}
       maxWidth="md"
-      submitLabel={t("create")}
+      submitLabel={tCommon("create")}
       isSubmitting={submitting}
       onSubmit={() =>
         (document.getElementById("create-user-form") as HTMLFormElement | null)?.requestSubmit()
@@ -876,13 +886,17 @@ function CreateUserDialog({
       >
         <VStack gap={3}>
           {dialogError && (
-            <Banner status="error" title={t("errorTitle")} description={dialogError} />
+            <Banner
+              status="error"
+              title={tCommon("somethingWentWrong")}
+              description={dialogError}
+            />
           )}
           <EmailInput
             {...NATIVE_REQUIRED}
             {...AUTOFILL_EMAIL}
             data-testid="create-email"
-            label={t("email")}
+            label={tCommon("email")}
             htmlName="email"
             value={email}
             onChange={setEmail}
@@ -892,7 +906,7 @@ function CreateUserDialog({
           />
           <TextInput
             data-testid="create-name"
-            label={t("name")}
+            label={tCommon("name")}
             isOptional
             htmlName="name"
             value={name}
@@ -912,7 +926,7 @@ function CreateUserDialog({
           />
           <Selector
             data-testid="create-role"
-            label={t("role")}
+            label={tCommon("role")}
             options={roleOptions}
             value={role}
             onChange={(v) => setRole(v as Role)}
@@ -935,7 +949,7 @@ function CreateUserDialog({
           ) : (
             <GeneratedPasswordField
               data-testid="create-password"
-              label={t("password")}
+              label={tCommon("password")}
               htmlName="password"
               value={password}
               onChange={setPassword}
@@ -962,6 +976,7 @@ function EditUserDialog({
   onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
   const roleOptions = ROLE_OPTIONS.map((option) => ({
     value: option.value,
     label: t(option.labelKey),
@@ -987,7 +1002,7 @@ function EditUserDialog({
       onClose={onClose}
       title={t("editingNamed", { name: user.name ?? user.email })}
       maxWidth="md"
-      submitLabel={t("save")}
+      submitLabel={tCommon("save")}
       isSubmitting={submitting}
       onSubmit={() =>
         (document.getElementById("edit-user-form") as HTMLFormElement | null)?.requestSubmit()
@@ -1012,7 +1027,7 @@ function EditUserDialog({
       >
         <VStack gap={3}>
           <TextInput
-            label={t("name")}
+            label={tCommon("name")}
             htmlName="name"
             value={name}
             onChange={setName}
@@ -1020,7 +1035,7 @@ function EditUserDialog({
           />
           <EmailInput
             {...AUTOFILL_EMAIL}
-            label={t("email")}
+            label={tCommon("email")}
             htmlName="email"
             value={email}
             onChange={setEmail}
@@ -1036,7 +1051,7 @@ function EditUserDialog({
             autoComplete="off"
           />
           <Selector
-            label={t("role")}
+            label={tCommon("role")}
             options={roleOptions}
             value={role}
             onChange={(v) => setRole(v as Role)}

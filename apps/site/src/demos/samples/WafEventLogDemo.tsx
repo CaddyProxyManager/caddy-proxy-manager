@@ -286,6 +286,8 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
 
 function WafEventLogDemoContent() {
   const t = useTranslations("waf");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const params = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Phone-only, as on the page: search waits behind its icon, and an event replaces the list.
@@ -333,8 +335,8 @@ function WafEventLogDemoContent() {
         .sort()
         .map((host) => ({ value: host, label: host })),
     },
-    { param: "ip", label: t("clientIp"), kind: "exact" },
-    { param: "rule", label: t("ruleId"), kind: "exact" },
+    { param: "ip", label: tCommon("clientIp"), kind: "exact" },
+    { param: "rule", label: tProxyHosts("ruleId"), kind: "exact" },
     {
       param: "action",
       label: t("action"),
@@ -356,7 +358,7 @@ function WafEventLogDemoContent() {
   const columns: Column<Event>[] = [
     {
       id: "ts",
-      label: t("time"),
+      label: tCommon("time"),
       width: 170,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">

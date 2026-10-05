@@ -35,7 +35,7 @@ export async function resolveSignInDirectory(
 }
 
 /**
- * A made-up address for an entry without `mail`: `users.email` is required and unique. The hash
+ * A made-up address for an entry without `mail`: `common.email` is required and unique. The hash
  * keeps two names that sanitize alike apart; `.invalid` can never be delivered to or registered.
  */
 export function placeholderEmail(

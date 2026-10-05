@@ -37,12 +37,12 @@ import {
   caddyModuleDescription,
   caddyModuleName,
 } from "@/src/lib/caddy/image-build/module-messages";
+import { agentStatusMessage, type AgentStatusWords } from "@/src/lib/agent/status-message";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy/image-build/image";
 
-type BuildStatus = {
+type BuildStatus = AgentStatusWords & {
   state: "idle" | "pending" | "building" | "applied" | "failed";
-  message?: string;
   appliedAt?: string;
   error?: string;
 };
@@ -120,6 +120,7 @@ export function CaddyBuildFields({
   >;
 }) {
   const t = useTranslations("caddyModules");
+  const tCommon = useTranslations("common");
   // Custom module problems are domain error codes, which live at the catalog root.
   const tRoot = useTranslations();
   const [target, setTarget] = useState<number>(FLEET);
@@ -257,11 +258,11 @@ export function CaddyBuildFields({
     },
     {
       key: "name",
-      header: t("customModuleName"),
+      header: tCommon("name"),
       width: proportional(1),
       renderCell: (entry) => (
         <TextInput
-          label={t("customModuleName")}
+          label={tCommon("name")}
           isLabelHidden
           value={entry.name ?? ""}
           onChange={(next) => updateCustomModule(entry.uid, { name: next })}
@@ -292,11 +293,11 @@ export function CaddyBuildFields({
     },
     {
       key: "version",
-      header: t("version"),
+      header: tCommon("version"),
       width: pixel(112),
       renderCell: (entry) => (
         <TextInput
-          label={t("version")}
+          label={tCommon("version")}
           isLabelHidden
           value={entry.version ?? ""}
           onChange={(next) => updateCustomModule(entry.uid, { version: next })}
@@ -306,13 +307,13 @@ export function CaddyBuildFields({
     },
     {
       key: "uid",
-      header: <VisuallyHidden>{t("remove")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("remove")}</VisuallyHidden>,
       width: pixel(48),
       renderCell: (entry) => (
         <Button
           variant="ghost"
           icon={<Trash2 />}
-          label={t("remove")}
+          label={tCommon("remove")}
           isIconOnly
           onClick={() => removeCustomModule(entry.uid)}
         />
@@ -541,6 +542,7 @@ function RebuildBanner({
   external: boolean;
 }) {
   const t = useTranslations("caddyModules");
+  const tRoot = useTranslations();
   if (!build) return null;
   const { diff, status } = build;
 
@@ -562,7 +564,7 @@ function RebuildBanner({
       icon={inFlight ? <Spinner size="sm" /> : undefined}
       title={
         inFlight
-          ? (status.message ?? t(external ? "loadingImage" : "rebuildingCaddy"))
+          ? (agentStatusMessage(tRoot, status) ?? t(external ? "loadingImage" : "rebuildingCaddy"))
           : status.state === "failed"
             ? t(external ? "lastLoadFailed" : "lastRebuildFailed")
             : t(external ? "imageRequired" : "rebuildRequired")

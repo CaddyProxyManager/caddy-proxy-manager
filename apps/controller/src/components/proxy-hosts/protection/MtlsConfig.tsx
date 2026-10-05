@@ -45,6 +45,8 @@ export function MtlsFields({
   mtlsRoles = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const tAccessLists = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [selectedCertIds, setSelectedCertIds] = useState<number[]>(
@@ -249,7 +251,7 @@ export function MtlsFields({
                                 label={cert.commonName}
                                 endContent={
                                   <Text type="body" size="xsm" color="secondary">
-                                    {t("certExpires", {
+                                    {tCommon("expiresOnInline", {
                                       date: format.dateTime(
                                         new Date(cert.validTo),
                                         TIMESTAMP_STYLES.date,
@@ -291,7 +293,7 @@ export function MtlsFields({
                   <Button
                     size="sm"
                     variant="secondary"
-                    label={t("addRule")}
+                    label={tCommon("addRule")}
                     icon={<Plus />}
                     onClick={() => setAddRuleOpen(true)}
                   />
@@ -314,7 +316,7 @@ export function MtlsFields({
                         <HStack gap={2} vAlign="center" wrap="wrap">
                           <Token size="sm" label={rule.pathPattern} />
                           {rule.denyAll ? (
-                            <Badge label={t("deny")} icon={<Ban />} variant="error" />
+                            <Badge label={tAccessLists("ipDeny")} icon={<Ban />} variant="error" />
                           ) : (
                             <HStack gap={1} wrap="wrap">
                               {rule.allowedRoleIds.map((roleId) => {
@@ -370,7 +372,7 @@ export function MtlsFields({
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
                     title={t("addAccessRule")}
-                    submitLabel={t("addRule")}
+                    submitLabel={tCommon("addRule")}
                     onSaved={loadRules}
                   />
                 )}
@@ -381,7 +383,7 @@ export function MtlsFields({
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
                     title={t("editAccessRule")}
-                    submitLabel={t("save")}
+                    submitLabel={tCommon("save")}
                     existing={editRule}
                     onSaved={loadRules}
                   />
@@ -415,6 +417,7 @@ function RuleDialog({
   onSaved: () => void;
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [pathPattern, setPathPattern] = useState(existing?.pathPattern ?? "*");
   const [priority, setPriority] = useState<number | null>(existing?.priority ?? 0);
   const [description, setDescription] = useState(existing?.description ?? "");
@@ -449,14 +452,14 @@ function RuleDialog({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || t("requestFailedStatus", { status: String(res.status) }));
+        setError(data.error || tCommon("requestFailed", { status: String(res.status) }));
         setSubmitting(false);
         return;
       }
       onSaved();
       onClose();
     } catch {
-      setError(t("networkError"));
+      setError(tCommon("networkError"));
       setSubmitting(false);
     }
   }
@@ -494,7 +497,7 @@ function RuleDialog({
         </HStack>
 
         <TextInput
-          label={t("description")}
+          label={tCommon("description")}
           isOptional
           value={description}
           onChange={setDescription}

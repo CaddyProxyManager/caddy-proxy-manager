@@ -94,6 +94,9 @@ export default function AgentsClient({
   fleetApplyFailure?: ApplyFailure | null;
 }) {
   const t = useTranslations("agents");
+  const tCaddyModules = useTranslations("caddyModules");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const emptyValue = useEmptyValue();
   const router = useRouter();
 
@@ -154,7 +157,7 @@ export default function AgentsClient({
     <VStack gap={6}>
       {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way. */}
       <PageHeader
-        title={t("title")}
+        title={tNav("agents")}
         action={isAdmin ? { label: t("pairAgent"), href: "/settings/agent" } : undefined}
       />
 
@@ -177,7 +180,7 @@ export default function AgentsClient({
           tiles={[
             {
               id: "agents",
-              label: t("title"),
+              label: tNav("agents"),
               value: agents.length,
               note: t("pinnedHostsNote", { count: pinnedHosts }),
             },
@@ -202,7 +205,7 @@ export default function AgentsClient({
             },
             {
               id: "versions",
-              label: t("version"),
+              label: tCommon("version"),
               value: versionLabel,
               note: t("versionNote"),
             },
@@ -221,7 +224,7 @@ export default function AgentsClient({
                     {agent.name}
                   </Heading>
                   <Text type="body" size="sm" color="secondary">
-                    {agent.version ? `v${agent.version}` : t("never")}
+                    {agent.version ? `v${agent.version}` : tCommon("never")}
                   </Text>
                 </VStack>
                 <HStack gap={2} vAlign="center" wrap="wrap">
@@ -233,7 +236,7 @@ export default function AgentsClient({
                   {agent.canManage && (
                     <>
                       <Button
-                        label={t("rename")}
+                        label={tCommon("rename")}
                         variant="secondary"
                         size="sm"
                         onClick={() => {
@@ -242,7 +245,7 @@ export default function AgentsClient({
                         }}
                       />
                       <Button
-                        label={t("rebuild")}
+                        label={tCaddyModules("rebuildCaddy")}
                         size="sm"
                         isDisabled={!agent.connected || busyId === agent.id}
                         onClick={() => void rebuild(agent)}
@@ -277,7 +280,7 @@ export default function AgentsClient({
                 </VStack>
                 <VStack gap={0}>
                   <Text type="body" size="xsm" color="secondary">
-                    {t("lastSeen")}
+                    {tCommon("lastSeen")}
                   </Text>
                   <Text type="body" size="sm">
                     {agent.lastSeenAt ? (
@@ -287,7 +290,7 @@ export default function AgentsClient({
                         relativeWithinMs={LAST_SEEN_RELATIVE_MS}
                       />
                     ) : (
-                      t("never")
+                      tCommon("never")
                     )}
                   </Text>
                 </VStack>
@@ -323,10 +326,10 @@ export default function AgentsClient({
           open
           onClose={() => setRenaming(null)}
           title={t("renameTitle")}
-          submitLabel={t("rename")}
+          submitLabel={tCommon("rename")}
           onSubmit={() => void submitRename()}
         >
-          <TextInput label={t("name")} value={newName} onChange={setNewName} isRequired />
+          <TextInput label={tCommon("name")} value={newName} onChange={setNewName} isRequired />
         </AppDialog>
       )}
     </VStack>

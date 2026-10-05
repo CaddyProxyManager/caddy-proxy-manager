@@ -168,6 +168,7 @@ function CustomRange({
   onChange: (from: number, to: number) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const [from, setFrom] = useState(state.from);
   const [to, setTo] = useState(state.to);
   const tooLong = from !== null && to !== null && to - from > MAX_CUSTOM_RANGE_SECONDS;
@@ -185,7 +186,7 @@ function CustomRange({
     <VStack gap={1}>
       <HStack gap={2} vAlign="center" wrap="wrap">
         <DateTimeInput
-          label={t("from")}
+          label={tCommon("rangeFrom")}
           isLabelHidden
           size="sm"
           width={200}
@@ -196,7 +197,7 @@ function CustomRange({
           -
         </Text>
         <DateTimeInput
-          label={t("to")}
+          label={tCommon("rangeTo")}
           isLabelHidden
           size="sm"
           width={200}
@@ -229,6 +230,7 @@ function ViewAllDialog({
   onFilter: (dimension: TopDimension, value: string, op: FilterOp) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const label = useTopRowLabel(dimension);
   const [rows, setRows] = useState<TopRow[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -263,7 +265,7 @@ function ViewAllDialog({
             isDisabled={!rows || rows.length === 0}
             onClick={() => rows && topListCsv(t, dimension, rows, label)}
           />
-          <Button variant="primary" label={t("close")} onClick={onClose} />
+          <Button variant="primary" label={tCommon("close")} onClick={onClose} />
         </HStack>
       }
     >
@@ -274,7 +276,7 @@ function ViewAllDialog({
           <Spinner label={t("loadingAnalytics")} />
         </HStack>
       ) : rows.length === 0 ? (
-        <EmptyState title={t("noData")} isCompact />
+        <EmptyState title={tCommon("noData")} isCompact />
       ) : (
         <TopListTable
           dimension={dimension}
@@ -298,6 +300,8 @@ type CountryRow = TopRow & { [k: string]: unknown };
 
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const format = useAppFormatter();
   const locale = useLocale();
   const density = useTableDensity();
@@ -367,11 +371,11 @@ export default function AnalyticsClient() {
               ? t("requestFailedWithStatus", { path: err.path, status: err.status })
               : err instanceof Error && err.message
                 ? err.message
-                : t("loadErrorToast"),
+                : t("loadErrorTitle"),
           );
           // Reset to empty rather than leaving stale data next to an error banner.
           setReport(null);
-          if (!quiet) toast.error(t("loadErrorToast"));
+          if (!quiet) toast.error(t("loadErrorTitle"));
         })
         .finally(() => {
           if (!signal.aborted) setLoading(false);
@@ -451,7 +455,7 @@ export default function AnalyticsClient() {
     : "?interval=24h";
 
   const metricOptions: { value: MapMetric; label: string }[] = [
-    { value: "total", label: t("metricRequests") },
+    { value: "total", label: tCommon("requests") },
     { value: "blocked", label: t("metricMitigated") },
     { value: "uniqueIps", label: t("uniqueIps") },
   ];
@@ -491,7 +495,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "requests",
-      header: t("metricRequests"),
+      header: tCommon("requests"),
       align: "end",
       width: pixel(100),
       renderCell: (row) => (
@@ -518,7 +522,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "actions",
-      header: <VisuallyHidden>{t("rowActions")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       align: "end",
       width: pixel(76),
       renderCell: (row) => {
@@ -563,7 +567,7 @@ export default function AnalyticsClient() {
           <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
             {t("trafficIntelligence")}
           </Text>
-          <Heading level={1}>{t("analytics")}</Heading>
+          <Heading level={1}>{tNav("analytics")}</Heading>
         </VStack>
         <HStack gap={3} vAlign="center" wrap="wrap">
           <div className="cpm-desktop-only">

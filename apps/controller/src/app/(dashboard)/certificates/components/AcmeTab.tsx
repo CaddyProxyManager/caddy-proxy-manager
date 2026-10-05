@@ -97,6 +97,7 @@ function useInventory() {
 
 export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Props) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const { inventory, refresh } = useInventory();
   const [checking, setChecking] = useState<AcmeHost | null>(null);
 
@@ -227,24 +228,24 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
     },
     {
       id: "status",
-      label: t("status"),
+      label: tCommon("status"),
       width: 110,
       render: (r: AcmeHost) => <StatusChip status={r.enabled ? "active" : "inactive"} />,
     },
     {
       id: "actions",
-      label: t("actions"),
+      label: tCommon("actions"),
       width: 60,
       render: (r: AcmeHost) => {
         const cert = soonest.get(r.id) ?? null;
         return (
           <MoreMenu
-            label={t("actionsFor", { name: r.name })}
+            label={tCommon("actionsFor", { name: r.name })}
             size="sm"
             alignment="end"
             items={[
               { label: t("renewNow"), onClick: () => renew(r) },
-              { label: t("testReachability"), onClick: () => setChecking(r) },
+              { label: tCommon("testReachability"), onClick: () => setChecking(r) },
               ...(cert
                 ? [
                     { type: "divider" as const },

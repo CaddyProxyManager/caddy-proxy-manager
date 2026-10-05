@@ -64,6 +64,8 @@ export default function LoginClient({
   directories = [],
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
+  const tCommon = useTranslations("common");
+  const tAuth = useTranslations("auth");
   const tPasskey = useTranslations("auth.passkey");
   const tErrors = useTranslations("auth.errors");
   const tApi = useTranslations("auth.apiErrors");
@@ -260,12 +262,14 @@ export default function LoginClient({
             </Text>
           </VStack>
 
-          {loginError && <Banner status="error" title={t("errorTitle")} description={loginError} />}
+          {loginError && (
+            <Banner status="error" title={tAuth("couldNotSignIn")} description={loginError} />
+          )}
 
           {!passwordFormEnabled && !hasProviders && (
             <Banner
               status="error"
-              title={t("noMethodTitle")}
+              title={tAuth("signInUnavailableTitle")}
               description={t("noMethodDescription")}
             />
           )}
@@ -302,7 +306,7 @@ export default function LoginClient({
                         startIcon={User}
                         {...AUTOFILL_USERNAME_WEBAUTHN}
                         {...NO_SPELLCHECK}
-                        label={t("username")}
+                        label={tCommon("username")}
                         htmlName="username"
                         value={username}
                         onChange={setUsername}
@@ -327,7 +331,7 @@ export default function LoginClient({
                       startIcon={KeyRound}
                       {...AUTOFILL_CURRENT_PASSWORD}
                       ref={passwordRef}
-                      label={t("password")}
+                      label={tCommon("password")}
                       type="password"
                       htmlName="password"
                       value={password}
@@ -354,7 +358,7 @@ export default function LoginClient({
                         ? t("submitPending")
                         : onPasswordStep
                           ? t("submit")
-                          : t("continueStep")
+                          : tCommon("continue")
                     }
                     isLoading={loginPending || captchaStep.pending}
                     isDisabled={disabled}

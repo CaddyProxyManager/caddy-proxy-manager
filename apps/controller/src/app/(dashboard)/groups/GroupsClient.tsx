@@ -128,6 +128,8 @@ export default function GroupsClient({
   access = {},
 }: Props) {
   const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(groups[0]?.id ?? null);
   const [search, setSearch] = useState("");
@@ -164,7 +166,7 @@ export default function GroupsClient({
     <VStack gap={3} padding={3}>
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
-          <Heading level={1}>{t("groups")}</Heading>
+          <Heading level={1}>{tNav("groups")}</Heading>
           <Button
             variant="primary"
             size="lg"
@@ -208,7 +210,7 @@ export default function GroupsClient({
             <Button
               variant="ghost"
               size="sm"
-              label={t("clearSearch")}
+              label={tCommon("clearSearch")}
               onClick={() => setSearch("")}
             />
           }
@@ -257,7 +259,7 @@ export default function GroupsClient({
   return (
     <SplitPage
       storageKey="groups-rail"
-      railLabel={t("groups")}
+      railLabel={tNav("groups")}
       resizeLabel={t("resizeRail")}
       backLabel={t("backToGroups")}
       hasSelection={selected !== null}
@@ -282,7 +284,7 @@ export default function GroupsClient({
             headingLevel={2}
             icon={<Users />}
             title={t("selectionEmptyTitle")}
-            description={t("selectionEmptyDescription")}
+            description={tCommon("selectionEmptyDescription")}
           />
         )
       }
@@ -290,7 +292,7 @@ export default function GroupsClient({
       <GroupFormDialog
         open={createOpen}
         title={t("newGroup")}
-        submitLabel={t("create")}
+        submitLabel={tCommon("create")}
         onClose={() => setCreateOpen(false)}
         onSubmit={async (formData) => {
           const { id } = await createGroupAction(formData);
@@ -324,6 +326,7 @@ function GroupDetail({
   onChanged: () => void;
 }) {
   const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
   const [tab, setTab] = useState<DetailTab>("members");
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -341,10 +344,13 @@ function GroupDetail({
           <VStack gap={1}>
             <Heading level={2}>{group.name}</Heading>
             <Text type="body" size="sm" color="secondary">
-              {group.description || t("noDescription")}
+              {group.description || tCommon("noDescription")}
             </Text>
             <HStack gap={2} wrap="wrap" vAlign="center">
-              <Badge icon={<Users />} label={t("memberCount", { count: group.members.length })} />
+              <Badge
+                icon={<Users />}
+                label={tCommon("memberCount", { count: group.members.length })}
+              />
               {isIdp && <Badge variant="info" label={t("idpManaged")} />}
               {counts.total === 0 ? (
                 <Badge variant="neutral" label={t("noGrants")} />
@@ -367,7 +373,7 @@ function GroupDetail({
             variant="primary"
             size="sm"
             icon={<UserPlus />}
-            label={t("addMember")}
+            label={tCommon("addMember")}
             onClick={() => setAddOpen(true)}
           />
           <IconButton
@@ -421,7 +427,7 @@ function GroupDetail({
       <TabList value={tab} onChange={(v) => setTab(v as DetailTab)} size="sm" hasDivider>
         <Tab
           value="members"
-          label={t("members")}
+          label={tCommon("members")}
           icon={<Users />}
           endContent={<Badge label={group.members.length} />}
         />
@@ -466,7 +472,7 @@ function GroupDetail({
       <GroupFormDialog
         open={editOpen}
         title={t("editGroupNamed", { name: group.name })}
-        submitLabel={t("save")}
+        submitLabel={tCommon("save")}
         initial={{ name: group.name, description: group.description ?? "" }}
         onClose={() => setEditOpen(false)}
         onSubmit={async (formData) => {
@@ -543,6 +549,7 @@ function MembersTab({
   onChanged: () => void;
 }) {
   const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
   const [query, setQuery] = useState("");
   const roles = new Map(users.map((u) => [u.id, u.role]));
   const q = query.trim().toLowerCase();
@@ -556,9 +563,11 @@ function MembersTab({
     return (
       <EmptyState
         icon={<Users />}
-        title={t("noMembersTitle")}
+        title={tCommon("noMembersYet")}
         description={t("noMembersDescription")}
-        actions={<Button size="sm" variant="secondary" label={t("addMember")} onClick={onAdd} />}
+        actions={
+          <Button size="sm" variant="secondary" label={tCommon("addMember")} onClick={onAdd} />
+        }
       />
     );
   }
@@ -629,6 +638,7 @@ function AccessTab({
   onEdit: () => void;
 }) {
   const t = useTranslations("groups");
+  const tNav = useTranslations("nav");
   const counts = grantCounts(access);
   const nameOf = (list: NamedResource[], ids: number[]) =>
     ids.map((id) => list.find((item) => item.id === id)?.name ?? `#${id}`);
@@ -639,16 +649,16 @@ function AccessTab({
     {
       key: "proxyHosts",
       icon: Globe,
-      title: t("proxyHosts"),
+      title: tNav("proxyHosts"),
       names: nameOf(proxyHosts, access.proxyHostIds),
     },
     {
       key: "l4",
       icon: Network,
-      title: t("l4ProxyHosts"),
+      title: tNav("l4ProxyHosts"),
       names: nameOf(l4ProxyHosts, access.l4ProxyHostIds),
     },
-    { key: "agents", icon: Server, title: t("agents"), names: nameOf(agents, access.agentIds) },
+    { key: "agents", icon: Server, title: tNav("agents"), names: nameOf(agents, access.agentIds) },
   ];
 
   return (
@@ -736,6 +746,8 @@ function AddMemberDialog({
   onAdded: () => void;
 }) {
   const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
+  const tUsers = useTranslations("users");
   const [query, setQuery] = useState("");
   // Stays open while picking, so several people join in one go; Add commits the whole selection.
   const [selected, setSelected] = useState<number[]>([]);
@@ -791,8 +803,8 @@ function AddMemberDialog({
             <SearchField
               value={query}
               onChange={setQuery}
-              placeholder={t("searchUsersPlaceholder")}
-              label={t("searchUsers")}
+              placeholder={tUsers("searchPlaceholder")}
+              label={tUsers("searchLabel")}
               width="100%"
             />
             {shown.length === 0 ? (
@@ -837,7 +849,7 @@ function AddMemberDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  label={t("clearSelection")}
+                  label={tCommon("clearSelection")}
                   onClick={() => setSelected([])}
                 />
               </HStack>
@@ -865,6 +877,7 @@ function GroupFormDialog({
   onSubmit: (formData: FormData) => Promise<void>;
 }) {
   const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [submitting, setSubmitting] = useState(false);
@@ -901,7 +914,7 @@ function GroupFormDialog({
         <VStack gap={3}>
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("name")}
+            label={tCommon("name")}
             htmlName="name"
             value={name}
             onChange={setName}
@@ -910,7 +923,7 @@ function GroupFormDialog({
             hasAutoFocus
           />
           <TextInput
-            label={t("description")}
+            label={tCommon("description")}
             isOptional
             htmlName="description"
             value={description}

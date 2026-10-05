@@ -59,6 +59,7 @@ export function AuthentikFields({
   defaults: AuthentikSettings | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const initial = authentik ?? null;
   const [enabled, setEnabled] = useState(false);
   const [outpostDomain, setOutpostDomain] = useState("");
@@ -113,7 +114,7 @@ export function AuthentikFields({
           <VStack gap={4}>
             <TextInput
               startIcon={Globe}
-              label={t("outpostDomain")}
+              label={tSettings("outpostDomain")}
               htmlName="authentikOutpostDomain"
               placeholder="outpost.goauthentik.io"
               value={outpostDomain}
@@ -131,7 +132,7 @@ export function AuthentikFields({
             />
             <TextInput
               startIcon={Route}
-              label={t("authEndpoint")}
+              label={tSettings("authEndpoint")}
               isOptional
               htmlName="authentikAuthEndpoint"
               placeholder="/outpost.goauthentik.io/auth/caddy"

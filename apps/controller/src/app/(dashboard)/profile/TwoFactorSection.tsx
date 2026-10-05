@@ -61,6 +61,7 @@ export function TwoFactorSection({
   locked: boolean;
 }) {
   const t = useTranslations("profile.twoFactor");
+  const tCommon = useTranslations("common");
   const tApi = useTranslations("auth.apiErrors");
   const router = useRouter();
   const [flow, setFlow] = useState<Flow>({ kind: "closed" });
@@ -142,7 +143,7 @@ export function TwoFactorSection({
     <TextInput
       startIcon={KeyRound}
       {...AUTOFILL_CURRENT_PASSWORD}
-      label={t("password")}
+      label={tCommon("currentPassword")}
       type="password"
       value={password}
       onChange={setPassword}
@@ -193,7 +194,7 @@ export function TwoFactorSection({
         onClose={close}
         title={t("turnOn")}
         maxWidth="sm"
-        submitLabel={t("continue")}
+        submitLabel={tCommon("continue")}
         onSubmit={startEnable}
         isSubmitting={busy}
         isSubmitDisabled={!password}
@@ -213,7 +214,7 @@ export function TwoFactorSection({
           onClose={close}
           title={t("scanTitle")}
           maxWidth="sm"
-          submitLabel={t("confirm")}
+          submitLabel={t("turnOn")}
           onSubmit={() => confirmEnable(flow.backupCodes)}
           isSubmitting={busy}
           isSubmitDisabled={!code.trim()}
@@ -276,7 +277,7 @@ export function TwoFactorSection({
         onClose={close}
         title={t("newBackupCodes")}
         maxWidth="sm"
-        submitLabel={t("continue")}
+        submitLabel={tCommon("continue")}
         onSubmit={regenerate}
         isSubmitting={busy}
         isSubmitDisabled={!password}

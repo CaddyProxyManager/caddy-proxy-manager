@@ -4,6 +4,7 @@
  * caddy/tailscale.ts, as config generation must never touch the network.
  */
 
+import { type DomainError, domainError } from "../errors/domain-error";
 import { isCaddyPlaceholder, tailscaleKeyId } from "./tailscale";
 
 const API_BASE = "https://api.tailscale.com/api/v2";
@@ -15,8 +16,8 @@ export type TailscaleKeyCheck =
   | { status: "ok" }
   /** Must let the save through: a Headscale key or `{env.*}` placeholder is legitimate. */
   | { status: "unknown"; reason: string }
-  /** The key, or the token used to ask about it. `reason` is shown to the operator. */
-  | { status: "rejected"; reason: string };
+  /** The key, or the token used to ask about it. `error` is shown to the operator. */
+  | { status: "rejected"; error: DomainError };
 
 type KeyResponse = {
   id?: string;
@@ -44,11 +45,7 @@ export async function checkTailscaleAuthKey(options: {
     };
   }
   if (!token) {
-    return {
-      status: "rejected",
-      reason:
-        "Checking auth keys needs a Tailscale API access token (tskey-api-…). Add one, or turn the check off.",
-    };
+    return { status: "rejected", error: domainError("tailscaleKeyCheckNeedsToken") };
   }
 
   const keyId = tailscaleKeyId(authKey);
@@ -72,29 +69,25 @@ export async function checkTailscaleAuthKey(options: {
   } catch (error) {
     return {
       status: "rejected",
-      reason: `Could not reach the Tailscale API to check the key (${
-        error instanceof Error ? error.message : "network error"
-      }). Try again, or turn the check off to save without it.`,
+      error: domainError("tailscaleKeyCheckUnreachable", {
+        detail: error instanceof Error ? error.message : String(error),
+      }),
     };
   }
 
   if (response.status === 401 || response.status === 403) {
-    return {
-      status: "rejected",
-      reason:
-        "Tailscale refused the API access token. Check the token itself - this says nothing about the auth key.",
-    };
+    return { status: "rejected", error: domainError("tailscaleKeyCheckTokenRefused") };
   }
   if (response.status === 404) {
     return {
       status: "rejected",
-      reason: `Tailnet "${options.tailnet}" has no key with id "${keyId}". It may have been deleted, or belong to a different tailnet.`,
+      error: domainError("tailscaleKeyNotFound", { tailnet: options.tailnet, keyId }),
     };
   }
   if (!response.ok) {
     return {
       status: "rejected",
-      reason: `The Tailscale API answered ${response.status} when asked about the key. Try again, or turn the check off to save without it.`,
+      error: domainError("tailscaleKeyCheckFailed", { status: response.status }),
     };
   }
 
@@ -105,15 +98,18 @@ export async function checkTailscaleAuthKey(options: {
     return { status: "unknown", reason: "the Tailscale API returned a response this cannot read" };
   }
 
-  if (key.invalid) return { status: "rejected", reason: "Tailscale reports this key as invalid." };
+  if (key.invalid) return { status: "rejected", error: domainError("tailscaleKeyInvalid") };
   if (key.revoked) {
-    return { status: "rejected", reason: `This key was revoked on ${key.revoked}.` };
+    return { status: "rejected", error: domainError("tailscaleKeyRevoked", { date: key.revoked }) };
   }
   // Not left to `invalid`: some tailnets report expiry only through the timestamp.
   if (key.expires) {
     const expires = Date.parse(key.expires);
     if (Number.isFinite(expires) && expires <= Date.now()) {
-      return { status: "rejected", reason: `This key expired on ${key.expires}.` };
+      return {
+        status: "rejected",
+        error: domainError("tailscaleKeyExpired", { date: key.expires }),
+      };
     }
   }
 

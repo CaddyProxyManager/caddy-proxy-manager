@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import AgentsClient, { type AgentRow } from "./AgentsClient";
 import { storedErrorMessage } from "@/src/lib/errors/action-error";
+import { agentStatusMessage } from "@/src/lib/agent/status-message";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { getApplyFailures } from "@/src/lib/caddy/apply-status";
 import { logAccessFixes } from "@/src/lib/agent/log-access";
@@ -66,13 +67,17 @@ export default async function AgentsPage() {
                 reported.error,
                 reported.code ? { code: reported.code, params: {} } : null,
               )
-            : (status?.caddyBuild.status.message ?? null),
+            : status
+              ? agentStatusMessage(tRoot, status.caddyBuild.status)
+              : null,
         hasOwnBuildSettings: agent.hasOwnBuildSettings,
         assignedHttpHosts: countAssigned(httpAssignments, agent.id),
         assignedL4Hosts: countAssigned(l4Assignments, agent.id),
         canManage: canManage(access, "agent", agent.id),
         logAccessFixes: logAccessFixes(status?.logAccess),
-        applyFailure: refused ? { at: refused.at, error: refused.error } : null,
+        applyFailure: refused
+          ? { at: refused.at, error: storedErrorMessage(tRoot, refused.error, refused.errorCode) }
+          : null,
       };
     });
 

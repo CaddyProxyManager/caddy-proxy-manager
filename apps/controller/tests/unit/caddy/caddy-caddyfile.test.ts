@@ -139,12 +139,14 @@ describe('validateCaddyfileSnippet', () => {
 
   it('returns the parse error as a message rather than throwing', async () => {
     installAdapter(() => ({ status: 400, text: JSON.stringify({ error: 'bad syntax' }) }));
-    expect(await validateCaddyfileSnippet('nope {')).toBe('bad syntax');
+    expect((await validateCaddyfileSnippet('nope {'))?.params).toEqual({ error: 'bad syntax' });
   });
 
   it('rejects directives that reach beyond HTTP routes', async () => {
     installAdapter(() => adaptedOk([], { layer4: {} }));
-    expect(await validateCaddyfileSnippet('...')).toMatch(/may only produce HTTP routes/);
+    expect((await validateCaddyfileSnippet('...'))?.message).toMatch(
+      /may only produce HTTP routes/,
+    );
   });
 
   it('does not blame the operator when Caddy is unreachable', async () => {

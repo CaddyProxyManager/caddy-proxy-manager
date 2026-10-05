@@ -306,6 +306,7 @@ export default function WorldMapInner({
   onSelectCountry?: (alpha2: string | null) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const locale = useLocale();
   const format = useAppFormatter();
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -525,7 +526,7 @@ export default function WorldMapInner({
                     </HStack>
                     <HStack justify="between" gap={5}>
                       <Text type="body" size="sm" color="secondary">
-                        {t("metricRequests")}
+                        {tCommon("requests")}
                       </Text>
                       <Text type="body" size="sm" weight="bold" color="accent" hasTabularNumbers>
                         {format.number(info.total)}

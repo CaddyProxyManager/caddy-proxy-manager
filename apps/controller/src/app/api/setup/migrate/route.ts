@@ -36,8 +36,9 @@ function json(body: MigrateResponse, status: number): Response {
 export async function POST(request: NextRequest): Promise<Response> {
   // The setup page shows `error` as it arrives, so every one is said in the reader's language.
   const t = await getTranslations("setup");
+  const tErrors = await getTranslations("errors");
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
-    return json({ ok: false, error: t("errors.alreadyCompleted") }, 409);
+    return json({ ok: false, error: tErrors("setupAlreadyCompleted") }, 409);
   }
 
   let body: { path?: unknown; groups?: unknown; legacyKey?: unknown };

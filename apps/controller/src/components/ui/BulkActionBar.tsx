@@ -23,6 +23,7 @@ export function BulkActionBar({
   children: ReactNode;
 }) {
   const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   return (
     <Toolbar
       label={t("bulk.label")}
@@ -35,7 +36,7 @@ export function BulkActionBar({
           {children}
         </>
       }
-      endContent={<Button variant="ghost" label={t("bulk.clear")} onClick={onClear} />}
+      endContent={<Button variant="ghost" label={tCommon("clearSelection")} onClick={onClear} />}
     />
   );
 }

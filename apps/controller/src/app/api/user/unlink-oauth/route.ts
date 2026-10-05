@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
   if (originCheck) return originCheck;
 
   const t = await getTranslations("profile");
+  const tAuth = await getTranslations("auth");
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {
       return NextResponse.json(
-        { error: t("tooManyAttempts") },
+        { error: tAuth("apiErrors.tooManyAttempts") },
         {
           status: 429,
           headers: rateCheck.retryAfterMs
@@ -71,11 +72,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
     if (!currentPassword) {
-      return NextResponse.json({ error: t("currentPasswordRequired") }, { status: 400 });
+      return NextResponse.json(
+        { error: tAuth("apiErrors.currentPasswordRequired") },
+        { status: 400 },
+      );
     }
     if (!(await verifyPassword(currentPassword, passwordHash))) {
       await registerFailedAttempt(rateLimitKey);
-      return NextResponse.json({ error: t("currentPasswordIncorrect") }, { status: 401 });
+      return NextResponse.json(
+        { error: tAuth("apiErrors.currentPasswordIncorrect") },
+        { status: 401 },
+      );
     }
     resetAttempts(rateLimitKey);
 

@@ -70,6 +70,7 @@ export function ApiTokensSection({
   onCreated: () => void;
 }) {
   const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
   const atLimit = tokens.length >= TOKEN_LIMIT;
@@ -138,8 +139,8 @@ export function ApiTokensSection({
                           {token.expiresAt === null
                             ? t("apiTokenNeverExpires")
                             : expired
-                              ? t("expiredOn", { date: formatDate(token.expiresAt) })
-                              : t("expiresOn", { date: formatDate(token.expiresAt) })}
+                              ? tCommon("expiredOn", { date: formatDate(token.expiresAt) })
+                              : tCommon("expiresOn", { date: formatDate(token.expiresAt) })}
                         </Text>,
                       )}
                     </HStack>
@@ -224,6 +225,7 @@ function CreateTokenDialog({
   onCreated: (rawToken: string) => void;
 }) {
   const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState<TokenExpiryPreset>(DEFAULT_TOKEN_EXPIRY);
   const [customDate, setCustomDate] = useState<ISODateTimeString | undefined>(undefined);
@@ -277,7 +279,7 @@ function CreateTokenDialog({
       <VStack gap={4}>
         {error && <Banner status="error" title={error} />}
         <TextInput
-          label={t("name")}
+          label={tCommon("name")}
           isRequired
           value={name}
           onChange={setName}

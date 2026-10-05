@@ -35,6 +35,8 @@ export function EmailServerSection({
   formAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings.email");
+  const tCommon = useTranslations("common");
+  const tSettings = useTranslations("settings");
   const [enabled, setEnabled] = useState(email.enabled);
   const [host, setHost] = useState(email.host);
   const [port, setPort] = useState(email.port);
@@ -52,24 +54,24 @@ export function EmailServerSection({
             <WarnAlert title={t("incompleteTitle")}>{t("incompleteBody")}</WarnAlert>
           )}
           <EnvLabelledField
-            label={t("enabled")}
+            label={tSettings("registry.smtp_enabled.label")}
             env={["SMTP_ENABLED"]}
             description={t("enabledHelp")}
             layout="inline"
           >
             <Switch
-              label={t("enabled")}
+              label={tSettings("registry.smtp_enabled.label")}
               htmlName="smtpEnabled"
               value={enabled}
               onChange={setEnabled}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("host")} env={["SMTP_HOST"]}>
+          <EnvLabelledField label={tSettings("registry.smtp_host.label")} env={["SMTP_HOST"]}>
             <TextInput
               startIcon={Globe}
               {...AUTOFILL_OFF}
-              label={t("host")}
-              description={t("hostHelp")}
+              label={tSettings("registry.smtp_host.label")}
+              description={tSettings("registry.smtp_host.description")}
               htmlName="smtpHost"
               value={host}
               onChange={setHost}
@@ -94,11 +96,11 @@ export function EmailServerSection({
               }}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("port")} env={["SMTP_PORT"]}>
+          <EnvLabelledField label={tCommon("port")} env={["SMTP_PORT"]}>
             <NumberInput
               startIcon={EthernetPort}
               hasNumberSteppers
-              label={t("port")}
+              label={tCommon("port")}
               htmlName="smtpPort"
               value={port}
               onChange={setPort}
@@ -107,35 +109,37 @@ export function EmailServerSection({
               max={65_535}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("username")} env={["SMTP_USERNAME"]}>
+          <EnvLabelledField label={tCommon("username")} env={["SMTP_USERNAME"]}>
             <TextInput
               startIcon={User}
               {...AUTOFILL_OFF}
-              label={t("username")}
-              description={t("usernameHelp")}
+              label={tCommon("username")}
+              description={tSettings("registry.smtp_username.description")}
               isOptional
               htmlName="smtpUsername"
               value={username}
               onChange={setUsername}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("password")} env={["SMTP_PASSWORD"]}>
+          <EnvLabelledField label={tCommon("password")} env={["SMTP_PASSWORD"]}>
             <TextInput
               startIcon={KeyRound}
               {...AUTOFILL_NEW_PASSWORD}
-              label={t("password")}
+              label={tCommon("password")}
               type="password"
               isOptional
-              description={email.hasPassword ? t("passwordStored") : t("passwordHelp")}
+              description={
+                email.hasPassword ? tSettings("clickhousePasswordStored") : t("passwordHelp")
+              }
               htmlName="smtpPassword"
               value={password}
               onChange={setPassword}
             />
           </EnvLabelledField>
-          <EnvLabelledField label={t("from")} env={["SMTP_FROM"]}>
+          <EnvLabelledField label={tSettings("registry.smtp_from.label")} env={["SMTP_FROM"]}>
             <EmailInput
-              label={t("from")}
-              description={t("fromHelp")}
+              label={tSettings("registry.smtp_from.label")}
+              description={tSettings("registry.smtp_from.description")}
               htmlName="smtpFrom"
               value={from}
               onChange={setFrom}
@@ -204,6 +208,7 @@ export function NotificationsSection({
   formAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings.email");
+  const tSettings = useTranslations("settings");
   const format = useFormatter();
   const [days, setDays] = useState(email.alertDays);
   const [recipients, setRecipients] = useState(email.alertRecipients);
@@ -234,7 +239,7 @@ export function NotificationsSection({
             <NumberInput
               startIcon={CalendarDays}
               hasNumberSteppers
-              units={t("alertDaysUnit")}
+              units={tSettings("units.days")}
               label={t("alertDays")}
               description={t("alertDaysHelp")}
               htmlName="alertDays"

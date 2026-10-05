@@ -32,8 +32,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   const token = request.headers.get(RESTART_TOKEN_HEADER);
   if (afterSetup) {
     if (!(await restartTokenMatches(token))) {
-      const t = await getTranslations("setup");
-      return Response.json({ ok: false, error: t("errors.alreadyCompleted") }, { status: 409 });
+      const tErrors = await getTranslations("errors");
+      return Response.json({ ok: false, error: tErrors("setupAlreadyCompleted") }, { status: 409 });
     }
   } else {
     if (!(await getMigrationSource())) {
@@ -72,8 +72,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   // Losing this race means another request already restarted on the same token.
   if (afterSetup && !(await consumeRestartToken(token))) {
-    const t = await getTranslations("setup");
-    return Response.json({ ok: false, error: t("errors.alreadyCompleted") }, { status: 409 });
+    const tErrors = await getTranslations("errors");
+    return Response.json({ ok: false, error: tErrors("setupAlreadyCompleted") }, { status: 409 });
   }
 
   // Asked before scheduling our own exit, while there is still a stream to send it on.

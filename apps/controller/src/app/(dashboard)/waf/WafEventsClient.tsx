@@ -387,6 +387,10 @@ function MatchTags({ tags }: { tags: string[] }) {
 
 function AuditPanel({ rawData }: { rawData: string | null }) {
   const t = useTranslations("waf");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const emptyValue = useEmptyValue();
   const [innerTab, setInnerTab] = useState("overview");
 
@@ -418,8 +422,8 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   return (
     <VStack gap={3}>
       <TabList value={innerTab} onChange={setInnerTab} size="sm">
-        <Tab value="overview" label={t("overview")} />
-        <Tab value="request" label={t("request")} />
+        <Tab value="overview" label={tNav("overview")} />
+        <Tab value="request" label={tCommon("request")} />
         <Tab value="response" label={t("response")} />
         {msgs.length > 0 && <Tab value="matches" label={t("matchesTab", { count: msgs.length })} />}
       </TabList>
@@ -439,7 +443,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     {tx.timestamp ?? emptyValue}
                   </Text>
                 </MetadataListItem>
-                <MetadataListItem label={t("client")}>
+                <MetadataListItem label={tCommon("client")}>
                   <Text type="code" size="xsm">
                     {tx.client_ip ?? emptyValue}:{tx.client_port ?? 0}
                   </Text>
@@ -543,7 +547,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   </Text>
                 </HStack>
               </Card>
-              <DetailRow label={t("responseHeaders")}>
+              <DetailRow label={tSettings("responseHeaders")}>
                 <HeadersGrid headers={res.headers} />
               </DetailRow>
               {res.body && (
@@ -559,7 +563,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               {msgs.map((m) => (
                 <VStack key={m.rowId} gap={2}>
                   <MetadataList columns="multi">
-                    <MetadataListItem label={t("ruleId")}>
+                    <MetadataListItem label={tProxyHosts("ruleId")}>
                       <Text type="code" size="xsm" weight="semibold">
                         {m.details?.ruleId ?? emptyValue}
                       </Text>
@@ -625,6 +629,8 @@ function EventDetailPanel({
   hosts: HostOption[];
 }) {
   const t = useTranslations("waf");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
   const router = useRouter();
 
@@ -643,8 +649,8 @@ function EventDetailPanel({
           <IconButton
             variant="ghost"
             size="sm"
-            label={t("close")}
-            tooltip={t("close")}
+            label={tCommon("close")}
+            tooltip={tCommon("close")}
             icon={<X />}
             onClick={onClose}
           />
@@ -652,7 +658,7 @@ function EventDetailPanel({
 
         <Card variant="muted" padding={4}>
           <MetadataList columns="multi">
-            <MetadataListItem label={t("time")}>
+            <MetadataListItem label={tCommon("time")}>
               <Text type="body" size="sm">
                 <Timestamp value={event.ts * 1000} />
               </Text>
@@ -662,7 +668,7 @@ function EventDetailPanel({
                 {event.host || emptyValue}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label={t("clientIp")}>
+            <MetadataListItem label={tCommon("clientIp")}>
               <HStack gap={2} vAlign="center" wrap="wrap">
                 <Text type="code" size="sm">
                   {event.clientIp}
@@ -670,7 +676,7 @@ function EventDetailPanel({
                 {event.countryCode && <Badge label={event.countryCode} />}
               </HStack>
             </MetadataListItem>
-            <MetadataListItem label={t("method")}>
+            <MetadataListItem label={tCommon("method")}>
               <Text type="code" size="sm" weight="semibold" color="accent">
                 {event.method}
               </Text>
@@ -680,7 +686,7 @@ function EventDetailPanel({
                 {event.uri || emptyValue}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label={t("ruleId")}>
+            <MetadataListItem label={tProxyHosts("ruleId")}>
               <Text type="code" size="sm" weight="semibold">
                 {event.ruleId ?? emptyValue}
               </Text>
@@ -782,6 +788,9 @@ export default function WafEventsClient({
   droppedDirectives,
 }: Props) {
   const t = useTranslations("waf");
+  const tNav = useTranslations("nav");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
   const timeZone = useTimeZone() ?? "UTC";
   const emptyValue = useEmptyValue();
@@ -843,8 +852,8 @@ export default function WafEventsClient({
       kind: "enum",
       values: hostOptions.map((host) => ({ value: host, label: host })),
     },
-    { param: "ip", label: t("clientIp"), kind: "exact" },
-    { param: "rule", label: t("ruleId"), kind: "exact" },
+    { param: "ip", label: tCommon("clientIp"), kind: "exact" },
+    { param: "rule", label: tProxyHosts("ruleId"), kind: "exact" },
     {
       param: "action",
       label: t("action"),
@@ -880,11 +889,15 @@ export default function WafEventsClient({
   // Per-option help: one line covering all three left "Default" unexplained.
   const bodyLimitActions = [
     { value: "", label: t("bodyLimitActionDefault"), help: t("overLimitActionHelpDefault") },
-    { value: "Reject", label: t("bodyLimitActionReject"), help: t("overLimitActionHelpReject") },
+    {
+      value: "Reject",
+      label: tProxyHosts("reject"),
+      help: tProxyHosts("overLimitActionHelpReject"),
+    },
     {
       value: "ProcessPartial",
-      label: t("bodyLimitActionPartial"),
-      help: t("overLimitActionHelpPartial"),
+      label: tProxyHosts("partial"),
+      help: tProxyHosts("overLimitActionHelpPartial"),
     },
   ];
 
@@ -976,7 +989,7 @@ export default function WafEventsClient({
   const columns: Column<WafEvent>[] = [
     {
       id: "ts",
-      label: t("time"),
+      label: tCommon("time"),
       width: 220,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
@@ -1014,7 +1027,7 @@ export default function WafEventsClient({
     },
     {
       id: "clientIp",
-      label: t("clientIp"),
+      label: tCommon("clientIp"),
       width: 200,
       render: (r) => (
         <HStack gap={1} vAlign="center">
@@ -1027,7 +1040,7 @@ export default function WafEventsClient({
     },
     {
       id: "method",
-      label: t("request"),
+      label: tCommon("request"),
       render: (r) => (
         <HStack gap={2} vAlign="center">
           <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
@@ -1043,7 +1056,7 @@ export default function WafEventsClient({
     },
     {
       id: "ruleId",
-      label: t("ruleId"),
+      label: tProxyHosts("ruleId"),
       width: 80,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
@@ -1059,12 +1072,12 @@ export default function WafEventsClient({
   };
 
   const views = [
-    { value: "events", label: t("events") },
+    { value: "events", label: tCommon("events") },
     { value: "exclusions", label: t("exclusions") },
-    { value: "hosts", label: t("hostModes") },
+    { value: "hosts", label: tNav("hosts") },
     { value: "presets", label: t("presets") },
     { value: "plugins", label: t("plugins") },
-    { value: "settings", label: t("settings") },
+    { value: "settings", label: tNav("settings") },
   ];
 
   const detailPanel = selected && (
@@ -1113,12 +1126,12 @@ export default function WafEventsClient({
       <DroppedDirectivesBanner dropped={droppedDirectives} />
 
       <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
-        <Tab value="events" label={t("events")} />
+        <Tab value="events" label={tCommon("events")} />
         <Tab value="exclusions" label={t("exclusions")} />
-        <Tab value="hosts" label={t("hostModes")} />
+        <Tab value="hosts" label={tNav("hosts")} />
         <Tab value="presets" label={t("presets")} />
         <Tab value="plugins" label={t("plugins")} />
-        <Tab value="settings" label={t("settings")} />
+        <Tab value="settings" label={tNav("settings")} />
       </TabList>
 
       {tab === "events" && (
@@ -1134,7 +1147,7 @@ export default function WafEventsClient({
             <HStack justify="between" vAlign="start" gap={3} wrap="wrap">
               <div className="cpm-desktop-only">
                 <SegmentedControl
-                  label={t("timeRange")}
+                  label={tCommon("timeRange")}
                   size="md"
                   value={range}
                   onChange={handleRangeChange}
@@ -1147,7 +1160,7 @@ export default function WafEventsClient({
               <FilterChip
                 className="cpm-mobile-flex"
                 label={rangeOptions.find((o) => o.value === range)?.label ?? range}
-                aria-label={t("timeRange")}
+                aria-label={tCommon("timeRange")}
                 isActive={range !== "all"}
                 onClick={() => setRangeSheetOpen(true)}
               />
@@ -1170,7 +1183,7 @@ export default function WafEventsClient({
               </div>
             </HStack>
             <OptionSheet
-              title={t("timeRange")}
+              title={tCommon("timeRange")}
               isOpen={rangeSheetOpen}
               onOpenChange={setRangeSheetOpen}
               value={range}
@@ -1180,20 +1193,20 @@ export default function WafEventsClient({
             {range === "custom" && (
               <HStack gap={2} vAlign="end" wrap="wrap">
                 <DateTimeInput
-                  label={t("rangeFrom")}
+                  label={tCommon("rangeFrom")}
                   size="sm"
                   value={(customFrom || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomFrom(v ?? "")}
                 />
                 <DateTimeInput
-                  label={t("rangeTo")}
+                  label={tCommon("rangeTo")}
                   size="sm"
                   value={(customTo || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomTo(v ?? "")}
                 />
                 <Button
                   size="sm"
-                  label={t("applyRange")}
+                  label={tCommon("applyRange")}
                   onClick={() => pushRange("custom", customFrom, customTo)}
                 />
               </HStack>
@@ -1305,7 +1318,7 @@ export default function WafEventsClient({
                 </ModuleGated>
               </Field>
               <Switch
-                label={t("owaspCrsLabel")}
+                label={tProxyHosts("owaspCrsLabel")}
                 description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
@@ -1375,7 +1388,7 @@ export default function WafEventsClient({
                 <NumberInput
                   startIcon={HardDrive}
                   hasNumberSteppers
-                  units={t("maxBodySizeMibUnit")}
+                  units={tCommon("unitMib")}
                   label={t("maxBodySizeMib")}
                   htmlName="wafRequestBodyLimitMb"
                   value={wafBodyLimitMb}
@@ -1391,8 +1404,8 @@ export default function WafEventsClient({
                 <NumberInput
                   startIcon={HardDrive}
                   hasNumberSteppers
-                  units={t("bufferedInMemoryMibUnit")}
-                  label={t("bufferedInMemoryMib")}
+                  units={tCommon("unitMib")}
+                  label={tProxyHosts("bufferedInMemoryMib")}
                   htmlName="wafRequestBodyInMemoryLimitMb"
                   value={wafInMemoryLimitMb}
                   onChange={setWafInMemoryLimitMb}
@@ -1408,7 +1421,7 @@ export default function WafEventsClient({
               <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
               {/* SegmentedControl's own label is only an aria-label; Field draws the visible one. */}
               <Field
-                label={t("overLimitAction")}
+                label={tProxyHosts("overLimitAction")}
                 inputID={limitActionId}
                 isGroupLabel
                 description={bodyLimitActions.find((o) => o.value === wafLimitAction)?.help}
@@ -1416,7 +1429,7 @@ export default function WafEventsClient({
                 {/* Keeps Field's column from stretching the control across the page. */}
                 <HStack>
                   <SegmentedControl
-                    label={t("overLimitAction")}
+                    label={tProxyHosts("overLimitAction")}
                     value={wafLimitAction}
                     onChange={setWafLimitAction}
                   >
@@ -1440,7 +1453,7 @@ export default function WafEventsClient({
                 isReadOnly={Boolean(wafModuleDisabledReason)}
               />
               <CodeEditor
-                label={t("customSeclangDirectives")}
+                label={tProxyHosts("customSeclangDirectives")}
                 language="seclang"
                 htmlName="wafCustomDirectives"
                 height="sm"
@@ -1454,7 +1467,7 @@ export default function WafEventsClient({
               />
               <WafQuickTemplates onInsert={setWafCustomDirectives} />
               <Banner status="info" title={t("exclusionsTabHelp")} />
-              <SaveButton label={t("save")} />
+              <SaveButton label={tCommon("save")} />
             </VStack>
           </form>
         </VStack>

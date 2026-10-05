@@ -28,6 +28,7 @@ import { applyStagedSettingsAction, discardStagedSettingsAction } from "./action
 /** `fill`: as wide as the rail, the buttons sharing it by the length of their labels. */
 export function StagedControls({ view, fill = false }: { view: StagedView; fill?: boolean }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -52,7 +53,7 @@ export function StagedControls({ view, fill = false }: { view: StagedView; fill?
       <Button
         variant="ghost"
         size="sm"
-        label={t("stagedDiscard")}
+        label={tCommon("discard")}
         onClick={discardAll}
         isDisabled={pending}
         className={fill ? "grow" : undefined}
@@ -138,6 +139,7 @@ function ReviewSheet({
   onClose: () => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +184,7 @@ function ReviewSheet({
 
         <HStack gap={4} vAlign="start">
           <VStack gap={3} width="100%" maxWidth={360}>
-            <Heading level={3}>{t("reviewChangeCount", { count: view.changes.length })}</Heading>
+            <Heading level={3}>{tCommon("changeCount", { count: view.changes.length })}</Heading>
             <Divider />
             {view.changes.map((change) => (
               <HStack key={change.key} gap={2} vAlign="start">
@@ -217,7 +219,7 @@ function ReviewSheet({
                 <Button
                   variant="ghost"
                   size="sm"
-                  label={t("reviewUndo")}
+                  label={tCommon("undo")}
                   onClick={() => undo(change.key)}
                   isDisabled={pending}
                 />
@@ -288,7 +290,7 @@ function ReviewSheet({
           {pending && <Spinner size="sm" />}
           <Button
             variant="secondary"
-            label={t("reviewClose")}
+            label={tCommon("close")}
             onClick={onClose}
             isDisabled={pending}
           />

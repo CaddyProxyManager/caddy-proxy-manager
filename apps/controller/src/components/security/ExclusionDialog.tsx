@@ -38,6 +38,8 @@ export function ExclusionDialog({
   onSaved: (message: string) => void;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const [ruleId, setRuleId] = useState<number | null>(null);
   const [scope, setScope] = useState(ALL_HOSTS);
   const [path, setPath] = useState("");
@@ -91,7 +93,7 @@ export function ExclusionDialog({
       <VStack gap={4}>
         {error && <Banner status="error" title={error} />}
         <NumberInput
-          label={t("ruleId")}
+          label={tProxyHosts("ruleId")}
           value={ruleId}
           onChange={setRuleId}
           isIntegerOnly
@@ -111,7 +113,7 @@ export function ExclusionDialog({
           ]}
         />
         <TextInput
-          label={t("exclusionPath")}
+          label={tProxyHosts("path")}
           description={t("exclusionPathHelp")}
           placeholder="/api/upload"
           value={path}
@@ -127,7 +129,7 @@ export function ExclusionDialog({
           isOptional
         />
         <TextInput
-          label={t("exclusionReason")}
+          label={tCommon("reason")}
           placeholder={t("exclusionReasonPlaceholder")}
           value={reason}
           onChange={setReason}

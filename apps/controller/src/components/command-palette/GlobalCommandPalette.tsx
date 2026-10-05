@@ -142,7 +142,7 @@ export function GlobalCommandPaletteProvider({
               id: `/settings/${item.id}`,
               label: settingsSectionName(tSettings, item),
               auxiliaryData: {
-                group: t("groupSettings"),
+                group: tNav("settings"),
                 desc: settingsSectionDescription(tSettings, item),
                 keywords: [
                   group ? settingsGroupLabel(tSettings, group) : "",
@@ -166,7 +166,7 @@ export function GlobalCommandPaletteProvider({
         id: entry.href,
         label: entry.title,
         auxiliaryData: {
-          group: t("groupSettings"),
+          group: tNav("settings"),
           desc: entry.context,
           keywords: entry.keywords,
           icon: Settings2,

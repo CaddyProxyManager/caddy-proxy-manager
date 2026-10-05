@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import type { NextRequest } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { getMigrationSource } from "@/src/lib/setup";
 
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest) {
 
   const path = await getMigrationSource();
   if (!path || !existsSync(path)) {
-    return new Response("No migrated database is available to download.", { status: 404 });
+    const t = await getTranslations("setup.migrateErrors");
+    return new Response(t("noBackupAvailable"), { status: 404 });
   }
 
   // node:stream's toWeb produces a type Response does not accept.

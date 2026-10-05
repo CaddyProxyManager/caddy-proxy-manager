@@ -56,6 +56,7 @@ type Props = {
 
 export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: Props) {
   const t = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   const addRule = () =>
@@ -111,7 +112,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                 </HStack>
                 {/* Styled HTML is unreadable in a three-row textarea. */}
                 <CodeEditor
-                  label={t("responseBody")}
+                  label={tSettings("responseBody")}
                   language="html"
                   height="sm"
                   placeholder={t.raw("errorPageBodyPlaceholder") as string}

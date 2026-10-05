@@ -7,8 +7,8 @@ import { getLoggingSettings } from "@/src/lib/settings";
 import LogsClient from "./LogsClient";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("logs");
-  return { title: t("title") };
+  const tNav = await getTranslations("nav");
+  return { title: tNav("logs") };
 }
 
 /** `?source=access&host=app.example.com` is how a host's Logs action opens it. */

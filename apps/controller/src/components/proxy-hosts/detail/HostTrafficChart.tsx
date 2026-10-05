@@ -22,7 +22,7 @@ export function HostTrafficChart({ timeline }: { timeline: readonly HostTrafficB
   const series = useMemo(
     () => [
       { name: t("chartServed"), type: "column", data: timeline.map((b) => b.served) },
-      { name: t("chartServerErrors"), type: "column", data: timeline.map((b) => b.serverErrors) },
+      { name: t("serverErrors"), type: "column", data: timeline.map((b) => b.serverErrors) },
       {
         name: t("chartErrorShare"),
         type: "line",

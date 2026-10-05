@@ -27,6 +27,7 @@ const idOrNull = (value: string) => (value === NONE_VALUE ? null : Number(value)
 export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear }: Props) {
   const t = useTranslations("proxyHosts");
   const tb = useTranslations("ui.bulk");
+  const tCommon = useTranslations("common");
   const [action, setAction] = useState<ProxyHostBulkAction | null>(null);
   const [certificateId, setCertificateId] = useState(NONE_VALUE);
   const [accessListId, setAccessListId] = useState(NONE_VALUE);
@@ -75,7 +76,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
       <BulkActionBar count={hosts.length} onClear={onClear}>
         <Button variant="ghost" label={tb("enable")} onClick={() => open("enable")} />
         <Button variant="ghost" label={tb("disable")} onClick={() => open("disable")} />
-        <Button variant="ghost" label={tb("delete")} onClick={() => open("delete")} />
+        <Button variant="ghost" label={tCommon("delete")} onClick={() => open("delete")} />
         <MoreMenu
           label={tb("moreActions")}
           size="sm"
@@ -96,7 +97,7 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
         title={action ? titles[action] : ""}
         items={hosts}
         isDestructive={action === "delete"}
-        confirmLabel={action === "delete" ? tb("delete") : undefined}
+        confirmLabel={action === "delete" ? tCommon("delete") : undefined}
         isPending={isPending}
         error={error}
         onConfirm={confirm}

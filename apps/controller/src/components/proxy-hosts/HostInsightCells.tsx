@@ -90,7 +90,7 @@ export function HostProtectionBadges({ protections }: { protections: HostProtect
         );
         // "ACL" is short for the column's sake; the hover spells it out.
         return key === "accessList" ? (
-          <Tooltip key={key} content={t("insights.protection.accessListTitle")}>
+          <Tooltip key={key} content={t("accessList")}>
             {badge}
           </Tooltip>
         ) : (

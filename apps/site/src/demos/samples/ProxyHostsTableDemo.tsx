@@ -110,6 +110,8 @@ const AGENTS = { total: 3, connected: 2 };
  */
 function ProxyHostsTableDemoContent() {
   const t = useTranslations("proxyHosts");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const tb = useTranslations("ui.bulk");
   const [hosts, setHosts] = useState(HOSTS);
   const router = useRouter();
@@ -215,7 +217,7 @@ function ProxyHostsTableDemoContent() {
     },
     {
       id: "serverErrors",
-      label: t("insights.serverErrors"),
+      label: t("detail.serverErrors"),
       align: "right",
       width: 72,
       render: (r) => (
@@ -233,7 +235,7 @@ function ProxyHostsTableDemoContent() {
     },
     {
       id: "status",
-      label: t("status"),
+      label: tCommon("status"),
       sortKey: "status",
       width: 148,
       render: (r) => (
@@ -258,7 +260,7 @@ function ProxyHostsTableDemoContent() {
           tiles={[
             {
               id: "hosts",
-              label: t("proxyHosts"),
+              label: tNav("proxyHosts"),
               value: counts.total,
               note: t("enabledDisabledNote", {
                 enabled: counts.enabled,
@@ -275,13 +277,13 @@ function ProxyHostsTableDemoContent() {
             },
             {
               id: "certificates",
-              label: t("certificates"),
+              label: tNav("certificates"),
               value: hosts.filter((h) => h.certificate).length,
               note: t("certificatesNote", { count: hosts.filter((h) => h.certificate).length }),
             },
             {
               id: "agents",
-              label: t("assignedAgents"),
+              label: tNav("agents"),
               value: AGENTS.total,
               note: t("agentsConnectedNote", { count: AGENTS.connected }),
               accent: { label: t("someAgentsOffline"), variant: "warning" },

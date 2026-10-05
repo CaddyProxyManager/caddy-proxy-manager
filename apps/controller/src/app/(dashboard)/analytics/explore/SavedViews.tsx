@@ -44,6 +44,7 @@ export function SavedViews({
   onOpen: (query: string) => void;
 }) {
   const t = useTranslations("analytics");
+  const tCommon = useTranslations("common");
   const density = useTableDensity();
   const [views, setViews] = useState<AnalyticsView[]>([]);
   const [managing, setManaging] = useState(false);
@@ -125,7 +126,7 @@ export function SavedViews({
   const columns: TableColumn<Row>[] = [
     {
       key: "name",
-      header: t("viewName"),
+      header: tCommon("name"),
       width: proportional(1),
       renderCell: (row) => (
         <VStack gap={0}>
@@ -149,7 +150,7 @@ export function SavedViews({
     },
     {
       key: "actions",
-      header: <VisuallyHidden>{t("rowActions")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       width: pixel(56),
       align: "end",
       renderCell: (row) => (
@@ -159,7 +160,7 @@ export function SavedViews({
           button={{
             variant: "ghost",
             icon: <MoreHorizontal />,
-            label: t("viewActions", { name: row.name }),
+            label: tCommon("actionsFor", { name: row.name }),
             isIconOnly: true,
           }}
           items={[
@@ -179,7 +180,7 @@ export function SavedViews({
                     label: t("viewUpdate"),
                     onClick: () => void save({ id: row.id, query }),
                   },
-                  { id: "rename", label: t("viewRename"), onClick: () => startRename(row) },
+                  { id: "rename", label: tCommon("rename"), onClick: () => startRename(row) },
                   {
                     id: "share",
                     label: row.shared ? t("viewUnshare") : t("viewShare"),
@@ -188,7 +189,7 @@ export function SavedViews({
                   { type: "divider" as const },
                   {
                     id: "delete",
-                    label: t("viewDelete"),
+                    label: tCommon("delete"),
                     variant: "destructive" as const,
                     onClick: () => void remove(row),
                   },
@@ -226,7 +227,7 @@ export function SavedViews({
         title={t("savedViews")}
         maxWidth="lg"
         actions={
-          <Button variant="secondary" label={t("close")} onClick={() => setManaging(false)} />
+          <Button variant="secondary" label={tCommon("close")} onClick={() => setManaging(false)} />
         }
       >
         {views.length === 0 ? (
@@ -250,7 +251,7 @@ export function SavedViews({
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing?.mode === "rename" ? t("viewRenameTitle") : t("viewSaveTitle")}
-        submitLabel={editing?.mode === "rename" ? t("viewRename") : t("viewSave")}
+        submitLabel={editing?.mode === "rename" ? tCommon("rename") : t("viewSave")}
         onSubmit={() => void submitEditing()}
         isSubmitting={saving}
         isSubmitDisabled={!name.trim() || name.trim().length > MAX_NAME}
@@ -258,7 +259,7 @@ export function SavedViews({
         <VStack gap={4}>
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("viewName")}
+            label={tCommon("name")}
             value={name}
             onChange={setName}
             isRequired

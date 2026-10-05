@@ -42,9 +42,7 @@ export function normalizeProxyHostDomains(domains: string[]) {
 
   const invalidDomain = normalizedDomains.find((domain) => !isValidProxyHostDomain(domain));
   if (invalidDomain) {
-    throw new Error(
-      `Invalid domain "${invalidDomain}". Wildcards are supported only as the left-most label, for example "*.example.com".`,
-    );
+    throw domainError("proxyHostDomainInvalid", { domain: invalidDomain });
   }
 
   return normalizedDomains;

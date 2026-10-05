@@ -86,7 +86,7 @@ function proxyProtocolOptions(t: Translator) {
  * What `layer4.proxy.selection_policies.*` registers, checked against the shipped binary: no
  * request-reading policies, since layer 4 has only a connection.
  */
-function lbPolicyOptions(t: ReturnType<typeof useTranslations<"l4ProxyHosts">>) {
+function lbPolicyOptions(t: ReturnType<typeof useTranslations<"proxyHosts">>) {
   return [
     { value: "random", label: t("lbPolicyRandom") },
     { value: "random_choose", label: t("lbPolicyRandomChoose") },
@@ -122,7 +122,7 @@ function geoblockModeOptions(t: Translator) {
 
 function upstreamDnsModeOptions(t: Translator) {
   return [
-    { value: "inherit", label: t("optDnsInherit") },
+    { value: "inherit", label: t("optDnsFamilyInherit") },
     { value: "enabled", label: t("optDnsEnabled") },
     { value: "disabled", label: t("optDnsDisabled") },
   ];
@@ -255,6 +255,9 @@ function L4HostForm({
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
+  const tSettings = useTranslations("settings");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const anchor = (section: L4EditorSection) => `${anchorPrefix}${l4EditorSectionAnchor(section)}`;
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
@@ -334,7 +337,7 @@ function L4HostForm({
 
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("name")}
+            label={tCommon("name")}
             htmlName="name"
             placeholder={t("namePlaceholder")}
             value={text.name}
@@ -349,7 +352,7 @@ function L4HostForm({
 
         <VStack gap={5} id={anchor("listener")}>
           <Selector
-            label={t("protocol")}
+            label={tProxyHosts("protocol")}
             htmlName="protocol"
             options={PROTOCOL_OPTIONS}
             value={protocol}
@@ -427,7 +430,7 @@ function L4HostForm({
           <TextArea
             {...NATIVE_REQUIRED}
             {...NO_SPELLCHECK}
-            label={t("upstreams")}
+            label={tProxyHosts("upstreams")}
             htmlName="upstreams"
             placeholder={samePort ? "10.0.0.1\n10.0.0.2" : "10.0.0.1:5432\n10.0.0.2:5432"}
             value={text.upstreams}
@@ -447,13 +450,13 @@ function L4HostForm({
 
           <Section
             icon={Layers}
-            title={t("loadBalancer")}
+            title={tProxyHosts("loadBalancer")}
             defaultIsOpen={initialData?.loadBalancer?.enabled ?? false}
           >
             <input type="hidden" name="lbPresent" value="1" />
             <input type="hidden" name="lbEnabledPresent" value="1" />
             <Switch
-              label={t("enableLoadBalancing")}
+              label={tProxyHosts("enableLoadBalancing")}
               htmlName="lbEnabled"
               value={lbEnabled}
               onChange={setLbEnabled}
@@ -461,13 +464,13 @@ function L4HostForm({
             <Selector
               label={t("policy")}
               htmlName="lbPolicy"
-              options={lbPolicyOptions(t)}
+              options={lbPolicyOptions(tProxyHosts)}
               value={lbPolicy}
               onChange={setLbPolicy}
             />
             {lbPolicy === "random_choose" && (
               <TextInput
-                label={t("lbChoose")}
+                label={tProxyHosts("lbChoose")}
                 isOptional
                 htmlName="lbPolicyChoose"
                 placeholder="2"
@@ -477,7 +480,7 @@ function L4HostForm({
             )}
             {lbPolicy === "weighted_round_robin" && (
               <TextInput
-                label={t("lbWeights")}
+                label={tProxyHosts("lbWeights")}
                 isOptional
                 htmlName="lbPolicyWeights"
                 placeholder="3, 2, 1"
@@ -487,7 +490,7 @@ function L4HostForm({
             )}
             <TextInput
               startIcon={Clock}
-              label={t("tryDuration")}
+              label={tProxyHosts("tryDuration")}
               isOptional
               htmlName="lbTryDuration"
               placeholder="5s"
@@ -496,7 +499,7 @@ function L4HostForm({
             />
             <TextInput
               startIcon={Clock}
-              label={t("tryInterval")}
+              label={tProxyHosts("tryInterval")}
               isOptional
               htmlName="lbTryInterval"
               placeholder="250ms"
@@ -518,7 +521,7 @@ function L4HostForm({
               description={samePort ? t("activeHealthCheckSamePort") : undefined}
             />
             <TextInput
-              label={t("healthCheckPort")}
+              label={tProxyHosts("healthCheckPort")}
               isOptional
               htmlName="lbActiveHealthPort"
               value={text.lbActiveHealthPort}
@@ -526,7 +529,7 @@ function L4HostForm({
             />
             <TextInput
               startIcon={Clock}
-              label={t("interval")}
+              label={tProxyHosts("interval")}
               isOptional
               htmlName="lbActiveHealthInterval"
               placeholder="30s"
@@ -535,7 +538,7 @@ function L4HostForm({
             />
             <TextInput
               startIcon={Clock}
-              label={t("timeout")}
+              label={tProxyHosts("timeout")}
               isOptional
               htmlName="lbActiveHealthTimeout"
               placeholder="5s"
@@ -555,7 +558,7 @@ function L4HostForm({
             />
             <TextInput
               startIcon={Clock}
-              label={t("failDuration")}
+              label={tProxyHosts("failDuration")}
               isOptional
               htmlName="lbPassiveHealthFailDuration"
               placeholder="30s"
@@ -573,7 +576,7 @@ function L4HostForm({
 
           <Section
             icon={Globe}
-            title={t("customDnsResolvers")}
+            title={tProxyHosts("customDnsResolvers")}
             defaultIsOpen={initialData?.dnsResolver?.enabled ?? false}
           >
             <input type="hidden" name="dnsPresent" value="1" />
@@ -585,7 +588,7 @@ function L4HostForm({
               onChange={setDnsEnabled}
             />
             <TextArea
-              label={t("dnsResolvers")}
+              label={tProxyHosts("dnsResolvers")}
               isOptional
               htmlName="dnsResolvers"
               placeholder={"1.1.1.1\n9.9.9.9"}
@@ -595,7 +598,7 @@ function L4HostForm({
               description={t("dnsResolversHelp")}
             />
             <TextArea
-              label={t("fallbackResolvers")}
+              label={tSettings("fallbackResolvers")}
               isOptional
               htmlName="dnsFallbacks"
               placeholder={"1.0.0.1\n149.112.112.112"}
@@ -606,7 +609,7 @@ function L4HostForm({
             />
             <TextInput
               startIcon={Clock}
-              label={t("timeout")}
+              label={tProxyHosts("timeout")}
               isOptional
               htmlName="dnsTimeout"
               placeholder="5s"
@@ -617,7 +620,7 @@ function L4HostForm({
 
           <Section
             icon={Pin}
-            title={t("upstreamDnsPinning")}
+            title={tProxyHosts("upstreamDnsPinning")}
             defaultIsOpen={initialData?.upstreamDnsResolution?.enabled === true}
           >
             <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
@@ -625,14 +628,14 @@ function L4HostForm({
               {t("dnsPinningDescription")}
             </Text>
             <Selector
-              label={t("resolutionMode")}
+              label={tProxyHosts("resolutionMode")}
               htmlName="upstreamDnsResolutionMode"
               options={upstreamDnsModeOptions(t)}
               value={upstreamDnsMode}
               onChange={setUpstreamDnsMode}
             />
             <Selector
-              label={t("addressFamilyPreference")}
+              label={tProxyHosts("addressFamilyPreference")}
               htmlName="upstreamDnsResolutionFamily"
               options={upstreamDnsFamilyOptions(t)}
               value={upstreamDnsFamily}
@@ -643,7 +646,7 @@ function L4HostForm({
 
         <VStack gap={5} id={anchor("protection")}>
           <Selector
-            label={t("accessList")}
+            label={tProxyHosts("accessList")}
             htmlName="accessListId"
             options={accessListOptions(t, accessLists, initialData?.accessListId ?? null)}
             value={accessListId}
@@ -655,7 +658,7 @@ function L4HostForm({
           <Section icon={ShieldBan} title={t("crowdsec")} defaultIsOpen={!crowdsecEnabled}>
             <input type="hidden" name="crowdsecPresent" value="1" />
             <Switch
-              label={t("enableCrowdsec")}
+              label={tProxyHosts("enableCrowdsec")}
               description={t("crowdsecHelp")}
               htmlName="crowdsecEnabled"
               value={crowdsecEnabled}
@@ -665,12 +668,12 @@ function L4HostForm({
 
           <Section
             icon={MapPin}
-            title={t("geoBlocking")}
+            title={tProxyHosts("geoBlocking")}
             defaultIsOpen={initialData?.geoblock?.enabled ?? false}
           >
             <input type="hidden" name="geoblockPresent" value="1" />
             <Switch
-              label={t("enableGeoBlocking")}
+              label={tProxyHosts("enableGeoBlocking")}
               htmlName="geoblockEnabled"
               value={geoblockEnabled}
               onChange={setGeoblockEnabled}
@@ -684,7 +687,7 @@ function L4HostForm({
             />
 
             <Text type="label" size="xsm" weight="semibold" color="secondary">
-              {t("blockRules")}
+              {tProxyHosts("blockRules")}
             </Text>
             <TextInput
               startIcon={Earth}
@@ -809,6 +812,7 @@ export function CreateL4HostDialog({
   accessLists?: L4AccessListOption[];
 }) {
   const t = useTranslations("l4ProxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction, isPending] = useActionState(
     createL4ProxyHostAction,
     INITIAL_ACTION_STATE,
@@ -824,7 +828,7 @@ export function CreateL4HostDialog({
       kind="l4"
       isCreate
       formId="create-l4-host-form"
-      submitLabel={t("create")}
+      submitLabel={tCommon("create")}
       state={state}
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(null, data)}
@@ -837,7 +841,7 @@ export function CreateL4HostDialog({
         state={state}
         initialData={
           initialData
-            ? { ...initialData, name: t("duplicateName", { name: initialData.name }) }
+            ? { ...initialData, name: tCommon("copyName", { name: initialData.name }) }
             : null
         }
         agents={agents}
@@ -866,6 +870,7 @@ export function EditL4HostDialog({
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction, isPending] = useActionState(
     updateL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -891,7 +896,7 @@ export function EditL4HostDialog({
       kind="l4"
       isCreate={false}
       formId="edit-l4-host-form"
-      submitLabel={t("saveChanges")}
+      submitLabel={tCommon("saveChanges")}
       state={state}
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(host.id, data)}
@@ -921,6 +926,8 @@ export function DeleteL4HostDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("l4ProxyHosts");
+  const tProxyHosts = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction] = useActionState(
     deleteL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -934,7 +941,7 @@ export function DeleteL4HostDialog({
       onClose={onClose}
       title={t("deleteL4ProxyHost")}
       maxWidth="lg"
-      submitLabel={t("delete")}
+      submitLabel={tCommon("delete")}
       onSubmit={() => {
         (document.getElementById("delete-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -952,7 +959,7 @@ export function DeleteL4HostDialog({
           </Text>
           <Card variant="muted" padding={3}>
             <MetadataList>
-              <MetadataListItem label={t("protocol")}>
+              <MetadataListItem label={tProxyHosts("protocol")}>
                 <Badge
                   variant={host.protocol === "tcp" ? "info" : "warning"}
                   label={host.protocol.toUpperCase()}
@@ -963,7 +970,7 @@ export function DeleteL4HostDialog({
                   {host.listenAddress}
                 </Text>
               </MetadataListItem>
-              <MetadataListItem label={t("upstreams")}>
+              <MetadataListItem label={tProxyHosts("upstreams")}>
                 <Text type="code" size="xsm">
                   {host.upstreams.join(", ")}
                 </Text>

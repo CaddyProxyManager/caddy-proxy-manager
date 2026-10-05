@@ -88,7 +88,7 @@ export function UpstreamInput({
     <VStack gap={2}>
       <input type="hidden" name={name} value={serializedValue} />
       <Text type="body" size="sm" weight="semibold">
-        {t("upstreamsInputLabel")}
+        {t("upstreams")}
       </Text>
 
       <VStack gap={3}>

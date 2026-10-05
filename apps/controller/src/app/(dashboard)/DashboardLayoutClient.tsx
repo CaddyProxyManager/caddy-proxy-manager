@@ -47,17 +47,14 @@ import {
   visibleDestinations,
 } from "@/src/lib/nav/destinations";
 
+/** Under `nav`: a group named like a page shares that page's label. */
 const RAIL_GROUP_LABELS: Record<
   RailGroup,
-  | "railGroupHosts"
-  | "railGroupAccess"
-  | "railGroupSecurity"
-  | "railGroupObservability"
-  | "railGroupSystem"
+  "hosts" | "railGroupAccess" | "security" | "railGroupObservability" | "railGroupSystem"
 > = {
-  hosts: "railGroupHosts",
+  hosts: "hosts",
   access: "railGroupAccess",
-  security: "railGroupSecurity",
+  security: "security",
   observability: "railGroupObservability",
   system: "railGroupSystem",
 };
@@ -351,7 +348,7 @@ export default function DashboardLayoutClient({
               </VStack>
             </div>
             {/* Laid out like the Settings rail; an empty group is skipped. */}
-            <SideNavSection title={t("sectionLabel")} isHeaderHidden>
+            <SideNavSection title={t("more.navigation")} isHeaderHidden>
               {railItems.filter((d) => !d.railGroup).map(renderRailItem)}
             </SideNavSection>
             {RAIL_GROUPS.map((group) => {

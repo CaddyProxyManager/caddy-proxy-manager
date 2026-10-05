@@ -261,6 +261,8 @@ function HostActions({
   canCreate: boolean;
 }) {
   const t = useTranslations("proxyHosts");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   return (
     <HStack gap={2} vAlign="center" justify="end">
       <Switch
@@ -270,12 +272,12 @@ function HostActions({
         onChange={onToggle}
       />
       <MoreMenu
-        label={t("hostActionsLabel", { name: host.name })}
+        label={tCommon("actionsFor", { name: host.name })}
         size="sm"
         alignment="end"
         items={[
-          { label: t("edit"), onClick: onEdit },
-          ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
+          { label: tCommon("edit"), onClick: onEdit },
+          ...(canCreate ? [{ label: tCommon("duplicate"), onClick: onDuplicate }] : []),
           host.maintenance?.enabled
             ? { label: t("turnOffMaintenance"), onClick: () => onMaintenance(false) }
             : { label: t("turnOnMaintenance"), onClick: () => onMaintenance(true) },
@@ -283,17 +285,17 @@ function HostActions({
           ...(canCreate
             ? [
                 {
-                  label: t("viewLogs"),
+                  label: tNav("logs"),
                   onClick: () =>
                     window.location.assign(
                       `/logs?source=access&host=${encodeURIComponent(host.domains[0] ?? "")}`,
                     ),
                 },
-                { label: t("testReachability"), onClick: onTestReachability },
+                { label: tCommon("testReachability"), onClick: onTestReachability },
               ]
             : []),
           { type: "divider" },
-          { label: t("delete"), variant: "destructive", onClick: onDelete },
+          { label: tCommon("delete"), variant: "destructive", onClick: onDelete },
         ]}
       />
     </HStack>
@@ -330,6 +332,8 @@ export default function ProxyHostsClient({
   manageableIds = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const format = useAppFormatter();
   const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
@@ -483,7 +487,7 @@ export default function ProxyHostsClient({
     ...(trafficKnown ? [] : [tlsColumn()]),
     {
       id: "agents",
-      label: t("assignedAgents"),
+      label: tNav("agents"),
       width: 170,
       render: (host) => {
         const assigned = agentAssignments?.[host.id] ?? [];
@@ -529,7 +533,7 @@ export default function ProxyHostsClient({
     ...(trafficKnown ? [certificateColumn()] : []),
     {
       id: "status",
-      label: t("status"),
+      label: tCommon("status"),
       sortKey: "enabled",
       width: trafficKnown ? 160 : 110,
       render: (host) => {
@@ -603,7 +607,7 @@ export default function ProxyHostsClient({
       },
       {
         id: "serverErrors",
-        label: t("insights.serverErrors"),
+        label: t("detail.serverErrors"),
         align: "right",
         width: 80,
         render: (host) => {
@@ -681,7 +685,7 @@ export default function ProxyHostsClient({
   return (
     <VStack gap={6}>
       <ListPageHeader
-        title={t("proxyHosts")}
+        title={tNav("proxyHosts")}
         action={
           canCreate
             ? {
@@ -698,7 +702,7 @@ export default function ProxyHostsClient({
             tiles={[
               {
                 id: "hosts",
-                label: t("proxyHosts"),
+                label: tNav("proxyHosts"),
                 value: counts.total,
                 note: t("enabledDisabledNote", {
                   enabled: counts.enabled,
@@ -708,20 +712,20 @@ export default function ProxyHostsClient({
               {
                 id: "requests",
                 label: t("requests24h"),
-                value: trafficKnown ? format.number(trafficTotals.total) : t("noData"),
+                value: trafficKnown ? format.number(trafficTotals.total) : tCommon("noData"),
                 note: trafficKnown
                   ? t("blockedShareNote", { percent: blockedShare })
                   : t("analyticsOffNote"),
               },
               {
                 id: "certificates",
-                label: t("certificates"),
+                label: tNav("certificates"),
                 value: certificates.length,
                 note: t("certificatesNote", { count: hostsWithTls }),
               },
               {
                 id: "agents",
-                label: t("assignedAgents"),
+                label: tNav("agents"),
                 value: agents?.length ?? 0,
                 note: t("agentsConnectedNote", { count: connectedAgents }),
                 accent:

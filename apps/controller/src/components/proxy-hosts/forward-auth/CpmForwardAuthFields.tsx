@@ -44,6 +44,7 @@ export function CpmForwardAuthFields({
   currentAccess?: ForwardAuthAccessData | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const initial = cpmForwardAuth ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>(currentAccess?.userIds ?? []);
@@ -132,7 +133,7 @@ export function CpmForwardAuthFields({
                     label={group.name}
                     description={group.description ?? undefined}
                     endContent={
-                      <Badge label={t("groupMemberCount", { count: group.member_count })} />
+                      <Badge label={tCommon("memberCount", { count: group.member_count })} />
                     }
                   />
                 ))}

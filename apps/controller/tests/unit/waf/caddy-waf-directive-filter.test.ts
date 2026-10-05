@@ -511,7 +511,7 @@ describe('customDirectivesError', () => {
 
   it('uses the codes of the field it checks', () => {
     expect(customDirectivesError('Include /x', {}, undefined, 'host')?.code).toBe(
-      'hostWafDirectivesDropped',
+      'wafDirectivesDropped',
     );
     expect(customDirectivesError('Include /x', {}, undefined, 'preset')?.code).toBe(
       'wafPresetDirectivesDropped',

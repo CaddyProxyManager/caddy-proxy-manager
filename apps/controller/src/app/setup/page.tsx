@@ -8,7 +8,7 @@ import { sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.account");
-  return { title: { absolute: t("metaTitle") } };
+  return { title: { absolute: t("heading") } };
 }
 
 /** Public by necessity, so the stage is re-checked here; the proxy lets it through always. */

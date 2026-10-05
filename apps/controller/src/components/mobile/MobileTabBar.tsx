@@ -113,7 +113,7 @@ export function MobileTabBar({
       >
         <span className="cpm-tab-bar-mark" aria-hidden="true" />
         <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
-        <span className="cpm-tab-label">{t("moreTab")}</span>
+        <span className="cpm-tab-label">{t("more.title")}</span>
       </button>
     </nav>
   );

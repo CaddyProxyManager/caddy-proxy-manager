@@ -311,6 +311,7 @@ export default function OverviewClient({
   previewChecklist?: SetupChecklist;
 }) {
   const t = useTranslations("overview");
+  const tCommon = useTranslations("common");
   const density = useTableDensity();
   const format = useAppFormatter();
   const emptyValue = useEmptyValue();
@@ -334,7 +335,7 @@ export default function OverviewClient({
     (key: MetricKey): string => {
       switch (key) {
         case "requests":
-          return t("metricRequests");
+          return tCommon("requests");
         case "serverEvents":
           return t("metricServerEvents");
         case "serverErrors":
@@ -347,7 +348,7 @@ export default function OverviewClient({
           return t("metricBlocked");
       }
     },
-    [t],
+    [t, tCommon],
   );
 
   useEffect(() => {
@@ -473,7 +474,7 @@ export default function OverviewClient({
     () => [
       {
         key: "ts",
-        header: t("logTime"),
+        header: tCommon("time"),
         // Fits a 12-hour clock with seconds, the longest locale; narrower wraps the "AM".
         width: pixel(116),
         renderCell: (row) => (
@@ -529,7 +530,7 @@ export default function OverviewClient({
           ),
       },
     ],
-    [t, emptyValue, format],
+    [t, emptyValue, format, tCommon],
   );
 
   const logRows = useMemo<LogRow[]>(() => {
@@ -603,7 +604,7 @@ export default function OverviewClient({
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
         <SegmentedControl
-          label={t("timeRange")}
+          label={tCommon("timeRange")}
           size="sm"
           value={interval}
           onChange={(next) => setIntervalValue(next as Interval)}

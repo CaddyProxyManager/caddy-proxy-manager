@@ -20,14 +20,15 @@ import {
   type MoreGroup,
 } from "@/src/lib/nav/destinations";
 
+/** Under `nav`, where the rail's groups are named too. */
 const GROUP_LABEL: Record<
   MoreGroup,
-  "groupAccess" | "groupSecurity" | "groupReference" | "groupInstance"
+  "railGroupAccess" | "security" | "more.groupReference" | "more.groupInstance"
 > = {
-  access: "groupAccess",
-  security: "groupSecurity",
-  reference: "groupReference",
-  instance: "groupInstance",
+  access: "railGroupAccess",
+  security: "security",
+  reference: "more.groupReference",
+  instance: "more.groupInstance",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -60,7 +61,7 @@ export default function MoreClient({
         const items = destinations.filter((d) => d.moreGroup === group);
         if (items.length === 0) return null;
         return (
-          <Section key={group} title={tMore(GROUP_LABEL[group])}>
+          <Section key={group} title={t(GROUP_LABEL[group])}>
             <List hasDividers>
               {items.map((item) => (
                 <Item

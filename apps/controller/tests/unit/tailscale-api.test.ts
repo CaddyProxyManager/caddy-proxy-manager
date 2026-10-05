@@ -79,7 +79,7 @@ describe('checkTailscaleAuthKey', () => {
     });
     const result = await check({ fetchImpl: impl });
     expect(result.status).toBe('rejected');
-    expect(result.status === 'rejected' && result.reason).toMatch(/revoked/i);
+    expect(result.status === 'rejected' && result.error.message).toMatch(/revoked/i);
   });
 
   it('rejects a key marked invalid', async () => {
@@ -94,14 +94,14 @@ describe('checkTailscaleAuthKey', () => {
       body: { id: 'abcDEF1CNTRL', expires: '2020-01-01T00:00:00Z' },
     });
     const result = await check({ fetchImpl: impl });
-    expect(result.status === 'rejected' && result.reason).toMatch(/expired/i);
+    expect(result.status === 'rejected' && result.error.message).toMatch(/expired/i);
   });
 
   it('blames the token, not the key, on a 401', async () => {
     const { impl } = fakeFetch({ status: 401 });
     const result = await check({ fetchImpl: impl });
-    expect(result.status === 'rejected' && result.reason).toMatch(/access token/i);
-    expect(result.status === 'rejected' && result.reason).toMatch(
+    expect(result.status === 'rejected' && result.error.message).toMatch(/access token/i);
+    expect(result.status === 'rejected' && result.error.message).toMatch(
       /says nothing about the auth key/,
     );
   });
@@ -109,7 +109,7 @@ describe('checkTailscaleAuthKey', () => {
   it('names the tailnet on a 404, since a key can simply belong to another one', async () => {
     const { impl } = fakeFetch({ status: 404 });
     const result = await check({ fetchImpl: impl, tailnet: 'other.example' });
-    expect(result.status === 'rejected' && result.reason).toMatch(/other\.example/);
+    expect(result.status === 'rejected' && result.error.message).toMatch(/other\.example/);
   });
 
   it('refuses rather than guessing when the API cannot be reached', async () => {
@@ -117,7 +117,7 @@ describe('checkTailscaleAuthKey', () => {
     const { impl } = fakeFetch({ status: 0, throws: new Error('getaddrinfo ENOTFOUND') });
     const result = await check({ fetchImpl: impl });
     expect(result.status).toBe('rejected');
-    expect(result.status === 'rejected' && result.reason).toMatch(/turn the check off/);
+    expect(result.status === 'rejected' && result.error.message).toMatch(/turn the check off/);
   });
 
   it('cannot check a Caddy placeholder, and says so instead of failing', async () => {
@@ -138,7 +138,7 @@ describe('checkTailscaleAuthKey', () => {
     const { impl, calls } = fakeFetch({ status: 200 });
     const result = await check({ apiAccessToken: '', fetchImpl: impl });
     expect(result.status).toBe('rejected');
-    expect(result.status === 'rejected' && result.reason).toMatch(/tskey-api/);
+    expect(result.status === 'rejected' && result.error.message).toMatch(/tskey-api/);
     expect(calls).toHaveLength(0);
   });
 });

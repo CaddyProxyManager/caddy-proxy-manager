@@ -50,6 +50,7 @@ function Side({ sign, value }: { sign: "-" | "+"; value: string }) {
 /** An audit event's before and after, one line pair per field, or as two columns. */
 export function AuditChanges({ changes, layout }: { changes: AuditChange[]; layout: DiffLayout }) {
   const t = useTranslations("auditLog");
+  const tCommon = useTranslations("common");
   const tReview = useTranslations("hostReview");
   const hostField = (field: string) => `fields.${field}` as Parameters<typeof tReview>[0];
   // Host fields read in words; anything else is the stored column name, as resources are.
@@ -75,7 +76,7 @@ export function AuditChanges({ changes, layout }: { changes: AuditChange[]; layo
       },
       {
         key: "before",
-        header: t("diffBefore"),
+        header: tCommon("before"),
         width: proportional(1),
         renderCell: (row) => (
           <Text type="code" size="sm" wordBreak="break-word">
@@ -85,7 +86,7 @@ export function AuditChanges({ changes, layout }: { changes: AuditChange[]; layo
       },
       {
         key: "after",
-        header: t("diffAfter"),
+        header: tCommon("after"),
         width: proportional(1),
         renderCell: (row) => (
           <Text type="code" size="sm" wordBreak="break-word">

@@ -95,6 +95,7 @@ export default function PortalLoginForm({
   directories = [],
 }: PortalLoginFormProps) {
   const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const tl = useTranslations("auth.login");
   const tPasskey = useTranslations("auth.passkey");
   const format = useFormatter();
@@ -388,7 +389,7 @@ export default function PortalLoginForm({
                   <TextInput
                     startIcon={User}
                     {...AUTOFILL_USERNAME_WEBAUTHN}
-                    label={t("username")}
+                    label={tCommon("username")}
                     htmlName="username"
                     value={username}
                     onChange={setUsername}
@@ -413,7 +414,7 @@ export default function PortalLoginForm({
                   startIcon={KeyRound}
                   {...AUTOFILL_CURRENT_PASSWORD}
                   ref={passwordRef}
-                  label={t("password")}
+                  label={tCommon("password")}
                   type="password"
                   htmlName="password"
                   value={password}
@@ -433,7 +434,7 @@ export default function PortalLoginForm({
                     ? t("login.submitPending")
                     : onPasswordStep
                       ? t("login.submit")
-                      : tl("continueStep")
+                      : tCommon("continue")
                 }
                 isLoading={pending || captchaStep.pending}
                 isDisabled={disabled}

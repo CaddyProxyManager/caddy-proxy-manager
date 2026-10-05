@@ -154,7 +154,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                 title={t("auth.passwordReset.doneTitle")}
                 description={t("auth.passwordReset.doneBody")}
               />
-              <Button label={t("auth.passwordReset.signIn")} href="/login" width="100%" />
+              <Button label={t("auth.login.submit")} href="/login" width="100%" />
             </>
           )}
 
@@ -175,7 +175,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                   <TextInput
                     startIcon={KeyRound}
                     {...AUTOFILL_NEW_PASSWORD}
-                    label={t("auth.passwordChange.newPassword")}
+                    label={t("common.newPassword")}
                     type="password"
                     value={password}
                     onChange={setPassword}
@@ -186,7 +186,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
                   <TextInput
                     startIcon={KeyRound}
                     {...AUTOFILL_NEW_PASSWORD}
-                    label={t("auth.passwordChange.confirmPassword")}
+                    label={t("common.confirmNewPassword")}
                     type="password"
                     value={confirm}
                     onChange={setConfirm}
@@ -202,9 +202,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
               </Card>
               <Button
                 type="submit"
-                label={
-                  invite ? t("auth.passwordReset.inviteSubmit") : t("auth.passwordReset.submit")
-                }
+                label={invite ? t("common.setPassword") : t("auth.passwordReset.submit")}
                 isLoading={pending}
                 isDisabled={pending}
                 width="100%"

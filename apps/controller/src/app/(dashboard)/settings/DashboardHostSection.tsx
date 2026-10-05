@@ -45,6 +45,7 @@ export function DashboardHostSection({
   checkDns: () => Promise<DashboardDnsCheck>;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [enabled, setEnabled] = useState(dashboard.enabled);
   const [domain, setDomain] = useState(dashboard.domain);
   const [tls, setTls] = useState(dashboard.tls);
@@ -117,7 +118,7 @@ export function DashboardHostSection({
                 type="button"
                 onClick={runCheck}
                 isDisabled={checking || !domainIsSaved || domain.trim() === ""}
-                label={checking ? t("dashboardDnsChecking") : t("dashboardDnsCheckLabel")}
+                label={checking ? tCommon("checking") : t("dashboardDnsCheckLabel")}
               />
             </HStack>
             {!domainIsSaved && (
@@ -162,7 +163,7 @@ export function DashboardHostSection({
                   variant="primary"
                   type="button"
                   onClick={() => setConfirmDisable(true)}
-                  label={t("save")}
+                  label={tCommon("save")}
                 />
               </HStack>
             ) : (

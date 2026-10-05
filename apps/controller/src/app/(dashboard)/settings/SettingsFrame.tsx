@@ -155,13 +155,13 @@ function SettingsHeader({
                 {group ? (
                   <BreadcrumbItem isCurrent>{settingsGroupLabel(t, group)}</BreadcrumbItem>
                 ) : (
-                  <BreadcrumbItem isCurrent>{title ?? t("homeOverview")}</BreadcrumbItem>
+                  <BreadcrumbItem isCurrent>{title ?? tNav("overview")}</BreadcrumbItem>
                 )}
               </Breadcrumbs>
             </div>
             {/* No env-var token here: it would claim to configure every block on the page. */}
             <Heading level={1}>
-              {item ? settingsSectionName(t, item) : (title ?? t("homeOverview"))}
+              {item ? settingsSectionName(t, item) : (title ?? tNav("overview"))}
             </Heading>
           </VStack>
 

@@ -74,16 +74,16 @@ export function AppDialog({
   footerStart,
   subheader,
 }: AppDialogProps) {
-  const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   useReturnFocus(open);
   const buttons = actions ?? (
     <>
-      <Button variant="secondary" label={t("cancel")} onClick={onClose} />
+      <Button variant="secondary" label={tCommon("cancel")} onClick={onClose} />
       {onSubmit && (
         <Button
           // Astryx defaults to secondary, the same grey as Cancel beside it.
           variant="primary"
-          label={submitLabel ?? t("save")}
+          label={submitLabel ?? tCommon("save")}
           onClick={onSubmit}
           isLoading={isSubmitting}
           isDisabled={isSubmitting || isSubmitDisabled}

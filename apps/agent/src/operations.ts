@@ -4,6 +4,8 @@
  */
 
 import {
+  type AgentStatusMessageCode,
+  type AgentStatusMessageParams,
   MANAGED_SERVICES,
   type ManagedServiceName,
   type ManagedServicesRequest,
@@ -31,6 +33,23 @@ import type { AgentStore } from "./db";
 
 type OperationKind = "l4-ports" | "caddy-build" | "services";
 
+type Said = {
+  message: string;
+  messageCode: AgentStatusMessageCode;
+  messageParams?: AgentStatusMessageParams;
+};
+
+/** `message` is the English an older controller shows; a newer one words the code itself. */
+function said(
+  code: AgentStatusMessageCode,
+  message: string,
+  params?: AgentStatusMessageParams,
+): Said {
+  return params
+    ? { message, messageCode: code, messageParams: params }
+    : { message, messageCode: code };
+}
+
 export class OperationBusyError extends Error {
   constructor(readonly running: OperationKind) {
     super(`Another operation is already running: ${running}`);
@@ -54,7 +73,10 @@ export class Operations {
     if (l4.state === "applying" || l4.state === "pending") {
       this.store.setL4PortsStatus({
         state: "failed",
-        message: "The agent restarted while applying port changes. Apply again to retry.",
+        ...said(
+          "l4Interrupted",
+          "The agent restarted while applying port changes. Apply again to retry.",
+        ),
         error: "Interrupted by an agent restart",
       });
     }
@@ -62,8 +84,10 @@ export class Operations {
     if (build.state === "building" || build.state === "pending") {
       this.store.setCaddyBuildStatus({
         state: "failed",
-        message:
+        ...said(
+          "buildInterrupted",
           "The agent restarted while rebuilding Caddy. The image was left unchanged; rebuild to try again.",
+        ),
         error: "Interrupted by an agent restart",
       });
     }
@@ -71,8 +95,10 @@ export class Operations {
     if (services.state === "applying" || services.state === "pending") {
       this.store.setManagedServicesStatus({
         state: "failed",
-        message:
+        ...said(
+          "servicesInterrupted",
           "The agent restarted while starting the optional services. Save the settings again to retry.",
+        ),
         error: "Interrupted by an agent restart",
       });
     }
@@ -128,7 +154,11 @@ export class Operations {
       console.warn(`[agent] refusing port change: ${error}`);
       this.store.setL4PortsStatus({
         state: "failed",
-        message: `The port change was refused: ${error}. Expected HOST:CONTAINER[/tcp|/udp], each side a port or an A-B range.`,
+        ...said(
+          "l4Refused",
+          `The port change was refused: ${error}. Expected HOST:CONTAINER[/tcp|/udp], each side a port or an A-B range.`,
+          { error },
+        ),
         triggeredAt: new Date().toISOString(),
         error,
       });
@@ -138,7 +168,11 @@ export class Operations {
     const triggeredAt = new Date().toISOString();
     this.store.setL4PortsStatus({
       state: "applying",
-      message: `Recreating Caddy with ${expandL4PortMappings(ports).length} published port(s).`,
+      ...said(
+        "l4Applying",
+        `Recreating Caddy with ${expandL4PortMappings(ports).length} published port(s).`,
+        { count: expandL4PortMappings(ports).length },
+      ),
       triggeredAt,
     });
 
@@ -154,7 +188,9 @@ export class Operations {
         const detail = tail(result.output, 5);
         this.store.setL4PortsStatus({
           state: "failed",
-          message: `Could not recreate the Caddy container: ${detail}`,
+          ...said("l4RecreateFailed", `Could not recreate the Caddy container: ${detail}`, {
+            detail,
+          }),
           triggeredAt,
           error: detail,
         });
@@ -165,10 +201,17 @@ export class Operations {
       this.store.setAppliedL4Ports(ports);
       this.store.setL4PortsStatus({
         state: "applied",
-        message:
-          health === "healthy"
-            ? `Caddy recreated and healthy with ${expandL4PortMappings(ports).length} published port(s).`
-            : `Caddy recreated; its health check reports "${health}" and may still be starting.`,
+        ...(health === "healthy"
+          ? said(
+              "l4AppliedHealthy",
+              `Caddy recreated and healthy with ${expandL4PortMappings(ports).length} published port(s).`,
+              { count: expandL4PortMappings(ports).length },
+            )
+          : said(
+              "l4AppliedStarting",
+              `Caddy recreated; its health check reports "${health}" and may still be starting.`,
+              { health },
+            )),
         triggeredAt,
         appliedAt: new Date().toISOString(),
       });
@@ -176,7 +219,7 @@ export class Operations {
       const message = error instanceof Error ? error.message : String(error);
       this.store.setL4PortsStatus({
         state: "failed",
-        message: `Applying port changes failed: ${message}`,
+        ...said("l4Failed", `Applying port changes failed: ${message}`, { detail: message }),
         triggeredAt,
         error: message,
       });
@@ -209,7 +252,7 @@ export class Operations {
     const triggeredAt = new Date().toISOString();
     this.store.setCaddyBuildStatus({
       state: "building",
-      message: "Loading the Caddy image you built.",
+      ...said("imageLoading", "Loading the Caddy image you built."),
       triggeredAt,
     });
     return this.runCaddyImageLoad(triggeredAt, narrowed).finally(() => this.end());
@@ -219,20 +262,29 @@ export class Operations {
     triggeredAt: string,
     narrowed: () => Promise<boolean>,
   ): Promise<void> {
-    const failed = (message: string, error: string) =>
-      this.store.setCaddyBuildStatus({ state: "failed", message, triggeredAt, error });
-    const untouched = (step: string, detail: string) =>
-      failed(`${step}; the running container was left untouched. ${detail}`, detail);
+    const failed = (message: Said, error: string) =>
+      this.store.setCaddyBuildStatus({ state: "failed", ...message, triggeredAt, error });
+    const untouched = (code: AgentStatusMessageCode, step: string, detail: string) =>
+      failed(
+        said(code, `${step}; the running container was left untouched. ${detail}`, { detail }),
+        detail,
+      );
     try {
       const pull = await this.docker.pullCaddyImage();
-      if (!pull.ok) return untouched("Pulling the Caddy image failed", tail(pull.output, 5));
+      if (!pull.ok) {
+        return untouched("imagePullFailed", "Pulling the Caddy image failed", tail(pull.output, 5));
+      }
 
       const image = await this.docker.composeCaddyImage();
       const incoming = image
         ? await this.docker.readImageModuleList(image)
         : ({ state: "unreadable", reason: "compose names no image for caddy." } as const);
       if (incoming.state === "unreadable") {
-        return untouched("The new image's module list could not be read", incoming.reason);
+        return untouched(
+          "imageModulesUnreadable",
+          "The new image's module list could not be read",
+          incoming.reason,
+        );
       }
       const next = incoming.state === "found" ? incoming.modules : [];
       const current = this.store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
@@ -241,7 +293,10 @@ export class Operations {
         this.store.setAppliedCaddyModules(kept);
         this.store.setCaddyBuildStatus({
           state: "building",
-          message: "Waiting for the controller to stop using modules the new image lacks.",
+          ...said(
+            "imageNarrowing",
+            "Waiting for the controller to stop using modules the new image lacks.",
+          ),
           triggeredAt,
         });
         // Timed out, the recreate is still tried: the old config may not use what was dropped.
@@ -251,14 +306,24 @@ export class Operations {
       }
 
       const up = await this.docker.upCaddyImage();
-      if (!up.ok) return untouched("Recreating Caddy on the new image failed", tail(up.output, 5));
+      if (!up.ok) {
+        return untouched(
+          "imageRecreateFailed",
+          "Recreating Caddy on the new image failed",
+          tail(up.output, 5),
+        );
+      }
 
       // Before the health wait: a binary missing a module the running config names never turns
       // healthy, and the controller has to stop emitting that module either way.
       const list = await this.syncModulesFromImage();
       if (list.state === "unreadable") {
         failed(
-          `Caddy was recreated, but its module list could not be read: ${list.reason}`,
+          said(
+            "imageModulesUnreadableAfter",
+            `Caddy was recreated, but its module list could not be read: ${list.reason}`,
+            { detail: list.reason },
+          ),
           list.reason,
         );
         return;
@@ -267,26 +332,41 @@ export class Operations {
       const health = await this.docker.waitForCaddyHealth();
       if (health !== "healthy") {
         failed(
-          `Caddy's health check reports "${health}" on the new image. Check the Caddy container ` +
-            "logs - a config referencing a module the image lacks will fail to load.",
+          said(
+            "imageUnhealthy",
+            `Caddy's health check reports "${health}" on the new image. Check the Caddy container ` +
+              "logs - a config referencing a module the image lacks will fail to load.",
+            { health },
+          ),
           `health=${health}`,
         );
         return;
       }
 
-      const loaded = this.store.caddyImage() ?? "the image";
+      const loadedRef = this.store.caddyImage() ?? "";
+      const loaded = loadedRef || "the image";
       this.store.setCaddyBuildStatus({
         state: "applied",
-        message:
-          list.state === "found"
-            ? `Loaded ${loaded} with ${list.modules.length} module(s).`
-            : `Loaded ${loaded}, which has no ${CADDY_MODULE_LIST_PATH}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.`,
+        ...(list.state === "found"
+          ? said("imageLoaded", `Loaded ${loaded} with ${list.modules.length} module(s).`, {
+              image: loadedRef,
+              named: loadedRef ? "yes" : "no",
+              count: list.modules.length,
+            })
+          : said(
+              "imageLoadedNoList",
+              `Loaded ${loaded}, which has no ${CADDY_MODULE_LIST_PATH}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.`,
+              { image: loadedRef, named: loadedRef ? "yes" : "no", path: CADDY_MODULE_LIST_PATH },
+            )),
         triggeredAt,
         appliedAt: new Date().toISOString(),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      failed(`Loading the Caddy image failed: ${message}`, message);
+      failed(
+        said("imageLoadFailed", `Loading the Caddy image failed: ${message}`, { detail: message }),
+        message,
+      );
     }
   }
 
@@ -297,7 +377,11 @@ export class Operations {
       console.warn(`[agent] refusing rebuild: ${error}`);
       this.store.setCaddyBuildStatus({
         state: "failed",
-        message: `The rebuild was refused and the running container left untouched: ${error}.`,
+        ...said(
+          "buildRefused",
+          `The rebuild was refused and the running container left untouched: ${error}.`,
+          { error },
+        ),
         triggeredAt: new Date().toISOString(),
         error,
       });
@@ -307,7 +391,11 @@ export class Operations {
     const triggeredAt = new Date().toISOString();
     this.store.setCaddyBuildStatus({
       state: "building",
-      message: `Rebuilding the Caddy image with ${modules.length} module(s). This can take several minutes.`,
+      ...said(
+        "building",
+        `Rebuilding the Caddy image with ${modules.length} module(s). This can take several minutes.`,
+        { count: modules.length },
+      ),
       triggeredAt,
     });
 
@@ -327,7 +415,9 @@ export class Operations {
         const message = `Caddy image build failed; the running container was left untouched. ${detail}`;
         this.store.setCaddyBuildStatus({
           state: "failed",
-          message,
+          ...(build.timedOut
+            ? said("buildTimedOut", message, { seconds: this.config.buildTimeoutSeconds })
+            : said("buildFailedOutput", message, { detail })),
           triggeredAt,
           error: detail,
         });
@@ -339,7 +429,11 @@ export class Operations {
         const detail = tail(up.output, 5);
         this.store.setCaddyBuildStatus({
           state: "failed",
-          message: `Caddy was built, but recreating the container failed: ${detail}`,
+          ...said(
+            "buildRecreateFailed",
+            `Caddy was built, but recreating the container failed: ${detail}`,
+            { detail },
+          ),
           triggeredAt,
           error: detail,
         });
@@ -354,7 +448,7 @@ export class Operations {
           `container logs - a config referencing a removed module will fail to load.`;
         this.store.setCaddyBuildStatus({
           state: "failed",
-          message,
+          ...said("buildUnhealthy", message, { health }),
           triggeredAt,
           error: `health=${health}`,
         });
@@ -365,7 +459,7 @@ export class Operations {
       this.store.setAppliedCaddyModules(modules);
       this.store.setCaddyBuildStatus({
         state: "applied",
-        message: "Caddy was rebuilt with the selected modules and is healthy.",
+        ...said("buildApplied", "Caddy was rebuilt with the selected modules and is healthy."),
         triggeredAt,
         appliedAt: new Date().toISOString(),
       });
@@ -373,7 +467,7 @@ export class Operations {
       const message = error instanceof Error ? error.message : String(error);
       this.store.setCaddyBuildStatus({
         state: "failed",
-        message: `The rebuild failed: ${message}`,
+        ...said("buildFailed", `The rebuild failed: ${message}`, { detail: message }),
         triggeredAt,
         error: message,
       });
@@ -392,10 +486,13 @@ export class Operations {
     const wanted = MANAGED_SERVICES.filter((name) => request.services[name]);
     this.store.setManagedServicesStatus({
       state: "applying",
-      message:
-        wanted.length > 0
-          ? `Starting ${wanted.join(" and ")}. The first start pulls the image, which can take a few minutes.`
-          : "Stopping the optional services.",
+      ...(wanted.length > 0
+        ? said(
+            "servicesStarting",
+            `Starting ${wanted.join(" and ")}. The first start pulls the image, which can take a few minutes.`,
+            { services: wanted.join(", ") },
+          )
+        : said("servicesStopping", "Stopping the optional services.")),
       triggeredAt,
     });
 
@@ -439,7 +536,9 @@ export class Operations {
         const detail = failures.join("; ");
         this.store.setManagedServicesStatus({
           state: "failed",
-          message: `Could not apply every optional service - ${detail}`,
+          ...said("servicesPartial", `Could not apply every optional service - ${detail}`, {
+            detail,
+          }),
           triggeredAt,
           error: detail,
         });
@@ -449,8 +548,11 @@ export class Operations {
       const running = MANAGED_SERVICES.filter((name) => applied[name]);
       this.store.setManagedServicesStatus({
         state: "applied",
-        message:
-          running.length > 0 ? `Running: ${running.join(", ")}.` : "The optional services are off.",
+        ...(running.length > 0
+          ? said("servicesRunning", `Running: ${running.join(", ")}.`, {
+              services: running.join(", "),
+            })
+          : said("servicesOff", "The optional services are off.")),
         triggeredAt,
         appliedAt: new Date().toISOString(),
       });
@@ -458,7 +560,9 @@ export class Operations {
       const message = error instanceof Error ? error.message : String(error);
       this.store.setManagedServicesStatus({
         state: "failed",
-        message: `Applying the optional services failed: ${message}`,
+        ...said("servicesFailed", `Applying the optional services failed: ${message}`, {
+          detail: message,
+        }),
         triggeredAt,
         error: message,
       });

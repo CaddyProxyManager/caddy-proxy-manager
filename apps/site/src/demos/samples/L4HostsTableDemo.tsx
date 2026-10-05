@@ -77,6 +77,7 @@ const protocolOf = (row: Row) => (row.listen.endsWith("/udp") ? "udp" : "tcp");
 /** The app's tabs filter the query; here the rows are filtered off the same `protocol` param. */
 function L4HostsTableDemoContent() {
   const t = useTranslations("l4ProxyHosts");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   const params = useSearchParams();
   const protocol =
@@ -143,13 +144,13 @@ function L4HostsTableDemoContent() {
           tiles={[
             {
               id: "hosts",
-              label: t("l4ProxyHosts"),
+              label: tNav("l4ProxyHosts"),
               value: HOSTS.length,
               note: t("enabledNote", { count: HOSTS.length }),
             },
             { id: "tcp", label: t("tcpStreams"), value: tcp, note: t("tcpNote") },
             { id: "udp", label: t("udpStreams"), value: udp, note: t("udpNote") },
-            { id: "agents", label: t("listeners"), value: 2, note: t("listenersNote") },
+            { id: "agents", label: tNav("agents"), value: 2, note: t("listenersNote") },
           ]}
         />
       </div>

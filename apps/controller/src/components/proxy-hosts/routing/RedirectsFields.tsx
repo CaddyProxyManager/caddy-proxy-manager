@@ -19,6 +19,7 @@ const KEEP_NONE = "none";
 
 export function RedirectsFields({ initialData = [] }: Props) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const pathOptions = [
     { value: KEEP_NONE, label: t("preservePathNone") },
     { value: "full", label: t("preservePathFull") },
@@ -77,7 +78,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "to", next)}
               />
               <Selector
-                label={t("status")}
+                label={tCommon("status")}
                 isLabelHidden={i > 0}
                 size="sm"
                 width={110}

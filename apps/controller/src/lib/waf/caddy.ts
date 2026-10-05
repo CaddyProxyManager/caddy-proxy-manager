@@ -439,7 +439,7 @@ export function droppedWafDirectiveDetails(dropped: readonly DroppedWafDirective
 /** Which catalog entries a directive error uses: each names its own field. */
 const DIRECTIVE_ERROR_CODES = {
   global: { bodyLimit: "wafDirectiveBodyLimitOutOfRange", dropped: "wafDirectivesDropped" },
-  host: { bodyLimit: "hostWafDirectiveBodyLimitOutOfRange", dropped: "hostWafDirectivesDropped" },
+  host: { bodyLimit: "wafDirectiveBodyLimitOutOfRange", dropped: "wafDirectivesDropped" },
   preset: {
     bodyLimit: "wafPresetDirectiveBodyLimitOutOfRange",
     dropped: "wafPresetDirectivesDropped",
@@ -543,11 +543,11 @@ export type CrsPluginRules = { config: string; before: string; after: string };
 export type CrsPluginRejectionReason =
   | "crsPluginDirectiveNotAllowed"
   | "crsPluginNeedsFile"
-  | "crsPluginCtlRuleEngine"
+  | "wafDirectiveDroppedCtlRuleEngine"
   | "crsPluginRuleIdOutOfRange"
   | "crsPluginPersistentCollection"
   | "crsPluginUnbalancedQuotes"
-  | "crsPluginUnterminated"
+  | "wafDirectiveDroppedUnterminated"
   | "crsPluginInvalidSeclang";
 
 export type CrsPluginRejection = {
@@ -619,12 +619,12 @@ function pluginDirectiveRejection(
   text: string | null,
   range: { start: number; end: number },
 ): CrsPluginRejectionReason | null {
-  if (text === null) return "crsPluginUnterminated";
+  if (text === null) return "wafDirectiveDroppedUnterminated";
   if (!PLUGIN_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
     return "crsPluginDirectiveNotAllowed";
   }
   if (FILE_OPERATOR.test(text)) return "crsPluginNeedsFile";
-  if (/ctl\s*:\s*ruleEngine/i.test(text)) return "crsPluginCtlRuleEngine";
+  if (/ctl\s*:\s*ruleEngine/i.test(text)) return "wafDirectiveDroppedCtlRuleEngine";
   if (PERSISTENT_COLLECTION.test(text)) return "crsPluginPersistentCollection";
   if (hasUnbalancedQuotes(text)) return "crsPluginUnbalancedQuotes";
   for (const match of text.matchAll(RULE_ID)) {

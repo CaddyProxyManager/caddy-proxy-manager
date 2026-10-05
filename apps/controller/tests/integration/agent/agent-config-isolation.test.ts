@@ -205,6 +205,8 @@ describe('validating a Caddyfile snippet', () => {
     await startFakeAgent({
       caddyAdmin: { status: 400, text: '{"error":"unrecognized directive: nope"}' },
     });
-    expect(await validateCaddyfileSnippet('nope')).toBe('unrecognized directive: nope');
+    expect((await validateCaddyfileSnippet('nope'))?.params).toEqual({
+      error: 'unrecognized directive: nope',
+    });
   });
 });

@@ -45,6 +45,8 @@ export function WafExclusionsPanel({
   wafEnabled: boolean;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const emptyValue = useEmptyValue();
   const router = useRouter();
   const [editing, setEditing] = useState<ExclusionDraft | null>(null);
@@ -53,7 +55,7 @@ export function WafExclusionsPanel({
   const columns: Column<WafExclusion>[] = [
     {
       id: "rule",
-      label: t("ruleId"),
+      label: tProxyHosts("ruleId"),
       render: (row) => (
         <VStack gap={0}>
           <Text type="code" size="sm" weight="semibold">
@@ -102,7 +104,7 @@ export function WafExclusionsPanel({
     },
     {
       id: "reason",
-      label: t("exclusionReason"),
+      label: tCommon("reason"),
       render: (row) => (
         <VStack gap={0}>
           <Text type="body" size="sm" maxLines={2}>
@@ -119,7 +121,7 @@ export function WafExclusionsPanel({
     },
     {
       id: "actions",
-      label: t("actions"),
+      label: tCommon("actions"),
       width: 64,
       align: "right",
       render: (row) => (
@@ -135,7 +137,7 @@ export function WafExclusionsPanel({
           items={[
             {
               id: "edit",
-              label: t("exclusionEdit"),
+              label: tCommon("edit"),
               onClick: () =>
                 setEditing({
                   id: row.id,

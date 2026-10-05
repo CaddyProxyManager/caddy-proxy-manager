@@ -17,6 +17,7 @@ process.env.FORWARD_AUTH_ALLOWED_PORTS = '8443, 9443';
 // bun evaluates a vi.mock factory synchronously while linking, so the helpers it needs
 // are imported above it rather than awaited inside it.
 const { createTestDb } = await import('../../helpers/db');
+const { testTranslator } = await import('../../helpers/next-intl');
 
 // Hoisted: a Bun mock factory must be synchronous, and an async one hangs the file.
 ctx.db = await createTestDb();
@@ -24,6 +25,9 @@ ctx.db = await createTestDb();
 vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 vi.mock('../../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+vi.mock('next-intl/server', () => ({
+  getTranslations: async (namespace?: string) => testTranslator(namespace),
+}));
 
 // The real builder keeps the proof-header wiring covered; only the apply is stubbed. bun has no
 // importOriginal, so the module is imported before the mock replaces it.

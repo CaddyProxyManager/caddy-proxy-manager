@@ -145,6 +145,7 @@ function MembersTab({
   onListUpdated: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const tUi = useTranslations("ui");
   const emptyValue = useEmptyValue();
   const density = useTableDensity();
@@ -230,7 +231,7 @@ function MembersTab({
   const columns: TableColumn<MemberRow>[] = [
     {
       key: "username",
-      header: t("username"),
+      header: tCommon("username"),
       width: proportional(1),
       renderCell: (row) => (
         <Text type="code" size="sm" weight="medium">
@@ -240,7 +241,7 @@ function MembersTab({
     },
     {
       key: "password",
-      header: t("password"),
+      header: tCommon("password"),
       width: pixel(180),
       renderCell: (row) => (
         <HStack gap={1} vAlign="center">
@@ -270,7 +271,7 @@ function MembersTab({
     },
     {
       key: "__remove",
-      header: <VisuallyHidden>{tUi("actionsColumn")}</VisuallyHidden>,
+      header: <VisuallyHidden>{tCommon("actions")}</VisuallyHidden>,
       width: pixel(48),
       align: "end",
       resizable: false,
@@ -279,7 +280,7 @@ function MembersTab({
           variant="ghost"
           size="sm"
           label={t("removeNamed", { username: row.username })}
-          tooltip={t("remove")}
+          tooltip={tCommon("remove")}
           icon={<Trash2 />}
           onClick={() => removeOne(row.id)}
         />
@@ -294,25 +295,25 @@ function MembersTab({
           {selected.size > 0 ? (
             <>
               <Text type="body" size="sm" weight="medium">
-                {t("selectedCount", { count: selected.size })}
+                {tUi("bulk.selectedCount", { count: selected.size })}
               </Text>
               <Button
                 variant="ghost"
                 size="sm"
                 icon={<Trash2 />}
-                label={t("remove")}
+                label={tCommon("remove")}
                 onClick={removeSelected}
               />
               <Button
                 variant="ghost"
                 size="sm"
-                label={t("cancel")}
+                label={tCommon("cancel")}
                 onClick={() => setSelected(new Set())}
               />
             </>
           ) : (
             <Text type="body" size="sm" color="secondary">
-              {t("memberCount", { count: list.entries.length })}
+              {tCommon("memberCount", { count: list.entries.length })}
             </Text>
           )}
         </HStack>
@@ -320,7 +321,7 @@ function MembersTab({
           variant="primary"
           size="sm"
           icon={<Plus />}
-          label={t("addMember")}
+          label={tCommon("addMember")}
           onClick={() => setAdding(true)}
         />
       </HStack>
@@ -331,7 +332,7 @@ function MembersTab({
             <TextInput
               startIcon={User}
               {...AUTOFILL_OFF}
-              label={t("username")}
+              label={tCommon("username")}
               isRequired
               size="sm"
               value={draft.username}
@@ -344,7 +345,7 @@ function MembersTab({
                 <TextInput
                   startIcon={KeyRound}
                   {...AUTOFILL_OFF}
-                  label={t("password")}
+                  label={tCommon("password")}
                   isRequired
                   size="sm"
                   value={draft.password}
@@ -355,8 +356,8 @@ function MembersTab({
                 <IconButton
                   variant="secondary"
                   size="sm"
-                  label={t("generatePasswordLabel")}
-                  tooltip={t("generatePasswordTooltip")}
+                  label={tUi("passwordField.generateLabel")}
+                  tooltip={tUi("passwordField.generateTooltip")}
                   icon={<Sparkles />}
                   onClick={() => setDraft((d) => ({ ...d, password: generatePassword() }))}
                 />
@@ -375,7 +376,7 @@ function MembersTab({
               <Button
                 variant="secondary"
                 size="sm"
-                label={t("cancel")}
+                label={tCommon("cancel")}
                 onClick={() => {
                   setAdding(false);
                   setDraft({ username: "", password: "" });
@@ -383,7 +384,7 @@ function MembersTab({
               />
               <Button
                 size="sm"
-                label={t("add")}
+                label={tCommon("add")}
                 onClick={submitNew}
                 isLoading={submitting}
                 isDisabled={!draft.username.trim() || !draft.password || submitting}
@@ -396,7 +397,7 @@ function MembersTab({
       {list.entries.length === 0 ? (
         <EmptyState
           icon={<Users />}
-          title={t("membersEmptyTitle")}
+          title={tCommon("noMembersYet")}
           description={t("membersEmptyDescription")}
           actions={
             <Button
@@ -435,6 +436,7 @@ function SettingsTab({
   onDeleted: () => void;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
   const [name, setName] = useState(list.name);
   const [desc, setDesc] = useState(list.description || "");
@@ -497,9 +499,9 @@ function SettingsTab({
   return (
     <VStack gap={6} maxWidth={672}>
       <VStack gap={3}>
-        <TextInput label={t("name")} isRequired size="sm" value={name} onChange={setName} />
+        <TextInput label={tCommon("name")} isRequired size="sm" value={name} onChange={setName} />
         <TextArea
-          label={t("description")}
+          label={tCommon("description")}
           isOptional
           size="sm"
           value={desc}
@@ -510,7 +512,7 @@ function SettingsTab({
         <HStack gap={2} vAlign="center">
           <Button
             size="sm"
-            label={t("saveChanges")}
+            label={tCommon("saveChanges")}
             onClick={save}
             isLoading={saving}
             isDisabled={!dirty || !name.trim() || saving}
@@ -519,7 +521,7 @@ function SettingsTab({
             <Button
               variant="ghost"
               size="sm"
-              label={t("discard")}
+              label={tCommon("discard")}
               onClick={() => {
                 setName(list.name);
                 setDesc(list.description || "");
@@ -715,6 +717,8 @@ function DetailPane({
   onDeleted: () => void;
 }) {
   const t = useTranslations("accessLists");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const [tab, setTab] = useState<DetailTab>("members");
 
   if (!list) {
@@ -723,7 +727,7 @@ function DetailPane({
         headingLevel={2}
         icon={<KeyRound />}
         title={t("selectionEmptyTitle")}
-        description={t("selectionEmptyDescription")}
+        description={tCommon("selectionEmptyDescription")}
       />
     );
   }
@@ -737,11 +741,14 @@ function DetailPane({
         <VStack gap={1}>
           <Heading level={2}>{list.name}</Heading>
           <Text type="body" size="sm" color="secondary">
-            {list.description || t("noDescription")}
+            {list.description || tCommon("noDescription")}
           </Text>
           <HStack gap={2} wrap="wrap" vAlign="center">
-            <Badge icon={<Users />} label={t("memberCount", { count: list.entries.length })} />
-            <Badge icon={<Globe />} label={t("hostCount", { count: usage.length })} />
+            <Badge
+              icon={<Users />}
+              label={tCommon("memberCount", { count: list.entries.length })}
+            />
+            <Badge icon={<Globe />} label={tCommon("hostCount", { count: usage.length })} />
             <Badge
               icon={<Clock />}
               label={t("updatedBadge", { when: fmtRelative(list.updatedAt, t) })}
@@ -767,7 +774,7 @@ function DetailPane({
       <TabList value={tab} onChange={(v) => setTab(v as DetailTab)} size="sm" hasDivider>
         <Tab
           value="members"
-          label={t("members")}
+          label={tCommon("members")}
           icon={<Users />}
           endContent={<Badge label={list.entries.length} />}
         />
@@ -779,11 +786,11 @@ function DetailPane({
         />
         <Tab
           value="usage"
-          label={t("usedBy")}
+          label={tCommon("usedBy")}
           icon={<Globe />}
           endContent={<Badge label={usage.length} />}
         />
-        <Tab value="settings" label={t("settings")} icon={<Settings2 />} />
+        <Tab value="settings" label={tNav("settings")} icon={<Settings2 />} />
       </TabList>
 
       {tab === "members" && <MembersTab list={list} onListUpdated={onListUpdated} />}
@@ -819,6 +826,7 @@ function NewListDialog({
   onCreate: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [seed, setSeed] = useState<WithRowId<SeedMember>[]>(() => [blankSeedMember()]);
@@ -870,7 +878,7 @@ function NewListDialog({
         </Text>
 
         <TextInput
-          label={t("name")}
+          label={tCommon("name")}
           isRequired
           size="sm"
           value={name}
@@ -879,7 +887,7 @@ function NewListDialog({
           hasAutoFocus
         />
         <TextInput
-          label={t("description")}
+          label={tCommon("description")}
           isOptional
           size="sm"
           value={desc}
@@ -937,7 +945,7 @@ function NewListDialog({
                 variant="ghost"
                 size="sm"
                 label={t("seedRemoveLabel", { index: i + 1 })}
-                tooltip={t("remove")}
+                tooltip={tCommon("remove")}
                 icon={<X />}
                 onClick={() =>
                   setSeed(
@@ -968,12 +976,12 @@ function NewListDialog({
 
 const SORT_OPTIONS: {
   value: SortKey;
-  labelKey: "sortRecent" | "name" | "members" | "sortUsage";
+  labelKey: "accessLists.sortRecent" | "common.name" | "common.members" | "accessLists.sortUsage";
 }[] = [
-  { value: "recent", labelKey: "sortRecent" },
-  { value: "name", labelKey: "name" },
-  { value: "members", labelKey: "members" },
-  { value: "usage", labelKey: "sortUsage" },
+  { value: "recent", labelKey: "accessLists.sortRecent" },
+  { value: "name", labelKey: "common.name" },
+  { value: "members", labelKey: "common.members" },
+  { value: "usage", labelKey: "accessLists.sortUsage" },
 ];
 
 function ListsRail({
@@ -998,6 +1006,9 @@ function ListsRail({
   usage: Record<number, AccessListUsage[]>;
 }) {
   const t = useTranslations("accessLists");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
+  const tRoot = useTranslations();
   const filtered = useMemo(() => {
     let arr = lists.slice();
     const q = query.trim().toLowerCase();
@@ -1025,7 +1036,7 @@ function ListsRail({
       {/* Sticky on a phone like every list header; boxless on a desktop. */}
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
-          <Heading level={1}>{t("title")}</Heading>
+          <Heading level={1}>{tNav("accessLists")}</Heading>
           {/* The phone gets this as a floating button instead. */}
           <Button
             variant="primary"
@@ -1053,7 +1064,7 @@ function ListsRail({
           onChange={(v) => setSort(v as SortKey)}
         >
           {SORT_OPTIONS.map((o) => (
-            <SegmentedControlItem key={o.value} value={o.value} label={t(o.labelKey)} />
+            <SegmentedControlItem key={o.value} value={o.value} label={tRoot(o.labelKey)} />
           ))}
         </SegmentedControl>
       </div>
@@ -1075,7 +1086,7 @@ function ListsRail({
             <Button
               variant="ghost"
               size="sm"
-              label={t("clearSearch")}
+              label={tCommon("clearSearch")}
               onClick={() => setQuery("")}
             />
           }
@@ -1130,6 +1141,7 @@ function ListsRail({
 
 export default function AccessListsClient({ lists: initialLists, usage: initialUsage }: Props) {
   const t = useTranslations("accessLists");
+  const tNav = useTranslations("nav");
   const router = useRouter();
   // Before the narrow branch's early return, so the hook order never changes with the width.
   const railWidth = usePersistedPanelWidth("access-lists-rail", {
@@ -1254,7 +1266,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
         start={
           <>
             {/* No hasDivider: the handle is the line, and both would paint it. */}
-            <LayoutPanel width={railWidth.width} role="navigation" label={t("accessLists")}>
+            <LayoutPanel width={railWidth.width} role="navigation" label={tNav("accessLists")}>
               {rail(setSelectedId)}
             </LayoutPanel>
             <PanelResizeHandle label={t("resizeRail")} panel={railWidth} />

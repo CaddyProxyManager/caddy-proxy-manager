@@ -163,12 +163,15 @@ export function CreateHostDialog({
   agents?: AgentOption[];
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction, isPending] = useActionState(
     createProxyHostAction,
     INITIAL_ACTION_STATE,
   );
 
-  const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
+  const [name, setName] = useState(
+    initialData ? tCommon("copyName", { name: initialData.name }) : "",
+  );
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [domains, setDomains] = useState(initialData ? "" : (defaultDomain ?? ""));
   const [certificateId, setCertificateId] = useState(
@@ -187,7 +190,7 @@ export function CreateHostDialog({
       kind="http"
       isCreate
       formId="create-host-form"
-      submitLabel={t("create")}
+      submitLabel={tCommon("create")}
       state={state}
       isPending={isPending}
       preview={(data) => previewProxyHostAction(null, data)}
@@ -209,7 +212,7 @@ export function CreateHostDialog({
               enabled={true}
             />
             <TextInput
-              label={t("name")}
+              label={tCommon("name")}
               htmlName="name"
               placeholder={t("namePlaceholder")}
               value={name}
@@ -220,7 +223,7 @@ export function CreateHostDialog({
             <HostTagsField initial={initialData?.tags} />
             <TextArea
               {...NO_SPELLCHECK}
-              label={t("domains")}
+              label={tCommon("domains")}
               htmlName="domains"
               placeholder="app.example.com"
               value={domains}
@@ -349,6 +352,7 @@ export function EditHostDialog({
   tailscaleDefaults?: TailscaleHostDefaults | null;
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction, isPending] = useActionState(
     updateProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -381,7 +385,7 @@ export function EditHostDialog({
       kind="http"
       isCreate={false}
       formId="edit-host-form"
-      submitLabel={t("saveChanges")}
+      submitLabel={tCommon("saveChanges")}
       state={state}
       isPending={isPending}
       preview={(data) => previewProxyHostAction(host.id, data)}
@@ -405,7 +409,7 @@ export function EditHostDialog({
               enabled={host.enabled}
             />
             <TextInput
-              label={t("name")}
+              label={tCommon("name")}
               htmlName="name"
               value={name}
               onChange={setName}
@@ -415,7 +419,7 @@ export function EditHostDialog({
             <HostTagsField initial={host.tags} />
             <TextArea
               {...NO_SPELLCHECK}
-              label={t("domains")}
+              label={tCommon("domains")}
               htmlName="domains"
               value={domains}
               onChange={setDomains}
@@ -509,6 +513,7 @@ export function DeleteHostDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("proxyHosts");
+  const tCommon = useTranslations("common");
   const [state, formAction] = useActionState(
     deleteProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -522,7 +527,7 @@ export function DeleteHostDialog({
       onClose={onClose}
       title={t("deleteProxyHost")}
       maxWidth="sm"
-      submitLabel={t("delete")}
+      submitLabel={tCommon("delete")}
       onSubmit={() => {
         (document.getElementById("delete-host-form") as HTMLFormElement)?.requestSubmit();
       }}

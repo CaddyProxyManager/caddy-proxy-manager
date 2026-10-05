@@ -66,11 +66,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     if (!currentPassword) {
-      return NextResponse.json({ error: t("profile.currentPasswordRequired") }, { status: 400 });
+      return NextResponse.json(
+        { error: t("auth.apiErrors.currentPasswordRequired") },
+        { status: 400 },
+      );
     }
     if (!(await verifyPassword(currentPassword, user.passwordHash))) {
       await registerFailedAttempt(rateLimitKey);
-      return NextResponse.json({ error: t("profile.currentPasswordIncorrect") }, { status: 401 });
+      return NextResponse.json(
+        { error: t("auth.apiErrors.currentPasswordIncorrect") },
+        { status: 401 },
+      );
     }
     resetAttempts(rateLimitKey);
 

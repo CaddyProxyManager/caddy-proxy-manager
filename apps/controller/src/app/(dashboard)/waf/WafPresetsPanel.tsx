@@ -37,6 +37,8 @@ export type WafPresetRow = {
 
 export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
+  const tSettings = useTranslations("settings");
   const router = useRouter();
   // null: closed. "new": creating. A row: editing it.
   const [editing, setEditing] = useState<WafPresetRow | "new" | null>(null);
@@ -45,15 +47,15 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
   const usageLabel = (row: WafPresetRow) => {
     const parts: string[] = [];
     if (row.usedGlobally) parts.push(t("presetUsedGlobally"));
-    if (row.usedByDashboard) parts.push(t("presetUsedByDashboard"));
-    if (row.hostCount > 0) parts.push(t("presetUsedByHosts", { count: row.hostCount }));
+    if (row.usedByDashboard) parts.push(tSettings("dashboardHostTitle"));
+    if (row.hostCount > 0) parts.push(tCommon("hostCount", { count: row.hostCount }));
     return parts;
   };
 
   const columns: Column<WafPresetRow>[] = [
     {
       id: "name",
-      label: t("presetName"),
+      label: tCommon("name"),
       render: (row) => (
         <VStack gap={0}>
           <Text type="body" size="sm" weight="semibold">
@@ -69,7 +71,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
     },
     {
       id: "usage",
-      label: t("presetUsedBy"),
+      label: tCommon("usedBy"),
       width: 220,
       render: (row) => {
         const labels = usageLabel(row);
@@ -98,7 +100,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
     },
     {
       id: "actions",
-      label: t("actions"),
+      label: tCommon("actions"),
       width: 64,
       align: "right",
       render: (row) => (
@@ -108,11 +110,11 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
           button={{
             variant: "ghost",
             icon: <MoreHorizontal />,
-            label: t("presetActions", { name: row.name }),
+            label: tCommon("actionsFor", { name: row.name }),
             isIconOnly: true,
           }}
           items={[
-            { id: "edit", label: t("presetEdit"), onClick: () => setEditing(row) },
+            { id: "edit", label: tCommon("edit"), onClick: () => setEditing(row) },
             { id: "delete", label: t("presetDelete"), onClick: () => setDeleting(row) },
           ]}
         />
@@ -199,6 +201,7 @@ function WafPresetDialog({
   onSaved: (message: string) => void;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
   const existing = preset === "new" ? null : preset;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -220,9 +223,9 @@ function WafPresetDialog({
     <AppDialog
       open={preset !== null}
       onClose={onClose}
-      title={existing ? t("presetEditNamed", { name: existing.name }) : t("presetNew")}
+      title={existing ? tCommon("editNamed", { name: existing.name }) : t("presetNew")}
       maxWidth="lg"
-      submitLabel={existing ? t("save") : t("presetCreate")}
+      submitLabel={existing ? tCommon("save") : tCommon("create")}
       isSubmitting={submitting}
       isSubmitDisabled={name.trim() === "" || directives.trim() === ""}
       onSubmit={() => (document.getElementById(formId) as HTMLFormElement | null)?.requestSubmit()}
@@ -249,7 +252,7 @@ function WafPresetDialog({
             )}
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("presetName")}
+            label={tCommon("name")}
             htmlName="name"
             value={name}
             onChange={setName}
@@ -257,7 +260,7 @@ function WafPresetDialog({
             hasAutoFocus
           />
           <TextInput
-            label={t("presetDescription")}
+            label={tCommon("description")}
             isOptional
             htmlName="description"
             value={description}

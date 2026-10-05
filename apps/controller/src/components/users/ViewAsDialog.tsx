@@ -28,6 +28,7 @@ export function ViewAsDialog({
   initialGroupIds?: number[];
 }) {
   const t = useTranslations("users.viewAs");
+  const tCommon = useTranslations("common");
   const [role, setRole] = useState<(typeof ROLES)[number]>("operator");
   const [groupIds, setGroupIds] = useState<number[]>(initialGroupIds);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function ViewAsDialog({
           {t("description")}
         </Text>
         <Selector
-          label={t("role")}
+          label={tCommon("role")}
           options={ROLES.map((value) => ({ value, label: t(`roles.${value}`) }))}
           value={role}
           onChange={(next) => setRole(next as (typeof ROLES)[number])}

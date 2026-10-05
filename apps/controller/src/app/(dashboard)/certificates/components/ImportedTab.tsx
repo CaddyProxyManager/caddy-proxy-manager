@@ -108,6 +108,7 @@ function SourceCell({ cert }: { cert: ImportedCertView }) {
 
 function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => void }) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -157,13 +158,13 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         size="sm"
         alignment="end"
         items={[
-          { label: t("edit"), onClick: onEdit },
+          { label: tCommon("edit"), onClick: onEdit },
           ...(cert.file ? [{ label: t("rereadNow"), onClick: reread }] : []),
           { label: t("downloadCertificate"), onClick: () => download(false) },
           { label: t("downloadKey"), onClick: () => download(true) },
           { type: "divider" },
           {
-            label: t("delete"),
+            label: tCommon("delete"),
             variant: "destructive",
             onClick: () => {
               setError(null);
@@ -230,6 +231,7 @@ export function ImportedTab({
   fileAgents,
 }: Props) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
   const [drawerCert, setDrawerCert] = useState<ImportedCertView | null | false>(false);
   const mobileCardRenderer = (c: ImportedCertView) => importedMobileCard(c, () => setDrawerCert(c));
@@ -264,7 +266,7 @@ export function ImportedTab({
   const columns = [
     {
       id: "name",
-      label: t("name"),
+      label: tCommon("name"),
       render: (c: ImportedCertView) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={FileKey} size="sm" color={expiryIconColor(c.expiryStatus)} />
@@ -276,7 +278,7 @@ export function ImportedTab({
     },
     {
       id: "domains",
-      label: t("domains"),
+      label: tCommon("domains"),
       render: (c: ImportedCertView) => <DomainsCell domains={c.domains} />,
     },
     {
@@ -291,7 +293,7 @@ export function ImportedTab({
     },
     {
       id: "usedBy",
-      label: t("usedBy"),
+      label: tCommon("usedBy"),
       render: (c: ImportedCertView) =>
         c.usedBy.length === 0 ? (
           <Text type="body" size="sm" color="secondary">
@@ -372,7 +374,7 @@ export function ImportedTab({
         items={unused}
         summary={t("deleteUnusedSummary", { count: unused.length })}
         isDestructive
-        confirmLabel={t("delete")}
+        confirmLabel={tCommon("delete")}
         isPending={isDeletingUnused}
         error={unusedError}
         onConfirm={deleteUnused}
@@ -391,12 +393,13 @@ export function ImportedTab({
 
 function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] }) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const [isPending, startTransition] = useTransition();
 
   const columns = [
     {
       id: "name",
-      label: t("name"),
+      label: tCommon("name"),
       render: (c: ManagedCertView) => (
         <Text type="body" size="sm" weight="semibold">
           {c.name}
@@ -405,7 +408,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
     },
     {
       id: "domains",
-      label: t("domains"),
+      label: tCommon("domains"),
       render: (c: ManagedCertView) => (
         <Text type="code" size="sm" color="secondary">
           {c.domainNames.join(", ")}
@@ -420,7 +423,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
         <Button
           size="sm"
           variant="destructive"
-          label={t("delete")}
+          label={tCommon("delete")}
           isDisabled={isPending}
           onClick={() =>
             startTransition(async () => {

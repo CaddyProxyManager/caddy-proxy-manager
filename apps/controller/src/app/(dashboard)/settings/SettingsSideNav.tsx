@@ -54,7 +54,7 @@ export default function SettingsSideNav({
         <SideNavItem
           as={Link}
           href="/settings"
-          label={t("homeOverview")}
+          label={tNav("overview")}
           icon={<LayoutGrid className={ACCENTS.gray.text} />}
           isSelected={pathname === "/settings"}
         />

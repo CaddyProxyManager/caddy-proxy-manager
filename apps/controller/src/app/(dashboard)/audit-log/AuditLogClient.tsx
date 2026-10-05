@@ -121,6 +121,8 @@ export default function AuditLogClient({
   verifyChain,
 }: Props) {
   const t = useTranslations("auditLog");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState<EventRow | null>(null);
   const [layout, setLayout] = useDiffLayout();
   const [verification, setVerification] = useState<VerifyChainResult | null>(null);
@@ -133,7 +135,7 @@ export default function AuditLogClient({
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
-      label: t("time"),
+      label: tCommon("time"),
       width: 180,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
@@ -180,7 +182,7 @@ export default function AuditLogClient({
           <Button
             variant="ghost"
             size="sm"
-            label={t("showChanges", { count: r.changes.length })}
+            label={tCommon("changeCount", { count: r.changes.length })}
             onClick={() => setOpen(r)}
           />
         ) : null,
@@ -203,7 +205,7 @@ export default function AuditLogClient({
           <Button
             variant="ghost"
             size="sm"
-            label={t("showChanges", { count: r.changes.length })}
+            label={tCommon("changeCount", { count: r.changes.length })}
             onClick={() => setOpen(r)}
           />
         )}
@@ -214,7 +216,7 @@ export default function AuditLogClient({
   return (
     <VStack gap={6}>
       <ListPageHeader
-        title={t("auditLog")}
+        title={tNav("auditLog")}
         stats={
           <StatTiles
             tiles={[

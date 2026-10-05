@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createTranslator, IntlErrorCode } from 'next-intl';
 import messages from '../../messages/en.json';
+import { DUPLICATE_REASONS, SEPARATE_DUPLICATES } from './message-duplicates';
 
 type Node = { [key: string]: string | Node };
 
@@ -77,6 +78,33 @@ describe('message catalog', () => {
       // fieldLabel: a number setting's label without the unit its Settings field shows apart.
       expect(['label', 'description', 'fieldLabel']).toContain(field);
     }
+  });
+});
+
+describe('message catalog duplicates', () => {
+  const normalise = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
+  const groups = new Map<string, string[]>();
+  for (const [key, value] of ALL) {
+    groups.set(normalise(value), [...(groups.get(normalise(value)) ?? []), key]);
+  }
+  const repeated = [...groups.values()].filter((keys) => keys.length > 1);
+  const listed = new Set(SEPARATE_DUPLICATES.map((entry) => [...entry.keys].sort().join(' ')));
+
+  it('says nothing twice unless the repeat is listed with its reason', () => {
+    // A translator words one key once; a repeat that means the same thing becomes one key.
+    const unlisted = repeated.filter((keys) => !listed.has([...keys].sort().join(' ')));
+    expect(unlisted).toEqual([]);
+  });
+
+  it('lists no repeat that is gone, so the list cannot cover a future one', () => {
+    const current = new Set(repeated.map((keys) => [...keys].sort().join(' ')));
+    expect(
+      SEPARATE_DUPLICATES.filter((entry) => !current.has([...entry.keys].sort().join(' '))),
+    ).toEqual([]);
+  });
+
+  it('gives every listed repeat a reason', () => {
+    expect(SEPARATE_DUPLICATES.filter((entry) => !DUPLICATE_REASONS[entry.reason])).toEqual([]);
   });
 });
 

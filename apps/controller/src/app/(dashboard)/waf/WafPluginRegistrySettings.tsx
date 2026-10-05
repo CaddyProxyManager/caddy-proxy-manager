@@ -38,6 +38,8 @@ export function WafPluginRegistrySettings({
   onSaved: (message: string) => void;
 }) {
   const t = useTranslations("waf");
+  const tSettings = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [intervalHours, setIntervalHours] = useState<number | null>(settings.refreshIntervalHours);
   const [token, setToken] = useState("");
@@ -81,7 +83,7 @@ export function WafPluginRegistrySettings({
       onClose={onClose}
       title={t("pluginRegistrySettingsTitle")}
       maxWidth="lg"
-      submitLabel={t("save")}
+      submitLabel={tCommon("save")}
       isSubmitting={saving}
       isSubmitDisabled={drafts.some((draft) => !draft.name.trim() || !draft.url.trim())}
       onSubmit={() => void save()}
@@ -101,7 +103,7 @@ export function WafPluginRegistrySettings({
           {drafts.map((draft) => (
             <HStack key={draft.key} gap={2} vAlign="end">
               <TextInput
-                label={t("pluginRegistryName")}
+                label={tCommon("name")}
                 value={draft.name}
                 onChange={(name) => update(draft.key, { name })}
                 width={200}
@@ -116,7 +118,7 @@ export function WafPluginRegistrySettings({
               />
               <IconButton
                 variant="ghost"
-                label={t("pluginRegistryRemove", { name: draft.name || draft.url })}
+                label={tCommon("removeNamed", { name: draft.name || draft.url })}
                 icon={<Trash2 />}
                 onClick={() => setDrafts((prev) => prev.filter((row) => row.key !== draft.key))}
               />
@@ -152,7 +154,7 @@ export function WafPluginRegistrySettings({
         <NumberInput
           startIcon={Clock}
           hasNumberSteppers
-          units={t("pluginRegistryIntervalUnit")}
+          units={tSettings("units.hours")}
           label={t("pluginRegistryInterval")}
           description={t("pluginRegistryIntervalHelp")}
           value={intervalHours}

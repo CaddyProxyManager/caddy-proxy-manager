@@ -80,6 +80,7 @@ export const CaptchaWidget = forwardRef<CaptchaWidgetHandle, Props>(function Cap
   ref,
 ) {
   const t = useTranslations("auth.login.captcha");
+  const tCommon = useTranslations("common");
   const locale = useLocale();
   const container = useRef<HTMLDivElement>(null);
   const resetRef = useRef<() => void>(() => {});
@@ -92,7 +93,7 @@ export const CaptchaWidget = forwardRef<CaptchaWidgetHandle, Props>(function Cap
   // Cap takes labels as attributes, not a language; every one, or the rest stay English.
   const capLabels = {
     "data-cap-i18n-initial-state": t("capInitial"),
-    "data-cap-i18n-verifying-label": t("capVerifying"),
+    "data-cap-i18n-verifying-label": tCommon("verifying"),
     "data-cap-i18n-solved-label": t("capSolved"),
     "data-cap-i18n-error-label": t("capError"),
     "data-cap-i18n-required-label": t("capRequired"),

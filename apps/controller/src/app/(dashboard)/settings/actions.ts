@@ -105,6 +105,7 @@ import { type DelegationCheck, checkDelegations } from "@/src/lib/dns/delegation
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
 import { parseCheckbox, parseCsv } from "@/src/lib/forms/form-parse";
 import { checkTailscaleAuthKey } from "@/src/lib/caddy/tailscale-api";
+import { agentStatusMessage } from "@/src/lib/agent/status-message";
 import { isCaptchaProvider } from "@/src/lib/captcha/providers";
 import { getCaptchaSettings, saveCaptchaSettings } from "@/src/lib/captcha/settings";
 import { hasForbiddenControlCharacter } from "@/src/lib/settings/validation";
@@ -686,7 +687,9 @@ async function updateTailscaleSettingsActionUnlocked(
       if (check.status === "rejected") {
         return {
           success: false,
-          message: t("results.tailscaleKeyRejected", { reason: check.reason }),
+          message: t("results.tailscaleKeyRejected", {
+            reason: await errorText(check.error, check.error.message),
+          }),
         };
       }
       if (check.status === "unknown") {
@@ -2418,7 +2421,10 @@ export async function rebuildCaddyAction(
     await requireAdmin();
     const status = await applyCaddyBuild();
     revalidatePath("/settings");
-    return { success: true, message: status.message ?? t("settings.results.rebuildTriggered") };
+    return {
+      success: true,
+      message: agentStatusMessage(t, status) ?? t("settings.results.rebuildTriggered"),
+    };
   } catch (error) {
     console.error("Failed to trigger a Caddy rebuild:", error);
     return {

@@ -40,6 +40,9 @@ export default function LogsClient({
   accessLogEnabled: boolean;
 }) {
   const t = useTranslations("logs");
+  const tOverview = useTranslations("overview");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const readable = agents.filter((agent) => agent.canReadLogs);
   const [agentId, setAgentId] = useState(initialAgent ?? readable[0]?.agentId ?? null);
   const [view, setView] = useState<LogView>(initialView);
@@ -114,7 +117,7 @@ export default function LogsClient({
   if (readable.length === 0) {
     return (
       <VStack gap={4} padding={6}>
-        <Heading level={1}>{t("title")}</Heading>
+        <Heading level={1}>{tNav("logs")}</Heading>
         <EmptyState
           headingLevel={2}
           title={t("noAgentTitle")}
@@ -126,7 +129,7 @@ export default function LogsClient({
 
   return (
     <VStack gap={4} padding={6}>
-      <Heading level={1}>{t("title")}</Heading>
+      <Heading level={1}>{tNav("logs")}</Heading>
       <HStack gap={3} vAlign="end" wrap="wrap">
         <SegmentedControl
           label={t("source")}
@@ -139,7 +142,7 @@ export default function LogsClient({
         </SegmentedControl>
         {readable.length > 1 && (
           <Selector
-            label={t("agent")}
+            label={tCommon("agent")}
             size="sm"
             options={readable.map((agent) => ({ value: agent.agentId, label: agent.name }))}
             value={agentId ?? ""}
@@ -169,7 +172,11 @@ export default function LogsClient({
       </HStack>
 
       {view === "access" && !accessLogEnabled && (
-        <Banner status="info" title={t("accessOffTitle")} description={t("accessOffDescription")} />
+        <Banner
+          status="info"
+          title={tOverview("loggingOffTitle")}
+          description={t("accessOffDescription")}
+        />
       )}
       {missing && view !== "access" && (
         <Banner status="info" title={t("missingTitle")} description={t("missingDescription")} />

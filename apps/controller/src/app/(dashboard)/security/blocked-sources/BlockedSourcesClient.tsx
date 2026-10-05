@@ -32,6 +32,8 @@ export default function BlockedSourcesClient({
   geoUsable: boolean;
 }) {
   const t = useTranslations("security");
+  const tWaf = useTranslations("waf");
+  const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
   const router = useRouter();
   const [adding, setAdding] = useState<BlockDraft | null>(null);
@@ -53,7 +55,7 @@ export default function BlockedSourcesClient({
     },
     {
       id: "reason",
-      label: t("reason"),
+      label: tCommon("reason"),
       render: (row) => (
         <VStack gap={0}>
           <Text type="body" size="sm" maxLines={2}>
@@ -61,7 +63,7 @@ export default function BlockedSourcesClient({
           </Text>
           {row.createdBy && (
             <Text type="body" size="xsm" color="secondary">
-              {t("addedBy", { name: row.createdBy })}
+              {tWaf("exclusionBy", { name: row.createdBy })}
             </Text>
           )}
         </VStack>
@@ -84,7 +86,7 @@ export default function BlockedSourcesClient({
     },
     {
       id: "actions",
-      label: t("actions"),
+      label: tCommon("actions"),
       width: 64,
       align: "right",
       render: (row) => (
@@ -106,7 +108,7 @@ export default function BlockedSourcesClient({
           variant="ghost"
           size="sm"
           icon={<ArrowLeft />}
-          label={t("backToSecurity")}
+          label={t("title")}
           href="/security"
         />
       </HStack>

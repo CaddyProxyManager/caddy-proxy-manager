@@ -74,6 +74,7 @@ export default function SetupMigrateClient({
   sqliteWarning?: boolean;
 }) {
   const t = useTranslations("setup");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   // Literal keys, so the catalog is type-checked; the detail is SQLite's own words.
   const rejectionReason = (entry: LegacyRejection): string => {
@@ -246,7 +247,7 @@ export default function SetupMigrateClient({
                             {t("migrationCandidateProxyHosts", { count: entry.proxyHosts })}
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {t("migrationCandidateCertificates", { count: entry.certificates })}
+                            {tCommon("certificateCount", { count: entry.certificates })}
                           </Text>
                           <Text size="xsm" color="secondary">
                             {formatSize(entry.sizeBytes)}
@@ -439,7 +440,7 @@ export default function SetupMigrateClient({
                 />
                 <Button
                   variant="secondary"
-                  label={t("migrate.confirmCancel")}
+                  label={tCommon("cancel")}
                   onClick={() => setConfirming(false)}
                 />
               </VStack>
