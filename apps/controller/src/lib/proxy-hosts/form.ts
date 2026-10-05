@@ -501,7 +501,9 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
   const wafMode: WafHostConfig["waf_mode"] = rawMode === "override" ? "override" : "merge";
   const rawEngineMode = formData.get("wafEngineMode");
   const engineMode: WafHostConfig["mode"] =
-    rawEngineMode === "On" ? "On" : rawEngineMode === "Off" ? "Off" : undefined;
+    rawEngineMode === "On" || rawEngineMode === "Off" || rawEngineMode === "DetectionOnly"
+      ? rawEngineMode
+      : undefined;
   const loadCrs = parseCheckbox(formData.get("wafLoadOwaspCrs"));
   const customDirectives =
     typeof formData.get("wafCustomDirectives") === "string"

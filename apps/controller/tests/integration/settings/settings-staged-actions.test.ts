@@ -28,6 +28,7 @@ vi.mock('@/src/lib/auth', () => ({
 
 import messages from '../../../messages/en.json';
 import * as actions from '@/src/app/(dashboard)/settings/actions';
+import { setSetting } from '@/src/lib/settings';
 import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import { decryptSecret, isEncryptedSecret } from '@/src/lib/secrets';
 import { invalidateSettingsCache } from '@/src/lib/settings/resolve';
@@ -247,11 +248,18 @@ describe('a staged Settings form', () => {
       form({ geoblockEnabled: 'on', geoblockBlockCountries: 'RU, CN' }),
     );
     // A second read-modify-write sees the first one's staged value, not the stored one.
-    await actions.suppressWafRuleGloballyAction(942100);
     await actions.updateWafSettingsAction(null, form({ wafEnabled: 'on', wafLoadOwaspCrs: 'on' }));
+    await actions.updateWafSettingsAction(
+      null,
+      form({ wafEngineMode: 'DetectionOnly', wafLoadOwaspCrs: 'on', wafParanoiaLevel: '2' }),
+    );
 
     expect(await staged('geoblock')).toMatchObject({ block_countries: ['RU', 'CN'] });
-    expect(await staged('waf')).toMatchObject({ enabled: true, excluded_rule_ids: [942100] });
+    expect(await staged('waf')).toMatchObject({
+      enabled: true,
+      mode: 'DetectionOnly',
+      paranoia_level: 2,
+    });
   });
 });
 
@@ -568,11 +576,45 @@ describe('WAF settings', () => {
     expect(await stagedKeys()).toEqual([]);
   });
 
-  it('keeps the stored exclusions when the form does not post them', async () => {
-    await actions.suppressWafRuleGloballyAction(941100);
+  it('keeps stored legacy exclusions when the form does not post them', async () => {
+    await setSetting('waf', {
+      enabled: false,
+      mode: 'Off',
+      load_owasp_crs: true,
+      custom_directives: '',
+      excluded_rule_ids: [941100],
+    });
     await actions.updateWafSettingsAction(null, form({ wafEnabled: 'on' }));
 
     expect(await staged('waf')).toMatchObject({ mode: 'On', excluded_rule_ids: [941100] });
+  });
+
+  it('stages the tuning, leaving defaults out', async () => {
+    await actions.updateWafSettingsAction(
+      null,
+      form({
+        wafEngineMode: 'On',
+        wafParanoiaLevel: '1',
+        wafLogNextParanoiaLevel: 'on',
+        wafInboundThreshold: '10',
+        wafOutboundThreshold: '4',
+      }),
+    );
+
+    const waf = await staged('waf');
+    expect(waf).toMatchObject({ log_next_paranoia_level: true, inbound_anomaly_threshold: 10 });
+    expect(waf).not.toHaveProperty('paranoia_level');
+    expect(waf).not.toHaveProperty('outbound_anomaly_threshold');
+  });
+
+  it('refuses a paranoia level out of range, and stages nothing', async () => {
+    const result = await actions.updateWafSettingsAction(
+      null,
+      form({ wafEngineMode: 'On', wafParanoiaLevel: '5' }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(await stagedKeys()).toEqual([]);
   });
 });
 

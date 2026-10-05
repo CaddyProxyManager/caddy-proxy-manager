@@ -1,28 +1,10 @@
 "use client";
 
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Check,
-  HardDrive,
-  Hash,
-  MoreHorizontal,
-  Search,
-  ShieldOff,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, HardDrive, MoreHorizontal, Search, X } from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -46,7 +28,6 @@ import { Text } from "@astryxdesign/core/Text";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
-import { TextInput } from "@astryxdesign/core/TextInput";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
@@ -55,10 +36,8 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
-import { SearchField } from "@/components/ui/SearchField";
 import { UrlPowerSearch, type UrlSearchField } from "@/components/ui/UrlPowerSearch";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
-import { nativeAttrs } from "@/components/ui/native-input-attrs";
 import {
   bytesToMib,
   CORAZA_MAX_BODY_LIMIT,
@@ -82,13 +61,21 @@ import { WafPluginPicker } from "@/components/proxy-hosts/waf/WafPluginPicker";
 import { WafQuickTemplates } from "@/components/proxy-hosts/waf/WafQuickTemplates";
 import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import { WafPluginsPanel, type WafPluginRow } from "./WafPluginsPanel";
+import { updateWafSettingsAction } from "../settings/actions";
+import { WafEventInsight } from "@/components/security/WafEventInsight";
+import type { HostOption } from "@/components/security/ExclusionDialog";
+import type { WafExclusion } from "@/lib/models/waf-exclusions";
+import type { WafHostMode } from "@/lib/security/waf-hosts";
 import {
-  suppressWafRuleGloballyAction,
-  suppressWafRuleForHostAction,
-  removeWafRuleGloballyAction,
-  lookupWafRuleMessageAction,
-  updateWafSettingsAction,
-} from "../settings/actions";
+  DEFAULT_INBOUND_THRESHOLD,
+  DEFAULT_OUTBOUND_THRESHOLD,
+  MAX_ANOMALY_THRESHOLD,
+  MIN_ANOMALY_THRESHOLD,
+  PARANOIA_LEVELS,
+  effectiveTuning,
+} from "@/lib/waf/tuning";
+import { WafExclusionsPanel } from "./WafExclusionsPanel";
+import { MODE_KEY, WafHostModesPanel } from "./WafHostModesPanel";
 
 type Props = {
   events: WafEvent[];
@@ -98,10 +85,11 @@ type Props = {
   initialRange: "all" | "24h" | "7d" | "30d" | "custom";
   initialFrom: number | null;
   initialTo: number | null;
-  globalExcluded: number[];
-  globalExcludedMessages: Record<number, string | null>;
+  exclusions: WafExclusion[];
+  ruleMessages: Record<number, string | null>;
   globalWafEnabled: boolean;
-  hostWafMap: Record<string, number[]>;
+  hosts: HostOption[];
+  hostModes: WafHostMode[];
   globalWaf: WafSettings | null;
   presets: WafPresetRow[];
   plugins: WafPluginRow[];
@@ -110,6 +98,12 @@ type Props = {
 };
 
 type RangeOption = Props["initialRange"];
+
+const MODE_HELP_KEY = {
+  Off: "globalModeHelpOff",
+  DetectionOnly: "globalModeHelpDetectionOnly",
+  On: "globalModeHelpBlocking",
+} as const satisfies Record<WafSettings["mode"], string>;
 
 // Wall-clock values in the list's zone, so a range typed from the times on screen selects exactly
 // those events; next-intl's zone, not the browser's, so server and browser render alike.
@@ -615,51 +609,15 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
 function EventDetailPanel({
   event,
   onClose,
-  globalExcluded,
-  hostWafMap,
-  onSuppressGlobal,
-  onSuppressHost,
+  hosts,
 }: {
   event: WafEvent;
   onClose: () => void;
-  globalExcluded: number[];
-  hostWafMap: Record<string, number[]>;
-  onSuppressGlobal: (ruleId: number) => void;
-  onSuppressHost: (ruleId: number, host: string) => void;
+  hosts: HostOption[];
 }) {
   const t = useTranslations("waf");
   const emptyValue = useEmptyValue();
-  const [pending, startTransition] = useTransition();
-
-  const eventHostBare = event.host ? event.host.replace(/:\d+$/, "") : "";
-  const isGloballySuppressed = event.ruleId != null && globalExcluded.includes(event.ruleId);
-  const isHostOnlySuppressed =
-    event.ruleId != null &&
-    !!eventHostBare &&
-    (hostWafMap[eventHostBare] ?? []).includes(event.ruleId);
-  const isHostSuppressed = isGloballySuppressed || isHostOnlySuppressed;
-
-  function handleSuppressGlobally() {
-    if (!event.ruleId) return;
-    startTransition(async () => {
-      const result = await suppressWafRuleGloballyAction(event.ruleId!);
-      if (result.success) {
-        toast.success(result.message ?? t("actionDone"));
-        onSuppressGlobal(event.ruleId!);
-      } else toast.error(result.message ?? t("actionFailed"));
-    });
-  }
-
-  function handleSuppressForHost() {
-    if (!event.ruleId || !event.host) return;
-    startTransition(async () => {
-      const result = await suppressWafRuleForHostAction(event.ruleId!, event.host!);
-      if (result.success) {
-        toast.success(result.message ?? t("actionDone"));
-        onSuppressHost(event.ruleId!, event.host!);
-      } else toast.error(result.message ?? t("actionFailed"));
-    });
-  }
+  const router = useRouter();
 
   return (
     // Beside the list, not a modal: triage reads several events in a row without dismissing each.
@@ -726,32 +684,12 @@ function EventDetailPanel({
           </MetadataList>
         </Card>
 
-        {event.ruleId != null && (
-          <HStack gap={2} wrap="wrap">
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={<ShieldOff />}
-              label={isGloballySuppressed ? t("suppressedGlobally") : t("suppressGlobally")}
-              isDisabled={pending || isGloballySuppressed}
-              onClick={handleSuppressGlobally}
-            />
-            {event.host && (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<ShieldOff />}
-                label={
-                  isHostSuppressed
-                    ? t("suppressedForHost", { host: event.host })
-                    : t("suppressForHost", { host: event.host })
-                }
-                isDisabled={pending || isHostSuppressed}
-                onClick={handleSuppressForHost}
-              />
-            )}
-          </HStack>
-        )}
+        <WafEventInsight
+          eventKey={event.key}
+          hosts={hosts}
+          showRawRecord={false}
+          onChanged={() => router.refresh()}
+        />
 
         <Divider />
 
@@ -763,209 +701,6 @@ function EventDetailPanel({
         </VStack>
       </VStack>
     </Card>
-  );
-}
-
-/* ── Global suppressed rules tab ─────────────────────────────────────────── */
-function GlobalSuppressedRules({
-  excluded,
-  messages: initialMessages,
-  wafEnabled,
-  onRemove,
-  onAdd,
-}: {
-  excluded: number[];
-  messages: Record<number, string | null>;
-  wafEnabled: boolean;
-  onRemove: (ruleId: number) => void;
-  onAdd: (ruleId: number, message: string | null) => void;
-}) {
-  const t = useTranslations("waf");
-  const [pending, startTransition] = useTransition();
-  const [messages, setMessages] = useState(initialMessages);
-
-  const [addInput, setAddInput] = useState("");
-  const [lookupPending, setLookupPending] = useState(false);
-  const [pendingRule, setPendingRule] = useState<{ id: number; message: string | null } | null>(
-    null,
-  );
-  const [search, setSearch] = useState("");
-
-  function handleRemove(ruleId: number) {
-    startTransition(async () => {
-      const result = await removeWafRuleGloballyAction(ruleId);
-      if (result.success) {
-        toast.success(result.message ?? t("actionDone"));
-        onRemove(ruleId);
-      } else toast.error(result.message ?? t("actionFailed"));
-    });
-  }
-
-  async function handleLookup() {
-    const n = parseInt(addInput.trim(), 10);
-    if (!Number.isInteger(n) || n <= 0) return;
-    if (excluded.includes(n)) {
-      toast.error(t("ruleAlreadySuppressed", { id: n }));
-      return;
-    }
-    setLookupPending(true);
-    try {
-      const result = await lookupWafRuleMessageAction(n);
-      setPendingRule({ id: n, message: result.message });
-    } finally {
-      setLookupPending(false);
-    }
-  }
-
-  function handleConfirmAdd() {
-    if (!pendingRule) return;
-    startTransition(async () => {
-      const result = await suppressWafRuleGloballyAction(pendingRule.id);
-      if (result.success) {
-        toast.success(result.message ?? t("actionDone"));
-        onAdd(pendingRule.id, pendingRule.message);
-        setMessages((prev) => ({ ...prev, [pendingRule.id]: pendingRule.message }));
-        setAddInput("");
-        setPendingRule(null);
-      } else {
-        toast.error(result.message ?? t("actionFailed"));
-      }
-    });
-  }
-
-  const filtered = excluded.filter((id) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return String(id).includes(q) || (messages[id] ?? "").toLowerCase().includes(q);
-  });
-
-  const noDescription = t("noRuleDescription");
-
-  return (
-    <VStack gap={4}>
-      <VStack gap={2}>
-        <Heading level={2}>{t("globalRuleExclusions")}</Heading>
-        <Text type="body" size="sm" color="secondary">
-          {t("globalExclusionsHelp")}
-        </Text>
-        {!wafEnabled && (
-          <Banner
-            status="warning"
-            title={t("exclusionsDisabledTitle")}
-            description={t("exclusionsDisabledDescription")}
-          />
-        )}
-      </VStack>
-
-      <VStack gap={2}>
-        <HStack gap={2} vAlign="end" maxWidth={360}>
-          <TextInput
-            startIcon={Hash}
-            {...nativeAttrs({ pattern: "[0-9]*" })}
-            label={t("addRuleById")}
-            size="sm"
-            value={addInput}
-            onChange={(v) => {
-              setAddInput(v);
-              setPendingRule(null);
-            }}
-            onEnter={handleLookup}
-            placeholder={t("ruleId")}
-            isDisabled={lookupPending || pending}
-            width="100%"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("lookUp")}
-            isLoading={lookupPending}
-            isDisabled={!addInput.trim() || lookupPending || pending}
-            onClick={handleLookup}
-          />
-        </HStack>
-        {pendingRule && (
-          <Card variant="muted" padding={3} maxWidth={480}>
-            <VStack gap={2}>
-              <Text type="code" size="sm" weight="bold">
-                {t("ruleLabel", { id: pendingRule.id })}
-              </Text>
-              <Text type="body" size="xsm" color="secondary">
-                {pendingRule.message ?? noDescription}
-              </Text>
-              <HStack gap={2} vAlign="center">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  label={t("suppressGlobally")}
-                  isLoading={pending}
-                  isDisabled={pending}
-                  onClick={handleConfirmAdd}
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  label={t("cancel")}
-                  isDisabled={pending}
-                  onClick={() => {
-                    setPendingRule(null);
-                    setAddInput("");
-                  }}
-                />
-              </HStack>
-            </VStack>
-          </Card>
-        )}
-      </VStack>
-
-      {excluded.length > 0 && (
-        <div style={{ maxWidth: 400 }}>
-          <SearchField
-            value={search}
-            onChange={setSearch}
-            placeholder={t("suppressedRulesSearchPlaceholder")}
-            label={t("searchSuppressedRules")}
-            width="100%"
-          />
-        </div>
-      )}
-
-      {excluded.length === 0 ? (
-        <EmptyState
-          icon={<ShieldOff />}
-          title={t("noGloballySuppressedRules")}
-          description={t("suppressedRulesEmptyDescription")}
-        />
-      ) : filtered.length === 0 ? (
-        <Text type="body" size="sm" color="secondary">
-          {t("suppressedRulesSearchEmptyMessage")}
-        </Text>
-      ) : (
-        <VStack gap={2}>
-          {filtered.map((id) => (
-            <Card key={id} variant="muted" padding={3}>
-              <HStack gap={4} vAlign="center" justify="between">
-                <VStack gap={0}>
-                  <Text type="code" size="sm" weight="bold">
-                    {t("ruleLabel", { id })}
-                  </Text>
-                  <Text type="body" size="xsm" color="secondary">
-                    {messages[id] ?? noDescription}
-                  </Text>
-                </VStack>
-                <IconButton
-                  variant="ghost"
-                  label={t("removeSuppressionForRule", { id })}
-                  tooltip={t("removeSuppression")}
-                  icon={<Trash2 />}
-                  isDisabled={pending}
-                  onClick={() => handleRemove(id)}
-                />
-              </HStack>
-            </Card>
-          ))}
-        </VStack>
-      )}
-    </VStack>
   );
 }
 
@@ -1026,10 +761,11 @@ export default function WafEventsClient({
   initialRange,
   initialFrom,
   initialTo,
-  globalExcluded,
-  globalExcludedMessages,
+  exclusions,
+  ruleMessages,
   globalWafEnabled,
-  hostWafMap,
+  hosts,
+  hostModes,
   globalWaf,
   presets,
   plugins,
@@ -1058,11 +794,17 @@ export default function WafEventsClient({
   useEffect(() => {
     if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
   }, [searchOpen]);
-  const [localGlobalExcluded, setLocalGlobalExcluded] = useState(globalExcluded);
-  const [localGlobalMessages, setLocalGlobalMessages] = useState(globalExcludedMessages);
-  const [localHostWafMap, setLocalHostWafMap] = useState(hostWafMap);
   const [wafState, wafFormAction] = useActionState(updateWafSettingsAction, null);
-  const [wafEnabled, setWafEnabled] = useState(globalWaf?.enabled ?? false);
+  const [wafMode, setWafMode] = useState<WafSettings["mode"]>(
+    globalWaf?.enabled ? globalWaf.mode : "Off",
+  );
+  const tuning = effectiveTuning(globalWaf);
+  const [paranoiaLevel, setParanoiaLevel] = useState(String(tuning.paranoiaLevel));
+  const [logNextLevel, setLogNextLevel] = useState(Boolean(globalWaf?.log_next_paranoia_level));
+  const [inboundThreshold, setInboundThreshold] = useState<number | null>(tuning.inboundThreshold);
+  const [outboundThreshold, setOutboundThreshold] = useState<number | null>(
+    tuning.outboundThreshold,
+  );
   const [wafLoadOwaspCrs, setWafLoadOwaspCrs] = useState(globalWaf?.load_owasp_crs ?? true);
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
@@ -1120,6 +862,8 @@ export default function WafEventsClient({
   ];
 
   const limitActionId = useId();
+  const modeId = useId();
+  const paranoiaId = useId();
   // Per-option help: one line covering all three left "Default" unexplained.
   const bodyLimitActions = [
     { value: "", label: t("bodyLimitActionDefault"), help: t("overLimitActionHelpDefault") },
@@ -1303,29 +1047,15 @@ export default function WafEventsClient({
 
   const views = [
     { value: "events", label: t("events") },
-    { value: "suppressed", label: t("suppressedRules") },
+    { value: "exclusions", label: t("exclusions") },
+    { value: "hosts", label: t("hostModes") },
     { value: "presets", label: t("presets") },
     { value: "plugins", label: t("plugins") },
     { value: "settings", label: t("settings") },
   ];
 
   const detailPanel = selected && (
-    <EventDetailPanel
-      event={selected}
-      onClose={() => setSelected(null)}
-      globalExcluded={localGlobalExcluded}
-      hostWafMap={localHostWafMap}
-      onSuppressGlobal={(ruleId) =>
-        setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
-      }
-      onSuppressHost={(ruleId, host) => {
-        const bare = host.replace(/:\d+$/, "");
-        setLocalHostWafMap((prev) => ({
-          ...prev,
-          [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
-        }));
-      }}
-    />
+    <EventDetailPanel event={selected} onClose={() => setSelected(null)} hosts={hosts} />
   );
 
   // On a phone the event replaces a list that may be scrolled well down.
@@ -1371,7 +1101,8 @@ export default function WafEventsClient({
 
       <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
         <Tab value="events" label={t("events")} />
-        <Tab value="suppressed" label={t("suppressedRules")} />
+        <Tab value="exclusions" label={t("exclusions")} />
+        <Tab value="hosts" label={t("hostModes")} />
         <Tab value="presets" label={t("presets")} />
         <Tab value="plugins" label={t("plugins")} />
         <Tab value="settings" label={t("settings")} />
@@ -1496,20 +1227,16 @@ export default function WafEventsClient({
         </VStack>
       )}
 
-      {tab === "suppressed" && (
-        <GlobalSuppressedRules
-          excluded={localGlobalExcluded}
-          messages={localGlobalMessages}
+      {tab === "exclusions" && (
+        <WafExclusionsPanel
+          exclusions={exclusions}
+          hosts={hosts}
+          ruleMessages={ruleMessages}
           wafEnabled={globalWafEnabled}
-          onRemove={(ruleId) =>
-            setLocalGlobalExcluded((prev) => prev.filter((id) => id !== ruleId))
-          }
-          onAdd={(ruleId, message) => {
-            setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])]);
-            setLocalGlobalMessages((prev) => ({ ...prev, [ruleId]: message }));
-          }}
         />
       )}
+
+      {tab === "hosts" && <WafHostModesPanel hosts={hostModes} />}
 
       {tab === "presets" && <WafPresetsPanel presets={presets} />}
 
@@ -1525,7 +1252,13 @@ export default function WafEventsClient({
           </VStack>
           <form action={wafFormAction}>
             <VStack gap={4}>
-              <input type="hidden" name="wafEnabled" value={wafEnabled ? "on" : ""} />
+              <input type="hidden" name="wafEngineMode" value={wafMode} />
+              <input type="hidden" name="wafParanoiaLevel" value={paranoiaLevel} />
+              <input
+                type="hidden"
+                name="wafLogNextParanoiaLevel"
+                value={logNextLevel ? "on" : ""}
+              />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
               <input type="hidden" name="wafPresetIds" value={JSON.stringify(wafPresetIds)} />
               <input type="hidden" name="wafPluginIds" value={JSON.stringify(wafPluginIds)} />
@@ -1540,20 +1273,95 @@ export default function WafEventsClient({
                 />
               )}
               {/* Disabled controls emit no pointer events, so the reason attaches by wrapping. */}
-              <ModuleGated feature="waf">
-                <Switch
-                  label={t("enableWafGloballyBlocking")}
-                  value={wafEnabled}
-                  onChange={setWafEnabled}
-                  isDisabled={Boolean(wafModuleDisabledReason)}
-                />
-              </ModuleGated>
+              <Field
+                label={t("globalMode")}
+                inputID={modeId}
+                isGroupLabel
+                description={t(MODE_HELP_KEY[wafMode])}
+              >
+                {/* Disabled controls emit no pointer events, so the reason attaches by wrapping. */}
+                <ModuleGated feature="waf">
+                  <HStack>
+                    <SegmentedControl
+                      label={t("globalMode")}
+                      value={wafMode}
+                      onChange={(next) => setWafMode(next as WafSettings["mode"])}
+                      isDisabled={Boolean(wafModuleDisabledReason)}
+                    >
+                      {(["Off", "DetectionOnly", "On"] as const).map((mode) => (
+                        <SegmentedControlItem key={mode} value={mode} label={t(MODE_KEY[mode])} />
+                      ))}
+                    </SegmentedControl>
+                  </HStack>
+                </ModuleGated>
+              </Field>
               <Switch
                 label={t("owaspCrsLabel")}
                 description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
               />
+              {wafLoadOwaspCrs && (
+                <VStack gap={4}>
+                  <Field
+                    label={t("paranoiaLevel")}
+                    inputID={paranoiaId}
+                    isGroupLabel
+                    description={t("paranoiaLevelHelp")}
+                  >
+                    <HStack>
+                      <SegmentedControl
+                        label={t("paranoiaLevel")}
+                        value={paranoiaLevel}
+                        onChange={setParanoiaLevel}
+                      >
+                        {PARANOIA_LEVELS.map((level) => (
+                          <SegmentedControlItem
+                            key={level}
+                            value={String(level)}
+                            label={String(level)}
+                          />
+                        ))}
+                      </SegmentedControl>
+                    </HStack>
+                  </Field>
+                  <Switch
+                    label={t("logNextParanoiaLevel")}
+                    description={t("logNextParanoiaLevelHelp")}
+                    value={logNextLevel}
+                    onChange={setLogNextLevel}
+                    isDisabled={paranoiaLevel === "4"}
+                  />
+                  <HStack gap={3} vAlign="start" wrap="wrap">
+                    <NumberInput
+                      hasNumberSteppers
+                      label={t("inboundThreshold")}
+                      htmlName="wafInboundThreshold"
+                      value={inboundThreshold}
+                      onChange={setInboundThreshold}
+                      min={MIN_ANOMALY_THRESHOLD}
+                      max={MAX_ANOMALY_THRESHOLD}
+                      step={1}
+                      isIntegerOnly
+                      placeholder={String(DEFAULT_INBOUND_THRESHOLD)}
+                      description={t("inboundThresholdHelp")}
+                    />
+                    <NumberInput
+                      hasNumberSteppers
+                      label={t("outboundThreshold")}
+                      htmlName="wafOutboundThreshold"
+                      value={outboundThreshold}
+                      onChange={setOutboundThreshold}
+                      min={MIN_ANOMALY_THRESHOLD}
+                      max={MAX_ANOMALY_THRESHOLD}
+                      step={1}
+                      isIntegerOnly
+                      placeholder={String(DEFAULT_OUTBOUND_THRESHOLD)}
+                      description={t("outboundThresholdHelp")}
+                    />
+                  </HStack>
+                </VStack>
+              )}
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
                   startIcon={HardDrive}

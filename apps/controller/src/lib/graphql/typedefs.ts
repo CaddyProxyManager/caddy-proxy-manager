@@ -540,6 +540,135 @@ export const typeDefs = /* GraphQL */ `
     total: Int!
   }
 
+  """A WAF rule switched off globally or on one host, optionally under a path or for one variable."""
+  type WafExclusion {
+    id: Int!
+    ruleId: Int!
+    """Null applies to every host."""
+    proxyHostId: Int
+    hostName: String
+    """Decoded and normalised; a trailing * covers everything below it."""
+    path: String
+    """A variable the rule then skips, such as ARGS:content."""
+    target: String
+    reason: String!
+    createdBy: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  input WafExclusionInput {
+    ruleId: Int!
+    proxyHostId: Int
+    path: String
+    target: String
+    reason: String
+  }
+
+  """An entry of the global deny list, checked before every other handler on HTTP hosts."""
+  type BlockedSource {
+    id: Int!
+    """ip, cidr, country, continent or asn."""
+    kind: String!
+    value: String!
+    reason: String!
+    """Null never expires."""
+    expiresAt: DateTime
+    createdBy: String
+    createdAt: DateTime!
+  }
+
+  input BlockedSourceInput {
+    kind: String!
+    value: String!
+    reason: String
+    """Must be in the future; null never expires."""
+    expiresAt: DateTime
+  }
+
+  type WafMatchedRule {
+    ruleId: Int
+    message: String!
+    severity: String
+    """What the rule added to the anomaly score."""
+    points: Int!
+    """The variable it matched, e.g. ARGS:id."""
+    variable: String
+    data: String
+    paranoiaLevel: Int
+    tags: [String!]!
+  }
+
+  type WafEventExplanation {
+    rules: [WafMatchedRule!]!
+    totalScore: Int!
+    """Whether the score is the one the rule set reported, rather than summed here."""
+    scoreReported: Boolean!
+    threshold: Int!
+    decidingRuleId: Int
+  }
+
+  type WafEventReview {
+    """intended or false_positive."""
+    verdict: String!
+    reviewedBy: String
+    reviewedAt: DateTime!
+  }
+
+  type SuggestedWafExclusion {
+    ruleId: Int!
+    proxyHostId: Int
+    hostName: String
+    path: String
+    target: String
+  }
+
+  type WafEventSummary {
+    """Stable across pages; names the event to wafEvent and reviewWafEvent."""
+    key: String!
+    ts: Int!
+    host: String!
+    clientIp: String!
+    countryCode: String
+    method: String!
+    uri: String!
+    ruleId: Int
+    ruleMessage: String
+    severity: String
+    blocked: Boolean!
+  }
+
+  """A WAF event in full. Credentials in the record are redacted."""
+  type WafEventDetail {
+    event: WafEventSummary!
+    explanation: WafEventExplanation!
+    suggestedExclusion: SuggestedWafExclusion
+    """The request as a curl command, credentials redacted."""
+    curl: String!
+    """The redacted audit record, as JSON."""
+    rawRecord: String
+    review: WafEventReview
+  }
+
+  """
+  The security events page for one state. source is traffic (access-log outcomes), waf (WAF events
+  alone, when outcomes are not recorded) or none (analytics are off). Shaped as the page uses it.
+  """
+  type SecurityReport {
+    source: String!
+    window: AnalyticsWindow!
+    previousWindow: AnalyticsWindow!
+    bucketSeconds: Int!
+    ruleSet: JSON!
+    totals: JSON!
+    buckets: [Int!]!
+    series: JSON!
+    peak: JSON
+    topRules: JSON!
+    topSources: JSON!
+    events: JSON!
+  }
+
   type Query {
     proxyHosts: [ProxyHost!]!
     proxyHost(id: Int!): ProxyHost
@@ -595,6 +724,14 @@ export const typeDefs = /* GraphQL */ `
     setupChecklist: SetupChecklist!
     """A proxy host's last 24 hours; null with analytics off."""
     proxyHostTraffic(id: Int!): HostTraffic
+    """Every WAF exclusion."""
+    wafExclusions: [WafExclusion!]!
+    """One WAF event by its key: what matched, the score, and the narrowest exclusion for it."""
+    wafEvent(key: String!): WafEventDetail!
+    """The security events page. page is the WAF event list's, 50 to a page."""
+    securityReport(query: AnalyticsQueryInput, page: Int): SecurityReport!
+    """The global deny list, expired entries included until the expiry pass removes them."""
+    blockedSources: [BlockedSource!]!
   }
 
   type Mutation {
@@ -641,6 +778,19 @@ export const typeDefs = /* GraphQL */ `
     setSetupStepDone(step: String!, done: Boolean!): SetupChecklistState!
     """Hide the setup checklist for every administrator, or show it again."""
     setSetupChecklistHidden(hidden: Boolean!): SetupChecklistState!
+
+    """
+    Compiled by Coraza on an agent first; refused, or undone when Caddy refuses the config.
+    Rules 949110, 949111, 959100 and 959101 cannot be excluded.
+    """
+    createWafExclusion(input: WafExclusionInput!): WafExclusion!
+    updateWafExclusion(id: Int!, input: WafExclusionInput!): WafExclusion!
+    deleteWafExclusion(id: Int!): Boolean!
+    """Review a WAF event as intended or false_positive; null clears the review."""
+    reviewWafEvent(key: String!, verdict: String): WafEventReview
+    """Adds to the deny list, or updates the reason and expiry of an entry already on it."""
+    createBlockedSource(input: BlockedSourceInput!): BlockedSource!
+    deleteBlockedSource(id: Int!): Boolean!
 
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!

@@ -155,6 +155,15 @@ export async function register() {
       console.error("Failed to expire stale access-list hostnames:", error);
     }
 
+    // Before the apply; the config it produces is the same, so nothing reloads differently.
+    const { migrateLegacyWafSuppressions } = await import("./lib/models/waf-exclusions");
+    try {
+      const moved = await migrateLegacyWafSuppressions();
+      if (moved > 0) console.log(`Moved ${moved} suppressed WAF rule(s) into WAF exclusions`);
+    } catch (error) {
+      console.error("Failed to move suppressed WAF rules into exclusions:", error);
+    }
+
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {
       console.log("Applying Caddy configuration from database...");
@@ -237,6 +246,14 @@ export async function register() {
       startAccessListDnsRefresher();
     } catch (error) {
       console.error("Failed to start the access-list hostname refresher:", error);
+    }
+
+    // Deletes expired blocks every 30 seconds and re-applies, so one lapses within a minute.
+    const { startSecurityHousekeeping } = await import("./lib/security/housekeeping");
+    try {
+      startSecurityHousekeeping();
+    } catch (error) {
+      console.error("Failed to start the blocked-sources expiry:", error);
     }
 
     const { startCrsRegistryUpdater } = await import("./lib/waf/crs-plugins/sync");

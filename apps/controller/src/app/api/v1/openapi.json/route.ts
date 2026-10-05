@@ -2678,13 +2678,18 @@ const spec = {
         description: "Web Application Firewall configuration",
         properties: {
           enabled: { type: "boolean" },
-          mode: { type: "string", enum: ["Off", "On"] },
+          mode: {
+            type: "string",
+            enum: ["Off", "On", "DetectionOnly"],
+            description: "Unset inherits the global mode",
+          },
           load_owasp_crs: { type: "boolean", description: "Load OWASP Core Rule Set" },
           custom_directives: { type: "string", description: "Custom WAF directives" },
           excluded_rule_ids: {
             type: "array",
             items: { type: "integer" },
-            description: "Rule IDs to exclude",
+            description:
+              "Deprecated: rule IDs to exclude. Still applied, and moved into WAF exclusions on the next start; use the WAF exclusion mutations in GraphQL instead.",
           },
           preset_ids: {
             type: "array",
@@ -4230,10 +4235,36 @@ const spec = {
         description: "Global WAF settings",
         properties: {
           enabled: { type: "boolean" },
-          mode: { type: "string", enum: ["Off", "On"] },
+          mode: { type: "string", enum: ["Off", "On", "DetectionOnly"] },
           load_owasp_crs: { type: "boolean" },
           custom_directives: { type: "string" },
-          excluded_rule_ids: { type: "array", items: { type: "integer" } },
+          excluded_rule_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "Deprecated: moved into WAF exclusions on the next start.",
+          },
+          paranoia_level: {
+            type: "integer",
+            minimum: 1,
+            maximum: 4,
+            description: "CRS paranoia level. Unset is 1.",
+          },
+          log_next_paranoia_level: {
+            type: "boolean",
+            description: "Also run the next level's rules, logging without blocking.",
+          },
+          inbound_anomaly_threshold: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10000,
+            description: "Inbound anomaly score that blocks. Unset is 5.",
+          },
+          outbound_anomaly_threshold: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10000,
+            description: "Outbound anomaly score that blocks. Unset is 4.",
+          },
           preset_ids: {
             type: "array",
             items: { type: "integer" },

@@ -57,4 +57,7 @@ export const {
   analyticsViews,
   wafPresets,
   crsPlugins,
+  wafExclusions,
+  wafEventReviews,
+  blockedSources,
 } = activeSchema;

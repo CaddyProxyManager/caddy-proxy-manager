@@ -203,7 +203,7 @@ export type PathAllowRule = {
 
 export type WafHostConfig = {
   enabled?: boolean;
-  mode?: "Off" | "On";
+  mode?: "Off" | "On" | "DetectionOnly";
   load_owasp_crs?: boolean;
   custom_directives?: string;
   excluded_rule_ids?: number[];
@@ -3741,7 +3741,7 @@ export async function updateProxyHost(
   await assertLocationAccessListsExist(parseMeta(meta).location_rules);
   await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
   await assertHostWafLoads(
-    { kind: "host", name: input.name ?? existing.name },
+    { kind: "host", name: input.name ?? existing.name, id },
     existingMeta.waf,
     parseMeta(meta).waf,
   );

@@ -68,6 +68,8 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "forward_auth_redirect_intents",
       "proxy_host_agents",
       "l4_proxy_host_agents",
+      // With the hosts: a cleared host reference would widen an exclusion to every host.
+      "waf_exclusions",
     ],
     // Agents too: lost placement rows read as "no assignment", which means every agent.
     requires: ["certificates", "accessLists", "agents"],
@@ -123,7 +125,14 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "rest.",
     // Staged and revisions are claimed only for coverage: always empty in a legacy source.
     // waf_presets and crs_plugins because WAF settings select them; a lost one drops just itself.
-    tables: ["settings", "settings_staged", "settings_revisions", "waf_presets", "crs_plugins"],
+    tables: [
+      "settings",
+      "settings_staged",
+      "settings_revisions",
+      "waf_presets",
+      "crs_plugins",
+      "blocked_sources",
+    ],
     requires: [],
   },
   {
@@ -131,7 +140,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     label: "Audit log",
     description:
       "The history of who changed what. Usually the largest table, and never load-bearing.",
-    tables: ["audit_events"],
+    tables: ["audit_events", "waf_event_reviews"],
     requires: [],
   },
 ];

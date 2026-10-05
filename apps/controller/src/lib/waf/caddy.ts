@@ -15,6 +15,8 @@ import {
   seclangErrors,
   splitRuleDirective,
 } from "./seclang";
+import { exclusionDirectives } from "./exclusions";
+import { type WafTuning, crsTuningDirectives } from "./tuning";
 
 // ---------------------------------------------------------------------------
 // Request body limits
@@ -767,6 +769,25 @@ export function listDroppedWafDirectives(
   return [...reports.values()];
 }
 
+/** CRS tuning is global only: every host's handler runs the CRS the way the settings tune it. */
+function globalTuning(global: WafSettings | null): WafTuning {
+  if (!global) return {};
+  const {
+    paranoia_level,
+    log_next_paranoia_level,
+    inbound_anomaly_threshold,
+    outbound_anomaly_threshold,
+  } = global;
+  return Object.fromEntries(
+    Object.entries({
+      paranoia_level,
+      log_next_paranoia_level,
+      inbound_anomaly_threshold,
+      outbound_anomaly_threshold,
+    }).filter(([, value]) => value !== undefined),
+  );
+}
+
 /**
  * Effective WAF settings for a host: null host → global as-is; `enabled === false` → opt out;
  * `waf_mode === "override"` → host only; `"merge"` (default) → host over global.
@@ -783,6 +804,7 @@ export function resolveEffectiveWaf(
   if (host && host.waf_mode === "override") {
     if (!hostEnabled) return null;
     return {
+      ...globalTuning(global),
       enabled: true,
       mode: host.mode ?? "On",
       load_owasp_crs: host.load_owasp_crs ?? false,
@@ -800,6 +822,7 @@ export function resolveEffectiveWaf(
   if (host && global) {
     if (host.enabled === false) return null;
     return {
+      ...globalTuning(global),
       enabled: true,
       mode: host.mode ?? global.mode,
       load_owasp_crs: host.load_owasp_crs ?? global.load_owasp_crs,
@@ -860,7 +883,9 @@ export function buildWafHandler(
 
   if (waf.load_owasp_crs) {
     parts.push("Include @coraza.conf-recommended", "Include @crs-setup.conf.example");
+    parts.push(...crsTuningDirectives(waf));
   }
+  const exclusions = exclusionDirectives(waf.exclusions ?? []);
 
   // CRS 4 order: every -config, every -before, the rules, every -after. Plugins only tune the CRS,
   // so without it they are left out; an unknown id is a stale selection and emits nothing.
@@ -880,17 +905,20 @@ export function buildWafHandler(
     if (kept.length > 0) parts.push(kept.join("\n"));
   }
 
+  // Scoped exclusions are ctl actions, which reach only the rules still to run.
+  parts.push(...exclusions.rules);
+
   if (waf.load_owasp_crs) parts.push("Include @owasp_crs/*.conf");
   pluginPart("after");
 
-  if (waf.excluded_rule_ids?.length) {
-    const validIds = waf.excluded_rule_ids.filter(
-      (id): id is number =>
-        typeof id === "number" && Number.isFinite(id) && id > 0 && Number.isInteger(id),
+  const legacyIds = (waf.excluded_rule_ids ?? []).filter(
+    (id): id is number =>
+      typeof id === "number" && Number.isFinite(id) && id > 0 && Number.isInteger(id),
+  );
+  if (legacyIds.length > 0 || exclusions.removeIds.length > 0) {
+    parts.push(
+      `SecRuleRemoveById ${[...new Set([...legacyIds, ...exclusions.removeIds])].join(" ")}`,
     );
-    if (validIds.length > 0) {
-      parts.push(`SecRuleRemoveById ${validIds.join(" ")}`);
-    }
   }
 
   parts.push(

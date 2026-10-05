@@ -122,6 +122,7 @@ export default defineConfig({
           label: "Protection",
           items: [
             { label: "WAF", slug: "features/waf" },
+            { label: "Security events", slug: "features/security" },
             { label: "Geo blocking", slug: "features/geo-blocking" },
             { label: "CrowdSec", slug: "features/crowdsec" },
             { label: "Bot challenge", slug: "features/bot-challenge" },

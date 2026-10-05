@@ -24,7 +24,7 @@ const MITIGATED_SQL = "outcome != 'served'";
 type Clause = { sql: string; params: QueryParams };
 
 /** One field's comparison, `is` form; `not` wraps it. Null for a field the table cannot answer. */
-function trafficCondition(field: FilterField, value: string, key: string): Clause | null {
+export function trafficCondition(field: FilterField, value: string, key: string): Clause | null {
   const p = (type: string) => `{${key}:${type}}`;
   switch (field) {
     case "host":
@@ -64,7 +64,7 @@ function trafficCondition(field: FilterField, value: string, key: string): Claus
 }
 
 /** WAF events have no status, protocol, ASN, user agent or outcome; those filters pass. */
-function wafCondition(field: FilterField, value: string, key: string): Clause | null {
+export function wafCondition(field: FilterField, value: string, key: string): Clause | null {
   const p = (type: string) => `{${key}:${type}}`;
   switch (field) {
     case "host":
@@ -80,7 +80,7 @@ function wafCondition(field: FilterField, value: string, key: string): Clause | 
   }
 }
 
-function buildWhere(
+export function buildWhere(
   window: TimeWindow,
   filters: readonly AnalyticsFilter[],
   condition: typeof trafficCondition,

@@ -16,6 +16,7 @@ export const ATTENTION_PROVIDERS = [
   "l4Ports",
   "crsPlugins",
   "geoip",
+  "security",
 ] as const;
 export type AttentionProviderId = (typeof ATTENTION_PROVIDERS)[number];
 
@@ -38,6 +39,8 @@ export const ATTENTION_CODES = [
   "l4PortsFailed",
   "crsPluginDisabled",
   "geoipFailing",
+  "wafDetectionOnly",
+  "blockedSourcesUnenforced",
 ] as const;
 export type AttentionCode = (typeof ATTENTION_CODES)[number];
 

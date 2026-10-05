@@ -53,6 +53,78 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Renamed analytics view (?<from>.+) to (?<to>.+)$/s,
   },
 
+  // models/waf-exclusions.ts
+  {
+    entityType: "waf_exclusion",
+    action: "create",
+    message: "wafExclusionCreated",
+    pattern: /^Added an exclusion for WAF rule (?<rule>\S+)$/,
+  },
+  {
+    entityType: "waf_exclusion",
+    action: "update",
+    message: "wafExclusionUpdated",
+    pattern: /^Changed the exclusion for WAF rule (?<rule>\S+)$/,
+  },
+  {
+    entityType: "waf_exclusion",
+    action: "delete",
+    message: "wafExclusionDeleted",
+    pattern: /^Removed the exclusion for WAF rule (?<rule>\S+)$/,
+  },
+  {
+    entityType: "waf_exclusion",
+    action: "update",
+    message: "wafExclusionsMigrated",
+    pattern: /^Moved suppressed WAF rules into exclusions \((?<count>\S+)\)$/,
+  },
+
+  // security/waf-event.ts
+  {
+    entityType: "waf_event",
+    action: "update",
+    message: "wafEventReviewedIntended",
+    pattern: /^Reviewed WAF event (?<key>\S+) as working as intended$/,
+  },
+  {
+    entityType: "waf_event",
+    action: "update",
+    message: "wafEventReviewedFalsePositive",
+    pattern: /^Reviewed WAF event (?<key>\S+) as a false positive$/,
+  },
+  {
+    entityType: "waf_event",
+    action: "update",
+    message: "wafEventReviewCleared",
+    pattern: /^Cleared the review of WAF event (?<key>\S+)$/,
+  },
+
+  // models/blocked-sources.ts
+  {
+    entityType: "blocked_source",
+    action: "create",
+    message: "blockedSourceCreated",
+    pattern: /^Blocked (?<kind>\S+) (?<value>\S+)$/,
+  },
+  {
+    entityType: "blocked_source",
+    action: "update",
+    message: "blockedSourceUpdated",
+    pattern: /^Changed the block on (?<kind>\S+) (?<value>\S+)$/,
+  },
+  {
+    entityType: "blocked_source",
+    action: "delete",
+    message: "blockedSourceDeleted",
+    pattern: /^Unblocked (?<kind>\S+) (?<value>\S+)$/,
+  },
+  {
+    entityType: "blocked_source",
+    action: "delete",
+    message: "blockedSourceExpired",
+    pattern: /^The block on (?<kind>\S+) (?<value>\S+) expired$/,
+  },
+
   // setup-checklist/index.ts
   {
     entityType: "setup_checklist",

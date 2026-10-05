@@ -1,0 +1,73 @@
+---
+title: Security events
+description: What the WAF, geo blocking, access lists, rate limits and the global deny list stopped, where it came from, and the blocked-sources list.
+---
+
+**Security** in the navigation is one page for everything that stopped a request in front of your
+hosts, not just the WAF: what was stopped and why, where it came from, and what to do about it.
+It is for administrators.
+
+## The page
+
+A range at the top - 1 hour, 24 hours, 7 days, 30 days or a custom one - and a filter bar take
+the same **is** and **is not** filters as [Analytics](../analytics/): host, path, country,
+network (ASN), client address, outcome, WAF rule and the rest. Both live in the URL, so a link
+opens the page as you see it. Below them:
+
+- **Rule set** - the global WAF mode, the Core Rule Set version, the paranoia level (and the
+  level logged on top of it), the anomaly thresholds, how many hosts block, only detect or have
+  the WAF off, and how many [exclusions](../waf/#exclusions) and blocked sources there are.
+- **Mitigated requests** - how many requests a gate stopped, their share of all requests, the
+  change from the period before, and the split by outcome: WAF, geo blocking, access list, sign-in,
+  rate limit, CrowdSec and blocked sources.
+- **Sources** - how many distinct addresses were stopped, and the most targeted host.
+- **A chart** of mitigated requests by outcome. Its busiest bucket is explained underneath - the
+  address, host and rule behind most of it - with **Show these events** to narrow the page to it.
+- **Top rules**, each with **Add exclusion**, and a filter button to see only its events.
+- **Top sources**, with the address's country, network, the rules it hit and when it was last
+  seen, each with **Block** - or marked **Blocked** if it already is.
+- **The WAF events**, a page at a time. Open one to see
+  [why it was blocked](../waf/#why-was-this-blocked) and act on it; a reviewed event shows its
+  verdict in the list.
+
+The outcomes come from the access log, so they need [analytics](../analytics/) on. An agent too old
+to record outcomes counts a WAF block as served; when the WAF events outnumber the WAF outcomes
+the page says so and counts from the WAF events alone until the agent is updated. With analytics
+off the page shows the rule set and the blocked sources, which work either way.
+
+## Blocked sources
+
+**Security → Blocked sources** is one deny list for every HTTP host, checked before anything else
+the host does - before the WAF, rate limits, sign-in and the host's own rules. A request it matches
+gets 403 and is recorded with the **Blocked** outcome. [L4 hosts](../l4-proxy/) are not covered.
+
+An entry is one of:
+
+| Type | Example | Needs |
+| ---- | ------- | ----- |
+| Address | `203.0.113.7` | Nothing |
+| Network | `203.0.113.0/24` | Nothing |
+| Country | `DE` | Geo Blocking module and GeoIP |
+| Continent | `EU` | Geo Blocking module and GeoIP |
+| Provider network (ASN) | `AS64500` | Geo Blocking module and GeoIP's ASN database |
+
+Addresses and networks are matched by Caddy itself, on the client address after the server's
+trusted proxies. Countries, continents and networks by number need the
+[Geo Blocking](../geo-blocking/) module; without it they are kept but not enforced, and the page
+and [Needs attention](../overview/) say so. `0.0.0.0/0` and `::/0` are refused: they are every
+address, the administrator's own included.
+
+Each entry has a reason and an optional expiry - in an hour, a day, a week, 30 days, or never. An
+expired entry stops applying with the next configuration change and is removed, with the
+configuration reloaded, within a minute. Adding, changing, removing and expiring an entry are all
+in the [audit log](../audit-log/).
+
+**Block** on a source in the security page, or on a WAF event, fills the same form with the
+address, expiring in 24 hours unless you choose otherwise.
+
+## Over the API
+
+The [GraphQL API](../api/) has the page as `securityReport`, a WAF event in full as `wafEvent`,
+`reviewWafEvent`, the `wafExclusions` with their create, update and delete mutations, and
+`blockedSources` with `createBlockedSource` and `deleteBlockedSource`. All of them are for
+administrators.

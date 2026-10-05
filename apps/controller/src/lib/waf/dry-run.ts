@@ -7,6 +7,7 @@
 import { CADDY_VALIDATE_REFUSED_STATUS } from "@cpm/shared";
 import { type CrsPluginRules, buildWafHandler, resolveEffectiveWaf } from "./caddy";
 import { domainError } from "../errors/domain-error";
+import { type WafExclusionRule, exclusionsFor } from "./exclusions";
 import type { WafHostConfig } from "../models/proxy-hosts";
 import type { WafSettings } from "../settings";
 
@@ -14,7 +15,8 @@ import type { WafSettings } from "../settings";
 export type WafDryRunTarget =
   | { kind: "global" }
   | { kind: "dashboard" }
-  | { kind: "host"; name: string }
+  /** `id` picks the host's own exclusions; a new host has none yet. */
+  | { kind: "host"; name: string; id?: number }
   | { kind: "preset" }
   | { kind: "plugin" };
 
@@ -181,6 +183,28 @@ async function loadPlugins(): Promise<Map<number, CrsPluginRules>> {
 
 type HostWaf = { target: WafDryRunTarget; waf: WafHostConfig | null | undefined };
 
+/** As caddy/index.ts attaches them: every global exclusion, and the host's own. */
+export function withExclusions(
+  waf: WafSettings | null,
+  exclusions: readonly WafExclusionRule[],
+  target: WafDryRunTarget,
+  host?: WafHostConfig | null,
+): WafSettings | null {
+  if (!waf) return null;
+  // A new host has no id, and gets the global ones only.
+  const own = exclusionsFor(
+    exclusions,
+    target.kind === "host" ? (target.id ?? null) : null,
+    host?.waf_mode === "override",
+  );
+  return own.length > 0 ? { ...waf, exclusions: own } : waf;
+}
+
+async function loadExclusions(): Promise<WafExclusionRule[]> {
+  const { listWafExclusionRules } = await import("../models/waf-exclusions");
+  return listWafExclusionRules();
+}
+
 function wafInMeta(meta: string | null | undefined): WafHostConfig | null {
   if (!meta) return null;
   try {
@@ -200,7 +224,7 @@ async function hostWafs(): Promise<HostWaf[]> {
   const [dashboard, rows] = await Promise.all([
     getDashboardSettings(),
     db
-      .select({ name: proxyHosts.name, meta: proxyHosts.meta })
+      .select({ id: proxyHosts.id, name: proxyHosts.name, meta: proxyHosts.meta })
       .from(proxyHosts)
       .where(eq(proxyHosts.enabled, true)),
   ]);
@@ -209,7 +233,7 @@ async function hostWafs(): Promise<HostWaf[]> {
     out.push({ target: { kind: "dashboard" }, waf: wafInMeta(dashboard.options?.meta) });
   }
   for (const row of rows)
-    out.push({ target: { kind: "host", name: row.name }, waf: wafInMeta(row.meta) });
+    out.push({ target: { kind: "host", name: row.name, id: row.id }, waf: wafInMeta(row.meta) });
   return out;
 }
 
@@ -219,12 +243,16 @@ async function currentGlobal(): Promise<WafSettings | null> {
 }
 
 /** A global save changes the global WAF and every host that merges it. */
-export async function wafCandidatesForGlobal(next: WafSettings): Promise<WafDryRunCandidate[]> {
+export async function wafCandidatesForGlobal(
+  next: WafSettings,
+  exclusions?: readonly WafExclusionRule[],
+): Promise<WafDryRunCandidate[]> {
+  const rules = exclusions ?? (await loadExclusions());
   return [
-    { target: { kind: "global" }, waf: next },
+    { target: { kind: "global" }, waf: withExclusions(next, rules, { kind: "global" }) },
     ...(await hostWafs()).map(({ target, waf }) => ({
       target,
-      waf: resolveEffectiveWaf(next, waf),
+      waf: withExclusions(resolveEffectiveWaf(next, waf), rules, target, waf),
     })),
   ];
 }
@@ -233,7 +261,25 @@ export async function wafCandidatesForHost(
   target: WafDryRunTarget,
   waf: WafHostConfig | null | undefined,
 ): Promise<WafDryRunCandidate[]> {
-  return [{ target, waf: resolveEffectiveWaf(await currentGlobal(), waf) }];
+  const effective = resolveEffectiveWaf(await currentGlobal(), waf);
+  return [{ target, waf: withExclusions(effective, await loadExclusions(), target, waf) }];
+}
+
+/** For an exclusion edit: every current WAF, with `next` in place of the stored exclusions. */
+export async function wafCandidatesForExclusions(
+  next: readonly WafExclusionRule[],
+): Promise<WafDryRunCandidate[]> {
+  const global = await currentGlobal();
+  return global ? wafCandidatesForGlobal(global, next) : hostOnlyCandidates(next);
+}
+
+async function hostOnlyCandidates(
+  next: readonly WafExclusionRule[],
+): Promise<WafDryRunCandidate[]> {
+  return (await hostWafs()).map(({ target, waf }) => ({
+    target,
+    waf: withExclusions(resolveEffectiveWaf(null, waf), next, target, waf),
+  }));
 }
 
 /** For a preset or plugin edit: every current WAF that `selects` matches. */
@@ -241,11 +287,12 @@ export async function wafCandidatesSelecting(
   selects: (waf: WafSettings) => boolean,
 ): Promise<WafDryRunCandidate[]> {
   const global = await currentGlobal();
+  const rules = await loadExclusions();
   const all: WafDryRunCandidate[] = [
-    { target: { kind: "global" }, waf: global },
+    { target: { kind: "global" }, waf: withExclusions(global, rules, { kind: "global" }) },
     ...(await hostWafs()).map(({ target, waf }) => ({
       target,
-      waf: resolveEffectiveWaf(global, waf),
+      waf: withExclusions(resolveEffectiveWaf(global, waf), rules, target, waf),
     })),
   ];
   return all.filter(({ waf }) => waf !== null && selects(waf));

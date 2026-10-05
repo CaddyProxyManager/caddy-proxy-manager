@@ -125,6 +125,10 @@ import { buildRoleMaps } from "../models/mtls-roles";
 import { getAccessRulesForHosts } from "../models/mtls-access-rules";
 import { getWafPresetDirectives } from "../models/waf-presets";
 import { getCrsPluginRules } from "../models/crs-plugins";
+import { listWafExclusionRules } from "../models/waf-exclusions";
+import { listActiveBlockedSources } from "../models/blocked-sources";
+import { type WafExclusionRule, exclusionsFor } from "../waf/exclusions";
+import { type ActiveBlockedSource, buildBlockedSourceHandlers } from "./blocked-sources";
 import { loadWithCrsPluginRecovery } from "../waf/crs-plugins/recovery";
 import {
   buildWafHandler,
@@ -954,6 +958,12 @@ type CaddyBuildContext = {
   wafPresets?: ReadonlyMap<number, string>;
   /** crs_plugins id -> rule files. */
   crsPlugins?: ReadonlyMap<number, CrsPluginRules>;
+  /** Every WAF exclusion; each host's handler takes the global ones and its own. */
+  wafExclusions?: readonly WafExclusionRule[];
+  /** The global deny list, unexpired entries only. */
+  blockedSources?: readonly ActiveBlockedSource[];
+  /** Where the blocker finds the client behind a proxy, for the deny list's geo entries. */
+  blockedSourcesTrustedProxies?: readonly string[];
   /**
    * Which plugin-backed features the running binary can serve. Caddy validates a posted config as a
    * whole, so one handler naming an uncompiled module takes every host offline.
@@ -1596,9 +1606,17 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const hostRoutes: CaddyHttpRoute[] = [];
 
     // The shared chain, pushed in order, cheapest refusals first so a request turned away never
-    // costs a Coraza transaction: ws-refuse, maintenance, encode, crowdsec, rate_limit, geoblock,
-    // appsec, WAF, headers (HSTS, X-Robots-Tag), robots.txt, Anubis, path rules, redirects, access
-    // list.
+    // costs a Coraza transaction: blocked sources, ws-refuse, maintenance, encode, crowdsec,
+    // rate_limit, geoblock, appsec, WAF, headers (HSTS, X-Robots-Tag), robots.txt, Anubis, path
+    // rules, redirects, access list.
+    if (context.blockedSources?.length) {
+      handlers.push(
+        ...buildBlockedSourceHandlers(context.blockedSources, {
+          geoUsable: geoblockUsable,
+          trustedProxies: context.blockedSourcesTrustedProxies,
+        }).handlers,
+      );
+    }
     if (!row.allowWebsocket) {
       handlers.push({
         handler: "subroute",
@@ -1651,7 +1669,16 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     // A round trip to AppSec per request, so after everything that refuses from memory.
     if (crowdsecOn && context.crowdsec?.appsec) handlers.push(buildAppSecHandler());
 
-    const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
+    const resolvedWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
+    const hostExclusions = exclusionsFor(
+      context.wafExclusions ?? [],
+      row.id,
+      meta.waf?.waf_mode === "override",
+    );
+    const effectiveWaf =
+      resolvedWaf && hostExclusions.length > 0
+        ? { ...resolvedWaf, exclusions: hostExclusions }
+        : resolvedWaf;
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       // WebSocket upgrades included: routing them around the WAF let any request claiming to be
       // one skip inspection (#195). coraza-caddy >= 2.6 passes the 101 hijack through.
@@ -3403,6 +3430,8 @@ export async function buildCaddyDocument(
     compressionSettings,
     httpCacheSettings,
     crowdsecSettings,
+    wafExclusions,
+    blockedSources,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3428,7 +3457,19 @@ export async function buildCaddyDocument(
       isFeatureUsable(availability, "cache") ? getHttpCacheSettings() : null,
     ),
     getCrowdSecSettings(),
+    listWafExclusionRules(),
+    listActiveBlockedSources(),
   ]);
+
+  if (
+    blockedSources.some((source) => source.kind !== "ip" && source.kind !== "cidr") &&
+    !isFeatureUsable(moduleAvailability, "geoblock")
+  ) {
+    console.warn(
+      "Blocked sources by country, continent or network are skipped: they need the Geo Blocking " +
+        "module. Enable it in Settings → Caddy Build and rebuild Caddy.",
+    );
+  }
 
   // The app carries the bouncer key, so it goes only to a binary that can load it.
   const crowdsec = crowdSecConnection(
@@ -3558,6 +3599,13 @@ export async function buildCaddyDocument(
     globalErrorPages: globalErrorPages?.rules ?? [],
     wafPresets,
     crsPlugins: crsPluginRules,
+    wafExclusions,
+    blockedSources,
+    blockedSourcesTrustedProxies: expandPrivateRanges(
+      effectiveGlobalGeoBlock?.trusted_proxies?.length
+        ? effectiveGlobalGeoBlock.trusted_proxies
+        : (trustedProxiesSettings?.ranges ?? []).map((r) => r.trim()).filter(Boolean),
+    ),
     moduleAvailability,
     tailscale: tailscaleRuntime,
     crowdsec: crowdsec && crowdsecUsable ? { appsec: Boolean(crowdsec.appsecUrl) } : null,

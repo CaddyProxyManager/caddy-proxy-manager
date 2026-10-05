@@ -11,6 +11,18 @@ import {
 } from "@/src/lib/errors/action-error";
 import { createWafPreset, deleteWafPreset, updateWafPreset } from "@/src/lib/models/waf-presets";
 import {
+  type WafExclusionInput,
+  createWafExclusion,
+  deleteWafExclusion,
+  updateWafExclusion,
+} from "@/src/lib/models/waf-exclusions";
+import {
+  type WafEventDetail,
+  type WafEventVerdict,
+  getWafEventDetail,
+  reviewWafEvent,
+} from "@/src/lib/security/waf-event";
+import {
   type CrsRegistryListing as CrsRegistryRow,
   checkCrsPluginUpdates,
   installCrsPlugin,
@@ -43,7 +55,11 @@ type FallbackKey =
   | "pluginUninstallFailed"
   | "pluginRegistrySaveFailed"
   | "pluginRegistryCheckFailed"
-  | "pluginRetryError";
+  | "pluginRetryError"
+  | "exclusionSaveFailed"
+  | "exclusionDeleteFailed"
+  | "eventDetailFailed"
+  | "reviewFailed";
 
 async function failure(error: unknown, fallbackKey: FallbackKey) {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
@@ -257,5 +273,67 @@ export async function retryCrsPluginAction(id: number, name: string): Promise<Ac
       : { status: "error", message: t("pluginRetryFailed", { name }) };
   } catch (error) {
     return failure(error, "pluginRetryError");
+  }
+}
+
+// ── Exclusions and event review ──────────────────────────────────────
+
+export async function saveWafExclusionAction(
+  id: number | null,
+  input: WafExclusionInput,
+): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    const userId = Number(session.user.id);
+    if (id === null) await createWafExclusion(input, userId);
+    else await updateWafExclusion(id, input, userId);
+    revalidatePath("/waf");
+    revalidatePath("/security");
+    const t = await getTranslations("waf");
+    return actionSuccess(id === null ? t("exclusionCreated") : t("exclusionUpdated"));
+  } catch (error) {
+    return failure(error, "exclusionSaveFailed");
+  }
+}
+
+export async function deleteWafExclusionAction(id: number): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    await deleteWafExclusion(id, Number(session.user.id));
+    revalidatePath("/waf");
+    revalidatePath("/security");
+    const t = await getTranslations("waf");
+    return actionSuccess(t("exclusionDeleted"));
+  } catch (error) {
+    return failure(error, "exclusionDeleteFailed");
+  }
+}
+
+export type WafEventDetailResult =
+  | { status: "success"; detail: WafEventDetail }
+  | { status: "error"; message: string };
+
+export async function getWafEventDetailAction(key: string): Promise<WafEventDetailResult> {
+  try {
+    await requireAdmin();
+    return { status: "success", detail: await getWafEventDetail(key) };
+  } catch (error) {
+    const result = await failure(error, "eventDetailFailed");
+    return { status: "error", message: result.message };
+  }
+}
+
+export async function reviewWafEventAction(
+  key: string,
+  verdict: WafEventVerdict | null,
+): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    await reviewWafEvent(key, verdict, Number(session.user.id));
+    revalidatePath("/security");
+    const t = await getTranslations("waf");
+    return actionSuccess(verdict === null ? t("reviewCleared") : t("reviewSaved"));
+  } catch (error) {
+    return failure(error, "reviewFailed");
   }
 }

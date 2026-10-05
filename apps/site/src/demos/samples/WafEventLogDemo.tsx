@@ -42,7 +42,7 @@ const SEVERITY_VARIANTS = {
   NOTICE: "info",
 } as const;
 
-/** Includes one false positive (HTML posted in a form) for the prose's suppression flow. */
+/** Includes one false positive (HTML posted in a form) for the prose's exclusion flow. */
 const EVENTS: Event[] = [
   {
     id: 1,
@@ -235,6 +235,7 @@ function WafStatusCard({ stats }: { stats: Stats }) {
 
 /** Beside the list, not over it, so reading the next event does not mean closing this one. */
 function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
+  const t = useTranslations("waf");
   return (
     <Card padding={4}>
       <VStack gap={3}>
@@ -273,8 +274,10 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
         <Divider />
 
         <HStack gap={2} wrap="wrap">
-          <Button variant="secondary" size="sm" label={`Suppress ${event.ruleId} everywhere`} />
-          <Button variant="secondary" size="sm" label={`Suppress on ${event.host}`} />
+          <Button variant="secondary" size="sm" label={t("workingAsIntended")} />
+          <Button variant="secondary" size="sm" label={t("falsePositive")} />
+          <Button variant="secondary" size="sm" label={t("blockSource")} />
+          <Button variant="ghost" size="sm" label={t("copyAsCurl")} />
         </HStack>
       </VStack>
     </Card>

@@ -13,6 +13,7 @@ import {
   normalizeHttpCacheSettings,
 } from "../proxy-hosts/http-cache";
 import { seclangErrors } from "../waf/seclang";
+import { MAX_ANOMALY_THRESHOLD, MIN_ANOMALY_THRESHOLD } from "../waf/tuning";
 import { normalizeDefaultResponseSettings } from "../caddy/default-response";
 import { normalizeTailscaleSettings } from "../caddy/tailscale";
 import { normalizeCrowdSecSettings } from "../caddy/crowdsec";
@@ -581,6 +582,10 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
       "request_body_limit",
       "request_body_in_memory_limit",
       "request_body_limit_action",
+      "paranoia_level",
+      "log_next_paranoia_level",
+      "inbound_anomaly_threshold",
+      "outbound_anomaly_threshold",
     ],
     "WAF settings",
   );
@@ -623,6 +628,17 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
   if (value.preset_ids !== undefined) validateNumberList(value.preset_ids, "waf.preset_ids");
   if (value.plugin_ids !== undefined) validateNumberList(value.plugin_ids, "waf.plugin_ids");
   validateBodyLimits(value, "waf");
+  if (value.paranoia_level !== undefined) {
+    integerValue(value.paranoia_level, "waf.paranoia_level", 1, 4);
+  }
+  if (value.log_next_paranoia_level !== undefined) {
+    booleanValue(value.log_next_paranoia_level, "waf.log_next_paranoia_level");
+  }
+  for (const key of ["inbound_anomaly_threshold", "outbound_anomaly_threshold"] as const) {
+    if (value[key] !== undefined) {
+      integerValue(value[key], `waf.${key}`, MIN_ANOMALY_THRESHOLD, MAX_ANOMALY_THRESHOLD);
+    }
+  }
 }
 
 /** Global and per-host WAF. Past Coraza's 1 GiB ceiling Caddy rejects the whole config. */

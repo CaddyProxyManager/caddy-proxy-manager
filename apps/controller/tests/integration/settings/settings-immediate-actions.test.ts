@@ -34,7 +34,7 @@ import { decryptSecret, isEncryptedSecret } from '@/src/lib/secrets';
 import * as registry from '@/src/lib/settings/registry';
 import { invalidateSettingsCache } from '@/src/lib/settings/resolve';
 import { invalidateClickHouseConfig } from '@/src/lib/clickhouse/client';
-import { type FakeCaddy, installFakeCaddy } from '../../helpers/caddy-admin';
+import { installFakeCaddy } from '../../helpers/caddy-admin';
 import { type FakeAgent, startFakeAgent } from '../../helpers/fake-agent';
 import { testTranslator } from '../../helpers/next-intl';
 import {
@@ -50,7 +50,6 @@ const tSettings = testTranslator('settings');
 const REFUSED = { success: false, message: domainErrorMessage('adminRequired') };
 
 let admin: SessionUser;
-let caddy: FakeCaddy;
 const realFetch = globalThis.fetch;
 /** Anything reaching the network here is a bug in the test. */
 const offline = vi.fn(async () => {
@@ -65,7 +64,7 @@ beforeEach(async () => {
   await invalidateClickHouseConfig();
   admin = await seedUser(ctx.db, 'admin@example.com', 'admin');
   ctx.session = { user: admin };
-  caddy = installFakeCaddy();
+  installFakeCaddy();
   offline.mockClear();
   globalThis.fetch = offline as unknown as typeof fetch;
 });
@@ -395,56 +394,6 @@ describe('GeoIP', () => {
   });
 });
 
-describe('WAF rule shortcuts', () => {
-  const RULE = 942100;
-
-  it('adds a rule to the global exclusions once, and reloads Caddy', async () => {
-    expect(await actions.suppressWafRuleGloballyAction(RULE)).toEqual({
-      success: true,
-      message: t('wafRuleSuppressed', { ruleId: String(RULE) }),
-    });
-    await actions.suppressWafRuleGloballyAction(RULE);
-
-    expect(await stored('waf')).toMatchObject({ enabled: false, excluded_rule_ids: [RULE] });
-    expect(caddy.loads.length).toBeGreaterThan(0);
-  });
-
-  it('keeps the exclusion but warns when Caddy does not reload', async () => {
-    caddy.failWith(500, 'nope');
-
-    expect(await actions.suppressWafRuleGloballyAction(RULE)).toEqual({
-      success: true,
-      message: t('wafRuleExcludedReloadFailed', { ruleId: String(RULE) }),
-    });
-    expect((await stored('waf')).excluded_rule_ids).toEqual([RULE]);
-  });
-
-  it('takes a rule back out of the exclusions', async () => {
-    await actions.suppressWafRuleGloballyAction(RULE);
-    await actions.suppressWafRuleGloballyAction(920350);
-
-    expect(await actions.removeWafRuleGloballyAction(RULE)).toEqual({
-      success: true,
-      message: t('wafRuleUnexcluded', { ruleId: String(RULE) }),
-    });
-    expect((await stored('waf')).excluded_rule_ids).toEqual([920350]);
-  });
-
-  it('has nothing to take out before WAF settings exist', async () => {
-    expect(await actions.removeWafRuleGloballyAction(RULE)).toEqual({
-      success: false,
-      message: t('wafSettingsNotFound'),
-    });
-  });
-
-  it('refuses a rule for a host no proxy host serves', async () => {
-    expect(await actions.suppressWafRuleForHostAction(RULE, 'nowhere.example.com:443')).toEqual({
-      success: false,
-      message: t('wafNoHost', { hostname: 'nowhere.example.com:443' }),
-    });
-  });
-});
-
 describe('a non-administrator', () => {
   beforeEach(async () => {
     ctx.session = { user: await seedUser(ctx.db, 'user@example.com', 'user') };
@@ -458,9 +407,6 @@ describe('a non-administrator', () => {
       actions.updateGeoipSettingsAction(null, form({})),
       actions.updateGeoipDatabasesAction(),
       actions.checkForUpdatesAction(),
-      actions.suppressWafRuleGloballyAction(1),
-      actions.removeWafRuleGloballyAction(1),
-      actions.suppressWafRuleForHostAction(1, 'example.com'),
     ]);
 
     for (const result of refusals) expect(result).toEqual(REFUSED);

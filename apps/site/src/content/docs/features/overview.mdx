@@ -29,6 +29,7 @@ is dealt with. The worst come first, up to 50; anything past that is counted. Th
 | L4 ports | L4 ports waiting for the Caddy container to be recreated, or a port change that failed. |
 | CRS plugins | A plugin switched off because Caddy would not load the WAF with it. |
 | GeoIP | The last GeoIP database update failed. |
+| Security | The global WAF only detects, or blocked countries, continents or networks are not enforced because Caddy lacks the Geo Blocking module. |
 
 Every check has four seconds. One that takes longer, or fails, is left out and the list says so, so
 an empty list with a skipped check is "unknown", not "all clear". With analytics off there are no

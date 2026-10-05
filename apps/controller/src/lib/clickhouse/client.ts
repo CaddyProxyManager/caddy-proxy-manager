@@ -3,6 +3,7 @@ import type { TrafficOutcome } from "@cpm/shared";
 import { userAgentFamily } from "../analytics/user-agent";
 import { isDemoMode } from "../demo/mode";
 import * as sqliteStore from "./sqlite-store";
+import { wafEventKey } from "../waf/event-key";
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -1378,6 +1379,8 @@ export async function queryWafRuleMessages(
 
 export interface WafEvent {
   id: number;
+  /** Stable across pages and reloads, unlike `id`; see waf/event-key.ts. */
+  key: string;
   ts: number;
   host: string;
   clientIp: string;
@@ -1425,8 +1428,26 @@ export async function queryWafEvents(
     blocked: string;
   }>(query, params);
 
-  return rows.map((r, i) => ({
-    id: safeOffset + i + 1,
+  return rows.map((r, i) => toWafEvent(r, safeOffset + i + 1));
+}
+
+export type StoredWafEventRow = {
+  ts: string | number;
+  host: string;
+  client_ip: string;
+  country_code: string | null;
+  method: string;
+  uri: string;
+  rule_id: string | number | null;
+  rule_message: string | null;
+  severity: string | null;
+  raw_data: string | null;
+  blocked: string | number | boolean;
+};
+
+export function toWafEvent(r: StoredWafEventRow, id: number): WafEvent {
+  const event = {
+    id,
     ts: Number(r.ts),
     host: r.host,
     clientIp: r.client_ip,
@@ -1438,5 +1459,6 @@ export async function queryWafEvents(
     severity: r.severity ?? null,
     rawData: r.raw_data ?? null,
     blocked: Boolean(Number(r.blocked)),
-  }));
+  };
+  return { ...event, key: wafEventKey(event) };
 }

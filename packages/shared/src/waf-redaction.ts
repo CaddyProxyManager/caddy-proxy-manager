@@ -48,9 +48,22 @@ const CREDENTIAL_NAME_WORDS = new Set([
   "token",
 ]);
 
+/** Anywhere in a name, so `X-Upstream-Token` and `new_password` count without a word boundary. */
+const CREDENTIAL_NAME_PARTS = [
+  "token",
+  "secret",
+  "api-key",
+  "api_key",
+  "apikey",
+  "password",
+  "passwd",
+];
+
 /** Whether a header, query parameter or form field name carries a credential. */
 export function isCredentialName(name: string): boolean {
-  if (CREDENTIAL_HEADERS.has(name.toLowerCase())) return true;
+  const lower = name.toLowerCase();
+  if (CREDENTIAL_HEADERS.has(lower)) return true;
+  if (CREDENTIAL_NAME_PARTS.some((part) => lower.includes(part))) return true;
   return name
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .toLowerCase()
@@ -62,8 +75,12 @@ export function isCredentialName(name: string): boolean {
 export function redactQueryString(uri: string): string {
   const query = uri.indexOf("?");
   if (query === -1) return uri;
-  const params = uri
-    .slice(query + 1)
+  return `${uri.slice(0, query + 1)}${redactFormEncoded(uri.slice(query + 1))}`;
+}
+
+/** An `a=1&b=2` string, a query or a form body, with credential-named values replaced. */
+export function redactFormEncoded(encoded: string): string {
+  return encoded
     .split("&")
     .map((param) => {
       const separator = param.indexOf("=");
@@ -75,9 +92,12 @@ export function redactQueryString(uri: string): string {
         // Not valid percent-encoding: judge the raw name.
       }
       return separator !== -1 && isCredentialName(name) ? `${rawName}=${WAF_REDACTED}` : param;
-    });
-  return `${uri.slice(0, query + 1)}${params.join("&")}`;
+    })
+    .join("&");
 }
+
+/** A body that reads as `name=value&...`; JSON or multipart is left to the rules' own redaction. */
+const FORM_ENCODED_BODY = /^[^\s{}[\]<>"]*=[^\s]*$/;
 
 // CRS logdata such as "Matched Data: %{TX.0} found within %{MATCHED_VAR_NAME}: %{MATCHED_VAR}"
 // echoes the variable's value, so these are the names whose value it must not keep.
@@ -312,8 +332,13 @@ export function redactAuditEntry<T>(entry: T): T {
   const tx = copy.transaction;
   if (tx && typeof tx === "object") {
     const request = tx.request as Record<string, unknown> | undefined;
-    if (request && typeof request === "object" && typeof request.uri === "string") {
-      request.uri = redactQueryString(request.uri);
+    if (request && typeof request === "object") {
+      if (typeof request.uri === "string") request.uri = redactQueryString(request.uri);
+      // Query and form fields by name, as some Coraza builds log them beside the URI.
+      if ("args" in request) request.args = redactHeaderMap(request.args);
+      if (typeof request.body === "string" && FORM_ENCODED_BODY.test(request.body)) {
+        request.body = redactFormEncoded(request.body);
+      }
     }
     for (const part of ["request", "response"] as const) {
       const section = tx[part] as Record<string, unknown> | undefined;

@@ -1,80 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { Plus } from "lucide-react";
-import { IconButton } from "@astryxdesign/core/IconButton";
-import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 
 type Props = {
+  /** The rule-id list exclusions replaced; startup moves it, so it is normally empty. */
   value?: number[];
 };
 
 export function WafRuleExclusions({ value }: Props) {
   const t = useTranslations("proxyHosts");
-  const [ids, setIds] = useState<number[]>(value ?? []);
-  const [draft, setDraft] = useState<number | null>(null);
-
-  function addId() {
-    if (draft === null || !Number.isInteger(draft) || draft <= 0) return;
-    setIds((prev) => (prev.includes(draft) ? prev : [...prev, draft]));
-    setDraft(null);
-  }
+  const legacy = value ?? [];
 
   return (
     <VStack gap={2}>
-      <input type="hidden" name="wafExcludedRuleIds" value={JSON.stringify(ids)} />
-
+      {/* Posted back unchanged, so a save never drops ids startup has yet to move. */}
+      <input type="hidden" name="wafExcludedRuleIds" value={JSON.stringify(legacy)} />
       <VStack gap={1}>
         <Text type="body" size="sm" weight="semibold">
-          {t("excludedRuleIds")}
+          {t("wafExclusionsTitle")}
         </Text>
         <Text type="body" size="xsm" color="secondary">
-          {t("wafRuleExclusionsHelp")}
+          {t("wafExclusionsMoved")}
         </Text>
       </VStack>
-
-      {ids.length > 0 && (
-        <HStack gap={2} wrap="wrap">
-          {ids.map((id) => (
-            <Token
-              key={id}
-              size="sm"
-              label={String(id)}
-              onRemove={() => setIds((prev) => prev.filter((x) => x !== id))}
-            />
-          ))}
-        </HStack>
+      <Link href="/waf">{t("wafExclusionsManage")}</Link>
+      {legacy.length > 0 && (
+        <VStack gap={1}>
+          <Text type="body" size="xsm" color="secondary">
+            {t("wafLegacyExclusions")}
+          </Text>
+          <HStack gap={2} wrap="wrap">
+            {legacy.map((id) => (
+              <Token key={id} size="sm" label={String(id)} />
+            ))}
+          </HStack>
+        </VStack>
       )}
-
-      <HStack gap={2} vAlign="end">
-        <NumberInput
-          hasNumberSteppers
-          label={t("ruleId")}
-          isLabelHidden
-          placeholder={t("ruleId")}
-          value={draft}
-          onChange={setDraft}
-          isIntegerOnly
-          min={1}
-          width={160}
-          onEnter={addId}
-          // onEnter does not prevent the default, which would submit the host form mid-edit.
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
-          }}
-        />
-        <IconButton
-          variant="ghost"
-          size="sm"
-          label={t("addExcludedRuleId")}
-          icon={<Plus />}
-          onClick={addId}
-        />
-      </HStack>
     </VStack>
   );
 }

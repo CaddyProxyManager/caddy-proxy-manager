@@ -37,9 +37,10 @@ describe('visibleDestinations', () => {
 });
 
 describe('moreDestinations', () => {
-  it('holds the ten pages the tab bar cannot name, for an admin', () => {
+  it('holds the eleven pages the tab bar cannot name, for an admin', () => {
     const more = ids(moreDestinations('admin'));
-    expect(more).toHaveLength(10);
+    expect(more).toHaveLength(11);
+    expect(more).toContain('security');
     for (const tab of ['overview', 'proxy-hosts', 'l4-proxy-hosts', 'agents', 'analytics']) {
       expect(more).not.toContain(tab);
     }

@@ -487,13 +487,20 @@ describe('parseWafConfig', () => {
     });
   });
 
+  it('keeps a host that only detects', () => {
+    expect(
+      parseWafConfig(form({ wafPresent: '1', wafEnabled: 'on', wafEngineMode: 'DetectionOnly' }))
+        .waf?.mode,
+    ).toBe('DetectionOnly');
+  });
+
   it('leaves blank limits, unknown modes and empty id lists to inherit', () => {
     expect(
       parseWafConfig(
         form({
           wafPresent: '1',
           wafEnabled: 'on',
-          wafEngineMode: 'DetectionOnly',
+          wafEngineMode: 'Paranoid',
           wafPresetIds: '[]',
           wafRequestBodyLimitMb: ' ',
           wafRequestBodyLimitAction: 'Drop',

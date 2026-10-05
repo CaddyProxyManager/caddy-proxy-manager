@@ -165,6 +165,19 @@ export const RULES: readonly Rule[] = [
     specs: ["setup/"],
   },
 
+  // The security page drives exclusions and the deny list; the WAF specs exercise both.
+  {
+    match: [
+      `${LIB}security/`,
+      `${LIB}blocked-sources/`,
+      `${LIB}caddy/blocked-sources.ts`,
+      `${SRC}components/security/`,
+      `${DASH}security/`,
+      `${MODELS}waf-exclusions.ts`,
+      `${MODELS}blocked-sources.ts`,
+    ],
+    specs: [...WAF, "security/"],
+  },
   {
     match: [
       `${LIB}waf/`,
@@ -403,6 +416,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   overview: ["dashboard"],
   profile: USERS,
   proxyHosts: PROXY_HOSTS,
+  security: ["security/"],
   settings: SETTINGS_PAGE,
   setup: ["setup/"],
   users: USERS,

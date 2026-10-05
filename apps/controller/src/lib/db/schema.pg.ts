@@ -550,6 +550,64 @@ export const crsPlugins = pgTable(
   }),
 );
 
+/** A WAF rule switched off globally or on one host, optionally under a path or for one variable. */
+export const wafExclusions = pgTable(
+  "waf_exclusions",
+  {
+    id: serial("id").primaryKey(),
+    ruleId: integer("ruleId").notNull(),
+    /** Null is every host. */
+    proxyHostId: integer("proxyHostId").references(() => proxyHosts.id, { onDelete: "cascade" }),
+    /** Decoded and normalised; a trailing `*` is a prefix. */
+    path: text("path"),
+    /** A rule target such as `ARGS:content`, which the rule then skips. */
+    target: text("target"),
+    reason: text("reason").notNull().default(""),
+    createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    hostIdx: index("waf_exclusions_host_idx").on(table.proxyHostId),
+  }),
+);
+
+/** A WAF event someone looked at. Events live in ClickHouse, so this keys them by content. */
+export const wafEventReviews = pgTable(
+  "waf_event_reviews",
+  {
+    id: serial("id").primaryKey(),
+    eventKey: text("eventKey").notNull(),
+    /** `intended` or `false_positive`. */
+    verdict: text("verdict").notNull(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    eventKeyUnique: uniqueIndex("waf_event_reviews_event_key_unique").on(table.eventKey),
+  }),
+);
+
+/** The global deny list, checked before every other handler on HTTP hosts. */
+export const blockedSources = pgTable(
+  "blocked_sources",
+  {
+    id: serial("id").primaryKey(),
+    /** `ip`, `cidr`, `country`, `continent` or `asn`. */
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    reason: text("reason").notNull().default(""),
+    /** Null never expires. */
+    expiresAt: text("expiresAt"),
+    createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    kindValueUnique: uniqueIndex("blocked_sources_kind_value_unique").on(table.kind, table.value),
+    expiresAtIdx: index("blocked_sources_expires_at_idx").on(table.expiresAt),
+  }),
+);
+
 export const mtlsCertificateRoles = pgTable(
   "mtls_certificate_roles",
   {

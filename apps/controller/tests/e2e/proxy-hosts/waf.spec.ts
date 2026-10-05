@@ -96,7 +96,8 @@ test.describe('WAF', () => {
   test('WAF page has tabs', async ({ page }) => {
     await page.goto('/waf');
     await expect(page.getByRole('button', { name: /events/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /suppressed rules/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /exclusions/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /hosts/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /settings/i })).toBeVisible();
   });
 
@@ -106,13 +107,11 @@ test.describe('WAF', () => {
     await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
-    const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
+    const blocking = page.getByRole('radio', { name: 'Blocking', exact: true });
     const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
-    if (!(await wafSwitch.isChecked())) {
-      await wafSwitch.click();
-      await expect(wafSwitch).toBeChecked();
-    }
+    await blocking.click();
+    await expect(blocking).toBeChecked();
 
     if (!(await owaspCheckbox.isChecked())) {
       await owaspCheckbox.click();
@@ -129,7 +128,38 @@ test.describe('WAF', () => {
     await waitForHydration(page);
     await page.getByRole('button', { name: /settings/i }).click();
 
-    await expect(wafSwitch).toBeChecked();
+    await expect(blocking).toBeChecked();
     await expect(owaspCheckbox).toBeChecked();
+  });
+
+  test('WAF settings offer detection only and CRS tuning', async ({ page }) => {
+    await page.goto('/waf');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /settings/i }).click();
+
+    await page.getByRole('radio', { name: 'Detection only', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'Detection only', exact: true })).toBeChecked();
+    await expect(page.getByText('Paranoia level')).toBeVisible();
+    await expect(page.getByLabel('Inbound anomaly threshold')).toBeVisible();
+  });
+
+  test('WAF exclusions tab adds and removes a scoped exclusion', async ({ page }) => {
+    await page.goto('/waf');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /exclusions/i }).click();
+    await page.getByRole('button', { name: 'Add exclusion' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Rule ID').fill('920350');
+    await dialog.getByLabel('Path').fill('/e2e-upload');
+    await dialog.getByLabel('Reason').fill('e2e');
+    await dialog.getByRole('button', { name: 'Save exclusion' }).click();
+
+    const row = page.getByRole('row').filter({ hasText: '/e2e-upload' });
+    await expect(row).toBeVisible();
+    await row.getByRole('button', { name: /actions for the exclusion/i }).click();
+    await page.getByRole('menuitem', { name: 'Remove exclusion' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Remove exclusion' }).click();
+    await expect(row).toHaveCount(0);
   });
 });

@@ -1,6 +1,6 @@
 ---
 title: WAF
-description: Coraza and the OWASP Core Rule Set - block or detect, per host, with suppression, rule presets, CRS plugins and custom directives.
+description: Coraza and the OWASP Core Rule Set - block or detect, per host, tuned, with scoped exclusions, rule presets, CRS plugins and custom directives.
 ---
 
 import WafEventLogDemo from "../../../demos/samples/WafEventLogDemo";
@@ -22,10 +22,36 @@ import WafDemo from "../../../demos/samples/WafDemo";
 
 ## Block, or only detect
 
-On, matching requests are rejected with 403. The global settings also take a detection-only mode
-through the [API](../api/) - `waf.mode` set to `DetectionOnly` - in which matching requests are
-logged and allowed through. Detect first is the usual order: it tells you what the rules would
-have done to your traffic before they start doing it.
+**WAF → Settings → Mode** is one of three:
+
+- **Off** - no WAF, unless a host turns one on for itself.
+- **Detection only** - rules run and log what they match, but every request goes through.
+- **Blocking** - a request that reaches the anomaly threshold, or matches a rule that denies on
+  its own, gets 403.
+
+Detect first is the usual order: it tells you what the rules would have done to your traffic
+before they start doing it. A host's WAF card sets its own mode or leaves it on **Global
+default**, and the **Hosts** tab lists every proxy host with its mode, where that mode comes from
+(the global setting, the host's own, turned off on the host, or a host overriding the global WAF)
+and its WAF events in the last 7 days.
+
+While the global WAF only detects, [Needs attention](../overview/) says so, since a WAF in
+detection only looks protected while it blocks nothing.
+
+## Tuning
+
+With the Core Rule Set loaded, the settings also take:
+
+- **Paranoia level**, 1 to 4. Each level adds stricter rules, which catch more and misfire more.
+  Level 1 suits most sites.
+- **Also log the next level without blocking** - runs the next level's rules in detection only,
+  so the event log shows what raising the level would block before you raise it.
+- **Inbound and outbound anomaly thresholds**, 1 to 10000, 5 and 4 by default. Each matched rule
+  adds points by its severity (5 for critical, 4 for error, 3 for warning, 2 for notice); the
+  request or response is blocked once the total reaches the threshold.
+
+These apply to every host's WAF, including hosts that override the global settings, and are left
+out of the config entirely while they are at their defaults.
 
 ## The rule set
 
@@ -35,15 +61,36 @@ and more. It is enabled by default when the WAF is on.
 A WebSocket upgrade is inspected like any other request, so claiming to be one does not get a
 request past the rules. Once the connection is upgraded, the messages on it are not inspected.
 
-## When a rule is wrong
+## Exclusions
 
-Real applications trip generic rules. Two ways out, both from the event detail panel beside the
-list:
+Real applications trip generic rules. An exclusion switches one rule off, as narrowly as you
+like:
 
-- **Suppress Globally** - the rule stops firing everywhere. The Suppressed Rules tab lists these,
-  and takes a rule id typed in by hand.
-- **Suppress for the host** - it keeps protecting everything else. A host's suppressions are also
-  edited in its WAF card.
+- **Applies to** every host, or one. A host that overrides the global WAF takes only its own.
+- **Path**, optional - only requests to this path. End it with `*` for everything below it. The
+  path is decoded and its `.`, `..` and repeated slashes resolved before it is stored, and the
+  request path is normalised the same way before it is compared, so `/api/../admin` is never
+  taken for `/api/`.
+- **Variable**, optional - such as `ARGS:content` or `REQUEST_COOKIES:session`. The rule keeps
+  checking everything else in the request and only skips this one.
+- **Reason** - why it misfires there. The author and time are recorded with it.
+
+**WAF → Exclusions** lists them, with an **Add exclusion** button. The quicker way is from an
+event: **False positive** fills the form with the narrowest exclusion that would have let it
+through - that rule, on that host, for that path and the variable it matched in.
+
+Rules 949110, 949111, 959100 and 959101 cannot be excluded: they are where the CRS compares the
+anomaly score with the threshold, and excluding one would switch its blocking off altogether.
+
+An exclusion is checked like any other WAF change (see
+[Before anything is saved](#before-anything-is-saved)) and saved only if Coraza compiles it. If
+Caddy still refuses the configuration it produces, the change is undone and the previous
+configuration loaded again, and the save reports it.
+
+The lists of suppressed rule ids from older versions - global and per host - are moved into
+exclusions when the controller starts, with the same effect, and shown as moved from an older
+version. `excluded_rule_ids` is still accepted by the REST API and applied, and moved on the next
+start; use the [GraphQL](../api/) exclusion mutations instead.
 
 ## Presets
 
@@ -155,7 +202,7 @@ Anything that would switch the engine off or rewrite rules - `SecRuleEngine`, `c
 with the offending lines named, and so are `setenv` and the operators that read the container's
 files or run a program (`@inspectFile`, `@pmFromFile`, `@ipMatchFromFile`, `@validateSchema`). The
 exception is a data file of the embedded CRS, such as `@pmFromFile @owasp_crs/unix-shell.data`,
-while the CRS is loaded. To stop a rule from firing, suppress it instead.
+while the CRS is loaded. To stop a rule from firing, add an [exclusion](#exclusions) instead.
 
 A stored line that a newer release refuses does not block saving anything else, but it is left
 out of the config, and the WAF page lists it until you rewrite or remove it.
@@ -186,8 +233,35 @@ ahead on the first check alone.
 Every blocked and detected request is recorded with its rule, severity and classification. Type to
 search the host, client IP, URI and rule message, or filter exactly on **Host**, **Client IP**,
 **Rule ID**, **Action** or **Severity** - the filters combine with each other and with the time
-range. That log is how suppression decisions get made - the drawer for an event links straight to
-suppressing the rule that produced it.
+range. The [security events](../security/) page shows the same events beside everything else that
+stopped a request.
+
+### Why was this blocked
+
+Opening an event explains it: every rule it matched, the points each added, the variable it
+matched in and the data it matched, and the total score against the threshold with the rule that
+made the decision. Then:
+
+- **Working as intended** marks the event reviewed.
+- **False positive** opens the narrowest [exclusion](#exclusions) for it, and marks the event a
+  false positive once saved.
+- **Block source** adds the client's address to the [blocked sources](../security/#blocked-sources).
+- **Copy as curl** copies the request as a curl command, to reproduce it.
+- **Raw JSON** shows the audit record as stored.
+
+### Credentials are not kept
+
+Before an event is stored, the agent replaces these with `[redacted]`, and the controller does so
+again on ingest and once more when an event is shown, so an event recorded by an older version is
+covered too:
+
+- the `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` headers, and any header
+  whose name contains `token`, `secret`, `api-key` or `apikey`;
+- query parameters and form fields named like `password`, `passwd`, `token`, `secret`, `api_key`
+  or `apikey`;
+- the matched value a rule reports, when it is one of those.
+
+The curl command keeps the placeholders, so a credential you need to replay has to be filled in.
 
 :::note
 The WAF is a compiled-in Caddy module. If the settings are greyed out, turn Coraza on in

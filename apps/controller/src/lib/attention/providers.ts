@@ -572,6 +572,52 @@ const geoip: AttentionProvider = {
   },
 };
 
+// ── Security ────────────────────────────────────────────────────────────────
+
+const security: AttentionProvider = {
+  id: "security",
+  adminOnly: true,
+  async run() {
+    const [{ getWafSettings }, { listActiveBlockedSources }, imageBuild] = await Promise.all([
+      import("../settings"),
+      import("../models/blocked-sources"),
+      import("../caddy/image-build"),
+    ]);
+    const [waf, blocked] = await Promise.all([getWafSettings(), listActiveBlockedSources()]);
+    const items: AttentionItem[] = [];
+    // Easy to leave on after tuning, and it reads as protected while blocking nothing.
+    if (waf?.enabled && waf.mode === "DetectionOnly") {
+      items.push({
+        id: "waf:detection-only",
+        provider: "security",
+        code: "wafDetectionOnly",
+        severity: "info",
+        values: {},
+        href: "/waf",
+        at: null,
+        scope: {},
+      });
+    }
+    const geo = blocked.filter((source) => source.kind !== "ip" && source.kind !== "cidr");
+    if (geo.length > 0) {
+      const availability = await imageBuild.getCaddyModuleAvailability();
+      if (!imageBuild.isFeatureUsable(availability, "geoblock")) {
+        items.push({
+          id: "blocked-sources:unenforced",
+          provider: "security",
+          code: "blockedSourcesUnenforced",
+          severity: "warning",
+          values: { count: geo.length },
+          href: "/security/blocked-sources",
+          at: null,
+          scope: {},
+        });
+      }
+    }
+    return { items };
+  },
+};
+
 export const ATTENTION_PROVIDER_LIST: readonly AttentionProvider[] = [
   certificates,
   caddyApply,
@@ -582,4 +628,5 @@ export const ATTENTION_PROVIDER_LIST: readonly AttentionProvider[] = [
   l4Ports,
   crsPlugins,
   geoip,
+  security,
 ];

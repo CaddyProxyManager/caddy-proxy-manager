@@ -14,6 +14,7 @@ export type DestinationId =
   | "users"
   | "certificates"
   | "waf"
+  | "security"
   | "audit-log"
   | "logs"
   | "api-docs"
@@ -43,6 +44,7 @@ export type NavLabelKey =
   | "users"
   | "certificates"
   | "waf"
+  | "security"
   | "auditLog"
   | "logs"
   | "apiDocs"
@@ -128,6 +130,15 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "waf",
     href: "/waf",
     labelKey: "waf",
+    railGroup: "security",
+    adminOnly: true,
+    operator: false,
+    moreGroup: "security",
+  },
+  {
+    id: "security",
+    href: "/security",
+    labelKey: "security",
     railGroup: "security",
     adminOnly: true,
     operator: false,

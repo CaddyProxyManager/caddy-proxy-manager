@@ -12,6 +12,7 @@ import {
   type TopWafRuleWithHosts,
   type WafEventFilter,
 } from "../clickhouse/client";
+import { redactWafEventRow } from "@cpm/shared";
 import { isConnectionError } from "../errors/net-errors";
 
 export type { WafEvent, WafEventStats, TopWafRule, TopWafRuleWithHosts, WafEventFilter };
@@ -104,7 +105,34 @@ export async function listWafEvents(
   from?: number,
   to?: number,
 ): Promise<WafEvent[]> {
-  return withWafAnalyticsFallback("listWafEvents", [], () =>
+  const events = await withWafAnalyticsFallback("listWafEvents", [], () =>
     queryWafEvents(limit, offset, filter, from, to),
   );
+  return events.map(redactStoredWafEvent);
+}
+
+/**
+ * Redacted again as it is read: a row stored before a credential rule existed keeps what that
+ * rule now covers. The key is the stored row's, so the event can still be looked up.
+ */
+export function redactStoredWafEvent(event: WafEvent): WafEvent {
+  const redacted = redactWafEventRow({
+    ts: event.ts,
+    host: event.host,
+    client_ip: event.clientIp,
+    country_code: event.countryCode,
+    rule_id: event.ruleId,
+    rule_message: event.ruleMessage,
+    severity: event.severity,
+    raw_data: event.rawData,
+    blocked: event.blocked,
+    method: event.method,
+    uri: event.uri,
+  });
+  return {
+    ...event,
+    uri: redacted.uri,
+    ruleMessage: redacted.rule_message,
+    rawData: redacted.raw_data,
+  };
 }

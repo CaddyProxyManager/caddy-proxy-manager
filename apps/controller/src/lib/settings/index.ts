@@ -1,3 +1,5 @@
+import type { WafExclusionRule } from "../waf/exclusions";
+import type { WafTuning } from "../waf/tuning";
 import type { DashboardHostSettings } from "../dashboard-host";
 import db, { nowIso } from "../db";
 import { settings } from "../db/schema";
@@ -503,14 +505,16 @@ export async function saveGeoBlockSettings(settings: GeoBlockSettings): Promise<
   await setSetting("geoblock", settings);
 }
 
-export type WafSettings = {
+export type WafSettings = WafTuning & {
   enabled: boolean;
-  // Coraza's SecRuleEngine values. DetectionOnly is settable through the REST API (the UI only
-  // offers Off/On); buildWafHandler rejects anything else.
+  // Coraza's SecRuleEngine values; buildWafHandler rejects anything else.
   mode: "Off" | "On" | "DetectionOnly";
   load_owasp_crs: boolean;
   custom_directives: string;
+  // Superseded by the waf_exclusions table, which startup moves these into; still honoured.
   excluded_rule_ids?: number[];
+  // Never stored: the exclusions a built handler applies, attached by the config build.
+  exclusions?: WafExclusionRule[];
   // waf_presets ids, emitted in this order ahead of the CRS rules.
   preset_ids?: number[];
   // crs_plugins ids; emitted only alongside the CRS.
@@ -529,8 +533,18 @@ export async function getWafSettings(): Promise<WafSettings | null> {
 export async function saveWafSettings(s: WafSettings): Promise<void> {
   // Lazy: waf-dry-run reaches the models, which import this module.
   const { assertWafLoads, wafCandidatesForGlobal } = await import("../waf/dry-run");
-  await assertWafLoads(await wafCandidatesForGlobal(s));
-  await setSetting("waf", s);
+  await assertWafLoads(await wafCandidatesForGlobal(withoutRuntimeWafFields(s)));
+  await setSetting("waf", withoutRuntimeWafFields(s));
+}
+
+/** For a rewrite that leaves the emitted config unchanged, so has nothing for Coraza to check. */
+export async function saveWafSettingsUnchecked(s: WafSettings): Promise<void> {
+  await setSetting("waf", withoutRuntimeWafFields(s));
+}
+
+function withoutRuntimeWafFields(s: WafSettings): WafSettings {
+  const { exclusions: _exclusions, ...stored } = s;
+  return stored;
 }
 
 // Fallbacks for every proxy host; per-host error pages win.

@@ -22,6 +22,14 @@ import {
   parseWafIdListJson,
   parseBodyLimitMib,
 } from "@/src/lib/waf/caddy";
+import {
+  DEFAULT_INBOUND_THRESHOLD,
+  DEFAULT_OUTBOUND_THRESHOLD,
+  DEFAULT_PARANOIA_LEVEL,
+  MAX_ANOMALY_THRESHOLD,
+  MIN_ANOMALY_THRESHOLD,
+  type WafTuning,
+} from "@/src/lib/waf/tuning";
 import { parseDefaultResponseHeaders } from "@/src/lib/caddy/default-response";
 import {
   getSetting,
@@ -60,11 +68,7 @@ import {
   saveCrowdSecSettings,
 } from "@/src/lib/settings";
 import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/caddy/crowdsec";
-import {
-  listProxyHosts,
-  updateProxyHost,
-  sanitizeErrorPageRules,
-} from "@/src/lib/models/proxy-hosts";
+import { sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
 import { assertCrsPluginIdsExist } from "@/src/lib/models/crs-plugins";
@@ -1970,66 +1974,6 @@ export async function lookupWafRuleMessageAction(
   return { message: map[ruleId] ?? null };
 }
 
-async function removeWafRuleGloballyActionUnlocked(ruleId: number): Promise<ActionResult> {
-  const t = await getTranslations("settings");
-  try {
-    await requireAdmin();
-    const current = await getWafSettings();
-    if (!current) return { success: false, message: t("results.wafSettingsNotFound") };
-    const ids = (current.excluded_rule_ids ?? []).filter((id) => id !== ruleId);
-    await saveWafSettings({ ...current, excluded_rule_ids: ids });
-    try {
-      await applyCaddyConfig();
-    } catch {
-      /* non-fatal */
-    }
-    revalidatePath("/settings");
-    revalidatePath("/waf");
-    // Rule ids are strings here: ICU would group 942100 as "942,100".
-    return { success: true, message: t("results.wafRuleUnexcluded", { ruleId: String(ruleId) }) };
-  } catch (error) {
-    return {
-      success: false,
-      message: await errorText(error, t("results.wafRemoveFailed")),
-    };
-  }
-}
-
-async function suppressWafRuleGloballyActionUnlocked(ruleId: number): Promise<ActionResult> {
-  const t = await getTranslations("settings");
-  try {
-    await requireAdmin();
-    const current = await getWafSettings();
-    const base = current ?? {
-      enabled: false,
-      mode: "Off" as const,
-      load_owasp_crs: true,
-      custom_directives: "",
-      excluded_rule_ids: [],
-    };
-    const ids = [...new Set([...(base.excluded_rule_ids ?? []), ruleId])];
-    await saveWafSettings({ ...base, excluded_rule_ids: ids });
-    try {
-      await applyCaddyConfig();
-    } catch {
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.wafRuleExcludedReloadFailed", { ruleId: String(ruleId) }),
-      };
-    }
-    revalidatePath("/settings");
-    revalidatePath("/waf");
-    return { success: true, message: t("results.wafRuleSuppressed", { ruleId: String(ruleId) }) };
-  } catch (error) {
-    console.error("Failed to suppress WAF rule:", error);
-    return {
-      success: false,
-      message: await errorText(error, t("results.wafSuppressFailed")),
-    };
-  }
-}
-
 export async function getOAuthProvidersAction() {
   await requireAdmin();
   const { listOAuthProviders } = await import("@/src/lib/models/oauth-providers");
@@ -2158,48 +2102,45 @@ export async function deleteOAuthProviderAction(id: string) {
   revalidatePath("/settings");
 }
 
-export async function suppressWafRuleForHostAction(
-  ruleId: number,
-  hostname: string,
-): Promise<ActionResult> {
-  const t = await getTranslations("settings");
-  try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    const hosts = await listProxyHosts();
-    const bareHostname = hostname.replace(/:\d+$/, "");
-    const host = hosts.find((h) => h.domains.includes(bareHostname));
-    if (!host) {
-      return { success: false, message: t("results.wafNoHost", { hostname }) };
+/** Blank or absent fields keep the CRS defaults, so an untuned WAF emits nothing new. */
+function parseWafTuning(formData: FormData): WafTuning {
+  const integer = (name: string, min: number, max: number, code: WafTuningErrorCode) => {
+    const raw = formData.get(name);
+    if (typeof raw !== "string" || !raw.trim()) return undefined;
+    const value = Number(raw.trim());
+    if (!Number.isInteger(value) || value < min || value > max) {
+      throw domainError(code, { min: String(min), max: String(max) }, { status: 400 });
     }
-    const existingWaf = host.waf ?? { enabled: true, waf_mode: "merge" as const };
-    const ids = [...new Set([...(existingWaf.excluded_rule_ids ?? []), ruleId])];
-    await updateProxyHost(
-      host.id,
-      {
-        waf: {
-          ...existingWaf,
-          enabled: true,
-          waf_mode: existingWaf.waf_mode ?? "merge",
-          excluded_rule_ids: ids,
-        },
-      },
-      userId,
-    );
-    revalidatePath("/proxy-hosts");
-    revalidatePath("/waf");
-    return {
-      success: true,
-      message: t("results.wafRuleSuppressedForHost", { ruleId: String(ruleId), hostname }),
-    };
-  } catch (error) {
-    console.error("Failed to suppress WAF rule for host:", error);
-    return {
-      success: false,
-      message: await errorText(error, t("results.wafSuppressFailed")),
-    };
-  }
+    return value;
+  };
+  const paranoia = integer("wafParanoiaLevel", 1, 4, "wafParanoiaLevelInvalid");
+  const inbound = integer(
+    "wafInboundThreshold",
+    MIN_ANOMALY_THRESHOLD,
+    MAX_ANOMALY_THRESHOLD,
+    "wafAnomalyThresholdInvalid",
+  );
+  const outbound = integer(
+    "wafOutboundThreshold",
+    MIN_ANOMALY_THRESHOLD,
+    MAX_ANOMALY_THRESHOLD,
+    "wafAnomalyThresholdInvalid",
+  );
+  return {
+    ...(paranoia !== undefined && paranoia !== DEFAULT_PARANOIA_LEVEL
+      ? { paranoia_level: paranoia }
+      : {}),
+    ...(formData.get("wafLogNextParanoiaLevel") === "on" ? { log_next_paranoia_level: true } : {}),
+    ...(inbound !== undefined && inbound !== DEFAULT_INBOUND_THRESHOLD
+      ? { inbound_anomaly_threshold: inbound }
+      : {}),
+    ...(outbound !== undefined && outbound !== DEFAULT_OUTBOUND_THRESHOLD
+      ? { outbound_anomaly_threshold: outbound }
+      : {}),
+  };
 }
+
+type WafTuningErrorCode = "wafParanoiaLevelInvalid" | "wafAnomalyThresholdInvalid";
 
 async function updateWafSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -2209,8 +2150,16 @@ async function updateWafSettingsActionUnlocked(
   try {
     await requireAdmin();
 
-    const enabled = formData.get("wafEnabled") === "on";
-    const mode: WafSettings["mode"] = enabled ? "On" : "Off";
+    // The mode control posts Off, DetectionOnly or On; an older form only the enable switch.
+    const rawMode = formData.get("wafEngineMode");
+    const mode: WafSettings["mode"] =
+      rawMode === "Off" || rawMode === "On" || rawMode === "DetectionOnly"
+        ? rawMode
+        : formData.get("wafEnabled") === "on"
+          ? "On"
+          : "Off";
+    const enabled = mode !== "Off";
+    const tuning = parseWafTuning(formData);
     const loadOwasp = formData.get("wafLoadOwaspCrs") === "on";
     const customDirectives =
       typeof formData.get("wafCustomDirectives") === "string"
@@ -2277,7 +2226,8 @@ async function updateWafSettingsActionUnlocked(
       mode,
       load_owasp_crs: loadOwasp,
       custom_directives: customDirectives,
-      excluded_rule_ids,
+      ...(excluded_rule_ids.length > 0 ? { excluded_rule_ids } : {}),
+      ...tuning,
       ...(preset_ids.length > 0 ? { preset_ids } : {}),
       ...(plugin_ids.length > 0 ? { plugin_ids } : {}),
       ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
@@ -2509,12 +2459,6 @@ export const updateTailscaleSettingsAction = stagedSettingsAction(
 );
 export const updateCrowdSecSettingsAction = stagedSettingsAction(
   updateCrowdSecSettingsActionUnlocked,
-);
-export const removeWafRuleGloballyAction = serializedSettingsAction(
-  removeWafRuleGloballyActionUnlocked,
-);
-export const suppressWafRuleGloballyAction = serializedSettingsAction(
-  suppressWafRuleGloballyActionUnlocked,
 );
 export const updateWafSettingsAction = stagedSettingsAction(updateWafSettingsActionUnlocked);
 export const updatePasswordPolicySettingsAction = stagedSettingsAction(

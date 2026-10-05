@@ -26,7 +26,7 @@ import type { ApexChartComponent } from "./KpiTiles";
 
 type SeriesColor = keyof ChartTheme["series"];
 
-const OUTCOME_COLOR: Record<TrafficOutcome, SeriesColor> = {
+export const OUTCOME_COLOR: Record<TrafficOutcome, SeriesColor> = {
   served: "green",
   waf: "red",
   geo: "orange",

@@ -124,6 +124,25 @@ query {
 
 `setSetupStepDone(step, done)` and `setSetupChecklistHidden(hidden)` change the checklist.
 
+## Security
+
+`securityReport` is the [security events](../security/) page for the same query input as
+`analyticsReport`, plus a `page` for its WAF event list. Each event carries a `key`, which
+`wafEvent` takes to answer the event in full: the rules it matched with their points, the score
+against the threshold, the narrowest exclusion for it and the request as a curl command.
+
+```graphql
+mutation {
+  createWafExclusion(input: { ruleId: 942100, proxyHostId: 3, path: "/upload", target: "ARGS:content", reason: "Rich text" }) { id path }
+  createBlockedSource(input: { kind: "cidr", value: "203.0.113.0/24", expiresAt: "2026-12-01T00:00:00Z" }) { id }
+}
+```
+
+`wafExclusions`, `updateWafExclusion` and `deleteWafExclusion` manage exclusions; a refused one
+answers with Coraza's reason. `reviewWafEvent(key, verdict)` marks an event `intended` or
+`false_positive`, and null clears it. `blockedSources` and `deleteBlockedSource` round out the
+deny list.
+
 ## Authentication
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an

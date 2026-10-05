@@ -23,6 +23,8 @@ import {
 } from "@/src/lib/models/crs-plugins";
 import { requireAdmin } from "@/src/lib/auth";
 import { listDroppedWafDirectives } from "@/src/lib/waf/caddy";
+import { listWafExclusions } from "@/src/lib/models/waf-exclusions";
+import { getWafHostModes } from "@/src/lib/security/report";
 import { strictId } from "@/src/lib/http/strict-id";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -110,6 +112,8 @@ export default async function WafPage({ searchParams }: PageProps) {
     pluginUsage,
     pluginUpdates,
     pluginFailures,
+    exclusions,
+    hostModes,
   ] = await Promise.all([
     listWafEvents(PER_PAGE, offset, filter, from, to),
     countWafEvents(filter, from, to),
@@ -122,18 +126,13 @@ export default async function WafPage({ searchParams }: PageProps) {
     withStagedReads(overlay, () => getCrsPluginUsage()),
     storedCrsPluginUpdates(),
     crsPluginLoadFailures(),
+    listWafExclusions(),
+    withStagedReads(overlay, () => getWafHostModes()),
   ]);
 
-  const globalExcludedIds = globalWaf?.excluded_rule_ids ?? [];
-  const globalExcludedMessages = await getWafRuleMessages(globalExcludedIds);
-
-  const hostWafMap: Record<string, number[]> = {};
-  for (const host of hosts) {
-    const ids = host.waf?.excluded_rule_ids ?? [];
-    for (const domain of host.domains) {
-      hostWafMap[domain] = ids;
-    }
-  }
+  const ruleMessages = await getWafRuleMessages([
+    ...new Set(exclusions.map((exclusion) => exclusion.ruleId)),
+  ]);
 
   return (
     <WafPresetOptionsProvider
@@ -148,10 +147,13 @@ export default async function WafPage({ searchParams }: PageProps) {
         initialRange={range}
         initialFrom={from ?? null}
         initialTo={to ?? null}
-        globalExcluded={globalExcludedIds}
-        globalExcludedMessages={globalExcludedMessages}
+        exclusions={exclusions}
+        ruleMessages={ruleMessages}
         globalWafEnabled={globalWaf?.enabled ?? false}
-        hostWafMap={hostWafMap}
+        hosts={hosts
+          .map((host) => ({ id: host.id, name: host.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))}
+        hostModes={hostModes}
         globalWaf={globalWaf ?? null}
         presets={presets.map((preset) => {
           const usage = presetUsage.get(preset.id);

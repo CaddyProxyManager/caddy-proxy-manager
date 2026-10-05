@@ -66,6 +66,10 @@ vi.mock('../../../src/lib/agent/managed-services', () => ({
 }));
 vi.mock('../../../src/lib/geoip/updater', () => ({ startGeoipUpdater: () => {} }));
 vi.mock('../../../src/lib/waf/crs-plugins/sync', () => ({ startCrsRegistryUpdater: () => {} }));
+vi.mock('../../../src/lib/security/housekeeping', () => ({ startSecurityHousekeeping: () => {} }));
+vi.mock('../../../src/lib/models/waf-exclusions', () => ({
+  migrateLegacyWafSuppressions: async () => 0,
+}));
 vi.mock('../../../src/lib/models/crs-plugins', () => ({
   installedCrsPluginRepositories: [],
   assertCrsPluginIdsExist: async () => {},
