@@ -15,7 +15,12 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-head_of() { gh api "repos/${DEPLOY_REPO}/git/ref/heads/$1" --jq .object.sha 2>/dev/null || true; }
+# Empty for a missing branch. gh prints a 404's body to stdout, so the exit status decides.
+head_of() {
+  local sha
+  sha="$(gh api "repos/${DEPLOY_REPO}/git/ref/heads/$1" --jq .object.sha 2>/dev/null)" && echo "$sha"
+  return 0
+}
 
 # commit <branch> <staging> <message> - prints the commit the branch ends on.
 commit() {
@@ -80,7 +85,8 @@ for tag in "$@"; do
   tar -xzf "$work/archive-${tag}"/*-deploy.tar.gz -C "$staging"
   cp "$root/docker/deploy-repo/README.md" "$root/docker/deploy-repo/.gitignore" "$root/LICENSE" "$staging/"
 
-  message="${tag}"$'\n\n'"https://github.com/${SOURCE_REPO}/releases/tag/${tag}"
+  # GitHub adds the blank line between headline and body itself.
+  message="${tag}"$'\n'"https://github.com/${SOURCE_REPO}/releases/tag/${tag}"
 
   # The first prerelease has no next yet: it starts from main.
   if [ -z "$(head_of next)" ]; then
