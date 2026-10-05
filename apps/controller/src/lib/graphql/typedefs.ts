@@ -443,6 +443,97 @@ export const typeDefs = /* GraphQL */ `
     updatedAt: DateTime!
   }
 
+  """critical, warning or info."""
+  enum AttentionSeverity {
+    critical
+    warning
+    info
+  }
+
+  """
+  Something worth an administrator's look. title and detail are English; code and values render
+  it in another language from the catalog's attention.items entries.
+  """
+  type AttentionItem {
+    """Stable across loads."""
+    id: String!
+    """Which provider found it, e.g. certificates, agents or traffic."""
+    provider: String!
+    code: String!
+    severity: AttentionSeverity!
+    title: String!
+    detail: String!
+    values: JSON!
+    """A dashboard path where it is dealt with."""
+    href: String
+    at: DateTime
+  }
+
+  type AttentionList {
+    """Worst first, at most 50."""
+    items: [AttentionItem!]!
+    """Providers that ran past their 4-second budget or failed: their items are missing."""
+    skipped: [String!]!
+    """Items past the 50."""
+    truncated: Int!
+  }
+
+  """One first step, detected from the instance or marked done by an administrator."""
+  type SetupChecklistStep {
+    """certificate, proxyHost, analytics, secondUser or sso."""
+    step: String!
+    detected: Boolean!
+    markedDone: Boolean!
+  }
+
+  type SetupChecklist {
+    hidden: Boolean!
+    steps: [SetupChecklistStep!]!
+  }
+
+  """What an administrator has set: the steps marked done and whether the list is hidden."""
+  type SetupChecklistState {
+    hidden: Boolean!
+    done: [String!]!
+  }
+
+  type HostTrafficTotals {
+    requests: Float!
+    serverErrors: Float!
+    uniqueIps: Float!
+    bytes: Float!
+    mitigated: Float!
+  }
+
+  """Half an hour."""
+  type HostTrafficBucket {
+    ts: Int!
+    requests: Float!
+    """Requests that passed every gate and did not answer 5xx."""
+    served: Float!
+    serverErrors: Float!
+  }
+
+  type HostTrafficPath {
+    path: String!
+    requests: Float!
+    serverErrors: Float!
+  }
+
+  type HostTrafficStatus {
+    status: Int!
+    requests: Float!
+  }
+
+  """The last 24 hours of one proxy host, across every name it serves."""
+  type HostTraffic {
+    window: AnalyticsWindow!
+    totals: HostTrafficTotals!
+    timeline: [HostTrafficBucket!]!
+    paths: [HostTrafficPath!]!
+    statuses: [HostTrafficStatus!]!
+  }
+
   """A page of results, with the total so a client can size its pager."""
   type AuditEventPage {
     items: [AuditEvent!]!
@@ -495,6 +586,15 @@ export const typeDefs = /* GraphQL */ `
     trafficSignals(from: Int, to: Int, budgetMs: Int): TrafficSignals!
     """The caller's saved analytics views and everyone's shared ones."""
     analyticsViews: [AnalyticsView!]!
+    """
+    Needs attention, as the overview shows it; with proxyHostId, only items about that host.
+    Each provider has a 4-second budget.
+    """
+    attention(proxyHostId: Int): AttentionList!
+    """The overview's first-steps checklist."""
+    setupChecklist: SetupChecklist!
+    """A proxy host's last 24 hours; null with analytics off."""
+    proxyHostTraffic(id: Int!): HostTraffic
   }
 
   type Mutation {
@@ -536,6 +636,11 @@ export const typeDefs = /* GraphQL */ `
     """The caller's own views only. Changes whichever of the arguments are given."""
     updateAnalyticsView(id: Int!, name: String, query: String, shared: Boolean): AnalyticsView!
     deleteAnalyticsView(id: Int!): Boolean!
+
+    """Mark a setup checklist step done, or not, by hand. Detected steps stay ticked either way."""
+    setSetupStepDone(step: String!, done: Boolean!): SetupChecklistState!
+    """Hide the setup checklist for every administrator, or show it again."""
+    setSetupChecklistHidden(hidden: Boolean!): SetupChecklistState!
 
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!

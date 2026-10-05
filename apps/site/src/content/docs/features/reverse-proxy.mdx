@@ -17,6 +17,7 @@ import RateLimitDemo from "../../../demos/samples/RateLimitDemo";
 import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 import HostTagsDemo from "../../../demos/samples/HostTagsDemo";
 import UpstreamHealthDemo from "../../../demos/samples/UpstreamHealthDemo";
+import ProxyHostDetailDemo from "../../../demos/samples/ProxyHostDetailDemo";
 
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
 mostly for, and most of the other features attach to it.
@@ -33,8 +34,48 @@ the host's name, the search box finds them, and the tag filter beside the tabs n
 the hosts carrying one. They label hosts and nothing more: Caddy's configuration never sees them,
 so tagging a host does not reload anything.
 
-<Demo title="The proxy host list" note="Sort by domain or status, switch to the enabled or disabled hosts, pick a tag, or hover the note on staging. Grafana is in maintenance mode. Tick a few rows to disable them together.">
+### The list and its traffic
+
+With [analytics](../analytics/) on, the list shows each host's last 24 hours beside its
+configuration, busiest first:
+
+- **Requests**, with a bar against the busiest host the list's filters match, and how many were
+  blocked.
+- **5xx**: how many requests the host answered with a server error, and what share they were.
+- **Certificate**: the days left on the certificate the host serves, its own imported one or the
+  one Caddy manages for it (read from the agents, so it can take a moment to appear).
+- **Status**: Healthy, Disabled, Maintenance, or the worst problem the host has. A problem is a
+  burst of 5xx answers, 5xx making up 5% or more of at least 20 requests, unusual blocking (a
+  spike in stopped requests, or 50 or more stopped on one path), or a certificate that has expired
+  or is close to it.
+- **Protections**: WAF, sign-in (with its kind), access list, mTLS, rate limit, geo blocking,
+  CrowdSec and bot challenge, whichever the host has on.
+
+Without analytics the list keeps its plain columns. Click a row, or the host's name, to open its
+page; **Edit** stays in the row menu.
+
+<Demo title="The proxy host list" note="Busiest first. Sort by requests, domain or status, switch to the enabled or disabled hosts, pick a tag, or hover the note on staging. Grafana is in maintenance mode. Tick a few rows to disable them together.">
   <ProxyHostsTableDemo client:visible />
+</Demo>
+
+### A host's page
+
+Each host has a page at `/proxy-hosts/<id>`:
+
+- what [needs attention](../overview/) about this host;
+- its last 24 hours with analytics on: requests, 5xx count and share, distinct clients and
+  bandwidth, a chart of served and 5xx responses every half hour with the 5xx share as a line, its
+  busiest paths with their 5xx counts, and its status codes;
+- its upstreams with their [live health](#live-upstream-health) and health-check settings;
+- a line for each part of the editor (General, Upstreams, TLS, Access, Protection, Routing,
+  Advanced) that opens the editor at that part;
+- for administrators, its recent changes from the [audit log](../audit-log/).
+
+An operator sees the page for a host their groups grant, without the recent changes; the edit links
+need a manage grant.
+
+<Demo title="A host's page" note="Sample data: a 5xx burst still going on, which the status, the attention list and the chart all show.">
+  <ProxyHostDetailDemo client:visible />
 </Demo>
 
 <Demo title="Tags in the host editor" note="Add a tag with Enter or a comma, or type one that starts with a dash to see it refused.">

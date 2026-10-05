@@ -22,11 +22,13 @@ export type AuditEventFilter = {
   /** null is the system actor. */
   userId?: number | null;
   entityType?: string;
+  /** With entityType: one row's history. */
+  entityId?: number;
   action?: string;
 };
 
 function auditWhere(filter?: string | AuditEventFilter) {
-  const { search, userId, entityType, action } =
+  const { search, userId, entityType, entityId, action } =
     typeof filter === "string" ? { search: filter } : (filter ?? {});
   const clauses = [];
   if (search) {
@@ -42,6 +44,7 @@ function auditWhere(filter?: string | AuditEventFilter) {
   if (userId === null) clauses.push(isNull(auditEvents.userId));
   else if (userId !== undefined) clauses.push(eq(auditEvents.userId, userId));
   if (entityType) clauses.push(eq(auditEvents.entityType, entityType));
+  if (entityId !== undefined) clauses.push(eq(auditEvents.entityId, entityId));
   if (action) clauses.push(eq(auditEvents.action, action));
   return clauses.length > 0 ? and(...clauses) : undefined;
 }

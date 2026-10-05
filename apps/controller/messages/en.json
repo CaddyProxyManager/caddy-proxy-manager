@@ -1,4 +1,92 @@
 {
+  "attention": {
+    "title": "Needs attention",
+    "count": "{count, plural, one {# item} other {# items}}",
+    "empty": "Nothing needs attention",
+    "loading": "Checking",
+    "loadFailed": "Could not check what needs attention.",
+    "skipped": "{count, plural, one {One check took} other {# checks took}} too long and {count, plural, one {was} other {were}} skipped, so items may be missing.",
+    "truncated": "{count, plural, one {# more item is} other {# more items are}} not shown.",
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "items": {
+      "certificateExpired": {
+        "title": "Certificate {name} has expired",
+        "detail": "It ran out on {date, date, medium}. Renew or replace it before clients stop connecting."
+      },
+      "certificateExpiring": {
+        "title": "Certificate {name} expires in {days, plural, one {# day} other {# days}}",
+        "detail": "Valid until {date, date, medium}. A certificate Caddy manages this close to expiry means its renewal is failing."
+      },
+      "certificateFileError": {
+        "title": "Certificate {name} could not be read from its file",
+        "detail": "The last read failed ({error}). The copy read before is still being served."
+      },
+      "caddyApplyFailed": {
+        "title": "{scope, select, agent {Caddy on {agent} refused the last configuration} other {Caddy refused the last configuration}}",
+        "detail": "{error}"
+      },
+      "agentOffline": {
+        "title": "Agent {agent} is offline",
+        "detail": "Last seen {since, date, medium} at {since, time, short}. The hosts it serves are not updated until it reconnects."
+      },
+      "agentProblem": {
+        "title": "{problem, select, caddyBuild {Agent {agent} could not build Caddy} services {Agent {agent} could not start its services} l4Ports {Agent {agent} could not apply the L4 ports} other {Agent {agent} cannot read its logs}}",
+        "detail": "{detail}"
+      },
+      "serverErrorBurst": {
+        "title": "{ongoing, select, yes {{host} is answering with 5xx errors} other {{host} had a burst of 5xx errors}}",
+        "detail": "{errors, number} errors, {share, number, percent} of its requests, from {from, time, short} to {to, time, short}."
+      },
+      "serverErrorShare": {
+        "title": "{host} answers {share, number, percent} of requests with 5xx",
+        "detail": "{errors, number} errors in the last 24 hours."
+      },
+      "mitigationSpike": {
+        "title": "{ratio, plural, =0 {{host} has started blocking requests} other {Blocked requests to {host} are up # times}}",
+        "detail": "{mitigated, number} requests were stopped in the last 24 hours, against the average of the 7 days before."
+      },
+      "mitigationSpikeFleet": {
+        "title": "{ratio, plural, =0 {Requests have started being blocked} other {Blocked requests are up # times across every host}}",
+        "detail": "{mitigated, number} requests were stopped in the last 24 hours, against the average of the 7 days before."
+      },
+      "blockedConcentration": {
+        "title": "{requests, number} requests to {host}{path} were stopped",
+        "detail": "All by {outcome, select, waf {the WAF} geo {geo blocking} access {an access list} auth {sign-in} rate_limit {rate limiting} crowdsec {CrowdSec} blocked {the blocked sources list} other {a gate}} in the last 24 hours."
+      },
+      "ldapUnreachable": {
+        "title": "Directory {name} cannot be reached",
+        "detail": "{stage, select, connect {Connecting to it failed} bind {Its service account could not bind} search {Reading its base DN failed} other {Its check failed}}, so sign-ins through it will fail."
+      },
+      "accountLocked": {
+        "title": "{email} is being made to wait after failed sign-ins",
+        "detail": "It can try again at {until, time, short}. Repeated failures can mean someone is guessing the password."
+      },
+      "accountDisabled": {
+        "title": "{email} was disabled after failed sign-ins",
+        "detail": "Turn the account back on from Users once you know who was trying."
+      },
+      "l4PortsPending": {
+        "title": "L4 ports are waiting to be applied",
+        "detail": "{count, plural, one {# port needs} other {# ports need}} the Caddy container recreated before the L4 hosts on them answer."
+      },
+      "l4PortsFailed": {
+        "title": "Applying the L4 ports failed",
+        "detail": "{error}"
+      },
+      "crsPluginDisabled": {
+        "title": "CRS plugin {name} was switched off",
+        "detail": "Caddy refused to load the WAF with version {version}, so it was disabled to keep the rest of the WAF running."
+      },
+      "geoipFailing": {
+        "title": "GeoIP databases are not updating",
+        "detail": "{error}"
+      }
+    }
+  },
   "accessLists": {
     "network": "Network",
     "ipRuleCount": "{count, plural, one {# IP rule} other {# IP rules}}",
@@ -404,6 +492,10 @@
     "systemActor": "System",
     "summaryFallback": "{action} on {entityType}",
     "summaries": {
+      "setupStepDone": "Marked setup step {step} done",
+      "setupStepUndone": "Marked setup step {step} not done",
+      "setupChecklistHidden": "Hid the setup checklist",
+      "setupChecklistShown": "Showed the setup checklist",
       "accessListCreated": "Created access list {name}",
       "accessListDeleted": "Deleted access list {name}",
       "accessListEntryAdded": "Added user {username} to access list {list}",
@@ -1030,6 +1122,8 @@
     "metaDescription": "Web UI for managing Caddy reverse proxies, certificates, and access control."
   },
   "errors": {
+    "setupStepUnknown": "That is not a setup checklist step",
+    "setupChecklistFailed": "Could not update the setup checklist",
     "analyticsViewLimit": "You can save at most {max} analytics views",
     "analyticsViewNameRequired": "A saved view needs a name",
     "analyticsViewNameTooLong": "A saved view's name can be at most {max} characters",
@@ -1769,6 +1863,42 @@
     "waf": "WAF"
   },
   "overview": {
+    "checklist": {
+      "title": "Get started",
+      "hide": "Hide",
+      "progress": "{done} of {total} done",
+      "detected": "Done",
+      "markedDone": "Marked done",
+      "markDone": "Mark done",
+      "undo": "Undo",
+      "steps": {
+        "certificate": {
+          "title": "Serve a domain with a valid certificate",
+          "description": "Import one, or let Caddy issue one for a proxy host's domain.",
+          "action": "Certificates"
+        },
+        "proxyHost": {
+          "title": "Add your first proxy host",
+          "description": "Point a domain at a service on your network.",
+          "action": "Add a host"
+        },
+        "analytics": {
+          "title": "Turn on analytics",
+          "description": "See traffic per host, 5xx bursts and blocked requests.",
+          "action": "Analytics settings"
+        },
+        "secondUser": {
+          "title": "Invite a second user",
+          "description": "So you are not the only one who can sign in.",
+          "action": "Users"
+        },
+        "sso": {
+          "title": "Set up single sign-on",
+          "description": "Sign in through an OIDC provider or an LDAP directory.",
+          "action": "Sign-in settings"
+        }
+      }
+    },
     "activityEmptyMessage": "No activity recorded yet.",
     "actorSystem": "system",
     "loadFailedTitle": "Could not load traffic for this range.",
@@ -2033,6 +2163,130 @@
     "passwordManagedBy": "Your password is managed by {directory}. Change it there; this instance never stores it."
   },
   "proxyHosts": {
+    "insights": {
+      "serverErrors": "5xx",
+      "certificate": "Certificate",
+      "certificateDaysLeft": "{days, plural, =0 {Today} one {# day} other {# days}}",
+      "certificateExpired": "Expired",
+      "requestsShare": "{share} of the busiest host",
+      "state": {
+        "healthy": "Healthy",
+        "disabled": "Disabled"
+      },
+      "problem": {
+        "serverErrorBurst": "5xx burst",
+        "serverErrorShare": "High 5xx share",
+        "blockedTraffic": "Unusual blocking",
+        "certificateExpired": "Certificate expired",
+        "certificateExpiring": "Certificate expiring"
+      },
+      "protection": {
+        "waf": "WAF",
+        "signInCpm": "Sign-in",
+        "signInAuthentik": "Authentik",
+        "signInForwardAuth": "Forward auth",
+        "accessList": "Access list",
+        "mtls": "mTLS",
+        "rateLimit": "Rate limit",
+        "geo": "Geo",
+        "crowdsec": "CrowdSec",
+        "botChallenge": "Bot challenge"
+      }
+    },
+    "detail": {
+      "backToList": "Proxy hosts",
+      "edit": "Edit",
+      "editSection": "Edit",
+      "viewAnalytics": "Analytics",
+      "viewLogs": "Logs",
+      "attentionTitle": "Needs attention",
+      "attentionEmpty": "Nothing needs attention on this host",
+      "tileRequests": "Requests, last 24 hours",
+      "tileMitigated": "{count} stopped by a gate",
+      "tileServerErrors": "5xx responses",
+      "tileShare": "{share} of requests",
+      "tileClients": "Distinct clients",
+      "tileBandwidth": "Bandwidth",
+      "chartTitle": "Responses every 30 minutes",
+      "chartServed": "Served",
+      "chartServerErrors": "5xx",
+      "chartErrorShare": "5xx share",
+      "chartEmpty": "No requests in the last 24 hours",
+      "trafficOffTitle": "Traffic is not recorded",
+      "trafficOffDescription": "Turn on analytics in Settings to see this host's requests, errors and busiest paths here.",
+      "upstreamsTitle": "Upstreams",
+      "activeChecks": "Active health checks on {uri}, every {interval}",
+      "noActiveChecks": "No active health checks",
+      "passiveChecks": "Passive health checks: out of rotation after {maxFails, plural, one {# failure} other {# failures}} for {duration}",
+      "noPassiveChecks": "No passive health checks",
+      "defaultValue": "the default",
+      "configurationTitle": "Configuration",
+      "pathsTitle": "Top paths",
+      "statusesTitle": "Status codes",
+      "noTraffic": "No requests in the last 24 hours",
+      "path": "Path",
+      "requests": "Requests",
+      "serverErrors": "5xx",
+      "status": "Status",
+      "auditTitle": "Recent changes",
+      "auditEmpty": "No changes recorded for this host",
+      "auditTime": "When",
+      "auditChange": "Change",
+      "actorSystem": "System",
+      "sections": {
+        "general": "General",
+        "upstreams": "Upstreams",
+        "tls": "TLS",
+        "access": "Access",
+        "protection": "Protection",
+        "routing": "Routing",
+        "advanced": "Advanced"
+      },
+      "facts": {
+        "domains": "{count, plural, one {# domain} other {# domains}}",
+        "tags": "{count, plural, one {# tag} other {# tags}}",
+        "hstsOn": "HSTS",
+        "httpsForced": "HTTPS forced",
+        "websocketsOn": "WebSockets",
+        "upstreams": "{count, plural, one {# upstream} other {# upstreams}}",
+        "loadBalancer": "Load balanced ({policy})",
+        "activeHealthChecks": "Active health checks",
+        "passiveHealthChecks": "Passive health checks",
+        "noHealthChecks": "No health checks",
+        "customTimeouts": "Custom timeouts",
+        "dnsResolver": "Own DNS resolvers",
+        "certificateImported": "Certificate {name}",
+        "certificateManaged": "Certificate managed by Caddy",
+        "mtls": "mTLS",
+        "accessList": "Access list {name}",
+        "signInCpm": "Sign-in required",
+        "signInAuthentik": "Authentik sign-in",
+        "signInForwardAuth": "Forward auth sign-in",
+        "tailnet": "Served on the tailnet",
+        "openAccess": "Open to everyone",
+        "waf": "WAF",
+        "geo": "Geo blocking",
+        "rateLimit": "Rate limited ({count, plural, one {# zone} other {# zones}})",
+        "crowdsec": "CrowdSec",
+        "botChallenge": "Bot challenge",
+        "noProtection": "No protection",
+        "redirects": "{count, plural, one {# redirect} other {# redirects}}",
+        "locationRules": "{count, plural, one {# location rule} other {# location rules}}",
+        "rewrite": "Rewrite",
+        "pathAllows": "{count, plural, one {# allowed path} other {# allowed paths}}",
+        "pathBlocks": "{count, plural, one {# blocked path} other {# blocked paths}}",
+        "pathRewrites": "{count, plural, one {# path rewrite} other {# path rewrites}}",
+        "errorPages": "{count, plural, one {# error page} other {# error pages}}",
+        "defaultRouting": "Everything to the upstreams",
+        "pinnedAgents": "Served by {names}",
+        "everyAgent": "Served by every agent",
+        "cache": "Caching",
+        "compressionOn": "Compression on",
+        "compressionOff": "Compression off",
+        "maintenanceOn": "In maintenance",
+        "customConfig": "Custom configuration"
+      }
+    },
     "upstreamHealth": {
       "title": "Live upstream health",
       "loading": "Asking Caddy…",

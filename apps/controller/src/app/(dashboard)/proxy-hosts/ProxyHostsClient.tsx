@@ -31,6 +31,20 @@ import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { HostTagFilter, HostTagList } from "@/components/proxy-hosts/HostTagsField";
 import { duplicateProxyHostDraft } from "@/lib/proxy-hosts/duplicate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
+import {
+  CertificateDaysCell,
+  HostProtectionBadges,
+  HostRequestsCell,
+  HostServerErrorsCell,
+  HostStatusCell,
+} from "@/components/proxy-hosts/HostInsightCells";
+import type { ListInsights } from "@/lib/proxy-hosts/list-insights";
+import {
+  isEditorSection,
+  proxyHostDetailHref,
+  type EditorSection,
+} from "@/lib/proxy-hosts/editor-sections";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList } from "@/lib/models/access-lists";
@@ -93,10 +107,10 @@ type Props = {
   agentAssignments?: Record<number, number[]>;
   /** Across everything visible, so the tabs do not count only this page. */
   counts: { total: number; enabled: number; disabled: number };
-  /** Last 24h; no entry means no traffic. */
-  hostTraffic: Record<number, { total: number; blocked: number }>;
-  /** False when analytics is off or unreachable. */
-  trafficAvailable: boolean;
+  /** Traffic columns, last 24h; unavailable when analytics is off or unreachable. */
+  insights: ListInsights;
+  /** Opened in the editor on arrival, from a section link on the host's page. */
+  editTarget?: ProxyHost | null;
   activeState: "all" | "enabled" | "disabled";
   /** False for an operator: grants name existing hosts. Duplicating goes with it. */
   canCreate?: boolean;
@@ -306,8 +320,8 @@ export default function ProxyHostsClient({
   agents,
   agentAssignments,
   counts,
-  hostTraffic,
-  trafficAvailable,
+  insights,
+  editTarget = null,
   activeState,
   canCreate = true,
   canEditRawConfig = false,
@@ -318,7 +332,8 @@ export default function ProxyHostsClient({
   const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
-  const [editHost, setEditHost] = useState<ProxyHost | null>(null);
+  const [editHost, setEditHost] = useState<ProxyHost | null>(editTarget);
+  const [editSection, setEditSection] = useState<EditorSection | null>(null);
   const [deleteHost, setDeleteHost] = useState<ProxyHost | null>(null);
   const [checkingHost, setCheckingHost] = useState<ProxyHost | null>(null);
   // Remounts CreateHostDialog on each open, resetting useFormState.
@@ -338,6 +353,24 @@ export default function ProxyHostsClient({
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
+
+  // The section rides in the hash, which the server never sees.
+  useEffect(() => {
+    if (!editTarget) return;
+    const hash = window.location.hash.slice(1);
+    setEditSection(isEditorSection(hash) ? hash : null);
+    setEditHost(editTarget);
+  }, [editTarget]);
+
+  function closeEditor() {
+    setEditHost(null);
+    setEditSection(null);
+    if (!searchParams.has("edit")) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("edit");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }
 
   function handleSearchChange(value: string) {
     setSearchTerm(value);
@@ -386,12 +419,13 @@ export default function ProxyHostsClient({
 
   const certificateNames = new Map(certificates.map((c) => [c.id, c.name]));
   const agentNames = new Map((agents ?? []).map((a) => [a.id, a.name]));
-  // From the server, not the map: an empty map is a quiet day, not "analytics is off".
-  const trafficKnown = trafficAvailable;
-  const trafficTotals = Object.values(hostTraffic).reduce(
-    (sum, row) => ({ total: sum.total + row.total, blocked: sum.blocked + row.blocked }),
-    { total: 0, blocked: 0 },
-  );
+  // From the server, not the numbers: no traffic is a quiet day, not "analytics is off".
+  const trafficKnown = insights.available;
+  const trafficTotals = insights.available
+    ? { total: insights.totals.requests, blocked: insights.totals.blocked }
+    : { total: 0, blocked: 0 };
+  const insightFor = (host: ProxyHost) =>
+    insights.available ? insights.byHost[host.id] : undefined;
   const blockedShare =
     trafficTotals.total > 0
       ? ((trafficTotals.blocked / trafficTotals.total) * 100).toFixed(1)
@@ -409,9 +443,11 @@ export default function ProxyHostsClient({
           <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
           <VStack gap={0} className="cpm-cell-lines">
             <HStack gap={1} vAlign="center">
-              <Text type="body" size="sm" weight="semibold">
-                {host.name}
-              </Text>
+              <AstryxLink href={proxyHostDetailHref(host.id)}>
+                <Text type="body" size="sm" weight="semibold">
+                  {host.name}
+                </Text>
+              </AstryxLink>
               <HostNotesHint notes={host.description} />
             </HStack>
             <Tooltip content={host.domains.join(", ")}>
@@ -439,28 +475,7 @@ export default function ProxyHostsClient({
         </HStack>
       ),
     },
-    {
-      id: "tls",
-      label: t("tls"),
-      width: 180,
-      render: (host) => {
-        const name = host.certificateId ? certificateNames.get(host.certificateId) : undefined;
-        if (!name) {
-          return (
-            <Text type="body" size="sm" color="secondary">
-              {emptyValue}
-            </Text>
-          );
-        }
-        return (
-          <Tooltip content={name}>
-            <Text type="body" size="sm" maxLines={1}>
-              {name}
-            </Text>
-          </Tooltip>
-        );
-      },
-    },
+    ...(trafficKnown ? [] : [tlsColumn()]),
     {
       id: "agents",
       label: t("assignedAgents"),
@@ -482,35 +497,13 @@ export default function ProxyHostsClient({
         );
       },
     },
-    ...(trafficKnown
-      ? [
-          {
-            id: "requests",
-            label: t("requests24h"),
-            align: "right" as const,
-            width: 110,
-            render: (host: ProxyHost) => {
-              const row = hostTraffic[host.id] ?? { total: 0, blocked: 0 };
-              return (
-                <VStack gap={0} hAlign="end" className="cpm-cell-lines">
-                  <Text type="code" size="sm">
-                    {format.number(row.total)}
-                  </Text>
-                  {row.blocked > 0 && (
-                    <Text type="supporting" color="secondary">
-                      {t("blockedCount", { count: format.number(row.blocked) })}
-                    </Text>
-                  )}
-                </VStack>
-              );
-            },
-          },
-        ]
-      : []),
+    ...(trafficKnown ? trafficColumns() : []),
     {
       id: "features",
       label: t("protections"),
       render: (host) => {
+        const insight = insightFor(host);
+        if (insight) return <HostProtectionBadges protections={insight.protections} />;
         const active = FEATURES.filter((f) => f.isOn(host));
         if (active.length === 0) {
           return (
@@ -528,12 +521,16 @@ export default function ProxyHostsClient({
         );
       },
     },
+    ...(trafficKnown ? [certificateColumn()] : []),
     {
       id: "status",
       label: t("status"),
       sortKey: "enabled",
-      width: 110,
-      render: (host) => <HostStatus host={host} />,
+      width: trafficKnown ? 160 : 110,
+      render: (host) => {
+        const insight = insightFor(host);
+        return insight ? <HostStatusCell status={insight.status} /> : <HostStatus host={host} />;
+      },
     },
     {
       id: "actions",
@@ -555,6 +552,82 @@ export default function ProxyHostsClient({
     },
   ];
 
+  function tlsColumn(): Column<ProxyHost> {
+    return {
+      id: "tls",
+      label: t("tls"),
+      width: 180,
+      render: (host) => {
+        const name = host.certificateId ? certificateNames.get(host.certificateId) : undefined;
+        if (!name) {
+          return (
+            <Text type="body" size="sm" color="secondary">
+              {emptyValue}
+            </Text>
+          );
+        }
+        return (
+          <Tooltip content={name}>
+            <Text type="body" size="sm" maxLines={1}>
+              {name}
+            </Text>
+          </Tooltip>
+        );
+      },
+    };
+  }
+
+  function trafficColumns(): Column<ProxyHost>[] {
+    return [
+      {
+        id: "requests",
+        label: t("requests24h"),
+        sortKey: "requests",
+        align: "right",
+        width: 140,
+        render: (host) => {
+          const insight = insightFor(host);
+          return (
+            <HostRequestsCell
+              requests={insight?.requests ?? 0}
+              blocked={insight?.blocked ?? 0}
+              share={insight?.share ?? 0}
+            />
+          );
+        },
+      },
+      {
+        id: "serverErrors",
+        label: t("insights.serverErrors"),
+        align: "right",
+        width: 80,
+        render: (host) => {
+          const insight = insightFor(host);
+          return (
+            <HostServerErrorsCell
+              serverErrors={insight?.serverErrors ?? 0}
+              requests={insight?.requests ?? 0}
+            />
+          );
+        },
+      },
+    ];
+  }
+
+  function certificateColumn(): Column<ProxyHost> {
+    return {
+      id: "certificate",
+      label: t("insights.certificate"),
+      width: 110,
+      render: (host) => (
+        <CertificateDaysCell
+          days={insightFor(host)?.certificateDaysLeft ?? null}
+          name={host.certificateId ? certificateNames.get(host.certificateId) : null}
+        />
+      ),
+    };
+  }
+
   const mobileCard = (host: ProxyHost) => (
     <Card
       className={
@@ -563,9 +636,11 @@ export default function ProxyHostsClient({
     >
       <HStack justify="between" vAlign="start" gap={2}>
         <VStack gap={1}>
-          <Text type="body" size="sm" weight="semibold">
-            {host.name}
-          </Text>
+          <AstryxLink href={proxyHostDetailHref(host.id)}>
+            <Text type="body" size="sm" weight="semibold">
+              {host.name}
+            </Text>
+          </AstryxLink>
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {summarize(host.domains)} &rarr; {host.upstreams[0]}
           </Text>
@@ -576,7 +651,11 @@ export default function ProxyHostsClient({
           )}
           <HostTagList tags={host.tags} />
           <HStack gap={2} vAlign="center">
-            <HostStatus host={host} />
+            {insightFor(host) ? (
+              <HostStatusCell status={insightFor(host)!.status} />
+            ) : (
+              <HostStatus host={host} />
+            )}
             {host.certificateId && <Badge variant="info" label={t("tls")} />}
           </HStack>
         </VStack>
@@ -693,6 +772,7 @@ export default function ProxyHostsClient({
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
+        rowHref={(host) => proxyHostDetailHref(host.id)}
         rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("filterDisabled") })}
         selection={{
           selectedKeys,
@@ -728,7 +808,8 @@ export default function ProxyHostsClient({
         <EditHostDialog
           open={!!editHost}
           host={editHost}
-          onClose={() => setEditHost(null)}
+          initialSection={editSection}
+          onClose={closeEditor}
           certificates={certificates}
           accessLists={accessLists}
           authentikDefaults={authentikDefaults}

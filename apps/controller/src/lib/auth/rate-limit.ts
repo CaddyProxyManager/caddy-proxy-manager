@@ -232,6 +232,17 @@ export function resetAccountFailures(account: string): void {
   ACCOUNTS.delete(account);
 }
 
+/** Accounts made to wait right now. Keys include names nobody owns; the caller matches users. */
+export function lockedAccounts(now = Date.now()): { account: string; until: number }[] {
+  const locked: { account: string; until: number }[] = [];
+  for (const [account, entry] of ACCOUNTS) {
+    if (entry.lockedUntil > now && now - entry.lastFailureAt <= ACCOUNT_FORGET_MS) {
+      locked.push({ account, until: entry.lockedUntil });
+    }
+  }
+  return locked;
+}
+
 /** Failures counted against the account since it last signed in, or was forgotten. */
 export function accountFailureCount(account: string, now = Date.now()): number {
   const entry = ACCOUNTS.get(account);

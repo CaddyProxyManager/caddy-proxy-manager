@@ -299,6 +299,7 @@ export async function getOverviewAnalytics(
 export interface HostTraffic {
   total: number;
   blocked: number;
+  serverErrors: number;
 }
 
 export interface HostTrafficResult {
@@ -352,8 +353,13 @@ export async function getTrafficByProxyHost(
       if (current) {
         current.total += row.total;
         current.blocked += row.blocked;
+        current.serverErrors += row.serverErrors ?? 0;
       } else {
-        byHost.set(id, { total: row.total, blocked: row.blocked });
+        byHost.set(id, {
+          total: row.total,
+          blocked: row.blocked,
+          serverErrors: row.serverErrors ?? 0,
+        });
       }
     }
   }

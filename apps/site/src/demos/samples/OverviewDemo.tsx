@@ -1,6 +1,8 @@
 import OverviewClient, {
   type OverviewPayload,
 } from "@cpm/controller/src/app/(dashboard)/OverviewClient";
+import type { AttentionList } from "@cpm/controller/src/lib/attention/types";
+import type { SetupChecklist } from "@cpm/controller/src/lib/setup-checklist/steps";
 import { DemoSurface } from "../DemoSurface";
 
 const SERVER_EVENTS_BY_HOUR: Record<number, number> = {
@@ -131,6 +133,62 @@ const PREVIEW: OverviewPayload = {
 };
 
 /** Demoable unchanged: it takes every number as a prop and imports no server action. */
+/** The chart's 5xx spike, a certificate Caddy is failing to renew, and the scanner sweep. */
+const ATTENTION: AttentionList = {
+  items: [
+    {
+      id: "burst:git.example.com",
+      provider: "traffic",
+      code: "serverErrorBurst",
+      severity: "warning",
+      values: {
+        host: "git.example.com",
+        errors: 280,
+        share: 0.062,
+        from: "2026-02-11T06:00:00.000Z",
+        to: "2026-02-11T07:58:00.000Z",
+        ongoing: "no",
+      },
+      href: null,
+      at: "2026-02-11T07:58:00.000Z",
+      scope: {},
+    },
+    {
+      id: "certificate-managed:edge-fra:media.example.com",
+      provider: "certificates",
+      code: "certificateExpiring",
+      severity: "warning",
+      values: { name: "media.example.com", days: 6, date: "2026-02-17T09:12:00.000Z" },
+      href: null,
+      at: "2026-02-17T09:12:00.000Z",
+      scope: {},
+    },
+    {
+      id: "blocked:git.example.com:waf:/wp-login.php",
+      provider: "traffic",
+      code: "blockedConcentration",
+      severity: "info",
+      values: { host: "git.example.com", path: "/wp-login.php", outcome: "waf", requests: 312 },
+      href: null,
+      at: null,
+      scope: {},
+    },
+  ],
+  skipped: [],
+  truncated: 0,
+};
+
+const CHECKLIST: SetupChecklist = {
+  hidden: false,
+  steps: [
+    { step: "certificate", detected: true, markedDone: false },
+    { step: "proxyHost", detected: true, markedDone: false },
+    { step: "analytics", detected: true, markedDone: false },
+    { step: "secondUser", detected: false, markedDone: false },
+    { step: "sso", detected: false, markedDone: false },
+  ],
+};
+
 export default function OverviewDemo() {
   return (
     <DemoSurface>
@@ -144,6 +202,8 @@ export default function OverviewDemo() {
         trafficSummary={{ totalRequests: 68_620, blockedPercent: 0.6 }}
         serverEventCount={17}
         previewPayload={PREVIEW}
+        previewAttention={ATTENTION}
+        previewChecklist={CHECKLIST}
         recentEvents={[
           {
             id: 9,

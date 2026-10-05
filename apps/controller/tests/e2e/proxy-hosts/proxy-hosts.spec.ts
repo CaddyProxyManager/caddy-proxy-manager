@@ -91,7 +91,7 @@ test.describe('Proxy Hosts', () => {
       expect(created!.skipHttpsHostnameValidation).toBe(false);
 
       const row = page.locator('tr', { hasText: 'Advanced Options Test' });
-      await row.getByRole('button').first().click();
+      await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: /edit/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -124,7 +124,7 @@ test.describe('Proxy Hosts', () => {
       expect(after.hstsSubdomains).toBe(true);
       expect(after.skipHttpsHostnameValidation).toBe(true);
 
-      await row.getByRole('button').first().click();
+      await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: /edit/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -485,7 +485,7 @@ test.describe('Proxy Hosts', () => {
     expect(created!.geoblockMode).toBe('override');
 
     const row = page.locator('tr', { hasText: 'Geoblock Override Host' });
-    await row.getByRole('button').first().click();
+    await row.getByRole('button', { name: /^Actions for / }).click();
     await page.getByRole('menuitem', { name: /edit/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -523,7 +523,7 @@ test.describe('Proxy Hosts', () => {
     });
 
     const row = page.locator('tr', { hasText: 'Host To Delete' });
-    await row.getByRole('button').first().click();
+    await row.getByRole('button', { name: /^Actions for / }).click();
     await page.getByRole('menuitem', { name: /delete/i }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();

@@ -58,6 +58,7 @@ import { ApiAuthError, NotFoundError } from "../api/auth";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
 import { assertNotSelf, assertUserRole } from "../users/admin";
 import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics";
+import { attentionMutationResolvers, attentionQueryResolvers } from "./attention";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -275,6 +276,7 @@ export const resolvers = {
       return await getCaddyModuleAvailability();
     },
     ...analyticsQueryResolvers,
+    ...attentionQueryResolvers,
   },
 
   Mutation: {
@@ -444,5 +446,6 @@ export const resolvers = {
     },
 
     ...analyticsMutationResolvers,
+    ...attentionMutationResolvers,
   },
 };

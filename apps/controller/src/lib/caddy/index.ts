@@ -3844,12 +3844,18 @@ async function reportedApply(
   try {
     await load();
   } catch (error) {
-    const { reportApplyFailure } = await import("../notifications/caddy-apply");
-    await reportApplyFailure(target, error);
+    const [{ reportApplyFailure }, { recordApplyFailure }] = await Promise.all([
+      import("../notifications/caddy-apply"),
+      import("./apply-status"),
+    ]);
+    await Promise.all([reportApplyFailure(target, error), recordApplyFailure(target, error)]);
     throw error;
   }
-  const { reportApplySuccess } = await import("../notifications/caddy-apply");
-  await reportApplySuccess(target);
+  const [{ reportApplySuccess }, { recordApplySuccess }] = await Promise.all([
+    import("../notifications/caddy-apply"),
+    import("./apply-status"),
+  ]);
+  await Promise.all([reportApplySuccess(target), recordApplySuccess(target)]);
 }
 
 async function loadEveryAgent(): Promise<void> {

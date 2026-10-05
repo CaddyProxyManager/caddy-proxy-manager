@@ -123,6 +123,7 @@ export default async function OverviewPage() {
         trafficSummary={null}
         recentEvents={[]}
         isAdmin={false}
+        showAttention={session.user.role === "operator"}
       />
     );
   }

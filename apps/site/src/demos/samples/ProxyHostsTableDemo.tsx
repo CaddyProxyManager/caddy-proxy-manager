@@ -17,7 +17,15 @@ import {
   useRowSelection,
 } from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
-import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
+import {
+  CertificateDaysCell,
+  HostProtectionBadges,
+  HostRequestsCell,
+  HostServerErrorsCell,
+  HostStatusCell,
+} from "@cpm/controller/src/components/proxy-hosts/HostInsightCells";
+import type { HostProtections } from "@cpm/controller/src/lib/proxy-hosts/protections";
+import type { HostStatus } from "@cpm/controller/src/lib/proxy-hosts/traffic-status";
 import { useRouter, useSearchParams } from "../shims/next-navigation";
 import { DemoSurface } from "../DemoSurface";
 
@@ -26,11 +34,12 @@ type Row = {
   domain: string;
   upstreams: string;
   certificate: string | null;
-  /** Agent names the host is pinned to; empty means every agent serves it. */
-  agents: string[];
   /** Requests in the last 24h, or null when nothing was recorded for it. */
-  requests: { total: number; blocked: number } | null;
-  protections: string[];
+  requests: { total: number; blocked: number; serverErrors: number } | null;
+  protections: HostProtections;
+  /** What the list's Status column works out from traffic, signals and the certificate. */
+  status: HostStatus;
+  certificateDays: number | null;
   notes: string | null;
   tags: string[];
   enabled: boolean;
@@ -43,9 +52,10 @@ const HOSTS: Row[] = [
     domain: "app.example.com",
     upstreams: "http://app-1:8080 +1",
     certificate: "app.example.com",
-    agents: [],
-    requests: { total: 18_412, blocked: 96 },
-    protections: ["WAF", "LB"],
+    requests: { total: 18_412, blocked: 96, serverErrors: 1_204 },
+    protections: { active: ["waf", "rateLimit"], signIn: null },
+    status: { state: "problem", problem: { code: "serverErrorBurst", severity: "critical" } },
+    certificateDays: 61,
     notes: null,
     tags: ["prod", "team:web"],
     enabled: true,
@@ -55,9 +65,10 @@ const HOSTS: Row[] = [
     domain: "grafana.example.com",
     upstreams: "http://grafana:3000",
     certificate: "grafana.example.com",
-    agents: ["edge-fra"],
-    requests: { total: 5_730, blocked: 0 },
-    protections: ["Authentik"],
+    requests: { total: 5_730, blocked: 0, serverErrors: 3 },
+    protections: { active: ["signIn"], signIn: "authentik" },
+    status: { state: "maintenance", problem: null },
+    certificateDays: 8,
     notes: null,
     tags: ["monitoring", "prod"],
     enabled: true,
@@ -68,9 +79,10 @@ const HOSTS: Row[] = [
     domain: "staging.example.com",
     upstreams: "http://staging:8080",
     certificate: "Wildcard *.example.com",
-    agents: ["lab-nuc"],
     requests: null,
-    protections: [],
+    protections: { active: [], signIn: null },
+    status: { state: "disabled", problem: null },
+    certificateDays: 212,
     notes: "Off until the next release candidate. Ask Priya before turning it back on.",
     tags: ["team:web"],
     enabled: false,
@@ -80,9 +92,10 @@ const HOSTS: Row[] = [
     domain: "vpn.example.com",
     upstreams: "http://headscale:8080",
     certificate: null,
-    agents: ["edge-fra", "edge-ams"],
-    requests: { total: 812, blocked: 4 },
-    protections: ["mTLS", "Tailnet"],
+    requests: { total: 812, blocked: 4, serverErrors: 0 },
+    protections: { active: ["mtls", "geo"], signIn: null },
+    status: { state: "healthy", problem: null },
+    certificateDays: 74,
     notes: null,
     tags: [],
     enabled: true,
@@ -101,8 +114,9 @@ function ProxyHostsTableDemoContent() {
   const [hosts, setHosts] = useState(HOSTS);
   const router = useRouter();
   const params = useSearchParams();
-  const sortBy = params.get("sortBy") ?? "domain";
-  const sortDir = params.get("sortDir") === "desc" ? "desc" : "asc";
+  // Busiest first, as the app sorts it with analytics on.
+  const sortBy = params.get("sortBy") ?? "requests";
+  const sortDir = params.get("sortDir") === "asc" ? "asc" : "desc";
   const state =
     params.get("state") === "enabled" || params.get("state") === "disabled"
       ? (params.get("state") as "enabled" | "disabled")
@@ -123,6 +137,7 @@ function ProxyHostsTableDemoContent() {
     { total: 0, blocked: 0 },
   );
   const format = useFormatter();
+  const busiest = Math.max(1, ...hosts.map((h) => h.requests?.total ?? 0));
 
   const rows = useMemo(() => {
     const filtered = hosts.filter(
@@ -130,9 +145,11 @@ function ProxyHostsTableDemoContent() {
         (state === "all" || h.enabled === (state === "enabled")) && (!tag || h.tags.includes(tag)),
     );
     const sorted = [...filtered].sort((a, b) =>
-      sortBy === "status"
-        ? Number(b.enabled) - Number(a.enabled)
-        : a.domain.localeCompare(b.domain),
+      sortBy === "requests"
+        ? (a.requests?.total ?? 0) - (b.requests?.total ?? 0)
+        : sortBy === "status"
+          ? Number(a.enabled) - Number(b.enabled)
+          : a.domain.localeCompare(b.domain),
     );
     return sortDir === "desc" ? sorted.reverse() : sorted;
   }, [hosts, sortBy, sortDir, state, tag]);
@@ -162,7 +179,8 @@ function ProxyHostsTableDemoContent() {
       id: "domain",
       label: "Domain",
       sortKey: "domain",
-      // The docs column is narrower than the app's, so protections ride under the domain.
+      // The docs column is narrower than the app's, so protections ride under the domain and the
+      // agents column is left out.
       render: (r) => (
         <VStack gap={1}>
           <VStack gap={0}>
@@ -177,75 +195,58 @@ function ProxyHostsTableDemoContent() {
             </Text>
             <HostTagList tags={r.tags} />
           </VStack>
-          {r.protections.length > 0 && (
-            <HStack gap={1} wrap="wrap">
-              {r.protections.map((p) => (
-                <Badge key={p} label={p} />
-              ))}
-            </HStack>
-          )}
+          <HostProtectionBadges protections={r.protections} />
         </VStack>
-      ),
-    },
-    {
-      id: "tls",
-      label: t("tls"),
-      width: 132,
-      render: (r) =>
-        r.certificate ? (
-          <Text type="body" size="sm" maxLines={1}>
-            {r.certificate}
-          </Text>
-        ) : (
-          <Text type="body" size="xsm" color="secondary">
-            &mdash;
-          </Text>
-        ),
-    },
-    {
-      id: "agents",
-      label: t("assignedAgents"),
-      width: 112,
-      render: (r) => (
-        <Text type="body" size="sm" color="secondary" maxLines={1}>
-          {r.agents.length === 0 ? t("servedByEveryAgent") : r.agents.join(", ")}
-        </Text>
       ),
     },
     {
       id: "requests",
       label: t("requests24h"),
+      sortKey: "requests",
       align: "right",
-      width: 104,
-      render: (r) =>
-        r.requests ? (
-          <VStack gap={0} hAlign="end">
-            <Text type="code" size="sm">
-              {format.number(r.requests.total)}
-            </Text>
-            {r.requests.blocked > 0 && (
-              <Text type="supporting" color="secondary">
-                {t("blockedCount", { count: format.number(r.requests.blocked) })}
-              </Text>
-            )}
-          </VStack>
-        ) : (
-          <Text type="body" size="xsm" color="secondary">
-            &mdash;
-          </Text>
-        ),
+      width: 128,
+      render: (r) => (
+        <HostRequestsCell
+          requests={r.requests?.total ?? 0}
+          blocked={r.requests?.blocked ?? 0}
+          share={(r.requests?.total ?? 0) / busiest}
+        />
+      ),
+    },
+    {
+      id: "serverErrors",
+      label: t("insights.serverErrors"),
+      align: "right",
+      width: 72,
+      render: (r) => (
+        <HostServerErrorsCell
+          serverErrors={r.requests?.serverErrors ?? 0}
+          requests={r.requests?.total ?? 0}
+        />
+      ),
+    },
+    {
+      id: "certificate",
+      label: t("insights.certificate"),
+      width: 96,
+      render: (r) => <CertificateDaysCell days={r.certificateDays} name={r.certificate} />,
     },
     {
       id: "status",
-      label: "Status",
+      label: t("status"),
       sortKey: "status",
-      width: 96,
-      render: (r) =>
-        r.enabled && r.maintenance ? (
-          <StatusChip status="warning" label={t("maintenanceToken")} />
-        ) : (
-          <StatusChip status={r.enabled ? "active" : "inactive"} />
-        ),
+      width: 148,
+      render: (r) => (
+        <HostStatusCell
+          status={
+            !r.enabled
+              ? { state: "disabled", problem: null }
+              : r.status.state === "disabled"
+                ? { state: "healthy", problem: null }
+                : r.status
+          }
+        />
+      ),
     },
   ];
 

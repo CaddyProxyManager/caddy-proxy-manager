@@ -3,10 +3,11 @@
   "compilerOptions": {
     // The demos render the controller's own components, whose imports are written against its
     // tsconfig paths. These mirror the Vite aliases in astro.config.mjs - see the note there for
-    // why `next-intl`, `next/navigation` and the two host action modules resolve to shims.
+    // why `next-intl`, `next/navigation` and the action modules resolve to shims.
     "paths": {
       "@/src/app/(dashboard)/proxy-hosts/actions": ["./src/demos/shims/proxy-host-actions.ts"],
       "@/src/app/(dashboard)/l4-proxy-hosts/actions": ["./src/demos/shims/l4-actions.ts"],
+      "@/src/app/(dashboard)/overview-actions": ["./src/demos/shims/overview-actions.ts"],
       "@/components/*": ["../controller/src/components/*"],
       "@/lib/*": ["../controller/src/lib/*"],
       "@/src/*": ["../controller/src/*"],

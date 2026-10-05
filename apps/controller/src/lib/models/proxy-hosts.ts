@@ -3434,6 +3434,44 @@ export async function listProxyHostsPaginated(
   return hosts.map(parseProxyHost);
 }
 
+/**
+ * Id and names of every host the list's filters match, newest first: the whole set, for traffic
+ * the database cannot sort by. Paging is the caller's.
+ */
+export async function listProxyHostDomainRefs(
+  search?: string,
+  visibleIds?: number[] | null,
+  enabled?: boolean,
+  tag?: string,
+): Promise<{ id: number; domains: string[] }[]> {
+  const rows = await db
+    .select({ id: proxyHosts.id, domains: proxyHosts.domains })
+    .from(proxyHosts)
+    .where(proxyHostListFilter(search, visibleIds, enabled, tag))
+    .orderBy(desc(proxyHosts.createdAt));
+  return rows.map((row) => ({ id: row.id, domains: parseStoredDomains(row.domains) }));
+}
+
+function parseStoredDomains(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((d): d is string => typeof d === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** In the order asked for; ids that no longer exist are left out. */
+export async function getProxyHostsByIds(ids: readonly number[]): Promise<ProxyHost[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(proxyHosts)
+    .where(inArray(proxyHosts.id, [...ids]));
+  const byId = new Map(rows.map((row) => [row.id, parseProxyHost(row)]));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 /** Every tag on the hosts the viewer can see, for the list's tag filter. */
 export async function listProxyHostTags(visibleIds?: number[] | null): Promise<string[]> {
   const rows = await db

@@ -61,7 +61,8 @@ function operation(status: AgentOperationStatus<string>): { state: string; detai
   return { state: status.state, detail: detail ? detail.slice(0, MAX_DETAIL) : null };
 }
 
-function problems(
+/** Each operation's state; also what Needs attention lists. */
+export function agentStatusProblems(
   status: AgentStatus | null,
 ): Map<AgentProblem, { state: string; detail: string | null }> {
   const found = new Map<AgentProblem, { state: string; detail: string | null }>();
@@ -89,8 +90,8 @@ export async function reportAgentStatus(
   status: AgentStatus,
   now = Date.now(),
 ): Promise<void> {
-  const before = problems(previous);
-  for (const [problem, { state, detail }] of problems(status)) {
+  const before = agentStatusProblems(previous);
+  for (const [problem, { state, detail }] of agentStatusProblems(status)) {
     const prior = before.get(problem);
     if (prior && prior.state === state && prior.detail === detail) continue;
     const key = `agent-problem:${agent.agentId}:${problem}`;

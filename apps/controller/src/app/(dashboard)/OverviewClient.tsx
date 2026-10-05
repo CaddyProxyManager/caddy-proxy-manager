@@ -31,6 +31,10 @@ import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import Link from "next/link";
 import { settingsHref } from "./settings/sections";
+import { NeedsAttentionCard } from "@/components/overview/NeedsAttentionCard";
+import { SetupChecklistCard } from "@/components/overview/SetupChecklistCard";
+import type { AttentionList } from "@/lib/attention/types";
+import type { SetupChecklist } from "@/lib/setup-checklist/steps";
 
 // Client only: v7's server entry is an async Server Component (see AnalyticsClient).
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -286,6 +290,9 @@ export default function OverviewClient({
   serverEventCount = 0,
   previewPayload,
   isAdmin = true,
+  showAttention = isAdmin,
+  previewAttention,
+  previewChecklist,
 }: {
   userName: string;
   stats: StatCard[];
@@ -296,6 +303,11 @@ export default function OverviewClient({
   /** For the docs demo, which has no API; a copy of this page there would go stale silently. */
   previewPayload?: OverviewPayload;
   isAdmin?: boolean;
+  /** Admins and operators; an operator's list holds only what their grants reach. */
+  showAttention?: boolean;
+  /** For the docs demo, as `previewPayload`. */
+  previewAttention?: AttentionList;
+  previewChecklist?: SetupChecklist;
 }) {
   const t = useTranslations("overview");
   const density = useTableDensity();
@@ -578,6 +590,7 @@ export default function OverviewClient({
     return (
       <VStack gap={8}>
         <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
+        {showAttention && <NeedsAttentionCard preview={previewAttention} />}
       </VStack>
     );
   }
@@ -619,6 +632,9 @@ export default function OverviewClient({
         />
       )}
       {hasFailed && <Banner status="error" title={t("loadFailedTitle")} />}
+
+      <NeedsAttentionCard preview={previewAttention} />
+      <SetupChecklistCard preview={previewChecklist} />
 
       {/* The only route to these pages that skips the side navigation. */}
       <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>

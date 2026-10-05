@@ -43,7 +43,7 @@ describe('getTrafficByProxyHost', () => {
       { id: 7, domains: ['media.example.com', 'watch.example.com'] },
     ]);
 
-    expect(result.byHost.get(7)).toEqual({ total: 150, blocked: 5 });
+    expect(result.byHost.get(7)).toEqual({ total: 150, blocked: 5, serverErrors: 0 });
   });
 
   it('matches regardless of case and ignores a port on the authority', async () => {
@@ -53,7 +53,7 @@ describe('getTrafficByProxyHost', () => {
 
     const result = await getTrafficByProxyHost(0, 1, [{ id: 3, domains: ['git.example.com'] }]);
 
-    expect(result.byHost.get(3)).toEqual({ total: 12, blocked: 0 });
+    expect(result.byHost.get(3)).toEqual({ total: 12, blocked: 0, serverErrors: 0 });
   });
 
   it('leaves out hosts that took no traffic rather than reporting zero', async () => {

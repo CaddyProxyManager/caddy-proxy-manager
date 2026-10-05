@@ -18,6 +18,9 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 const client = await import('../../../src/lib/clickhouse/client');
 const { translateClickHouseSql } = await import('../../../src/lib/clickhouse/sqlite-store');
 const { generateTraffic, trafficShares } = await import('../../../src/lib/demo/traffic');
+const { queryHostTraffic, HOST_TRAFFIC_BUCKET_SECONDS } = await import(
+  '../../../src/lib/clickhouse/host-traffic'
+);
 
 const NOW = Math.floor(Date.now() / 1000);
 const FROM = NOW - 2 * 86400;
@@ -153,6 +156,51 @@ describe('demo analytics in SQLite', () => {
     expect(await client.queryWafCountWithSearch({ clientIp: sample.client_ip }, FROM, NOW)).toBe(
       count(waf, (row) => row.client_ip === sample.client_ip),
     );
+  });
+});
+
+describe("a proxy host's traffic in SQLite", () => {
+  const name = HOSTS[0]!;
+  const mine = traffic.filter((row) => row.host === name || row.host.startsWith(`${name}:`));
+  const outcome = (row: (typeof traffic)[number]) =>
+    row.outcome ?? (row.is_blocked ? 'geo' : 'served');
+
+  it('counts 5xx per host in the list totals', async () => {
+    const totals = await client.queryHostTotals(FROM, NOW);
+    const row = totals.find((t) => t.host === name);
+    expect(row?.serverErrors).toBe(count(traffic, (r) => r.host === name && r.status >= 500));
+  });
+
+  it('totals, buckets, paths and statuses agree with the rows', async () => {
+    const report = await queryHostTraffic({ from: FROM, to: NOW }, [name]);
+    expect(report.totals.requests).toBe(mine.length);
+    expect(report.totals.serverErrors).toBe(count(mine, (r) => r.status >= 500));
+    expect(report.totals.uniqueIps).toBe(new Set(mine.map((r) => r.client_ip)).size);
+    expect(report.totals.mitigated).toBe(count(mine, (r) => outcome(r) !== 'served'));
+
+    expect(report.timeline.length).toBe(
+      Math.ceil(
+        (NOW - Math.floor(FROM / HOST_TRAFFIC_BUCKET_SECONDS) * HOST_TRAFFIC_BUCKET_SECONDS) /
+          HOST_TRAFFIC_BUCKET_SECONDS,
+      ),
+    );
+    expect(report.timeline.reduce((sum, b) => sum + b.requests, 0)).toBe(mine.length);
+    expect(report.timeline.reduce((sum, b) => sum + b.served, 0)).toBe(
+      count(mine, (r) => outcome(r) === 'served' && r.status < 500),
+    );
+
+    const top = report.paths[0]!;
+    const path = (uri: string) => uri.split('?')[0];
+    expect(top.requests).toBe(count(mine, (r) => path(r.uri) === top.path));
+    expect(report.statuses[0]!.requests).toBe(
+      count(mine, (r) => r.status === report.statuses[0]!.status),
+    );
+  });
+
+  it('answers an empty report for a host with no plain name', async () => {
+    const report = await queryHostTraffic({ from: FROM, to: NOW }, []);
+    expect(report.totals.requests).toBe(0);
+    expect(report.paths).toEqual([]);
   });
 });
 

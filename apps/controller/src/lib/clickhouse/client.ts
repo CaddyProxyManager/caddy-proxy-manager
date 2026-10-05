@@ -1140,16 +1140,23 @@ export interface HostTotals {
   host: string;
   total: number;
   blocked: number;
+  serverErrors: number;
 }
 
 /** Per-host request counts in one grouped query, not a round trip per row of the host list. */
 export async function queryHostTotals(from: number, to: number): Promise<HostTotals[]> {
-  const rows = await queryRows<{ host: string; total: string; blocked: string }>(
+  const rows = await queryRows<{
+    host: string;
+    total: string;
+    blocked: string;
+    server_errors?: string;
+  }>(
     `
     SELECT
       host,
       count() AS total,
-      countIf(is_blocked) AS blocked
+      countIf(is_blocked) AS blocked,
+      countIf(status >= 500) AS server_errors
     FROM traffic_events
     WHERE ${timeFilter()} AND host != ''
     GROUP BY host
@@ -1161,6 +1168,7 @@ export async function queryHostTotals(from: number, to: number): Promise<HostTot
     host: r.host,
     total: Number(r.total),
     blocked: Number(r.blocked),
+    serverErrors: Number(r.server_errors ?? 0),
   }));
 }
 

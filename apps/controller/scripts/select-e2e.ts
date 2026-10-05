@@ -355,7 +355,21 @@ export const RULES: readonly Rule[] = [
     ],
     specs: NAV,
   },
-  { match: [`${DASH}page.tsx`, `${DASH}OverviewClient.tsx`], specs: ["dashboard"] },
+  {
+    match: [
+      `${DASH}page.tsx`,
+      `${DASH}OverviewClient.tsx`,
+      `${DASH}overview-actions.ts`,
+      `${SRC}components/overview/`,
+      `${LIB}setup-checklist/`,
+    ],
+    specs: ["dashboard"],
+  },
+  // On the overview and every host's page.
+  {
+    match: [`${LIB}attention/`, `${SRC}components/attention/`],
+    specs: ["dashboard", "proxy-hosts/host-detail"],
+  },
 
   // The specs and their infrastructure.
   { match: [/^apps\/controller\/tests\/e2e\/[\w./-]+\.spec\.ts$/], specs: [] },
@@ -373,6 +387,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   accessLists: ACCESS_LISTS,
   agents: ["agents", "functional/agent"],
   analytics: ANALYTICS,
+  attention: ["dashboard", "proxy-hosts/host-detail"],
   apiDocs: ["api/api-docs"],
   auditLog: ["audit-log"],
   auth: AUTH,

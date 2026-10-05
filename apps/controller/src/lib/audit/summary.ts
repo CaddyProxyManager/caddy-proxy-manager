@@ -53,6 +53,32 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Renamed analytics view (?<from>.+) to (?<to>.+)$/s,
   },
 
+  // setup-checklist/index.ts
+  {
+    entityType: "setup_checklist",
+    action: "update",
+    message: "setupStepDone",
+    pattern: /^Marked setup step (?<step>\S+) done$/,
+  },
+  {
+    entityType: "setup_checklist",
+    action: "update",
+    message: "setupStepUndone",
+    pattern: /^Marked setup step (?<step>\S+) not done$/,
+  },
+  {
+    entityType: "setup_checklist",
+    action: "update",
+    message: "setupChecklistHidden",
+    pattern: /^Hid the setup checklist$/,
+  },
+  {
+    entityType: "setup_checklist",
+    action: "update",
+    message: "setupChecklistShown",
+    pattern: /^Showed the setup checklist$/,
+  },
+
   // models/proxy-hosts.ts, the row menu's maintenance switch
   {
     entityType: "proxy_host",

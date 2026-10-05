@@ -96,6 +96,11 @@ type DataTableProps<T> = {
   loading?: boolean;
   /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
+  /**
+   * A click on the row's background opens this page. Give the row a link of its own too (its
+   * name, say): a row click is unreachable from the keyboard.
+   */
+  rowHref?: (row: T) => string;
   rowStatus?: (row: T) => TableRowStatus | null;
   pagination?: {
     total: number;
@@ -212,6 +217,7 @@ export function DataTable<T>({
   emptyHeadingLevel = 2,
   loading = false,
   onRowClick,
+  rowHref,
   rowStatus,
   pagination,
   sort,
@@ -287,6 +293,30 @@ export function DataTable<T>({
     [astryxExpansion, expandOnRowClick, toggleExpanded, getRowKey],
   );
 
+  const router = useRouter();
+  const rowLinkPlugin = useMemo(
+    (): TablePlugin<TableRow> => ({
+      transformBodyRow: (props, row) => {
+        if (!rowHref) return props;
+        return {
+          ...props,
+          htmlProps: {
+            ...props.htmlProps,
+            style: { ...props.htmlProps.style, cursor: "pointer" },
+            onClick: (event) => {
+              props.htmlProps.onClick?.(event);
+              if (isInteractiveTarget(event)) return;
+              // Selecting text in a cell is not a request to leave the page.
+              if (window.getSelection()?.toString()) return;
+              router.push(rowHref(row as T));
+            },
+          },
+        };
+      },
+    }),
+    [rowHref, router],
+  );
+
   // Hooks run unconditionally; without a `selection` prop the fallback set is simply never shown.
   const [fallbackKeys, setFallbackKeys] = useState<Set<string>>(() => new Set());
   const { selectionConfig } = useTableSelectionState<TableRow>({
@@ -305,6 +335,7 @@ export function DataTable<T>({
     ...(selection ? { selection: selectionPlugin } : {}),
     ...(rowStatus ? { rowStatus: statusPlugin } : {}),
     ...(expandedRow ? { expansion: expansionPlugin } : {}),
+    ...(rowHref && !expandedRow ? { rowLink: rowLinkPlugin } : {}),
   };
 
   const tableColumns: TableColumn<TableRow>[] = columns.map((col) => ({

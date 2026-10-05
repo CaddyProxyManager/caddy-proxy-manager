@@ -137,3 +137,31 @@ test.describe('Dashboard home page', () => {
     await expect(page.getByRole('main').getByRole('row').nth(1)).toBeVisible();
   });
 });
+
+test.describe('Needs attention and the setup checklist', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForHydration(page);
+  });
+
+  test('lists what needs attention, or says nothing does', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Needs attention', level: 2 })).toBeVisible();
+    // Loaded after the page; either outcome is a finished load, never the spinner.
+    await expect(
+      page.getByText(/^(Nothing needs attention|Critical|Warning|Info)$/).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Could not check what needs attention.')).toHaveCount(0);
+  });
+
+  test('a step can be marked done by hand and undone', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Get started', level: 2 })).toBeVisible();
+    const step = page.getByRole('listitem').filter({ hasText: 'Invite a second user' });
+    const mark = step.getByRole('button', { name: 'Mark done' });
+    // The e2e stack may already have a second user, which ticks the step with no button.
+    test.skip(!(await mark.isVisible()), 'detected already');
+    await mark.click();
+    await expect(step.getByText('Marked done')).toBeVisible();
+    await step.getByRole('button', { name: 'Undo' }).click();
+    await expect(step.getByRole('button', { name: 'Mark done' })).toBeVisible();
+  });
+});

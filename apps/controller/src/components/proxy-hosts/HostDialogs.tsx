@@ -53,6 +53,7 @@ import { useTranslations } from "next-intl";
 import { HostNotesField } from "./HostNotesField";
 import { HostTagsField } from "./HostTagsField";
 import { UpstreamHealthPanel } from "./upstreams/UpstreamHealthPanel";
+import { type EditorSection, editorSectionAnchor } from "@/lib/proxy-hosts/editor-sections";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -285,10 +286,13 @@ export function EditHostDialog({
   assignedAgentIds = [],
   tailscaleDefaults,
   canEditRawConfig = false,
+  initialSection = null,
 }: {
   open: boolean;
   host: ProxyHost;
   onClose: () => void;
+  /** Scrolled to on open, from a section link on the host's page. */
+  initialSection?: EditorSection | null;
   /** Admins only. Omitted rather than disabled, so the save leaves an admin's snippet untouched. */
   canEditRawConfig?: boolean;
   certificates: CertificatePickerOption[];
@@ -320,6 +324,17 @@ export function EditHostDialog({
 
   useCloseOnSuccess(state, onClose);
 
+  // After the dialog has laid out; the anchor is inside it.
+  useEffect(() => {
+    if (!open || !initialSection) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .getElementById(editorSectionAnchor(initialSection))
+        ?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, initialSection]);
+
   return (
     <AppDialog
       open={open}
@@ -332,89 +347,110 @@ export function EditHostDialog({
       }}
     >
       <form id="edit-host-form" action={formAction}>
+        {/* Grouped by the sections the host's page links to (lib/proxy-hosts/editor-sections). */}
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
-          <SettingsToggles
-            sslForced={host.sslForced}
-            hstsEnabled={host.hstsEnabled}
-            hstsSubdomains={host.hstsSubdomains}
-            allowWebsocket={host.allowWebsocket}
-            preserveHostHeader={host.preserveHostHeader}
-            skipHttpsValidation={host.skipHttpsHostnameValidation}
-            compression={host.compression}
-            discourageIndexing={host.discourageIndexing}
-            enabled={host.enabled}
-          />
-          <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
-          <HostNotesField value={description} onChange={setDescription} />
-          <HostTagsField initial={host.tags} />
-          <TextArea
-            {...NO_SPELLCHECK}
-            label={t("domains")}
-            htmlName="domains"
-            value={domains}
-            onChange={setDomains}
-            rows={2}
-            description={t("domainsHelp")}
-          />
-          <UpstreamInput defaultUpstreams={host.upstreams} />
-          <UpstreamHealthPanel hostId={host.id} />
-          <Selector
-            label={t("certificate")}
-            htmlName="certificateId"
-            options={toOptions(certificates, t("managedByCaddyAuto"))}
-            value={certificateId}
-            onChange={(next) => setCertificateId(next as string)}
-          />
-          <Selector
-            label={t("accessList")}
-            htmlName="accessListId"
-            options={accessListOptions(accessLists, t)}
-            value={accessListId}
-            onChange={(next) => setAccessListId(next as string)}
-            status={accessListStatus(accessLists, accessListId, t)}
-          />
-          <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
-          <RedirectsFields initialData={host.redirects} />
-          <LocationRulesFields initialData={host.locationRules} accessLists={accessLists} />
-          <RewriteFields initialData={host.rewrite} />
-          <PathAllowsFields initialData={host.pathAllows} />
-          <PathBlocksFields initialData={host.pathBlocks} />
-          <PathRewritesFields initialData={host.pathRewrites} />
-          <ErrorPagesFields initialData={host.errorPages} />
-          <CacheFields cache={host.cache} />
-          <MaintenanceFields maintenance={host.maintenance} />
-          {canEditRawConfig && <AdvancedConfigFields host={host} />}
-          <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
-          <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />
-          <CpmForwardAuthFields
-            cpmForwardAuth={host.cpmForwardAuth}
-            users={forwardAuthUsers}
-            groups={forwardAuthGroups}
-            currentAccess={forwardAuthAccess}
-          />
-          <TailscaleFields tailscale={host.tailscale} defaults={tailscaleDefaults} />
-          <LoadBalancerFields loadBalancer={host.loadBalancer} />
-          <DnsResolverFields dnsResolver={host.dnsResolver} />
-          <UpstreamTimeoutsFields upstreamTimeouts={host.upstreamTimeouts} />
-          <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
-          <RateLimitFields rateLimit={host.rateLimit} />
-          <GeoBlockFields
-            initialValues={{
-              geoblock: host.geoblock,
-              geoblock_mode: host.geoblockMode,
-            }}
-          />
-          <CrowdSecFields enabled={host.crowdsec} />
-          <AnubisFields anubis={host.anubis} />
-          <WafFields value={host.waf} />
-          <MtlsFields
-            value={host.mtls}
-            caCertificates={caCertificates}
-            proxyHostId={host.id}
-            mtlsRoles={mtlsRoles}
-            issuedClientCerts={issuedClientCerts}
-          />
+          <VStack gap={5} id={editorSectionAnchor("general")}>
+            <SettingsToggles
+              sslForced={host.sslForced}
+              hstsEnabled={host.hstsEnabled}
+              hstsSubdomains={host.hstsSubdomains}
+              allowWebsocket={host.allowWebsocket}
+              preserveHostHeader={host.preserveHostHeader}
+              skipHttpsValidation={host.skipHttpsHostnameValidation}
+              compression={host.compression}
+              discourageIndexing={host.discourageIndexing}
+              enabled={host.enabled}
+            />
+            <TextInput
+              label={t("name")}
+              htmlName="name"
+              value={name}
+              onChange={setName}
+              isRequired
+            />
+            <HostNotesField value={description} onChange={setDescription} />
+            <HostTagsField initial={host.tags} />
+            <TextArea
+              {...NO_SPELLCHECK}
+              label={t("domains")}
+              htmlName="domains"
+              value={domains}
+              onChange={setDomains}
+              rows={2}
+              description={t("domainsHelp")}
+            />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("upstreams")}>
+            <UpstreamInput defaultUpstreams={host.upstreams} />
+            <UpstreamHealthPanel hostId={host.id} />
+            <LoadBalancerFields loadBalancer={host.loadBalancer} />
+            <DnsResolverFields dnsResolver={host.dnsResolver} />
+            <UpstreamTimeoutsFields upstreamTimeouts={host.upstreamTimeouts} />
+            <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("tls")}>
+            <Selector
+              label={t("certificate")}
+              htmlName="certificateId"
+              options={toOptions(certificates, t("managedByCaddyAuto"))}
+              value={certificateId}
+              onChange={(next) => setCertificateId(next as string)}
+            />
+            <MtlsFields
+              value={host.mtls}
+              caCertificates={caCertificates}
+              proxyHostId={host.id}
+              mtlsRoles={mtlsRoles}
+              issuedClientCerts={issuedClientCerts}
+            />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("access")}>
+            <Selector
+              label={t("accessList")}
+              htmlName="accessListId"
+              options={accessListOptions(accessLists, t)}
+              value={accessListId}
+              onChange={(next) => setAccessListId(next as string)}
+              status={accessListStatus(accessLists, accessListId, t)}
+            />
+            <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
+            <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />
+            <CpmForwardAuthFields
+              cpmForwardAuth={host.cpmForwardAuth}
+              users={forwardAuthUsers}
+              groups={forwardAuthGroups}
+              currentAccess={forwardAuthAccess}
+            />
+            <TailscaleFields tailscale={host.tailscale} defaults={tailscaleDefaults} />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("protection")}>
+            <RateLimitFields rateLimit={host.rateLimit} />
+            <GeoBlockFields
+              initialValues={{
+                geoblock: host.geoblock,
+                geoblock_mode: host.geoblockMode,
+              }}
+            />
+            <CrowdSecFields enabled={host.crowdsec} />
+            <AnubisFields anubis={host.anubis} />
+            <WafFields value={host.waf} />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("routing")}>
+            <RedirectsFields initialData={host.redirects} />
+            <LocationRulesFields initialData={host.locationRules} accessLists={accessLists} />
+            <RewriteFields initialData={host.rewrite} />
+            <PathAllowsFields initialData={host.pathAllows} />
+            <PathBlocksFields initialData={host.pathBlocks} />
+            <PathRewritesFields initialData={host.pathRewrites} />
+            <ErrorPagesFields initialData={host.errorPages} />
+          </VStack>
+          <VStack gap={5} id={editorSectionAnchor("advanced")}>
+            <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
+            <CacheFields cache={host.cache} />
+            <MaintenanceFields maintenance={host.maintenance} />
+            {canEditRawConfig && <AdvancedConfigFields host={host} />}
+          </VStack>
         </VStack>
       </form>
     </AppDialog>

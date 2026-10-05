@@ -1,0 +1,63 @@
+---
+title: Overview and Needs attention
+description: The overview's Needs attention list, what each check looks at, who sees what, and the setup checklist.
+---
+
+import Demo from "../../../components/Demo.astro";
+import OverviewDemo from "../../../demos/samples/OverviewDemo";
+
+The overview is the dashboard's front page. Above the traffic tiles and chart it lists what needs
+attention right now, and for a new instance, the first steps still to take.
+
+<Demo title="The overview" note="Sample data. The attention list names the chart's 5xx spike, a certificate close to expiry and a scanner sweep the WAF stopped.">
+  <OverviewDemo client:visible />
+</Demo>
+
+## Needs attention
+
+Each item says what is wrong, how serious it is (critical, warning or info) and links to where it
+is dealt with. The worst come first, up to 50; anything past that is counted. The checks are:
+
+| Check | What makes an item |
+| --- | --- |
+| Certificates | An imported certificate, or one Caddy manages, that has expired or has fewer days left than the certificate alert threshold (**Settings → Email**, 14 by default). A managed one must also be in the last quarter of its life, so Caddy's short-lived internal certificates never show; one this close means its renewal is failing. A certificate read from a file on an agent whose last read failed. |
+| Caddy | The last configuration Caddy refused, on one agent or all of them, until one loads again. |
+| Agents | An agent gone for more than two minutes after it had connected, and an agent whose Caddy build, optional services, L4 port change or log access failed. |
+| Traffic | With [analytics](../analytics/) on: 5xx bursts (critical while still going on), a host answering 5% or more of at least 20 requests with 5xx, spikes in stopped requests against the 7-day average, and 50 or more requests stopped on one path. |
+| LDAP | A directory that cannot be connected to, bound to or searched. Each is checked at most every five minutes. |
+| Accounts | An account being made to wait after failed sign-ins, and one disabled after too many. |
+| L4 ports | L4 ports waiting for the Caddy container to be recreated, or a port change that failed. |
+| CRS plugins | A plugin switched off because Caddy would not load the WAF with it. |
+| GeoIP | The last GeoIP database update failed. |
+
+Every check has four seconds. One that takes longer, or fails, is left out and the list says so, so
+an empty list with a skipped check is "unknown", not "all clear". With analytics off there are no
+traffic items at all, which is not the same as no traffic problems.
+
+Administrators see every item. An operator sees the items about the proxy hosts and agents their
+groups grant: a certificate on one of their hosts, their hosts' traffic, their agents. Users and
+viewers see none.
+
+A host's own page lists the items about that host alone; see [the reverse proxy
+page](../reverse-proxy/#a-hosts-page).
+
+## Setup checklist
+
+Administrators also get a short checklist for a new instance:
+
+1. Serve a domain with a valid certificate.
+2. Add a first proxy host.
+3. Turn on analytics.
+4. Invite a second user.
+5. Set up single sign-on, through an OIDC provider or an LDAP directory.
+
+Each step ticks itself once the instance has it. A step can also be marked done by hand, for
+instance when single sign-on is deliberately not wanted, and the whole list can be hidden. Both are
+stored once for the instance, not per administrator, and both are recorded in the
+[audit log](../audit-log/).
+
+## Over the API
+
+The GraphQL [API](../api/) has the same list as `attention` (with `proxyHostId` for one host's
+items), the checklist as `setupChecklist`, and the `setSetupStepDone` and `setSetupChecklistHidden`
+mutations. Like the rest of the API, they are for administrators.

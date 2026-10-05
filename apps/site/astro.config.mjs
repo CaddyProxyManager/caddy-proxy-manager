@@ -132,6 +132,7 @@ export default defineConfig({
         {
           label: "Operations",
           items: [
+            { label: "Overview", slug: "features/overview" },
             { label: "Analytics", slug: "features/analytics" },
             { label: "Settings", slug: "features/settings" },
             { label: "Email", slug: "features/email" },
@@ -153,8 +154,8 @@ export default defineConfig({
     resolve: {
       /**
        * Three controller tsconfig paths repeated (`@/*` is unused by demos), plus shims for
-       * next-intl, next/navigation, the auth client, full page loads and the host actions. The
-       * shims must precede the `@/src/` alias, which would otherwise match first.
+       * next-intl, next/navigation, the auth client, full page loads, the host and overview
+       * actions. The shims must precede the `@/src/` alias, which would otherwise match first.
        */
       alias: [
         {
@@ -171,6 +172,12 @@ export default defineConfig({
           find: /^@\/src\/app\/\(dashboard\)\/proxy-hosts\/actions$/,
           replacement: fileURLToPath(
             new URL("./src/demos/shims/proxy-host-actions.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^@\/src\/app\/\(dashboard\)\/overview-actions$/,
+          replacement: fileURLToPath(
+            new URL("./src/demos/shims/overview-actions.ts", import.meta.url),
           ),
         },
         {

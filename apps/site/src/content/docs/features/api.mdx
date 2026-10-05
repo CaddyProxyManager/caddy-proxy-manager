@@ -105,6 +105,25 @@ query {
 Saved views are `analyticsViews`, `createAnalyticsView`, `updateAnalyticsView` and
 `deleteAnalyticsView`; a view's `query` is the page's address after the `?`.
 
+`proxyHostTraffic(id)` is one host's last 24 hours, as its page shows them: totals, half-hour
+buckets of served and 5xx responses, top paths and status codes. It is null with analytics off.
+
+## Needs attention
+
+`attention` is the overview's [Needs attention](../overview/) list, worst first; `proxyHostId`
+narrows it to one host. Each item has an English `title` and `detail`, and the `code` and `values`
+the dashboard renders them from in the reader's language. `skipped` names the checks that ran out
+of their four seconds, whose items are missing.
+
+```graphql
+query {
+  attention { items { severity title detail href } skipped truncated }
+  setupChecklist { hidden steps { step detected markedDone } }
+}
+```
+
+`setSetupStepDone(step, done)` and `setSetupChecklistHidden(hidden)` change the checklist.
+
 ## Authentication
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an

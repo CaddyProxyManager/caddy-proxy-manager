@@ -3,9 +3,17 @@ import {
   listProxyHostsPaginated,
   countProxyHosts,
   countProxyHostsByState,
+  getProxyHost,
+  getProxyHostsByIds,
+  listProxyHostDomainRefs,
   listProxyHostTags,
 } from "@/src/lib/models/proxy-hosts";
-import { getTrafficByProxyHost } from "@/src/lib/analytics/db";
+import { isAnalyticsEnabled } from "@/src/lib/clickhouse/client";
+import {
+  getTrafficForList,
+  listInsights,
+  sortIdsByRequests,
+} from "@/src/lib/proxy-hosts/list-insights";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
@@ -25,7 +33,13 @@ import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins"
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
+import {
+  canCreate,
+  canManage,
+  canView,
+  requireAccess,
+  visibleIdFilter,
+} from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificates/api";
 import { getTranslations } from "next-intl/server";
@@ -40,6 +54,8 @@ interface PageProps {
     sortDir?: string;
     state?: string;
     tag?: string;
+    /** A host to open the editor on, from its page's section links. */
+    edit?: string;
   }>;
 }
 
@@ -60,6 +76,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     sortDir: sortDirParam,
     state: stateParam,
     tag: tagParam,
+    edit: editParam,
   } = await searchParams;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   // Filtered in the query: client-side, "Disabled 2" shows nothing when both sit on a later page.
@@ -67,8 +84,17 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
-  const sortBy = sortByParam || undefined;
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
+  // Busiest first when there is traffic to sort by. Not a column, so sorted here over the whole
+  // filtered set and paged after.
+  const analyticsOn = await isAnalyticsEnabled().catch(() => false);
+  const sortBy = sortByParam || (analyticsOn ? "requests" : undefined);
+  const refs = analyticsOn ? await listProxyHostDomainRefs(search, visibleIds, enabled, tag) : [];
+  const traffic = analyticsOn
+    ? await getTrafficForList(refs)
+    : { available: false, byHost: new Map<number, never>() };
+  const byRequests = sortBy === "requests" && traffic.available;
+  const editId = Number.parseInt(editParam ?? "", 10);
 
   // The header counts the whole visible, searched set, not this page.
   const [
@@ -92,7 +118,24 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     wafPresets,
     crsPlugins,
   ] = await Promise.all([
-    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled, tag),
+    byRequests
+      ? getProxyHostsByIds(
+          sortIdsByRequests(
+            refs.map((ref) => ref.id),
+            traffic.byHost,
+            sortDir,
+          ).slice(offset, offset + PER_PAGE),
+        )
+      : listProxyHostsPaginated(
+          PER_PAGE,
+          offset,
+          search,
+          sortBy,
+          sortDir,
+          visibleIds,
+          enabled,
+          tag,
+        ),
     countProxyHosts(search, visibleIds, enabled, tag),
     countProxyHostsByState(search, visibleIds, tag),
     listProxyHostTags(visibleIds),
@@ -112,24 +155,27 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listCrsPlugins(),
   ]);
 
-  // Assignments for this page's hosts only, not the fleet. Traffic is best-effort: unavailable
-  // analytics drops the column instead of failing the list.
-  const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
-  const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
-  const [assignments, traffic, faAccessEntries] = await Promise.all([
+  // The editor opened from a host's page, which may sit on another page of the list.
+  const editHost = Number.isInteger(editId)
+    ? (hosts.find((h) => h.id === editId) ??
+      (canView(access, "proxyHost", editId) ? await getProxyHost(editId) : null))
+    : null;
+  const dialogHosts = editHost && !hosts.includes(editHost) ? [...hosts, editHost] : hosts;
+
+  // Assignments for this page's hosts only, not the fleet. Insights are best-effort: unavailable
+  // analytics drops the columns instead of failing the list.
+  const faHosts = dialogHosts.filter((h) => h.cpmForwardAuth?.enabled);
+  const [assignments, insights, faAccessEntries] = await Promise.all([
     agentIdsForHosts(
       "http",
-      hosts.map((host) => host.id),
+      dialogHosts.map((host) => host.id),
     ).catch(() => new Map<number, number[]>()),
-    getTrafficByProxyHost(
-      dayAgo,
-      Math.floor(Date.now() / 1000),
-      hosts.map((host) => ({ id: host.id, domains: host.domains })),
+    listInsights({ pageHosts: hosts, traffic, certificates }).catch(
+      () => ({ available: false }) as const,
     ),
     Promise.all(faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => []))),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
-  const hostTraffic = Object.fromEntries(traffic.byHost);
   const forwardAuthAccessMap: Record<number, { userIds: number[]; groupIds: number[] }> = {};
   faHosts.forEach((h, i) => {
     const entries = faAccessEntries[i];
@@ -178,7 +224,10 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         tags={tags}
         activeTag={tag ?? null}
         activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
-        initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
+        initialSort={{
+          sortBy: sortBy === "requests" && !byRequests ? "createdAt" : (sortBy ?? "createdAt"),
+          sortDir,
+        }}
         mtlsRoles={mtlsRoles}
         issuedClientCerts={issuedClientCerts}
         forwardAuthUsers={forwardAuthUsers}
@@ -187,10 +236,12 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         agents={agents}
         agentAssignments={agentAssignments}
         counts={counts}
-        hostTraffic={hostTraffic}
-        trafficAvailable={traffic.available}
+        insights={insights}
+        editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
         canCreate={canCreate(access)}
-        manageableIds={hosts.filter((h) => canManage(access, "proxyHost", h.id)).map((h) => h.id)}
+        manageableIds={dialogHosts
+          .filter((h) => canManage(access, "proxyHost", h.id))
+          .map((h) => h.id)}
         canEditRawConfig={access.isAdmin}
       />
     </WafPresetOptionsProvider>
