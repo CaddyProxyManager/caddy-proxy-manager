@@ -13,7 +13,7 @@
     },
     "apps/agent": {
       "name": "@cpm/agent",
-      "version": "3.6.1",
+      "version": "3.6.2",
       "dependencies": {
         "@cpm/shared": "workspace:*",
         "maxmind": "^5.0.7",
@@ -25,7 +25,7 @@
     },
     "apps/controller": {
       "name": "@cpm/controller",
-      "version": "3.6.1",
+      "version": "3.6.2",
       "dependencies": {
         "@astryxdesign/core": "^0.6.5",
         "@astryxdesign/theme-neutral": "^0.6.5",
@@ -115,7 +115,7 @@
     },
     "packages/shared": {
       "name": "@cpm/shared",
-      "version": "3.6.1",
+      "version": "3.6.2",
     },
   },
   "trustedDependencies": [
