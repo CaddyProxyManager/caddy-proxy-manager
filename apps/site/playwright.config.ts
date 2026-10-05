@@ -10,13 +10,13 @@ const PORT = 4329;
 export default defineConfig({
   testDir: "./tests/e2e",
   reporter: "list",
-  use: { baseURL: `http://localhost:${PORT}/caddy-proxy-manager/` },
+  use: { baseURL: `http://localhost:${PORT}/` },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     // --ignore-lock: a preview someone already has running (one per project, whatever the port)
     // would otherwise make this exit at once, which Playwright reports as the server dying.
     command: `bun run preview --port ${PORT} --ignore-lock`,
-    url: `http://localhost:${PORT}/caddy-proxy-manager/`,
+    url: `http://localhost:${PORT}/`,
     reuseExistingServer: !process.env.CI,
   },
 });
