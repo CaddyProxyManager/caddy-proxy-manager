@@ -144,15 +144,17 @@ export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): Caddy
 
 export const agentCaddyAdminTransport = agentCaddyAdminTransportWith(httpCaddyAdminTransport);
 
-let transport: CaddyAdminTransport = agentCaddyAdminTransport;
+// On globalThis: a dev program reload re-evaluates this module without re-running register(),
+// which would drop the demo's simulated Caddy for the real one.
+const slot = globalThis as typeof globalThis & { __cpmCaddyAdminTransport?: CaddyAdminTransport };
 
 /** Returns the previous adapter so callers can restore it. */
 export function setCaddyAdminTransport(next: CaddyAdminTransport): CaddyAdminTransport {
-  const previous = transport;
-  transport = next;
+  const previous = slot.__cpmCaddyAdminTransport ?? agentCaddyAdminTransport;
+  slot.__cpmCaddyAdminTransport = next;
   return previous;
 }
 
 export function caddyAdminRequest(request: CaddyAdminRequest): Promise<CaddyAdminResponse> {
-  return transport(request);
+  return (slot.__cpmCaddyAdminTransport ?? agentCaddyAdminTransport)(request);
 }

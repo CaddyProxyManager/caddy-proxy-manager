@@ -42,8 +42,13 @@ type Waiter = {
   timer: ReturnType<typeof setTimeout>;
 };
 
-const connections = new Map<string, Connection>();
-const waiters = new Map<string, Waiter>();
+// On globalThis: a dev program reload re-evaluates this module, and every agent would vanish
+// until it reconnected - the demo's never does.
+const state = globalThis as typeof globalThis & {
+  __cpmAgentRegistry?: { connections: Map<string, Connection>; waiters: Map<string, Waiter> };
+};
+state.__cpmAgentRegistry ??= { connections: new Map(), waiters: new Map() };
+const { connections, waiters } = state.__cpmAgentRegistry;
 
 export class AgentNotConnectedError extends Error {
   constructor(message: string) {
