@@ -165,9 +165,9 @@ const VALID_SAVES: Array<{
   {
     name: 'two-factor policy',
     action: actions.updateTwoFactorPolicySettingsAction,
-    fields: { requireForAdmins: 'on' },
+    fields: { mode: 'admins', graceDays: '14' },
     key: 'two_factor_policy',
-    expected: { requireForAdmins: true },
+    expected: { mode: 'admins', graceDays: 14, requireForAdmins: true },
   },
   {
     name: 'DNS resolvers',
@@ -846,7 +846,7 @@ describe('applying the change set', () => {
 
   it('discards one key, or the whole set', async () => {
     await actions.updateCompressionSettingsAction(null, form({ enabled: 'on' }));
-    await actions.updateTwoFactorPolicySettingsAction(null, form({ requireForAdmins: 'on' }));
+    await actions.updateTwoFactorPolicySettingsAction(null, form({ mode: 'admins' }));
 
     expect(await actions.discardStagedSettingsAction('compression')).toEqual({ success: true });
     expect(await stagedKeys()).toEqual(['two_factor_policy']);

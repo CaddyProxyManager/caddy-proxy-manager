@@ -4,19 +4,13 @@ import { type ReactNode, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { Card } from "@astryxdesign/core/Card";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
-import { DateTimeInput, type ISODateTimeString } from "@astryxdesign/core/DateTimeInput";
 import { Divider } from "@astryxdesign/core/Divider";
-import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FileInput } from "@astryxdesign/core/FileInput";
-import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -31,34 +25,32 @@ import { MAX_AVATAR_FILE_KB } from "@/src/lib/users/avatar-limits";
 import { authClient } from "@/src/lib/auth/client";
 import {
   Bell,
-  Key,
   KeyRound,
   Link,
   Lock,
   LogIn,
   LogOut,
   Monitor,
-  Plus,
-  Rows3,
   ShieldCheck,
   Trash2,
   Unlink,
   User,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { TwoFactorSection } from "./TwoFactorSection";
+import { ProfileSection } from "./ProfileSection";
+import { ApiTokensSection } from "./ApiTokensSection";
+import { DisplaySection } from "./DisplaySection";
+import type { DisplayPreferences } from "@/src/lib/users/display-preferences";
+import type { ApproximatePlace } from "@/src/lib/geoip/lookup";
+import { regionName } from "@/src/lib/locale/region-names";
 import { PasskeySection } from "./PasskeySection";
 import { type DeviceWords, describeDevice } from "./device";
 import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import type { PasskeySummary } from "@/src/lib/auth/passkeys";
 import type { ApiToken } from "@/lib/models/api-tokens";
-import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
-import { saveTableDensityAction } from "./display-actions";
-import { useSetTableDensity, useTableDensity } from "@/components/ui/TableDensity";
-import { isTableDensity, TABLE_DENSITIES } from "@/src/lib/users/table-density";
 import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
-import { useFormatter, useNow, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useNow, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
@@ -70,6 +62,8 @@ interface ActiveSession {
   ipAddress: string | null;
   userAgent: string | null;
   current: boolean;
+  /** From GeoIP, when the database is present. */
+  place: ApproximatePlace | null;
 }
 
 interface UserData {
@@ -109,85 +103,7 @@ interface ProfileClientProps {
   managedByDirectory?: string | null;
   /** An administrator's notification choices; null for everyone else, who is never notified. */
   notifications?: NotificationsSectionProps | null;
-}
-
-function ProfileSection({
-  icon,
-  title,
-  action,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card padding={6}>
-      <VStack gap={4}>
-        <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
-          <HStack gap={2} vAlign="center">
-            <Icon icon={icon} color="accent" />
-            <Heading level={2}>{title}</Heading>
-          </HStack>
-          {action}
-        </HStack>
-        <Divider />
-        {children}
-      </VStack>
-    </Card>
-  );
-}
-
-/** Table density, applied optimistically; a refused save restores the old one. */
-function DisplaySection({ onError }: { onError: (message: string) => void }) {
-  const t = useTranslations("profile");
-  const density = useTableDensity();
-  const setDensity = useSetTableDensity();
-  const [saving, setSaving] = useState(false);
-
-  const choose = async (next: string) => {
-    if (!isTableDensity(next) || next === density) return;
-    const previous = density;
-    setDensity(next);
-    setSaving(true);
-    try {
-      const result = await saveTableDensityAction(next);
-      if (!result.ok) {
-        setDensity(previous);
-        onError(result.error);
-      }
-    } catch {
-      setDensity(previous);
-      onError(t("tableDensitySaveFailed"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ProfileSection icon={Rows3} title={t("display")}>
-      <VStack gap={2}>
-        <SegmentedControl
-          label={t("tableDensity")}
-          value={density}
-          onChange={choose}
-          isDisabled={saving}
-        >
-          {TABLE_DENSITIES.map((option) => (
-            <SegmentedControlItem
-              key={option}
-              value={option}
-              label={t(`tableDensityOptions.${option}`)}
-            />
-          ))}
-        </SegmentedControl>
-        <Text type="body" size="sm" color="secondary">
-          {t("tableDensityHelp")}
-        </Text>
-      </VStack>
-    </ProfileSection>
-  );
+  displayPreferences: DisplayPreferences;
 }
 
 export default function ProfileClient({
@@ -204,6 +120,7 @@ export default function ProfileClient({
   directories = [],
   managedByDirectory = null,
   notifications = null,
+  displayPreferences,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
@@ -211,6 +128,7 @@ export default function ProfileClient({
   // `now` is passed explicitly, or next-intl reports an environment fallback on every call.
   const format = useFormatter();
   const now = useNow();
+  const locale = useLocale();
   const deviceWords: DeviceWords = {
     unknown: t("deviceUnknown"),
     browser: t("deviceBrowser"),
@@ -228,9 +146,6 @@ export default function ProfileClient({
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl);
-  const [newToken, setNewToken] = useState<string | null>(null);
-  const [tokenName, setTokenName] = useState("");
-  const [tokenExpiresAt, setTokenExpiresAt] = useState<ISODateTimeString | undefined>(undefined);
 
   const getProviderName = (provider: string) => {
     if (provider === "credentials") return t("providerCredentials");
@@ -472,18 +387,11 @@ export default function ProfileClient({
     }
   };
 
-  const handleCreateToken = async (formData: FormData) => {
-    setError(null);
-    setNewToken(null);
-    const result = await createApiTokenAction(formData);
-    if ("error" in result) {
-      setError(result.error);
-    } else {
-      setNewToken(result.rawToken);
-      setSuccess(t("apiTokenCreated"));
-      setTokenName("");
-      setTokenExpiresAt(undefined);
-    }
+  const placeLine = (place: ApproximatePlace) => {
+    const country = place.countryCode ? regionName(place.countryCode, locale) : null;
+    return place.city && country
+      ? t("sessionPlaceCity", { city: place.city, country })
+      : t("sessionPlace", { place: place.city ?? country ?? "" });
   };
 
   const formatDate = (iso: string | null): string => {
@@ -494,11 +402,6 @@ export default function ProfileClient({
   /** A line stating a time gets the UTC instant as its tooltip; "never" has none to give. */
   const withUtc = (iso: string | null, line: ReactNode) =>
     iso ? <UtcTooltip value={iso}>{line}</UtcTooltip> : line;
-
-  const isExpired = (expiresAt: string | null): boolean => {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) <= new Date();
-  };
 
   return (
     <VStack gap={6}>
@@ -584,7 +487,7 @@ export default function ProfileClient({
           </VStack>
         </ProfileSection>
 
-        <DisplaySection onError={setError} />
+        <DisplaySection preferences={displayPreferences} onError={setError} />
 
         {notifications && (
           <ProfileSection icon={Bell} title={t("notifications.title")}>
@@ -641,7 +544,7 @@ export default function ProfileClient({
         )}
 
         {localPasswordsEnabled && (
-          <ProfileSection icon={ShieldCheck} title={t("twoFactor.title")}>
+          <ProfileSection id="two-factor" icon={ShieldCheck} title={t("twoFactor.title")}>
             <TwoFactorSection
               enabled={user.twoFactorEnabled}
               hasPassword={hasPassword}
@@ -697,6 +600,11 @@ export default function ProfileClient({
                       {s.ipAddress && (
                         <Text type="body" size="xsm" color="secondary">
                           {t("ipAddress", { address: s.ipAddress })}
+                        </Text>
+                      )}
+                      {s.place && (
+                        <Text type="body" size="xsm" color="secondary">
+                          {placeLine(s.place)}
                         </Text>
                       )}
                       {withUtc(
@@ -806,122 +714,13 @@ export default function ProfileClient({
           </ProfileSection>
         )}
 
-        <ProfileSection icon={Key} title={t("apiTokens")}>
-          <VStack gap={4}>
-            <Text type="body" size="sm" color="secondary">
-              {t("apiTokensDescription")}
-            </Text>
-
-            {newToken && (
-              <VStack gap={2}>
-                <Text type="body" size="sm" weight="semibold">
-                  {t("tokenCopyWarning")}
-                </Text>
-                <CodeBlock code={newToken} width="100%" />
-              </VStack>
-            )}
-
-            {apiTokens.length > 0 && (
-              <List hasDividers>
-                {apiTokens.map((token) => {
-                  const expired = isExpired(token.expiresAt);
-                  return (
-                    <ListItem
-                      key={token.id}
-                      startContent={<Icon icon={Key} size="sm" color="secondary" />}
-                      label={token.name}
-                      description={
-                        <HStack gap={3} wrap="wrap" vAlign="center">
-                          {withUtc(
-                            token.createdAt,
-                            <Text type="body" size="xsm" color="secondary">
-                              {t("createdOn", { date: formatDate(token.createdAt) })}
-                            </Text>,
-                          )}
-                          {withUtc(
-                            token.lastUsedAt,
-                            <Text type="body" size="xsm" color="secondary">
-                              {t("used", { when: formatDate(token.lastUsedAt) })}
-                            </Text>,
-                          )}
-                          {token.expiresAt &&
-                            withUtc(
-                              token.expiresAt,
-                              <Text type="body" size="xsm" color="secondary">
-                                {expired
-                                  ? t("expiredOn", { date: formatDate(token.expiresAt) })
-                                  : t("expiresOn", { date: formatDate(token.expiresAt) })}
-                              </Text>,
-                            )}
-                        </HStack>
-                      }
-                      endContent={
-                        <HStack gap={2} vAlign="center">
-                          {expired && <Badge variant="error" label={t("expired")} />}
-                          <form action={deleteApiTokenAction.bind(null, token.id)}>
-                            <IconButton
-                              type="submit"
-                              variant="ghost"
-                              size="sm"
-                              label={t("deleteTokenNamed", { name: token.name })}
-                              tooltip={t("deleteToken")}
-                              icon={<Trash2 />}
-                            />
-                          </form>
-                        </HStack>
-                      }
-                    />
-                  );
-                })}
-              </List>
-            )}
-
-            {apiTokens.length === 0 && !newToken && (
-              <EmptyState
-                icon={<Key />}
-                title={t("noApiTokensYet")}
-                description={t("tokensEmptyDescription")}
-                isCompact
-              />
-            )}
-
-            <form action={handleCreateToken}>
-              <VStack gap={3}>
-                <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
-                  <TextInput
-                    label={t("name")}
-                    isRequired
-                    size="sm"
-                    htmlName="name"
-                    value={tokenName}
-                    onChange={setTokenName}
-                    placeholder={t("tokenNamePlaceholder")}
-                  />
-                  <VStack gap={0}>
-                    <DateTimeInput
-                      label={t("expiresAt")}
-                      isOptional
-                      size="sm"
-                      value={tokenExpiresAt}
-                      onChange={setTokenExpiresAt}
-                    />
-                    {/* DateTimeInput has no htmlName, hence the hidden field. */}
-                    <input type="hidden" name="expires_at" value={tokenExpiresAt ?? ""} />
-                  </VStack>
-                </Grid>
-                <HStack justify="end">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus />}
-                    label={t("createToken")}
-                  />
-                </HStack>
-              </VStack>
-            </form>
-          </VStack>
-        </ProfileSection>
+        <ApiTokensSection
+          tokens={apiTokens}
+          formatDate={formatDate}
+          withUtc={withUtc}
+          onError={setError}
+          onCreated={() => setSuccess(t("apiTokenCreated"))}
+        />
       </VStack>
 
       <AppDialog

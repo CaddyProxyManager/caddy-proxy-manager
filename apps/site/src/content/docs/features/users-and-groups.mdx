@@ -131,9 +131,7 @@ time if the phone is lost.
   and portal, locks it for fifteen minutes.
 - **Single sign-on accounts are left to their provider.** There is no password for a second
   factor to protect, so the section says so rather than offering it.
-- **Administrators can be required to use it.** **Settings → Authentication → Two-factor
-  Sign-in** sends an administrator who signs in with a password and hasn't set it up to do that
-  first, before anything else in the dashboard or the API answers them.
+- **A second factor can be required.** See [the two-factor policy](#the-two-factor-policy).
 
 An administrator can reset another user's second factor from **Users**, which also signs that user
 out everywhere. For the one administrator who has lost both the phone and the backup codes, the
@@ -146,6 +144,31 @@ docker compose exec web /app/cpm-server --reset-2fa admin
 It asks the running server to do it, so the reset is in the audit log like any other, and it only
 works from inside the container: the request is signed with a key derived from `SESSION_SECRET` and
 answered only on the container's own loopback. It removes the user's passkeys too.
+
+### The two-factor policy
+
+**Settings → Authentication → Two-factor Sign-in** decides who must have a second factor: nobody,
+**administrators**, or **every password account**. An authenticator app or a passkey satisfies it.
+
+- **Accounts without a local password are exempt.** Single sign-on and directory accounts are
+  left to their identity provider or directory, which is where their second factor belongs.
+- **A grace period comes first.** For 0 to 90 days (7 by default) after the policy reaches an
+  account - when the policy is turned on or widened, or when the account is created, whichever is
+  later - a banner across the dashboard asks for setup and names the date. After that, signing in
+  leads straight to setup, and until it is done the dashboard, REST and GraphQL answer nothing
+  else. Changing only the number of days keeps the clock that is running.
+- **API tokens keep working.** They are credentials of their own, scoped as
+  [the API page](../api/#scopes) describes.
+- **"Require for administrators" from an earlier release** is the administrators policy, enforced
+  at once as it was.
+
+If the policy locks out everyone who could change it, turn it off from inside the server's
+container. Like the reset below, it is signed with a key derived from `SESSION_SECRET`, answered
+only on the container's loopback, and recorded in the audit log:
+
+```bash
+docker compose exec web /app/cpm-server --lift-mfa-policy
+```
 
 ### Passkeys
 
@@ -160,8 +183,8 @@ offer saved passkeys in the username field's autofill.
   password guessing: there is no name to guess against, and no guess without the private key.
   Better Auth's request limit (**Settings → Authentication → Sign-in**) still applies to each
   address.
-- **It does not count as two-factor sign-in.** An administrator required to use two-factor
-  sign-in who also has a password still has to set up an authenticator app.
+- **It counts as a second factor.** [The two-factor policy](#the-two-factor-policy) is satisfied
+  by a passkey as well as by an authenticator app.
 - **Adding one needs a recent sign-in.** It is a new way into the account, so a session more than
   ten minutes old is asked to sign in again first - a borrowed or stolen one usually is older.
 - **It needs HTTPS and the Public URL's hostname.** Every passkey belongs to the hostname of the
@@ -178,6 +201,40 @@ offer saved passkeys in the username field's autofill.
 An administrator can remove another user's passkeys from **Users**, next to the two-factor reset,
 which signs them out everywhere too. Removing a passkey here doesn't delete it from the device or
 password manager that holds it; it just no longer signs in.
+
+## The users list
+
+**Users** shows, for each account, where it came from (local, single sign-on or a directory), its
+second factor (none, an authenticator app, a passkey, or both), and its last sign-in: when, and
+whether with a password, a passkey, single sign-on or a directory password. Sign-ins from before
+this release show the newest session's start instead, with no method. Administrators who sign in
+with a password alone get a badge in the list and a banner above it, which shows only them or, with
+no policy on, leads to [requiring a second factor](#the-two-factor-policy).
+
+### Sign-in overview
+
+**Users → Sign-in overview** (the arrow icon beside the heading) puts every way in on one page:
+
+- **Each method and whether it is on**: username and password, passkeys (with the hostname they
+  are bound to), every OAuth provider and every directory, each with the number of accounts using
+  it and a link to where it is configured. Directories are checked as Needs attention checks them,
+  and one not answering is marked.
+- **The second-factor policy** and how many accounts have an authenticator app or a passkey.
+- **The login page as it stands**: what someone signing in sees first, drawn from the same
+  settings. Nothing in it signs anyone in.
+- **Group and role mappings**: which provider or directory group becomes which role, the role for
+  anyone else, and the IdP groups mapped onto CPM groups.
+
+## Display preferences
+
+**Profile → Display** holds three choices of your own. Table density applies at once. The time
+zone and the number format are stored on the account, so they follow it to every browser: times
+show in the zone you pick (or the browser's, by default), and large numbers group the way you
+choose - `1,234.5`, `1.234,5`, `1 234,5` or `1'234.5` - whatever language the pages are in. A
+browser you have not set a zone for still tells the server its own, as before.
+
+The session list on the same page shows each session's approximate place, such as "Near Lyon,
+France", when the [GeoIP](../geo-blocking/) City or Country database is on the controller.
 
 ## OAuth / SSO
 

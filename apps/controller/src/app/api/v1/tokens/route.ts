@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { domainErrorMessage } from "@/src/lib/errors/domain-error";
 import { createApiToken, listApiTokens, listAllApiTokens } from "@/src/lib/models/api-tokens";
+import { parseTokenScope } from "@/src/lib/api-tokens/scope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +49,12 @@ export async function POST(request: NextRequest) {
 
     let result: Awaited<ReturnType<typeof createApiToken>>;
     try {
-      result = await createApiToken(body.name, userId, body.expires_at ?? undefined);
+      result = await createApiToken(
+        body.name,
+        userId,
+        body.expires_at ?? undefined,
+        parseTokenScope(body.scope, body.permissions),
+      );
     } catch (e) {
       if (
         e instanceof Error &&

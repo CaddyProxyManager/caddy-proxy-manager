@@ -19,6 +19,7 @@ import {
 import { isConnected } from "../agent/registry";
 import { type PairedAgent, listAgents } from "../models/agents";
 import { createApiToken, deleteApiToken, listApiTokens } from "../models/api-tokens";
+import { parseTokenScope } from "../api-tokens/scope";
 import { countAuditEvents, listAuditEvents } from "../models/audit";
 import { listCaCertificates } from "../models/ca-certificates";
 import { listCertificates, getCertificate } from "../models/certificates";
@@ -146,6 +147,8 @@ function projectUser(row: UserRow) {
     status: row.status,
     provider: row.provider,
     avatarUrl: row.avatarUrl,
+    lastSignInAt: row.lastSignInAt,
+    lastSignInMethod: row.lastSignInMethod,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -292,6 +295,11 @@ export const resolvers = {
     caddyModules: async (_: unknown, __: unknown, context: GraphQLContext) => {
       await requireAdmin(context);
       return await getCaddyModuleAvailability();
+    },
+    signInOverview: async (_: unknown, __: unknown, context: GraphQLContext) => {
+      await requireAdmin(context);
+      const { getSignInOverview } = await import("../users/sign-in-overview");
+      return await getSignInOverview();
     },
     ...analyticsQueryResolvers,
     ...attentionQueryResolvers,
@@ -453,7 +461,14 @@ export const resolvers = {
 
     createApiToken: async (
       _: unknown,
-      args: { input: { name: string; expiresAt?: string | null } },
+      args: {
+        input: {
+          name: string;
+          expiresAt?: string | null;
+          scope?: unknown;
+          permissions?: unknown;
+        };
+      },
       context: GraphQLContext,
     ) => {
       const viewer = await context.viewer();
@@ -465,6 +480,7 @@ export const resolvers = {
         args.input.name,
         viewer.userId,
         args.input.expiresAt ?? undefined,
+        parseTokenScope(args.input.scope, args.input.permissions),
       );
       // The only time the secret is readable.
       return { token: created.token, secret: created.rawToken };

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { APP_VERSION } from "@/src/lib/runtime/app-version";
+import { TOKEN_AREAS, TOKEN_SCOPE_KINDS } from "@/src/lib/api-tokens/scope";
 import { APP_ROLES } from "@/src/lib/auth/oidc/groups";
 import { USER_STATUSES } from "@/src/lib/users/admin";
 import { SETTINGS_GROUPS } from "@/src/lib/settings/api";
@@ -19,6 +20,8 @@ import {
   MAX_REDIS_DB,
   MIN_OTTER_SIZE,
 } from "@/src/lib/proxy-hosts/http-cache-options";
+
+const TOKEN_PERMISSION_VALUES = TOKEN_AREAS.flatMap((area) => [`${area}:read`, `${area}:write`]);
 
 const spec = {
   openapi: "3.1.0",
@@ -2659,8 +2662,14 @@ const spec = {
           createdAt: { type: "string", format: "date-time" },
           lastUsedAt: { type: ["string", "null"], format: "date-time" },
           expiresAt: { type: ["string", "null"], format: "date-time" },
+          scope: { type: "string", enum: [...TOKEN_SCOPE_KINDS] },
+          permissions: {
+            type: "array",
+            items: { type: "string", enum: TOKEN_PERMISSION_VALUES },
+            description: "The custom scope's permissions; empty for full and read.",
+          },
         },
-        required: ["id", "name", "createdBy", "createdAt"],
+        required: ["id", "name", "createdBy", "createdAt", "scope", "permissions"],
       },
       TokenInput: {
         type: "object",
@@ -2673,6 +2682,18 @@ const spec = {
             format: "date-time",
             description:
               "Optional expiration date (ISO 8601). Field name is snake_case for this endpoint.",
+          },
+          scope: {
+            type: "string",
+            enum: [...TOKEN_SCOPE_KINDS],
+            default: "full",
+            description:
+              "full acts with the owner's role, read refuses every change, custom allows the permissions listed. A scope never widens the owner's role.",
+          },
+          permissions: {
+            type: "array",
+            items: { type: "string", enum: TOKEN_PERMISSION_VALUES },
+            description: "Required for a custom scope. area:write implies area:read.",
           },
         },
         required: ["name"],

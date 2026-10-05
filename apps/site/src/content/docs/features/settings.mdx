@@ -8,6 +8,16 @@ holds only what has to be read before the database can be: the session key, the 
 and what Docker Compose itself needs. The full list of both is in the
 [README](https://source.caddyproxy.com#configuration).
 
+## Finding a setting
+
+The search field at the top of the Settings overview finds a setting by what it is called or by the
+words someone might use for it: `smtp` finds **Email**, `prometheus` finds **Metrics & Monitoring**,
+`redis` finds the **HTTP Cache** storage, `mfa` finds **Two-factor Sign-in**. It also reaches the
+pages that configure the instance outside the settings sections - **Backup and restore** and its
+portable configuration, settings history, the WAF's tuning, per-host modes and exclusions, blocked
+sources and the sign-in overview - and the environment variables each section reads. The same
+index answers the command palette (Ctrl/Cmd+K) from any page.
+
 ## How a value is resolved
 
 **Stored value → environment variable → default**, in that order. Until a deployment has been

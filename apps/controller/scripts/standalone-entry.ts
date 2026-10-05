@@ -11,6 +11,8 @@ import pkg from "../package.json";
 import { installPeerAddressStamp } from "../src/lib/http/peer-address";
 import {
   CONSOLE_ENABLE_USER_PATH,
+  CONSOLE_LIFT_MFA_POLICY_PATH,
+  CONSOLE_POLICY_SUBJECT,
   CONSOLE_RESET_TWO_FACTOR_PATH,
   type ConsoleCommandPurpose,
   signConsoleCommand,
@@ -81,6 +83,30 @@ function runEnableUser(port: number, username: string): void {
     });
 }
 
+function runLiftMfaPolicy(port: number): void {
+  postConsoleCommand(port, CONSOLE_LIFT_MFA_POLICY_PATH, "lift-mfa-policy", CONSOLE_POLICY_SUBJECT)
+    .then(async (response) => {
+      const body = (await response.json().catch(() => ({}))) as {
+        previousMode?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        console.error(`[cpm] Lifting the policy was refused: ${body.error ?? response.status}`);
+        process.exit(1);
+      }
+      console.log(
+        body.previousMode && body.previousMode !== "off"
+          ? `[cpm] The two-factor policy is off (it covered "${body.previousMode}"). Turn it back on under Settings > Authentication once you are in.`
+          : "[cpm] The two-factor policy was already off.",
+      );
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("[cpm] Could not reach the running server:", error);
+      process.exit(1);
+    });
+}
+
 function runResetTwoFactor(port: number, username: string): void {
   postConsoleCommand(port, CONSOLE_RESET_TWO_FACTOR_PATH, "reset-2fa", username)
     .then(async (response) => {
@@ -108,6 +134,12 @@ function runResetTwoFactor(port: number, username: string): void {
       console.error("[cpm] Could not reach the running server:", error);
       process.exit(1);
     });
+}
+
+// Its own options and exit codes, so it is dispatched before the server's parser sees it.
+if (hideBin(process.argv)[0] === "--copy-to-postgres") {
+  const { runCopyCli } = await import("../src/lib/migration/sqlite-to-postgres-cli");
+  process.exit(await runCopyCli(hideBin(process.argv).slice(1)));
 }
 
 /**
@@ -140,6 +172,18 @@ const argv = yargs(hideBin(process.argv))
     describe:
       "Turn off two-factor sign-in and remove the passkeys of a user on the running server, then exit",
   })
+  .option("copy-to-postgres", {
+    type: "boolean",
+    default: false,
+    describe:
+      "Copy a SQLite database into an empty PostgreSQL one, then exit. Must come first; add --help after it for its options",
+  })
+  .option("lift-mfa-policy", {
+    type: "boolean",
+    default: false,
+    describe:
+      "Turn off the policy requiring a second factor on the running server, then exit (break glass)",
+  })
   .option("enable-user", {
     type: "string",
     describe:
@@ -160,6 +204,8 @@ if (argv["reset-2fa"] !== undefined) {
   runResetTwoFactor(argv.port, argv["reset-2fa"]);
 } else if (argv["enable-user"] !== undefined) {
   runEnableUser(argv.port, argv["enable-user"]);
+} else if (argv["lift-mfa-policy"]) {
+  runLiftMfaPolicy(argv.port);
 } else if (argv.healthcheck) {
   // The resolved port, so probing a server started with --port still reaches it.
   runHealthCheck(argv.port);

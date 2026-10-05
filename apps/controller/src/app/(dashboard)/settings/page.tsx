@@ -153,7 +153,7 @@ async function remainingBlocks() {
     ldapDirectoryCount: ldap.length,
     signIn: { localUsersDisabled, accountLockEnabled },
     captchaProvider: captcha?.provider ?? null,
-    twoFactorRequiredForAdmins: twoFactor.requireForAdmins,
+    twoFactorMode: twoFactor.mode,
     requireChangeOnLegacyHash: passwordPolicy?.requireChangeOnLegacyHash ?? false,
     authentikOutpost: authentik?.outpostDomain ?? "",
     forwardAuth: forwardAuth?.authUpstream

@@ -9,6 +9,8 @@ import { getAccentColor } from "@/src/lib/branding/accent-color";
 import { getAppName } from "@/src/lib/branding/app-name";
 import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/users/theme-mode";
+import { requestDisplayPreferences } from "@/src/lib/users/display-preferences";
+import { numberLocaleFor } from "@/src/lib/locale/number-format";
 
 // From the same cookie `<html data-theme>` is rendered from, so the browser's own chrome is tinted
 // with the mode the page is actually in rather than the one the OS would have chosen.
@@ -46,6 +48,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const timeZone = await getTimeZone();
   const localePreference = parsePreference(cookieStore.get(LOCALE_COOKIE)?.value);
   const accent = await getAccentColor();
+  // The account's, when it chose: they follow it to every browser (lib/users/display-preferences.ts).
+  const preferences = await requestDisplayPreferences();
 
   return (
     // data-theme is rendered from the cookie so the first paint is already in the right mode;
@@ -65,6 +69,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           localePreference={localePreference}
           messages={messages}
           timeZone={timeZone}
+          timeZoneFromAccount={Boolean(preferences?.timeZone)}
+          numberLocale={numberLocaleFor(preferences?.numberFormat)}
         >
           {children}
         </Providers>

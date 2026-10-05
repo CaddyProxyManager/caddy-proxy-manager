@@ -22,7 +22,8 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { useFormatter, useTranslations } from "next-intl";
+import { type useFormatter, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -311,7 +312,7 @@ export default function OverviewClient({
 }) {
   const t = useTranslations("overview");
   const density = useTableDensity();
-  const format = useFormatter();
+  const format = useAppFormatter();
   const emptyValue = useEmptyValue();
   const chartTheme = useChartTheme();
 

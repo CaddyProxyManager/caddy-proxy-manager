@@ -27,7 +27,8 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { AttentionList } from "@/components/attention/AttentionList";
 import { HostTagList } from "@/components/proxy-hosts/HostTagsField";
 import {
@@ -103,7 +104,7 @@ export function ProxyHostDetailView({
 }) {
   const t = useTranslations("proxyHosts.detail");
   const tFacts = useTranslations("proxyHosts.detail.facts") as unknown as DynamicTranslate;
-  const format = useFormatter();
+  const format = useAppFormatter();
   const density = useTableDensity();
   const { host, traffic } = detail;
 

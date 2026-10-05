@@ -342,7 +342,10 @@ export function ConfigTransfer() {
   return (
     <VStack gap={4}>
       <VStack gap={1}>
-        <Heading level={2}>{t("heading")}</Heading>
+        {/* Settings search links here. */}
+        <Heading level={2} id="portable-config">
+          {t("heading")}
+        </Heading>
         <Text type="body" size="sm" color="secondary">
           {t("intro")}
         </Text>

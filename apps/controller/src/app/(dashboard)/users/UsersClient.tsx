@@ -10,6 +10,7 @@ import {
   Ban,
   CheckCircle2,
   Eye,
+  LogIn,
   Pencil,
   Plus,
   Trash2,
@@ -44,7 +45,7 @@ import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/users/avatar";
 import { isUsableSignInUsername } from "@/src/lib/auth/login-username";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   createUserAction,
@@ -57,6 +58,11 @@ import {
   sendEmailedLinkAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
+import type { AccountSource } from "@/src/lib/users/account-source";
+import type { MfaPolicyMode } from "@/src/lib/auth/two-factor/mfa-policy";
+import { isSignInMethod } from "@/src/lib/auth/sign-in-methods";
+import { Token } from "@astryxdesign/core/Token";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 
 type Role = "admin" | "operator" | "user" | "viewer";
 
@@ -88,6 +94,10 @@ type UserEntry = {
   isDemoAdmin: boolean;
   /** Disabled by the auto-disable after failed sign-ins, not by an administrator. */
   disabledByFailedSignIns?: boolean;
+  accountSource: AccountSource;
+  /** The last completed sign-in, recorded since this release; older ones fall back to sessions. */
+  lastSignInAt: string | null;
+  lastSignInMethod: string | null;
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
@@ -105,6 +115,7 @@ type Props = {
   localUsersEnabled?: boolean;
   /** Email is set up, so accounts can be invited and sent password links. */
   emailEnabled?: boolean;
+  mfaPolicyMode?: MfaPolicyMode;
 };
 
 type StatusFilter = "all" | "active" | "disabled";
@@ -129,6 +140,11 @@ function userLabel(user: Pick<UserEntry, "name" | "email">) {
   return user.name ?? user.email.split("@")[0];
 }
 
+/** A password and nothing else: what the banner and the rail's warning point at. */
+function lacksSecondFactor(user: UserEntry) {
+  return user.hasPassword && !user.twoFactorEnabled && user.passkeyCount === 0;
+}
+
 /** "local" is the absence of an external provider, so anything else names an IdP. */
 function isExternal(user: UserEntry) {
   return !!user.provider && user.provider !== "local" && user.provider !== "credentials";
@@ -139,8 +155,10 @@ export default function UsersClient({
   groups = [],
   localUsersEnabled = true,
   emailEnabled = false,
+  mfaPolicyMode = "off",
 }: Props) {
   const [viewAsOpen, setViewAsOpen] = useState(false);
+  const [noMfaOnly, setNoMfaOnly] = useState(false);
   const t = useTranslations("users");
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(users[0]?.id ?? null);
@@ -175,6 +193,7 @@ export default function UsersClient({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
+      if (noMfaOnly && !(u.role === "admin" && lacksSecondFactor(u))) return false;
       if (status === "active" && u.status !== "active") return false;
       if (status === "disabled" && u.status === "active") return false;
       if (!q) return true;
@@ -184,7 +203,11 @@ export default function UsersClient({
         u.role.includes(q)
       );
     });
-  }, [users, search, status]);
+  }, [users, search, status, noMfaOnly]);
+
+  const adminsWithoutMfa = users.filter(
+    (u) => u.role === "admin" && u.status === "active" && lacksSecondFactor(u),
+  );
 
   const selected = users.find((u) => u.id === selectedId) ?? null;
   const activeCount = users.filter((u) => u.status === "active").length;
@@ -236,6 +259,16 @@ export default function UsersClient({
           <SegmentedControlItem value="active" label={t("filterActive")} />
           <SegmentedControlItem value="disabled" label={t("filterDisabled")} />
         </SegmentedControl>
+        {noMfaOnly && (
+          <HStack>
+            <Token
+              size="sm"
+              color="orange"
+              label={t("mfa.filterToken")}
+              onRemove={() => setNoMfaOnly(false)}
+            />
+          </HStack>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -253,6 +286,13 @@ export default function UsersClient({
               description={user.email}
               endContent={
                 <HStack gap={1} vAlign="center">
+                  {user.role === "admin" && lacksSecondFactor(user) && (
+                    <StatusDot
+                      variant="warning"
+                      label={t("mfa.noSecondFactorShort")}
+                      tooltip={t("mfa.noSecondFactorShort")}
+                    />
+                  )}
                   {user.status !== "active" && <Badge variant="error" label={t("disabledBadge")} />}
                   <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
                 </HStack>
@@ -265,6 +305,16 @@ export default function UsersClient({
           ))}
         </List>
       )}
+
+      <HStack>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<LogIn />}
+          label={t("signInOverview")}
+          href="/users/sign-in"
+        />
+      </HStack>
 
       {/* Totals at the foot: the rail scrolls, and these describe the whole set. */}
       <Text type="supporting" color="secondary">
@@ -289,6 +339,18 @@ export default function UsersClient({
       detail={
         <VStack gap={4}>
           {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+          {adminsWithoutMfa.length > 0 && (
+            <AdminsWithoutMfaBanner
+              admins={adminsWithoutMfa}
+              policyMode={mfaPolicyMode}
+              onShow={() => {
+                setNoMfaOnly(true);
+                setStatus("all");
+                setSearch("");
+                setSelectedId(adminsWithoutMfa[0]?.id ?? null);
+              }}
+            />
+          )}
           <ViewAsDialog
             open={viewAsOpen}
             onClose={() => setViewAsOpen(false)}
@@ -436,10 +498,24 @@ function UserDetail({
               {isUsableSignInUsername(user.username) ? user.username : t("signInUsernameNone")}
             </MetadataListItem>
             <MetadataListItem label={t("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
+            <MetadataListItem label={t("accountSource.label")}>
+              {t(`accountSource.${user.accountSource}`)}
+            </MetadataListItem>
             <MetadataListItem label={t("signInMethod")}>
               {isExternal(user)
                 ? t("signInExternal", { provider: user.provider ?? "" })
                 : t("signInLocal")}
+            </MetadataListItem>
+            <MetadataListItem label={t("mfa.secondFactor")}>
+              {user.twoFactorEnabled && user.passkeyCount > 0
+                ? t("mfa.both")
+                : user.twoFactorEnabled
+                  ? t("mfa.totp")
+                  : user.passkeyCount > 0
+                    ? t("mfa.passkey")
+                    : user.hasPassword
+                      ? t("mfa.none")
+                      : t("mfa.notApplicable")}
             </MetadataListItem>
             {isExternal(user) && user.subject && (
               <MetadataListItem label={t("subject")}>
@@ -449,7 +525,14 @@ function UserDetail({
               </MetadataListItem>
             )}
             <MetadataListItem label={t("lastSignIn")}>
-              {user.lastSessionAt ? (
+              {user.lastSignInAt ? (
+                <HStack gap={2} vAlign="center" wrap="wrap">
+                  <Timestamp value={user.lastSignInAt} style="dateTimeShort" />
+                  {isSignInMethod(user.lastSignInMethod) && (
+                    <Token size="sm" label={t(`lastSignInMethods.${user.lastSignInMethod}`)} />
+                  )}
+                </HStack>
+              ) : user.lastSessionAt ? (
                 <Timestamp value={user.lastSessionAt} style="dateTimeShort" />
               ) : (
                 t("noActiveSession")
@@ -587,6 +670,45 @@ function UserDetail({
         }}
       />
     </VStack>
+  );
+}
+
+/** Administrators who sign in with a password alone, and the two ways to deal with them. */
+function AdminsWithoutMfaBanner({
+  admins,
+  policyMode,
+  onShow,
+}: {
+  admins: UserEntry[];
+  policyMode: MfaPolicyMode;
+  onShow: () => void;
+}) {
+  const t = useTranslations("users");
+  const format = useFormatter();
+  const names = format.list(admins.map(userLabel));
+  return (
+    <Banner
+      status="warning"
+      title={t("mfa.bannerTitle", { count: admins.length })}
+      description={
+        policyMode === "off"
+          ? t("mfa.bannerDescriptionOff", { names })
+          : t("mfa.bannerDescriptionPolicy", { names })
+      }
+      endContent={
+        <HStack gap={2} wrap="wrap">
+          <Button variant="secondary" size="sm" label={t("mfa.show")} onClick={onShow} />
+          {policyMode === "off" && (
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mfa.requireAction")}
+              href="/settings/authentication#two-factor"
+            />
+          )}
+        </HStack>
+      }
+    />
   );
 }
 

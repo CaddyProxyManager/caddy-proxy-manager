@@ -11,6 +11,8 @@ import { getTranslations } from "next-intl/server";
 import { emailReady } from "@/src/lib/email/config";
 import { passkeyCountsByUser } from "@/src/lib/auth/passkeys";
 import { disabledByFailedSignIns } from "@/src/lib/auth/account-failures";
+import { type AccountSource, accountSourcesByUser } from "@/src/lib/users/account-source";
+import { getTwoFactorPolicySettings } from "@/src/lib/settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -19,14 +21,17 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function UsersPage() {
   const session = await requireAdmin();
-  const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword] = await Promise.all([
-    listUsers(),
-    isGravatarEnabled(),
-    // Best-effort: a failure here must not take the page with it.
-    lastSessionByUser().catch(() => new Map<number, string>()),
-    listGroups().catch(() => []),
-    usersWithPassword().catch(() => new Set<number>()),
-  ]);
+  const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword, sources, policy] =
+    await Promise.all([
+      listUsers(),
+      isGravatarEnabled(),
+      // Best-effort: a failure here must not take the page with it.
+      lastSessionByUser().catch(() => new Map<number, string>()),
+      listGroups().catch(() => []),
+      usersWithPassword().catch(() => new Set<number>()),
+      accountSourcesByUser().catch(() => new Map<number, AccountSource>()),
+      getTwoFactorPolicySettings(),
+    ]);
   const passkeyCounts = await passkeyCountsByUser(allUsers.map((user) => user.id)).catch(
     () => new Map<number, number>(),
   );
@@ -40,6 +45,7 @@ export default async function UsersPage() {
     lastSessionAt: lastSessions.get(rest.id) ?? null,
     hasPassword: passwordHash !== null || withPassword.has(rest.id),
     passkeyCount: passkeyCounts.get(rest.id) ?? 0,
+    accountSource: sources.get(rest.id) ?? ("local" as const),
     disabledByFailedSignIns: autoDisabled.has(rest.id),
     isDemoAdmin: isDemoAdmin(rest.id),
     isSelf: rest.id === Number(session.user.id),
@@ -56,6 +62,7 @@ export default async function UsersPage() {
       groups={groups}
       localUsersEnabled={!(await localUsersDisabled())}
       emailEnabled={await emailReady()}
+      mfaPolicyMode={policy.mode}
     />
   );
 }

@@ -253,6 +253,13 @@ Run it inside the container: `docker compose exec web /app/cpm-server --reset-2f
 starts their count over - the way back in when that user is the only administrator:
 `docker compose exec web /app/cpm-server --enable-user admin`.
 
+`cpm-server --lift-mfa-policy` turns the two-factor policy off on the running server - the way back
+in when it locks out everyone who could change it:
+`docker compose exec web /app/cpm-server --lift-mfa-policy`.
+
+`cpm-server --copy-to-postgres` copies a SQLite database into an empty PostgreSQL one and exits; see
+[Moving from SQLite to PostgreSQL](#moving-from-sqlite-to-postgresql).
+
 ---
 
 ## Features
@@ -285,15 +292,15 @@ starts their count over - the way back in when that user is the only administrat
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires
 - **REST API (deprecated)** - `/api/v1/` still works exactly as it did, with Bearer token authentication and interactive OpenAPI 3.1.0 docs at `/api-docs`. It is no longer the documented path and will be removed in a later release; new integrations should use GraphQL
-- **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
+- **API Tokens** - Up to ten per account, from Profile, each expiring in 30 days, 90 days, a year, on a chosen date or never, and scoped to the owner's role, read only, or chosen read or write permissions per area; a token never does more than its owner's role allows
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, INWX, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults). Challenge delegation: CNAME `_acme-challenge` to a zone a provider can write, per domain, with a live CNAME check; acme-dns accounts per domain, registered from the UI
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
-- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
+- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored. A search finds any setting by name or by what it is for, such as `smtp`, `prometheus` or `redis`
 - **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, a certificate expiry digest for the administrators, and admin notifications, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
 - **Notifications** - Tells the administrators by email and browser push, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications** turns it off for everyone; each administrator picks their own events and channels under **Profile → Notifications**
-- **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. Optionally required for administrators; resettable by an admin or from the container console
+- **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. A policy can require a second factor (an authenticator app or a passkey) of administrators or of every password account, after a grace period with a banner, with a console command to lift it; resettable by an admin or from the container console
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
 - **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`. Restores onto a new machine with a different `SESSION_SECRET`, and saves what it replaces first
@@ -302,12 +309,14 @@ starts their count over - the way back in when that user is the only administrat
 - **Log Viewer** - Tail access, WAF, Caddy and certificate logs from any agent, following new lines, with a Logs action on each proxy host. Admin only
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
 - **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported - accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
+- **SQLite to PostgreSQL** - `cpm-server --copy-to-postgres` copies a SQLite install into an empty PostgreSQL database in one transaction, ids, secrets and the audit chain intact, with a dry run and a row count of every table on both sides
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. An apply that any host refuses fails and names it
 - **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. It can be switched off; the only other requests the app makes to the internet on its own are the CRS plugin registry check and the GeoIP downloads, each with a switch of its own
 - **Audit Log** - Searchable configuration change history with user attribution, field-level before and after for each change (secrets masked, unified or side by side), and a SHA-256 hash chain an administrator can verify to find the first altered, removed or inserted event
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
 - **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie - no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
+- **Users and Sign-in** - The users list shows each account's source (local, single sign-on or directory), its second factor and its last sign-in time and method, and flags administrators without a second factor. A sign-in overview shows every method and whether it is on, linked accounts, directory health, group-to-role mappings and a preview of the login page. Profile keeps a time zone and number format that follow the account to every browser, and shows each session's approximate place from GeoIP
 - **Mobile UI** - Fully responsive interface optimised for iPhone and other narrow viewports
 
 ---
@@ -542,9 +551,16 @@ groups, agents, settings, the audit log, and a Caddy apply.
 curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $CPM_TOKEN"   -H 'content-type: application/json'   -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
 ```
 
-Tokens are created from **Profile → API Tokens** in an authenticated dashboard session, with an
-optional expiry - an existing bearer token cannot mint replacement credentials, so a leaked one
-cannot extend its own life.
+Tokens are created from **Profile → API Tokens** in an authenticated dashboard session - an
+existing bearer token cannot mint replacement credentials, so a leaked one cannot extend its own
+life. An account holds at most ten, each expiring in 30 days, 90 days, a year, on a chosen date or
+never, and each with a scope that narrows its owner's role: **same as my role** (`full`, what every
+earlier token has), **read only** (`read`: no mutation, the config export and import, the audit
+check and the host previews included), or **chosen permissions** (`custom`: `area:read` or
+`area:write` for `overview`, `hosts`, `accessLists`, `certificates`, `security`, `analytics`,
+`agents`, `users`, `settings`, `audit` and `tokens`). What a request gets is the role and the scope
+together; a field or route added later is closed to a narrowed token until it is given an area.
+`createApiToken` and `POST /api/v1/tokens` take `scope` and `permissions`.
 
 ### What is a field and what is JSON
 
@@ -666,6 +682,27 @@ and `--port` moves it off 3020.
 
 A pre-3.0 database is not opened in place, even though it is also SQLite - see
 [Upgrading from a pre-3.0 install](#upgrading-from-a-pre-30-install-which-used-sqlite).
+
+### Moving from SQLite to PostgreSQL
+
+`cpm-server --copy-to-postgres` copies a current SQLite install into an empty PostgreSQL database:
+every row with its id, secrets still sealed under the same `SESSION_SECRET`, the audit hash chain
+verbatim, and each sequence moved past the copied ids. It runs in one transaction, then counts every
+table on both sides and exits 1 if any differ.
+
+```bash
+docker compose stop web
+docker compose up -d --wait postgres          # POSTGRES_PASSWORD set in .env
+docker compose run --rm --entrypoint /app/cpm-server web --copy-to-postgres --dry-run
+docker compose run --rm --entrypoint /app/cpm-server web --copy-to-postgres
+# then remove DATABASE_URL from .env and start web again
+```
+
+The source defaults to `DATABASE_URL` and the target to the `POSTGRES_*` values; `--from` and `--to`
+name them instead. `--dry-run` writes nothing. A source this version has not finished migrating is
+refused (start the new release on it once first), and so is a target that already holds rows,
+unless `--allow-non-empty` skips the rows whose key is taken. In a checkout it is
+`bun scripts/sqlite-to-postgres.ts` in `apps/controller`.
 
 ### Upgrading from PostgreSQL 17
 
@@ -1825,10 +1862,15 @@ after the password, on the dashboard and the forward-auth portal alike, and a ba
 its place once. The dashboard can skip the code on a trusted device for 30 days; the portal always
 asks.
 
-**Settings → Authentication → Two-factor Sign-in** can require it for administrators with a
-password. Until one enrols, the dashboard sends them to enrolment and their session's REST and
-GraphQL calls answer 403. An account that signs in only through OAuth is left to its identity
-provider, and API tokens are credentials of their own that keep working.
+**Settings → Authentication → Two-factor Sign-in** sets the policy: nobody, administrators, or
+every account with a password must have a second factor, and an authenticator app or a passkey
+satisfies it. An account the policy reaches gets a grace period (0-90 days, 7 by default, counted
+from the policy change or the account's creation, whichever is later) with a banner naming the
+date; after it, the dashboard sends them to setup and their session's REST and GraphQL calls answer
+403. An account that signs in only through OAuth or a directory is left to its identity provider,
+and API tokens are credentials of their own that keep working. The older "require for
+administrators" switch is the administrators policy, enforced at once. `cpm-server
+--lift-mfa-policy` turns it off from inside the container - see [Runtime](#runtime).
 
 An admin resets another user's two-factor sign-in from **Users**, which also signs them out. With no
 other admin to ask, `cpm-server --reset-2fa` does it from inside the container - see
@@ -1838,8 +1880,7 @@ other admin to ask, `cpm-server --reset-2fa` does it from inside the container -
 
 **Profile → Passkeys** adds a passkey, and the sign-in screen and portal sign in with one - no
 username, no password. The authenticator has to verify the person (a PIN, fingerprint or face), so a
-passkey counts as both factors and never asks for a code; it does not satisfy "required for
-administrators", though. A passkey belongs to the Public URL's hostname: it needs HTTPS (or
+passkey counts as both factors, never asks for a code, and satisfies the two-factor policy. A passkey belongs to the Public URL's hostname: it needs HTTPS (or
 `localhost`), and changing that hostname orphans every one registered. Adding one needs a sign-in
 from the last ten minutes. Passkey sign-in skips the CAPTCHA and the per-account lockout, which
 guard password guessing, and stays under Better Auth's per-address request limit. Admins remove a

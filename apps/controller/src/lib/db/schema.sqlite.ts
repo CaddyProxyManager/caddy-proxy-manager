@@ -26,6 +26,12 @@ export const users = sqliteTable(
     twoFactorEnabled: integer("twoFactorEnabled", { mode: "boolean" }).notNull().default(false),
     // Forward auth's opaque user id. Nullable: rows from raw SQL are filled by `ensureUserUuids`.
     uuid: text("uuid").$defaultFn(() => uuidv7()),
+    // Written when a sign-in completes (lib/auth/last-sign-in.ts); null until the first one.
+    lastSignInAt: isoTimestamp("lastSignInAt"),
+    lastSignInMethod: text("lastSignInMethod"),
+    // Display preferences that follow the account; null falls back to the browser's.
+    timeZone: text("timeZone"),
+    numberFormat: text("numberFormat"),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
@@ -466,6 +472,9 @@ export const apiTokens = sqliteTable(
     createdAt: text("createdAt").notNull(),
     lastUsedAt: text("lastUsedAt"),
     expiresAt: text("expiresAt"),
+    // "full", "read" or "custom"; a custom scope's permissions are a JSON array (lib/api-tokens).
+    scope: text("scope").notNull().default("full"),
+    permissions: text("permissions"),
   },
   (table) => ({
     tokenHashUnique: uniqueIndex("api_tokens_token_hash_unique").on(table.tokenHash),

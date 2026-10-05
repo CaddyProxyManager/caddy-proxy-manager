@@ -713,7 +713,10 @@
       "blockedSourceCreated": "Blocked {kind} {value}",
       "blockedSourceUpdated": "Changed the block on {kind} {value}",
       "blockedSourceDeleted": "Unblocked {kind} {value}",
-      "blockedSourceExpired": "The block on {kind} {value} expired"
+      "blockedSourceExpired": "The block on {kind} {value} expired",
+      "apiTokenCreated": "Created API token {name}",
+      "apiTokenDeleted": "Deleted API token {name}",
+      "mfaPolicyLiftedConsole": "Lifted the two-factor policy from the server console"
     }
   },
   "auth": {
@@ -834,10 +837,12 @@
     "unexpectedError": "An unexpected error occurred.",
     "unexpectedErrorTryAgain": "An unexpected error occurred. Please try again.",
     "twoFactorSetup": {
-      "metaTitle": "Turn on two-factor sign-in",
-      "title": "Turn on two-factor sign-in",
-      "description": "This instance requires administrators to use a code from an authenticator app as well as their password. Set it up to continue.",
-      "signOut": "Sign out"
+      "metaTitle": "Set up a second factor",
+      "title": "Set up a second factor",
+      "description": "This instance requires a second factor for your account as well as your password: a code from an authenticator app, or a passkey. Set one up to continue.",
+      "signOut": "Sign out",
+      "passkeyTitle": "Or add a passkey",
+      "passkeyDescription": "A passkey is a second factor in itself: it is something you have, unlocked by something you know or are."
     },
     "twoFactor": {
       "title": "Two-factor sign-in",
@@ -1693,7 +1698,12 @@
     "blockedSourceNotFound": "Blocked source not found",
     "wafParanoiaLevelInvalid": "The paranoia level must be from {min} to {max}",
     "wafAnomalyThresholdInvalid": "An anomaly threshold must be a whole number from {min} to {max}",
-    "previewHostFailed": "Could not work out what this save would change."
+    "previewHostFailed": "Could not work out what this save would change.",
+    "apiTokenScopeInvalid": "A token's scope must be full, read or custom",
+    "apiTokenPermissionInvalid": "Unknown token permissions: {permissions}",
+    "apiTokenPermissionsRequired": "Choose at least one permission for a custom scope",
+    "timeZoneInvalid": "Unknown time zone",
+    "numberFormatInvalid": "Unknown number format"
   },
   "groups": {
     "viewAsGroup": "View as an operator in this group",
@@ -2173,7 +2183,10 @@
     "updateBadge": "Update",
     "users": "Users",
     "waf": "WAF",
-    "security": "Security"
+    "security": "Security",
+    "mfaGraceTitle": "Set up a second factor by {date}",
+    "mfaGraceDescription": "This instance requires an authenticator app or a passkey for your account. After that date you'll be asked to set one up before anything else.",
+    "mfaGraceAction": "Set it up"
   },
   "overview": {
     "checklist": {
@@ -2473,7 +2486,62 @@
     },
     "tableDensityInvalid": "That is not a table density this app offers.",
     "tableDensitySaveFailed": "Could not save your table density. Try again.",
-    "passwordManagedBy": "Your password is managed by {directory}. Change it there; this instance never stores it."
+    "passwordManagedBy": "Your password is managed by {directory}. Change it there; this instance never stores it.",
+    "apiTokenLimit": "You have {max} tokens, the most an account can hold. Delete one to create another.",
+    "apiTokenCount": "{count} of {max} tokens",
+    "apiTokenNeverExpires": "Never expires",
+    "apiTokenCreateFailed": "The token could not be created",
+    "apiTokenPermissionLine": "{area}: {access}",
+    "apiTokenAreaAccess": "Access to {area}",
+    "apiTokenExpiry": {
+      "label": "Expires",
+      "days30": "In 30 days",
+      "days90": "In 90 days",
+      "year1": "In a year",
+      "never": "Never",
+      "custom": "On a date I choose"
+    },
+    "apiTokenScope": {
+      "label": "Scope",
+      "help": "A token never does more than your role allows, whatever its scope.",
+      "full": "Same as my role",
+      "fullHelp": "Everything your role can do through the API.",
+      "read": "Read only",
+      "readHelp": "Reads only. Every change, export and import is refused.",
+      "custom": "Chosen permissions",
+      "customHelp": "Only the areas you pick, each read only or read and change.",
+      "customCount": "{count, plural, one {# permission} other {# permissions}}"
+    },
+    "apiTokenAccess": {
+      "none": "None",
+      "read": "Read",
+      "write": "Read and change"
+    },
+    "apiTokenAreas": {
+      "overview": "Overview and setup checklist",
+      "hosts": "Proxy and L4 hosts",
+      "accessLists": "Access lists",
+      "certificates": "Certificates and mTLS",
+      "security": "WAF and blocked sources",
+      "analytics": "Analytics",
+      "agents": "Agents",
+      "users": "Users, groups and sessions",
+      "settings": "Settings, backup and Caddy",
+      "audit": "Audit log",
+      "tokens": "API tokens"
+    },
+    "sessionPlace": "Near {place}",
+    "sessionPlaceCity": "Near {city}, {country}",
+    "displayPreferences": {
+      "timeZone": "Time zone",
+      "timeZoneHelp": "Times on every page, in every browser you sign in from. Now showing {zone}.",
+      "followBrowser": "Follow this browser",
+      "numberFormat": "Number format",
+      "numberFormatHelp": "How large numbers are grouped, whatever language the pages are in.",
+      "numberFormatAuto": "As the language does ({sample})",
+      "save": "Save display preferences",
+      "saveFailed": "Your display preferences could not be saved"
+    }
   },
   "proxyHosts": {
     "insights": {
@@ -3930,8 +3998,6 @@
     "trustedProxiesInfoDescription": "This fixes client-IP attribution everywhere at once - access logs, analytics, the country map, and any downstream handler using the client_ip placeholder.",
     "trustedProxiesInfoTitle": "Nothing else on the host has to change",
     "trustedProxiesScopeDescription": "Applied to the main HTTP server",
-    "requireAdminTwoFactor": "Require two-factor sign-in for administrators",
-    "requireAdminTwoFactorHelp": "An administrator who signs in with a password and hasn't set up an authenticator app is sent to do that before anything else. Single sign-on accounts are left to their identity provider.",
     "http2": "HTTP/2",
     "http2Help": "Offer HTTP/2 over TLS. HTTP/1.1 is always available, so clients that can't use it still connect",
     "http3": "HTTP/3",
@@ -4615,7 +4681,8 @@
       },
       "twoFactor": {
         "valueRequired": "Required for administrators",
-        "valueOptional": "Optional"
+        "valueOptional": "Optional",
+        "valueAll": "Required for every password account"
       },
       "passwordPolicy": {
         "valueRequireChange": "Old password hashes must be changed",
@@ -5171,6 +5238,108 @@
           "unavailable": "The sign-in failed partway. The server log says where."
         }
       }
+    },
+    "mfaPolicy": {
+      "modeLabel": "Require a second factor for",
+      "modes": {
+        "off": "Nobody",
+        "admins": "Administrators",
+        "all": "Every password account"
+      },
+      "modeHelp": {
+        "off": "Anyone may turn on an authenticator app or add a passkey from their Profile, but nobody has to.",
+        "admins": "Administrators who sign in with a password need an authenticator app or a passkey. Single sign-on accounts are left to their identity provider.",
+        "all": "Everyone who signs in with a password needs an authenticator app or a passkey. Single sign-on accounts are left to their identity provider."
+      },
+      "graceDays": "Grace period (days)",
+      "graceDaysHelp": "How long an account has once the policy reaches it. Until then a banner asks for setup; afterwards setup comes before anything else at sign-in. 0 asks at once.",
+      "breakGlass": "Locked out by the policy? Run cpm-server --lift-mfa-policy inside the web container to turn it off."
+    },
+    "search": {
+      "label": "Search settings",
+      "placeholder": "Search settings, e.g. smtp or prometheus",
+      "empty": "No setting matches",
+      "synonyms": {
+        "general": "domain, default domain, hostname",
+        "acme": "certificate authority, ca, lets encrypt, ssl, tls, https, issuer",
+        "updates": "upgrade, version, release",
+        "branding": "logo, accent, colour, color, favicon, theme",
+        "instance": "app name, public url, base url, address",
+        "avatars": "gravatar, profile picture, photo",
+        "defaultResponse": "fallback, unknown host, catch-all, 404",
+        "errorPages": "custom error page, 502, 503, maintenance page",
+        "caddyBuild": "plugins, modules, image, build",
+        "globalCaddyConfig": "caddyfile, global options, snippets",
+        "httpCache": "cache, caching, redis, cdn, cache storage, purge",
+        "dashboard": "admin ui, dashboard domain, panel",
+        "agent": "pairing, remote host, node, fleet",
+        "email": "smtp, mail, mail server, outgoing mail",
+        "certificateAlerts": "alerts, notifications, expiry warnings, email alerts",
+        "dnsProviders": "dns challenge, wildcard, api token",
+        "dnsResolvers": "resolver, nameserver, dns server",
+        "upstreamDns": "upstream resolution, pinning, ipv4, ipv6",
+        "trustedProxies": "x-forwarded-for, real ip, client ip, load balancer",
+        "httpProtocols": "http2, http3, quic, h2, h3",
+        "compression": "gzip, zstd, brotli, encode",
+        "tailscale": "tailnet, vpn, wireguard",
+        "oauth": "oidc, sso, single sign-on, openid, identity provider, idp",
+        "ldap": "active directory, ad, directory",
+        "signIn": "login, registration, lockout, brute force",
+        "captcha": "bot check, challenge, human check",
+        "twoFactor": "mfa, 2fa, totp, authenticator, passkey, second factor",
+        "passwordPolicy": "password, bcrypt, argon2, hash",
+        "authentik": "forward auth, outpost",
+        "forwardAuth": "auth proxy, sso gate",
+        "geoip": "maxmind, geolite, country database, city database",
+        "geoblock": "geo blocking, country block, region",
+        "rateLimit": "throttle, rate limiting, requests per second, 429, allowlist",
+        "crowdsec": "bouncer, ip reputation, ban",
+        "analytics": "clickhouse, traffic, statistics, stats",
+        "metrics": "prometheus, monitoring, metrics endpoint, scrape",
+        "logging": "access log, logs, log format",
+        "backup": "restore, export, snapshot, download",
+        "portableConfig": "export, import, migrate, json, config transfer",
+        "settingsHistory": "revisions, changes, undo, rollback",
+        "wafTuning": "paranoia level, anomaly threshold, crs, detection only, blocking",
+        "wafHostModes": "per host waf, detection, blocking",
+        "wafExclusions": "false positive, rule exclusion, suppress rule",
+        "blockedSources": "ban, deny list, blocklist, block ip, block country",
+        "signInOverview": "login methods, sso, ldap, passkeys, linked accounts, group mappings"
+      },
+      "pages": {
+        "backup": {
+          "title": "Backup and restore",
+          "context": "Settings"
+        },
+        "portableConfig": {
+          "title": "Portable configuration",
+          "context": "Backup and restore"
+        },
+        "settingsHistory": {
+          "title": "Settings history",
+          "context": "Settings"
+        },
+        "wafTuning": {
+          "title": "WAF tuning",
+          "context": "WAF"
+        },
+        "wafHostModes": {
+          "title": "WAF mode per host",
+          "context": "WAF"
+        },
+        "wafExclusions": {
+          "title": "WAF exclusions",
+          "context": "WAF"
+        },
+        "blockedSources": {
+          "title": "Blocked sources",
+          "context": "Security"
+        },
+        "signInOverview": {
+          "title": "Sign-in overview",
+          "context": "Users"
+        }
+      }
     }
   },
   "setup": {
@@ -5651,7 +5820,35 @@
     "resetLinkSent": "Password reset link sent to {email}.",
     "inviteNotSent": "The user was created, but the invitation was not sent: {error} Send it again from their details.",
     "sendResetLink": "Email a reset link",
-    "sendInvite": "Send invitation"
+    "sendInvite": "Send invitation",
+    "accountSource": {
+      "label": "Account source",
+      "local": "Local",
+      "oidc": "Single sign-on",
+      "ldap": "Directory (LDAP)"
+    },
+    "lastSignInMethods": {
+      "password": "Password",
+      "passkey": "Passkey",
+      "oidc": "Single sign-on",
+      "ldap": "Directory password"
+    },
+    "mfa": {
+      "secondFactor": "Second factor",
+      "none": "None",
+      "totp": "Authenticator app",
+      "passkey": "Passkey",
+      "both": "Authenticator app and passkey",
+      "notApplicable": "Left to the identity provider",
+      "noSecondFactorShort": "No second factor",
+      "filterToken": "Administrators without a second factor",
+      "bannerTitle": "{count, plural, one {# administrator signs in with a password alone} other {# administrators sign in with a password alone}}",
+      "bannerDescriptionOff": "{names}. A stolen password is all it takes to sign in as them. Ask them to add an authenticator app or a passkey, or require one.",
+      "bannerDescriptionPolicy": "{names}. The two-factor policy will ask them to set one up when they next sign in, once any grace period ends.",
+      "show": "Show them",
+      "requireAction": "Require a second factor"
+    },
+    "signInOverview": "Sign-in overview"
   },
   "waf": {
     "applyRange": "Apply range",
@@ -6205,5 +6402,73 @@
     "blockedSourcesEmptyDescription": "Block an address, network, country, continent or provider network here, or from a source on the security events page.",
     "analyticsUnavailableTitle": "Analytics could not be reached",
     "analyticsUnavailableDescription": "ClickHouse did not answer, so no events can be shown right now. The rule set and blocked sources below still work."
+  },
+  "signInOverview": {
+    "title": "Sign-in overview",
+    "description": "Every way people sign in to this dashboard, how many accounts use each, and what the login page offers as a result. Each switch is changed where its Configure link goes.",
+    "backToUsers": "Users",
+    "methodsTitle": "Sign-in methods",
+    "configure": "Configure",
+    "configureNamed": "Configure {name}",
+    "externalRegistrationOn": "A first sign-in through a provider or directory creates an account.",
+    "externalRegistrationOff": "A first sign-in through a provider or directory creates no account: only people who already have one, or a linked one, get in.",
+    "columns": {
+      "source": "Provider or directory",
+      "externalGroup": "Group there",
+      "becomes": "Here"
+    },
+    "kinds": {
+      "password": "Local accounts",
+      "passkey": "Local accounts",
+      "oidc": "Single sign-on (OIDC)",
+      "ldap": "Directory (LDAP)"
+    },
+    "methods": {
+      "password": "Username and password",
+      "passkey": "Passkeys"
+    },
+    "status": {
+      "on": "On",
+      "off": "Off",
+      "unreachable": "Not answering"
+    },
+    "notes": {
+      "selfRegistration": "Anyone may register",
+      "passkeyHost": "Bound to {host}",
+      "passkeyNoHost": "No Public URL, so no passkeys",
+      "passkeysRegistered": "{count, plural, one {# passkey} other {# passkeys}}",
+      "primary": "Primary",
+      "autoLink": "Links by email",
+      "syncGroups": "Syncs groups",
+      "reachable": "Answering",
+      "unreachable": "Failed at {stage}",
+      "unchecked": "Not checked yet"
+    },
+    "mfaTitle": "Second factor",
+    "mfaModes": {
+      "off": "Not required",
+      "admins": "Required for administrators",
+      "all": "Required for every password account"
+    },
+    "mfaGrace": "{days, plural, =0 {Asked for at once.} one {# day to set one up.} other {# days to set one up.}}",
+    "mfaCounts": "{totp, plural, one {# account uses} other {# accounts use}} an authenticator app; {passkey, plural, one {# has} other {# have}} a passkey.",
+    "mfaConfigure": "Change the policy",
+    "previewTitle": "The login page",
+    "previewDescription": "What someone signing in sees first, from the settings above. Nothing here signs anyone in.",
+    "previewDirectories": "Choosing between {names}",
+    "previewNothing": "Nothing: with no method on, nobody can sign in.",
+    "mappingsTitle": "Group and role mappings",
+    "mappingsEmpty": "No provider or directory maps its groups to roles or groups here.",
+    "anyProvider": "Any provider",
+    "anyOtherGroup": "Any other",
+    "becomesRole": "Role: {role}",
+    "becomesGroup": "Group: {group}",
+    "roles": {
+      "admin": "Admin",
+      "operator": "Operator",
+      "user": "User",
+      "viewer": "Viewer"
+    },
+    "accountCount": "{count, plural, one {# account} other {# accounts}}"
   }
 }

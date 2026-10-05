@@ -4,6 +4,16 @@ import { apiTokens } from "../db/schema";
 import { and, count, eq } from "drizzle-orm";
 import { NotFoundError } from "../api/auth";
 import { domainError } from "../errors/domain-error";
+import { logAuditEvent } from "../audit";
+import {
+  FULL_SCOPE,
+  type TokenPermission,
+  type TokenScope,
+  type TokenScopeKind,
+  flattenScope,
+  scopeFromColumns,
+  scopeToColumns,
+} from "../api-tokens/scope";
 
 export type ApiToken = {
   id: number;
@@ -12,6 +22,9 @@ export type ApiToken = {
   createdAt: string;
   lastUsedAt: string | null;
   expiresAt: string | null;
+  /** Narrows the owner's role; never widens it. See `unflattenScope`. */
+  scope: TokenScopeKind;
+  permissions: TokenPermission[];
 };
 
 type ApiTokenRow = typeof apiTokens.$inferSelect;
@@ -24,6 +37,7 @@ function toApiToken(row: ApiTokenRow): ApiToken {
     createdAt: toIso(row.createdAt)!,
     lastUsedAt: row.lastUsedAt ? toIso(row.lastUsedAt) : null,
     expiresAt: row.expiresAt ? toIso(row.expiresAt) : null,
+    ...flattenScope(scopeFromColumns(row.scope, row.permissions)),
   };
 }
 
@@ -31,13 +45,14 @@ function hashToken(rawToken: string): string {
   return createHash("sha256").update(rawToken).digest("hex");
 }
 
-const MAX_TOKENS_PER_USER = 10;
+export const MAX_TOKENS_PER_USER = 10;
 const MAX_TOKEN_NAME_LENGTH = 100;
 
 export async function createApiToken(
   name: string,
   createdBy: number,
   expiresAt?: string,
+  scope: TokenScope = FULL_SCOPE,
 ): Promise<{ token: ApiToken; rawToken: string }> {
   const trimmedName = name.trim();
   if (trimmedName.length > MAX_TOKEN_NAME_LENGTH) {
@@ -76,6 +91,7 @@ export async function createApiToken(
       createdBy,
       createdAt: now,
       expiresAt: validatedExpiresAt,
+      ...scopeToColumns(scope),
     })
     .returning();
 
@@ -83,7 +99,16 @@ export async function createApiToken(
     throw domainError("failedToCreateApiToken");
   }
 
-  return { token: toApiToken(row), rawToken };
+  const token = toApiToken(row);
+  await logAuditEvent({
+    userId: createdBy,
+    action: "create",
+    entityType: "api_token",
+    entityId: token.id,
+    summary: `Created API token ${token.name}`,
+    data: { scope: token.scope, permissions: token.permissions, expiresAt: token.expiresAt },
+  });
+  return { token, rawToken };
 }
 
 export async function listApiTokens(userId: number): Promise<ApiToken[]> {
@@ -114,11 +139,18 @@ export async function deleteApiToken(
         ? eq(apiTokens.id, id)
         : and(eq(apiTokens.id, id), eq(apiTokens.createdBy, userId)),
     )
-    .returning({ id: apiTokens.id });
+    .returning({ id: apiTokens.id, name: apiTokens.name });
 
   if (deleted.length === 0) {
     throw new NotFoundError("Token not found");
   }
+  await logAuditEvent({
+    userId,
+    action: "delete",
+    entityType: "api_token",
+    entityId: id,
+    summary: `Deleted API token ${deleted[0].name}`,
+  });
 }
 
 const LAST_USED_DEBOUNCE_MS = 60_000; // 60 seconds

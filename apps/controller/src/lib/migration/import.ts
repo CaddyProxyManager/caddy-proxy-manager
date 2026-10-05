@@ -4,12 +4,15 @@
  * references into unselected tables nulled, or the row dropped when it cannot exist without them.
  */
 import { Database } from "bun:sqlite";
-import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
-import { is, sql } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import db from "../db";
 import { reanchorAuditChain } from "../audit/chain";
 import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
+import { type Described, describeTables, inFkOrder } from "./tables";
+
+export { type Described, describeTables, inFkOrder } from "./tables";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
 import { sealSecretColumn } from "../secrets";
 import { forwardAuthSequentialUserIds } from "../settings/registry";
@@ -35,89 +38,6 @@ export type ImportReport = {
   clearedReferences: string[];
   totalRows: number;
 };
-
-type Reference = {
-  target: string;
-  columns: string[];
-  /** True when the row cannot exist at all without its target. */
-  required: boolean;
-};
-
-export type Described = {
-  key: string;
-  /** Read for its shape only; rows are written to the active backend's table of the same key. */
-  table: PgTable;
-  name: string;
-  columns: Array<{ name: string; isBoolean: boolean }>;
-  references: Reference[];
-  /** The serial column whose sequence needs resyncing, if the table has one. */
-  serialColumn: string | null;
-};
-
-export function describeTables(): Described[] {
-  const described: Described[] = [];
-
-  for (const [key, value] of Object.entries(schema)) {
-    // `is` is the only reliable runtime test: `$inferSelect` is a type-only phantom.
-    if (!is(value, PgTable)) continue;
-    const table = value as PgTable;
-
-    let config: ReturnType<typeof getTableConfig>;
-    try {
-      config = getTableConfig(table);
-    } catch {
-      continue;
-    }
-
-    described.push({
-      key,
-      table,
-      name: config.name,
-      columns: config.columns.map((column) => ({
-        name: column.name,
-        isBoolean: column.dataType === "boolean",
-      })),
-      references: config.foreignKeys.map((foreignKey) => {
-        const reference = foreignKey.reference();
-        return {
-          target: getTableConfig(reference.foreignTable).name,
-          columns: reference.columns.map((column) => column.name),
-          // One non-null column is enough: the row has nowhere to put "no parent".
-          required: reference.columns.some((column) => column.notNull),
-        };
-      }),
-      serialColumn: config.columns.find((column) => column.columnType === "PgSerial")?.name ?? null,
-    });
-  }
-
-  return described;
-}
-
-/** Self-references are ignored: they only constrain row order, which the source satisfied. */
-export function inFkOrder(tables: Described[]): Described[] {
-  const byName = new Map(tables.map((table) => [table.name, table]));
-  const ordered: Described[] = [];
-  const state = new Map<string, "visiting" | "done">();
-
-  function visit(table: Described): void {
-    const status = state.get(table.name);
-    if (status === "done") return;
-    if (status === "visiting") return; // A cycle; the remaining edge is handled by deferral below.
-    state.set(table.name, "visiting");
-
-    for (const reference of table.references) {
-      if (reference.target === table.name) continue;
-      const target = byName.get(reference.target);
-      if (target) visit(target);
-    }
-
-    state.set(table.name, "done");
-    ordered.push(table);
-  }
-
-  for (const table of tables) visit(table);
-  return ordered;
-}
 
 function sqliteTables(source: Database): Set<string> {
   const rows = source

@@ -21,6 +21,7 @@ import {
 import { isDemoAdmin, isDemoMode } from "@/src/lib/demo/mode";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { ACCOUNT_LOCKED } from "@/src/lib/auth/sign-in-error";
+import { passwordSignInMethod, recordSignIn } from "@/src/lib/auth/last-sign-in";
 
 export const dynamic = "force-dynamic";
 
@@ -180,12 +181,20 @@ export async function POST(request: Request) {
     } else if (response.ok) resetAccountFailures(account);
   }
   if (captcha) response.headers.append("Set-Cookie", CAPTCHA_PASS_CLEAR_COOKIE);
-  if (response.ok) await auditCompletedSignIn(response);
+  if (response.ok) {
+    // As the failure count above: with local accounts off, /sign-in/ldap tries no local password.
+    const directoryChosen = directoryId !== null || (await localUsersDisabled());
+    await auditCompletedSignIn(response, pathname.slice("/api/auth".length), directoryChosen);
+  }
   return response;
 }
 
 /** The session hook skips password sign-ins, as the 2FA plugin may yet delete that session. */
-async function auditCompletedSignIn(response: Response): Promise<void> {
+async function auditCompletedSignIn(
+  response: Response,
+  path: string,
+  directoryChosen: boolean,
+): Promise<void> {
   try {
     const body = (await response.clone().json()) as {
       twoFactorRedirect?: boolean;
@@ -193,6 +202,7 @@ async function auditCompletedSignIn(response: Response): Promise<void> {
     };
     const userId = Number(body.user?.id);
     if (body.twoFactorRedirect || !Number.isInteger(userId)) return;
+    await recordSignIn(userId, await passwordSignInMethod(userId, path, directoryChosen));
     await createAuditEvent({
       userId,
       action: "login_success",

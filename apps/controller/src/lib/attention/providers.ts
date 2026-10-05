@@ -346,49 +346,16 @@ const traffic: AttentionProvider = {
 
 // ── LDAP ────────────────────────────────────────────────────────────────────
 
-const LDAP_CHECK_TTL_MS = 5 * 60_000;
-const ldapChecks = new Map<string, { at: number; failure: string | null }>();
-const ldapRunning = new Map<string, Promise<void>>();
-
-/** Test seam. */
-export function resetLdapChecksForTests(): void {
-  ldapChecks.clear();
-  ldapRunning.clear();
-}
-
 const ldap: AttentionProvider = {
   id: "ldap",
   adminOnly: true,
   async run({ now }) {
-    const [{ listEnabledLdapDirectories }, { testLdapConnection }] = await Promise.all([
+    const [{ listEnabledLdapDirectories }, { checkLdapDirectories }] = await Promise.all([
       import("../models/ldap-directories"),
-      import("../ldap/client"),
+      import("../ldap/health"),
     ]);
     const directories = await listEnabledLdapDirectories();
-    // Each check is a network round trip, so one is reused for a few minutes; a slow one keeps
-    // running past the budget and is ready for the next load.
-    await Promise.all(
-      directories.map((directory) => {
-        const cached = ldapChecks.get(directory.id);
-        if (cached && now - cached.at < LDAP_CHECK_TTL_MS) return Promise.resolve();
-        let running = ldapRunning.get(directory.id);
-        if (!running) {
-          running = testLdapConnection(directory)
-            .then((result) => {
-              ldapChecks.set(directory.id, {
-                at: Date.now(),
-                failure: result.ok ? null : result.stage,
-              });
-            })
-            .catch(() => {
-              ldapChecks.set(directory.id, { at: Date.now(), failure: "connect" });
-            })
-            .finally(() => ldapRunning.delete(directory.id));
-          ldapRunning.set(directory.id, running);
-        }
-        return running;
-      }),
-    );
+    const ldapChecks = await checkLdapDirectories(directories, now);
     return {
       items: directories.flatMap((directory) => {
         const failure = ldapChecks.get(directory.id)?.failure;
@@ -401,7 +368,7 @@ const ldap: AttentionProvider = {
             severity: "warning",
             values: { name: directory.name, stage: failure },
             href: SETTINGS_LINKS.ldap,
-            at: iso(ldapChecks.get(directory.id)!.at),
+            at: iso(ldapChecks.get(directory.id)?.at ?? now),
             scope: {},
           } satisfies AttentionItem,
         ];

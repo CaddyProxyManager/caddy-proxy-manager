@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 
-vi.mock('../../../src/lib/settings', () => ({
-  getTwoFactorPolicySettings: async () => ({ requireForAdmins: true }),
+const policy = vi.hoisted(() => ({
+  stored: { requireForAdmins: true } as Record<string, unknown>,
+  facts: { passkeyCount: 0, createdAt: '2026-01-01T00:00:00.000Z' as string | null },
 }));
 
-const { mustEnrollTwoFactor } = await import('../../../src/lib/auth/two-factor/policy');
+vi.mock('../../../src/lib/settings', () => ({
+  getTwoFactorPolicySettings: async () => policy.stored,
+}));
+
+vi.mock('../../../src/lib/auth/two-factor/facts', () => ({
+  accountMfaFacts: async () => policy.facts,
+}));
+
+const { mfaStandingFor, mustEnrollTwoFactor } = await import(
+  '../../../src/lib/auth/two-factor/policy'
+);
 
 const admin = {
   user: {
@@ -43,5 +54,32 @@ describe('mustEnrollTwoFactor', () => {
     expect(await mustEnrollTwoFactor({ user: { ...admin.user, twoFactorEnabled: true } })).toBe(
       false,
     );
+  });
+});
+
+describe('the policy modes', () => {
+  it('counts a passkey as a second factor', async () => {
+    policy.facts = { passkeyCount: 1, createdAt: null };
+    expect(await mustEnrollTwoFactor(admin)).toBe(false);
+    policy.facts = { passkeyCount: 0, createdAt: '2026-01-01T00:00:00.000Z' };
+  });
+
+  it('covers every password account under "all", within its grace period first', async () => {
+    const recently = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    policy.stored = { mode: 'all', graceDays: 7, since: recently };
+    const user = { user: { ...admin.user, role: 'user' } };
+    const standing = await mfaStandingFor(user);
+    expect(standing.status).toBe('grace');
+    expect(await mustEnrollTwoFactor(user)).toBe(false);
+
+    policy.stored = { mode: 'all', graceDays: 0, since: recently };
+    expect(await mustEnrollTwoFactor(user)).toBe(true);
+    policy.stored = { requireForAdmins: true };
+  });
+
+  it('leaves everyone alone when off', async () => {
+    policy.stored = { mode: 'off', graceDays: 7, since: null };
+    expect(await mustEnrollTwoFactor(admin)).toBe(false);
+    policy.stored = { requireForAdmins: true };
   });
 });

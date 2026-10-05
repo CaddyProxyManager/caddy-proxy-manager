@@ -206,13 +206,48 @@ Global rate-limit zones and the never-limited list are the `rate-limit` settings
 
 ## Authentication
 
-Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an
-optional expiry. That restriction is deliberate: an existing token cannot mint replacement
-credentials, so a leaked one cannot extend its own life.
+Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session. That
+restriction is deliberate: an existing token cannot mint replacement credentials, so a leaked one
+cannot extend its own life. An account holds at most ten, and each expires in 30 days, 90 days, a
+year, on a date you pick, or never.
 
 A token carries its owner's role. The management fields are **admin-only**, including for an
 operator - a [group grant](../users-and-groups/) delegates the dashboard, not the API. Managing your
 own tokens is the exception, and open to every signed-in role.
+
+### Scopes
+
+Each token also has a scope, which can only narrow what the role allows:
+
+| Scope | What it may do |
+| --- | --- |
+| **Same as my role** (`full`) | Everything the owner's role can do through the API. Tokens made before scopes existed have this one |
+| **Read only** (`read`) | Queries and `GET` requests. Every mutation is refused, the config export and import, the audit log check and the host previews included |
+| **Chosen permissions** (`custom`) | Only the areas listed, each `read` or `write` (write includes read) |
+
+The areas are `overview`, `hosts` (proxy and L4 hosts), `accessLists`, `certificates` (with CAs,
+client certificates and mTLS roles), `security` (WAF, CRS plugins and blocked sources),
+`analytics`, `agents`, `users` (users, groups and sessions), `settings` (settings, providers, Caddy,
+backups and the portable config), `audit` and `tokens`. A permission is written `area:access`, such
+as `hosts:write`.
+
+What a request gets is the role and the scope together. A user's token scoped to `users:write`
+still cannot manage users, because the role cannot; an admin's read-only token cannot delete a host,
+because the scope cannot. A refused request answers 403 over REST and as a GraphQL error naming the
+scope. A query or route added in a later release stays closed to a narrowed token until it is given
+an area.
+
+```graphql
+mutation {
+  createApiToken(input: {
+    name: "Monitoring", expiresAt: "2027-01-01T00:00:00Z",
+    scope: "custom", permissions: ["hosts:read", "analytics:read"]
+  }) { secret token { id scope permissions } }
+}
+```
+
+Over REST, `POST /api/v1/tokens` takes the same `scope` and `permissions` beside `name` and
+`expires_at`. Creating and deleting a token is in the audit log.
 
 ## The REST API is deprecated
 

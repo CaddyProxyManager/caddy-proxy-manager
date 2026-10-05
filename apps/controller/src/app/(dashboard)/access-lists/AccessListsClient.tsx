@@ -54,7 +54,8 @@ import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { NetworkTab } from "./NetworkTab";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -619,7 +620,7 @@ function SettingsTab({
 /** What the list did over the last day; null while loading or when it could not be read. */
 function UsageStats({ listId }: { listId: number }) {
   const t = useTranslations("accessLists");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const [stats, setStats] = useState<AccessListStats | null>(null);
 
   useEffect(() => {

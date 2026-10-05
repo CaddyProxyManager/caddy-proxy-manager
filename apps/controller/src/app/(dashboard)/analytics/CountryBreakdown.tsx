@@ -14,7 +14,8 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { X } from "lucide-react";
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { regionName } from "@/src/lib/locale/region-names";
 
 export type CountryBreakdownData = {
@@ -30,7 +31,7 @@ export type CountryBreakdownData = {
 type Row = { label: string; count: number };
 
 function RankedList({ title, rows, color }: { title: string; rows: Row[]; color: string }) {
-  const format = useFormatter();
+  const format = useAppFormatter();
   const top = rows.reduce((max, row) => Math.max(max, row.count), 0);
   return (
     <VStack gap={2}>
@@ -120,7 +121,7 @@ export function CountryBreakdownView({
 }) {
   const t = useTranslations("analytics");
   const locale = useLocale();
-  const format = useFormatter();
+  const format = useAppFormatter();
 
   // The UI's locale, not the browser's, so it matches the map popup and server and client agree.
   // "XX" is traffic GeoIP could not place, which no locale names.

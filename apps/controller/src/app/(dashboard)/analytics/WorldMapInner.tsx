@@ -24,7 +24,8 @@ import {
 // this a same-origin fetch (CSP `connect-src 'self'`) instead of inlining 756 KB into a JS chunk.
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { regionName } from "@/src/lib/locale/region-names";
 
 // maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling -
@@ -306,7 +307,7 @@ export default function WorldMapInner({
 }) {
   const t = useTranslations("analytics");
   const locale = useLocale();
-  const format = useFormatter();
+  const format = useAppFormatter();
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 

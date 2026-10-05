@@ -15,7 +15,8 @@ import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { Download, ListFilter, ListX } from "lucide-react";
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import type { TrafficOutcome } from "@cpm/shared";
 import { regionName } from "@/src/lib/locale/region-names";
 import type { FilterOp, TopDimension } from "@/src/lib/analytics/explore-state";
@@ -96,7 +97,7 @@ export function TopListTable({
   onFilter?: (dimension: TopDimension, value: string, op: FilterOp) => void;
 }) {
   const t = useTranslations("analytics");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const density = useTableDensity();
   const label = useTopRowLabel(dimension);
   // A WAF rule counts WAF events, which are not a share of requests.

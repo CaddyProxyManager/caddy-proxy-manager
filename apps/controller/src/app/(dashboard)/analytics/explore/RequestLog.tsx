@@ -11,7 +11,8 @@ import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useTableDensity } from "@/components/ui/TableDensity";
@@ -31,7 +32,7 @@ export function RequestLog({
   onMitigatedOnlyChange: (value: boolean) => void;
 }) {
   const t = useTranslations("analytics");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const density = useTableDensity();
   const emptyValue = useEmptyValue();
   const outcomeLabel = useOutcomeLabel();

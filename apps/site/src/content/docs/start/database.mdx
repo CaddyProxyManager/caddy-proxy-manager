@@ -1,0 +1,63 @@
+---
+title: Database
+description: PostgreSQL by default, SQLite when DATABASE_URL names a file, and how to move an install from SQLite to PostgreSQL.
+---
+
+The controller keeps everything it knows in one database. **PostgreSQL** is the default: the
+bundled `docker-compose.yml` starts a `postgres` service and hands the app its `POSTGRES_*` values,
+so an install needs nothing but `POSTGRES_PASSWORD`. **SQLite** is used instead when `DATABASE_URL`
+names a file, such as `file:/app/data/cpm.db`, with no database server at all. It suits a demo or a
+small install; PostgreSQL is what a busy one wants, since SQLite serializes writes.
+
+Both run the same code and the same migrations, which run on every start. The
+[README](https://source.caddyproxy.com#the-database) has every connection option.
+
+## Moving from SQLite to PostgreSQL
+
+The server copies a SQLite install into an empty PostgreSQL database itself, row for row. Ids,
+encrypted secrets (still sealed under the same `SESSION_SECRET`), sessions, API tokens and the
+audit log's hash chain all arrive as they were, and each sequence is moved past the ids copied, so
+nothing has to be set up again.
+
+1. **Let the SQLite install finish upgrading.** The copy refuses a database that this version has
+   not migrated: start the new release on it once.
+2. **Stop the server**, so nothing is written while it copies:
+
+   ```bash
+   docker compose stop web
+   ```
+
+3. **Start PostgreSQL.** With the bundled stack, set `POSTGRES_PASSWORD` in `.env` and:
+
+   ```bash
+   docker compose up -d --wait postgres
+   ```
+
+4. **Check first.** `--dry-run` reads both databases and counts what would be copied, writing
+   nothing:
+
+   ```bash
+   docker compose run --rm --entrypoint /app/cpm-server web --copy-to-postgres --dry-run
+   ```
+
+5. **Copy:**
+
+   ```bash
+   docker compose run --rm --entrypoint /app/cpm-server web --copy-to-postgres
+   ```
+
+   It creates the schema, copies every table in one transaction, and then counts every table on
+   both sides. It ends with the counts and exit code 0 when they all match; anything else is
+   named, with exit code 1.
+
+6. **Switch over.** Remove `DATABASE_URL` from `.env` (the `POSTGRES_*` values take over), start
+   the server, and sign in. Keep the SQLite file until you have.
+
+The source is `DATABASE_URL` and the target the `POSTGRES_*` values unless you name them:
+`--from file:/app/data/cpm.db` and `--to postgres://user:password@host:5432/cpm`. The target must be
+empty - a database that already holds rows is refused, unless `--allow-non-empty` asks to skip the
+rows whose key is already taken, which the counts then report. From a checkout, the same command is
+`bun scripts/sqlite-to-postgres.ts` in `apps/controller`.
+
+A database from before 3.0 is a different case: the setup screen finds it and
+[migrates it](../first-run/) into whichever database the new install uses.

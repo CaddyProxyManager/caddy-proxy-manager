@@ -5,7 +5,8 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { editorSectionHref } from "@/src/lib/proxy-hosts/editor-sections";
@@ -32,7 +33,7 @@ const SOURCE_KEY = {
 
 export function WafHostModesPanel({ hosts }: { hosts: WafHostMode[] }) {
   const t = useTranslations("waf");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const emptyValue = useEmptyValue();
 
   const columns: Column<WafHostMode>[] = [

@@ -196,11 +196,11 @@ test.describe('Admin two-factor policy', () => {
     test.setTimeout(90_000);
     await page.goto('/settings/authentication');
     await waitForHydration(page);
-    const toggle = page.getByRole('switch', {
-      name: /require two-factor sign-in for administrators/i,
-    });
-    await toggle.scrollIntoViewIfNeeded();
-    await toggle.click();
+    const administrators = page.getByRole('radio', { name: 'Administrators', exact: true });
+    await administrators.scrollIntoViewIfNeeded();
+    await administrators.click();
+    // No grace period, so the policy takes hold at the next page load.
+    await page.getByLabel(/grace period/i).fill('0');
     await page.getByTestId('settings-page-save').click({ force: true });
     await expectStaged(page);
     await applyStagedChanges(page);
@@ -223,6 +223,27 @@ test.describe('Admin two-factor policy', () => {
     // The policy is no respecter of persons: the suite's admin has no authenticator either.
     await page.goto('/proxy-hosts');
     await expect(page).toHaveURL(/\/two-factor-setup$/);
+  });
+});
+
+test.describe('Two-factor grace period', () => {
+  test.afterAll(() => {
+    seed.clearSettingRow('two_factor_policy');
+  });
+
+  test('an account inside its grace period is asked by a banner, not sent to setup', async ({
+    page,
+  }) => {
+    seed.setSettingRow('two_factor_policy', {
+      mode: 'all',
+      graceDays: 7,
+      since: new Date().toISOString(),
+    });
+    await page.goto('/proxy-hosts');
+    await expect(page).not.toHaveURL(/\/two-factor-setup$/);
+    await expect(page.getByText(/set up a second factor by/i)).toBeVisible();
+    await page.getByRole('link', { name: 'Set it up' }).click();
+    await expect(page).toHaveURL(/\/profile#two-factor$/);
   });
 });
 

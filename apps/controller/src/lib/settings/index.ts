@@ -19,6 +19,12 @@ import { encryptDnsProviderSettingCredentials } from "../dns/provider-credential
 import type { AcmeDnsAccount, DnsChallengeDelegation } from "../dns/challenge-delegation";
 import { encryptSecret } from "../secrets";
 import {
+  type TwoFactorPolicySettings,
+  isMfaPolicyMode,
+  nextMfaPolicy,
+  readMfaPolicy,
+} from "../auth/two-factor/mfa-policy";
+import {
   DEFAULT_HTTP_CACHE_SETTINGS,
   encryptHttpCacheSecrets,
   type HttpCacheSettings,
@@ -454,16 +460,27 @@ export async function saveHttpCacheSettings(settings: unknown): Promise<void> {
   await setSetting("http_cache", encryptHttpCacheSecrets(merged));
 }
 
-export type TwoFactorPolicySettings = { requireForAdmins: boolean };
+export type { TwoFactorPolicySettings } from "../auth/two-factor/mfa-policy";
 
 export async function getTwoFactorPolicySettings(): Promise<TwoFactorPolicySettings> {
-  const stored = await getSetting<TwoFactorPolicySettings>("two_factor_policy");
-  return { requireForAdmins: stored?.requireForAdmins === true };
+  return readMfaPolicy(await getSetting<unknown>("two_factor_policy"));
 }
 
+/** `{ mode, graceDays }`, or the older `{ requireForAdmins }`, which is "admins" or "off". */
 export async function saveTwoFactorPolicySettings(settings: unknown): Promise<void> {
   const raw = settings && typeof settings === "object" ? (settings as Record<string, unknown>) : {};
-  await setSetting("two_factor_policy", { requireForAdmins: raw.requireForAdmins === true });
+  const previous = await getTwoFactorPolicySettings();
+  const mode = isMfaPolicyMode(raw.mode)
+    ? raw.mode
+    : "requireForAdmins" in raw
+      ? raw.requireForAdmins === true
+        ? previous.mode === "all"
+          ? "all"
+          : "admins"
+        : "off"
+      : previous.mode;
+  const graceDays = "graceDays" in raw ? Number(raw.graceDays) : previous.graceDays;
+  await setSetting("two_factor_policy", nextMfaPolicy(previous, { mode, graceDays }));
 }
 
 export async function getDnsSettings(): Promise<DnsSettings | null> {

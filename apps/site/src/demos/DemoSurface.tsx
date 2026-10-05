@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ThemeContext, registerTheme } from "@astryxdesign/core/theme";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
+import { LinkProvider } from "@astryxdesign/core/Link";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { IntlProvider } from "use-intl";
 import messages from "@cpm/controller/messages/en.json";
+import { DemoLink } from "./DemoLink";
 import "./demo.css";
 
 // The theme's CSS ships pre-built, so registering is all that is left to do and it is idempotent.
@@ -52,7 +54,8 @@ export function DemoSurface({ children }: { children: ReactNode }) {
             data-theme={mode}
             style={{ colorScheme: mode }}
           >
-            {children}
+            {/* Every Astryx link renders through DemoLink, as next/link does by alias. */}
+            <LinkProvider component={DemoLink}>{children}</LinkProvider>
           </div>
         </InternationalizationProvider>
       </IntlProvider>

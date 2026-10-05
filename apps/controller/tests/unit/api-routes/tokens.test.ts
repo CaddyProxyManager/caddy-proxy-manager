@@ -161,7 +161,7 @@ describe('POST /api/v1/tokens', () => {
     expect(response.status).toBe(201);
     expect(data.raw_token).toBe('cpm_raw_token_abc123');
     expect(data.token).toEqual(tokenResult.token);
-    expect(mockCreateApiToken).toHaveBeenCalledWith('New Token', 1, undefined);
+    expect(mockCreateApiToken).toHaveBeenCalledWith('New Token', 1, undefined, { kind: 'full' });
   });
 
   it('creates a token with expires_at', async () => {
@@ -187,7 +187,36 @@ describe('POST /api/v1/tokens', () => {
     await response.json();
 
     expect(response.status).toBe(201);
-    expect(mockCreateApiToken).toHaveBeenCalledWith('Expiring Token', 1, '2027-01-01');
+    expect(mockCreateApiToken).toHaveBeenCalledWith('Expiring Token', 1, '2027-01-01', {
+      kind: 'full',
+    });
+  });
+
+  it('passes a scope and its permissions to the model', async () => {
+    mockCreateApiToken.mockResolvedValue({ token: { id: 12 }, rawToken: 'raw' } as any);
+
+    const response = await POST(
+      createMockRequest({
+        method: 'POST',
+        body: { name: 'Scoped', scope: 'custom', permissions: ['hosts:read', 'audit:read'] },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockCreateApiToken).toHaveBeenCalledWith('Scoped', 1, undefined, {
+      kind: 'custom',
+      permissions: ['hosts:read', 'audit:read'],
+    });
+  });
+
+  it('refuses an unknown scope with an error REST answers as a 400', async () => {
+    const { apiErrorResponse } = await import('@/src/lib/api/auth');
+    await POST(createMockRequest({ method: 'POST', body: { name: 'Bad', scope: 'everything' } }));
+
+    expect(vi.mocked(apiErrorResponse)).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'apiTokenScopeInvalid', status: 400 }),
+    );
+    expect(mockCreateApiToken).not.toHaveBeenCalled();
   });
 
   it('rejects token creation authenticated by another bearer token', async () => {
@@ -219,7 +248,7 @@ describe('POST /api/v1/tokens', () => {
     );
 
     expect(response.status).toBe(201);
-    expect(mockCreateApiToken).toHaveBeenCalledWith('Viewer Token', 5, undefined);
+    expect(mockCreateApiToken).toHaveBeenCalledWith('Viewer Token', 5, undefined, { kind: 'full' });
   });
 
   it('returns 400 when name is missing', async () => {

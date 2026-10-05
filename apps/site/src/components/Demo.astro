@@ -48,35 +48,48 @@ const hintID = `cpm-demo-hint-${crypto.randomUUID().slice(0, 8)}`;
    * plugin it can compile in, each linked to its repository, and that is worth keeping. So are the
    * links under `data-cpm-demo-routes`, whose demo serves those routes itself (the setup flow).
    *
+   * React does most of it: next/link and every Astryx link render through DemoLink, which leaves
+   * the href out on the server and in the browser alike. This catches a plain anchor that does not,
+   * and only once its island has hydrated - changing the server's markup first is what made every
+   * delinked anchor a hydration mismatch. Until then a click on one goes nowhere.
+   *
    * Dropping `href` rather than swallowing the click is what makes it stop being a link - no
    * pointer cursor, no status bar preview, and not announced as one. The `tabindex` goes with it,
-   * or a keyboard would still stop on a card that no longer does anything; Astryx's ClickableCard
-   * sets that explicitly, so losing the href is not enough on its own. The card keeps its hover
-   * styling and still looks like the thing it is a picture of.
-   *
-   * This runs against the server-rendered markup before React ever hydrates, and the observer
-   * reapplies it to whatever each island renders afterwards. Removing the attributes retriggers
-   * the observer once, finds nothing left to change, and settles.
+   * or a keyboard would still stop on a card that no longer does anything.
    */
+  const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+  function isDeadLink(anchor: HTMLAnchorElement): boolean {
+    const href = anchor.getAttribute("href");
+    if (href !== null && HAS_SCHEME.test(href)) return false;
+    return !anchor.closest("[data-cpm-demo-routes]");
+  }
+
   function deLink(root: ParentNode) {
-    const anchors = root.querySelectorAll<HTMLAnchorElement>("a[href], a[data-cpm-demo-delinked]");
+    const anchors = root.querySelectorAll<HTMLAnchorElement>("a[href]");
     for (const anchor of anchors) {
-      const href = anchor.getAttribute("href");
-      if (href !== null && /^[a-z][a-z0-9+.-]*:/i.test(href)) continue;
-      if (anchor.closest("[data-cpm-demo-routes]")) continue;
+      if (!isDeadLink(anchor) || anchor.closest("astro-island[ssr]")) continue;
       anchor.removeAttribute("href");
       // Assigned, not removed: React sets tabIndex as a property, which survives the attribute
-      // going away. -1 is the value that takes it out of the tab order while leaving the card
-      // reachable by script, and writing it back is what the observer watches for.
+      // going away. Writing it back is what the observer watches for.
       if (anchor.tabIndex !== -1) anchor.tabIndex = -1;
       anchor.dataset.cpmDemoDelinked = "";
     }
   }
 
   for (const frame of document.querySelectorAll(".cpm-demo-frame")) {
+    frame.addEventListener(
+      "click",
+      (event) => {
+        const anchor = (event.target as Element | null)?.closest?.("a[href]");
+        if (anchor instanceof HTMLAnchorElement && isDeadLink(anchor)) event.preventDefault();
+      },
+      true,
+    );
     deLink(frame);
+    // `ssr` leaves an island once it has hydrated, which is when its anchors are React's.
     new MutationObserver(() => deLink(frame)).observe(frame, {
-      attributeFilter: ["href", "tabindex"],
+      attributeFilter: ["href", "tabindex", "ssr"],
       childList: true,
       subtree: true,
     });

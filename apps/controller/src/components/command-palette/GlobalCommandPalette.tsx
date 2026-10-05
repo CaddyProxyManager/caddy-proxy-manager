@@ -7,7 +7,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { type LucideIcon, Search } from "lucide-react";
+import { type LucideIcon, Search, Settings2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Kbd } from "@astryxdesign/core/Kbd";
@@ -27,6 +27,7 @@ import {
   settingsSectionDescription,
   settingsSectionName,
 } from "@/src/app/(dashboard)/settings/sections";
+import { settingsSearchEntries } from "@/src/app/(dashboard)/settings/search-index";
 
 type PaletteItem = {
   /** The page it opens; unique, so it doubles as the id. */
@@ -129,7 +130,10 @@ export function GlobalCommandPaletteProvider({
       },
     }));
 
-    // Admin-only pages; anyone else would only be refused.
+    // Admin-only pages; anyone else would only be refused. Synonyms come from the settings
+    // search index, so "smtp" finds Email here as on the Settings page.
+    const searchEntries = role === "admin" ? settingsSearchEntries(tSettings) : [];
+    const keywordsFor = new Map(searchEntries.map((entry) => [entry.id, entry.keywords]));
     const settings: PaletteItem[] =
       role === "admin"
         ? SETTINGS_ITEMS.map((item) => {
@@ -145,8 +149,7 @@ export function GlobalCommandPaletteProvider({
                   // So a page is found by anything it carries, not only its name.
                   ...item.blocks.flatMap((block) => [
                     settingsBlockName(tSettings, block.id),
-                    ...(block.env ?? []),
-                    ...(block.envSearch ?? []),
+                    ...(keywordsFor.get(block.id) ?? []),
                   ]),
                 ],
                 icon: item.icon,
@@ -155,8 +158,22 @@ export function GlobalCommandPaletteProvider({
             };
           })
         : [];
+    // The blocks a page holds, and the admin pages outside the sections, each its own row.
+    const pageHrefs = new Set(settings.map((item) => item.id));
+    const settingsBlocks: PaletteItem[] = searchEntries
+      .filter((entry) => !pageHrefs.has(entry.href))
+      .map((entry) => ({
+        id: entry.href,
+        label: entry.title,
+        auxiliaryData: {
+          group: t("groupSettings"),
+          desc: entry.context,
+          keywords: entry.keywords,
+          icon: Settings2,
+        },
+      }));
 
-    const items = [...pages, ...settings];
+    const items = [...pages, ...settings, ...settingsBlocks];
     return createStaticSource(items, {
       keywords: (item) => [item.auxiliaryData.desc, ...item.auxiliaryData.keywords],
     });

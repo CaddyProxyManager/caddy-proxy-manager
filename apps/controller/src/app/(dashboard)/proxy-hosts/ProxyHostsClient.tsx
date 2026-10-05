@@ -64,7 +64,8 @@ import { ProxyHostBulkActions } from "@/components/proxy-hosts/ProxyHostBulkActi
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useEmptyValue } from "@/components/ui/empty-value";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import {
   CreateHostDialog,
   EditHostDialog,
@@ -329,7 +330,7 @@ export default function ProxyHostsClient({
   manageableIds = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);

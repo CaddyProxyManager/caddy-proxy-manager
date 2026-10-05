@@ -5,6 +5,8 @@ import { validateToken } from "../models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./errors";
 import { DomainError, domainErrorMessage } from "../errors/domain-error";
+import { type TokenScope, unflattenScope } from "../api-tokens/scope";
+import { restRequirement, tokenAllows } from "../api-tokens/requirements";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -14,6 +16,9 @@ export class ApiAuthError extends Error {
     this.status = status;
   }
 }
+
+/** English: what an API client reads. */
+export const TOKEN_SCOPE_REFUSED = "This API token's scope does not allow this request";
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -28,6 +33,8 @@ export type ApiAuthResult = {
   authMethod: "bearer" | "session";
   /** A session viewing as some groups; a token never is. */
   viewAsGroupIds?: number[];
+  /** A token's; a session has none, and is limited by its role alone. */
+  tokenScope?: TokenScope;
 };
 
 export async function authenticateApiRequest(request: NextRequest): Promise<ApiAuthResult> {
@@ -47,6 +54,7 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
       userId: result.user.id,
       role: result.user.role,
       authMethod: "bearer",
+      tokenScope: unflattenScope(result.token),
     };
   }
 
@@ -76,6 +84,15 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
 
 export async function requireApiUser(request: NextRequest): Promise<ApiAuthResult> {
   const result = await authenticateApiRequest(request);
+
+  // Every REST route comes through here, so a scoped token is checked once, by path.
+  const scope = result.tokenScope;
+  if (scope && scope.kind !== "full") {
+    const pathname = request.nextUrl.pathname;
+    if (!tokenAllows(scope, restRequirement(pathname, request.method))) {
+      throw new ApiAuthError(TOKEN_SCOPE_REFUSED, 403);
+    }
+  }
 
   // A bearer token cannot be ridden cross-site; a session cookie can.
   if (result.authMethod === "session") {

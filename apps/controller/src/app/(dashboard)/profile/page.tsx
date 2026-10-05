@@ -16,7 +16,9 @@ import ProfileClient from "./ProfileClient";
 import { isDemoAdmin } from "@/src/lib/demo/mode";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { approximatePlace } from "@/src/lib/geoip/lookup";
+import { getDisplayPreferences } from "@/src/lib/users/display-preferences";
 import { listUserPasskeys } from "@/src/lib/auth/passkeys";
 import { passkeyRpId } from "@/src/lib/auth/passkeys/relying-party";
 import { getPublicBaseUrl } from "@/src/lib/http/public-url";
@@ -53,6 +55,8 @@ export default async function ProfilePage() {
     passkeys,
     publicBaseUrl,
     directoryNames,
+    displayPreferences,
+    locale,
   ] = await Promise.all([
     getUserById(userId),
     // The accounts table is authoritative; users.provider/subject are a projection (#261).
@@ -65,6 +69,8 @@ export default async function ProfilePage() {
     listUserPasskeys(userId),
     getPublicBaseUrl(),
     ldapDirectoryNames(),
+    getDisplayPreferences(userId),
+    getLocale(),
   ]);
   if (!user) {
     redirect("/login");
@@ -79,7 +85,12 @@ export default async function ProfilePage() {
   const directoryLink = linkedProviders.find((link) => directoryNames.has(link.providerId));
   const managedByDirectory =
     !passwordHash && directoryLink ? (directoryNames.get(directoryLink.providerId) ?? null) : null;
-  const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+  const sessions = userSessions.map((s) => ({
+    ...s,
+    current: s.id === currentSessionId,
+    // Approximate, from the GeoIP database when one is on the data volume.
+    place: approximatePlace(s.ipAddress, locale),
+  }));
   const notifications = await notificationsView;
 
   return (
@@ -108,6 +119,7 @@ export default async function ProfilePage() {
       passwordLocked={isDemoAdmin(userId)}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
       notifications={notifications}
+      displayPreferences={displayPreferences}
     />
   );
 }

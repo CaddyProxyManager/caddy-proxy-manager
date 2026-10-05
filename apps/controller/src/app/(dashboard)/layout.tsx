@@ -21,6 +21,7 @@ import { stagedKeys } from "@/src/lib/settings/staged-view";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 import { getTableDensity } from "@/src/lib/models/table-density";
 import { TableDensityProvider } from "@/components/ui/TableDensity";
+import { mfaStandingFor } from "@/src/lib/auth/two-factor/policy";
 
 /** Names for the banner, in the order the ids were chosen. */
 async function groupNames(ids: number[]): Promise<string[]> {
@@ -40,21 +41,31 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const t = await getTranslations();
 
   // Parallel: this runs on every dashboard navigation.
-  const [mustChangePassword, gravatar, moduleGate, updates, stagedSet, morePins, tableDensity] =
-    await Promise.all([
-      requiresLegacyPasswordChange(userId),
-      isGravatarEnabled(),
-      // Once for the whole dashboard: every page needs the same answer, and it changes only when
-      // an admin saves Settings > Caddy Build.
-      getModuleGateState((module) => caddyModuleName(t, module)),
-      // A cache read that refreshes in the background, never a network call on render.
-      getUpdateStatus(),
-      // Only admins reach Settings, so nobody else pays for this read.
-      session.user.role === "admin" ? stagedKeys(userId) : null,
-      // Null means never chosen, which keeps the phone's More drawer offering to be customized.
-      getMoreDrawerPins(userId),
-      getTableDensity(userId),
-    ]);
+  const [
+    mustChangePassword,
+    gravatar,
+    moduleGate,
+    updates,
+    stagedSet,
+    morePins,
+    tableDensity,
+    mfaStanding,
+  ] = await Promise.all([
+    requiresLegacyPasswordChange(userId),
+    isGravatarEnabled(),
+    // Once for the whole dashboard: every page needs the same answer, and it changes only when
+    // an admin saves Settings > Caddy Build.
+    getModuleGateState((module) => caddyModuleName(t, module)),
+    // A cache read that refreshes in the background, never a network call on render.
+    getUpdateStatus(),
+    // Only admins reach Settings, so nobody else pays for this read.
+    session.user.role === "admin" ? stagedKeys(userId) : null,
+    // Null means never chosen, which keeps the phone's More drawer offering to be customized.
+    getMoreDrawerPins(userId),
+    getTableDensity(userId),
+    // Overdue is the proxy's to enforce; only the grace period's banner is decided here.
+    mfaStandingFor(session).catch(() => ({ status: "exempt" }) as const),
+  ]);
 
   // Here, not per page: a bcrypt-hash user must reach the reset screen from any URL. The reset
   // page is outside this layout, so this cannot loop.
@@ -81,6 +92,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           updateAvailable={updates.updateAvailable}
           stagedKeys={staged}
           morePins={morePins}
+          mfaDeadline={mfaStanding.status === "grace" ? mfaStanding.deadline : null}
           viewAs={
             session.viewAs
               ? { role: session.viewAs.role, groupNames: await groupNames(session.viewAs.groupIds) }

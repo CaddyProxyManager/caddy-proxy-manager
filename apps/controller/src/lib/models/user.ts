@@ -42,6 +42,12 @@ export type User = {
   avatarUrl: string | null;
   status: string;
   twoFactorEnabled: boolean;
+  /** The last completed sign-in (lib/auth/last-sign-in.ts); null before the first one. */
+  lastSignInAt: string | null;
+  lastSignInMethod: string | null;
+  /** Display preferences that follow the account; null falls back to the browser's. */
+  timeZone: string | null;
+  numberFormat: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -62,6 +68,10 @@ function parseDbUser(user: DbUser): User {
     avatarUrl: user.avatarUrl,
     status: user.status,
     twoFactorEnabled: user.twoFactorEnabled,
+    lastSignInAt: toIso(user.lastSignInAt),
+    lastSignInMethod: user.lastSignInMethod,
+    timeZone: user.timeZone,
+    numberFormat: user.numberFormat,
     createdAt: toIso(user.createdAt)!,
     updatedAt: toIso(user.updatedAt)!,
   };

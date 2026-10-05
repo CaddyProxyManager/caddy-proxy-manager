@@ -5,7 +5,8 @@ import { stopViewAsAction } from "./view-as/actions";
 import { Button } from "@astryxdesign/core/Button";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 import { useTheme } from "@astryxdesign/core";
 import { LogOut, Sun, Moon } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
@@ -143,6 +144,7 @@ export default function DashboardLayoutClient({
   stagedKeys,
   morePins,
   viewAs = null,
+  mfaDeadline = null,
   children,
 }: {
   user: User;
@@ -158,9 +160,12 @@ export default function DashboardLayoutClient({
   morePins: readonly DestinationId[] | null;
   /** See lib/users/view-as.ts. */
   viewAs?: { role: string; groupNames: string[] } | null;
+  /** Inside a two-factor policy's grace period: when setup becomes compulsory. */
+  mfaDeadline?: string | null;
   children: ReactNode;
 }) {
   const t = useTranslations("nav");
+  const format = useFormatter();
   const pathname = usePathname();
   const isNarrow = useMediaQuery(NARROW);
   // Keyed to the path it opened on, so any navigation closes it with no effect to keep in step.
@@ -254,6 +259,23 @@ export default function DashboardLayoutClient({
       container="section"
       title={t("demoBannerTitle")}
       description={t("demoBannerDescription")}
+    />
+  ) : mfaDeadline ? (
+    <Banner
+      status="warning"
+      container="section"
+      title={t("mfaGraceTitle", {
+        date: format.dateTime(new Date(mfaDeadline), TIMESTAMP_STYLES.date),
+      })}
+      description={t("mfaGraceDescription")}
+      endContent={
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("mfaGraceAction")}
+          href="/profile#two-factor"
+        />
+      }
     />
   ) : sqliteNotice ? (
     <Banner

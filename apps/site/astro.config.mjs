@@ -107,6 +107,7 @@ export default defineConfig({
             { label: "What it is", slug: "start/what-it-is" },
             { label: "Install", slug: "start/install" },
             { label: "First run", slug: "start/first-run" },
+            { label: "Database", slug: "start/database" },
           ],
         },
         {
@@ -155,8 +156,8 @@ export default defineConfig({
     resolve: {
       /**
        * Three controller tsconfig paths repeated (`@/*` is unused by demos), plus shims for
-       * next-intl, next/navigation, the auth client, full page loads, the host and overview
-       * actions, and the editors' URL section links. The shims must precede the `@/src/` alias,
+       * next-intl, next/link, next/navigation, the auth client, full page loads, the host and
+       * overview actions, and the editors' URL section links. The shims must precede the `@/src/` alias,
        * which would otherwise match first.
        */
       alias: [
@@ -196,6 +197,10 @@ export default defineConfig({
         {
           find: /^next-intl$/,
           replacement: fileURLToPath(new URL("./src/demos/shims/next-intl.ts", import.meta.url)),
+        },
+        {
+          find: /^next\/link$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/next-link.tsx", import.meta.url)),
         },
         {
           find: /^next\/navigation$/,

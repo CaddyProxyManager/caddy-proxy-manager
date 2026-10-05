@@ -25,6 +25,7 @@ import {
   normalizeDnsName,
 } from "../dns/challenge-delegation";
 import { isEmailAddress } from "../email/address";
+import { MAX_MFA_GRACE_DAYS, MFA_POLICY_MODES } from "../auth/two-factor/mfa-policy";
 
 export class SettingsValidationError extends Error {
   constructor(message: string) {
@@ -699,6 +700,17 @@ function validateDefaultResponse(value: Record<string, unknown>): void {
 }
 
 /** The GET shape round-trips: `hasPassword` and `hasApiKey` are accepted and ignored. */
+/** `{ mode, graceDays }`, or the older `{ requireForAdmins }` API clients still send. */
+function validateTwoFactorPolicy(value: Record<string, unknown>): void {
+  onlyKeys(value, ["mode", "graceDays", "requireForAdmins"], "two-factor settings");
+  if (!("mode" in value) && !("requireForAdmins" in value)) {
+    required(value, "mode", "two-factor settings");
+  }
+  if ("mode" in value) optionalOneOf(value.mode, MFA_POLICY_MODES, "mode");
+  if ("requireForAdmins" in value) booleanValue(value.requireForAdmins, "requireForAdmins");
+  if ("graceDays" in value) integerValue(value.graceDays, "graceDays", 0, MAX_MFA_GRACE_DAYS);
+}
+
 function validateHttpCache(value: Record<string, unknown>): void {
   const label = "HTTP cache settings";
   onlyKeys(value, ["storage", "otterSize", "redis", "etcd", "cdn"], label);
@@ -884,8 +896,7 @@ export function validateSettingsGroup(
       booleanValue(required(value, "enabled", "compression settings"), "enabled");
       break;
     case "two-factor":
-      onlyKeys(value, ["requireForAdmins"], "two-factor settings");
-      booleanValue(required(value, "requireForAdmins", "two-factor settings"), "requireForAdmins");
+      validateTwoFactorPolicy(value);
       break;
     case "http-cache":
       validateHttpCache(value);

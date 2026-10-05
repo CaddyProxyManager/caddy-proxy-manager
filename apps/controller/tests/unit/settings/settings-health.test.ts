@@ -80,7 +80,7 @@ function input(overrides: Partial<HealthInput> = {}): HealthInput {
     ldapDirectoryCount: 0,
     signIn: { localUsersDisabled: false, accountLockEnabled: true },
     captchaProvider: null,
-    twoFactorRequiredForAdmins: false,
+    twoFactorMode: 'off',
     requireChangeOnLegacyHash: false,
     authentikOutpost: '',
     forwardAuth: null,

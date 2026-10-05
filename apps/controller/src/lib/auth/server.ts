@@ -568,6 +568,10 @@ async function createAuth(baseURL: string): Promise<any> {
               console.warn("[auth-server] Binding the session to its IdP session failed:", error);
             }
 
+            const { recordSignIn, sessionSignInMethod } = await import("./last-sign-in");
+            const method = await sessionSignInMethod(userId, context?.path).catch(() => null);
+            if (method) await recordSignIn(userId, method);
+
             try {
               const { createAuditEvent } = await import("../models/audit");
               await createAuditEvent({

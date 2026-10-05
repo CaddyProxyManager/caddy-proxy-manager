@@ -22,7 +22,8 @@ import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { ACCENTS } from "@/components/ui/accent";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -111,7 +112,7 @@ export function HostRequestsCell({
   share: number;
 }) {
   const t = useTranslations("proxyHosts");
-  const format = useFormatter();
+  const format = useAppFormatter();
   return (
     <VStack gap={1} className="cpm-cell-lines">
       <HStack gap={2} vAlign="center" justify="end">
@@ -143,7 +144,7 @@ export function HostServerErrorsCell({
   serverErrors: number;
   requests: number;
 }) {
-  const format = useFormatter();
+  const format = useAppFormatter();
   const emptyValue = useEmptyValue();
   if (serverErrors === 0) {
     return (

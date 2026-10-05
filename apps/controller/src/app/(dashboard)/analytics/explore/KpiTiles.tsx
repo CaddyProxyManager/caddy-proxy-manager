@@ -13,7 +13,8 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import type { ExploreBucket, ExploreTotals } from "@/src/lib/clickhouse/explore";
@@ -142,7 +143,7 @@ export function KpiTiles({
   Chart: ApexChartComponent;
 }) {
   const t = useTranslations("analytics");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const theme = useChartTheme();
   const kpis = kpisFor(totals, previousTotals, timeline);
 

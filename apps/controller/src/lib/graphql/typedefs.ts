@@ -219,6 +219,10 @@ export const typeDefs = /* GraphQL */ `
     status: String!
     provider: String
     avatarUrl: String
+    """The last completed sign-in; null before the first one this release recorded."""
+    lastSignInAt: DateTime
+    """password, passkey, oidc or ldap."""
+    lastSignInMethod: String
     createdAt: DateTime!
     updatedAt: DateTime!
   }
@@ -247,6 +251,10 @@ export const typeDefs = /* GraphQL */ `
     createdAt: DateTime!
     lastUsedAt: DateTime
     expiresAt: DateTime
+    """full (the owner's role), read (no mutation) or custom (the permissions below)."""
+    scope: String!
+    """area:read or area:write, for a custom scope; empty otherwise."""
+    permissions: [String!]!
   }
 
   """A token is only readable once, when it is created."""
@@ -848,6 +856,11 @@ export const typeDefs = /* GraphQL */ `
     settings(group: String!): JSON
     """The Caddy modules compiled into the running binary."""
     caddyModules: JSON
+    """
+    Every sign-in method and whether it is on, linked-account counts, directory health,
+    group-to-role mappings and the two-factor policy, as Users > Sign-in overview shows them.
+    """
+    signInOverview: JSON!
     """Tiles, chart, top lists and latest requests for one analytics page state."""
     analyticsReport(query: AnalyticsQueryInput): AnalyticsReport!
     """One top list under the same filters, up to 100 rows."""
@@ -932,6 +945,10 @@ export const typeDefs = /* GraphQL */ `
     updateUser(id: Int!, input: JSON!): User!
     deleteUser(id: Int!): Boolean!
 
+    """
+    input: name, expiresAt, scope (full, read or custom) and permissions (area:read or
+    area:write). A scope narrows the owner's role and never widens it.
+    """
     createApiToken(input: JSON!): CreatedApiToken!
     deleteApiToken(id: Int!): Boolean!
 

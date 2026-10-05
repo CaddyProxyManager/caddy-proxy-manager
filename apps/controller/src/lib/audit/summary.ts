@@ -46,6 +46,10 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("ldap_directory", "directory", "ldapDirectory"),
   // models/analytics-views.ts
   ...lifecycle("analytics_view", "analytics view", "analyticsView"),
+  // models/api-tokens.ts; a token is never updated.
+  ...lifecycle("api_token", "API token", "apiToken").filter(
+    (pattern) => pattern.action !== "update",
+  ),
   {
     entityType: "analytics_view",
     action: "update",
@@ -597,6 +601,13 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "two_factor_reset",
     message: "twoFactorResetConsole",
     pattern: /^Two-factor sign-in reset for user (?<email>.+?) from the server console$/s,
+  },
+  // `cpm-server --lift-mfa-policy`
+  {
+    entityType: "settings",
+    action: "mfa_policy_lifted",
+    message: "mfaPolicyLiftedConsole",
+    pattern: /^Lifted the two-factor policy from the server console$/,
   },
   // lib/auth/account-failures.ts, and `cpm-server --enable-user`
   {

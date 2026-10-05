@@ -18,6 +18,7 @@ import {
   settingLabel,
 } from "@cpm/controller/src/lib/settings/messages";
 import { DemoSurface } from "../DemoSurface";
+import { DemoRoutes } from "../DemoLink";
 import {
   LEGACY_CANDIDATES,
   SETTING_FIELDS,
@@ -86,7 +87,9 @@ export default function SetupFlowDemo() {
         {/* The screens centre themselves in the viewport's height; see demo.css. The attribute
             keeps Demo.astro from de-linking what followLinks serves. */}
         <div className="cpm-demo-auth" data-cpm-demo-routes="" onClickCapture={followLinks}>
-          <Page key={state.load} state={state} simulation={simulation} />
+          <DemoRoutes>
+            <Page key={state.load} state={state} simulation={simulation} />
+          </DemoRoutes>
         </div>
       </VStack>
     </DemoSurface>

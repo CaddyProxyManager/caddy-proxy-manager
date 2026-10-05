@@ -141,6 +141,7 @@ import { AccentColorPicker } from "./AccentColorPicker";
 import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
+import { TwoFactorPolicySection } from "./TwoFactorPolicySection";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { RateLimitSection } from "./RateLimitSection";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
@@ -1463,35 +1464,6 @@ function CompressionSection({
             htmlName="enabled"
             value={enabled}
             onChange={setEnabled}
-          />
-        </VStack>
-      </form>
-    </FormCard>
-  );
-}
-
-function TwoFactorPolicySection({
-  policy,
-  state,
-  formAction,
-}: {
-  policy: TwoFactorPolicySettings;
-  state: { success: boolean; message?: string } | null;
-  formAction: (payload: FormData) => void;
-}) {
-  const t = useTranslations("settings");
-  const [requireForAdmins, setRequireForAdmins] = useState(policy.requireForAdmins);
-  return (
-    <FormCard>
-      <form action={formAction}>
-        <VStack gap={3}>
-          {state?.message && <StatusAlert message={state.message} success={state.success} />}
-          <Switch
-            label={t("requireAdminTwoFactor")}
-            description={t("requireAdminTwoFactorHelp")}
-            htmlName="requireForAdmins"
-            value={requireForAdmins}
-            onChange={setRequireForAdmins}
           />
         </VStack>
       </form>

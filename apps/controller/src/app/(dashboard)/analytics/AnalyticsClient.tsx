@@ -30,7 +30,8 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Download, ListFilter, ListX } from "lucide-react";
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { useTableDensity } from "@/components/ui/TableDensity";
@@ -297,7 +298,7 @@ type CountryRow = TopRow & { [k: string]: unknown };
 
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const locale = useLocale();
   const density = useTableDensity();
   const router = useRouter();

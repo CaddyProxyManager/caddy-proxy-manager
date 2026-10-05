@@ -28,7 +28,7 @@ const mockValidateToken = vi.mocked(validateToken);
 const mockAuth = vi.mocked(auth);
 
 function createMockRequest(
-  options: { authorization?: string; method?: string; origin?: string } = {},
+  options: { authorization?: string; method?: string; origin?: string; pathname?: string } = {},
 ): any {
   return {
     headers: {
@@ -39,7 +39,7 @@ function createMockRequest(
       },
     },
     method: options.method ?? 'GET',
-    nextUrl: { pathname: '/api/v1/test' },
+    nextUrl: { pathname: options.pathname ?? '/api/v1/test' },
   };
 }
 
@@ -57,6 +57,8 @@ describe('authenticateApiRequest', () => {
         createdAt: '',
         lastUsedAt: null,
         expiresAt: null,
+        scope: 'full',
+        permissions: [],
       },
       user: { id: 42, role: 'admin' },
     });
@@ -115,6 +117,8 @@ describe('requireApiAdmin', () => {
         createdAt: '',
         lastUsedAt: null,
         expiresAt: null,
+        scope: 'full',
+        permissions: [],
       },
       user: { id: 1, role: 'admin' },
     });
@@ -132,6 +136,8 @@ describe('requireApiAdmin', () => {
         createdAt: '',
         lastUsedAt: null,
         expiresAt: null,
+        scope: 'full',
+        permissions: [],
       },
       user: { id: 2, role: 'user' },
     });
@@ -196,6 +202,8 @@ describe('requireApiUser', () => {
         createdAt: '',
         lastUsedAt: null,
         expiresAt: null,
+        scope: 'full',
+        permissions: [],
       },
       user: { id: 42, role: 'admin' },
     });
@@ -210,6 +218,66 @@ describe('requireApiUser', () => {
     );
     expect(result.userId).toBe(42);
     expect(result.authMethod).toBe('bearer');
+  });
+});
+
+describe('requireApiUser - a scoped token', () => {
+  function tokenWith(scope: 'full' | 'read' | 'custom', permissions: string[] = []) {
+    mockValidateToken.mockResolvedValue({
+      token: {
+        id: 1,
+        name: 'scoped',
+        createdBy: 42,
+        createdAt: '',
+        lastUsedAt: null,
+        expiresAt: null,
+        scope,
+        permissions: permissions as never,
+      },
+      user: { id: 42, role: 'admin' },
+    });
+  }
+
+  it('lets a read-only token read and refuses its writes', async () => {
+    tokenWith('read');
+    const read = createMockRequest({ authorization: 'Bearer t', pathname: '/api/v1/proxy-hosts' });
+    await expect(requireApiUser(read)).resolves.toMatchObject({ userId: 42 });
+    const write = createMockRequest({
+      authorization: 'Bearer t',
+      method: 'POST',
+      pathname: '/api/v1/proxy-hosts',
+    });
+    await expect(requireApiUser(write)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('keeps a custom token to its areas', async () => {
+    tokenWith('custom', ['hosts:write']);
+    const hosts = createMockRequest({
+      authorization: 'Bearer t',
+      method: 'DELETE',
+      pathname: '/api/v1/proxy-hosts/3',
+    });
+    await expect(requireApiUser(hosts)).resolves.toMatchObject({ userId: 42 });
+    const users = createMockRequest({ authorization: 'Bearer t', pathname: '/api/v1/users' });
+    await expect(requireApiUser(users)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('still needs the role: an admin-only route stays closed to a user whatever the scope', async () => {
+    mockValidateToken.mockResolvedValue({
+      token: {
+        id: 1,
+        name: 'scoped',
+        createdBy: 7,
+        createdAt: '',
+        lastUsedAt: null,
+        expiresAt: null,
+        scope: 'custom',
+        permissions: ['users:write'],
+      },
+      user: { id: 7, role: 'user' },
+    });
+    const request = createMockRequest({ authorization: 'Bearer t', pathname: '/api/v1/users' });
+    await expect(requireApiAdmin(request)).rejects.toMatchObject({ status: 403 });
   });
 });
 

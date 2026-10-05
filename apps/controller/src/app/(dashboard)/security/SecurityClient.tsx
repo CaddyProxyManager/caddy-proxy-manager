@@ -25,7 +25,8 @@ import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList"
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { useFormatter, useTimeZone, useTranslations } from "next-intl";
+import { useTimeZone, useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -81,7 +82,7 @@ function useOutcomeName() {
 
 function SecurityChart({ report, onShowPeak }: { report: SecurityReport; onShowPeak: () => void }) {
   const t = useTranslations("security");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const theme = useChartTheme();
   const outcomeName = useOutcomeName();
   const rangeSeconds = report.window.to - report.window.from;
@@ -234,7 +235,7 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
 
 function MitigatedCard({ report }: { report: SecurityReport }) {
   const t = useTranslations("security");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const outcomeName = useOutcomeName();
   const { totals } = report;
   const change =
@@ -286,7 +287,7 @@ function MitigatedCard({ report }: { report: SecurityReport }) {
 
 function SourcesCard({ report }: { report: SecurityReport }) {
   const t = useTranslations("security");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const emptyValue = useEmptyValue();
   return (
     <Card padding={4}>
@@ -323,7 +324,7 @@ export default function SecurityClient({
 }) {
   const t = useTranslations("security");
   const tWaf = useTranslations("waf");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const timeZone = useTimeZone() ?? "UTC";
   const emptyValue = useEmptyValue();
   const router = useRouter();

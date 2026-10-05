@@ -1646,8 +1646,10 @@ async function updateTwoFactorPolicySettingsActionUnlocked(
   const t = await getTranslations("settings");
   try {
     await requireAdmin();
+    const graceDays = formData.get("graceDays");
     await saveTwoFactorPolicySettings({
-      requireForAdmins: formData.get("requireForAdmins") === "on",
+      mode: String(formData.get("mode") ?? "off"),
+      ...(graceDays !== null && graceDays !== "" ? { graceDays: Number(graceDays) } : {}),
     });
     revalidatePath("/settings");
     return { success: true, message: t("results.twoFactorPolicySaved") };

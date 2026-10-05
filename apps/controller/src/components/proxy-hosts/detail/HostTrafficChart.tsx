@@ -6,7 +6,8 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import type { ApexOptions } from "apexcharts";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { useChartTheme } from "@/src/app/(dashboard)/analytics/chart-theme";
 import type { HostTrafficBucket } from "@/lib/clickhouse/host-traffic";
 
@@ -15,7 +16,7 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
 export function HostTrafficChart({ timeline }: { timeline: readonly HostTrafficBucket[] }) {
   const t = useTranslations("proxyHosts.detail");
-  const format = useFormatter();
+  const format = useAppFormatter();
   const theme = useChartTheme();
 
   const series = useMemo(

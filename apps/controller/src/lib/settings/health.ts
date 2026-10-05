@@ -76,7 +76,7 @@ export type HealthInput = {
   ldapDirectoryCount: number;
   signIn: { localUsersDisabled: boolean; accountLockEnabled: boolean };
   captchaProvider: string | null;
-  twoFactorRequiredForAdmins: boolean;
+  twoFactorMode: "off" | "admins" | "all";
   requireChangeOnLegacyHash: boolean;
   authentikOutpost: string;
   forwardAuth: { provider: "authelia" | "custom"; upstream: string } | null;
@@ -501,10 +501,12 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   push(
     "two-factor",
     "twoFactor",
-    input.twoFactorRequiredForAdmins ? "ok" : "unset",
-    input.twoFactorRequiredForAdmins
-      ? t("health.twoFactor.valueRequired")
-      : t("health.twoFactor.valueOptional"),
+    input.twoFactorMode !== "off" ? "ok" : "unset",
+    input.twoFactorMode === "all"
+      ? t("health.twoFactor.valueAll")
+      : input.twoFactorMode === "admins"
+        ? t("health.twoFactor.valueRequired")
+        : t("health.twoFactor.valueOptional"),
   );
 
   push(

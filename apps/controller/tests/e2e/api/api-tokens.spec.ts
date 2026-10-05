@@ -10,17 +10,45 @@ import { signInWithCredentials } from '../../helpers/sign-in';
 const BASE = 'http://localhost:3000';
 const USER = { username: 'apitokenuser', password: 'ApiTokenUser2026!' };
 
-async function withBearer(token: string) {
+async function withBearer(token: string, method: 'GET' | 'POST' = 'GET') {
   const ctx = await playwrightRequest.newContext({ storageState: { cookies: [], origins: [] } });
   try {
-    return (
-      await ctx.get(`${BASE}/api/v1/proxy-hosts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    ).status();
+    const headers = { Authorization: `Bearer ${token}` };
+    const response =
+      method === 'GET'
+        ? await ctx.get(`${BASE}/api/v1/access-lists`, { headers })
+        : await ctx.post(`${BASE}/api/v1/access-lists`, {
+            headers,
+            data: { name: `E2E scoped ${Date.now()}` },
+          });
+    return response.status();
   } finally {
     await ctx.dispose();
   }
+}
+
+/** Opens the create dialog, fills it, and returns the secret shown once afterwards. */
+async function createToken(
+  page: import('@playwright/test').Page,
+  name: string,
+  scope?: RegExp,
+): Promise<string> {
+  await page
+    .getByRole('button', { name: /^create token$/i })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByPlaceholder('e.g. CI/CD Pipeline').fill(name);
+  if (scope) await dialog.getByRole('radio', { name: scope }).check();
+  await dialog.getByRole('button', { name: /^create token$/i }).click();
+  await expect(page.getByText(/copy this token now/i)).toBeVisible({ timeout: 15_000 });
+  return (
+    await page
+      .locator('pre, code')
+      .filter({ hasText: /\S{20,}/ })
+      .first()
+      .innerText()
+  ).trim();
 }
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -38,16 +66,7 @@ test('an API token is shown once, works as a Bearer token, and dies when deleted
 
   await page.goto(`${BASE}/profile`);
   await waitForHydration(page);
-  await page.getByPlaceholder('e.g. CI/CD Pipeline').fill(name);
-  await page.getByRole('button', { name: /^create token$/i }).click();
-  await expect(page.getByText(/copy this token now/i)).toBeVisible({ timeout: 15_000 });
-  const token = (
-    await page
-      .locator('pre, code')
-      .filter({ hasText: /\S{20,}/ })
-      .first()
-      .innerText()
-  ).trim();
+  const token = await createToken(page, name);
   expect(token.length).toBeGreaterThan(20);
 
   expect(await withBearer(token)).toBe(200);
@@ -66,4 +85,21 @@ test('an API token is shown once, works as a Bearer token, and dies when deleted
   }
   await expect(page.getByText(name)).toHaveCount(0, { timeout: 15_000 });
   expect(await withBearer(token)).toBe(401);
+});
+
+test('a read-only token reads and is refused every change', async ({ page }) => {
+  seed.ensureTestUser(USER.username, USER.password, 'admin');
+  await page.goto(`${BASE}/login`);
+  await waitForHydration(page);
+  await signInWithCredentials(page, USER.username, USER.password);
+  await page.waitForURL((url) => !url.pathname.includes('/login'));
+
+  await page.goto(`${BASE}/profile`);
+  await waitForHydration(page);
+  const name = `E2E read-only ${Date.now()}`;
+  const token = await createToken(page, name, /^read only/i);
+  await expect(page.getByText(name)).toBeVisible();
+
+  expect(await withBearer(token)).toBe(200);
+  expect(await withBearer(token, 'POST')).toBe(403);
 });

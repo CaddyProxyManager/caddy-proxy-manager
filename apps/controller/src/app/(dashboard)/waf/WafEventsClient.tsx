@@ -99,6 +99,15 @@ type Props = {
 
 type RangeOption = Props["initialRange"];
 
+const WAF_TABS: readonly string[] = [
+  "events",
+  "exclusions",
+  "hosts",
+  "presets",
+  "plugins",
+  "settings",
+];
+
 const MODE_HELP_KEY = {
   Off: "globalModeHelpOff",
   DetectionOnly: "globalModeHelpDetectionOnly",
@@ -779,7 +788,11 @@ export default function WafEventsClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState("events");
+  // ?tab= opens one directly, as settings search does for the tuning and per-host tabs.
+  const [tab, setTab] = useState(() => {
+    const requested = searchParams.get("tab");
+    return requested && WAF_TABS.includes(requested) ? requested : "events";
+  });
   const [range, setRange] = useState<RangeOption>(initialRange);
   const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
   const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));

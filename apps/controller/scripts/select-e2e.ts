@@ -106,6 +106,9 @@ export const RULES: readonly Rule[] = [
       "apps/controller/scripts/seed-demo.ts",
       "apps/controller/scripts/generate-sqlite-schema.ts",
       "apps/controller/scripts/with-test-db.ts",
+      // A console tool the stack never runs; its own integration test covers it.
+      "apps/controller/scripts/sqlite-to-postgres.ts",
+      `${LIB}migration/sqlite-to-postgres`,
     ],
     specs: [],
   },
@@ -154,6 +157,8 @@ export const RULES: readonly Rule[] = [
     ],
     specs: AUTH,
   },
+  // The session list's place comes from here; the geo specs read the agent's copies.
+  { match: [`${LIB}geoip/lookup.ts`], specs: USERS },
   {
     match: [
       `${LIB}setup.ts`,
@@ -368,7 +373,7 @@ export const RULES: readonly Rule[] = [
     specs: ["audit-log"],
   },
   {
-    match: [`${DASH}api-tokens/`, `${V1}tokens/`, `${MODELS}api-tokens.ts`],
+    match: [`${DASH}api-tokens/`, `${V1}tokens/`, `${MODELS}api-tokens.ts`, `${LIB}api-tokens/`],
     specs: ["api/api-tokens", "api/api-security"],
   },
   { match: [`${DASH}api-docs/`, `${V1}openapi.json`], specs: ["api/api-docs"] },
@@ -435,6 +440,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   security: ["security/"],
   settings: SETTINGS_PAGE,
   setup: ["setup/"],
+  signInOverview: USERS,
   users: USERS,
   waf: WAF,
 };
