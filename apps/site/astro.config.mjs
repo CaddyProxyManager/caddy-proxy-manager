@@ -1,4 +1,5 @@
 // @ts-check
+import { copyFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
@@ -11,6 +12,22 @@ const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, impo
 
 /** Inlined the way the controller's vite.config.ts does, so the sign-in demo shows its version. */
 const { version: controllerVersion } = createRequire(import.meta.url)("../controller/package.json");
+
+/**
+ * Starlight's sitemap is `sitemap-index.xml`; `/sitemap.xml` is where crawlers and people look
+ * first. Copied rather than redirected: Pages can't redirect, and a crawler may not follow one.
+ */
+function sitemapAlias() {
+  return {
+    name: "sitemap-alias",
+    hooks: {
+      /** @param {{ dir: URL }} options */
+      "astro:build:done": async ({ dir }) => {
+        await copyFile(new URL("sitemap-index.xml", dir), new URL("sitemap.xml", dir));
+      },
+    },
+  };
+}
 
 /**
  * Shims `./actions` under the folders listed here only. A plugin, since an alias on a relative
@@ -128,6 +145,7 @@ export default defineConfig({
         },
       ],
     }),
+    sitemapAlias(),
   ],
 
   vite: {
