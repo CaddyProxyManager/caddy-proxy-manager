@@ -2,7 +2,7 @@
 
 import { Avatar } from "@astryxdesign/core/Avatar";
 import type { AvatarSize } from "@astryxdesign/core/Avatar";
-import type { ResolvedAvatar } from "@/src/lib/avatar";
+import type { ResolvedAvatar } from "@/src/lib/users/avatar";
 
 interface UserAvatarProps {
   /** From resolveAvatar() on the server. */

@@ -4,7 +4,7 @@
  * app itself creates.
  */
 import { describe, expect, it } from 'bun:test';
-import { isEmailAddress } from '@/src/lib/email-address';
+import { isEmailAddress } from '@/src/lib/email/address';
 
 describe('email address syntax', () => {
   it('accepts ordinary addresses', () => {

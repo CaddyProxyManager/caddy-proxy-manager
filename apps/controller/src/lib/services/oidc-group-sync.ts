@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
-import { type AppRole, normalizeGroupName } from "../oidc-groups";
+import { type AppRole, normalizeGroupName } from "../auth/oidc/groups";
 import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
 import { isLastActiveAdmin, reportNewAdmin, withAdminLock } from "../models/user";
 

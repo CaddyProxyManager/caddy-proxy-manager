@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { removeAccessListEntry } from "@/src/lib/models/access-lists";
 
 export async function DELETE(

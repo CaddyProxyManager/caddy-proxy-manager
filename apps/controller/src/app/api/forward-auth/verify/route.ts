@@ -9,8 +9,11 @@ import {
   FORWARD_AUTH_PORTAL_TARGET_HEADER,
   getForwardAuthPortalTarget,
   resolveTrustedForwardAuthAudience,
-} from "@/src/lib/forward-auth-trust";
-import { encodeGroupsHeaderValue, encodeIdentityHeaderValue } from "@/src/lib/identity-header";
+} from "@/src/lib/forward-auth/trust";
+import {
+  encodeGroupsHeaderValue,
+  encodeIdentityHeaderValue,
+} from "@/src/lib/forward-auth/identity-header";
 
 const COOKIE_NAME = "_cpm_fa";
 

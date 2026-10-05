@@ -478,6 +478,7 @@ export function WafPluginsPanel({
               />
               <DataTable
                 columns={registryColumns}
+                emptyHeadingLevel={3}
                 data={registryRows}
                 keyField="key"
                 emptyMessage={t("pluginRegistryNoMatches")}

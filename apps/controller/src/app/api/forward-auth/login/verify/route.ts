@@ -1,14 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import db from "@/src/lib/db";
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { logAuditEvent } from "@/src/lib/audit";
-import { getClientIp } from "@/src/lib/client-ip";
-import { completePortalLogin } from "@/src/lib/forward-auth-portal-login";
-import { redeemPortalChallenge, spendPortalChallenge } from "@/src/lib/portal-two-factor";
-import { isPublicOrigin } from "@/src/lib/public-url";
-import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
-import { type SecondFactorMethod, verifySecondFactor } from "@/src/lib/two-factor";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { completePortalLogin } from "@/src/lib/forward-auth/portal-login";
+import {
+  redeemPortalChallenge,
+  spendPortalChallenge,
+} from "@/src/lib/forward-auth/portal-two-factor";
+import { isPublicOrigin } from "@/src/lib/http/public-url";
+import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/auth/rate-limit";
+import { type SecondFactorMethod, verifySecondFactor } from "@/src/lib/forward-auth/two-factor";
 
 /** The portal's second step: a TOTP or backup code against the password step's challenge. */
 export async function POST(request: NextRequest) {

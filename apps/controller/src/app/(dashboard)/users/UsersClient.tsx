@@ -41,8 +41,8 @@ import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordFie
 import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { UserAvatar } from "@/src/components/UserAvatar";
-import type { ResolvedAvatar } from "@/src/lib/avatar";
-import { isUsableSignInUsername } from "@/src/lib/login-username";
+import type { ResolvedAvatar } from "@/src/lib/users/avatar";
+import { isUsableSignInUsername } from "@/src/lib/auth/login-username";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -239,7 +239,7 @@ export default function UsersClient({
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={<UserCog />} title={t("noUsersFound")} isCompact />
+        <EmptyState headingLevel={2} icon={<UserCog />} title={t("noUsersFound")} isCompact />
       ) : (
         <List>
           {filtered.map((user) => (

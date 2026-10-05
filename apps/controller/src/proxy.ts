@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { domainErrorMessage } from "@/src/lib/domain-error";
-import { TWO_FACTOR_SETUP_PATH, mustEnrollTwoFactor } from "@/src/lib/two-factor-policy";
-import { CONSOLE_ENABLE_USER_PATH, CONSOLE_RESET_TWO_FACTOR_PATH } from "@/src/lib/console-command";
+import { domainErrorMessage } from "@/src/lib/errors/domain-error";
+import { TWO_FACTOR_SETUP_PATH, mustEnrollTwoFactor } from "@/src/lib/auth/two-factor/policy";
+import {
+  CONSOLE_ENABLE_USER_PATH,
+  CONSOLE_RESET_TWO_FACTOR_PATH,
+} from "@/src/lib/users/console-command";
 import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
 import { config as appConfig } from "@/src/lib/config";
-import { buildCsp, type CspAdditions } from "@/src/lib/csp";
+import { buildCsp, type CspAdditions } from "@/src/lib/http/csp";
 
 /** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
 

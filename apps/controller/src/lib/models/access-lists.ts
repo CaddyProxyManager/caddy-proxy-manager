@@ -1,4 +1,4 @@
-import { hashBcrypt } from "../password";
+import { hashBcrypt } from "../auth/password";
 
 /**
  * Caddy's http_basic verifies these itself, so they stay bcrypt though user passwords moved to
@@ -17,7 +17,7 @@ import {
   proxyHosts,
 } from "../db/schema";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import { getDashboardSettings } from "../settings";
 import {
   ACCESS_LIST_SATISFY,
@@ -28,14 +28,14 @@ import {
   hostnameRanges,
   sanitizeIpRules,
   splitRuleHostname,
-} from "../access-list-rules";
+} from "../access-lists/rules";
 import {
   type HostnameResolution,
   SAVE_TIMEOUT_MS,
   lookupNames,
   readHostnameResolutions,
   resolveHostnames,
-} from "../access-list-dns";
+} from "../access-lists/dns";
 
 export type AccessListEntry = {
   id: number;

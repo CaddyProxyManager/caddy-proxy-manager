@@ -10,10 +10,10 @@
  *   Compose reads on the host, and the agent's pre-database config.
  */
 
-import { EMAIL_ADDRESS } from "../email-address";
-import { ACCENT_COLORS, DEFAULT_ACCENT_COLOR } from "../accent-colors";
+import { EMAIL_ADDRESS } from "../email/address";
+import { ACCENT_COLORS, DEFAULT_ACCENT_COLOR } from "../branding/accent-colors";
 import { SMTP_SECURITY_MODES } from "../email/security";
-import { hasForbiddenControlCharacter } from "../settings-validation";
+import { hasForbiddenControlCharacter } from "./validation";
 
 export type SettingGroup = "application" | "authentication" | "email" | "analytics" | "geoip";
 

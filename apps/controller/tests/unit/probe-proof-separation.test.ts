@@ -10,8 +10,8 @@ import {
   FORWARD_AUTH_PROXY_PROOF_HEADER,
   getForwardAuthProxyProof,
   getTrustedForwardAuthOrigin,
-} from '@/src/lib/forward-auth-trust';
-import { signProbe } from '@/src/lib/reachability-probe';
+} from '@/src/lib/forward-auth/trust';
+import { signProbe } from '@/src/lib/reachability/probe';
 
 async function probe(nonce: string): Promise<string | undefined> {
   const response = await health(

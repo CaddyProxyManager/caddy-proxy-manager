@@ -11,11 +11,11 @@ import {
   encryptSecret,
   isEncryptedSecret,
   sealSecretColumn,
-} from "../secret";
+} from "../secrets";
 import {
   BETTER_AUTH_ENCRYPTED_COLUMNS as BETTER_AUTH_ENCRYPTED,
   mapTextColumn,
-} from "../secret-walk";
+} from "../secrets/walk";
 
 const MARKER = "cpmbak-secret:";
 

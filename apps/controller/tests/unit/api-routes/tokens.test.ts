@@ -8,7 +8,7 @@ vi.mock('@/src/lib/models/api-tokens', () => ({
   deleteApiToken: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -42,7 +42,7 @@ import {
   listAllApiTokens,
   deleteApiToken,
 } from '@/src/lib/models/api-tokens';
-import { requireApiUser } from '@/src/lib/api-auth';
+import { requireApiUser } from '@/src/lib/api/auth';
 
 const mockCreateApiToken = vi.mocked(createApiToken);
 const mockListApiTokens = vi.mocked(listApiTokens);
@@ -129,7 +129,7 @@ describe('GET /api/v1/tokens', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await GET(createMockRequest());
@@ -266,7 +266,7 @@ describe('DELETE /api/v1/tokens/[id]', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await DELETE(createMockRequest({ method: 'DELETE' }), {

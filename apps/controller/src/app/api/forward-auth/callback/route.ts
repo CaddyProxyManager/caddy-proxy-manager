@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { redeemExchangeCode } from "@/src/lib/models/forward-auth";
-import { resolveTrustedForwardAuthAudience } from "@/src/lib/forward-auth-trust";
+import { resolveTrustedForwardAuthAudience } from "@/src/lib/forward-auth/trust";
 
 const COOKIE_NAME = "_cpm_fa";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;

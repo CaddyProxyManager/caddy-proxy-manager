@@ -4,7 +4,7 @@
  * so an unreachable endpoint is not retried on every render.
  */
 
-import { type StoredErrorCode, domainError, storedErrorCode } from "../domain-error";
+import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 

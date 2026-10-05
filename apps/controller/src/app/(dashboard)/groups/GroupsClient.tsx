@@ -185,6 +185,7 @@ export default function GroupsClient({
 
       {groups.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           icon={<Users />}
           title={t("noGroupsYet")}
           description={t("emptyDescription")}
@@ -200,6 +201,7 @@ export default function GroupsClient({
         />
       ) : filtered.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           title={t("noGroupsMatch", { query: search })}
           isCompact
           actions={
@@ -277,6 +279,7 @@ export default function GroupsClient({
           />
         ) : (
           <EmptyState
+            headingLevel={2}
             icon={<Users />}
             title={t("selectionEmptyTitle")}
             description={t("selectionEmptyDescription")}

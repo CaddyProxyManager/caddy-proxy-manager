@@ -11,8 +11,8 @@ import {
   ENCRYPTED_SECRET_PREFIX,
   encryptSecret,
   isEncryptedSecret,
-} from "../secret";
-import { mapTextColumn } from "../secret-walk";
+} from "../secrets";
+import { mapTextColumn } from "../secrets/walk";
 
 /** How many samples `probeLegacySecrets` collects before it stops reading. */
 const SAMPLE_LIMIT = 25;

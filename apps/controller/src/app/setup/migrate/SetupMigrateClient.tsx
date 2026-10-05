@@ -207,7 +207,7 @@ export default function SetupMigrateClient({
   }
 
   return (
-    <Center>
+    <Center role="main">
       <VStack gap={5} padding={5}>
         <SetupSteps stage="migrate" hasMigrateStep />
         {sqliteWarning && <SqliteSetupWarning />}

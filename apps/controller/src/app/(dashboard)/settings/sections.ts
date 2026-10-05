@@ -475,7 +475,7 @@ export function settingsHref(id: string): string {
 
 /*
  * Screens render the catalog entries, keyed by id at runtime where tsc cannot check them, so
- * `tests/unit/settings-sections-messages.test.ts` asserts each matches the English above.
+ * `tests/unit/settings/settings-sections-messages.test.ts` asserts each matches the English above.
  */
 
 type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;

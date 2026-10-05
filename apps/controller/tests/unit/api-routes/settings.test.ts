@@ -63,7 +63,7 @@ vi.mock('@/src/lib/caddy', () => ({
   applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -124,8 +124,8 @@ import {
   clearSetting,
 } from '@/src/lib/settings';
 import { applyCaddyConfig } from '@/src/lib/caddy';
-import { requireApiAdmin } from '@/src/lib/api-auth';
-import { DefaultResponseValidationError } from '@/src/lib/caddy-default-response';
+import { requireApiAdmin } from '@/src/lib/api/auth';
+import { DefaultResponseValidationError } from '@/src/lib/caddy/default-response';
 import { updateGeneralSettingsAction } from '@/src/app/(dashboard)/settings/actions';
 
 const mockGetGeneral = vi.mocked(getGeneralSettings);
@@ -318,7 +318,7 @@ describe('GET /api/v1/settings/[group]', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await GET(createMockRequest(), {

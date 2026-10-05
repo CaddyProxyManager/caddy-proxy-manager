@@ -9,7 +9,7 @@ import { SETTING_DEFINITIONS } from "@/src/lib/settings/registry";
 import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
 import SetupDoneClient from "./SetupDoneClient";
-import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
+import { sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.done");

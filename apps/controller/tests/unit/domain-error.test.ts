@@ -3,7 +3,7 @@ import { describe, it, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import messages from '../../messages/en.json';
-import { DomainError, domainError } from '@/src/lib/domain-error';
+import { DomainError, domainError } from '@/src/lib/errors/domain-error';
 
 const CODES = messages.errors as Record<string, string>;
 

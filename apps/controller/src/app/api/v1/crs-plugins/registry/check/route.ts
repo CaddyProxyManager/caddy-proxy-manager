@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { runCrsRegistrySync } from "@/src/lib/crs-plugins/sync";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { runCrsRegistrySync } from "@/src/lib/waf/crs-plugins/sync";
 import { installedCrsPluginRepositories, listCrsRegistry } from "@/src/lib/models/crs-plugins";
 
 /** Re-reads every registry and checks each plugin, answering once the pass is done. */

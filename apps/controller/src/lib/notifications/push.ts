@@ -11,8 +11,8 @@ import {
   forgetPushEndpoint,
   type PushTarget,
 } from "../models/push-subscriptions";
-import { getPublicBaseUrl } from "../public-url";
-import { decryptSecret, encryptSecret } from "../secret";
+import { getPublicBaseUrl } from "../http/public-url";
+import { decryptSecret, encryptSecret } from "../secrets";
 import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import type { PendingNotice } from "./plan";

@@ -13,7 +13,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { SearchField } from "@/components/ui/SearchField";
-import { type LogSource, type LogView, accessLine, isAcmeLine } from "@/src/lib/log-view";
+import { type LogSource, type LogView, accessLine, isAcmeLine } from "@/src/lib/analytics/log-view";
 
 type Agent = { agentId: string; name: string; canReadLogs: boolean };
 
@@ -115,7 +115,11 @@ export default function LogsClient({
     return (
       <VStack gap={4} padding={6}>
         <Heading level={1}>{t("title")}</Heading>
-        <EmptyState title={t("noAgentTitle")} description={t("noAgentDescription")} />
+        <EmptyState
+          headingLevel={2}
+          title={t("noAgentTitle")}
+          description={t("noAgentDescription")}
+        />
       </VStack>
     );
   }

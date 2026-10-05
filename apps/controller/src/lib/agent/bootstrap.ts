@@ -8,7 +8,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmodSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared";
-import { isDemoMode } from "../demo-mode";
+import { isDemoMode } from "../demo/mode";
 import { findAgentRowByAgentId, listAgents } from "../models/agents";
 import { clearSetting, getSetting, setSetting } from "../settings";
 

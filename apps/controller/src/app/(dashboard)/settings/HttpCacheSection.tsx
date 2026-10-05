@@ -27,7 +27,7 @@ import {
   MAX_OTTER_SIZE,
   MAX_REDIS_DB,
   MIN_OTTER_SIZE,
-} from "@/src/lib/http-cache-options";
+} from "@/src/lib/proxy-hosts/http-cache-options";
 
 export function HttpCacheSection({
   httpCache,

@@ -1,4 +1,4 @@
-import { agentCaddyAdminTransportWith, setCaddyAdminTransport } from "../caddy-admin";
+import { agentCaddyAdminTransportWith, setCaddyAdminTransport } from "../caddy/admin";
 import { createSimulatedCaddy } from "./simulated-caddy";
 
 /** Call first at startup: the transport is the one seam all Caddy traffic passes. */

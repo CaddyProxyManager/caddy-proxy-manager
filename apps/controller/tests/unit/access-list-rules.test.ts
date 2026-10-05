@@ -10,7 +10,7 @@ import {
   normalizeCidr,
   normalizeRuleHostname,
   sanitizeIpRules,
-} from '../../src/lib/access-list-rules';
+} from '../../src/lib/access-lists/rules';
 import golden from './__golden__/access-list-handlers.json';
 
 const account = { username: 'alice', passwordHash: '$2b$10$hash' };

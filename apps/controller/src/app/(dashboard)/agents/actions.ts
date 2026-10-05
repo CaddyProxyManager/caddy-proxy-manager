@@ -12,10 +12,10 @@ import {
   INITIAL_ACTION_STATE,
   actionError,
   actionSuccess,
-} from "@/src/lib/actions";
-import { applyCaddyBuild } from "@/src/lib/caddy-build";
+} from "@/src/lib/errors/action-error";
+import { applyCaddyBuild } from "@/src/lib/caddy/image-build";
 import { renameAgent } from "@/src/lib/models/agents";
-import { assertCanManage, requireAccess } from "@/src/lib/permissions";
+import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
 
 export async function rebuildAgentCaddyAction(
   agentRowId: number,

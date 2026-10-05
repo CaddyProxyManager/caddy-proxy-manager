@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { APP_VERSION } from "@/src/lib/app-version";
-import { APP_ROLES } from "@/src/lib/oidc-groups";
-import { USER_STATUSES } from "@/src/lib/user-admin";
-import { SETTINGS_GROUPS } from "@/src/lib/settings-api";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { APP_VERSION } from "@/src/lib/runtime/app-version";
+import { APP_ROLES } from "@/src/lib/auth/oidc/groups";
+import { USER_STATUSES } from "@/src/lib/users/admin";
+import { SETTINGS_GROUPS } from "@/src/lib/settings/api";
 import {
   DEFAULT_CACHE_MAX_AGE,
   HOST_CACHE_MODES,
   MAX_CACHE_MAX_AGE,
   MIN_CACHE_MAX_AGE,
-} from "@/src/lib/host-cache";
+} from "@/src/lib/proxy-hosts/cache";
 import {
   CACHE_STORAGES,
   CDN_PROVIDERS,
@@ -18,7 +18,7 @@ import {
   MAX_OTTER_SIZE,
   MAX_REDIS_DB,
   MIN_OTTER_SIZE,
-} from "@/src/lib/http-cache-options";
+} from "@/src/lib/proxy-hosts/http-cache-options";
 
 const spec = {
   openapi: "3.1.0",

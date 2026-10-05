@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { extractErrorMessage } from "@/src/lib/actions";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import {
   applyCaddyBuild,
   getCaddyBuildDiff,
   getCaddyBuildStatus,
   parseAgentRowId,
-} from "@/src/lib/caddy-build";
-import { DomainError } from "@/src/lib/domain-error";
+} from "@/src/lib/caddy/image-build";
+import { DomainError } from "@/src/lib/errors/domain-error";
 
 /**
  * GET /api/caddy-build - the module diff plus the agent's rebuild status. Polled by the settings

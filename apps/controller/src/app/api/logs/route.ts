@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/src/lib/auth";
 import { readAgentLog } from "@/src/lib/agent/client";
-import type { LogSource } from "@/src/lib/log-view";
+import type { LogSource } from "@/src/lib/analytics/log-view";
 
 const SOURCES: readonly LogSource[] = ["access", "waf", "caddy"];
 

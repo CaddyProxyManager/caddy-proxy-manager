@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { declineMigration, hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
-import { domainError } from "@/src/lib/domain-error";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 
 /**
  * The import is a route handler (app/api/setup/migrate/route.ts): an action's re-render would

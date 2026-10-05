@@ -18,7 +18,7 @@ import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { passwordPolicyHint } from "@/src/lib/password-policy-message";
+import { passwordPolicyHint } from "@/src/lib/auth/password/policy-message";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
@@ -58,7 +58,7 @@ export default function SetupAccountClient({
   const [oauthState, submitOAuth] = useActionState(configureFirstOAuthProvider, { error: null });
 
   return (
-    <Center>
+    <Center role="main">
       <VStack gap={5} padding={5}>
         <SetupSteps stage="account" hasMigrateStep={hasMigrateStep} />
         {sqliteWarning && <SqliteSetupWarning />}

@@ -13,7 +13,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
-import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";

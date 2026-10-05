@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { formatUtc, fromZonedWallTime, toZonedWallTime } from '@/src/lib/date-format';
+import { formatUtc, fromZonedWallTime, toZonedWallTime } from '@/src/lib/locale/date-format';
 
 describe('formatUtc', () => {
   it('writes the instant the way logs record it, whatever the runtime locale', () => {

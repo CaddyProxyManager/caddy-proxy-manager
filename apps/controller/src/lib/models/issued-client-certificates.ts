@@ -3,7 +3,7 @@ import { logAuditEvent } from "../audit";
 import { applyCaddyConfig } from "../caddy";
 import { issuedClientCertificates } from "../db/schema";
 import { desc, eq } from "drizzle-orm";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 
 export type IssuedClientCertificate = {
   id: number;

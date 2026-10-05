@@ -4,9 +4,9 @@
  */
 
 import type { NextRequest } from "next/server";
-import { type ApiAuthResult, ApiAuthError, authenticateApiRequest } from "../api-auth";
+import { type ApiAuthResult, ApiAuthError, authenticateApiRequest } from "../api/auth";
 import { checkSameOrigin } from "../auth";
-import { type Access, accessFor } from "../permissions";
+import { type Access, accessFor } from "../users/permissions";
 
 export type GraphQLContext = {
   /** Authentication failures are per-field, not per-request. */

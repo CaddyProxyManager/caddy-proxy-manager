@@ -3,7 +3,7 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { mtlsAccessRules } from "../db/schema";
 import { asc, desc, eq, inArray } from "drizzle-orm";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 
 // ── Types ────────────────────────────────────────────────────────────
 

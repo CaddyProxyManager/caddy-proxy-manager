@@ -1,9 +1,9 @@
 "use server";
 
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { domainError } from "@/src/lib/domain-error";
+import { domainError } from "@/src/lib/errors/domain-error";
 import {
   createUser,
   updateUserAccount,
@@ -14,10 +14,10 @@ import {
   type User,
 } from "@/src/lib/models/user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
-import { resetTwoFactor } from "@/src/lib/two-factor";
-import { deleteUserPasskeys } from "@/src/lib/passkeys";
+import { resetTwoFactor } from "@/src/lib/forward-auth/two-factor";
+import { deleteUserPasskeys } from "@/src/lib/auth/passkeys";
 import { logAuditEvent } from "@/src/lib/audit";
-import { hashPassword } from "@/src/lib/password";
+import { hashPassword } from "@/src/lib/auth/password";
 import { getLocale, getTranslations } from "next-intl/server";
 import { sendEmailedLink } from "@/src/lib/services/emailed-links";
 import {
@@ -25,14 +25,14 @@ import {
   actionSuccess,
   extractErrorMessage,
   type ActionState,
-} from "@/src/lib/actions";
+} from "@/src/lib/errors/action-error";
 import {
   assertAcceptablePassword,
   assertEmailAddress,
   assertNotSelf,
   assertUserRole,
   assertUserStatus,
-} from "@/src/lib/user-admin";
+} from "@/src/lib/users/admin";
 
 /** Returns why an invitation was not sent: the account exists regardless, and can be re-sent. */
 async function createUserActionUntranslated(formData: FormData): Promise<unknown> {

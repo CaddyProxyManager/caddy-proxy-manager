@@ -32,6 +32,7 @@ import { Pagination } from "@astryxdesign/core/Pagination";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { VStack } from "@astryxdesign/core/Stack";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { useTranslations } from "next-intl";
 import { useTableDensity } from "./TableDensity";
 
@@ -90,6 +91,8 @@ type DataTableProps<T> = {
   data: T[];
   keyField: keyof T;
   emptyMessage?: string;
+  /** The empty state heading sits under the page h1 unless the table is in a titled section. */
+  emptyHeadingLevel?: 2 | 3 | 4;
   loading?: boolean;
   /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
@@ -170,10 +173,13 @@ function SortableHeader<T>({
   col: Column<T>;
   sort?: { sortBy: string; sortDir: "asc" | "desc" };
 }) {
+  const t = useTranslations("ui");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // A column with no visible title still needs one for a screen reader.
+  if (!col.label) return <VisuallyHidden>{t("actionsColumn")}</VisuallyHidden>;
   if (!col.sortKey) return <>{col.label}</>;
 
   const isActive = sort?.sortBy === col.sortKey;
@@ -203,6 +209,7 @@ export function DataTable<T>({
   data,
   keyField,
   emptyMessage,
+  emptyHeadingLevel = 2,
   loading = false,
   onRowClick,
   rowStatus,
@@ -314,7 +321,7 @@ export function DataTable<T>({
     // A focusable control: a bare row click is unreachable from the keyboard.
     tableColumns.push({
       key: "__open",
-      header: "",
+      header: <VisuallyHidden>{t("actionsColumn")}</VisuallyHidden>,
       width: pixel(48),
       align: "end",
       resizable: false,
@@ -341,7 +348,7 @@ export function DataTable<T>({
           ))
         ) : isEmpty ? (
           <Card>
-            <EmptyState title={emptyTitle} isCompact />
+            <EmptyState title={emptyTitle} headingLevel={emptyHeadingLevel} isCompact />
           </Card>
         ) : (
           data.map((row) => <VStack key={String(row[keyField])}>{mobileCard(row)}</VStack>)
@@ -354,7 +361,7 @@ export function DataTable<T>({
   if (isEmpty) {
     return (
       <Card>
-        <EmptyState title={emptyTitle} />
+        <EmptyState title={emptyTitle} headingLevel={emptyHeadingLevel} />
       </Card>
     );
   }

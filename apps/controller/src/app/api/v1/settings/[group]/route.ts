@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { DefaultResponseValidationError } from "@/src/lib/caddy/default-response";
 import {
   isSettingsGroup,
   readSettingsGroup,
   saveSettingsGroup,
   SettingsApplyError,
-} from "@/src/lib/settings-api";
-import { assertSettingsPayloadSize, SettingsValidationError } from "@/src/lib/settings-validation";
+} from "@/src/lib/settings/api";
+import { assertSettingsPayloadSize, SettingsValidationError } from "@/src/lib/settings/validation";
 
 export async function GET(
   request: NextRequest,

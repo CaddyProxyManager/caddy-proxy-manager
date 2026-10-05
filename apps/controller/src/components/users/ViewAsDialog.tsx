@@ -13,7 +13,7 @@ import { startViewAsAction } from "@/src/app/(dashboard)/view-as/actions";
 const ROLES = ["operator", "user", "viewer"] as const;
 
 /**
- * Starts "View as" (lib/view-as.ts). Groups are only offered for an operator: grants reach no
+ * Starts "View as" (lib/users/view-as.ts). Groups are only offered for an operator: grants reach no
  * other role, so a viewer in a group sees exactly what a viewer outside one does.
  */
 export function ViewAsDialog({

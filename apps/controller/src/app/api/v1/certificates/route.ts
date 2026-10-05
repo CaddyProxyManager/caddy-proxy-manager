@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { listCertificates, createCertificate } from "@/src/lib/models/certificates";
-import { toCertificateApiResponse } from "@/src/lib/certificate-api";
+import { toCertificateApiResponse } from "@/src/lib/certificates/api";
 import { createCertificateFromAgentFiles } from "@/src/lib/models/certificate-files";
 
 const PRIVATE_RESPONSE_INIT = { headers: { "Cache-Control": "no-store" } };

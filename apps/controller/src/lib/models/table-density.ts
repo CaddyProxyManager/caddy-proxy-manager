@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { settings } from "../db/schema";
-import { DEFAULT_TABLE_DENSITY, isTableDensity, type TableDensity } from "../table-density";
+import { DEFAULT_TABLE_DENSITY, isTableDensity, type TableDensity } from "../users/table-density";
 
 /** Written straight to the table: setSetting would stage a personal choice for Review & apply. */
 const keyFor = (userId: number) => `ui:table_density:${userId}`;

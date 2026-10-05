@@ -1,9 +1,9 @@
 /** Resolver failures are redacted, as REST's always were. */
 import { describe, expect, it } from 'bun:test';
 import { GraphQLError } from 'graphql';
-import { ApiAuthError } from '@/src/lib/api-auth';
-import { ApiValidationError } from '@/src/lib/api-errors';
-import { domainError } from '@/src/lib/domain-error';
+import { ApiAuthError } from '@/src/lib/api/auth';
+import { ApiValidationError } from '@/src/lib/api/errors';
+import { domainError } from '@/src/lib/errors/domain-error';
 import { maskGraphQLError } from '@/src/lib/graphql/errors';
 
 /** As graphql-js hands it over. */

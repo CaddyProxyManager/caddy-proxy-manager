@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { domainError } from "@/src/lib/domain-error";
-import { internalCaSubject } from "@/src/lib/ca-subject";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { internalCaSubject } from "@/src/lib/certificates/ca-subject";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import {
   createCaCertificate,
   deleteCaCertificate,
@@ -18,7 +18,7 @@ import {
 import { generateKeyPair as generateKeyPairCb, randomBytes, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
 import { getTranslations } from "next-intl/server";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 import forge from "node-forge";
 
 /**
@@ -195,7 +195,7 @@ async function issueClientCertificateActionUntranslated(
   if (exportPasswordError) throw new Error(exportPasswordError);
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
-  // A code, not a sentence: see `domain-error.ts`.
+  // A code, not a sentence: see `errors/domain-error.ts`.
   if (!caPrivateKeyPem) throw domainError("caCertificatePrivateKeyMissing");
 
   const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>

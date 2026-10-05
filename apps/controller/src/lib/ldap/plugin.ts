@@ -10,8 +10,8 @@ import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint, type createAuthMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { parseUserOutput } from "better-auth/db";
-import { isValidLoginUsername } from "../login-username";
-import { LDAP_SIGN_IN_PATH } from "../auth-sign-in-paths";
+import { isValidLoginUsername } from "../auth/login-username";
+import { LDAP_SIGN_IN_PATH } from "../auth/sign-in-paths";
 import { isAcceptableLdapPassword, isAcceptableLdapUsername } from "./client";
 import { resolveSignInDirectory, signInWithDirectory } from "./sign-in";
 

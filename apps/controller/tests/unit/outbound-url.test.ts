@@ -3,9 +3,9 @@
  * the controller requests (acme-dns, a CrowdSec LAPI) may point at one, in any spelling.
  */
 import { describe, expect, it } from 'bun:test';
-import { isMetadataHost, parseOutboundBaseUrl } from '@/src/lib/outbound-url';
-import { parseAcmeDnsServerUrl } from '@/src/lib/acme-dns';
-import { normalizeCrowdSecSettings, probeCrowdSecLapi } from '@/src/lib/crowdsec';
+import { isMetadataHost, parseOutboundBaseUrl } from '@/src/lib/http/outbound-url';
+import { parseAcmeDnsServerUrl } from '@/src/lib/dns/acme-dns';
+import { normalizeCrowdSecSettings, probeCrowdSecLapi } from '@/src/lib/caddy/crowdsec';
 
 const METADATA_URLS = [
   'http://169.254.169.254',

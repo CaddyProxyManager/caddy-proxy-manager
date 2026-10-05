@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { agents } from "../db/schema";
-import { decryptSecret, encryptSecret } from "../secret";
+import { decryptSecret, encryptSecret } from "../secrets";
 import { type CaddyBuildSettings, getSetting, setSetting } from "../settings";
 
 const CONTROLLER_ID_KEY = "controller_id";

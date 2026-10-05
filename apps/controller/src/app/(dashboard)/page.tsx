@@ -3,9 +3,9 @@ import { requireUser } from "@/src/lib/auth";
 import OverviewClient from "./OverviewClient";
 import { accessLists, auditEvents, certificates, proxyHosts, users } from "@/src/lib/db/schema";
 import { count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
-import { getAnalyticsSummary } from "@/src/lib/analytics-db";
-import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
-import { auditSummaryText } from "@/src/lib/audit-summary";
+import { getAnalyticsSummary } from "@/src/lib/analytics/db";
+import { isDomainCoveredByCert } from "@/src/lib/certificates/domain-match";
+import { auditSummaryText } from "@/src/lib/audit/summary";
 import type { Metadata } from "next";
 
 import type { StatCard } from "./OverviewClient";

@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { isDemoAdmin } from "@/src/lib/demo-mode";
+import { isDemoAdmin } from "@/src/lib/demo/mode";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById, listUserOAuthProviders, removeUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
-import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
-import { verifyPassword } from "@/src/lib/password";
-import { countUserPasskeys } from "@/src/lib/passkeys";
+import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/auth/rate-limit";
+import { verifyPassword } from "@/src/lib/auth/password";
+import { countUserPasskeys } from "@/src/lib/auth/passkeys";
 
 /**
  * The inverse of unlink-oauth: refuses to leave the account without a provider or a passkey. Asks

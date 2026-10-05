@@ -54,7 +54,7 @@ async function remainingBlocks() {
     import("@/src/lib/settings"),
     import("@/src/lib/email/config"),
     import("@/src/lib/notifications"),
-    import("@/src/lib/updates"),
+    import("@/src/lib/runtime/updates"),
     import("@/src/lib/branding"),
     import("@/src/lib/models/ldap-directories"),
     import("@/src/lib/captcha/settings"),

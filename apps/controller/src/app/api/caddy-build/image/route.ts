@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { extractErrorMessage } from "@/src/lib/actions";
-import { loadCaddyImage, parseAgentRowId } from "@/src/lib/caddy-build";
-import { DomainError } from "@/src/lib/domain-error";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
+import { loadCaddyImage, parseAgentRowId } from "@/src/lib/caddy/image-build";
+import { DomainError } from "@/src/lib/errors/domain-error";
 
 /** POST /api/caddy-build/image - external mode's rebuild: load the image the operator built. */
 export async function POST(request: NextRequest) {

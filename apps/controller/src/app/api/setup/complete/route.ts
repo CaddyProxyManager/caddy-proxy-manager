@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { createOAuthProvider, listOAuthProviders } from "@/src/lib/models/oauth-providers";
-import { isAppRole } from "@/src/lib/oidc-groups";
+import { isAppRole } from "@/src/lib/auth/oidc/groups";
 import {
   analyticsEnabled,
   clickhousePassword,
@@ -18,11 +18,11 @@ import {
   saveGeneralSettings,
 } from "@/src/lib/settings";
 import { activateDashboardHost, dashboardHostOrigin, isHostname } from "@/src/lib/dashboard-host";
-import { dashboardSettingsFromHost } from "@/src/lib/dashboard-host-options";
+import { dashboardSettingsFromHost } from "@/src/lib/dashboard-host/options";
 import { updateProxyHost } from "@/src/lib/models/proxy-hosts";
 // Not the registry's SettingValidationError: this is the JSON groups', and the route uses both.
-import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
-import { isEmailAddress } from "@/src/lib/email-address";
+import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings/validation";
+import { isEmailAddress } from "@/src/lib/email/address";
 import {
   getMigrationSource,
   isSetupCompleted,

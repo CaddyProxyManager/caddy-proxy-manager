@@ -9,7 +9,7 @@ vi.mock('@/src/lib/models/l4-proxy-hosts', () => ({
   deleteL4ProxyHost: vi.fn(),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -44,7 +44,7 @@ import {
   updateL4ProxyHost,
   deleteL4ProxyHost,
 } from '@/src/lib/models/l4-proxy-hosts';
-import { requireApiAdmin } from '@/src/lib/api-auth';
+import { requireApiAdmin } from '@/src/lib/api/auth';
 
 const mockList = vi.mocked(listL4ProxyHosts);
 const mockCreate = vi.mocked(createL4ProxyHost);
@@ -90,7 +90,7 @@ describe('GET /api/v1/l4-proxy-hosts', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await listGET(createMockRequest());

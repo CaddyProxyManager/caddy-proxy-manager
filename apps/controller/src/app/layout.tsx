@@ -5,10 +5,10 @@ import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
-import { getAccentColor } from "@/src/lib/accent-color";
-import { getAppName } from "@/src/lib/app-name";
+import { getAccentColor } from "@/src/lib/branding/accent-color";
+import { getAppName } from "@/src/lib/branding/app-name";
 import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
-import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/theme-mode";
+import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/users/theme-mode";
 
 // From the same cookie `<html data-theme>` is rendered from, so the browser's own chrome is tinted
 // with the mode the page is actually in rather than the one the OS would have chosen.

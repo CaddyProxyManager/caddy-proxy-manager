@@ -2,7 +2,7 @@
 
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
-import { extractErrorMessage } from "@/src/lib/actions";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { getCurrentSessionId, requireAdmin } from "@/src/lib/auth";
 import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
 import { setNotificationPreferences } from "@/src/lib/models/notification-preferences";

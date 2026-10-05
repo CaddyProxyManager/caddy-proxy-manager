@@ -1,4 +1,4 @@
-import { GeoBlockFields } from "@cpm/controller/src/components/proxy-hosts/GeoBlockFields";
+import { GeoBlockFields } from "@cpm/controller/src/components/proxy-hosts/protection/GeoBlockFields";
 import { DemoSurface } from "../DemoSurface";
 import { json, serveApi } from "../fake-api";
 

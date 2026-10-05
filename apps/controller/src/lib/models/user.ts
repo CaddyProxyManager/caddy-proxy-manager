@@ -1,26 +1,26 @@
 import db, { nowIso, runInTransaction, toIso } from "../db";
-import type { AppRole } from "../oidc-groups";
+import type { AppRole } from "../auth/oidc/groups";
 import { users, accounts, sessions } from "../db/schema";
 import { and, count, desc, eq, isNotNull, isNull, max, ne } from "drizzle-orm";
-import { uuidv7 } from "../uuidv7";
+import { uuidv7 } from "../db/uuidv7";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
-import { isDemoAdmin } from "../demo-mode";
-import { domainError } from "../domain-error";
-import { withRowLock } from "../db-claim";
-import { resetAccountFailuresFor } from "../rate-limit";
+import { isDemoAdmin } from "../demo/mode";
+import { domainError } from "../errors/domain-error";
+import { withRowLock } from "../db/claim";
+import { resetAccountFailuresFor } from "../auth/rate-limit";
 import type { AccountDisabledReason } from "../notifications/account-owner";
 import {
   isUsableSignInUsername,
   LOGIN_USERNAME_MAX_LENGTH,
   LOGIN_USERNAME_MIN_LENGTH,
-} from "../login-username";
+} from "../auth/login-username";
 import {
   isSignInNameTaken,
   lowercasesIntoAscii,
   ownEmailUsername,
   PORTAL_EMAIL_DOMAIN,
   signInEmailConflict,
-} from "../sign-in-names";
+} from "../auth/sign-in-names";
 
 /** See isDemoAdmin: the shared demo account keeps its password, its role and its access. */
 function assertNotDemoAdmin(userId: number): void {

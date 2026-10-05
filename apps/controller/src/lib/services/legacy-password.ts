@@ -1,5 +1,5 @@
 import { getUserById } from "../models/user";
-import { isLegacyPasswordHash } from "../password";
+import { isLegacyPasswordHash } from "../auth/password";
 import { isLegacyPasswordChangeRequired } from "../settings";
 
 /**

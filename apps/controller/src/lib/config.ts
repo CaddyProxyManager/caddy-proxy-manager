@@ -1,4 +1,4 @@
-import { passwordPolicyViolationsInEnglish } from "./password-policy-message";
+import { passwordPolicyViolationsInEnglish } from "./auth/password/policy-message";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
 const DEFAULT_ADMIN_PASSWORD = "admin";

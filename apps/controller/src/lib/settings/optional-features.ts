@@ -7,7 +7,7 @@ import { geoipDatabaseAgeDays, geoipEnabled, installedGeoipDatabases } from "../
 import { editionsBehind, getGeoipUpdateCheck } from "../geoip/update-check";
 import { getGeoipDownloadState } from "../geoip/updater";
 import { geoipDownloadErrorMessage } from "../geoip/messages";
-import { storedErrorMessage } from "../actions";
+import { storedErrorMessage } from "../errors/action-error";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import * as registry from "./registry";
 import { resolveSetting, saveSettings, type SettingSource } from "./resolve";

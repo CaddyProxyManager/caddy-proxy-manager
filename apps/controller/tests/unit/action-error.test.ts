@@ -3,8 +3,8 @@
  * placeholders raw, and no code took params yet to catch it.
  */
 import { describe, expect, it } from 'bun:test';
-import { actionError, extractErrorMessage } from '@/src/lib/actions';
-import { DomainError, domainError } from '@/src/lib/domain-error';
+import { actionError, extractErrorMessage } from '@/src/lib/errors/action-error';
+import { DomainError, domainError } from '@/src/lib/errors/domain-error';
 
 /** Resolves nothing; records what it was handed. */
 function translator(seen?: { key?: string; values?: Record<string, string | number> }) {

@@ -10,17 +10,18 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { useTranslations } from "next-intl";
 import { FormCard, InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTableDensity } from "@/components/ui/TableDensity";
-import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
+import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns/providers";
 import {
   ACMEDNS_PROVIDER,
   challengeRecordName,
   expectedDelegationTarget,
-} from "@/src/lib/dns-challenge-delegation";
-import type { DelegationCheck } from "@/src/lib/dns-delegation-check";
+} from "@/src/lib/dns/challenge-delegation";
+import type { DelegationCheck } from "@/src/lib/dns/delegation-check";
 import { checkDnsDelegationsAction, registerAcmeDnsAccountAction } from "./actions";
 import { SKIP_PAGE_SAVE } from "./PageBlocks";
 
@@ -84,6 +85,7 @@ export function DnsDelegationSection({
   isProviderAvailable: (name: string) => boolean;
 }) {
   const t = useTranslations("settings.dnsDelegation");
+  const tUi = useTranslations("ui");
   const density = useTableDensity();
   const [registerState, registerFormAction, registering] = useActionState(
     registerAcmeDnsAccountAction,
@@ -174,7 +176,7 @@ export function DnsDelegationSection({
     },
     {
       key: "__remove",
-      header: "",
+      header: <VisuallyHidden>{tUi("actionsColumn")}</VisuallyHidden>,
       width: pixel(100),
       align: "end",
       resizable: false,

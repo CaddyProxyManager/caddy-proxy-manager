@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { config } from "@/src/lib/config";
 import { logAuditEvent } from "@/src/lib/audit";
-import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/console-command";
-import { findUserByConsoleName } from "@/src/lib/console-user";
+import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/users/console-command";
+import { findUserByConsoleName } from "@/src/lib/users/console-user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
-import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/peer-address";
-import { resetTwoFactor } from "@/src/lib/two-factor";
-import { deleteUserPasskeys } from "@/src/lib/passkeys";
+import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/http/peer-address";
+import { resetTwoFactor } from "@/src/lib/forward-auth/two-factor";
+import { deleteUserPasskeys } from "@/src/lib/auth/passkeys";
 
 /**
  * `cpm-server --reset-2fa <username>`: turns off 2FA and removes the passkeys, the recovery for a

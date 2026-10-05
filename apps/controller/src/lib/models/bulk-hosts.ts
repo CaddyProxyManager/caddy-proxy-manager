@@ -9,9 +9,9 @@ import db, { nowIso, runInTransaction } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { auditEventRow, type AuditEventParams } from "../audit";
 import { accessLists, auditEvents, certificates, l4ProxyHosts, proxyHosts } from "../db/schema";
-import { domainError } from "../domain-error";
-import { assertCertificatesServable } from "../certificate-placement";
-import { assertL4PortPlan } from "../l4-port-plan";
+import { domainError } from "../errors/domain-error";
+import { assertCertificatesServable } from "../certificates/placement";
+import { assertL4PortPlan } from "../l4/port-plan";
 import { agentIdsForHosts } from "./host-agents";
 import { assertTailscaleServable, assertWildcardIssuable, withMaintenance } from "./proxy-hosts";
 
@@ -91,7 +91,7 @@ export function parseL4HostBulkRequest(body: unknown): L4HostBulkRequest {
   return { action, ids: normalizeBulkIds(input.ids) };
 }
 
-/** English, parsed back by `lib/audit-summary.ts` into the reader's language like a single edit. */
+/** English, parsed back by `lib/audit/summary.ts` into the reader's language like a single edit. */
 function proxyHostSummary(action: ProxyHostBulkAction, name: string): string {
   if (action === "delete") return `Deleted proxy host ${name}`;
   if (action === "maintenanceOn") return `Turned on maintenance mode for proxy host ${name}`;

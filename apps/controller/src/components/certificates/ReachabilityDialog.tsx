@@ -8,8 +8,8 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
-import type { DomainReachability } from "@/src/lib/domain-reachability";
-import type { LetsDebugResult } from "@/src/lib/letsdebug";
+import type { DomainReachability } from "@/src/lib/reachability/domain";
+import type { LetsDebugResult } from "@/src/lib/reachability/letsdebug";
 
 type Props = { hostId: number; hostName: string; open: boolean; onClose: () => void };
 

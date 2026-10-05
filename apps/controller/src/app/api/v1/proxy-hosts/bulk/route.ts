@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { bulkUpdateProxyHosts, parseProxyHostBulkRequest } from "@/src/lib/models/bulk-hosts";
 
 /** Admin-only: an API token carries no per-host grants to check each id against. */

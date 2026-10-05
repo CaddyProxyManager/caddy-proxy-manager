@@ -6,9 +6,9 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, oauthProviders, passkeys, users } from "../db/schema";
-import { decryptSecret, encryptSecret } from "../secret";
-import { isAppRole } from "../oidc-groups";
-import { domainError } from "../domain-error";
+import { decryptSecret, encryptSecret } from "../secrets";
+import { isAppRole } from "../auth/oidc/groups";
+import { domainError } from "../errors/domain-error";
 import { revokeSessionsAfterPasswordChange } from "./sessions";
 import type { OAuthGroupMapping } from "./oauth-providers";
 import {

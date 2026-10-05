@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   getOAuthProvider,
   updateOAuthProvider,
@@ -9,10 +9,10 @@ import {
   oauthCallbackUrl,
   toOAuthProviderView,
   type OAuthProviderView,
-} from "@/src/lib/oauth-provider-view";
+} from "@/src/lib/auth/oidc/provider-view";
 import { createAuditEvent } from "@/src/lib/models/audit";
-import { invalidateProviderCache } from "@/src/lib/auth-server";
-import { getPublicBaseUrl } from "@/src/lib/public-url";
+import { invalidateProviderCache } from "@/src/lib/auth/server";
+import { getPublicBaseUrl } from "@/src/lib/http/public-url";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
 

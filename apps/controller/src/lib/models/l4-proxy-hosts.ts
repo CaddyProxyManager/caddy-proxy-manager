@@ -5,23 +5,23 @@ import {
   splitHostPort,
   splitHostPortRange,
   splitL4UpstreamHost,
-} from "../caddy-utils";
+} from "../caddy/utils";
 import { applyCaddyConfig } from "../caddy";
 import { getMetricsSettings } from "../settings";
 import { logAuditEvent } from "../audit";
 import { accessListIpRules, accessLists, l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
-import { normalizeHostDescription } from "../host-description";
-import { assertL4PortPlan, MAX_L4_PORTS_PER_HOST } from "../l4-port-plan";
+import { normalizeHostDescription } from "../proxy-hosts/description";
+import { assertL4PortPlan, MAX_L4_PORTS_PER_HOST } from "../l4/port-plan";
 import {
   type HostCrowdSecMeta,
   hostCrowdSecEnabled,
   sanitizeHostCrowdSec,
   storedHostCrowdSec,
-} from "../crowdsec";
+} from "../caddy/crowdsec";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";

@@ -10,7 +10,7 @@ import {
   type IssuedClientCertificate,
 } from "@/src/lib/models/issued-client-certificates";
 import { listMtlsRoles, type MtlsRole } from "@/src/lib/models/mtls-roles";
-import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
+import { isDomainCoveredByCert } from "@/src/lib/certificates/domain-match";
 import { countHealthyAcmeHosts } from "./certificate-summary";
 import { listAgents } from "@/src/lib/models/agents";
 import { certificateFileAgentOptions } from "@/src/lib/models/certificate-files";

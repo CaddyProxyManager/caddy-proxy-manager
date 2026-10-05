@@ -33,7 +33,7 @@ import {
 } from "../agent/desired-state";
 import { ingestCertificateFileResults } from "../models/certificate-files";
 import { verifyAgentRequest } from "../agent/verify";
-import { isDemoMode } from "../demo-mode";
+import { isDemoMode } from "../demo/mode";
 import { agentCredentialFingerprint, getControllerId, recordAgentContact } from "../models/agents";
 import { getSetting } from "../settings";
 import type { GraphQLContext } from "./context";

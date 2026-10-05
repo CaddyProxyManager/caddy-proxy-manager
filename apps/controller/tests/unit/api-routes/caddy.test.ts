@@ -5,7 +5,7 @@ vi.mock('@/src/lib/caddy', () => ({
   applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-vi.mock('@/src/lib/api-auth', () => {
+vi.mock('@/src/lib/api/auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
     constructor(msg: string, status: number) {
@@ -33,7 +33,7 @@ vi.mock('@/src/lib/api-auth', () => {
 
 import { POST } from '@/src/app/api/v1/caddy/apply/route';
 import { applyCaddyConfig } from '@/src/lib/caddy';
-import { requireApiAdmin } from '@/src/lib/api-auth';
+import { requireApiAdmin } from '@/src/lib/api/auth';
 
 const mockApplyCaddyConfig = vi.mocked(applyCaddyConfig);
 const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
@@ -64,7 +64,7 @@ describe('POST /api/v1/caddy/apply', () => {
   });
 
   it('returns 401 on auth failure', async () => {
-    const { ApiAuthError } = await import('@/src/lib/api-auth');
+    const { ApiAuthError } = await import('@/src/lib/api/auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await POST(createMockRequest());

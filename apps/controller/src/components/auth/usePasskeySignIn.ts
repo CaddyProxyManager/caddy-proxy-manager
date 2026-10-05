@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { authClient } from "@/src/lib/auth-client";
-import { passkeyError } from "@/src/lib/passkey-error";
+import { authClient } from "@/src/lib/auth/client";
+import { passkeyError } from "@/src/lib/auth/passkeys/error";
 
 type PasskeySignInResult = {
   data: unknown;

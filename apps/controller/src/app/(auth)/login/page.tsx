@@ -1,16 +1,16 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
-import { getAppName } from "@/src/lib/app-name";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
+import { getAppName } from "@/src/lib/branding/app-name";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
-import { cspNonce } from "@/src/lib/csp";
+import { cspNonce } from "@/src/lib/http/csp";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listLdapDirectoryChoices } from "@/src/lib/models/ldap-directories";
 import LoginClient from "@/src/components/auth/LoginClient";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
-import { oauthCallbackErrorMessage } from "@/src/lib/oauth-callback-error";
+import { oauthCallbackErrorMessage } from "@/src/lib/auth/oauth-callback-error";
 import { emailReady } from "@/src/lib/email/config";
 
 export async function generateMetadata(): Promise<Metadata> {

@@ -4,14 +4,14 @@ import { applyCaddyConfig } from "../caddy";
 import { auditEvents, certificates, proxyHosts } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 import { getDashboardSettings } from "../settings";
-import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
-import { domainError } from "../domain-error";
-import { checkCertificatePair } from "../certificate-pem";
+import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secrets";
+import { domainError } from "../errors/domain-error";
+import { checkCertificatePair } from "../certificates/pem";
 import {
   normalizeCertificateProviderOptions,
   parseStoredCertificateProviderOptions,
   sanitizeStoredCertificateProviderOptions,
-} from "../certificate-provider-options";
+} from "../certificates/provider-options";
 
 export type CertificateType = "managed" | "imported";
 

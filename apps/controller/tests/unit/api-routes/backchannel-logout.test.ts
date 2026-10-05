@@ -9,8 +9,8 @@ import { vi } from '@/tests/helpers/vi';
 import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
 import * as providerModel from '@/src/lib/models/oauth-providers';
 import * as logoutService from '@/src/lib/services/oidc-logout';
-import { clearDiscoveryCache } from '@/src/lib/oidc-claims';
-import { clearJwksCache, clearLogoutJtis } from '@/src/lib/oidc-logout-token';
+import { clearDiscoveryCache } from '@/src/lib/auth/oidc/claims';
+import { clearJwksCache, clearLogoutJtis } from '@/src/lib/auth/oidc/logout-token';
 
 /**
  * A spy, not `vi.mock`: Bun's module mocks leak into every later file in the process, which broke

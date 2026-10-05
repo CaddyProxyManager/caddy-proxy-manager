@@ -24,7 +24,7 @@ import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import RestartDialog from "@/src/components/setup/RestartDialog";
-import type { DomainClaim } from "@/src/lib/dashboard-host-options";
+import type { DomainClaim } from "@/src/lib/dashboard-host/options";
 import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
@@ -210,7 +210,7 @@ export default function SetupSettingsClient({
   };
 
   return (
-    <Center>
+    <Center role="main">
       <VStack gap={5} padding={5}>
         <SetupSteps stage="settings" hasMigrateStep={hasMigrateStep} />
         {sqliteWarning && <SqliteSetupWarning />}

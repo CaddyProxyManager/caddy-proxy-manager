@@ -5,8 +5,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';
 import messages from '../../messages/en.json';
-import { storedErrorMessage } from '@/src/lib/actions';
-import { domainError, storedErrorCode } from '@/src/lib/domain-error';
+import { storedErrorMessage } from '@/src/lib/errors/action-error';
+import { domainError, storedErrorCode } from '@/src/lib/errors/domain-error';
 import { geoipDownloadErrorMessage, geoipUpdateErrorMessage } from '@/src/lib/geoip/messages';
 
 const t = createTranslator({ locale: 'en', messages });

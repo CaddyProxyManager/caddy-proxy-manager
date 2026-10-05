@@ -1,6 +1,6 @@
 /**
  * `settings.*` lookups keyed at runtime, so tsc cannot check them;
- * tests/unit/settings-messages.test.ts asserts the catalog covers every setting, group and code.
+ * tests/unit/settings/settings-messages.test.ts asserts the catalog covers every setting, group and code.
  */
 
 import type { useTranslations } from "next-intl";

@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { config } from "@/src/lib/config";
 import { logAuditEvent } from "@/src/lib/audit";
-import { CONSOLE_ENABLE_ACTION } from "@/src/lib/account-failures";
-import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/console-command";
-import { findUserByConsoleName } from "@/src/lib/console-user";
+import { CONSOLE_ENABLE_ACTION } from "@/src/lib/auth/account-failures";
+import { isLoopbackAddress, verifyConsoleCommand } from "@/src/lib/users/console-command";
+import { findUserByConsoleName } from "@/src/lib/users/console-user";
 import { updateUserStatus } from "@/src/lib/models/user";
-import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/peer-address";
+import { PEER_ADDRESS_HEADER, isPeerAddressStamped } from "@/src/lib/http/peer-address";
 
 /**
  * `cpm-server --enable-user <username>`: the recovery for an account disabled after failed

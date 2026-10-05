@@ -1,4 +1,4 @@
-import { UpstreamTimeoutsFields } from "@cpm/controller/src/components/proxy-hosts/UpstreamTimeoutsFields";
+import { UpstreamTimeoutsFields } from "@cpm/controller/src/components/proxy-hosts/upstreams/UpstreamTimeoutsFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** A slow report endpoint and a long-lived WebSocket, the two usual reasons to change them. */

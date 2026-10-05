@@ -11,9 +11,9 @@ export const TEST_ENV: Record<string, string> = {
   // scripts/with-test-db.ts provides the server; TEST_DB=sqlite needs none.
   DATABASE_URL:
     process.env.TEST_DB === 'sqlite' ? ':memory:' : (process.env.TEST_POSTGRES_URL ?? ''),
-  // No deployment history, so the one-time data migrations in src/lib/db.ts skip.
+  // No deployment history, so the one-time data migrations in src/lib/db/index.ts skip.
   CPM_EPHEMERAL_DB: 'true',
-  // src/lib/caddy-admin.ts refuses a real socket when set; `bun test` has no marker of its own.
+  // src/lib/caddy/admin.ts refuses a real socket when set; `bun test` has no marker of its own.
   CPM_TEST: '1',
   SESSION_SECRET: 'test-session-secret-for-unit-tests-12345',
   NODE_ENV: 'test',

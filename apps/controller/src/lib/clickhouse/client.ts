@@ -1,5 +1,5 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { isDemoMode } from "../demo-mode";
+import { isDemoMode } from "../demo/mode";
 import * as sqliteStore from "./sqlite-store";
 
 // ── Configuration ───────────────────────────────────────────────────────────

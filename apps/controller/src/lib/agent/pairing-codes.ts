@@ -6,7 +6,7 @@
 
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MS } from "@cpm/shared";
-import { resetWindows, takeFromWindow, windowSpent } from "../rate-limit";
+import { resetWindows, takeFromWindow, windowSpent } from "../auth/rate-limit";
 
 export type PairingCode = { code: string; expiresAt: number };
 

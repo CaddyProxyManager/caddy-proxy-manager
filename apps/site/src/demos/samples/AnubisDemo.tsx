@@ -1,4 +1,4 @@
-import { AnubisFields } from "@cpm/controller/src/components/proxy-hosts/AnubisFields";
+import { AnubisFields } from "@cpm/controller/src/components/proxy-hosts/protection/AnubisFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** A challenged site whose API stays open to scripts. */

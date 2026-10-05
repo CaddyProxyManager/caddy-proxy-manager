@@ -2,7 +2,7 @@
  * Shims `app/(dashboard)/l4-proxy-hosts/actions` (aliased in astro.config.mjs). A save succeeds,
  * closing the editor, and the posted form goes to the demo to show what it sent.
  */
-import type { ActionState } from "@cpm/controller/src/lib/actions";
+import type { ActionState } from "@cpm/controller/src/lib/errors/action-error";
 import { t } from "../catalog";
 
 export type SavedL4Host = { id: number | null; form: FormData };

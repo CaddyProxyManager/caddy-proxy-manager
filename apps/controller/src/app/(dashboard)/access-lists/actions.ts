@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { domainError } from "@/src/lib/domain-error";
-import { normalizeCidr } from "@/src/lib/access-list-rules";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { normalizeCidr } from "@/src/lib/access-lists/rules";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { getTranslations } from "next-intl/server";
 import {
   addAccessListEntry,

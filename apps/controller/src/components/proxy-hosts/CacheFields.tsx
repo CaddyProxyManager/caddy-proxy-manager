@@ -16,7 +16,7 @@ import {
   type HostCacheMode,
   MAX_CACHE_MAX_AGE,
   MIN_CACHE_MAX_AGE,
-} from "@/lib/host-cache";
+} from "@/lib/proxy-hosts/cache";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 export function CacheFields({ cache }: { cache?: HostCacheConfig | null }) {

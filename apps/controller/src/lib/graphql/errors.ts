@@ -5,13 +5,13 @@
 
 import { type DocumentNode, GraphQLError, visit } from "graphql";
 import type { Plugin } from "graphql-yoga";
-import { ApiAuthError, logUnexpectedApiError, NotFoundError } from "../api-auth";
-import { ApiClientError } from "../api-errors";
-import { DefaultResponseValidationError } from "../caddy-default-response";
-import { DomainError } from "../domain-error";
-import { ForbiddenError } from "../permissions";
-import { SettingsApplyError } from "../settings-api";
-import { SettingsValidationError } from "../settings-validation";
+import { ApiAuthError, logUnexpectedApiError, NotFoundError } from "../api/auth";
+import { ApiClientError } from "../api/errors";
+import { DefaultResponseValidationError } from "../caddy/default-response";
+import { DomainError } from "../errors/domain-error";
+import { ForbiddenError } from "../users/permissions";
+import { SettingsApplyError } from "../settings/api";
+import { SettingsValidationError } from "../settings/validation";
 import type { GraphQLContext } from "./context";
 
 const SAFE_ERRORS = [

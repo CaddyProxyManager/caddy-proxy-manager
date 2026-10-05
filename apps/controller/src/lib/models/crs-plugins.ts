@@ -3,8 +3,8 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { crsPlugins, proxyHosts } from "../db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import { domainError } from "../domain-error";
-import { type CrsPluginRules, findCrsPluginRejections, normalizeWafPluginIds } from "../caddy-waf";
+import { domainError } from "../errors/domain-error";
+import { type CrsPluginRules, findCrsPluginRejections, normalizeWafPluginIds } from "../waf/caddy";
 import {
   type CrsUnsupportedReason,
   type Fetcher,
@@ -12,22 +12,22 @@ import {
   fetchCrsPluginRelease,
   resolveCrsPluginVersion,
   withGitHubToken,
-} from "../crs-plugins/registry";
-import { crsRegistryGithubToken, getCrsRegistrySettings } from "../crs-plugins/settings";
+} from "../waf/crs-plugins/registry";
+import { crsRegistryGithubToken, getCrsRegistrySettings } from "../waf/crs-plugins/settings";
 import {
   type CrsListedPlugin,
   crsRegistryListsStale,
   getCrsRegistryState,
   refreshCrsRegistryLists,
   verdictKey,
-} from "../crs-plugins/sync";
+} from "../waf/crs-plugins/sync";
 import { getDashboardSettings, getWafSettings } from "../settings";
-import { assertWafLoads, wafCandidatesSelecting } from "../waf-dry-run";
+import { assertWafLoads, wafCandidatesSelecting } from "../waf/dry-run";
 import {
   type CrsPluginLoadFailure,
   getCrsPluginQuarantine,
   releaseCrsPlugin,
-} from "../crs-plugins/quarantine";
+} from "../waf/crs-plugins/quarantine";
 
 // ── Types ────────────────────────────────────────────────────────────
 

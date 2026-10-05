@@ -29,7 +29,7 @@ export default defineConfig({
         rules: { "orphan-message": "off" },
       },
       {
-        // Read through a translator passed as a parameter, in password-policy-message.ts.
+        // Read through a translator passed as a parameter, in auth/password/policy-message.ts.
         keys: "passwordPolicy.*",
         rules: { "orphan-message": "off" },
       },

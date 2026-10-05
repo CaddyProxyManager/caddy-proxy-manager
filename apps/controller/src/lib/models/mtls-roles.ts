@@ -3,8 +3,8 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { mtlsRoles, mtlsCertificateRoles, issuedClientCertificates } from "../db/schema";
 import { asc, eq, inArray, count, and, isNull } from "drizzle-orm";
-import { isCertificateUnexpired, normalizeFingerprint } from "../caddy-mtls";
-import { domainError } from "../domain-error";
+import { isCertificateUnexpired, normalizeFingerprint } from "../caddy/mtls";
+import { domainError } from "../errors/domain-error";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -329,5 +329,5 @@ export async function buildRoleCertIdMap(): Promise<Map<number, Set<number>>> {
   return (await buildRoleMaps()).roleCertIdMap;
 }
 
-// Re-exported for convenience; normalizeFingerprint's canonical home is caddy-mtls.ts.
-export { normalizeFingerprint } from "../caddy-mtls";
+// Re-exported for convenience; normalizeFingerprint's canonical home is caddy/mtls.ts.
+export { normalizeFingerprint } from "../caddy/mtls";

@@ -29,7 +29,7 @@ installDemoCaddy();
 async function actorId(): Promise<number> {
   // As the app's first start would, so `bun run demo` can seed before the server exists.
   if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
-    await (await import("../src/lib/init-db")).ensureAdminUser();
+    await (await import("../src/lib/db/init")).ensureAdminUser();
   }
   const [admin] = await db
     .select({ id: schema.users.id })

@@ -10,7 +10,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { ACCENTS } from "@/components/ui/accent";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
-import { downloadText } from "@/src/lib/download-text";
+import { downloadText } from "@/src/lib/browser/download-text";
 import { toast } from "sonner";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
@@ -23,7 +23,7 @@ import {
   rereadCertificateFileAction,
 } from "../actions";
 import { Timestamp } from "@/components/ui/Timestamp";
-import { certificateFileErrorMessage } from "@/src/lib/certificate-file-errors";
+import { certificateFileErrorMessage } from "@/src/lib/certificates/file-errors";
 import { BulkConfirmDialog } from "@/components/ui/BulkActionBar";
 import type {
   CertExpiryStatus,

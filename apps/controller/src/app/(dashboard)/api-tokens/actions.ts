@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
 import { createApiToken, deleteApiToken } from "@/src/lib/models/api-tokens";
-import { withTranslatedErrors } from "@/src/lib/translated-action";
+import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 
 export async function createApiTokenAction(
   formData: FormData,

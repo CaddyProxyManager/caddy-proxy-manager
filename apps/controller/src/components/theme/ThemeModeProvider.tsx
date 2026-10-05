@@ -3,7 +3,7 @@
 import { createContext, use, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Theme } from "@astryxdesign/core";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
-import { THEME_COOKIE, THEME_COOKIE_MAX_AGE, type ThemeMode } from "@/src/lib/theme-mode";
+import { THEME_COOKIE, THEME_COOKIE_MAX_AGE, type ThemeMode } from "@/src/lib/users/theme-mode";
 
 interface ThemeModeContextValue {
   /** The stored preference - "system" included, unresolved. */

@@ -1,4 +1,4 @@
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { requireUser, getCurrentSessionId } from "@/src/lib/auth";
 import {
   getPasswordSignInUsername,
@@ -10,16 +10,16 @@ import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { ldapDirectoryNames } from "@/src/lib/models/ldap-directories";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
-import { resolveAvatar } from "@/src/lib/avatar";
+import { resolveAvatar } from "@/src/lib/users/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import ProfileClient from "./ProfileClient";
-import { isDemoAdmin } from "@/src/lib/demo-mode";
+import { isDemoAdmin } from "@/src/lib/demo/mode";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { listUserPasskeys } from "@/src/lib/passkeys";
-import { passkeyRpId } from "@/src/lib/passkey-relying-party";
-import { getPublicBaseUrl } from "@/src/lib/public-url";
+import { listUserPasskeys } from "@/src/lib/auth/passkeys";
+import { passkeyRpId } from "@/src/lib/auth/passkeys/relying-party";
+import { getPublicBaseUrl } from "@/src/lib/http/public-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");

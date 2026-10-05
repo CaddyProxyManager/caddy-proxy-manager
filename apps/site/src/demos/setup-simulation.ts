@@ -3,7 +3,7 @@
  * fake-api.ts). Nothing persists. `currentSimulation()` is null unless a demo started one, so the
  * sign-in demo elsewhere keeps failing every attempt.
  */
-import { passwordPolicyMessage } from "@cpm/controller/src/lib/password-policy-message";
+import { passwordPolicyMessage } from "@cpm/controller/src/lib/auth/password/policy-message";
 import type { MigrationGroupId } from "@cpm/controller/src/lib/migration/selection";
 import type { SetupStage } from "@cpm/controller/src/lib/setup";
 import { t } from "./catalog";
@@ -235,7 +235,7 @@ export class Simulation {
     this.navigate("/setup");
   }
 
-  // Sign-in (lib/auth-client).
+  // Sign-in (lib/auth/client).
 
   async signInUsername(username: string, password: string) {
     await pause();

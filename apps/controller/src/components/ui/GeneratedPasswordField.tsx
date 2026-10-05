@@ -8,7 +8,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { Popover } from "@astryxdesign/core/Popover";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { generatePassword } from "@/src/lib/password-generator";
+import { generatePassword } from "@/src/lib/auth/password/generator";
 import {
   AUTOFILL_NEW_PASSWORD,
   NATIVE_REQUIRED,

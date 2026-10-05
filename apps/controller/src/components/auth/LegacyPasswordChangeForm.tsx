@@ -17,7 +17,7 @@ import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_NEW_PASSWORD,
 } from "@/components/ui/native-input-attrs";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 
 export default function LegacyPasswordChangeForm() {
   const t = useTranslations();
@@ -76,7 +76,7 @@ export default function LegacyPasswordChangeForm() {
   }
 
   return (
-    <Center minHeight="100vh" padding={4} className="cpm-auth-page">
+    <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
       <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400 }}>
         <VStack gap={3}>
           <VStack gap={1}>

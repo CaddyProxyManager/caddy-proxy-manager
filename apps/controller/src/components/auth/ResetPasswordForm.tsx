@@ -16,7 +16,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { PasswordPolicyChecklist } from "@/src/components/auth/PasswordPolicyChecklist";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 
 type EmailedLink = { purpose: "reset" | "invite"; username: string };
 type Stage =
@@ -109,7 +109,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
     (stage.kind === "done" && stage.purpose === "invite");
 
   return (
-    <Center minHeight="100vh" padding={4} className="cpm-auth-page">
+    <Center role="main" minHeight="100vh" padding={4} className="cpm-auth-page">
       <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400 }}>
         <VStack gap={3}>
           <VStack gap={1}>

@@ -6,7 +6,7 @@ import { auth } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { isHostname, seedDashboardDomain } from "@/src/lib/dashboard-host";
-import { listDomainClaims } from "@/src/lib/dashboard-host-options";
+import { listDomainClaims } from "@/src/lib/dashboard-host/options";
 import { getDashboardSettings, getGeneralSettings } from "@/src/lib/settings";
 import { baseUrl, SETTING_DEFINITIONS, SETTING_GROUPS } from "@/src/lib/settings/registry";
 import { gateDefaults } from "@/src/lib/settings/optional-features";
@@ -14,7 +14,7 @@ import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { settingDescription, settingGroupTitle, settingLabel } from "@/src/lib/settings/messages";
 import { getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupSettingsClient, { type SettingField } from "./SetupSettingsClient";
-import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
+import { sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.settingsStep");

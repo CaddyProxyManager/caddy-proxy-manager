@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getAuth } from "@/src/lib/auth-server";
+import { getAuth } from "@/src/lib/auth/server";
 import { checkSameOrigin } from "@/src/lib/auth";
 import { headers } from "next/headers";
 

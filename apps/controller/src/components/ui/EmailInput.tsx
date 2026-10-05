@@ -4,7 +4,7 @@ import { type ComponentProps, type FocusEvent, useState } from "react";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { type EmailDomain, isEmailAddress } from "@/src/lib/email-address";
+import { type EmailDomain, isEmailAddress } from "@/src/lib/email/address";
 import { NO_SPELLCHECK } from "./native-input-attrs";
 
 type EmailInputProps = Omit<ComponentProps<typeof TextInput>, "type" | "status" | "value"> & {

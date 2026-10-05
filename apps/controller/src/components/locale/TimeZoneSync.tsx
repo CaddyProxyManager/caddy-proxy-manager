@@ -2,7 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { TIME_ZONE_COOKIE, TIME_ZONE_COOKIE_MAX_AGE, parseTimeZone } from "@/src/lib/time-zone";
+import {
+  TIME_ZONE_COOKIE,
+  TIME_ZONE_COOKIE_MAX_AGE,
+  parseTimeZone,
+} from "@/src/lib/locale/time-zone";
 
 /**
  * The server has no other way to learn the zone. On a mismatch it writes the cookie and refreshes

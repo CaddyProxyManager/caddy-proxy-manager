@@ -9,9 +9,9 @@ import {
   groupMembers,
 } from "../db/schema";
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
-import { hostMatchesPattern } from "../host-pattern-priority";
-import { domainError } from "../domain-error";
-import { takeFromWindow } from "../rate-limit";
+import { hostMatchesPattern } from "../proxy-hosts/pattern-priority";
+import { domainError } from "../errors/domain-error";
+import { takeFromWindow } from "../auth/rate-limit";
 
 const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 const EXCHANGE_CODE_TTL = 60; // 60 seconds
@@ -52,7 +52,7 @@ export function parseForwardAuthPortList(raw: string): Set<string> {
   );
 }
 
-/** Read per call so a save needs no restart; imported lazily, as in rate-limit.ts. */
+/** Read per call so a save needs no restart; imported lazily, as in auth/rate-limit.ts. */
 async function allowedForwardAuthPorts(): Promise<Set<string>> {
   const [{ forwardAuthAllowedPorts }, { getSetting }] = await Promise.all([
     import("../settings/registry"),

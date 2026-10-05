@@ -7,7 +7,7 @@
 import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { pushSubscriptions, users } from "../db/schema";
-import { domainError } from "../domain-error";
+import { domainError } from "../errors/domain-error";
 import type { Locale } from "../locale";
 
 export type PushTarget = {

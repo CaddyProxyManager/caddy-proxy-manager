@@ -1,4 +1,4 @@
-import { CrowdSecFields } from "@cpm/controller/src/components/proxy-hosts/CrowdSecFields";
+import { CrowdSecFields } from "@cpm/controller/src/components/proxy-hosts/protection/CrowdSecFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** The per-host switch as every host starts: following the global setting. */

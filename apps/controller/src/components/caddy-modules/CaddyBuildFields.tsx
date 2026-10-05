@@ -31,10 +31,13 @@ import {
   customModuleProblem,
   customModuleSpec,
   validateCustomModule,
-} from "@/src/lib/caddy-modules";
-import { caddyModuleDescription, caddyModuleName } from "@/src/lib/caddy-module-messages";
-import { extractErrorMessage } from "@/src/lib/actions";
-import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy-image-build";
+} from "@/src/lib/caddy/image-build/modules";
+import {
+  caddyModuleDescription,
+  caddyModuleName,
+} from "@/src/lib/caddy/image-build/module-messages";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
+import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy/image-build/image";
 
 type BuildStatus = {
   state: "idle" | "pending" | "building" | "applied" | "failed";

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { extractErrorMessage } from "../actions";
+import { extractErrorMessage } from "../errors/action-error";
 
 /** A route's failure in the reader's words: a domain error by its code, anything else generically. */
 export async function backupErrorMessage(error: unknown): Promise<string> {

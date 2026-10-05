@@ -10,7 +10,7 @@ function keyFor(secret: string): Buffer {
 }
 
 /**
- * Encrypted the way src/lib/secret.ts does it, under another secret: config memoises
+ * Encrypted the way src/lib/secrets/index.ts does it, under another secret: config memoises
  * SESSION_SECRET, so a test cannot switch it and encrypt.
  */
 export function encryptUnderOtherSecret(value: string, secret = OTHER_SESSION_SECRET): string {

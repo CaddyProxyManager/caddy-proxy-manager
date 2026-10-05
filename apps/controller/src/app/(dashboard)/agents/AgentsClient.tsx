@@ -125,6 +125,7 @@ export default function AgentsClient({
 
       {agents.length === 0 && (
         <EmptyState
+          headingLevel={2}
           title={t("noneTitle")}
           description={anyPaired && !isAdmin ? t("noneGrantedDescription") : t("noneDescription")}
         />

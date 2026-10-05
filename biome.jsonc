@@ -75,7 +75,7 @@
     "enabled": true,
     "actions": {
       "source": {
-        // Deliberately off. Import order is load-bearing here: src/lib/db.ts runs
+        // Deliberately off. Import order is load-bearing here: src/lib/db/index.ts runs
         // migrations, env provider sync and the admin bootstrap at module scope,
         // so a module's imports are also its startup sequence. Sorting them is a
         // silent reordering of that sequence.

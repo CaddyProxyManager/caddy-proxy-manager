@@ -1,4 +1,4 @@
-import { UpstreamInput } from "@cpm/controller/src/components/proxy-hosts/UpstreamInput";
+import { UpstreamInput } from "@cpm/controller/src/components/proxy-hosts/upstreams/UpstreamInput";
 import { DemoSurface } from "../DemoSurface";
 
 /** Two upstreams, which is the smallest number that makes the load balancer worth configuring. */

@@ -758,7 +758,7 @@ DATABASE_URL=postgres://... bun run db:generate         # emits drizzle/postgres
 DATABASE_URL=file:./data/cpm.db bun run db:generate     # emits drizzle/sqlite/
 ```
 
-`tests/unit/db-schema-parity.test.ts` fails if either of the last two steps was skipped.
+`tests/unit/db/db-schema-parity.test.ts` fails if either of the last two steps was skipped.
 
 `apps/controller/drizzle/legacy-sqlite/` holds the migrations every pre-3.0 deployment ran. Nothing
 generates into it; it stays so the migration flow's tests can build a realistic old database.

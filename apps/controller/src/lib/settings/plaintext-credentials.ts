@@ -6,8 +6,8 @@
 import { eq, like, or } from "drizzle-orm";
 import db from "../db";
 import { settings, settingsRevisions } from "../db/schema";
-import { encryptDnsProviderSettingCredentials } from "../dns-provider-credentials";
-import { encryptSecret, isEncryptedSecret } from "../secret";
+import { encryptDnsProviderSettingCredentials } from "../dns/provider-credentials";
+import { encryptSecret, isEncryptedSecret } from "../secrets";
 
 function encryptCloudflareToken<T>(value: T): T {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;

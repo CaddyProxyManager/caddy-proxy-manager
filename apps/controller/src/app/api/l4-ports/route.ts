@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getL4PortsDiff, getL4PortsStatus, applyL4Ports } from "@/src/lib/l4-ports";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { getL4PortsDiff, getL4PortsStatus, applyL4Ports } from "@/src/lib/l4/ports";
 
 export async function GET(request: NextRequest) {
   try {

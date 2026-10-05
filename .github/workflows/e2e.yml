@@ -1,11 +1,15 @@
 name: End-to-end tests
 
 on:
-  # Opt-in: the whole Compose stack against a live Caddy is the expensive check, and not required
-  # on main. Run it from the Actions tab, or label a PR `e2e` to run it on every push after that.
+  # Opt-in on PRs: label one `e2e` to run the specs its changes can reach
+  # (apps/controller/scripts/select-e2e.ts) on every push after that, or `e2e-full` for all of them.
+  # Main runs the whole suite on each merge to catch what the map missed; so does a dispatch.
   # No `ref` input: one feeding `actions/checkout` would let any commit seed main's cache (CodeQL
   # actions/cache-poisoning). To test a commit, push it to a branch or tag and dispatch that.
   workflow_dispatch:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -15,16 +19,54 @@ on:
       - labeled
       - synchronize
 
-# One run per ref. A force-push supersedes the in-flight run rather than leaving
-# a 30-minute Docker job grinding against a commit nobody is looking at.
+# One run per ref. On a PR a force-push supersedes the in-flight run rather than leaving a 30-minute
+# Docker job grinding against a commit nobody is looking at; main's queue, so every merge is tested.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  select:
+    # A job-level `if`, as a workflow filter cannot see labels. The e2e job needs this one, so it
+    # is skipped with it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'e2e') ||
+      contains(github.event.pull_request.labels.*.name, 'e2e-full')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      specs: ${{ steps.select.outputs.specs }}
+    steps:
+      # A PR checks out its merge commit; depth 2 brings the base it was merged onto.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Select specs
+        id: select
+        env:
+          FULL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e-full') }}
+        run: |
+          if [ "$FULL" = true ]; then
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            echo "### Full suite" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git diff --name-only HEAD^1 HEAD | bun apps/controller/scripts/select-e2e.ts --base HEAD^1
+
   e2e:
-    # PRs run only while labelled `e2e`; a job-level `if`, as a workflow filter cannot see labels.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    needs: select
+    if: needs.select.outputs.mode != 'none'
     runs-on: ubuntu-latest
     # global-setup allows 180s for the stack and the suite runs single-worker: healthy runs take
     # 15-20 minutes, so past 45 something is wedged.
@@ -85,9 +127,12 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # global-setup builds and seeds the stack and teardown removes it: nothing to clean up here.
+      # SPECS is empty for the full suite, and unquoted so each filter is its own argument.
       - name: Run Playwright end-to-end suite
-        run: bun run test:e2e
+        working-directory: apps/controller
+        run: bunx playwright test --config tests/playwright.config.ts $SPECS
         env:
+          SPECS: ${{ needs.select.outputs.specs }}
           # Layers the GHA cache config onto the stack. tests/helpers/compose.ts adds it as one
           # more -f; nothing outside CI sets this, so a local run is unchanged.
           E2E_COMPOSE_EXTRA_FILE: apps/controller/tests/docker-compose.ci.yml
@@ -100,6 +145,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-results
-          path: test-results/
+          path: apps/controller/test-results/
           retention-days: 14
           if-no-files-found: ignore

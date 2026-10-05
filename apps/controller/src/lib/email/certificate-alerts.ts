@@ -5,7 +5,7 @@
  */
 
 import { X509Certificate } from "node:crypto";
-import { isEmailAddress } from "../email-address";
+import { isEmailAddress } from "./address";
 import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
 import { emailReady } from "./config";
 import { type CertificateAlertItem, certificateAlertEmail } from "./messages";

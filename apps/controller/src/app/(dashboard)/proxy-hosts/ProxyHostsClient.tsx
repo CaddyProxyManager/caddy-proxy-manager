@@ -32,7 +32,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList } from "@/lib/models/access-lists";
-import type { CertificatePickerOption } from "@/lib/certificate-api";
+import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";

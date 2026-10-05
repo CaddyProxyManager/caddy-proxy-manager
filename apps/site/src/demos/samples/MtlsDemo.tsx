@@ -1,4 +1,4 @@
-import { MtlsFields } from "@cpm/controller/src/components/proxy-hosts/MtlsConfig";
+import { MtlsFields } from "@cpm/controller/src/components/proxy-hosts/protection/MtlsConfig";
 import { DemoSurface } from "../DemoSurface";
 
 const CA = {

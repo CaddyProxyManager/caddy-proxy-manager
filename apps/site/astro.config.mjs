@@ -140,11 +140,11 @@ export default defineConfig({
        */
       alias: [
         {
-          find: /^@\/src\/lib\/auth-client$/,
+          find: /^@\/src\/lib\/auth\/client$/,
           replacement: fileURLToPath(new URL("./src/demos/shims/auth-client.ts", import.meta.url)),
         },
         {
-          find: /^@\/src\/lib\/browser-navigation$/,
+          find: /^@\/src\/lib\/browser\/navigation$/,
           replacement: fileURLToPath(
             new URL("./src/demos/shims/browser-navigation.ts", import.meta.url),
           ),
@@ -176,7 +176,7 @@ export default defineConfig({
       // The controller is a symlink; a second React copy would make every demo hook throw.
       dedupe: ["react", "react-dom"],
     },
-    // Read by the controller's src/lib/app-version.ts.
+    // Read by the controller's src/lib/runtime/app-version.ts.
     define: {
       "process.env.NEXT_PUBLIC_APP_VERSION": JSON.stringify(controllerVersion),
     },

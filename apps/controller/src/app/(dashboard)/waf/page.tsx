@@ -13,7 +13,7 @@ import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
-import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
+import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/waf/WafPresetOptions";
 import {
   crsPluginLoadFailures,
   getCrsPluginUsage,
@@ -22,8 +22,8 @@ import {
   toCrsPluginOption,
 } from "@/src/lib/models/crs-plugins";
 import { requireAdmin } from "@/src/lib/auth";
-import { listDroppedWafDirectives } from "@/src/lib/caddy-waf";
-import { strictId } from "@/src/lib/strict-id";
+import { listDroppedWafDirectives } from "@/src/lib/waf/caddy";
+import { strictId } from "@/src/lib/http/strict-id";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 

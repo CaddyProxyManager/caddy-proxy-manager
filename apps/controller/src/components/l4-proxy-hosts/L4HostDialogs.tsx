@@ -6,7 +6,7 @@ import {
   deleteL4ProxyHostAction,
   updateL4ProxyHostAction,
 } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
-import { INITIAL_ACTION_STATE } from "@/lib/actions";
+import { INITIAL_ACTION_STATE } from "@/lib/errors/action-error";
 import type { L4ProxyHost } from "@/lib/models/l4-proxy-hosts";
 import type { L4AccessListOption } from "@/lib/models/access-lists";
 import { AppDialog } from "@/components/ui/AppDialog";

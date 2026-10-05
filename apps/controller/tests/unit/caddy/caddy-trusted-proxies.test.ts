@@ -1,0 +1,225 @@
+/**
+ * Server-level trusted_proxies / client_ip_headers (#222). Caddy resolves client_ip in core, so
+ * servers.cpm is the only place a global list can fix attribution.
+ */
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import type { TestDb } from '../../helpers/db';
+
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
+
+const { createTestDb } = await import('../../helpers/db');
+
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous - an async one never resolves and the file hangs.
+ctx.db = await createTestDb();
+
+vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
+
+vi.mock('../../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
+import { createProxyHost } from '../../../src/lib/models/proxy-hosts';
+import {
+  saveTrustedProxiesSettings,
+  saveGeoBlockSettings,
+  type GeoBlockSettings,
+} from '../../../src/lib/settings';
+import {
+  buildServerTrustedProxies,
+  buildBlockerHandler,
+  resolveEffectiveGeoBlock,
+  buildCaddyDocument,
+} from '../../../src/lib/caddy';
+import * as schema from '../../../src/lib/db/schema';
+
+const PRIVATE_RANGES = [
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '127.0.0.0/8',
+  'fd00::/8',
+  '::1/128',
+];
+
+function cpmServer(doc: unknown): Record<string, unknown> {
+  return (
+    (doc as { apps?: { http?: { servers?: { cpm?: Record<string, unknown> } } } })?.apps?.http
+      ?.servers?.cpm ?? {}
+  );
+}
+
+const baseGeoBlock: GeoBlockSettings = {
+  enabled: true,
+  block_countries: ['CN'],
+  block_continents: [],
+  block_asns: [],
+  block_cidrs: [],
+  block_ips: [],
+  allow_countries: [],
+  allow_continents: [],
+  allow_asns: [],
+  allow_cidrs: [],
+  allow_ips: [],
+  trusted_proxies: [],
+  fail_closed: false,
+  response_status: 403,
+  response_body: 'Forbidden',
+  response_headers: {},
+  redirect_url: '',
+};
+
+describe('buildServerTrustedProxies', () => {
+  it('returns an empty object when no settings are configured', () => {
+    expect(buildServerTrustedProxies(null)).toEqual({});
+    expect(buildServerTrustedProxies(undefined)).toEqual({});
+  });
+
+  it('returns an empty object when ranges is empty (feature disabled by default)', () => {
+    expect(buildServerTrustedProxies({ ranges: [] })).toEqual({});
+    expect(buildServerTrustedProxies({ ranges: ['  ', ''] })).toEqual({});
+  });
+
+  it('emits a static trusted_proxies source with the configured ranges', () => {
+    expect(buildServerTrustedProxies({ ranges: ['172.21.0.1/32'] })).toEqual({
+      trusted_proxies: { source: 'static', ranges: ['172.21.0.1/32'] },
+    });
+  });
+
+  it('expands the private_ranges shorthand', () => {
+    const result = buildServerTrustedProxies({ ranges: ['private_ranges'] });
+    expect((result.trusted_proxies as { ranges: string[] }).ranges).toEqual(PRIVATE_RANGES);
+  });
+
+  it('trims and drops blank ranges', () => {
+    const result = buildServerTrustedProxies({ ranges: ['  172.21.0.1/32 ', '', ' 10.1.2.3/32'] });
+    expect((result.trusted_proxies as { ranges: string[] }).ranges).toEqual([
+      '172.21.0.1/32',
+      '10.1.2.3/32',
+    ]);
+  });
+
+  it('emits client_ip_headers only when custom headers are set', () => {
+    expect(buildServerTrustedProxies({ ranges: ['10.0.0.0/8'] }).client_ip_headers).toBeUndefined();
+    expect(
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], client_ip_headers: ['Cf-Connecting-Ip'] })
+        .client_ip_headers,
+    ).toEqual(['Cf-Connecting-Ip']);
+  });
+
+  it('emits trusted_proxies_strict as 1 when strict is enabled', () => {
+    expect(
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'] }).trusted_proxies_strict,
+    ).toBeUndefined();
+    expect(
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], strict: true }).trusted_proxies_strict,
+    ).toBe(1);
+  });
+});
+
+describe('buildCaddyDocument server-level trusted proxies', () => {
+  beforeEach(async () => {
+    await ctx.db.delete(schema.proxyHosts);
+    await ctx.db.delete(schema.settings);
+    await ctx.db.delete(schema.users).catch(() => {});
+    await ctx.db.insert(schema.users).values({
+      id: 1,
+      email: 'admin@example.com',
+      name: 'Admin',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'admin',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    await createProxyHost(
+      { name: 'plain', domains: ['app.example.com'], upstreams: ['10.0.0.5:8080'] },
+      1,
+    );
+  });
+
+  it('does not emit trusted_proxies on servers.cpm by default', async () => {
+    const doc = await buildCaddyDocument();
+    const server = cpmServer(doc);
+    expect(server.trusted_proxies).toBeUndefined();
+    expect(server.client_ip_headers).toBeUndefined();
+    expect(server.trusted_proxies_strict).toBeUndefined();
+  });
+
+  it('emits trusted_proxies / client_ip_headers / strict on servers.cpm when configured', async () => {
+    await saveTrustedProxiesSettings({
+      ranges: ['172.21.0.1/32'],
+      client_ip_headers: ['Cf-Connecting-Ip'],
+      strict: true,
+    });
+
+    const doc = await buildCaddyDocument();
+    const server = cpmServer(doc);
+    expect(server.trusted_proxies).toEqual({ source: 'static', ranges: ['172.21.0.1/32'] });
+    expect(server.client_ip_headers).toEqual(['Cf-Connecting-Ip']);
+    expect(server.trusted_proxies_strict).toBe(1);
+  });
+
+  it('leaves geoblock trusted_proxies untouched when default_geoblock is off', async () => {
+    await saveTrustedProxiesSettings({ ranges: ['172.21.0.1/32'] });
+    await saveGeoBlockSettings(baseGeoBlock);
+
+    const doc = await buildCaddyDocument();
+    const json = JSON.stringify(doc);
+    // The blocker handler carries no trusted_proxies (geoblock list stayed empty).
+    expect(json).toContain('"handler":"blocker"');
+    const blocker = findBlocker(doc);
+    expect(blocker?.trusted_proxies).toBeUndefined();
+  });
+
+  it('defaults the global geoblock trusted_proxies from the server list when default_geoblock is on', async () => {
+    await saveTrustedProxiesSettings({ ranges: ['172.21.0.1/32'], default_geoblock: true });
+    await saveGeoBlockSettings(baseGeoBlock);
+
+    const doc = await buildCaddyDocument();
+    const blocker = findBlocker(doc);
+    expect(blocker?.trusted_proxies).toEqual(['172.21.0.1/32']);
+  });
+
+  it('does not override an explicitly-set geoblock trusted_proxies list', async () => {
+    await saveTrustedProxiesSettings({ ranges: ['172.21.0.1/32'], default_geoblock: true });
+    await saveGeoBlockSettings({ ...baseGeoBlock, trusted_proxies: ['10.9.9.9/32'] });
+
+    const doc = await buildCaddyDocument();
+    const blocker = findBlocker(doc);
+    expect(blocker?.trusted_proxies).toEqual(['10.9.9.9/32']);
+  });
+});
+
+/** Find the first geoip blocker handler anywhere in the config document. */
+function findBlocker(node: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findBlocker(item);
+      if (found) return found;
+    }
+  } else if (node && typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    if (obj.handler === 'blocker') return obj;
+    for (const v of Object.values(obj)) {
+      const found = findBlocker(v);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+describe('geoblock helpers remain reachable', () => {
+  it('buildBlockerHandler emits trusted_proxies from a resolved config', () => {
+    const resolved = resolveEffectiveGeoBlock(
+      { ...baseGeoBlock, trusted_proxies: ['private_ranges'] },
+      {
+        geoblock_mode: 'merge',
+        geoblock: null,
+      },
+    );
+    const handler = buildBlockerHandler(resolved!);
+    expect(handler.trusted_proxies).toEqual(PRIVATE_RANGES);
+  });
+});

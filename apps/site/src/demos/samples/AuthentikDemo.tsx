@@ -1,4 +1,4 @@
-import { AuthentikFields } from "@cpm/controller/src/components/proxy-hosts/AuthentikFields";
+import { AuthentikFields } from "@cpm/controller/src/components/proxy-hosts/forward-auth/AuthentikFields";
 import { DemoSurface } from "../DemoSurface";
 
 /** Seeded from settings, as a host that has never been told anything of its own would be. */

@@ -1,26 +1,26 @@
-import { getAuth } from "@/src/lib/auth-server";
+import { getAuth } from "@/src/lib/auth/server";
 import { toNextJsHandler } from "better-auth/next-js";
 import { getTranslations } from "next-intl/server";
-import { CLIENT_IP_HEADER, getClientIp } from "@/src/lib/client-ip";
+import { CLIENT_IP_HEADER, getClientIp } from "@/src/lib/http/client-ip";
 import {
   CAPTCHA_PASS_CLEAR_COOKIE,
   captchaPassFromCookieHeader,
   redeemCaptchaPass,
 } from "@/src/lib/captcha/pass";
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
-import { accountKey, accountRetryAfterMs, resetAccountFailures } from "@/src/lib/rate-limit";
-import { recordAccountFailure } from "@/src/lib/account-failures";
-import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { accountKey, accountRetryAfterMs, resetAccountFailures } from "@/src/lib/auth/rate-limit";
+import { recordAccountFailure } from "@/src/lib/auth/account-failures";
+import { localUsersDisabled } from "@/src/lib/auth/policy";
 import {
   CREDENTIAL_SIGN_IN_PATHS,
   LDAP_SIGN_IN_PATH,
   PASSKEY_MANAGE_PATHS,
   TWO_FACTOR_MANAGE_PATHS,
   hasTwoFactorChallengeCookie,
-} from "@/src/lib/auth-sign-in-paths";
-import { isDemoAdmin, isDemoMode } from "@/src/lib/demo-mode";
+} from "@/src/lib/auth/sign-in-paths";
+import { isDemoAdmin, isDemoMode } from "@/src/lib/demo/mode";
 import { createAuditEvent } from "@/src/lib/models/audit";
-import { ACCOUNT_LOCKED } from "@/src/lib/sign-in-error";
+import { ACCOUNT_LOCKED } from "@/src/lib/auth/sign-in-error";
 
 export const dynamic = "force-dynamic";
 

@@ -12,7 +12,7 @@ import {
   type TopWafRuleWithHosts,
   type WafEventFilter,
 } from "../clickhouse/client";
-import { isConnectionError } from "../net-errors";
+import { isConnectionError } from "../errors/net-errors";
 
 export type { WafEvent, WafEventStats, TopWafRule, TopWafRuleWithHosts, WafEventFilter };
 

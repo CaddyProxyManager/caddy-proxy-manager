@@ -9,7 +9,7 @@ import {
   MIN_PASSWORD_LENGTH,
   type PasswordPolicyViolation,
   passwordPolicyViolations,
-} from "@/src/lib/password-policy";
+} from "@/src/lib/auth/password/policy";
 
 /** Every rule, in the order the policy reports them, so the checklist and the error agree. */
 const RULES: PasswordPolicyViolation[] = ["length", "case", "number", "special"];

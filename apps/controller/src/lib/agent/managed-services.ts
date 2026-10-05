@@ -9,8 +9,8 @@
 import type { ManagedServiceName, ManagedServicesRequest, ManagedServicesState } from "@cpm/shared";
 import { findAgentRowByAgentId } from "../models/agents";
 import { isAnalyticsEnabled } from "../clickhouse/client";
-import { wantsManagedCrowdSec } from "../crowdsec";
-import { decryptSecret } from "../secret";
+import { wantsManagedCrowdSec } from "../caddy/crowdsec";
+import { decryptSecret } from "../secrets";
 import { bundledAgentId } from "./bootstrap";
 import { pushDesiredState } from "./desired-state";
 import { connectedAgents } from "./registry";

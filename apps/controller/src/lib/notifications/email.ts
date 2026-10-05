@@ -10,7 +10,7 @@ import type { EmailMessage } from "../email/transport";
 import type { NotificationEvent } from "./events";
 import type { PendingNotice } from "./plan";
 
-/** Keys are composed from the kind, so the narrowing is given up here, as in audit-summary.ts. */
+/** Keys are composed from the kind, so the narrowing is given up here, as in audit/summary.ts. */
 type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
 
 const TIME_FORMAT = {

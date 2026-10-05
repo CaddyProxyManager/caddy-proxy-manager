@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import db, { nowIso } from "../db";
 import { oauthProviders, settings } from "../db/schema";
 import { and, asc, eq, ne } from "drizzle-orm";
-import { encryptSecret, decryptSecret } from "../secret";
-import type { AppRole } from "../oidc-groups";
-import { isAppRole } from "../oidc-groups";
-import { toOAuthProviderView, type OAuthProviderView } from "../oauth-provider-view";
-import { domainError } from "../domain-error";
+import { encryptSecret, decryptSecret } from "../secrets";
+import type { AppRole } from "../auth/oidc/groups";
+import { isAppRole } from "../auth/oidc/groups";
+import { toOAuthProviderView, type OAuthProviderView } from "../auth/oidc/provider-view";
+import { domainError } from "../errors/domain-error";
 import { LDAP_PROVIDER_TYPE } from "../ldap/defaults";
 
 /** LDAP directories share the table (models/ldap-directories.ts); no reader here may see one. */

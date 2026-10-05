@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import { listProxyHosts, createProxyHost } from "@/src/lib/models/proxy-hosts";
 
 export async function GET(request: NextRequest) {

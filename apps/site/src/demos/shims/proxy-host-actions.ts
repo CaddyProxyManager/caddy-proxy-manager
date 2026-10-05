@@ -2,7 +2,7 @@
  * Stands in for `app/(dashboard)/proxy-hosts/actions` in the demos (aliased in astro.config.mjs):
  * HostDialogs imports it, and a demo that ever submits fails as a save with no controller would.
  */
-import type { ActionState } from "@cpm/controller/src/lib/actions";
+import type { ActionState } from "@cpm/controller/src/lib/errors/action-error";
 
 const refused: ActionState = {
   status: "error",

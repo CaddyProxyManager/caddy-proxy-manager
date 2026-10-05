@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { parseTimeZone, resolveTimeZone } from '@/src/lib/time-zone';
+import { parseTimeZone, resolveTimeZone } from '@/src/lib/locale/time-zone';
 
 describe('time zone cookie', () => {
   it('accepts an IANA zone the runtime knows', () => {

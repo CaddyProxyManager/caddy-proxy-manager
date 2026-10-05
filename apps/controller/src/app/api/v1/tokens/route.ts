@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
-import { domainErrorMessage } from "@/src/lib/domain-error";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { domainErrorMessage } from "@/src/lib/errors/domain-error";
 import { createApiToken, listApiTokens, listAllApiTokens } from "@/src/lib/models/api-tokens";
 
 export async function GET(request: NextRequest) {

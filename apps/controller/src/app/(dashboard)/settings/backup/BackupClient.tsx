@@ -84,7 +84,9 @@ function DownloadCard() {
   return (
     <Card padding={6}>
       <VStack gap={3}>
-        <Heading level={3}>{t("downloadTitle")}</Heading>
+        <Heading level={3} accessibilityLevel={2}>
+          {t("downloadTitle")}
+        </Heading>
         <Text type="body" size="sm" color="secondary">
           {t("downloadHelp")}
         </Text>
@@ -192,7 +194,9 @@ function RestoreCard() {
   return (
     <Card padding={6}>
       <VStack gap={3}>
-        <Heading level={3}>{t("restoreTitle")}</Heading>
+        <Heading level={3} accessibilityLevel={2}>
+          {t("restoreTitle")}
+        </Heading>
         <Text type="body" size="sm" color="secondary">
           {t("restoreHelp")}
         </Text>

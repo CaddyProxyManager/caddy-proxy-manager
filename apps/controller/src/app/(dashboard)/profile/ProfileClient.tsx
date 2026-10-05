@@ -26,9 +26,9 @@ import {
   AUTOFILL_NEW_PASSWORD,
 } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
-import type { ResolvedAvatar } from "@/src/lib/avatar";
-import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
-import { authClient } from "@/src/lib/auth-client";
+import type { ResolvedAvatar } from "@/src/lib/users/avatar";
+import { MAX_AVATAR_FILE_KB } from "@/src/lib/users/avatar-limits";
+import { authClient } from "@/src/lib/auth/client";
 import {
   Bell,
   Key,
@@ -50,14 +50,14 @@ import { TwoFactorSection } from "./TwoFactorSection";
 import { PasskeySection } from "./PasskeySection";
 import { type DeviceWords, describeDevice } from "./device";
 import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
-import type { PasskeySummary } from "@/src/lib/passkeys";
+import type { PasskeySummary } from "@/src/lib/auth/passkeys";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
 import { saveTableDensityAction } from "./display-actions";
 import { useSetTableDensity, useTableDensity } from "@/components/ui/TableDensity";
-import { isTableDensity, TABLE_DENSITIES } from "@/src/lib/table-density";
-import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { isTableDensity, TABLE_DENSITIES } from "@/src/lib/users/table-density";
+import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";

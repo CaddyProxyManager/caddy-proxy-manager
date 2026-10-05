@@ -3,10 +3,10 @@
 import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { checkSameOrigin } from "@/src/lib/auth";
-import { getClientIp } from "@/src/lib/client-ip";
-import { DomainError } from "@/src/lib/domain-error";
-import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
-import { takeFromWindow } from "@/src/lib/rate-limit";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { DomainError } from "@/src/lib/errors/domain-error";
+import { passwordPolicyMessage } from "@/src/lib/auth/password/policy-message";
+import { takeFromWindow } from "@/src/lib/auth/rate-limit";
 import { completeEmailedLink } from "@/src/lib/services/emailed-links";
 
 export const dynamic = "force-dynamic";

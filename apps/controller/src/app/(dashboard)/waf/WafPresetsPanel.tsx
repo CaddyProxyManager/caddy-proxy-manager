@@ -21,7 +21,7 @@ import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Timestamp } from "@/components/ui/Timestamp";
-import { INITIAL_ACTION_STATE } from "@/lib/actions";
+import { INITIAL_ACTION_STATE } from "@/lib/errors/action-error";
 import { deleteWafPresetAction, saveWafPresetAction } from "./actions";
 
 export type WafPresetRow = {

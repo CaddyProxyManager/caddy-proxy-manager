@@ -6,8 +6,8 @@
 import type { NextRequest } from "next/server";
 import { getLocale } from "next-intl/server";
 import { checkSameOrigin } from "@/src/lib/auth";
-import { getClientIp } from "@/src/lib/client-ip";
-import { takeFromWindow } from "@/src/lib/rate-limit";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { takeFromWindow } from "@/src/lib/auth/rate-limit";
 import { requestPasswordReset } from "@/src/lib/services/emailed-links";
 
 export const dynamic = "force-dynamic";

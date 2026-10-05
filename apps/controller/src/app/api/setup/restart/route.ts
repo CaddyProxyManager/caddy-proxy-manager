@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { broadcastRestart } from "@/src/lib/agent/registry";
-import { scheduleProcessRestart } from "@/src/lib/process-restart";
+import { scheduleProcessRestart } from "@/src/lib/runtime/process-restart";
 import {
   claimRestartSlot,
   consumeRestartToken,

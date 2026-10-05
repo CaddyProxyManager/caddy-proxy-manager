@@ -8,7 +8,7 @@ import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
+import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 

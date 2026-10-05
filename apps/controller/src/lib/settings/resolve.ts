@@ -6,7 +6,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { settings } from "../db/schema";
-import { decryptSecret, encryptSecret } from "../secret";
+import { decryptSecret, encryptSecret } from "../secrets";
 import {
   SETTINGS_BY_KEY,
   SETTING_DEFINITIONS,

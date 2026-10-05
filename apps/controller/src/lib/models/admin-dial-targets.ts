@@ -4,8 +4,8 @@
  */
 
 import db from "../db";
-import { parseUpstreamTarget } from "../caddy-utils";
-import { domainError } from "../domain-error";
+import { parseUpstreamTarget } from "../caddy/utils";
+import { domainError } from "../errors/domain-error";
 
 const CADDY_ADMIN_PORT = 2019;
 

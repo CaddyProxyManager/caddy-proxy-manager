@@ -13,7 +13,7 @@ import {
   mapGroupsToRole,
   needsGroupClaims,
   toGroupMappingConfig,
-} from "../oidc-groups";
+} from "../auth/oidc/groups";
 import { applyOidcSync } from "../services/oidc-group-sync";
 import {
   type LdapDirectory,

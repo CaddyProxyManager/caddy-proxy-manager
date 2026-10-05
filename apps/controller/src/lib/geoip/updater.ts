@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:f
 import { basename, dirname } from "node:path";
 import { GEOIP_EDITIONS, type GeoipEdition } from "@cpm/shared";
 import { geoipDatabasePath, geoipEnabled } from "../agent/geoip";
-import { type StoredErrorCode, domainError, storedErrorCode } from "../domain-error";
+import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import { checkGeoipUpdates, geoipCredentials } from "./update-check";

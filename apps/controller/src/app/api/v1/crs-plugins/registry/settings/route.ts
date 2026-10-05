@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   type CrsRegistrySettingsInput,
   getCrsRegistrySettings,
   saveCrsRegistrySettings,
-} from "@/src/lib/crs-plugins/settings";
-import { runCrsRegistrySync } from "@/src/lib/crs-plugins/sync";
+} from "@/src/lib/waf/crs-plugins/settings";
+import { runCrsRegistrySync } from "@/src/lib/waf/crs-plugins/sync";
 import { installedCrsPluginRepositories } from "@/src/lib/models/crs-plugins";
 
 export async function GET(request: NextRequest) {

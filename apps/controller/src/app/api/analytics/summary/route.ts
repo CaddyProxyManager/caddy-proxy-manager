@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getAnalyticsSummary, resolveAnalyticsRange } from "@/src/lib/analytics-db";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { getAnalyticsSummary, resolveAnalyticsRange } from "@/src/lib/analytics/db";
 
 export async function GET(req: NextRequest) {
   try {

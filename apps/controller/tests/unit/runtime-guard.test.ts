@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { assertBunRuntime } from '@/src/lib/runtime-guard';
+import { assertBunRuntime } from '@/src/lib/runtime/runtime-guard';
 
 /** Stands in for process.exit, which the real signature declares as `never`. */
 const exitSpy = () => {

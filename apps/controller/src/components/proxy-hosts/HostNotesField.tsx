@@ -5,7 +5,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { StickyNote } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { HOST_DESCRIPTION_MAX_LENGTH } from "@/src/lib/host-description-limit";
+import { HOST_DESCRIPTION_MAX_LENGTH } from "@/src/lib/proxy-hosts/description-limit";
 
 /** Shared by the HTTP and L4 editors. */
 export function HostNotesField({

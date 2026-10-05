@@ -60,7 +60,7 @@ export function sectionForStorageKey(key: string): { id: string; label: string }
 // ─── Messages ────────────────────────────────────────────────────────────────
 
 // The catalog key is composed at runtime, so tsc cannot check it -
-// `tests/unit/section-keys-messages.test.ts` asserts every section has an entry matching `label`.
+// `tests/unit/settings/section-keys-messages.test.ts` asserts every section has an entry matching `label`.
 
 type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
 

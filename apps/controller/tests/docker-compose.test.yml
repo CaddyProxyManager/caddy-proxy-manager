@@ -304,8 +304,8 @@ services:
       - "5556:5556"
     networks:
       - caddy-network
-  # The LDAP directory for tests/e2e/ldap.spec.ts, reached as openldap:389 by web. Plain LDAP:
-  # the image's bundled CA has expired, and TLS is covered by tests/integration/ldap-client.test.ts.
+  # The LDAP directory for tests/e2e/auth/ldap.spec.ts, reached as openldap:389 by web. Plain LDAP:
+  # the image's bundled CA has expired, and TLS is covered by tests/integration/ldap/ldap-client.test.ts.
   openldap:
     image: osixia/openldap:1.5.0
     # Copies the read-only mount below before bootstrap edits it.
