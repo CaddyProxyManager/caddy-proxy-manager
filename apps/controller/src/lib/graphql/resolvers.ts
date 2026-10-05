@@ -57,6 +57,7 @@ import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/us
 import { ApiAuthError, NotFoundError } from "../api/auth";
 import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
 import { assertNotSelf, assertUserRole } from "../users/admin";
+import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -273,6 +274,7 @@ export const resolvers = {
       await requireAdmin(context);
       return await getCaddyModuleAvailability();
     },
+    ...analyticsQueryResolvers,
   },
 
   Mutation: {
@@ -440,5 +442,7 @@ export const resolvers = {
       await applyCaddy();
       return true;
     },
+
+    ...analyticsMutationResolvers,
   },
 };

@@ -22,6 +22,10 @@ export interface ChartTheme {
     cyan: string;
     orange: string;
     green: string;
+    pink: string;
+    teal: string;
+    indigo: string;
+    brown: string;
   };
   /** Text drawn on top of a filled series colour (donut slice labels). */
   onSeries: string;
@@ -55,6 +59,10 @@ export function useChartTheme(): ChartTheme {
         cyan: token("--color-data-categorical-cyan"),
         orange: token("--color-data-categorical-orange"),
         green: token("--color-data-categorical-green"),
+        pink: token("--color-data-categorical-pink"),
+        teal: token("--color-data-categorical-teal"),
+        indigo: token("--color-data-categorical-indigo"),
+        brown: token("--color-data-categorical-brown"),
       },
       // Saturated mid-tones, so "on dark" stays legible on each in both modes.
       onSeries: token("--color-on-dark"),

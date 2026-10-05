@@ -141,7 +141,8 @@ type MetricDef = {
       >
     | null;
   format: "count" | "bytes";
-  color?: keyof ChartTheme["series"];
+  /** A series colour that is also a tile hue. */
+  color?: Extract<keyof ChartTheme["series"], Hue>;
 };
 
 const METRICS: MetricDef[] = [

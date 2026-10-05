@@ -42,6 +42,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "pending_oauth_links",
       "api_tokens",
       "push_subscriptions",
+      "analytics_views",
       "groups",
       "group_members",
       // With the group, not the hosts: without hosts the resource column is cleared (clearedColumns

@@ -9,6 +9,7 @@ import {
   type AgentAnalyticsResult,
   type TrafficEventRow,
   type WafEventRow,
+  isTrafficOutcome,
   redactWafEventRow,
 } from "@cpm/shared";
 import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
@@ -59,6 +60,13 @@ function isTimestamp(value: unknown): value is number {
   );
 }
 
+const MAX_UINT32 = 4_294_967_295;
+
+/** Absent from an older agent, which is fine; present and malformed, which is not. */
+function isOptionalWhole(value: unknown, max: number): value is number | null | undefined {
+  return value === undefined || value === null || isWhole(value, 0, max);
+}
+
 export function parseTrafficRow(value: unknown): TrafficEventRow | null {
   if (!isFields(value)) return null;
   const row = value;
@@ -73,7 +81,10 @@ export function parseTrafficRow(value: unknown): TrafficEventRow | null {
     !isText(row.proto) ||
     !isWhole(row.bytes_sent, 0, Number.MAX_SAFE_INTEGER) ||
     !isText(row.user_agent) ||
-    typeof row.is_blocked !== "boolean"
+    typeof row.is_blocked !== "boolean" ||
+    !isOptionalWhole(row.duration_ms, MAX_UINT32) ||
+    !isOptionalWhole(row.asn, MAX_UINT32) ||
+    !(row.asn_org === undefined || isOptionalText(row.asn_org, 1024))
   ) {
     return null;
   }
@@ -90,6 +101,11 @@ export function parseTrafficRow(value: unknown): TrafficEventRow | null {
     bytes_sent: row.bytes_sent,
     user_agent: row.user_agent,
     is_blocked: row.is_blocked,
+    duration_ms: row.duration_ms ?? null,
+    // A newer agent's outcome this controller has no name for counts as served, not as refused.
+    outcome: isTrafficOutcome(row.outcome) ? row.outcome : row.is_blocked ? "geo" : "served",
+    asn: row.asn ?? null,
+    asn_org: row.asn_org ?? null,
   };
 }
 

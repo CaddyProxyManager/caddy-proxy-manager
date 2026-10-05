@@ -87,6 +87,26 @@ const WAF_RULES = [
 
 const ATTACKER_COUNTRIES = ["CN", "RU", "US", "NL", "VN", "BR"] as const;
 
+/** Documentation-range AS numbers, with invented names. */
+const NETWORKS = [
+  [64500, "Example Broadband"],
+  [64501, "Example Mobile"],
+  [64502, "Example Fibre"],
+  [64503, "Example University"],
+] as const;
+const HOSTING_NETWORKS = [
+  [64510, "Example Cloud"],
+  [64511, "Example Hosting"],
+] as const;
+
+/** Most requests are quick; a few wait on a slow upstream. */
+function duration(): number {
+  const r = Math.random();
+  if (r > 0.97) return Math.floor(800 + Math.random() * 4000);
+  if (r > 0.8) return Math.floor(120 + Math.random() * 600);
+  return Math.floor(4 + Math.random() * 90);
+}
+
 function pick<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)] as T;
 }
@@ -157,6 +177,10 @@ export function generateTraffic(
       const host = weighted(hostEntries);
       const code = status();
       const media = Math.random() < 0.15;
+      const [asn, asnOrg] = pick(NETWORKS);
+      // A sliver of ordinary traffic still meets a gate: a forgotten password, a burst of retries.
+      const gate = Math.random();
+      const outcome = gate > 0.996 ? "rate_limit" : gate > 0.99 ? "auth" : "served";
       traffic.push({
         ts,
         client_ip: visitorIp(),
@@ -164,13 +188,17 @@ export function generateTraffic(
         host,
         method: Math.random() > 0.86 ? "POST" : "GET",
         uri: pick(PATHS),
-        status: code,
+        status: outcome === "rate_limit" ? 429 : outcome === "auth" ? 401 : code,
         proto: Math.random() > 0.25 ? "HTTP/2.0" : Math.random() > 0.3 ? "HTTP/1.1" : "HTTP/3.0",
         bytes_sent: media
           ? Math.floor(Math.random() * 40_000_000) + 1_000_000
           : Math.floor(Math.random() * 180_000) + 400,
         user_agent: pick(AGENTS),
         is_blocked: false,
+        duration_ms: duration(),
+        outcome,
+        asn,
+        asn_org: asnOrg,
       });
     }
 
@@ -185,6 +213,7 @@ export function generateTraffic(
       const uri = pick(PROBE_PATHS);
       const [ruleId, message, severity] = pick(WAF_RULES);
       const blocked = Math.random() < 0.85;
+      const [asn, asnOrg] = pick(HOSTING_NETWORKS);
       waf.push({
         ts,
         host,
@@ -210,6 +239,10 @@ export function generateTraffic(
         bytes_sent: 0,
         user_agent: "Mozilla/5.0 zgrab/0.x",
         is_blocked: blocked,
+        duration_ms: Math.floor(1 + Math.random() * 6),
+        outcome: blocked ? "waf" : "served",
+        asn,
+        asn_org: asnOrg,
       });
     }
   }

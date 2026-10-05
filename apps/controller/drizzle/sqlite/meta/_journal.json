@@ -127,6 +127,13 @@
       "when": 1791184741815,
       "tag": "0017_host_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791186877714,
+      "tag": "0018_analytics_views",
+      "breakpoints": true
     }
   ]
 }

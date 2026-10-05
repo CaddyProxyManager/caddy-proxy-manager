@@ -82,18 +82,30 @@ test.describe('Analytics - traffic ingestion', () => {
 
       const rows = await (
         await ch.query({
-          query: `SELECT host, method, uri, status, client_ip FROM traffic_events
+          query: `SELECT host, method, uri, status, client_ip, outcome, duration_ms
+                  FROM traffic_events
                   WHERE user_agent = {agent:String} ORDER BY uri`,
           query_params: { agent },
           format: 'JSONEachRow',
         })
-      ).json<{ host: string; method: string; uri: string; status: number; client_ip: string }>();
+      ).json<{
+        host: string;
+        method: string;
+        uri: string;
+        status: number;
+        client_ip: string;
+        outcome: string;
+        duration_ms: number | null;
+      }>();
       expect(rows).toHaveLength(REQUESTS);
       for (const row of rows) {
         expect(row.host).toBe(DOMAIN);
         expect(row.method).toBe('GET');
         expect(row.status).toBe(200);
         expect(row.client_ip).not.toBe('');
+        // No gate on this host, so nothing marks it and the agent reads it as served.
+        expect(row.outcome).toBe('served');
+        expect(row.duration_ms).not.toBeNull();
       }
       expect(rows.map((r) => r.uri)).toContain('/ingest/0?q=1');
 

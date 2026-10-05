@@ -20,13 +20,9 @@ test.describe('Analytics', () => {
     // These card headers are rendered by AnalyticsClient. Scoped to the stat row: the same words
     // label the map's metric switch and the country table's columns.
     const stats = page.getByTestId('analytics-stats');
-    await expect(stats.getByText('Total Requests', { exact: true })).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(stats.getByText('Unique IPs', { exact: true })).toBeVisible({ timeout: 10000 });
-    await expect(stats.getByText('Blocked Requests', { exact: true })).toBeVisible({
-      timeout: 10000,
-    });
+    for (const label of ['Requests', 'Bandwidth', 'Unique IPs', 'Mitigated', '5xx rate']) {
+      await expect(stats.getByText(label, { exact: true })).toBeVisible({ timeout: 10000 });
+    }
   });
 
   test('analytics page shows the disabled banner only while analytics is off', async ({ page }) => {
@@ -43,8 +39,9 @@ test.describe('Analytics', () => {
 
   test('analytics page has time range toggle buttons', async ({ page }) => {
     await page.goto('/analytics');
-    await expect(page.getByRole('radio', { name: '24h' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: '7d' })).toBeVisible();
+    for (const range of ['1h', '24h', '7d', '30d', 'Custom']) {
+      await expect(page.getByRole('radio', { name: range })).toBeVisible();
+    }
   });
 
   test('analytics page does not show error content', async ({ page }) => {

@@ -3,8 +3,15 @@
  * host; the offset lives in the agent's SQLite and the rows are relayed to the controller.
  */
 import { existsSync, statSync } from "node:fs";
-import maxmind, { type CountryResponse } from "maxmind";
-import { type TrafficEventRow, UPSTREAM_ERROR_STATUSES, type UpstreamErrorRow } from "@cpm/shared";
+import maxmind, { type AsnResponse, type CountryResponse } from "maxmind";
+import {
+  ACCESS_LOG_OUTCOME_FIELD,
+  type TrafficEventRow,
+  type TrafficOutcome,
+  UPSTREAM_ERROR_STATUSES,
+  type UpstreamErrorRow,
+  isTrafficOutcome,
+} from "@cpm/shared";
 import type { AgentStore } from "../db";
 import {
   analyticsEnabled,
@@ -13,7 +20,7 @@ import {
   upstreamErrorsEnabled,
 } from "./relay";
 import { readLines as readLinesFrom } from "./log-read";
-import { accessLogPath, geoipCountryDb } from "./paths";
+import { accessLogPath, geoipAsnDb, geoipCountryDb } from "./paths";
 
 const LOG_FILE = accessLogPath();
 const BATCH_SIZE = 500;
@@ -31,6 +38,9 @@ export function accessLogPresent(): boolean {
 
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
 const geoCache = new Map<string, string | null>();
+let asnReader: Awaited<ReturnType<typeof maxmind.open<AsnResponse>>> | null = null;
+type Asn = { number: number; org: string } | null;
+const asnCache = new Map<string, Asn>();
 
 let stopped = false;
 
@@ -60,6 +70,17 @@ async function initGeoIP(): Promise<void> {
   }
 }
 
+/** Optional on top: without it rows carry no ASN, and nothing else changes. */
+async function initAsn(): Promise<void> {
+  const asnDatabase = geoipAsnDb();
+  if (!existsSync(asnDatabase)) return;
+  try {
+    asnReader = await maxmind.open<AsnResponse>(asnDatabase);
+  } catch (err) {
+    console.warn("[log-parser] Failed to load the GeoIP ASN database:", err);
+  }
+}
+
 function lookupCountry(ip: string): string | null {
   if (!geoReader) return null;
   if (geoCache.has(ip)) return geoCache.get(ip)!;
@@ -75,6 +96,24 @@ function lookupCountry(ip: string): string | null {
   }
 }
 
+function lookupAsn(ip: string): Asn {
+  if (!asnReader) return null;
+  if (asnCache.has(ip)) return asnCache.get(ip)!;
+  if (asnCache.size > 10_000) asnCache.clear();
+  let asn: Asn = null;
+  try {
+    const result = asnReader.get(ip);
+    const number = result?.autonomous_system_number;
+    if (typeof number === "number" && Number.isInteger(number) && number > 0) {
+      asn = { number, org: result?.autonomous_system_organization ?? "" };
+    }
+  } catch {
+    asn = null;
+  }
+  asnCache.set(ip, asn);
+  return asn;
+}
+
 // ── log parsing ──────────────────────────────────────────────────────────────
 
 interface CaddyLogEntry {
@@ -88,6 +127,8 @@ interface CaddyLogEntry {
   // fields on "handled request" entries
   status?: number;
   size?: number;
+  /** Seconds, fractional. */
+  duration?: number;
   request?: {
     client_ip?: string;
     remote_ip?: string;
@@ -158,8 +199,23 @@ export function pruneBlockedSignatures(
   return blocked;
 }
 
+/** Whole milliseconds, capped where the controller's column ends. */
+export function durationMs(seconds: unknown): number | null {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) return null;
+  return Math.min(Math.round(seconds * 1000), 4_294_967_295);
+}
+
+/**
+ * The config marks the gate a request is at before each one and `served` past it. No marker is a
+ * route with no gate, or a config from before the markers; the blocker's own log line still counts.
+ */
+export function requestOutcome(marker: unknown, isBlocked: boolean): TrafficOutcome {
+  if (isTrafficOutcome(marker)) return marker;
+  return isBlocked ? "geo" : "served";
+}
+
 export function parseLine(line: string, blocked: BlockedSignatures): TrafficEventRow | null {
-  let entry: CaddyLogEntry;
+  let entry: CaddyLogEntry & Record<string, unknown>;
   try {
     entry = JSON.parse(line);
   } catch {
@@ -176,6 +232,8 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
   const status = entry.status ?? 0;
 
   const key = `${ts}|${clientIp}|${method}|${uri}`;
+  const isBlocked = consumeBlockedSignature(blocked, key);
+  const asn = clientIp ? lookupAsn(clientIp) : null;
 
   return {
     ts,
@@ -188,7 +246,11 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
     proto: req.proto ?? "",
     bytes_sent: entry.size ?? 0,
     user_agent: req.headers?.["User-Agent"]?.[0] ?? "",
-    is_blocked: consumeBlockedSignature(blocked, key),
+    is_blocked: isBlocked,
+    duration_ms: durationMs(entry.duration),
+    outcome: requestOutcome(entry[ACCESS_LOG_OUTCOME_FIELD], isBlocked),
+    asn: asn?.number ?? null,
+    asn_org: asn?.org ?? null,
   };
 }
 
@@ -225,6 +287,7 @@ async function insertBatch(rows: TrafficEventRow[]): Promise<void> {
 export async function initLogParser(): Promise<void> {
   stopped = false;
   await initGeoIP();
+  await initAsn();
   console.log("[log-parser] initialized");
 }
 

@@ -4,6 +4,7 @@
  */
 import { isIP } from "node:net";
 import { domainError } from "../errors/domain-error";
+import { tagOutcome } from "../caddy/outcome-markers";
 
 export const IP_RULE_ACTIONS = ["allow", "deny"] as const;
 export type IpRuleAction = (typeof IP_RULE_ACTIONS)[number];
@@ -214,7 +215,7 @@ function ipSubroute(list: AccessListRuntime, onDeny: Record<string, unknown>[]) 
     match: [set],
     handle: onDeny,
   }));
-  return { handler: "subroute", routes };
+  return tagOutcome({ handler: "subroute", routes }, "access");
 }
 
 /** The handlers a host (or one of its location rules) puts in its chain for this list. */
@@ -223,7 +224,7 @@ export function buildAccessListHandlers(list: AccessListRuntime): Record<string,
   const hasIpRules = list.ipRules.length > 0;
 
   // Fail closed: a list with nothing in it admits nobody.
-  if (!hasAccounts && !hasIpRules) return [DENY];
+  if (!hasAccounts && !hasIpRules) return [tagOutcome({ ...DENY }, "access")];
 
   const handlers: Record<string, unknown>[] = [];
   if (hasIpRules && hasAccounts && list.satisfy === "any") {

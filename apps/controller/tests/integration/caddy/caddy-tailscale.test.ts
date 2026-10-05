@@ -28,6 +28,7 @@ import {
 } from '../../../src/lib/settings';
 import { createProxyHost } from '../../../src/lib/models/proxy-hosts';
 import { startFakeAgent } from '../../helpers/fake-agent';
+import { withoutMarkers } from '../../helpers/host-chains';
 import * as schema from '../../../src/lib/db/schema';
 
 type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
@@ -316,7 +317,10 @@ describe('identity authentication', () => {
     );
     expect(proxying.length).toBeGreaterThan(1);
     for (const route of proxying) {
-      const first = route.handle[0] as { handler: string; request?: { delete?: string[] } };
+      const first = withoutMarkers(route.handle)[0] as {
+        handler: string;
+        request?: { delete?: string[] };
+      };
       expect(first.handler).toBe('headers');
       expect(first.request?.delete).toContain('X-Tailscale-User');
     }

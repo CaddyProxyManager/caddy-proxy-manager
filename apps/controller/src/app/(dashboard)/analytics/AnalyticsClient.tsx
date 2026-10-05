@@ -1,26 +1,23 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import dayjs, { type Dayjs } from "dayjs";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dayjs from "dayjs";
 import { toast } from "sonner";
-import type { ApexOptions } from "apexcharts";
 
-import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { DateTimeInput, type ISODateTimeString } from "@astryxdesign/core/DateTimeInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Link as AstryxLink } from "@astryxdesign/core/Link";
-import { MultiSelector } from "@astryxdesign/core/MultiSelector";
-import { Pagination } from "@astryxdesign/core/Pagination";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Spinner } from "@astryxdesign/core/Spinner";
+import { Switch } from "@astryxdesign/core/Switch";
 import {
   Table,
   pixel,
@@ -29,30 +26,60 @@ import {
   type TableColumn,
 } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
-import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { List, ListItem } from "@astryxdesign/core/List";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Download, ListFilter, ListX } from "lucide-react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Timestamp } from "@/components/ui/Timestamp";
+import { AppDialog } from "@/components/ui/AppDialog";
+import { useTableDensity } from "@/components/ui/TableDensity";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
-import { toSafeChartLabel } from "@/src/lib/analytics/chart-labels";
+import { regionName } from "@/src/lib/locale/region-names";
+import {
+  ANALYTICS_RANGES,
+  AUTO_REFRESH_MS,
+  type AnalyticsFilter,
+  type AnalyticsRange,
+  type ExploreState,
+  type FilterOp,
+  MAX_CUSTOM_RANGE_SECONDS,
+  type TopDimension,
+  TOP_DIMENSION_FIELD,
+  TOP_DIMENSIONS,
+  autoRefreshes,
+  parseExploreState,
+  serializeExploreState,
+  withFilter,
+} from "@/src/lib/analytics/explore-state";
+import type { AnalyticsReport } from "@/src/lib/analytics/explore";
+import type { TopRow } from "@/src/lib/clickhouse/explore";
 
-import { useChartTheme } from "./chart-theme";
 import { settingsHref } from "../settings/sections";
-import { useFormatter, useTranslations } from "next-intl";
-import { useEmptyValue } from "@/components/ui/empty-value";
-import { ACCENTS, type Hue } from "@/components/ui/accent";
-import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { CountryBreakdown } from "./CountryBreakdown";
 import type { MapMetric } from "./WorldMapInner";
-import { useTableDensity } from "@/components/ui/TableDensity";
+import { FilterBar } from "./explore/FilterBar";
+import { type ApexChartComponent, KpiTiles } from "./explore/KpiTiles";
+import { RequestLog } from "./explore/RequestLog";
+import { SavedViews } from "./explore/SavedViews";
+import {
+  TopListCard,
+  TopListTable,
+  topListCsv,
+  topRowLabel,
+  useTopRowLabel,
+} from "./explore/TopList";
+import { TrafficChart } from "./explore/TrafficChart";
+import { countryFlag, TOP_TITLE_KEY } from "./explore/format";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
 // ApexCharts v7 server-renders only via an async Server Component this client file cannot reach,
 // and every dataset arrives in an effect anyway.
-const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
+const ReactApexChart = dynamic(() => import("react-apexcharts"), {
+  ssr: false,
+}) as unknown as ApexChartComponent;
 
 /** `loading` is called at module scope, where no hook can run. */
 function MapLoading() {
@@ -74,283 +101,6 @@ const WorldMap = dynamic(() => import("./WorldMapInner"), {
   onSelectCountry?: (alpha2: string | null) => void;
 }>;
 
-// ── Types (mirrored from analytics-db - can't import server-only code) ────────
-
-type Interval = "1h" | "12h" | "24h" | "7d" | "30d";
-type DisplayInterval = Interval | "custom";
-
-const INTERVAL_SECONDS_CLIENT: Record<Interval, number> = {
-  "1h": 3600,
-  "12h": 43200,
-  "24h": 86400,
-  "7d": 7 * 86400,
-  "30d": 30 * 86400,
-};
-
-interface AnalyticsSummary {
-  totalRequests: number;
-  uniqueIps: number;
-  blockedRequests: number;
-  blockedPercent: number;
-  bytesServed: number;
-  loggingDisabled: boolean;
-  analyticsDisabled: boolean;
-}
-
-interface TimelineBucket {
-  ts: number;
-  total: number;
-  blocked: number;
-}
-interface CountryStats {
-  countryCode: string;
-  total: number;
-  blocked: number;
-  uniqueIps: number;
-}
-interface ProtoStats {
-  proto: string;
-  count: number;
-  percent: number;
-}
-interface UAStats {
-  userAgent: string;
-  count: number;
-  percent: number;
-}
-
-interface AnalyticsHost {
-  host: string;
-  configured: boolean;
-}
-
-interface BlockedEvent {
-  id: number;
-  ts: number;
-  clientIp: string;
-  countryCode: string | null;
-  method: string;
-  uri: string;
-  status: number;
-  host: string;
-}
-interface BlockedPage {
-  events: BlockedEvent[];
-  total: number;
-  page: number;
-  pages: number;
-}
-
-/** Astryx's Table requires an index signature on rows. */
-type CountryRow = {
-  countryCode: string;
-  total: number;
-  blocked: number;
-  uniqueIps: number;
-  waf: number;
-  [k: string]: unknown;
-};
-type ProtoRow = ProtoStats & { [k: string]: unknown };
-type BlockedRow = BlockedEvent & { [k: string]: unknown };
-
-interface TopWafRule {
-  ruleId: number;
-  count: number;
-  message: string | null;
-  hosts: { host: string; count: number }[];
-}
-type WafRuleRow = TopWafRule & { [k: string]: unknown };
-interface WafStats {
-  total: number;
-  topRules: TopWafRule[];
-  byCountry: { countryCode: string; count: number }[];
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function countryFlag(code: string): string {
-  if (code?.length !== 2) return "🌐";
-  return String.fromCodePoint(
-    ...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
-  );
-}
-
-/** `unknown` is passed in because it comes from the catalog. */
-function parseUA(ua: string, unknown: string): string {
-  if (!ua) return unknown;
-  if (/Googlebot/i.test(ua)) return "Googlebot";
-  if (/bingbot/i.test(ua)) return "Bingbot";
-  if (/DuckDuckBot/i.test(ua)) return "DuckDuckBot";
-  if (/curl/i.test(ua)) return "curl";
-  if (/python-requests|Python\//i.test(ua)) return "Python";
-  if (/Go-http-client/i.test(ua)) return "Go";
-  if (/wget/i.test(ua)) return "wget";
-  if (/Edg\//i.test(ua)) return "Edge";
-  if (/OPR\//i.test(ua)) return "Opera";
-  if (/SamsungBrowser/i.test(ua)) return "Samsung Browser";
-  if (/Chrome\//i.test(ua)) return "Chrome";
-  if (/Firefox\//i.test(ua)) return "Firefox";
-  if (/Safari\//i.test(ua)) return "Safari";
-  return ua.substring(0, 32);
-}
-
-/** Through next-intl, not `toFixed`, which writes English's decimal separator in every locale. */
-function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): string {
-  const fixed = (value: number, digits: number) =>
-    format.number(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  if (bytes < 1024) return `${format.number(bytes)} B`;
-  if (bytes < 1024 * 1024) return `${fixed(bytes / 1024, 1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${fixed(bytes / 1024 / 1024, 1)} MB`;
-  return `${fixed(bytes / 1024 / 1024 / 1024, 2)} GB`;
-}
-
-function formatTs(
-  format: ReturnType<typeof useFormatter>,
-  ts: number,
-  rangeSeconds: number,
-): string {
-  const d = new Date(ts * 1000);
-  if (rangeSeconds <= 86400) return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });
-  if (rangeSeconds <= 7 * 86400) {
-    return format.dateTime(d, { weekday: "short", hour: "2-digit", minute: "2-digit" });
-  }
-  return format.dateTime(d, { month: "short", day: "numeric" });
-}
-
-// ── Local DateTimePicker ───────────────────────────────────────────────────────
-
-function DateTimePicker({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: Dayjs | null;
-  onChange: (v: Dayjs | null) => void;
-  placeholder?: string;
-}) {
-  const t = useTranslations("analytics");
-  return (
-    <DateTimeInput
-      label={placeholder ?? t("pickDateTime")}
-      isLabelHidden
-      value={
-        (value ? value.format("YYYY-MM-DDTHH:mm") : undefined) as ISODateTimeString | undefined
-      }
-      onChange={(next) => onChange(next ? dayjs(next) : null)}
-      size="sm"
-      width={200}
-    />
-  );
-}
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
-type StatTone = "error" | "warning";
-
-const STAT_TONE_VAR: Record<StatTone, string> = {
-  error: "var(--color-error)",
-  warning: "var(--color-warning)",
-};
-
-function StatCard({
-  label,
-  value,
-  sub,
-  tone,
-  hue,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  /** Overrides the hue for the number, when the number itself is the warning. */
-  tone?: StatTone;
-  hue: Hue;
-}) {
-  return (
-    <Card padding={5} height="100%" className={ACCENTS[hue].edge}>
-      <VStack gap={1}>
-        <Text type="body" style={CARD_TITLE_STYLE}>
-          {label}
-        </Text>
-        <Text type="display-3" hasTabularNumbers className={tone ? undefined : ACCENTS[hue].text}>
-          <span style={tone ? { color: STAT_TONE_VAR[tone] } : undefined}>{value}</span>
-        </Text>
-        {sub && (
-          <Text type="body" size="sm" color="secondary">
-            {sub}
-          </Text>
-        )}
-      </VStack>
-    </Card>
-  );
-}
-
-// ── Hosts multi-select combobox ───────────────────────────────────────────────
-
-const INCLUDE_UNCONFIGURED_KEY = "analytics:includeUnconfiguredHosts";
-
-function HostsCombobox({
-  allHosts,
-  selectedHosts,
-  onChange,
-}: {
-  allHosts: AnalyticsHost[];
-  selectedHosts: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const t = useTranslations("analytics");
-  const [includeUnconfigured, setIncludeUnconfigured] = useState(false);
-
-  useEffect(() => {
-    try {
-      setIncludeUnconfigured(localStorage.getItem(INCLUDE_UNCONFIGURED_KEY) === "1");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  function setFilter(v: boolean) {
-    setIncludeUnconfigured(v);
-    try {
-      localStorage.setItem(INCLUDE_UNCONFIGURED_KEY, v ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const hasUnconfigured = allHosts.some((h) => !h.configured);
-  const visibleHosts = (includeUnconfigured ? allHosts : allHosts.filter((h) => h.configured)).map(
-    (h) => h.host,
-  );
-
-  return (
-    <VStack gap={2}>
-      <MultiSelector
-        label={t("hosts")}
-        isLabelHidden
-        options={visibleHosts.map((h) => ({ value: h, label: h }))}
-        value={selectedHosts}
-        onChange={onChange}
-        hasSearch
-        searchPlaceholder={t("searchHostsPlaceholder")}
-        hasSelectAll
-        triggerDisplay="badges"
-        maxBadges={2}
-        placeholder={t("allHosts")}
-        width={240}
-      />
-      {hasUnconfigured && (
-        <CheckboxInput
-          label={t("includeUnconfiguredHostsLabel")}
-          description={t("unconfiguredHostsHelp")}
-          value={includeUnconfigured}
-          onChange={setFilter}
-        />
-      )}
-    </VStack>
-  );
-}
-
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 /** Carries the parts so the page can word it from the catalog. */
@@ -365,9 +115,9 @@ class UnexplainedStatusError extends Error {
   }
 }
 
-/** An unchecked `{ error }` body lands in array state, and the first `.map()` blanks the page. */
-async function fetchJson(url: string): Promise<unknown> {
-  const response = await fetch(url);
+/** An unchecked `{ error }` body lands in state, and the first `.map()` blanks the page. */
+async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
+  const response = await fetch(url, { signal });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const reported =
@@ -377,263 +127,344 @@ async function fetchJson(url: string): Promise<unknown> {
     // ClickHouse errors often carry an empty message, which would leave the banner invisible.
     throw reported
       ? new Error(reported)
-      : new UnexplainedStatusError(url.split("?")[0], response.status);
+      : new UnexplainedStatusError(url.split("?")[0] ?? url, response.status);
   }
   return body;
 }
 
 /** Renders empty rather than throwing on an odd 200. */
-function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
+function asReport(value: unknown): AnalyticsReport | null {
+  if (!value || typeof value !== "object") return null;
+  const report = value as Partial<AnalyticsReport>;
+  if (!report.totals || !Array.isArray(report.timeline) || !report.top || !report.window) {
+    return null;
+  }
+  return {
+    ...(report as AnalyticsReport),
+    groups: Array.isArray(report.groups) ? report.groups : [],
+    countries: Array.isArray(report.countries) ? report.countries : [],
+    requests: Array.isArray(report.requests) ? report.requests : [],
+  };
+}
+
+function asRows(value: unknown): TopRow[] {
+  return Array.isArray(value) ? (value as TopRow[]) : [];
+}
+
+// ── Custom range ──────────────────────────────────────────────────────────────
+
+function toInput(epoch: number | null): ISODateTimeString | undefined {
+  return epoch === null
+    ? undefined
+    : (dayjs.unix(epoch).format("YYYY-MM-DDTHH:mm") as ISODateTimeString);
+}
+
+function CustomRange({
+  state,
+  onChange,
+}: {
+  state: ExploreState;
+  onChange: (from: number, to: number) => void;
+}) {
+  const t = useTranslations("analytics");
+  const [from, setFrom] = useState(state.from);
+  const [to, setTo] = useState(state.to);
+  const tooLong = from !== null && to !== null && to - from > MAX_CUSTOM_RANGE_SECONDS;
+  const backwards = from !== null && to !== null && from >= to;
+
+  const commit = (nextFrom: number | null, nextTo: number | null) => {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    if (nextFrom === null || nextTo === null || nextFrom >= nextTo) return;
+    if (nextTo - nextFrom > MAX_CUSTOM_RANGE_SECONDS) return;
+    onChange(nextFrom, nextTo);
+  };
+
+  return (
+    <VStack gap={1}>
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        <DateTimeInput
+          label={t("from")}
+          isLabelHidden
+          size="sm"
+          width={200}
+          value={toInput(from)}
+          onChange={(next) => commit(next ? dayjs(next).unix() : null, to)}
+        />
+        <Text type="body" size="xsm" color="secondary">
+          -
+        </Text>
+        <DateTimeInput
+          label={t("to")}
+          isLabelHidden
+          size="sm"
+          width={200}
+          value={toInput(to)}
+          onChange={(next) => commit(from, next ? dayjs(next).unix() : null)}
+        />
+      </HStack>
+      {(tooLong || backwards) && (
+        <Text type="body" size="xsm" color="secondary" role="alert">
+          {tooLong ? t("customRangeTooLong", { days: 92 }) : t("customRangeBackwards")}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+// ── View all ──────────────────────────────────────────────────────────────────
+
+function ViewAllDialog({
+  dimension,
+  query,
+  total,
+  onClose,
+  onFilter,
+}: {
+  dimension: TopDimension;
+  query: string;
+  total: number;
+  onClose: () => void;
+  onFilter: (dimension: TopDimension, value: string, op: FilterOp) => void;
+}) {
+  const t = useTranslations("analytics");
+  const label = useTopRowLabel(dimension);
+  const [rows, setRows] = useState<TopRow[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams(query);
+    params.set("dimension", dimension);
+    fetchJson(`/api/analytics/top?${params.toString()}`, controller.signal)
+      .then((body) => setRows(asRows(body)))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.warn("[analytics] could not load the full list:", error);
+        setFailed(true);
+      });
+    return () => controller.abort();
+  }, [dimension, query]);
+
+  const title = t(`top.${TOP_TITLE_KEY[dimension]}`);
+  return (
+    <AppDialog
+      open
+      onClose={onClose}
+      title={title}
+      maxWidth="lg"
+      actions={
+        <HStack gap={2}>
+          <Button
+            variant="secondary"
+            icon={<Download />}
+            label={t("csv.download")}
+            isDisabled={!rows || rows.length === 0}
+            onClick={() => rows && topListCsv(t, dimension, rows, label)}
+          />
+          <Button variant="primary" label={t("close")} onClick={onClose} />
+        </HStack>
+      }
+    >
+      {failed ? (
+        <Banner status="error" title={t("viewAllLoadError")} />
+      ) : rows === null ? (
+        <HStack justify="center" padding={6}>
+          <Spinner label={t("loadingAnalytics")} />
+        </HStack>
+      ) : rows.length === 0 ? (
+        <EmptyState title={t("noData")} isCompact />
+      ) : (
+        <TopListTable
+          dimension={dimension}
+          rows={rows}
+          total={total}
+          onFilter={(d, value, op) => {
+            onClose();
+            onFilter(d, value, op);
+          }}
+        />
+      )}
+    </AppDialog>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+type DisplayRange = AnalyticsRange | "custom";
+
+type CountryRow = TopRow & { [k: string]: unknown };
+
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
-  const density = useTableDensity();
   const format = useFormatter();
-  const emptyValue = useEmptyValue();
-  const [interval, setIntervalVal] = useState<DisplayInterval>("1h");
-  const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
-  const [allHosts, setAllHosts] = useState<AnalyticsHost[]>([]);
+  const locale = useLocale();
+  const density = useTableDensity();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
-  const [customFrom, setCustomFrom] = useState<Dayjs | null>(null);
-  const [customTo, setCustomTo] = useState<Dayjs | null>(null);
+  // The URL is the state: parsed, then re-serialised, so an odd link settles to one spelling.
+  const urlQuery = searchParams.toString();
+  const state = useMemo(() => parseExploreState(new URLSearchParams(urlQuery)), [urlQuery]);
+  const query = useMemo(() => serializeExploreState(state).toString(), [state]);
 
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [timeline, setTimeline] = useState<TimelineBucket[]>([]);
-  const [countries, setCountries] = useState<CountryStats[]>([]);
-  const [protocols, setProtocols] = useState<ProtoStats[]>([]);
-  const [userAgents, setUserAgents] = useState<UAStats[]>([]);
-  const [blocked, setBlocked] = useState<BlockedPage | null>(null);
-  const [wafStats, setWafStats] = useState<WafStats | null>(null);
+  const navigate = useCallback(
+    (next: ExploreState | string) => {
+      const nextQuery =
+        typeof next === "string"
+          ? serializeExploreState(parseExploreState(new URLSearchParams(next))).toString()
+          : serializeExploreState(next).toString();
+      // A filter or grouping changes the page in place; jumping to the top would lose the reader.
+      router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    },
+    [router, pathname],
+  );
+
+  const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [hosts, setHosts] = useState<string[]>([]);
+  const [viewAll, setViewAll] = useState<TopDimension | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [mapMetric, setMapMetric] = useState<MapMetric>("total");
-  const isNarrow = useMediaQuery("(max-width: 767px)");
-  const [intervalSheetOpen, setIntervalSheetOpen] = useState(false);
-  const [metricSheetOpen, setMetricSheetOpen] = useState(false);
-
-  const rangeSeconds = useMemo(() => {
-    if (interval === "custom" && customFrom && customTo) {
-      const diff = customTo.unix() - customFrom.unix();
-      return diff > 0 ? diff : 3600;
-    }
-    return INTERVAL_SECONDS_CLIENT[interval as Interval] ?? 3600;
-  }, [interval, customFrom, customTo]);
-
-  const buildParams = useCallback(
-    (extra = "") => {
-      const h =
-        selectedHosts.length > 0 ? `hosts=${selectedHosts.map(encodeURIComponent).join(",")}` : "";
-      const sep = h ? `&${h}` : "";
-      if (interval === "custom" && customFrom && customTo) {
-        return `?from=${customFrom.unix()}&to=${customTo.unix()}${sep}${extra}`;
-      }
-      return `?interval=${interval}${sep}${extra}`;
-    },
-    [interval, selectedHosts, customFrom, customTo],
-  );
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const shownQuery = useRef<string | null>(null);
 
   useEffect(() => {
     fetchJson("/api/analytics/hosts")
-      .then((h) => setAllHosts(asArray<AnalyticsHost>(h)))
-      .catch(() => setAllHosts([]));
+      .then((body) =>
+        setHosts(
+          Array.isArray(body)
+            ? body
+                .map((entry) => (entry as { host?: unknown }).host)
+                .filter((host): host is string => typeof host === "string")
+            : [],
+        ),
+      )
+      .catch(() => setHosts([]));
   }, []);
 
-  useEffect(() => {
-    if (interval === "custom") {
-      if (!customFrom || !customTo || customFrom.unix() >= customTo.unix()) return;
-    }
-    setLoading(true);
-    const params = buildParams();
-    Promise.all([
-      fetchJson(`/api/analytics/summary${params}`),
-      fetchJson(`/api/analytics/timeline${params}`),
-      fetchJson(`/api/analytics/countries${params}`),
-      fetchJson(`/api/analytics/protocols${params}`),
-      fetchJson(`/api/analytics/user-agents${params}`),
-      fetchJson(`/api/analytics/blocked${params}&page=1`),
-      fetchJson(`/api/analytics/waf-stats${params}`),
-    ])
-      .then(([s, t, c, p, u, b, w]) => {
-        setLoadError(null);
-        setSummary(s as AnalyticsSummary);
-        setTimeline(asArray<TimelineBucket>(t));
-        setCountries(asArray<CountryStats>(c));
-        setProtocols(asArray<ProtoStats>(p));
-        setUserAgents(asArray<UAStats>(u));
-        setBlocked(b as BlockedPage);
-        setWafStats(w as WafStats);
-      })
-      .catch((err: unknown) => {
-        // Reset to empty rather than leaving stale data next to an error banner.
-        setLoadError(
-          err instanceof UnexplainedStatusError
-            ? t("requestFailedWithStatus", { path: err.path, status: err.status })
-            : err instanceof Error
-              ? err.message
-              : t("loadErrorToast"),
-        );
-        setSummary(null);
-        setTimeline([]);
-        setCountries([]);
-        setProtocols([]);
-        setUserAgents([]);
-        setBlocked(null);
-        setWafStats(null);
-        toast.error(t("loadErrorToast"));
-      })
-      .finally(() => setLoading(false));
-  }, [buildParams, interval, customFrom, customTo, t]);
-
-  const fetchBlockedPage = useCallback(
-    (page: number) => {
-      fetchJson(`/api/analytics/blocked${buildParams(`&page=${page}`)}`)
-        .then((b) => setBlocked(b as BlockedPage))
-        .catch(() => toast.error(t("blockedRequestsLoadError")));
+  const load = useCallback(
+    (signal: AbortSignal) => {
+      // A refresh of the same view keeps the old numbers up rather than flashing a spinner.
+      const quiet = shownQuery.current === query;
+      if (!quiet) setLoading(true);
+      fetchJson(`/api/analytics/explore${query ? `?${query}` : ""}`, signal)
+        .then((body) => {
+          setLoadError(null);
+          setReport(asReport(body));
+          setLoadedAt(Date.now());
+          shownQuery.current = query;
+        })
+        .catch((err: unknown) => {
+          if (signal.aborted) return;
+          setLoadError(
+            err instanceof UnexplainedStatusError
+              ? t("requestFailedWithStatus", { path: err.path, status: err.status })
+              : err instanceof Error && err.message
+                ? err.message
+                : t("loadErrorToast"),
+          );
+          // Reset to empty rather than leaving stale data next to an error banner.
+          setReport(null);
+          if (!quiet) toast.error(t("loadErrorToast"));
+        })
+        .finally(() => {
+          if (!signal.aborted) setLoading(false);
+        });
     },
-    [buildParams, t],
+    [query, t],
   );
 
-  // ── Chart configs ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
 
-  const chartTheme = useChartTheme();
+  const refreshes = autoRefreshes(state);
+  useEffect(() => {
+    if (!refreshes) return;
+    let controller: AbortController | null = null;
+    const timer = setInterval(() => {
+      // A hidden tab skips its refreshes; the first one after it is shown again catches up.
+      if (document.visibilityState !== "visible") return;
+      controller?.abort();
+      controller = new AbortController();
+      load(controller.signal);
+    }, AUTO_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+      controller?.abort();
+    };
+  }, [refreshes, load]);
 
-  // Memoized: react-apexcharts deep-compares options and series, so a fresh object walked the
-  // whole timeline on every unrelated state change.
-  const timelineOptions = useMemo<ApexOptions>(
-    () => ({
-      ...chartTheme.base,
-      chart: { ...chartTheme.base.chart, type: "area", stacked: false, id: "timeline" },
-      colors: [chartTheme.series.blue, chartTheme.series.red],
-      fill: {
-        type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 },
-      },
-      stroke: { curve: "smooth", width: 2 },
-      dataLabels: { enabled: false },
-      xaxis: {
-        categories: timeline.map((b) => formatTs(format, b.ts, rangeSeconds)),
-        labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-      },
-      yaxis: { labels: { style: { colors: chartTheme.labelColor } } },
-      legend: { labels: { colors: chartTheme.labelColor } },
-      tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
-    }),
-    [chartTheme, timeline, rangeSeconds, format],
-  );
-  const timelineSeries = useMemo(
-    () => [
-      { name: t("seriesAllowed"), data: timeline.map((b) => b.total - b.blocked) },
-      { name: t("metricBlocked"), data: timeline.map((b) => b.blocked) },
-    ],
-    [timeline, t],
+  const addFilter = useCallback(
+    (dimension: TopDimension, value: string, op: FilterOp) => {
+      navigate(withFilter(state, { field: TOP_DIMENSION_FIELD[dimension], op, value }));
+    },
+    [navigate, state],
   );
 
-  const donutOptions = useMemo<ApexOptions>(
-    () => ({
-      ...chartTheme.base,
-      chart: { ...chartTheme.base.chart, type: "donut", id: "protocols" },
-      colors: [
-        chartTheme.series.blue,
-        chartTheme.series.purple,
-        chartTheme.series.cyan,
-        chartTheme.series.orange,
-      ],
-      labels: protocols.map((p) => toSafeChartLabel(p.proto)),
-      legend: { position: "bottom", labels: { colors: chartTheme.labelColor } },
-      dataLabels: { style: { colors: [chartTheme.onSeries] } },
-      plotOptions: { pie: { donut: { size: "65%" } } },
-    }),
-    [chartTheme, protocols],
-  );
-  const donutSeries = useMemo(() => protocols.map((p) => p.count), [protocols]);
+  const setFilters = (filters: AnalyticsFilter[]) => navigate({ ...state, filters });
 
-  const barOptions = useMemo<ApexOptions>(
-    () => ({
-      ...chartTheme.base,
-      chart: { ...chartTheme.base.chart, type: "bar", id: "ua" },
-      colors: [chartTheme.series.purple],
-      plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-      dataLabels: { enabled: false },
-      xaxis: {
-        categories: userAgents.map((u) =>
-          toSafeChartLabel(parseUA(u.userAgent, t("unknownUserAgent"))),
-        ),
-        labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
-      },
-      yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
-    }),
-    [chartTheme, userAgents, t],
-  );
-  const barSeries = useMemo(
-    () => [{ name: t("metricRequests"), data: userAgents.map((u) => u.count) }],
-    [userAgents, t],
-  );
-
-  const wafBarOptions = useMemo<ApexOptions>(
-    () => ({
-      ...chartTheme.base,
-      chart: { ...chartTheme.base.chart, type: "bar", id: "waf-rules" },
-      colors: [chartTheme.series.orange],
-      plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-      dataLabels: { enabled: false },
-      xaxis: {
-        categories: (wafStats?.topRules ?? []).map((r) => `#${r.ruleId}`),
-        labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
-      },
-      yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
-    }),
-    [chartTheme, wafStats],
-  );
-  const wafBarSeries = useMemo(
-    () => [{ name: t("hits"), data: (wafStats?.topRules ?? []).map((r) => r.count) }],
-    [wafStats, t],
-  );
-
-  const wafByCountry = new Map((wafStats?.byCountry ?? []).map((r) => [r.countryCode, r.count]));
-
-  const INTERVALS: DisplayInterval[] = ["1h", "12h", "24h", "7d", "30d", "custom"];
-  const intervalLabel = (iv: DisplayInterval) => (iv === "custom" ? t("intervalCustom") : iv);
-
-  const changeInterval = (iv: DisplayInterval) => {
-    if (iv === "custom" && !customFrom) {
-      setCustomFrom(dayjs().subtract(24, "hour"));
-      setCustomTo(dayjs());
+  const changeRange = (range: DisplayRange) => {
+    if (range === "custom") {
+      const window = report?.window ?? {
+        from: Math.floor(Date.now() / 1000) - 86400,
+        to: Math.floor(Date.now() / 1000),
+      };
+      navigate({ ...state, range: "custom", from: window.from, to: window.to });
+      return;
     }
-    setIntervalVal(iv);
+    navigate({ ...state, range, from: null, to: null });
   };
+
+  const exportTopList = useCallback(
+    (dimension: TopDimension) => {
+      const params = new URLSearchParams(query);
+      params.set("dimension", dimension);
+      fetchJson(`/api/analytics/top?${params.toString()}`)
+        .then((body) => {
+          topListCsv(t, dimension, asRows(body), (row) => topRowLabel(t, locale, dimension, row));
+        })
+        .catch(() => toast.error(t("viewAllLoadError")));
+    },
+    [query, t, locale],
+  );
+
+  const ranges: DisplayRange[] = [...ANALYTICS_RANGES, "custom"];
+  const rangeLabel = (range: DisplayRange) => (range === "custom" ? t("intervalCustom") : range);
+  const rangeSeconds = report ? report.window.to - report.window.from : 86400;
+
+  const hostFilters = state.filters.filter((f) => f.field === "host" && f.op === "is");
+  const breakdownQuery = report
+    ? `?from=${report.window.from}&to=${report.window.to}${
+        hostFilters.length > 0
+          ? `&hosts=${hostFilters.map((f) => encodeURIComponent(f.value)).join(",")}`
+          : ""
+      }`
+    : "?interval=24h";
 
   const metricOptions: { value: MapMetric; label: string }[] = [
     { value: "total", label: t("metricRequests") },
-    { value: "blocked", label: t("metricBlocked") },
+    { value: "blocked", label: t("metricMitigated") },
     { value: "uniqueIps", label: t("uniqueIps") },
   ];
 
-  // ── Table shapes ──────────────────────────────────────────────────────────
-
-  const countryRows: CountryRow[] = countries.slice(0, 10).map((c) => ({
-    countryCode: c.countryCode,
-    total: c.total,
-    blocked: c.blocked,
-    uniqueIps: c.uniqueIps,
-    waf: wafByCountry.get(c.countryCode) ?? 0,
-  }));
-
-  // Not a tinted background: colour alone is invisible to assistive tech.
+  const countryRows: CountryRow[] = (report?.countries ?? [])
+    .slice(0, 10)
+    .map((row) => ({ ...row }));
   const countryStatus = useTableRowStatus<CountryRow>({
     getStatus: (row) =>
-      row.countryCode === selectedCountry ? { color: "accent", label: t("selected") } : null,
+      row.key === selectedCountry ? { color: "accent", label: t("selected") } : null,
   });
-
   const countryColumns: TableColumn<CountryRow>[] = [
     {
-      key: "countryCode",
+      key: "key",
       header: t("country"),
       width: proportional(1),
       // A button, not a clickable row, so keyboard users can reach it.
@@ -642,244 +473,90 @@ export default function AnalyticsClient() {
           variant="ghost"
           size="sm"
           label={
-            row.countryCode === selectedCountry
-              ? t("closeCountryBreakdown", { code: row.countryCode })
-              : t("openCountryBreakdown", { code: row.countryCode })
+            row.key === selectedCountry
+              ? t("closeCountryBreakdown", { code: row.key })
+              : t("openCountryBreakdown", { code: row.key })
           }
-          onClick={() =>
-            setSelectedCountry((cur) => (cur === row.countryCode ? null : row.countryCode))
-          }
+          onClick={() => setSelectedCountry((cur) => (cur === row.key ? null : row.key))}
         >
           <HStack gap={2} vAlign="center">
-            <span aria-hidden="true">{countryFlag(row.countryCode)}</span>
-            <Text type="inherit" size="sm">
-              {row.countryCode}
+            <span aria-hidden="true">{countryFlag(row.key)}</span>
+            <Text type="inherit" size="sm" maxLines={1}>
+              {row.key === "XX" ? t("unplacedCountry") : regionName(row.key, locale)}
             </Text>
           </HStack>
         </Button>
       ),
     },
     {
-      key: "total",
-      header: t("total"),
+      key: "requests",
+      header: t("metricRequests"),
       align: "end",
-      width: pixel(90),
+      width: pixel(100),
       renderCell: (row) => (
         <Text type="body" size="sm" hasTabularNumbers>
-          {format.number(row.total)}
+          {format.number(row.requests)}
         </Text>
       ),
     },
     {
-      key: "uniqueIps",
-      header: t("uniqueIps"),
+      key: "mitigated",
+      header: t("metricMitigated"),
       align: "end",
-      width: pixel(104),
-      renderCell: (row) => (
-        <Text type="body" size="sm" hasTabularNumbers>
-          {format.number(row.uniqueIps)}
-        </Text>
-      ),
-    },
-    {
-      key: "waf",
-      header: t("waf"),
-      align: "end",
-      width: pixel(80),
-      renderCell: (row) => (
-        <Text type="body" size="sm" color={row.waf > 0 ? "primary" : "secondary"} hasTabularNumbers>
-          {row.waf > 0 ? format.number(row.waf) : emptyValue}
-        </Text>
-      ),
-    },
-    {
-      key: "blocked",
-      header: t("metricBlocked"),
-      align: "end",
-      width: pixel(90),
+      width: pixel(100),
       renderCell: (row) => (
         <Text
           type="body"
           size="sm"
-          color={row.blocked > 0 ? "primary" : "secondary"}
+          color={row.mitigated > 0 ? "primary" : "secondary"}
           hasTabularNumbers
         >
-          {format.number(row.blocked)}
+          {format.number(row.mitigated)}
         </Text>
       ),
+    },
+    {
+      key: "actions",
+      header: <VisuallyHidden>{t("rowActions")}</VisuallyHidden>,
+      align: "end",
+      width: pixel(76),
+      renderCell: (row) => {
+        const name = row.key === "XX" ? t("unplacedCountry") : regionName(row.key, locale);
+        return (
+          <HStack gap={1} justify="end">
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              icon={<ListFilter />}
+              label={t("filterTo", { value: name })}
+              tooltip={t("filterToShort")}
+              onClick={() => addFilter("country", row.key, "is")}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              icon={<ListX />}
+              label={t("filterOut", { value: name })}
+              tooltip={t("filterOutShort")}
+              onClick={() => addFilter("country", row.key, "not")}
+            />
+          </HStack>
+        );
+      },
     },
   ];
 
-  const protocolRows: ProtoRow[] = protocols.map((p) => ({ ...p }));
-
-  const protocolColumns: TableColumn<ProtoRow>[] = [
-    {
-      key: "proto",
-      header: t("protocol"),
-      width: proportional(1),
-      renderCell: (row) => (
-        <Text type="body" size="sm">
-          {row.proto}
-        </Text>
-      ),
-    },
-    {
-      key: "count",
-      header: t("metricRequests"),
-      align: "end",
-      width: pixel(110),
-      renderCell: (row) => (
-        <Text type="body" size="sm" hasTabularNumbers>
-          {format.number(row.count)}
-        </Text>
-      ),
-    },
-    {
-      key: "percent",
-      header: t("share"),
-      align: "end",
-      width: pixel(80),
-      renderCell: (row) => (
-        <Text type="body" size="sm" color="secondary" hasTabularNumbers>
-          {row.percent}%
-        </Text>
-      ),
-    },
-  ];
-
-  const blockedRows: BlockedRow[] = (blocked?.events ?? []).map((ev) => ({ ...ev }));
-
-  const blockedColumns: TableColumn<BlockedRow>[] = [
-    {
-      key: "ts",
-      header: t("time"),
-      width: pixel(190),
-      renderCell: (row) => (
-        <Text type="body" size="sm" color="secondary">
-          <Timestamp value={row.ts * 1000} />
-        </Text>
-      ),
-    },
-    {
-      key: "clientIp",
-      header: t("ip"),
-      width: pixel(130),
-      renderCell: (row) => (
-        <Text type="code" size="sm">
-          {row.clientIp}
-        </Text>
-      ),
-    },
-    {
-      key: "countryCode",
-      header: t("country"),
-      width: pixel(100),
-      renderCell: (row) => (
-        <Text type="body" size="sm">
-          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : emptyValue}
-        </Text>
-      ),
-    },
-    {
-      key: "host",
-      header: t("host"),
-      width: pixel(160),
-      renderCell: (row) => (
-        <Text type="body" size="sm" maxLines={1}>
-          {row.host || emptyValue}
-        </Text>
-      ),
-    },
-    {
-      key: "method",
-      header: t("method"),
-      width: pixel(90),
-      renderCell: (row) => (
-        <Text type="code" size="sm">
-          {row.method}
-        </Text>
-      ),
-    },
-    {
-      key: "uri",
-      header: t("uri"),
-      width: proportional(1),
-      renderCell: (row) => (
-        <Tooltip content={row.uri}>
-          <Text type="code" size="sm" maxLines={1}>
-            {row.uri}
-          </Text>
-        </Tooltip>
-      ),
-    },
-    {
-      key: "status",
-      header: t("status"),
-      width: pixel(80),
-      align: "end",
-      renderCell: (row) => <Badge variant="error" label={String(row.status)} />,
-    },
-  ];
-
-  const wafRuleRows: WafRuleRow[] = (wafStats?.topRules ?? []).map((r) => ({ ...r }));
-
-  const wafRuleColumns: TableColumn<WafRuleRow>[] = [
-    {
-      key: "ruleId",
-      header: t("rule"),
-      width: pixel(90),
-      renderCell: (row) => (
-        <Text type="code" size="sm">
-          #{row.ruleId}
-        </Text>
-      ),
-    },
-    {
-      key: "message",
-      header: t("description"),
-      width: proportional(1),
-      renderCell: (row) =>
-        row.message ? (
-          <Tooltip content={row.message}>
-            <Text type="body" size="sm" color="secondary" maxLines={1}>
-              {row.message}
-            </Text>
-          </Tooltip>
-        ) : (
-          <Text type="body" size="sm" color="secondary">
-            {emptyValue}
-          </Text>
-        ),
-    },
-    {
-      key: "count",
-      header: t("hits"),
-      width: pixel(80),
-      align: "end",
-      renderCell: (row) => (
-        <Text type="body" size="sm" weight="semibold" hasTabularNumbers>
-          {format.number(row.count)}
-        </Text>
-      ),
-    },
-    {
-      key: "hosts",
-      header: t("triggeredBy"),
-      width: proportional(1),
-      renderCell: (row) => (
-        <HStack gap={1} wrap="wrap">
-          {row.hosts.map((h) => (
-            <Badge key={h.host} label={`${h.host} ×${h.count}`} />
-          ))}
-        </HStack>
-      ),
-    },
-  ];
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const mapData = (report?.countries ?? []).map((row) => ({
+    countryCode: row.key,
+    total: row.requests,
+    blocked: row.mitigated,
+    uniqueIps: row.uniqueIps,
+  }));
 
   return (
-    <VStack gap={8}>
+    <VStack gap={6}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={0}>
           <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
@@ -892,47 +569,64 @@ export default function AnalyticsClient() {
             <SegmentedControl
               label={t("timeInterval")}
               size="sm"
-              value={interval}
-              onChange={(next) => changeInterval(next as DisplayInterval)}
+              value={state.range}
+              onChange={(next) => changeRange(next as DisplayRange)}
             >
-              {INTERVALS.map((iv) => (
-                <SegmentedControlItem key={iv} value={iv} label={intervalLabel(iv)} />
+              {ranges.map((range) => (
+                <SegmentedControlItem key={range} value={range} label={rangeLabel(range)} />
               ))}
             </SegmentedControl>
           </div>
-          {/* Six segments do not fit a phone: the interval is a pill that opens a sheet. */}
+          {/* Five segments do not fit a phone: the range is a pill that opens a sheet. */}
           <div className="cpm-chip-row cpm-mobile-flex">
             <FilterChip
-              label={intervalLabel(interval)}
+              label={rangeLabel(state.range)}
               aria-label={t("timeInterval")}
-              onClick={() => setIntervalSheetOpen(true)}
+              onClick={() => setRangeSheetOpen(true)}
             />
           </div>
           <OptionSheet
             title={t("timeInterval")}
-            isOpen={intervalSheetOpen}
-            onOpenChange={setIntervalSheetOpen}
-            value={interval}
-            options={INTERVALS.map((iv) => ({ value: iv, label: intervalLabel(iv) }))}
-            onChange={changeInterval}
+            isOpen={rangeSheetOpen}
+            onOpenChange={setRangeSheetOpen}
+            value={state.range}
+            options={ranges.map((range) => ({ value: range, label: rangeLabel(range) }))}
+            onChange={changeRange}
           />
-
-          {interval === "custom" && (
-            <HStack gap={2} vAlign="center" wrap="wrap">
-              <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder={t("from")} />
-              <Text type="body" size="xsm" color="secondary">
-                -
-              </Text>
-              <DateTimePicker value={customTo} onChange={setCustomTo} placeholder={t("to")} />
-            </HStack>
+          {state.range === "custom" && (
+            <CustomRange
+              // Keyed, so a view opened from the menu replaces what was being typed.
+              key={`${state.from}-${state.to}`}
+              state={state}
+              onChange={(from, to) => navigate({ ...state, range: "custom", from, to })}
+            />
           )}
-
-          <HostsCombobox
-            allHosts={allHosts}
-            selectedHosts={selectedHosts}
-            onChange={setSelectedHosts}
+          <Switch
+            size="sm"
+            label={t("compare")}
+            value={state.compare}
+            onChange={(compare) => navigate({ ...state, compare })}
           />
+          <SavedViews query={query} onOpen={(next) => navigate(next)} />
         </HStack>
+      </HStack>
+
+      <FilterBar filters={state.filters} onChange={setFilters} suggestions={{ host: hosts }} />
+
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        {report && (
+          <Text type="body" size="sm" color="secondary">
+            {t.rich("windowSummary", {
+              from: () => <Timestamp value={report.window.from * 1000} />,
+              to: () => <Timestamp value={report.window.to * 1000} />,
+            })}
+          </Text>
+        )}
+        {refreshes && loadedAt !== null && (
+          <Text type="body" size="sm" color="secondary">
+            {t("autoRefreshing")}
+          </Text>
+        )}
       </HStack>
 
       {loadError && (
@@ -941,7 +635,7 @@ export default function AnalyticsClient() {
         </div>
       )}
 
-      {summary?.analyticsDisabled && (
+      {report?.analyticsDisabled && (
         <Banner
           status="info"
           title={t("analyticsDisabledTitle")}
@@ -957,7 +651,7 @@ export default function AnalyticsClient() {
         />
       )}
 
-      {summary?.loggingDisabled && !summary?.analyticsDisabled && (
+      {report?.loggingDisabled && !report.analyticsDisabled && (
         <Banner
           status="warning"
           title={t("accessLoggingDisabledTitle")}
@@ -973,116 +667,30 @@ export default function AnalyticsClient() {
         />
       )}
 
-      {loading && (
+      {loading && !report && (
         <HStack justify="center" padding={10}>
           <Spinner size="lg" label={t("loadingAnalytics")} />
         </HStack>
       )}
 
-      {!loading && summary && (
+      {report && (
         <>
-          {/* One card on a phone, where five tiles are a screen of their own. */}
-          <div className="cpm-mobile-only">
-            <Card padding={4}>
-              <VStack gap={3}>
-                <VStack gap={0}>
-                  <Text type="body" style={CARD_TITLE_STYLE}>
-                    {t("totalRequests")}
-                  </Text>
-                  <Text type="display-3" hasTabularNumbers>
-                    {format.number(summary.totalRequests)}
-                  </Text>
-                </VStack>
-                <Grid columns={{ minWidth: 80, max: 3 }} gap={2}>
-                  {[
-                    {
-                      label: t("blockedRequests"),
-                      value: format.number(summary.blockedRequests),
-                      tone: summary.blockedRequests > 0 ? ("error" as const) : undefined,
-                    },
-                    { label: t("uniqueIps"), value: format.number(summary.uniqueIps) },
-                    { label: t("blockRate"), value: `${summary.blockedPercent}%` },
-                  ].map((stat) => (
-                    <VStack key={stat.label} gap={0}>
-                      <Text type="label" size="3xs" color="secondary">
-                        {stat.label}
-                      </Text>
-                      <Text type="body" weight="semibold" hasTabularNumbers>
-                        <span style={stat.tone ? { color: STAT_TONE_VAR[stat.tone] } : undefined}>
-                          {stat.value}
-                        </span>
-                      </Text>
-                    </VStack>
-                  ))}
-                </Grid>
-                <Text type="body" size="sm" color="secondary">
-                  {t("wafEventsCount", { count: format.number(wafStats?.total ?? 0) })}
-                </Text>
-              </VStack>
-            </Card>
-          </div>
-          <Grid
-            columns={{ minWidth: 150, max: 5 }}
-            gap={3}
-            data-testid="analytics-stats"
-            className="cpm-desktop-only"
-          >
-            <StatCard
-              label={t("totalRequests")}
-              value={format.number(summary.totalRequests)}
-              hue="blue"
-            />
-            <StatCard label={t("uniqueIps")} value={format.number(summary.uniqueIps)} hue="teal" />
-            <StatCard
-              hue="red"
-              label={t("blockedRequests")}
-              value={format.number(summary.blockedRequests)}
-              sub={
-                (wafStats?.total ?? 0) > 0
-                  ? t("blockedFromWaf", { count: format.number(wafStats!.total) })
-                  : undefined
-              }
-              tone={summary.blockedRequests > 0 ? "error" : undefined}
-            />
-            <StatCard
-              hue="orange"
-              label={t("blockRate")}
-              value={`${summary.blockedPercent}%`}
-              sub={t("bytesServed", { bytes: formatBytes(format, summary.bytesServed) })}
-              tone={summary.blockedPercent > 10 ? "warning" : undefined}
-            />
-            <StatCard
-              hue="purple"
-              label={t("wafEvents")}
-              value={format.number(wafStats?.total ?? 0)}
-              sub={
-                wafStats && wafStats.topRules.length > 0
-                  ? t("rulesTriggered", { count: wafStats.topRules.length })
-                  : t("noWafEvents")
-              }
-              tone={(wafStats?.total ?? 0) > 0 ? "warning" : undefined}
-            />
-          </Grid>
+          <KpiTiles
+            totals={report.totals}
+            previousTotals={report.previousTotals}
+            timeline={report.timeline}
+            Chart={ReactApexChart}
+          />
 
-          <Card padding={5}>
-            <VStack gap={4}>
-              <Text as="h2" type="body" size="sm" weight="semibold">
-                {t("requestsOverTime")}
-              </Text>
-              {timeline.length === 0 ? (
-                <EmptyState title={t("periodEmptyTitle")} isCompact />
-              ) : (
-                <div style={{ overflowX: "auto", width: "100%" }}>
-                  <ReactApexChart
-                    type="area"
-                    series={timelineSeries}
-                    options={timelineOptions}
-                    height={220}
-                  />
-                </div>
-              )}
-            </VStack>
-          </Card>
+          <TrafficChart
+            timeline={report.timeline}
+            previousTimeline={report.previousTimeline}
+            groups={report.groups}
+            group={state.group}
+            onGroupChange={(group) => navigate({ ...state, group })}
+            rangeSeconds={rangeSeconds}
+            Chart={ReactApexChart}
+          />
 
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
             <Card padding={5}>
@@ -1092,41 +700,23 @@ export default function AnalyticsClient() {
                   <Text as="h2" type="body" size="sm" weight="semibold">
                     {t("trafficByCountry")}
                   </Text>
-                  {/* The ramp normalises per metric, so Blocked lights up the most-blocked. */}
-                  <div className="cpm-desktop-only">
-                    <SegmentedControl
-                      label={t("mapMetric")}
-                      size="sm"
-                      value={mapMetric}
-                      onChange={(value) => setMapMetric(value as MapMetric)}
-                    >
-                      {metricOptions.map((option) => (
-                        <SegmentedControlItem
-                          key={option.value}
-                          value={option.value}
-                          label={option.label}
-                        />
-                      ))}
-                    </SegmentedControl>
-                  </div>
-                  <div className="cpm-mobile-flex">
-                    <FilterChip
-                      label={metricOptions.find((o) => o.value === mapMetric)?.label ?? mapMetric}
-                      aria-label={t("mapMetric")}
-                      onClick={() => setMetricSheetOpen(true)}
-                    />
-                  </div>
-                  <OptionSheet
-                    title={t("mapMetric")}
-                    isOpen={metricSheetOpen}
-                    onOpenChange={setMetricSheetOpen}
+                  <SegmentedControl
+                    label={t("mapMetric")}
+                    size="sm"
                     value={mapMetric}
-                    options={metricOptions}
-                    onChange={setMapMetric}
-                  />
+                    onChange={(value) => setMapMetric(value as MapMetric)}
+                  >
+                    {metricOptions.map((option) => (
+                      <SegmentedControlItem
+                        key={option.value}
+                        value={option.value}
+                        label={option.label}
+                      />
+                    ))}
+                  </SegmentedControl>
                 </HStack>
                 <WorldMap
-                  data={countries}
+                  data={mapData}
                   selectedCountry={selectedCountry}
                   metric={mapMetric}
                   onSelectCountry={(code) =>
@@ -1137,24 +727,44 @@ export default function AnalyticsClient() {
                 />
               </VStack>
             </Card>
-            <Card padding={4}>
+            <Card padding={4} data-testid="analytics-top-country">
               <VStack gap={3}>
-                <Text as="h2" type="body" size="sm" weight="semibold">
-                  {t("topCountries")}
-                </Text>
-                {countries.length === 0 ? (
+                <HStack justify="between" vAlign="center" gap={2}>
+                  <Text as="h2" type="body" size="sm" weight="semibold">
+                    {t("topCountries")}
+                  </Text>
+                  <HStack gap={1} vAlign="center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      isIconOnly
+                      icon={<Download />}
+                      label={t("csv.exportList", { list: t("top.countries") })}
+                      tooltip={t("csv.exportListShort")}
+                      isDisabled={countryRows.length === 0}
+                      onClick={() => exportTopList("country")}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t("viewAll")}
+                      isDisabled={countryRows.length === 0}
+                      onClick={() => setViewAll("country")}
+                    />
+                  </HStack>
+                </HStack>
+                {countryRows.length === 0 ? (
                   <EmptyState title={t("geoDataEmptyTitle")} isCompact />
                 ) : (
                   <Table
                     density={density}
                     data={countryRows}
-                    // Five fixed columns are wider than the card on a phone.
                     columns={
                       isNarrow
-                        ? countryColumns.filter((c) => c.key !== "uniqueIps" && c.key !== "waf")
+                        ? countryColumns.filter((c) => c.key !== "mitigated")
                         : countryColumns
                     }
-                    idKey="countryCode"
+                    idKey="key"
                     hasHover
                     plugins={{ rowStatus: countryStatus }}
                   />
@@ -1166,132 +776,42 @@ export default function AnalyticsClient() {
           {selectedCountry && (
             <CountryBreakdown
               code={selectedCountry}
-              query={buildParams()}
-              totalRequests={summary?.totalRequests ?? 0}
+              query={breakdownQuery}
+              totalRequests={report.totals.requests}
               onClose={() => setSelectedCountry(null)}
             />
           )}
 
-          <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
-            <Card padding={5}>
-              <VStack gap={4}>
-                <Text as="h2" type="body" size="sm" weight="semibold">
-                  {t("httpProtocols")}
-                </Text>
-                {protocols.length === 0 ? (
-                  <EmptyState title={t("noData")} isCompact />
-                ) : (
-                  <>
-                    <div style={{ overflowX: "auto", width: "100%" }}>
-                      <ReactApexChart
-                        type="donut"
-                        series={donutSeries}
-                        options={donutOptions}
-                        height={220}
-                      />
-                    </div>
-                    <Table
-                      density={density}
-                      data={protocolRows}
-                      columns={protocolColumns}
-                      idKey="proto"
-                    />
-                  </>
-                )}
-              </VStack>
-            </Card>
-            <Card padding={5}>
-              <VStack gap={4}>
-                <Text as="h2" type="body" size="sm" weight="semibold">
-                  {t("topUserAgents")}
-                </Text>
-                {userAgents.length === 0 ? (
-                  <EmptyState title={t("noData")} isCompact />
-                ) : (
-                  <div style={{ overflowX: "auto", width: "100%" }}>
-                    <ReactApexChart
-                      type="bar"
-                      series={barSeries}
-                      options={barOptions}
-                      height={260}
-                    />
-                  </div>
-                )}
-              </VStack>
-            </Card>
+          <Grid columns={{ minWidth: 340, max: 2 }} gap={3}>
+            {TOP_DIMENSIONS.filter((dimension) => dimension !== "country").map((dimension) => (
+              <TopListCard
+                key={dimension}
+                dimension={dimension}
+                rows={report.top[dimension] ?? []}
+                total={report.totals.requests}
+                onFilter={addFilter}
+                onViewAll={setViewAll}
+                onExport={exportTopList}
+              />
+            ))}
           </Grid>
 
-          <Card padding={5}>
-            <VStack gap={4}>
-              <Text as="h2" type="body" size="sm" weight="semibold">
-                {t("recentBlockedRequests")}
-              </Text>
-              {!blocked || blocked.events.length === 0 ? (
-                <EmptyState title={t("blockedRequestsEmptyTitle")} isCompact />
-              ) : (
-                <>
-                  <div className="cpm-desktop-only">
-                    <Table
-                      density={density}
-                      data={blockedRows}
-                      columns={blockedColumns}
-                      idKey="id"
-                      hasHover
-                    />
-                  </div>
-                  <div className="cpm-mobile-only">
-                    <List>
-                      {blockedRows.map((row) => (
-                        <ListItem
-                          key={row.id}
-                          label={row.clientIp}
-                          description={`${row.method} ${row.uri}`}
-                          endContent={
-                            row.countryCode ? <Badge label={row.countryCode} /> : undefined
-                          }
-                        />
-                      ))}
-                    </List>
-                  </div>
-                  {blocked.pages > 1 && (
-                    <HStack justify="center">
-                      <Pagination
-                        page={blocked.page}
-                        pageSize={blocked.events.length || 1}
-                        totalItems={blocked.total}
-                        onChange={fetchBlockedPage}
-                      />
-                    </HStack>
-                  )}
-                </>
-              )}
-            </VStack>
-          </Card>
-
-          {wafStats && wafStats.total > 0 && (
-            <Card padding={5}>
-              <VStack gap={4}>
-                <Text type="body" size="sm" weight="semibold">
-                  {t("topWafRulesTriggered")}
-                </Text>
-                <div style={{ overflowX: "auto", width: "100%" }}>
-                  <ReactApexChart
-                    type="bar"
-                    series={wafBarSeries}
-                    options={wafBarOptions}
-                    height={Math.max(120, wafStats.topRules.length * 32)}
-                  />
-                </div>
-                <Table
-                  density={density}
-                  data={wafRuleRows}
-                  columns={wafRuleColumns}
-                  idKey="ruleId"
-                />
-              </VStack>
-            </Card>
-          )}
+          <RequestLog
+            requests={report.requests}
+            mitigatedOnly={state.mitigatedOnly}
+            onMitigatedOnlyChange={(mitigatedOnly) => navigate({ ...state, mitigatedOnly })}
+          />
         </>
+      )}
+
+      {viewAll && (
+        <ViewAllDialog
+          dimension={viewAll}
+          query={query}
+          total={report?.totals.requests ?? 0}
+          onClose={() => setViewAll(null)}
+          onFilter={addFilter}
+        />
       )}
     </VStack>
   );

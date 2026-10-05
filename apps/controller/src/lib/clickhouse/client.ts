@@ -1,4 +1,6 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { TrafficOutcome } from "@cpm/shared";
+import { userAgentFamily } from "../analytics/user-agent";
 import { isDemoMode } from "../demo/mode";
 import * as sqliteStore from "./sqlite-store";
 
@@ -137,6 +139,18 @@ export async function getClient(): Promise<ClickHouseClient> {
 
 // ── Table creation ──────────────────────────────────────────────────────────
 
+/**
+ * Outcome, duration, ASN and user-agent family. The outcome's default is computed per read for rows
+ * written before it, so an older blocker row still counts as geo without rewriting a part.
+ */
+const TRAFFIC_EVENTS_V2_COLUMNS = [
+  "duration_ms  Nullable(UInt32)",
+  "outcome      LowCardinality(String) DEFAULT if(is_blocked, 'geo', 'served')",
+  "asn          UInt32 DEFAULT 0",
+  "asn_org      LowCardinality(String) DEFAULT ''",
+  "ua_family    LowCardinality(String) DEFAULT ''",
+];
+
 const trafficEventsDdl = (retentionDays: number) => `
 CREATE TABLE IF NOT EXISTS traffic_events (
     ts           DateTime          CODEC(Delta, ZSTD),
@@ -150,7 +164,8 @@ CREATE TABLE IF NOT EXISTS traffic_events (
     bytes_sent   UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
     user_agent   String            DEFAULT '' CODEC(ZSTD(3)),
     is_blocked   Bool              DEFAULT false,
-    agent_id     LowCardinality(String) DEFAULT ''
+    agent_id     LowCardinality(String) DEFAULT '',
+    ${TRAFFIC_EVENTS_V2_COLUMNS.join(", ")}
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
@@ -191,6 +206,10 @@ const TRAFFIC_EVENTS_MIGRATIONS = [
   `ALTER TABLE traffic_events MODIFY COLUMN bytes_sent UInt64 DEFAULT 0 CODEC(Delta, ZSTD)`,
   `ALTER TABLE traffic_events MODIFY COLUMN user_agent String DEFAULT '' CODEC(ZSTD(3))`,
   `ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS agent_id LowCardinality(String) DEFAULT ''`,
+  // Metadata only: an added column costs no rewrite, so this is safe on a table of any size.
+  ...TRAFFIC_EVENTS_V2_COLUMNS.map(
+    (column) => `ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS ${column}`,
+  ),
 ];
 
 const WAF_EVENTS_MIGRATIONS = [
@@ -395,6 +414,23 @@ export interface TrafficEventRow {
   bytes_sent: number;
   user_agent: string;
   is_blocked: boolean;
+  duration_ms?: number | null;
+  outcome?: TrafficOutcome;
+  asn?: number | null;
+  asn_org?: string | null;
+}
+
+/** The columns an older agent leaves out, filled the way a newer one would. */
+function storedTrafficRow(row: TrafficEventRow, agentId: string) {
+  return {
+    ...row,
+    duration_ms: row.duration_ms ?? null,
+    outcome: row.outcome ?? (row.is_blocked ? "geo" : "served"),
+    asn: row.asn ?? 0,
+    asn_org: row.asn_org ?? "",
+    ua_family: userAgentFamily(row.user_agent),
+    agent_id: agentId,
+  };
 }
 
 export interface WafEventRow {
@@ -417,16 +453,15 @@ export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = "")
   if ((await chConfig()).sqlite) {
     sqliteStore.insertIntoSqliteStore(
       "traffic_events",
-      rows.map((r) => ({ ...r, agent_id: agentId })),
+      rows.map((r) => storedTrafficRow(r, agentId)),
     );
     return;
   }
   await ensureSchema();
   const values = rows.map((r) => ({
-    ...r,
+    ...storedTrafficRow(r, agentId),
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     is_blocked: r.is_blocked ? 1 : 0,
-    agent_id: agentId,
   }));
   await withSchema((ch) => ch.insert({ table: "traffic_events", values, format: "JSONEachRow" }));
 }
@@ -452,10 +487,10 @@ export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promis
 
 // ── Parameterized query helpers ─────────────────────────────────────────────
 
-type QueryParams = Record<string, unknown>;
+export type QueryParams = Record<string, unknown>;
 
 /** A host filter clause with parameterized placeholders: the SQL fragment plus its params. */
-function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
+export function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
   if (hosts.length === 0) return { sql: "", params: {} };
   const params: QueryParams = {};
   const placeholders: string[] = [];
@@ -467,11 +502,11 @@ function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
   return { sql: ` AND host IN (${placeholders.join(",")})`, params };
 }
 
-function timeFilter(): string {
+export function timeFilter(): string {
   return `ts >= toDateTime({p_from:UInt32}) AND ts <= toDateTime({p_to:UInt32})`;
 }
 
-function timeParams(from: number, to: number): QueryParams {
+export function timeParams(from: number, to: number): QueryParams {
   return { p_from: safeUint(from), p_to: safeUint(to) };
 }
 
@@ -540,12 +575,12 @@ function buildWafFilter(
 }
 
 /** Clamp a number to a safe non-negative integer (guards against NaN/Infinity). */
-function safeUint(n: number): number {
+export function safeUint(n: number): number {
   if (!Number.isFinite(n) || n < 0) return 0;
   return Math.floor(n);
 }
 
-async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
+export async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
   if (!(await isAnalyticsEnabled())) return [];
   if ((await chConfig()).sqlite) return sqliteStore.querySqliteStore<T>(query, query_params);
   return withSchema(async (ch) => {
@@ -554,7 +589,7 @@ async function queryRows<T>(query: string, query_params?: QueryParams): Promise<
   });
 }
 
-async function queryRow<T>(query: string, query_params?: QueryParams): Promise<T | null> {
+export async function queryRow<T>(query: string, query_params?: QueryParams): Promise<T | null> {
   const rows = await queryRows<T>(query, query_params);
   return rows[0] ?? null;
 }

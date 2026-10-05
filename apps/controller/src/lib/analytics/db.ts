@@ -93,7 +93,7 @@ export interface AnalyticsSummary extends CHSummary {
  * Asked of the agents, not this filesystem: the log lives on the agent's host. With no agent
  * answering, nothing is being written either.
  */
-async function isLoggingActive(): Promise<boolean> {
+export async function isLoggingActive(): Promise<boolean> {
   const { getAllAgentStatuses } = await import("../agent/client");
   const statuses = await getAllAgentStatuses();
   return statuses.some((result) => result.ok && result.value.analytics.accessLogPresent);

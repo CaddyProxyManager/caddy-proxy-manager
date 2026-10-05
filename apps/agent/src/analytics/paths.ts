@@ -29,3 +29,7 @@ export function geoipDir(): string {
 export function geoipCountryDb(): string {
   return process.env.GEOIP_DB || join(geoipDir(), "GeoLite2-Country.mmdb");
 }
+
+export function geoipAsnDb(): string {
+  return join(geoipDir(), "GeoLite2-ASN.mmdb");
+}

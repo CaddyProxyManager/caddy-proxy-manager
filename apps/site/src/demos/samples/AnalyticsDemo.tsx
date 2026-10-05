@@ -1,328 +1,347 @@
 import { useMemo, useState } from "react";
 import ReactApexChart from "react-apexcharts";
-import { Badge } from "@astryxdesign/core/Badge";
-import { Card } from "@astryxdesign/core/Card";
 import { Grid } from "@astryxdesign/core/Grid";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { useChartTheme } from "@cpm/controller/src/app/(dashboard)/analytics/chart-theme";
+import { Switch } from "@astryxdesign/core/Switch";
+import { useTranslations } from "next-intl";
 import {
-  CountryBreakdownView,
-  type CountryBreakdownData,
-} from "@cpm/controller/src/app/(dashboard)/analytics/CountryBreakdown";
-import { FilterChip } from "@cpm/controller/src/components/mobile/FilterChip";
-import { OptionSheet } from "@cpm/controller/src/components/mobile/OptionSheet";
-import { useFormatter, useTranslations } from "next-intl";
+  type AnalyticsFilter,
+  type FilterOp,
+  type GroupBy,
+  TOP_DIMENSION_FIELD,
+  type TopDimension,
+  withFilter,
+  DEFAULT_EXPLORE_STATE,
+} from "@cpm/controller/src/lib/analytics/explore-state";
+import type {
+  ExploreBucket,
+  ExploreRequest,
+  ExploreSeries,
+  ExploreTotals,
+  TopRow,
+} from "@cpm/controller/src/lib/clickhouse/explore";
+import { FilterBar } from "@cpm/controller/src/app/(dashboard)/analytics/explore/FilterBar";
+import {
+  type ApexChartComponent,
+  KpiTiles,
+} from "@cpm/controller/src/app/(dashboard)/analytics/explore/KpiTiles";
+import { RequestLog } from "@cpm/controller/src/app/(dashboard)/analytics/explore/RequestLog";
+import { TopListCard } from "@cpm/controller/src/app/(dashboard)/analytics/explore/TopList";
+import { TrafficChart } from "@cpm/controller/src/app/(dashboard)/analytics/explore/TrafficChart";
 import { DemoSurface } from "../DemoSurface";
 
-type Range = "24h" | "7d" | "30d";
+const Chart = ReactApexChart as unknown as ApexChartComponent;
 
-const RANGES: Range[] = ["24h", "7d", "30d"];
+type TrafficOutcome = ExploreRequest["outcome"];
 
-/** Shaped like real traffic: a working-hours curve, a quiet night, a flat trickle of blocks. */
-const SERIES: Record<Range, { labels: string[]; ok: number[]; blocked: number[] }> = {
-  "24h": {
-    labels: ["00", "03", "06", "09", "12", "15", "18", "21"],
-    ok: [180, 120, 340, 1420, 1680, 1510, 990, 420],
-    blocked: [4, 2, 11, 18, 9, 7, 26, 12],
-  },
-  "7d": {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    ok: [8600, 9100, 8800, 9400, 7900, 2600, 2100],
-    blocked: [61, 74, 58, 92, 66, 21, 18],
-  },
-  "30d": {
-    labels: ["W1", "W2", "W3", "W4"],
-    ok: [48200, 51900, 47400, 53100],
-    blocked: [380, 412, 355, 447],
-  },
+/** Invented, but shaped: a working-day curve, a scanner that keeps coming back, a slow upstream. */
+type Sample = {
+  bucket: number;
+  host: string;
+  path: string;
+  country: string;
+  asn: number;
+  asnOrg: string;
+  status: number;
+  method: string;
+  proto: string;
+  ip: string;
+  ua: string;
+  outcome: TrafficOutcome;
+  rule: number | null;
+  bytes: number;
+  durationMs: number;
 };
 
-const PROTOCOLS = [
-  { label: "HTTP/2", value: 62 },
-  { label: "HTTP/3", value: 29 },
-  { label: "HTTP/1.1", value: 9 },
-];
+const BUCKETS = 24;
+const HOUR = 3600;
+/** A fixed "now", so the server render and the browser's agree. */
+const END = 1_790_000_000 - (1_790_000_000 % HOUR);
 
-type Metric = "requests" | "blocked" | "uniqueIps";
-
-const COUNTRIES = [
-  { code: "GB", name: "United Kingdom", requests: 21400, blocked: 38, uniqueIps: 612 },
-  { code: "DE", name: "Germany", requests: 12800, blocked: 22, uniqueIps: 419 },
-  { code: "US", name: "United States", requests: 9600, blocked: 141, uniqueIps: 388 },
-  { code: "NL", name: "Netherlands", requests: 4100, blocked: 9, uniqueIps: 97 },
-  { code: "SG", name: "Singapore", requests: 1900, blocked: 204, uniqueIps: 41 },
-];
-
-const TOTAL_REQUESTS = COUNTRIES.reduce((sum, c) => sum + c.requests, 0);
-
-/** Derived from the country's totals, each part summing to them, like /api/analytics/country. */
-function breakdownFor(country: (typeof COUNTRIES)[number]): CountryBreakdownData {
-  const r = country.requests;
-  const part = (share: number) => Math.round(r * share);
-  return {
-    countryCode: country.code,
-    total: r,
-    blocked: country.blocked,
-    uniqueIps: country.uniqueIps,
-    hosts: [
-      { host: "app.example.com", count: part(0.58) },
-      { host: "grafana.example.com", count: part(0.27) },
-      { host: "cloud.example.com", count: r - part(0.58) - part(0.27) },
-    ],
-    statusClasses: {
-      ok: part(0.87),
-      redirects: part(0.06),
-      clientErrors: part(0.06),
-      serverErrors: r - part(0.87) - part(0.06) - part(0.06),
-    },
-    userAgents: [
-      { userAgent: "Chrome 141", count: part(0.49) },
-      { userAgent: "Safari 19", count: part(0.26) },
-      { userAgent: "curl/8.9", count: part(0.07) },
-    ],
+function random(seed: number) {
+  let state = seed;
+  return () => {
+    state = (state * 1_664_525 + 1_013_904_223) % 4_294_967_296;
+    return state / 4_294_967_296;
   };
 }
 
-const USER_AGENTS = [
-  { name: "Chrome 141", requests: 18200 },
-  { name: "Safari 19", requests: 9700 },
-  { name: "Firefox 146", requests: 5100 },
-  { name: "curl/8.9", requests: 2400 },
-  { name: "Unknown scanner", requests: 890 },
-];
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Card>
-      <VStack gap={3}>
-        <Text type="label" size="xsm" weight="semibold" color="secondary">
-          {title}
-        </Text>
-        {children}
-      </VStack>
-    </Card>
-  );
+function samples(seed: number, scale: number): Sample[] {
+  const next = random(seed);
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(next() * list.length)] as T;
+  const rows: Sample[] = [];
+  for (let bucket = 0; bucket < BUCKETS; bucket++) {
+    const busy = 0.2 + 0.8 * Math.max(0, Math.sin(((bucket - 5) / 24) * Math.PI * 2) * 0.5 + 0.5);
+    const count = Math.round(40 * busy * scale);
+    for (let i = 0; i < count; i++) {
+      const r = next();
+      const outcome: TrafficOutcome =
+        r > 0.985 ? "rate_limit" : r > 0.975 ? "auth" : r > 0.965 ? "geo" : "served";
+      rows.push({
+        bucket,
+        host: pick([
+          "app.example.com",
+          "app.example.com",
+          "grafana.example.com",
+          "cloud.example.com",
+        ]),
+        path: pick(["/", "/", "/login", "/api/items", "/assets/app.js", "/media/stream"]),
+        country: pick(["GB", "GB", "DE", "US", "NL", "FR"]),
+        asn: 64500,
+        asnOrg: "Example Broadband",
+        status:
+          outcome === "rate_limit"
+            ? 429
+            : outcome === "auth"
+              ? 401
+              : outcome === "geo"
+                ? 403
+                : next() > 0.97
+                  ? 502
+                  : next() > 0.92
+                    ? 404
+                    : 200,
+        method: next() > 0.85 ? "POST" : "GET",
+        proto: next() > 0.3 ? "HTTP/2.0" : "HTTP/3.0",
+        ip: `198.51.100.${Math.floor(next() * 60) + 1}`,
+        ua: pick(["Chrome", "Chrome", "Safari", "Firefox", "curl"]),
+        outcome,
+        rule: null,
+        bytes: Math.floor(next() * 90_000) + 400,
+        durationMs: next() > 0.95 ? Math.floor(next() * 3000) + 500 : Math.floor(next() * 80) + 4,
+      });
+    }
+    // A scanner, mostly turned away by the WAF.
+    for (let i = 0; i < Math.round(4 * scale); i++) {
+      rows.push({
+        bucket,
+        host: "app.example.com",
+        path: pick(["/.env", "/wp-login.php", "/admin/config.php"]),
+        country: "CN",
+        asn: 64510,
+        asnOrg: "Example Hosting",
+        status: 403,
+        method: "GET",
+        proto: "HTTP/1.1",
+        ip: "203.0.113.66",
+        ua: "Other",
+        outcome: "waf",
+        rule: pick([930130, 913100]),
+        bytes: 0,
+        durationMs: 2,
+      });
+    }
+  }
+  return rows;
 }
 
-function Bar({
-  label,
-  value,
-  max,
-  badge,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  badge?: string;
-}) {
-  const format = useFormatter();
-  return (
-    <VStack gap={1}>
-      <HStack justify="between" vAlign="center" gap={2}>
-        <HStack gap={2} vAlign="center">
-          {badge && <Badge label={badge} />}
-          <Text type="body" size="sm">
-            {label}
-          </Text>
-        </HStack>
-        <Text type="code" size="xsm" color="secondary">
-          {format.number(value)}
-        </Text>
-      </HStack>
-      <div
-        style={{
-          height: 6,
-          borderRadius: "var(--radius-full)",
-          background: "var(--color-background-muted)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${Math.round((value / max) * 100)}%`,
-            background: "var(--color-data-categorical-blue)",
-          }}
-        />
-      </div>
-    </VStack>
-  );
+const CURRENT = samples(7, 1);
+const PREVIOUS = samples(11, 0.85);
+
+function matches(row: Sample, filter: AnalyticsFilter): boolean {
+  const value = filter.value;
+  const hit = (() => {
+    switch (filter.field) {
+      case "host":
+        return row.host === value;
+      case "path":
+        return row.path === value;
+      case "country":
+        return row.country === value;
+      case "asn":
+        return String(row.asn) === value;
+      case "status":
+        return value.endsWith("xx")
+          ? String(row.status)[0] === value[0]
+          : String(row.status) === value;
+      case "method":
+        return row.method === value;
+      case "proto":
+        return row.proto === value;
+      case "ip":
+        return row.ip === value;
+      case "ua":
+        return row.ua === value;
+      case "outcome":
+        return row.outcome === value;
+      case "rule":
+        return String(row.rule) === value;
+    }
+  })();
+  return filter.op === "is" ? hit : !hit;
 }
+
+function totalsOf(rows: Sample[]): ExploreTotals {
+  return {
+    requests: rows.length,
+    bytes: rows.reduce((sum, row) => sum + row.bytes, 0),
+    uniqueIps: new Set(rows.map((row) => row.ip)).size,
+    mitigated: rows.filter((row) => row.outcome !== "served").length,
+    serverErrors: rows.filter((row) => row.status >= 500).length,
+    avgDurationMs: rows.length
+      ? Math.round(rows.reduce((sum, row) => sum + row.durationMs, 0) / rows.length)
+      : null,
+  };
+}
+
+function timelineOf(rows: Sample[]): ExploreBucket[] {
+  return Array.from({ length: BUCKETS }, (_, bucket) => {
+    const inBucket = rows.filter((row) => row.bucket === bucket);
+    const totals = totalsOf(inBucket);
+    return {
+      ts: END - (BUCKETS - bucket) * HOUR,
+      requests: totals.requests,
+      bytes: totals.bytes,
+      uniqueIps: totals.uniqueIps,
+      mitigated: totals.mitigated,
+      serverErrors: totals.serverErrors,
+    };
+  });
+}
+
+function groupsOf(rows: Sample[], group: GroupBy): ExploreSeries[] {
+  if (group === "none") return [];
+  const keyOf = (row: Sample) =>
+    group === "outcome"
+      ? row.outcome
+      : group === "status"
+        ? `${String(row.status)[0]}xx`
+        : row.host;
+  const keys = [...new Set(rows.map(keyOf))].sort();
+  return keys.map((key) => ({
+    key,
+    counts: Array.from(
+      { length: BUCKETS },
+      (_, bucket) => rows.filter((row) => row.bucket === bucket && keyOf(row) === key).length,
+    ),
+  }));
+}
+
+const KEY_OF: Partial<Record<TopDimension, (row: Sample) => string>> = {
+  host: (row) => row.host,
+  path: (row) => row.path,
+  status: (row) => String(row.status),
+  ua: (row) => row.ua,
+  rule: (row) => (row.rule === null ? "" : String(row.rule)),
+};
+
+const RULE_MESSAGES: Record<string, string> = {
+  "930130": "Restricted File Access Attempt",
+  "913100": "Found User-Agent associated with security scanner",
+};
+
+function topOf(rows: Sample[], dimension: TopDimension): TopRow[] {
+  const keyOf = KEY_OF[dimension];
+  if (!keyOf) return [];
+  const byKey = new Map<string, Sample[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (!key) continue;
+    byKey.set(key, [...(byKey.get(key) ?? []), row]);
+  }
+  return [...byKey.entries()]
+    .map(([key, group]) => ({
+      key,
+      label: dimension === "rule" ? (RULE_MESSAGES[key] ?? null) : null,
+      ...totalsOf(group),
+    }))
+    .sort((a, b) => b.requests - a.requests)
+    .slice(0, 6);
+}
+
+function requestsOf(rows: Sample[], mitigatedOnly: boolean): ExploreRequest[] {
+  return rows
+    .filter((row) => !mitigatedOnly || row.outcome !== "served")
+    .slice(-8)
+    .reverse()
+    .map((row, index) => ({
+      ts: END - (BUCKETS - row.bucket) * HOUR + index * 7,
+      clientIp: row.ip,
+      countryCode: row.country,
+      asn: row.asn,
+      asnOrg: row.asnOrg,
+      host: row.host,
+      method: row.method,
+      uri: row.path,
+      status: row.status,
+      proto: row.proto,
+      bytesSent: row.bytes,
+      durationMs: row.durationMs,
+      outcome: row.outcome,
+      userAgent: row.ua,
+    }));
+}
+
+const LISTS: TopDimension[] = ["host", "path", "status", "rule"];
 
 function AnalyticsDemoContent() {
   const t = useTranslations("analytics");
-  const [range, setRange] = useState<Range>("7d");
-  const [metric, setMetric] = useState<Metric>("requests");
-  const [selected, setSelected] = useState<string | null>(null);
-  // Phone-only, as on the page: both choices open as sheets instead of segments.
-  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
-  const [metricSheetOpen, setMetricSheetOpen] = useState(false);
-  const theme = useChartTheme();
-  const metricOptions: { value: Metric; label: string }[] = [
-    { value: "requests", label: t("metricRequests") },
-    { value: "blocked", label: t("metricBlocked") },
-    { value: "uniqueIps", label: t("uniqueIps") },
-  ];
-  const data = SERIES[range];
+  const [filters, setFilters] = useState<AnalyticsFilter[]>([]);
+  const [group, setGroup] = useState<GroupBy>("outcome");
+  const [compare, setCompare] = useState(true);
+  const [mitigatedOnly, setMitigatedOnly] = useState(false);
 
-  const options = useMemo(
-    () => ({
-      ...theme.base,
-      chart: { ...theme.base.chart, type: "area" as const, stacked: false },
-      colors: [theme.series.blue, theme.series.red],
-      dataLabels: { enabled: false },
-      stroke: { curve: "smooth" as const, width: 2 },
-      fill: { type: "gradient", gradient: { opacityFrom: 0.35, opacityTo: 0.02 } },
-      xaxis: { categories: data.labels, labels: { style: { colors: theme.labelColor } } },
-      yaxis: { labels: { style: { colors: theme.labelColor } } },
-      legend: { labels: { colors: theme.labelColor } },
-    }),
-    [theme, data.labels],
+  const current = useMemo(
+    () => CURRENT.filter((row) => filters.every((filter) => matches(row, filter))),
+    [filters],
   );
+  const previous = useMemo(
+    () => PREVIOUS.filter((row) => filters.every((filter) => matches(row, filter))),
+    [filters],
+  );
+  const timeline = useMemo(() => timelineOf(current), [current]);
+  const previousTimeline = useMemo(() => timelineOf(previous), [previous]);
 
-  // Like the map's switch: one ranking, re-sorted by the chosen count.
-  const ranked = [...COUNTRIES].sort((a, b) => b[metric] - a[metric]);
-  const maxCountry = Math.max(...COUNTRIES.map((c) => c[metric]));
-  const selectedCountry = COUNTRIES.find((c) => c.code === selected) ?? null;
-  const maxAgent = Math.max(...USER_AGENTS.map((a) => a.requests));
+  const addFilter = (dimension: TopDimension, value: string, op: FilterOp) => {
+    setFilters(
+      withFilter(
+        { ...DEFAULT_EXPLORE_STATE, filters },
+        { field: TOP_DIMENSION_FIELD[dimension], op, value },
+      ).filters,
+    );
+  };
 
   return (
     <VStack gap={4}>
-      <div className="cpm-desktop-only">
-        <SegmentedControl
-          label={t("timeInterval")}
-          size="sm"
-          value={range}
-          onChange={(next) => setRange(next as Range)}
-        >
-          {RANGES.map((option) => (
-            <SegmentedControlItem key={option} value={option} label={option} />
-          ))}
+      <HStack gap={3} vAlign="center" wrap="wrap">
+        <SegmentedControl label={t("timeInterval")} size="sm" value="24h" onChange={() => {}}>
+          <SegmentedControlItem value="24h" label="24h" />
         </SegmentedControl>
-      </div>
-      {/* The segments do not fit a phone: the interval is a pill that opens a sheet. */}
-      <div className="cpm-chip-row cpm-mobile-flex">
-        <FilterChip
-          label={range}
-          aria-label={t("timeInterval")}
-          onClick={() => setRangeSheetOpen(true)}
-        />
-      </div>
-      <OptionSheet
-        title={t("timeInterval")}
-        isOpen={rangeSheetOpen}
-        onOpenChange={setRangeSheetOpen}
-        value={range}
-        options={RANGES.map((option) => ({ value: option, label: option }))}
-        onChange={setRange}
+        <Switch size="sm" label={t("compare")} value={compare} onChange={setCompare} />
+      </HStack>
+      <FilterBar filters={filters} onChange={setFilters} />
+      <KpiTiles
+        totals={totalsOf(current)}
+        previousTotals={compare ? totalsOf(previous) : null}
+        timeline={timeline}
+        Chart={Chart}
       />
-
-      <Panel title="Requests">
-        <ReactApexChart
-          type="area"
-          height={220}
-          options={options}
-          series={[
-            { name: "Served", data: data.ok },
-            { name: "Blocked", data: data.blocked },
-          ]}
-        />
-      </Panel>
-
-      <Grid columns={{ minWidth: 240, max: 2 }} gap={3}>
-        <Panel title="Protocols">
-          <VStack gap={3}>
-            {PROTOCOLS.map((protocol) => (
-              <Bar key={protocol.label} label={protocol.label} value={protocol.value} max={100} />
-            ))}
-          </VStack>
-        </Panel>
-
-        <Panel title="Top countries">
-          <VStack gap={3}>
-            <div className="cpm-desktop-only">
-              <SegmentedControl
-                label={t("mapMetric")}
-                size="sm"
-                value={metric}
-                onChange={(next) => setMetric(next as Metric)}
-              >
-                {metricOptions.map((option) => (
-                  <SegmentedControlItem
-                    key={option.value}
-                    value={option.value}
-                    label={option.label}
-                  />
-                ))}
-              </SegmentedControl>
-            </div>
-            <div className="cpm-mobile-flex">
-              <FilterChip
-                label={metricOptions.find((option) => option.value === metric)?.label ?? metric}
-                aria-label={t("mapMetric")}
-                onClick={() => setMetricSheetOpen(true)}
-              />
-            </div>
-            <OptionSheet
-              title={t("mapMetric")}
-              isOpen={metricSheetOpen}
-              onOpenChange={setMetricSheetOpen}
-              value={metric}
-              options={metricOptions}
-              onChange={setMetric}
-            />
-            {ranked.map((country) => (
-              <button
-                key={country.code}
-                type="button"
-                aria-pressed={country.code === selected}
-                aria-label={
-                  country.code === selected
-                    ? t("closeCountryBreakdown", { code: country.code })
-                    : t("openCountryBreakdown", { code: country.code })
-                }
-                onClick={() => setSelected((cur) => (cur === country.code ? null : country.code))}
-                style={{
-                  all: "unset",
-                  cursor: "pointer",
-                  display: "block",
-                  borderRadius: "var(--radius-inner)",
-                  padding: "4px 6px",
-                  margin: "-4px -6px",
-                  background:
-                    country.code === selected ? "var(--color-accent-muted)" : "transparent",
-                }}
-              >
-                <Bar
-                  badge={country.code}
-                  label={country.name}
-                  value={country[metric]}
-                  max={maxCountry}
-                />
-              </button>
-            ))}
-          </VStack>
-        </Panel>
+      <TrafficChart
+        timeline={timeline}
+        previousTimeline={compare ? previousTimeline : null}
+        groups={groupsOf(current, group)}
+        group={group}
+        onGroupChange={setGroup}
+        rangeSeconds={86400}
+        Chart={Chart}
+      />
+      <Grid columns={{ minWidth: 300, max: 2 }} gap={3}>
+        {LISTS.map((dimension) => (
+          <TopListCard
+            key={dimension}
+            dimension={dimension}
+            rows={topOf(current, dimension)}
+            total={current.length}
+            onFilter={addFilter}
+          />
+        ))}
       </Grid>
-
-      {selectedCountry && (
-        <CountryBreakdownView
-          code={selectedCountry.code}
-          data={breakdownFor(selectedCountry)}
-          totalRequests={TOTAL_REQUESTS}
-          onClose={() => setSelected(null)}
-        />
-      )}
-
-      <Panel title="Top user agents">
-        <VStack gap={3}>
-          {USER_AGENTS.map((agent) => (
-            <Bar key={agent.name} label={agent.name} value={agent.requests} max={maxAgent} />
-          ))}
-        </VStack>
-      </Panel>
+      <RequestLog
+        requests={requestsOf(current, mitigatedOnly)}
+        mitigatedOnly={mitigatedOnly}
+        onMitigatedOnlyChange={setMitigatedOnly}
+      />
     </VStack>
   );
 }

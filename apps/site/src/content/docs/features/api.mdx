@@ -80,6 +80,31 @@ query {
 
 There is no REST route for it: new API surface goes into GraphQL only.
 
+## Analytics
+
+`analyticsReport(query)` answers what the [analytics](../analytics/) page shows for one state:
+totals against the previous period, the timeline, the chart's groups, ten rows of each top list and
+the latest requests. `query` takes the page's own fields - `range` (or `from` and `to`), `compare`,
+`group`, `filters` and `mitigatedOnly` - and is sanitised the way a hand-edited link is.
+`analyticsTopList` returns one list at up to 100 rows, and `trafficSignals` the 5xx bursts,
+mitigation spikes and blocked-traffic concentrations of the last 24 hours, with `budgetMs` capping
+how long it waits.
+
+```graphql
+query {
+  analyticsReport(
+    query: { range: "7d", filters: [{ field: "outcome", op: "not", value: "served" }] }
+  ) {
+    totals { requests mitigated serverErrors }
+    topLists { dimension rows { key label requests } }
+  }
+  trafficSignals { available skipped signals { kind severity host ongoing } }
+}
+```
+
+Saved views are `analyticsViews`, `createAnalyticsView`, `updateAnalyticsView` and
+`deleteAnalyticsView`; a view's `query` is the page's address after the `?`.
+
 ## Authentication
 
 Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an

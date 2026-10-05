@@ -41,6 +41,27 @@ CREATE TABLE IF NOT EXISTS waf_events (
 CREATE INDEX IF NOT EXISTS waf_events_ts ON waf_events (ts);
 `;
 
+/** Added after the first demos shipped, so an existing store gets them by ALTER. */
+const TRAFFIC_EVENTS_V2_COLUMNS: ReadonlyArray<[string, string]> = [
+  ["duration_ms", "INTEGER"],
+  ["outcome", "TEXT NOT NULL DEFAULT 'served'"],
+  ["asn", "INTEGER NOT NULL DEFAULT 0"],
+  ["asn_org", "TEXT NOT NULL DEFAULT ''"],
+  ["ua_family", "TEXT NOT NULL DEFAULT ''"],
+];
+
+function addMissingColumns(database: Database): void {
+  const present = new Set(
+    database
+      .query<{ name: string }, []>("PRAGMA table_info(traffic_events)")
+      .all()
+      .map((column) => column.name),
+  );
+  for (const [name, type] of TRAFFIC_EVENTS_V2_COLUMNS) {
+    if (!present.has(name)) database.run(`ALTER TABLE traffic_events ADD COLUMN ${name} ${type}`);
+  }
+}
+
 export const ANALYTICS_TABLES = ["traffic_events", "waf_events"] as const;
 
 /** Beside the app's SQLite file, so a demo resets in one directory; memory on PostgreSQL. */
@@ -64,6 +85,7 @@ function store(): Database {
   database.run("PRAGMA journal_mode = WAL");
   database.run("PRAGMA busy_timeout = 5000");
   database.run(DDL);
+  addMissingColumns(database);
   global.__CPM_ANALYTICS_SQLITE__ = database;
   return database;
 }
@@ -161,6 +183,12 @@ const FUNCTIONS: Array<[string, (args: string[]) => string]> = [
   ["concat", (args) => `(${args.join(" || ")})`],
   ["ifNull", ([value, fallback]) => `ifnull(${value}, ${fallback})`],
   ["any", ([value]) => `min(${value})`],
+  ["position", ([haystack, needle]) => `instr(${haystack}, ${needle})`],
+  ["substring", ([value, start, length]) => `substr(${value}, ${start}, ${length})`],
+  [
+    "if",
+    ([condition, then, otherwise]) => `(CASE WHEN ${condition} THEN ${then} ELSE ${otherwise} END)`,
+  ],
 ];
 
 function translateCalls(sql: string): string {

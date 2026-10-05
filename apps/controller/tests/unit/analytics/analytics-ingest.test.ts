@@ -59,7 +59,32 @@ beforeEach(() => {
 
 describe('parseTrafficRow', () => {
   it('keeps a well-formed row, fractional timestamp included, and nothing it did not ask for', () => {
-    expect(parseTrafficRow({ ...traffic, agent_id: 'someone-else', extra: 1 })).toEqual(traffic);
+    expect(parseTrafficRow({ ...traffic, agent_id: 'someone-else', extra: 1 })).toEqual({
+      ...traffic,
+      duration_ms: null,
+      outcome: 'served',
+      asn: null,
+      asn_org: null,
+    });
+  });
+
+  it("keeps a newer agent's outcome, duration and ASN", () => {
+    const row = {
+      ...traffic,
+      duration_ms: 42,
+      outcome: 'waf' as const,
+      asn: 64500,
+      asn_org: 'Example',
+    };
+    expect(parseTrafficRow(row)).toEqual(row);
+  });
+
+  it("reads an older agent's blocker row as geo", () => {
+    expect(parseTrafficRow({ ...traffic, is_blocked: true })?.outcome).toBe('geo');
+  });
+
+  it('counts an outcome it has no name for as served rather than dropping the row', () => {
+    expect(parseTrafficRow({ ...traffic, outcome: 'from-the-future' })?.outcome).toBe('served');
   });
 
   it('drops a row with a field of the wrong type or out of range', () => {
@@ -72,6 +97,10 @@ describe('parseTrafficRow', () => {
       { ...traffic, bytes_sent: 1.5 },
       { ...traffic, uri: 'x'.repeat(64 * 1024 + 1) },
       { ...traffic, host: undefined },
+      { ...traffic, duration_ms: -1 },
+      { ...traffic, duration_ms: 1.5 },
+      { ...traffic, asn: 'AS1' },
+      { ...traffic, asn_org: 7 },
     ]) {
       expect(parseTrafficRow(bad)).toBeNull();
     }
@@ -148,7 +177,8 @@ describe('ingestAnalytics', () => {
     const result = await ingestAnalytics('edge-1', 'traffic', [traffic, { nope: true }, traffic]);
 
     expect(result).toEqual({ accepted: 2, rejected: 1 });
-    expect(ctx.writes).toEqual([{ table: 'traffic', rows: [traffic, traffic], agentId: 'edge-1' }]);
+    const stored = { ...traffic, duration_ms: null, outcome: 'served', asn: null, asn_org: null };
+    expect(ctx.writes).toEqual([{ table: 'traffic', rows: [stored, stored], agentId: 'edge-1' }]);
   });
 
   it('writes WAF rows to their own table', async () => {

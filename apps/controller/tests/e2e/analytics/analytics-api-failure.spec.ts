@@ -79,24 +79,21 @@ test.describe('Analytics API failures', () => {
     expect(errors, `uncaught errors crashed the page: ${JSON.stringify(errors)}`).toEqual([]);
   });
 
-  test('page survives list endpoints returning a non-array payload', async ({ page }) => {
+  test('page survives the report endpoint returning an unexpected payload', async ({ page }) => {
     // A 200 with an unexpected shape must not reach `.map()` unguarded.
     const errors = trackPageErrors(page);
-    for (const path of ['countries', 'timeline', 'protocols', 'user-agents']) {
-      await page.route(`**/api/analytics/${path}?**`, (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ unexpected: 'shape' }),
-        }),
-      );
-    }
+    await page.route('**/api/analytics/explore**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unexpected: 'shape', top: 'nope' }),
+      }),
+    );
 
     await page.goto('/analytics');
     await pageShellRendered(page);
 
-    await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('combobox', { name: 'Filters' })).toBeVisible({ timeout: 15_000 });
     expect(errors, `uncaught errors crashed the page: ${JSON.stringify(errors)}`).toEqual([]);
   });
 });

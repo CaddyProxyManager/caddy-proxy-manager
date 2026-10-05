@@ -326,6 +326,29 @@ export type FleetConfig = {
 
 // ─── Analytics rows ──────────────────────────────────────────────────────────
 
+/**
+ * Why a request ended: `served` reached the end of the gates, the rest name the gate that answered
+ * it. `blocked` is the global deny list. A row without one is `served`, or `geo` when `is_blocked`.
+ */
+export const TRAFFIC_OUTCOMES = [
+  "served",
+  "waf",
+  "geo",
+  "access",
+  "auth",
+  "rate_limit",
+  "crowdsec",
+  "blocked",
+] as const;
+export type TrafficOutcome = (typeof TRAFFIC_OUTCOMES)[number];
+
+/** The access-log field the config's `log_append` writes the outcome to. */
+export const ACCESS_LOG_OUTCOME_FIELD = "cpm_outcome";
+
+export function isTrafficOutcome(value: unknown): value is TrafficOutcome {
+  return (TRAFFIC_OUTCOMES as readonly unknown[]).includes(value);
+}
+
 export type TrafficEventRow = {
   ts: number;
   client_ip: string;
@@ -338,6 +361,13 @@ export type TrafficEventRow = {
   bytes_sent: number;
   user_agent: string;
   is_blocked: boolean;
+  // Optional: absent from an older agent, and an older controller drops what it does not know.
+  /** Caddy's own request duration, in whole milliseconds. */
+  duration_ms?: number | null;
+  outcome?: TrafficOutcome;
+  /** From GeoLite2-ASN, when the agent has it. */
+  asn?: number | null;
+  asn_org?: string | null;
 };
 
 export type WafEventRow = {

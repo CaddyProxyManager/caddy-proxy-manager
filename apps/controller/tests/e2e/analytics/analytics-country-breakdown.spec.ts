@@ -62,27 +62,14 @@ test.describe('Analytics country breakdown', () => {
   test('choosing a country opens its breakdown, and the map metric can be switched', async ({
     page,
   }) => {
-    const tag = `breakdown-ui-${Date.now()}`;
-    const host = `${tag}.example.com`;
+    const host = `breakdown-ui-${Date.now()}.example.com`;
     const ch = makeClient();
     try {
       await ch.insert({ table: 'traffic_events', format: 'JSONEachRow', values: seedRows(host) });
 
-      // The seeded host is traffic-only, so the dropdown needs unconfigured hosts included.
-      await page.addInitScript(() => {
-        try {
-          localStorage.setItem('analytics:includeUnconfiguredHosts', '1');
-        } catch {
-          /* ignore */
-        }
-      });
-      await page.goto('/analytics');
+      // A host filter in the URL, as a shared link or saved view carries it.
+      await page.goto(`/analytics?range=1h&f=${encodeURIComponent(`host:is:${host}`)}`);
       await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
-
-      await page.locator('button[aria-haspopup="listbox"]').click();
-      await page.getByPlaceholder('Search hosts…').fill(tag);
-      await page.getByRole('option', { name: host }).click();
-      await page.keyboard.press('Escape');
 
       const open = page.getByRole('button', { name: `Show the breakdown for ${COUNTRY}` });
       await expect(open).toBeVisible({ timeout: 15_000 });
@@ -99,9 +86,9 @@ test.describe('Analytics country breakdown', () => {
       await page.getByRole('button', { name: `Close the breakdown for ${COUNTRY}` }).click();
       await expect(breakdown).toBeHidden();
 
-      const blocked = page.getByRole('radio', { name: 'Blocked', exact: true });
-      await blocked.click();
-      await expect(blocked).toBeChecked();
+      const mitigated = page.getByRole('radio', { name: 'Mitigated', exact: true });
+      await mitigated.click();
+      await expect(mitigated).toBeChecked();
       const ips = page.getByRole('radio', { name: 'Unique IPs', exact: true });
       await ips.click();
       await expect(ips).toBeChecked();

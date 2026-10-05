@@ -864,3 +864,23 @@ export const pushSubscriptions = sqliteTable(
     userIdx: index("push_subscriptions_user_idx").on(table.userId),
   }),
 );
+
+/** A named analytics page state. Shared ones are listed for everyone who can open analytics. */
+export const analyticsViews = sqliteTable(
+  "analytics_views",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    /** The page's query string, re-parsed on load, so an old view never bypasses sanitising. */
+    query: text("query").notNull(),
+    shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("analytics_views_user_idx").on(table.userId),
+  }),
+);

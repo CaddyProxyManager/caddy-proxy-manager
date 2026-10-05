@@ -869,3 +869,23 @@ export const pushSubscriptions = pgTable(
     userIdx: index("push_subscriptions_user_idx").on(table.userId),
   }),
 );
+
+/** A named analytics page state. Shared ones are listed for everyone who can open analytics. */
+export const analyticsViews = pgTable(
+  "analytics_views",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    /** The page's query string, re-parsed on load, so an old view never bypasses sanitising. */
+    query: text("query").notNull(),
+    shared: boolean("shared").notNull().default(false),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("analytics_views_user_idx").on(table.userId),
+  }),
+);

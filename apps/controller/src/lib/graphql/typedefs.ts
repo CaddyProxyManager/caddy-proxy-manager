@@ -250,6 +250,199 @@ export const typeDefs = /* GraphQL */ `
     upstreams: [UpstreamHealth!]!
   }
 
+  """Why a request ended: served, or the gate that answered it. blocked is the global deny list."""
+  enum TrafficOutcome {
+    served
+    waf
+    geo
+    access
+    auth
+    rate_limit
+    crowdsec
+    blocked
+  }
+
+  """What a top list ranks. ua is the user-agent family; rule a WAF rule, from WAF events."""
+  enum AnalyticsDimension {
+    host
+    path
+    country
+    asn
+    status
+    ip
+    ua
+    method
+    proto
+    rule
+  }
+
+  """
+  One filter. op is is or not. field is a dimension or outcome; status takes 404 or 5xx, country
+  XX for unplaced addresses. WAF-rule lists ignore the fields WAF events do not carry.
+  """
+  input AnalyticsFilterInput {
+    field: String!
+    op: String!
+    value: String!
+  }
+
+  """
+  The analytics page's state, as its URL query holds it. Sanitised as a hand-edited link is: an
+  invalid filter is dropped, a custom range is cut to 92 days.
+  """
+  input AnalyticsQueryInput {
+    """1h, 24h (the default), 7d or 30d. Ignored when from and to are both given."""
+    range: String
+    """Epoch seconds, for a custom range."""
+    from: Int
+    to: Int
+    """Also the same length of time immediately before. On unless false."""
+    compare: Boolean
+    """none, outcome, status or host."""
+    group: String
+    filters: [AnalyticsFilterInput!]
+    """Limit the latest-requests log to mitigated requests."""
+    mitigatedOnly: Boolean
+  }
+
+  type AnalyticsWindow {
+    from: Int!
+    to: Int!
+  }
+
+  type AnalyticsTotals {
+    requests: Float!
+    bytes: Float!
+    uniqueIps: Float!
+    """Requests a gate answered: every outcome but served."""
+    mitigated: Float!
+    serverErrors: Float!
+    """Null when no request in the window carried a duration (an older agent)."""
+    avgDurationMs: Int
+  }
+
+  type AnalyticsBucket {
+    ts: Int!
+    requests: Float!
+    bytes: Float!
+    uniqueIps: Float!
+    mitigated: Float!
+    serverErrors: Float!
+  }
+
+  """Requests per bucket for one group; __other__ gathers the hosts past the busiest."""
+  type AnalyticsSeries {
+    key: String!
+    counts: [Float!]!
+  }
+
+  type AnalyticsTopRow {
+    """The value a filter on this row uses."""
+    key: String!
+    """An ASN's network name, or a WAF rule's message."""
+    label: String
+    requests: Float!
+    mitigated: Float!
+    serverErrors: Float!
+    bytes: Float!
+    uniqueIps: Float!
+  }
+
+  type AnalyticsTopList {
+    dimension: AnalyticsDimension!
+    rows: [AnalyticsTopRow!]!
+  }
+
+  type AnalyticsRequest {
+    ts: Int!
+    clientIp: String!
+    countryCode: String
+    asn: Float
+    asnOrg: String
+    host: String!
+    method: String!
+    uri: String!
+    status: Int!
+    proto: String!
+    bytesSent: Float!
+    durationMs: Float
+    outcome: TrafficOutcome!
+    userAgent: String!
+  }
+
+  type AnalyticsReport {
+    analyticsDisabled: Boolean!
+    loggingDisabled: Boolean!
+    window: AnalyticsWindow!
+    previousWindow: AnalyticsWindow
+    bucketSeconds: Int!
+    totals: AnalyticsTotals!
+    previousTotals: AnalyticsTotals
+    timeline: [AnalyticsBucket!]!
+    """Index-aligned with timeline: bucket i of the period before."""
+    previousTimeline: [AnalyticsBucket!]
+    groups: [AnalyticsSeries!]!
+    """Ten rows each."""
+    topLists: [AnalyticsTopList!]!
+    """Every country, for a map; the country top list is its first ten."""
+    countries: [AnalyticsTopRow!]!
+    """The latest 50."""
+    requests: [AnalyticsRequest!]!
+  }
+
+  enum TrafficSignalKind {
+    serverErrorBurst
+    mitigationSpike
+    blockedConcentration
+  }
+
+  """
+  One finding. Which fields are set follows kind: a burst has from, to, errors, requests, share
+  and ongoing; a spike mitigated, baseline and ratio (host null for every host together); a
+  concentration path, outcome and requests.
+  """
+  type TrafficSignal {
+    kind: TrafficSignalKind!
+    """critical, warning or info."""
+    severity: String!
+    host: String
+    from: Int
+    to: Int
+    errors: Float
+    requests: Float
+    share: Float
+    ongoing: Boolean
+    mitigated: Float
+    baseline: Float
+    ratio: Float
+    path: String
+    outcome: TrafficOutcome
+  }
+
+  type TrafficSignals {
+    """False with analytics off: no signals then means unknown, not all clear."""
+    available: Boolean!
+    window: AnalyticsWindow!
+    signals: [TrafficSignal!]!
+    """Detectors that ran out of time or failed; their findings are missing."""
+    skipped: [TrafficSignalKind!]!
+  }
+
+  """A named analytics page state. Shared ones are listed to every administrator."""
+  type AnalyticsView {
+    id: Int!
+    name: String!
+    """The page's URL query, without the question mark."""
+    query: String!
+    shared: Boolean!
+    ownerId: Int!
+    ownerName: String
+    """Whether the caller owns it, and so may change it."""
+    own: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
   """A page of results, with the total so a client can size its pager."""
   type AuditEventPage {
     items: [AuditEvent!]!
@@ -287,6 +480,21 @@ export const typeDefs = /* GraphQL */ `
     settings(group: String!): JSON
     """The Caddy modules compiled into the running binary."""
     caddyModules: JSON
+    """Tiles, chart, top lists and latest requests for one analytics page state."""
+    analyticsReport(query: AnalyticsQueryInput): AnalyticsReport!
+    """One top list under the same filters, up to 100 rows."""
+    analyticsTopList(
+      query: AnalyticsQueryInput
+      dimension: AnalyticsDimension!
+      limit: Int
+    ): [AnalyticsTopRow!]!
+    """
+    5xx bursts, mitigation spikes and blocked-traffic concentrations. The last 24 hours unless
+    from and to say otherwise; detectors still running after budgetMs (default 4000) are skipped.
+    """
+    trafficSignals(from: Int, to: Int, budgetMs: Int): TrafficSignals!
+    """The caller's saved analytics views and everyone's shared ones."""
+    analyticsViews: [AnalyticsView!]!
   }
 
   type Mutation {
@@ -322,6 +530,12 @@ export const typeDefs = /* GraphQL */ `
     deleteApiToken(id: Int!): Boolean!
 
     saveSettings(group: String!, input: JSON!): JSON!
+
+    """At most 100 per user. query is the page's URL query; it is stored sanitised."""
+    createAnalyticsView(name: String!, query: String!, shared: Boolean): AnalyticsView!
+    """The caller's own views only. Changes whichever of the arguments are given."""
+    updateAnalyticsView(id: Int!, name: String, query: String, shared: Boolean): AnalyticsView!
+    deleteAnalyticsView(id: Int!): Boolean!
 
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!

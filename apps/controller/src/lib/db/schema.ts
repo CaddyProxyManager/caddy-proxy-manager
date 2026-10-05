@@ -54,6 +54,7 @@ export const {
   groupIdpMappings,
   groupGrants,
   pushSubscriptions,
+  analyticsViews,
   wafPresets,
   crsPlugins,
 } = activeSchema;

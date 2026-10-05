@@ -44,6 +44,14 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("waf_preset", "WAF preset", "wafPreset"),
   // settings/ldap-actions.ts
   ...lifecycle("ldap_directory", "directory", "ldapDirectory"),
+  // models/analytics-views.ts
+  ...lifecycle("analytics_view", "analytics view", "analyticsView"),
+  {
+    entityType: "analytics_view",
+    action: "update",
+    message: "analyticsViewRenamed",
+    pattern: /^Renamed analytics view (?<from>.+) to (?<to>.+)$/s,
+  },
 
   // models/proxy-hosts.ts, the row menu's maintenance switch
   {

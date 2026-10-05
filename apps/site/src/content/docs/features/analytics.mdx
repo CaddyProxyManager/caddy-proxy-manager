@@ -1,6 +1,6 @@
 ---
 title: Analytics
-description: Live traffic charts, protocol breakdown, a country map with a per-country breakdown, top user agents and blocked requests, backed by ClickHouse - and a viewer for the raw logs.
+description: Requests, bandwidth, mitigated traffic and 5xx rate against the previous period, why each request ended and how long it took, filters on every dimension, top lists, CSV export, saved views and traffic signals, backed by ClickHouse - and a viewer for the raw logs.
 ---
 
 import Demo from "../../../components/Demo.astro";
@@ -10,19 +10,74 @@ import LogViewerDemo from "../../../demos/samples/LogViewerDemo";
 Traffic and WAF events are written to a bundled ClickHouse instance and queried back as charts. It
 is optional - everything else works without it.
 
-<Demo title="Traffic analytics" note="Change the range, switch what the countries are ranked by, or pick a country to open its breakdown.">
+<Demo title="Traffic analytics" note="Add a filter from any list row, group the chart differently, turn the comparison off, or show only mitigated requests. The numbers are made up in your browser.">
   <AnalyticsDemo client:visible />
 </Demo>
 
 ## What you get
 
-- **Request volume** over a time range you pick, filterable by host.
-- **Protocol breakdown** - the HTTP versions actually in use.
+- **Five headline numbers** - requests, bandwidth, unique IPs, mitigated requests (and their
+  share), and the 5xx rate - each with a sparkline and its change from the period before.
+- **Requests over time**, with the previous period drawn behind as a dashed line. Split the chart
+  by outcome, status class or host (the five busiest, the rest together).
+- **Why each request ended.** Every request is recorded with its outcome: **served**, or the gate
+  that answered it - **WAF**, **geo block**, **access list** (a refused address), **sign-in** (a
+  wrong basic-auth password, or a forward-auth server that said no), **rate limit** or
+  **CrowdSec**. Anything but served counts as mitigated. Its duration is recorded too.
+- **Filters on everything**: host, path, country, network (ASN), status code or class (`404`,
+  `5xx`), method, HTTP version, client IP, user-agent family, outcome and WAF rule, each as *is* or
+  *is not*. Every top-list row has a button to show only it or leave it out.
+- **Top lists** of hosts, paths, countries, networks, status codes, client IPs, user agents,
+  methods, HTTP versions and WAF rules. Each shows ten; **View all** shows up to 100.
 - **A country map**, from the same GeoIP databases [geo blocking](../geo-blocking/) uses. Colour it
-  by requests, blocked requests or unique IPs, and pick a country - on the map or in the table
-  beside it - to see which hosts it reached, how they answered, and which user agents it sent.
-- **Top user agents**, which is usually how you notice a scraper.
-- **Blocked requests**, paginated, and the [WAF](../waf/) rules that fired most often.
+  by requests, mitigated requests or unique IPs, and pick a country to see which hosts it reached,
+  how they answered, and which user agents it sent.
+- **The latest requests**, with their outcome and duration, or only the mitigated ones.
+- **CSV export** of the chart's buckets and of every list. A value a client sent that a spreadsheet
+  would run as a formula is kept as text.
+- **Ranges** of 1 hour, 24 hours, 7 days and 30 days, or a custom range of up to 92 days. Ranges of
+  a day or less refresh every 30 seconds.
+
+The page's whole state - range, comparison, grouping, filters - is in its address, so a link opens
+exactly what you were looking at.
+
+### Saved views
+
+**Saved views** stores the current state under a name. Pick one from the menu to open it; from
+**Manage views** you can rename it, save the current state over it, copy its link or delete it.
+Ticking **Share with every administrator** lists it for everyone who can open analytics; only its
+owner can change it. Each person can keep up to 100. Saving, changing and deleting a view are in the
+[audit log](../audit-log/).
+
+### How the outcome is worked out
+
+The generated Caddy config marks each gate a request reaches - WAF, geo block, access list,
+sign-in, rate limit, CrowdSec - and logs the last one it got to with the request. A request a gate
+turns away never gets past the mark, so that gate is its outcome; one that clears them all is
+served. A host with no gates logs no mark and is always served.
+
+Rows recorded before this existed, or relayed by an agent older than it, count as served - or as
+geo-blocked where the geo blocker logged them - and have no duration. The network column needs the
+GeoLite2 ASN database, which the controller downloads with the others when a MaxMind key is set.
+
+A **WAF rule** filter matches requests by client and path against the WAF events the rule logged,
+since the access log does not know the rule. The WAF rule list follows the host, path, country,
+client IP and method filters, the ones a WAF event carries.
+
+### Traffic signals
+
+The controller also looks for traffic worth a look, over the last 24 hours:
+
+- **5xx bursts**: at least 10 5xx answers making up at least 10% of a host's requests in those
+  minutes, with runs less than three minutes apart joined. A burst with a 5xx in the last five
+  minutes is still going on.
+- **Mitigation spikes**: at least 50 mitigated requests, and at least three times the average for a
+  window that long over the 7 days before it - for one host, or for all of them together.
+- **Blocked traffic concentrations**: one host, path and outcome with at least 50 mitigated
+  requests.
+
+They are in the [API](../api/) as `trafficSignals`; each detector has a time budget, and one that
+runs out is reported as skipped rather than holding the answer up.
 
 ## Turning it on
 

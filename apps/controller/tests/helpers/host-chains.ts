@@ -1,4 +1,5 @@
 /** Reads a built Caddy document back as the handler lists that end in a given upstream. */
+import { isOutcomeMarker } from '../../src/lib/caddy/outcome-markers';
 
 export type Handler = Record<string, unknown>;
 
@@ -41,6 +42,11 @@ export function handlerLabel(handler: Handler): string {
   return String(handler.handler);
 }
 
+/** The outcome markers sit around every gate and say nothing about the order. */
+export function withoutMarkers(chain: Handler[]): Handler[] {
+  return chain.filter((handler) => !isOutcomeMarker(handler));
+}
+
 export function chainLabels(doc: unknown, upstream: string): string[][] {
-  return chainsTo(doc, upstream).map((chain) => chain.map(handlerLabel));
+  return chainsTo(doc, upstream).map((chain) => withoutMarkers(chain).map(handlerLabel));
 }

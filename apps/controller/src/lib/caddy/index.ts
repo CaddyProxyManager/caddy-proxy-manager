@@ -175,6 +175,7 @@ import {
   transportTimeoutFields,
 } from "../proxy-hosts/upstream-timeouts";
 import { buildRateLimitHandler, type HostRateLimitMeta } from "../proxy-hosts/rate-limit";
+import { instrumentOutcomes, tagOutcome } from "./outcome-markers";
 import {
   buildAppSecHandler,
   buildCrowdSecApp,
@@ -2037,7 +2038,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         domainGroups,
         authMode,
         baseHandlers: authentikStripHandler ? [authentikStripHandler, ...handlers] : handlers,
-        authHandler: forwardAuthHandler,
+        authHandler: tagOutcome(forwardAuthHandler, "auth"),
         reverseProxyHandler: hostProxyHandler,
         locationRules,
         cacheHandler: hostCacheHandler,
@@ -2062,9 +2063,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         domainGroups,
         authMode: resolvePathAuthMode(forwardAuth.protectedPaths, forwardAuth.excludedPaths),
         baseHandlers: forwardAuthHandlers,
-        authHandler: buildGenericForwardAuthHandler(forwardAuth, false),
+        authHandler: tagOutcome(buildGenericForwardAuthHandler(forwardAuth, false), "auth"),
         apiAuthHandler: forwardAuth.apiSplit
-          ? buildGenericForwardAuthHandler(forwardAuth, true)
+          ? tagOutcome(buildGenericForwardAuthHandler(forwardAuth, true), "auth")
           : null,
         bypassHeaders: forwardAuth.apiBypassHeaders,
         reverseProxyHandler: hostProxyHandler,
@@ -2192,7 +2193,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           domainGroups,
           authMode,
           baseHandlers: cpmHandlers,
-          authHandler: cpmForwardAuthHandler,
+          authHandler: tagOutcome(cpmForwardAuthHandler, "auth"),
           reverseProxyHandler: hostProxyHandler,
           locationRules,
           cacheHandler: hostCacheHandler,
@@ -2405,6 +2406,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         buildDefaultCatchAll,
       });
     }
+
+    instrumentOutcomes(hostRoutes);
 
     if (tailscale?.serve) {
       tailscaleNodes.add(tailscale.node);

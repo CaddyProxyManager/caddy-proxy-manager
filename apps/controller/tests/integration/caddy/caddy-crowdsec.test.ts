@@ -46,7 +46,7 @@ import {
 } from '../../../src/lib/models/proxy-hosts';
 import { DomainError } from '../../../src/lib/errors/domain-error';
 import { startFakeAgent } from '../../helpers/fake-agent';
-import { chainLabels, chainsTo, handlerLabel } from '../../helpers/host-chains';
+import { chainLabels, chainsTo, handlerLabel, withoutMarkers } from '../../helpers/host-chains';
 import * as schema from '../../../src/lib/db/schema';
 
 const NOW = new Date().toISOString();
@@ -264,7 +264,7 @@ describe('the handler chain', () => {
     await create('all.example.com', everything);
     const plain = chainsTo(await document(), UPSTREAM);
     expect(plain).toHaveLength(1);
-    expect(plain[0].map(label)).toEqual([...gates, 'proxy']);
+    expect(withoutMarkers(plain[0]).map(label)).toEqual([...gates, 'proxy']);
 
     await ctx.db.delete(schema.proxyHosts);
     await create('all-fa.example.com', {
@@ -273,7 +273,12 @@ describe('the handler chain', () => {
     });
     const withAuth = chainsTo(await document(), UPSTREAM);
     expect(withAuth).toHaveLength(1);
-    expect(withAuth[0].map(label)).toEqual(['strip-remote', ...gates, 'forward-auth', 'proxy']);
+    expect(withoutMarkers(withAuth[0]).map(label)).toEqual([
+      'strip-remote',
+      ...gates,
+      'forward-auth',
+      'proxy',
+    ]);
   });
 
   it('runs once, ahead of the auth subrequest, on a forward-auth host', async () => {
