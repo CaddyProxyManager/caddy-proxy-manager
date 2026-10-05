@@ -78,6 +78,8 @@ const protocolOf = (row: Row) => (row.listen.endsWith("/udp") ? "udp" : "tcp");
 function L4HostsTableDemoContent() {
   const t = useTranslations("l4ProxyHosts");
   const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
+  const tProxyHosts = useTranslations("proxyHosts");
   const router = useRouter();
   const params = useSearchParams();
   const protocol =
@@ -98,7 +100,7 @@ function L4HostsTableDemoContent() {
   const columns: Column<Row>[] = [
     {
       id: "name",
-      label: "Name",
+      label: tCommon("name"),
       render: (r) => (
         <HStack gap={1} vAlign="center">
           <Text type="body" size="sm" weight="semibold">
@@ -108,10 +110,10 @@ function L4HostsTableDemoContent() {
         </HStack>
       ),
     },
-    { id: "listen", label: "Listening", render: (r) => <Badge label={r.listen} /> },
+    { id: "listen", label: t("listen"), render: (r) => <Badge label={r.listen} /> },
     {
       id: "matcher",
-      label: "Matcher",
+      label: t("matcher"),
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
           {r.matcher}
@@ -120,7 +122,7 @@ function L4HostsTableDemoContent() {
     },
     {
       id: "upstream",
-      label: "Upstream",
+      label: tProxyHosts("upstreams"),
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
           {r.upstream}
@@ -129,7 +131,7 @@ function L4HostsTableDemoContent() {
     },
     {
       id: "status",
-      label: "Status",
+      label: tCommon("status"),
       render: (r) => (
         <StatusChip status={r.status} label={r.status === "warning" ? "Port pending" : undefined} />
       ),
@@ -159,7 +161,7 @@ function L4HostsTableDemoContent() {
         <Tab value="tcp" label="TCP" endContent={<Badge label={tcp} />} />
         <Tab value="udp" label="UDP" endContent={<Badge label={udp} />} />
       </TabList>
-      <DataTable columns={columns} data={rows} keyField="id" emptyMessage="No L4 hosts yet" />
+      <DataTable columns={columns} data={rows} keyField="id" emptyMessage={t("emptyMessage")} />
     </VStack>
   );
 }

@@ -12,9 +12,13 @@ import type { EmailMessage } from "./transport";
 
 type Catalog = typeof import("../../../messages/en.json");
 
-async function emailTranslator(locale: Locale) {
+async function emailTranslators(locale: Locale) {
   const messages = (await import(`../../../messages/${locale}.json`)).default as Catalog;
-  return createTranslator({ locale, messages, namespace: "email" });
+  return {
+    t: createTranslator({ locale, messages, namespace: "email" }),
+    // For what a notice carries as a stored error code, rendered from `errors.*`.
+    tRoot: createTranslator({ locale, messages }),
+  };
 }
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -83,12 +87,12 @@ export function renderBody(body: Body): { text: string; html: string } {
 
 /** Shared with the admin notifications (lib/notifications/email.ts). */
 export async function emailContext(locale: Locale) {
-  const [t, appName, url] = await Promise.all([
-    emailTranslator(locale),
+  const [{ t, tRoot }, appName, url] = await Promise.all([
+    emailTranslators(locale),
     getAppName(),
     getPublicBaseUrl(),
   ]);
-  return { t, appName, url, footer: t("footer", { appName, url }) };
+  return { t, tRoot, appName, url, footer: t("footer", { appName, url }) };
 }
 
 export async function testEmail(

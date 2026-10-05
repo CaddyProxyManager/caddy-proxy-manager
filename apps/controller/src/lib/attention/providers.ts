@@ -168,6 +168,7 @@ const caddyApply: AttentionProvider = {
           agent: failure.agent ?? "",
           error: failure.error,
         },
+        errors: [{ message: failure.error, code: failure.errorCode ?? null }],
         href: rowIds.has(key) ? `/agents#agent-${rowIds.get(key)}` : "/agents",
         at: failure.at,
         scope: {},
@@ -534,6 +535,14 @@ const geoip: AttentionProvider = {
           values: {
             error: state.error ?? state.failures.map((failure) => failure.message).join("; "),
           },
+          // A state stored before failures were kept has only the joined English.
+          ...(state.failures.length > 0 && {
+            errors: state.failures.map((failure) => ({
+              message: failure.message,
+              code: failure.code,
+              edition: failure.edition,
+            })),
+          }),
           href: SETTINGS_LINKS.geoip,
           at: state.ranAt,
           scope: {},

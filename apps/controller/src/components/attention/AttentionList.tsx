@@ -18,6 +18,7 @@ import {
   type AttentionSeverity,
   attentionMessageValues,
 } from "@/lib/attention/types";
+import { attentionErrorText } from "@/lib/attention/error-text";
 
 const DOT: Record<AttentionSeverity, "error" | "warning" | "neutral"> = {
   critical: "error",
@@ -42,6 +43,8 @@ export function AttentionList({
   emptyTitle?: string;
 }) {
   const t = useTranslations("attention");
+  // For an error stored with its code, said in the reader's language rather than the English.
+  const tRoot = useTranslations();
   // The one place the keys are composed at runtime; tests/unit/attention covers the catalog.
   const tItem = t as unknown as DynamicTranslate;
 
@@ -63,7 +66,10 @@ export function AttentionList({
     <VStack gap={2}>
       <List hasDividers density="compact">
         {list.items.map((item) => {
-          const values = attentionMessageValues(item);
+          const values = {
+            ...attentionMessageValues(item),
+            ...(item.errors?.length && { error: attentionErrorText(tRoot, item.errors) }),
+          };
           return (
             <ListItem
               key={item.id}

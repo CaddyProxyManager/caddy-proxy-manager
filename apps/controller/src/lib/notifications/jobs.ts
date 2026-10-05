@@ -1,12 +1,13 @@
 /** Background jobs worth an email: GeoIP updates that keep failing, a CRS plugin switched off, a release. */
 
+import type { GeoipUpdateResult } from "../geoip/updater";
 import { notify, recordJobFailure, recordJobSuccess } from "./index";
 
 /** A single failed download is routine (a MaxMind blip); three in a row is not. */
 export const GEOIP_FAILURE_STREAK = 3;
 
 export async function reportGeoipRun(
-  result: { error: string | null; skipped?: string },
+  result: Pick<GeoipUpdateResult, "error" | "skipped" | "checkError" | "failures">,
   now = Date.now(),
 ): Promise<void> {
   if (result.skipped) return;
@@ -15,7 +16,13 @@ export async function reportGeoipRun(
     await recordJobFailure(
       "geoip",
       GEOIP_FAILURE_STREAK,
-      (failures) => ({ kind: "geoipFailed", failures, error }),
+      (failures) => ({
+        kind: "geoipFailed",
+        failures,
+        error,
+        checkError: result.checkError ?? null,
+        editionFailures: result.failures ?? [],
+      }),
       now,
     );
   } else {

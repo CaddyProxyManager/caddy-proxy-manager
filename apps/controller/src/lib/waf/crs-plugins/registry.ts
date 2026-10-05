@@ -5,7 +5,7 @@
  */
 
 import { findCrsPluginRejections } from "../caddy";
-import { DomainError, domainError, domainErrorMessage } from "../../errors/domain-error";
+import { DomainError, type DomainErrorDetail, domainError } from "../../errors/domain-error";
 
 /** The OWASP registry; an operator may point at a registry of their own instead. */
 export const OFFICIAL_CRS_REGISTRY_URL =
@@ -343,12 +343,13 @@ export function assertCrsPluginRulesLoadable(
   );
   if (rejections.length === 0) return;
   const range = { start: String(ruleIdStart), end: String(ruleIdEnd) };
-  const details = rejections
-    .slice(0, MAX_NAMED_REJECTIONS)
-    .map(
-      (entry) =>
-        `"${entry.line.slice(0, 160)}" - ${domainErrorMessage(entry.reason, { ...range, ...entry.params })}`,
-    );
+  // Codes, not sentences, so each reason is said in the reader's language too.
+  const details: DomainErrorDetail[] = rejections.slice(0, MAX_NAMED_REJECTIONS).map((entry) => ({
+    code: entry.reason,
+    params: { ...range, ...entry.params },
+    line: entry.line.slice(0, 160),
+    ...(entry.cause && { cause: entry.cause }),
+  }));
   throw domainError(
     "crsPluginRejected",
     // `reasons` is for checkCrsPluginSupport; the message does not print it.

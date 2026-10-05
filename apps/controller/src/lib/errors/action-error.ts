@@ -1,5 +1,11 @@
 import type { useFormatter, useTranslations } from "next-intl";
-import { DomainError, domainErrorOf, type StoredErrorCode } from "./domain-error";
+import {
+  DomainError,
+  domainErrorOf,
+  isDetailList,
+  renderDetails,
+  type StoredErrorCode,
+} from "./domain-error";
 
 export type ActionState = {
   status: "idle" | "success" | "error";
@@ -45,15 +51,19 @@ export function extractErrorMessage(
   if (domain) {
     // `params` has to come along: without it a code carrying placeholders renders them raw.
     const values: Record<string, string | number> = {};
+    const translate = t as unknown as DynamicTranslate;
     for (const [name, value] of Object.entries(domain.params)) {
+      const list = isDetailList(value)
+        ? renderDetails(value, (code, params) => translate(`errors.${code}`, params))
+        : value;
       values[name] =
-        typeof value !== "object"
-          ? value
+        typeof list !== "object"
+          ? list
           : format
-            ? format.list(value, { type: "unit" })
-            : value.join(", ");
+            ? format.list(list, { type: "unit" })
+            : list.join(", ");
     }
-    return (t as unknown as DynamicTranslate)(`errors.${domain.code}`, values);
+    return translate(`errors.${domain.code}`, values);
   }
   return error instanceof Error ? error.message : fallbackMessage;
 }

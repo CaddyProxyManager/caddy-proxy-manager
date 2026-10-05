@@ -66,10 +66,15 @@ const LISTS: AccessList[] = [
   },
 ];
 
-const MEMBER_COLUMNS: Column<Member>[] = [
+/** Labelled as AccessListsClient labels the same columns. */
+const memberColumns = (labels: {
+  username: string;
+  added: string;
+  remove: (username: string) => string;
+}): Column<Member>[] => [
   {
     id: "username",
-    label: "Username",
+    label: labels.username,
     render: (r) => (
       <Text type="code" size="sm">
         {r.username}
@@ -78,7 +83,7 @@ const MEMBER_COLUMNS: Column<Member>[] = [
   },
   {
     id: "addedAt",
-    label: "Added",
+    label: labels.added,
     width: 120,
     render: (r) => (
       <Text type="body" size="sm" color="secondary">
@@ -91,7 +96,9 @@ const MEMBER_COLUMNS: Column<Member>[] = [
     label: "",
     width: 60,
     align: "right",
-    render: () => <IconButton variant="ghost" size="sm" icon={<Trash2 />} label="Remove member" />,
+    render: (r) => (
+      <IconButton variant="ghost" size="sm" icon={<Trash2 />} label={labels.remove(r.username)} />
+    ),
   },
 ];
 
@@ -187,7 +194,15 @@ function AccessListDemoContent() {
             description={t("membersEmptyDescription")}
           />
         ) : (
-          <DataTable columns={MEMBER_COLUMNS} data={selected.members} keyField="id" />
+          <DataTable
+            columns={memberColumns({
+              username: tCommon("username"),
+              added: t("columnAdded"),
+              remove: (username) => t("removeNamed", { username }),
+            })}
+            data={selected.members}
+            keyField="id"
+          />
         )
       ) : selected.usedBy.length === 0 ? (
         <EmptyState

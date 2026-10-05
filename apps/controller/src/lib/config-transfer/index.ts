@@ -14,7 +14,14 @@ import { MARKER, exportRow, importRow } from "../backup/secrets";
 import { applyCaddyConfig } from "../caddy";
 import db, { nowIso, runInTransaction } from "../db";
 import { activeSchema, schemaDialect } from "../db/schema";
-import { type DomainError, domainError, domainErrorOf } from "../errors/domain-error";
+import {
+  type DomainError,
+  domainError,
+  domainErrorMessage,
+  domainErrorOf,
+  isDetailList,
+  renderDetails,
+} from "../errors/domain-error";
 import { MASKED_VALUE } from "../host-review/types";
 import { type Described, describeTables, resyncSequence } from "../migration/import";
 import { isNewer } from "../runtime/updates";
@@ -376,7 +383,11 @@ function invalidValues(error: DomainError): Record<string, string> {
     ...Object.fromEntries(
       Object.entries(error.params).map(([name, value]) => [
         name,
-        typeof value === "object" ? value.join(", ") : String(value),
+        isDetailList(value)
+          ? renderDetails(value, domainErrorMessage).join(", ")
+          : typeof value === "object"
+            ? value.join(", ")
+            : String(value),
       ]),
     ),
     code: error.code,

@@ -7,6 +7,8 @@ import { createFormatter } from "next-intl";
 import { DEFAULT_LOCALE, type Locale } from "../locale";
 import { emailContext, renderBody } from "../email/messages";
 import type { EmailMessage } from "../email/transport";
+import { storedErrorMessage } from "../errors/action-error";
+import { geoipUpdateErrorMessage } from "../geoip/messages";
 import type { NotificationEvent } from "./events";
 import type { PendingNotice } from "./plan";
 
@@ -38,8 +40,10 @@ function clean(values: Record<string, string | number>): Record<string, string |
   return cleaned;
 }
 
-/** The ICU values for a kind's `item` and `title`. */
-function values(event: NotificationEvent): Record<string, string | number> {
+type RootTranslate = Parameters<typeof storedErrorMessage>[0];
+
+/** The ICU values for a kind's `item` and `title`. Errors with a stored code in `tRoot`'s language. */
+function values(event: NotificationEvent, tRoot: RootTranslate): Record<string, string | number> {
   switch (event.kind) {
     case "accountDisabled":
     case "lastAdminKept":
@@ -59,7 +63,7 @@ function values(event: NotificationEvent): Record<string, string | number> {
       return {
         scope: event.agent === null ? "all" : "agent",
         agent: event.agent ?? "",
-        error: event.error,
+        error: storedErrorMessage(tRoot, event.error, event.errorCode),
       };
     case "caddyApplyRecovered":
       return { scope: event.agent === null ? "all" : "agent", agent: event.agent ?? "" };
@@ -67,7 +71,16 @@ function values(event: NotificationEvent): Record<string, string | number> {
     case "agentProblemResolved":
       return { agent: event.agent, problem: event.problem };
     case "geoipFailed":
-      return { failures: event.failures, error: event.error };
+      return {
+        failures: event.failures,
+        error:
+          geoipUpdateErrorMessage(tRoot, {
+            downloaded: [],
+            error: event.error,
+            checkError: event.checkError,
+            failures: event.editionFailures,
+          }) ?? event.error,
+      };
     case "crsPluginDisabled":
       return { plugin: event.plugin, version: event.version };
     case "updateAvailable":
@@ -83,9 +96,10 @@ export async function notificationText(notices: readonly PendingNotice[], locale
   const context = await emailContext(locale);
   const { t, appName } = context;
   const translate = t as unknown as DynamicTranslate;
+  const tRoot = context.tRoot as unknown as RootTranslate;
 
   const texts = notices.map(({ event }) => {
-    const text = translate(`notifications.kinds.${event.kind}.item`, clean(values(event)));
+    const text = translate(`notifications.kinds.${event.kind}.item`, clean(values(event, tRoot)));
     return event.kind === "agentProblem" && event.detail
       ? t("notifications.withDetail", { text, detail: String(clean({ d: event.detail }).d) })
       : text;
@@ -97,7 +111,7 @@ export async function notificationText(notices: readonly PendingNotice[], locale
           appName,
           title: translate(
             `notifications.kinds.${first.event.kind}.title`,
-            clean(values(first.event)),
+            clean(values(first.event, tRoot)),
           ),
         })
       : t("notifications.subjectMany", { appName, count: notices.length });

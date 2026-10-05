@@ -49,6 +49,7 @@ const CERTS: Row[] = [
 
 function CertificatesTableDemoContent() {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const acme = CERTS.filter((c) => c.issuer === "Let's Encrypt").length;
   const imported = CERTS.length - acme;
   const expired = CERTS.filter((c) => c.status === "error").length;
@@ -75,7 +76,7 @@ function CertificatesTableDemoContent() {
     },
     {
       id: "expires",
-      label: "Expires",
+      label: t("expires"),
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
           {r.expires}
@@ -84,13 +85,13 @@ function CertificatesTableDemoContent() {
     },
     {
       id: "status",
-      label: "Status",
+      label: tCommon("status"),
       render: (r) => (
         <StatusChip
           status={r.status}
-          label={
-            r.status === "warning" ? "Expiring soon" : r.status === "error" ? "Expired" : "Valid"
-          }
+          label={t(
+            `expiry.${r.status === "warning" ? "soon" : r.status === "error" ? "expired" : "ok"}`,
+          )}
         />
       ),
     },

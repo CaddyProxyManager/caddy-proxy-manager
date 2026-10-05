@@ -9,6 +9,7 @@ import {
 } from "../errors/domain-error";
 import {
   type SeclangIssue,
+  type SeclangIssueCode,
   goTrimSpace,
   parseActions,
   seclangDirectives,
@@ -555,6 +556,8 @@ export type CrsPluginRejection = {
   reason: CrsPluginRejectionReason;
   /** The linter's own reason, as a sentence, for `crsPluginInvalidSeclang`. */
   params?: { reason: string };
+  /** That reason as its code, for a reader in another language. */
+  cause?: { code: SeclangIssueCode; params: Record<string, string> };
 };
 
 /**
@@ -610,6 +613,7 @@ export function findCrsPluginRejections(
       line: sourceLines[issue.line - 1].trim(),
       reason: "crsPluginInvalidSeclang",
       params: { reason: domainErrorMessage(issue.code, issue.params) },
+      cause: { code: issue.code, params: issue.params },
     });
   }
   return rejections;

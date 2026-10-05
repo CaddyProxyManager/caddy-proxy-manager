@@ -9,6 +9,7 @@ import {
   type NamedResource,
 } from "@cpm/controller/src/components/groups/GroupAccessDialog";
 import { DemoSurface } from "../DemoSurface";
+import { t } from "../catalog";
 
 const PROXY_HOSTS: NamedResource[] = [
   { id: 1, name: "grafana.example.com" },
@@ -51,7 +52,12 @@ export default function GroupAccessDemo() {
         <VStack gap={2} align="start">
           <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
             <Text weight="semibold">Network team</Text>
-            <Button variant="secondary" size="sm" label="Access" onClick={() => setOpen(true)} />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("groups.access")}
+              onClick={() => setOpen(true)}
+            />
           </HStack>
           <Text size="sm" color="secondary">
             {access.mappings.length > 0

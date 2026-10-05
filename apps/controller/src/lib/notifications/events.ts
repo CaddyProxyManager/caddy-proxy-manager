@@ -3,6 +3,9 @@
  * `email.notifications.*`, so no sentence is built here and the catalog holds every language's.
  */
 
+import type { StoredErrorCode } from "../errors/domain-error";
+import type { GeoipDownloadFailure } from "../geoip/updater";
+
 export const NOTIFICATION_CATEGORIES = [
   "accountDisabled",
   "adminLocked",
@@ -31,11 +34,24 @@ export type NotificationEvent =
   | { kind: "agentOnline"; agent: string }
   | { kind: "upstreamErrors"; host: string; count: number; minutes: number }
   | { kind: "upstreamRecovered"; host: string }
-  | { kind: "caddyApplyFailed"; agent: string | null; error: string }
+  /** `errorCode` renders `error` in the reader's language; absent on a notice stored before it. */
+  | {
+      kind: "caddyApplyFailed";
+      agent: string | null;
+      error: string;
+      errorCode?: StoredErrorCode | null;
+    }
   | { kind: "caddyApplyRecovered"; agent: string | null }
   | { kind: "agentProblem"; agent: string; problem: AgentProblem; detail: string | null }
   | { kind: "agentProblemResolved"; agent: string; problem: AgentProblem }
-  | { kind: "geoipFailed"; failures: number; error: string }
+  /** As caddyApplyFailed, with the run's parts in place of one code. */
+  | {
+      kind: "geoipFailed";
+      failures: number;
+      error: string;
+      checkError?: { message: string; code: StoredErrorCode | null } | null;
+      editionFailures?: GeoipDownloadFailure[];
+    }
   | { kind: "geoipRecovered" }
   | { kind: "crsPluginDisabled"; plugin: string; version: string }
   | { kind: "updateAvailable"; version: string; current: string }

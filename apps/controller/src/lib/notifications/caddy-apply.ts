@@ -5,6 +5,7 @@
  */
 
 import { CaddyApplyError } from "../caddy/apply-error";
+import { storedErrorCode } from "../errors/domain-error";
 import { openProblemKeys, raiseProblem, resolveProblem } from "./index";
 
 const PREFIX = "caddy-apply:";
@@ -21,7 +22,12 @@ export async function reportApplyFailure(
   const agent = target ?? error.agent;
   await raiseProblem(
     `${PREFIX}${agent?.agentId ?? "all"}`,
-    { kind: "caddyApplyFailed", agent: agent?.name ?? null, error: error.message },
+    {
+      kind: "caddyApplyFailed",
+      agent: agent?.name ?? null,
+      error: error.message,
+      errorCode: storedErrorCode(error),
+    },
     now,
   );
 }

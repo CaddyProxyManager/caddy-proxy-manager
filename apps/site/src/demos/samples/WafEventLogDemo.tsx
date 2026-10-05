@@ -236,26 +236,27 @@ function WafStatusCard({ stats }: { stats: Stats }) {
 /** Beside the list, not over it, so reading the next event does not mean closing this one. */
 function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
   return (
     <Card padding={4}>
       <VStack gap={3}>
         <HStack gap={2} vAlign="center" justify="between">
           <HStack gap={2} vAlign="center">
             <Text type="label" weight="bold">
-              WAF Event
+              {t("wafEvent")}
             </Text>
             {event.blocked ? (
-              <Badge variant="error" label="Blocked" />
+              <Badge variant="error" label={t("blocked")} />
             ) : (
-              <Badge variant="warning" label="Detected" />
+              <Badge variant="warning" label={t("detected")} />
             )}
           </HStack>
-          <Button variant="ghost" size="sm" label="Close" onClick={onClose} />
+          <Button variant="ghost" size="sm" label={tCommon("close")} onClick={onClose} />
         </HStack>
 
         <VStack gap={0}>
           <Text type="label" size="3xs" weight="bold" color="secondary">
-            Rule message
+            {t("ruleMessage")}
           </Text>
           <Text type="body" size="sm">
             {event.ruleMessage}
@@ -368,18 +369,18 @@ function WafEventLogDemoContent() {
     },
     {
       id: "blocked",
-      label: "Action",
+      label: t("action"),
       width: 110,
       render: (r) =>
         r.blocked ? (
-          <Badge variant="error" label="Blocked" />
+          <Badge variant="error" label={t("blocked")} />
         ) : (
-          <Badge variant="warning" label="Detected" />
+          <Badge variant="warning" label={t("detected")} />
         ),
     },
     {
       id: "severity",
-      label: "Severity",
+      label: t("severity"),
       width: 100,
       render: (r) => (
         <Badge variant={SEVERITY_VARIANTS[r.severity]} label={titleCase(r.severity)} />
@@ -387,7 +388,7 @@ function WafEventLogDemoContent() {
     },
     {
       id: "host",
-      label: "Host",
+      label: t("host"),
       width: 150,
       render: (r) => (
         <Text type="code" size="xsm" maxLines={1}>
@@ -397,7 +398,7 @@ function WafEventLogDemoContent() {
     },
     {
       id: "clientIp",
-      label: "Client IP",
+      label: tCommon("clientIp"),
       width: 150,
       render: (r) => (
         <HStack gap={1} vAlign="center">
@@ -410,7 +411,7 @@ function WafEventLogDemoContent() {
     },
     {
       id: "method",
-      label: "Request",
+      label: tCommon("request"),
       width: 220,
       render: (r) => (
         <HStack gap={2} vAlign="center">
@@ -425,7 +426,7 @@ function WafEventLogDemoContent() {
     },
     {
       id: "ruleId",
-      label: "Rule ID",
+      label: tProxyHosts("ruleId"),
       width: 80,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
@@ -499,7 +500,7 @@ function WafEventLogDemoContent() {
               emptyMessage="No events match that search"
               onRowClick={(row) => setSelectedId((cur) => (cur === row.id ? null : row.id))}
               rowStatus={(row) =>
-                row.id === selectedId ? { color: "accent", label: "Selected" } : null
+                row.id === selectedId ? { color: "accent", label: t("selected") } : null
               }
             />
           </div>

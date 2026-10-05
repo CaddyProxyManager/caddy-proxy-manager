@@ -1516,6 +1516,7 @@
     "crsPluginNoRuleFiles": "The plugin's repository has no rule files in its plugins folder",
     "crsPluginEngineIncompatible": "The plugin does not support Coraza, the WAF engine Caddy runs. It supports: {engines}",
     "crsPluginRejected": "The plugin cannot be loaded here: {count} directive(s) are refused, for example {details}",
+    "quotedReason": "\"{line}\" - {reason}",
     "crsPluginDirectiveNotAllowed": "not a directive a plugin may use - only SecRule, SecAction, SecMarker, SecRuleRemoveById, SecRuleRemoveByTag, SecRuleUpdateTargetById and SecRuleUpdateTargetByTag are permitted",
     "crsPluginNeedsFile": "it reads a Lua script, a data file or a GeoIP database, which Caddy cannot load for a plugin",
     "crsPluginRuleIdOutOfRange": "a rule id is outside the plugin's registered range, {start} to {end}",

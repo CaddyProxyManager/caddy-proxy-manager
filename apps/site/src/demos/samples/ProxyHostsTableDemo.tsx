@@ -179,7 +179,7 @@ function ProxyHostsTableDemoContent() {
   const columns: Column<Row>[] = [
     {
       id: "domain",
-      label: "Domain",
+      label: t("nameDomain"),
       sortKey: "domain",
       // The docs column is narrower than the app's, so protections ride under the domain and the
       // agents column is left out.
@@ -319,8 +319,8 @@ function ProxyHostsTableDemoContent() {
         data={rows}
         keyField="id"
         sort={{ sortBy, sortDir }}
-        emptyMessage="No proxy hosts yet"
-        rowStatus={(r) => (r.enabled ? null : { color: "gray", label: "Disabled" })}
+        emptyMessage={t("noProxyHostsFound")}
+        rowStatus={(r) => (r.enabled ? null : { color: "gray", label: t("filterDisabled") })}
         selection={{
           selectedKeys,
           onChange: setSelectedKeys,

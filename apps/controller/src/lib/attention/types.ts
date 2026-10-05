@@ -3,6 +3,8 @@
  * `attention.items.<code>` in the reader's language, so no provider builds a sentence. Client safe.
  */
 
+import type { StoredErrorCode } from "../errors/domain-error";
+
 export const ATTENTION_SEVERITIES = ["critical", "warning", "info"] as const;
 export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
 
@@ -47,6 +49,12 @@ export type AttentionCode = (typeof ATTENTION_CODES)[number];
 
 export type AttentionValues = Record<string, string | number>;
 
+/**
+ * What `values.error` was built from, for a reader in another language: each part's English and
+ * code, and the GeoIP edition it is about. The English in `values` stays for the API.
+ */
+export type AttentionError = { message: string; code: StoredErrorCode | null; edition?: string };
+
 /** Who may see an item. Neither set: administrators only. */
 export type AttentionScope = { proxyHosts?: number[]; agent?: number };
 
@@ -62,6 +70,7 @@ export type AttentionItem = {
   /** When it started or was last seen, if known. */
   at: string | null;
   scope: AttentionScope;
+  errors?: AttentionError[];
 };
 
 export type AttentionList = {

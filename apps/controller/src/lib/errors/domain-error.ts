@@ -8,8 +8,41 @@ import { errors as englishErrors } from "../../../messages/en.json";
 
 export type DomainErrorCode = keyof typeof englishErrors;
 
-/** Joined with ", " in English; `extractErrorMessage` list-formats it for a reader. */
-export type DomainErrorParams = Record<string, string | number | readonly string[]>;
+type CodedSentence = { code: DomainErrorCode; params: Record<string, string | number> };
+
+/**
+ * One item of a list param that is itself a sentence: rendered from its own code, after the quoted
+ * `line` it is about when there is one (`errors.quotedReason`). A `cause` renders into `{reason}`.
+ */
+export type DomainErrorDetail = CodedSentence & { line?: string; cause?: CodedSentence };
+
+/** A list is joined with ", " in English; `extractErrorMessage` list-formats it for a reader. */
+export type DomainErrorParams = Record<
+  string,
+  string | number | readonly string[] | readonly DomainErrorDetail[]
+>;
+
+export function isDetailList(
+  value: DomainErrorParams[string],
+): value is readonly DomainErrorDetail[] {
+  return Array.isArray(value) && value.length > 0 && typeof value[0] === "object";
+}
+
+/** How a detail list reads, given how one code renders; shared by English and a reader's language. */
+export function renderDetails(
+  details: readonly DomainErrorDetail[],
+  render: (code: DomainErrorCode, params: Record<string, string | number>) => string,
+): string[] {
+  return details.map((detail) => {
+    const params = detail.cause
+      ? { ...detail.params, reason: render(detail.cause.code, detail.cause.params) }
+      : detail.params;
+    const reason = render(detail.code, params);
+    return detail.line === undefined
+      ? reason
+      : render("quotedReason", { line: detail.line, reason });
+  });
+}
 
 export class DomainError extends Error {
   constructor(
@@ -32,6 +65,7 @@ export function domainErrorMessage(code: DomainErrorCode, params: DomainErrorPar
   return englishErrors[code].replace(/\{(\w+)\}/g, (whole, name: string) => {
     if (!(name in params)) return whole;
     const value = params[name];
+    if (isDetailList(value)) return renderDetails(value, domainErrorMessage).join(", ");
     return typeof value === "object" ? value.join(", ") : String(value);
   });
 }

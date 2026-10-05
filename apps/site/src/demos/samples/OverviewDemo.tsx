@@ -4,6 +4,7 @@ import OverviewClient, {
 import type { AttentionList } from "@cpm/controller/src/lib/attention/types";
 import type { SetupChecklist } from "@cpm/controller/src/lib/setup-checklist/steps";
 import { DemoSurface } from "../DemoSurface";
+import { t } from "../catalog";
 
 const SERVER_EVENTS_BY_HOUR: Record<number, number> = {
   9: 2,
@@ -195,9 +196,10 @@ export default function OverviewDemo() {
       <OverviewClient
         userName="Avery"
         stats={[
-          { label: "Proxy hosts", icon: "proxyHosts", count: 11, total: 12, href: "#" },
-          { label: "Certificates", icon: "certificates", count: 9, href: "#" },
-          { label: "Access lists", icon: "accessLists", count: 3, href: "#" },
+          // Named as the overview page names them.
+          { label: t("nav.proxyHosts"), icon: "proxyHosts", count: 11, total: 12, href: "#" },
+          { label: t("nav.certificates"), icon: "certificates", count: 9, href: "#" },
+          { label: t("nav.accessLists"), icon: "accessLists", count: 3, href: "#" },
         ]}
         trafficSummary={{ totalRequests: 68_620, blockedPercent: 0.6 }}
         serverEventCount={17}
