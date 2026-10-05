@@ -3,6 +3,7 @@ import { installFakeCaddy } from './helpers/caddy-admin';
 import { cleanupTestDbs, markTestBoundary } from './helpers/db';
 import { clearDotEnv } from './helpers/env';
 import { vi } from './helpers/vi';
+import { invalidateProcessMemos } from '@/src/lib/settings/process-memo';
 
 // Preloaded (bunfig.toml) once per test file, before it is imported; `--isolate` keeps it per file.
 
@@ -23,6 +24,8 @@ if (!process.env.TEST_LOG) {
 installFakeCaddy();
 beforeEach(() => {
   installFakeCaddy();
+  // Each test has its own database, so nothing held for the process may outlive it.
+  invalidateProcessMemos();
   // Runs before the file's own hooks, so a database made in its beforeEach belongs to the test.
   markTestBoundary();
 });

@@ -3,6 +3,7 @@ import { getAuth } from "./server";
 import { domainError } from "../errors/domain-error";
 import { getUserById } from "../models/user";
 import { type ViewAs, readViewAs } from "../users/view-as";
+import { requestMemo } from "../request-memo";
 
 export type Session = {
   user: {
@@ -19,14 +20,23 @@ export type Session = {
   /** Viewing as another role, `user.role` is that role (checks read it); `realRole` is not. */
   viewAs?: ViewAs;
   realRole?: string;
+  /** Off `user`, which the dashboard hands to the browser; read with the row at no extra cost. */
+  account?: { createdAt: string; timeZone: string | null; numberFormat: string | null };
 };
 
-/** Role is fetched fresh from the DB, so a demotion takes effect immediately. */
+/**
+ * Role is fetched fresh from the DB, so a demotion takes effect immediately. Without `req`, once
+ * per page render: the proxy, layouts, page and metadata would otherwise each read it again.
+ */
 export async function auth(req?: NextRequest): Promise<Session | null> {
-  const hdrs = req ? req.headers : (await import("next/headers")).headers();
+  if (req) return resolveSession(req.headers);
+  return requestMemo("auth:session", async () => {
+    const { headers } = await import("next/headers");
+    return resolveSession(await headers());
+  });
+}
 
-  const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
-
+async function resolveSession(resolvedHeaders: Headers): Promise<Session | null> {
   // biome-ignore lint/suspicious/noExplicitAny: better-auth's runtime shape, narrowed below
   let betterAuthSession: any;
   try {
@@ -72,6 +82,11 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
       image: currentUser.avatarUrl ?? (baUser.avatarUrl as string | null | undefined) ?? null,
       hasPassword: Boolean(currentUser.passwordHash),
       twoFactorEnabled: currentUser.twoFactorEnabled,
+    },
+    account: {
+      createdAt: currentUser.createdAt,
+      timeZone: currentUser.timeZone,
+      numberFormat: currentUser.numberFormat,
     },
   };
 }

@@ -13,6 +13,7 @@ import { listEnabledOAuthProviders } from "./models/oauth-providers";
 import { listEnabledLdapDirectories } from "./models/ldap-directories";
 import { scanForLegacyDatabases } from "./migration/legacy-database";
 import { logAuditEvent } from "./audit";
+import { invalidateProcessMemos, processMemo } from "./settings/process-memo";
 
 /** Whether anything on this host looks like a database from before the PostgreSQL move. */
 export function hasLegacyDatabase(): boolean {
@@ -61,6 +62,7 @@ async function setFlag(key: string): Promise<void> {
     .insert(settings)
     .values({ key, value: "true", updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value: "true", updatedAt: now } });
+  invalidateProcessMemos();
 }
 
 /** Remember which file was migrated, for the summary and the backup download. */
@@ -209,8 +211,11 @@ export async function isMigrationSettled(): Promise<boolean> {
   return (await getMigrationSource()) !== null;
 }
 
+/** The proxy asks on every page request. Held once true: only a restore or import clears it. */
 export async function isSetupCompleted(): Promise<boolean> {
-  return isFlagSet(SETUP_COMPLETED_KEY);
+  return processMemo(SETUP_COMPLETED_KEY, () => isFlagSet(SETUP_COMPLETED_KEY), {
+    keep: (completed) => completed,
+  });
 }
 
 export async function markSetupCompleted(): Promise<void> {

@@ -3,9 +3,10 @@
  * actions have a reader's language: so a code plus an English sentence, which REST keeps returning.
  */
 
-import en from "../../../messages/en.json";
+// Named, so a client bundle carries this namespace and not the whole catalog.
+import { errors as englishErrors } from "../../../messages/en.json";
 
-export type DomainErrorCode = keyof typeof en.errors;
+export type DomainErrorCode = keyof typeof englishErrors;
 
 /** Joined with ", " in English; `extractErrorMessage` list-formats it for a reader. */
 export type DomainErrorParams = Record<string, string | number | readonly string[]>;
@@ -28,7 +29,7 @@ export class DomainError extends Error {
 }
 
 export function domainErrorMessage(code: DomainErrorCode, params: DomainErrorParams = {}): string {
-  return en.errors[code].replace(/\{(\w+)\}/g, (whole, name: string) => {
+  return englishErrors[code].replace(/\{(\w+)\}/g, (whole, name: string) => {
     if (!(name in params)) return whole;
     const value = params[name];
     return typeof value === "object" ? value.join(", ") : String(value);

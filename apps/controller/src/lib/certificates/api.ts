@@ -50,6 +50,8 @@ export function toCertificateApiResponse(certificate: Certificate): CertificateA
   };
 }
 
-export function toCertificatePickerOption(certificate: Certificate): CertificatePickerOption {
+export function toCertificatePickerOption(
+  certificate: Pick<Certificate, "id" | "name">,
+): CertificatePickerOption {
   return { id: certificate.id, name: certificate.name };
 }

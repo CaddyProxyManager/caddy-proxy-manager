@@ -48,15 +48,10 @@ import {
 } from "@/lib/proxy-hosts/editor-sections";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
-import type { CaCertificate } from "@/lib/models/ca-certificates";
-import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
-import type { TailscaleHostDefaults } from "@/components/proxy-hosts/TailscaleFields";
-import type { MtlsRole } from "@/lib/models/mtls-roles";
-import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { setProxyHostMaintenanceAction, toggleProxyHostAction } from "./actions";
+import { useHostEditorOptions } from "./useHostEditorOptions";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column, useRowSelection } from "@/components/ui/DataTable";
@@ -66,44 +61,23 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
-import {
-  CreateHostDialog,
-  EditHostDialog,
-  DeleteHostDialog,
-} from "@/components/proxy-hosts/HostDialogs";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { StatTiles } from "@/components/ui/StatTiles";
+import dynamic from "next/dynamic";
 
-type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
-type ForwardAuthGroup = {
-  id: number;
-  name: string;
-  description: string | null;
-  member_count: number;
-};
-type ForwardAuthAccessMap = Record<number, { userIds: number[]; groupIds: number[] }>;
+// On first open: the editor is most of this page's code, and most visits never open it.
+const HostEditors = dynamic(() => import("./HostEditors"), { ssr: false });
 
 type Props = {
   hosts: ProxyHost[];
+  /** Names for the TLS column and the count; the editor reads its own options when it opens. */
   certificates: CertificatePickerOption[];
-  accessLists: AccessList[];
-  caCertificates: CaCertificate[];
-  authentikDefaults: AuthentikSettings | null;
-  forwardAuthDefaults: ForwardAuthSettings | null;
-  /** Prefilled into a new host's domains; empty for none. */
-  defaultDomain: string;
-  tailscaleDefaults: TailscaleHostDefaults | null;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
   /** Every tag on a host the viewer can see, for the filter. */
   tags?: string[];
   activeTag?: string | null;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
-  mtlsRoles?: MtlsRole[];
-  issuedClientCerts?: IssuedClientCertificate[];
-  forwardAuthUsers?: ForwardAuthUser[];
-  forwardAuthGroups?: ForwardAuthGroup[];
-  forwardAuthAccessMap?: ForwardAuthAccessMap;
   agents?: AgentOption[];
   /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
@@ -305,22 +279,11 @@ function HostActions({
 export default function ProxyHostsClient({
   hosts,
   certificates,
-  accessLists,
-  caCertificates,
-  authentikDefaults,
-  forwardAuthDefaults,
-  defaultDomain,
-  tailscaleDefaults,
   pagination,
   initialSearch,
   tags = [],
   activeTag = null,
   initialSort,
-  mtlsRoles,
-  issuedClientCerts,
-  forwardAuthUsers,
-  forwardAuthGroups,
-  forwardAuthAccessMap,
   agents,
   agentAssignments,
   counts,
@@ -350,6 +313,16 @@ export default function ProxyHostsClient({
   const selectedHosts = hosts.filter((host) => selectedKeys.has(String(host.id)));
   // Hidden on a phone in v1: the cards have no checkboxes to select with.
   const isNarrow = useMediaQuery("(max-width: 767px)");
+  const showBulkBar = selectedHosts.length > 0 && !isNarrow;
+  // Mounted from the first open on, so a closing dialog still animates out.
+  const [editorsUsed, setEditorsUsed] = useState(false);
+  if (!editorsUsed && (createOpen || editHost !== null || deleteHost !== null)) {
+    setEditorsUsed(true);
+  }
+  const editorOptions = useHostEditorOptions(createOpen || editHost !== null || showBulkBar, () => {
+    setCreateOpen(false);
+    setEditHost(null);
+  });
 
   const router = useRouter();
   const pathname = usePathname();
@@ -762,11 +735,11 @@ export default function ProxyHostsClient({
           />
         }
         bulkBar={
-          selectedHosts.length > 0 && !isNarrow ? (
+          showBulkBar && editorOptions ? (
             <ProxyHostBulkActions
               hosts={selectedHosts}
-              certificates={certificates}
-              accessLists={accessLists}
+              certificates={editorOptions.certificates}
+              accessLists={editorOptions.accessLists}
               onClear={() => setSelectedKeys(new Set())}
             />
           ) : undefined
@@ -791,56 +764,24 @@ export default function ProxyHostsClient({
         }}
       />
 
-      <CreateHostDialog
-        defaultDomain={defaultDomain}
-        key={dialogKey}
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setTimeout(() => setDuplicateHost(null), 200);
-        }}
-        initialData={duplicateHost}
-        certificates={certificates}
-        accessLists={accessLists}
-        authentikDefaults={authentikDefaults}
-        forwardAuthDefaults={forwardAuthDefaults}
-        tailscaleDefaults={tailscaleDefaults}
-        caCertificates={caCertificates}
-        mtlsRoles={mtlsRoles ?? []}
-        issuedClientCerts={issuedClientCerts ?? []}
-        forwardAuthUsers={forwardAuthUsers ?? []}
-        forwardAuthGroups={forwardAuthGroups ?? []}
-        agents={agents ?? []}
-      />
-
-      {editHost && (
-        <EditHostDialog
-          open={!!editHost}
-          host={editHost}
-          initialSection={editSection}
-          onClose={closeEditor}
-          certificates={certificates}
-          accessLists={accessLists}
-          authentikDefaults={authentikDefaults}
-          forwardAuthDefaults={forwardAuthDefaults}
-          tailscaleDefaults={tailscaleDefaults}
-          caCertificates={caCertificates}
-          mtlsRoles={mtlsRoles ?? []}
-          issuedClientCerts={issuedClientCerts ?? []}
-          forwardAuthUsers={forwardAuthUsers ?? []}
-          forwardAuthGroups={forwardAuthGroups ?? []}
-          forwardAuthAccess={forwardAuthAccessMap?.[editHost.id] ?? null}
+      {editorsUsed && (
+        <HostEditors
+          options={editorOptions}
+          createOpen={createOpen}
+          createKey={dialogKey}
+          duplicateHost={duplicateHost}
+          onCloseCreate={() => {
+            setCreateOpen(false);
+            setTimeout(() => setDuplicateHost(null), 200);
+          }}
+          editHost={editHost}
+          editSection={editSection}
+          onCloseEdit={closeEditor}
+          deleteHost={deleteHost}
+          onCloseDelete={() => setDeleteHost(null)}
           agents={agents ?? []}
-          assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
+          agentAssignments={agentAssignments ?? {}}
           canEditRawConfig={canEditRawConfig}
-        />
-      )}
-
-      {deleteHost && (
-        <DeleteHostDialog
-          open={!!deleteHost}
-          host={deleteHost}
-          onClose={() => setDeleteHost(null)}
         />
       )}
 

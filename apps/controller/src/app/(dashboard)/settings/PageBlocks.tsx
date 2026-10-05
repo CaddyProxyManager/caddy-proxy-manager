@@ -361,22 +361,23 @@ function useDirtyForms(
     const check = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        setDirty((previous) => {
-          for (const form of forms()) {
-            const key = formKey(form);
-            // Rendered after the first frame: unedited, so what it holds now is its baseline.
-            let fields = fieldBaselines.get(key);
-            if (!fields) {
-              fields = valuesByName(form);
-              fieldBaselines.set(key, fields);
-              baselines.set(key, serializeForm(form));
-            }
-            markUnsaved(form, fields, staged);
+        // Outside the updater, which StrictMode runs twice.
+        for (const form of forms()) {
+          const key = formKey(form);
+          // Rendered after the first frame: unedited, so what it holds now is its baseline.
+          let fields = fieldBaselines.get(key);
+          if (!fields) {
+            fields = valuesByName(form);
+            fieldBaselines.set(key, fields);
+            baselines.set(key, serializeForm(form));
           }
-          const next = saveable().filter((form) => {
-            const baseline = baselines.get(formKey(form));
-            return baseline !== undefined && serializeForm(form) !== baseline;
-          });
+          markUnsaved(form, fields, staged);
+        }
+        const next = saveable().filter((form) => {
+          const baseline = baselines.get(formKey(form));
+          return baseline !== undefined && serializeForm(form) !== baseline;
+        });
+        setDirty((previous) => {
           // Same set, same array: a new one every frame would rerender the bar continuously.
           const same =
             next.length === previous.length && next.every((form, i) => form === previous[i]);

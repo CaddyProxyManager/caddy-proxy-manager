@@ -2,7 +2,9 @@ import db, { toIso, nowIso } from "../db";
 import { auditEvents } from "../db/schema";
 import { insertAuditRows } from "../audit";
 import { type AuditChange, parseAuditChanges } from "../audit/changes";
-import { and, asc, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
+import { processMemo } from "../settings/process-memo";
+import { AUDIT_FILTER_OPTIONS } from "../audit/filter-options";
 
 export type AuditEvent = {
   id: number;
@@ -58,21 +60,23 @@ export async function countAuditEvents(filter?: string | AuditEventFilter): Prom
   return row?.value ?? 0;
 }
 
+/**
+ * Read from the table once per process, then kept current by every audit insert
+ * (`noteAuditFilterValues`), so the page does not scan the whole log twice per view.
+ */
 export async function auditFilterOptions(): Promise<{ entityTypes: string[]; actions: string[] }> {
-  const [entityTypes, actions] = await Promise.all([
-    db
-      .selectDistinct({ value: auditEvents.entityType })
-      .from(auditEvents)
-      .orderBy(asc(auditEvents.entityType)),
-    db
-      .selectDistinct({ value: auditEvents.action })
-      .from(auditEvents)
-      .orderBy(asc(auditEvents.action)),
-  ]);
-  return {
-    entityTypes: entityTypes.map((row) => row.value),
-    actions: actions.map((row) => row.value),
-  };
+  const known = await processMemo(AUDIT_FILTER_OPTIONS, async () => {
+    const [entityTypes, actions] = await Promise.all([
+      db.selectDistinct({ value: auditEvents.entityType }).from(auditEvents),
+      db.selectDistinct({ value: auditEvents.action }).from(auditEvents),
+    ]);
+    return {
+      entityTypes: new Set(entityTypes.map((row) => row.value)),
+      actions: new Set(actions.map((row) => row.value)),
+    };
+  });
+  const sorted = (values: Set<string>) => [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return { entityTypes: sorted(known.entityTypes), actions: sorted(known.actions) };
 }
 
 export async function listAuditEvents(

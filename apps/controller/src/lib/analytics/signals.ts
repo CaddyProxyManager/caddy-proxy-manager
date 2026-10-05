@@ -5,7 +5,14 @@
  */
 
 import type { TrafficOutcome } from "@cpm/shared";
-import { isAnalyticsEnabled, queryRows, timeFilter, timeParams } from "../clickhouse/client";
+import {
+  isAnalyticsEnabled,
+  queryRows,
+  timeFilter,
+  timeParams,
+  withQueryAbort,
+} from "../clickhouse/client";
+import { processMemo } from "../settings/process-memo";
 import { PATH_SQL } from "../clickhouse/explore";
 import type { TimeWindow } from "./explore-state";
 
@@ -254,9 +261,13 @@ function withinBudget<T>(
   });
 }
 
+/** The host list, the overview and a host's page all ask within the same minute. */
+const SIGNALS_MEMO_MS = 60_000;
+
 /**
  * The last 24 hours by default. Detectors run in parallel; one still running at the budget is
- * reported in `skipped` rather than waited for.
+ * reported in `skipped` rather than waited for, and its query cancelled. A complete answer is
+ * held for a minute, keyed on the window to the minute.
  */
 export async function detectTrafficSignals(
   options: { window?: TimeWindow; budgetMs?: number; now?: number } = {},
@@ -270,16 +281,34 @@ export async function detectTrafficSignals(
   if (!(await isAnalyticsEnabled().catch(() => false))) {
     return { available: false, window, signals: [], skipped: [] };
   }
+  const minute = (seconds: number) => Math.floor(seconds / 60);
+  return processMemo(
+    `traffic-signals:${minute(window.from)}:${minute(window.to)}`,
+    () => runDetectors(window, now, options.budgetMs ?? DEFAULT_SIGNAL_BUDGET_MS),
+    { ttlMs: SIGNALS_MEMO_MS, keep: (found) => found.skipped.length === 0 },
+  );
+}
 
+async function runDetectors(
+  window: TimeWindow,
+  now: number,
+  budgetMs: number,
+): Promise<TrafficSignals> {
+  const abort = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<typeof TIMED_OUT>((resolve) => {
-    timer = setTimeout(() => resolve(TIMED_OUT), options.budgetMs ?? DEFAULT_SIGNAL_BUDGET_MS);
+    timer = setTimeout(() => {
+      resolve(TIMED_OUT);
+      abort.abort();
+    }, budgetMs);
   });
+  const run = <T>(detect: () => Promise<T>) =>
+    withinBudget(withQueryAbort(abort.signal, detect), deadline);
   try {
     const [errors, mitigated, piles] = await Promise.all([
-      withinBudget(minuteErrors(window), deadline),
-      withinBudget(mitigatedCounts(window), deadline),
-      withinBudget(concentrations(window), deadline),
+      run(() => minuteErrors(window)),
+      run(() => mitigatedCounts(window)),
+      run(() => concentrations(window)),
     ]);
     const signals: TrafficSignal[] = [];
     const skipped: TrafficSignal["kind"][] = [];

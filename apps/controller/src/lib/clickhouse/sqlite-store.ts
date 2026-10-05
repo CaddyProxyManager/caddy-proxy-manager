@@ -172,6 +172,7 @@ const FUNCTIONS: Array<[string, (args: string[]) => string]> = [
     ([value, condition]) => `count(DISTINCT CASE WHEN ${condition} THEN ${value} END)`,
   ],
   ["uniqExact", ([value]) => `count(DISTINCT ${value})`],
+  ["uniqIf", ([value, condition]) => `count(DISTINCT CASE WHEN ${condition} THEN ${value} END)`],
   ["uniq", ([value]) => `count(DISTINCT ${value})`],
   ["countIf", ([condition]) => `count(CASE WHEN ${condition} THEN 1 END)`],
   ["count", (args) => (args.length === 0 ? "count(*)" : `count(${args.join(", ")})`)],

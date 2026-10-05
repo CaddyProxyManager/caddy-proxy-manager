@@ -17,6 +17,7 @@ import { config } from "../config";
 import db, { nowIso, runInTransaction } from "../db";
 import { auditChain, auditEvents, schemaDialect } from "../db/schema";
 import { derivePurposeKey } from "../secrets/derived-key";
+import { noteAuditFilterValues } from "./filter-options";
 
 export const GENESIS_HASH = "0".repeat(64);
 const HEAD_ID = 1;
@@ -234,6 +235,7 @@ export function chainedAuditInsert(tx: Builder, rows: AuditRow[]) {
     const head = yield* lockHead(tx);
     const linked = linkAuditRows(head, rows, key);
     yield { run: tx.insert(auditEvents).values(linked.values) };
+    noteAuditFilterValues(rows);
     const next = { ...head, headSeq: linked.headSeq, headHash: linked.headHash };
     yield {
       run: tx

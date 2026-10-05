@@ -11,7 +11,7 @@ import { BulkActionBar, BulkConfirmDialog } from "@/components/ui/BulkActionBar"
 import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHostBulkAction } from "@/lib/models/bulk-hosts";
-import { NONE_VALUE, accessListOptions, accessListStatus, toOptions } from "./HostDialogs";
+import { NONE_VALUE, accessListOptions, accessListStatus, toOptions } from "./host-pickers";
 import { BulkTagInput } from "./HostTagsField";
 
 type Props = {

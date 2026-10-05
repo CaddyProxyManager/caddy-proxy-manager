@@ -1,5 +1,6 @@
 import { and, count, gte, lte, sql } from "drizzle-orm";
 import db from "../db";
+import { processMemo } from "../settings/process-memo";
 import { auditEvents, proxyHosts, schemaDialect } from "../db/schema";
 import {
   querySummary,
@@ -311,6 +312,8 @@ export interface HostTrafficResult {
   byHost: Map<number, HostTraffic>;
 }
 
+const HOST_TOTALS_MEMO_MS = 30_000;
+
 /**
  * ClickHouse records the Host header, so totals fold back onto the host serving that domain.
  * Wildcards are not expanded: a request counts only if its exact name is on the host. `available`
@@ -329,7 +332,13 @@ export async function getTrafficByProxyHost(
     // analytics is off and when nothing was recorded, and only the first should hide the column.
     if (!(await isAnalyticsEnabled())) return { available: false, byHost };
     if (hosts.length === 0) return { available: true, byHost };
-    totals = await queryHostTotals(from, to);
+    // The host list and the overview's attention both ask for the last day, per render.
+    const minute = (seconds: number) => Math.floor(seconds / 60);
+    totals = await processMemo(
+      `host-totals:${minute(from)}:${minute(to)}`,
+      () => queryHostTotals(from, to),
+      { ttlMs: HOST_TOTALS_MEMO_MS },
+    );
   } catch {
     return { available: false, byHost };
   }

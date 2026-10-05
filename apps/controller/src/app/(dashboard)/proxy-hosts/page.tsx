@@ -1,7 +1,6 @@
 import ProxyHostsClient from "./ProxyHostsClient";
 import {
   listProxyHostsPaginated,
-  countProxyHosts,
   countProxyHostsByState,
   getProxyHost,
   getProxyHostsByIds,
@@ -13,24 +12,9 @@ import {
   getTrafficForList,
   listInsights,
   sortIdsByRequests,
+  startListInsightInputs,
 } from "@/src/lib/proxy-hosts/list-insights";
-import { listCertificates } from "@/src/lib/models/certificates";
-import { listCaCertificates } from "@/src/lib/models/ca-certificates";
-import { listAccessLists } from "@/src/lib/models/access-lists";
-import {
-  getAuthentikSettings,
-  getForwardAuthSettings,
-  getGeneralSettings,
-  getTailscaleSettings,
-} from "@/src/lib/settings";
-import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
-import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
-import { listUsers } from "@/src/lib/models/user";
-import { listGroups } from "@/src/lib/models/groups";
-import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
-import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/waf/WafPresetOptions";
-import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
-import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
+import { listCertificateSummaries } from "@/src/lib/models/certificates";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import {
@@ -89,71 +73,44 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // filtered set and paged after.
   const analyticsOn = await isAnalyticsEnabled().catch(() => false);
   const sortBy = sortByParam || (analyticsOn ? "requests" : undefined);
-  const refs = analyticsOn ? await listProxyHostDomainRefs(search, visibleIds, enabled, tag) : [];
-  const traffic = analyticsOn
-    ? await getTrafficForList(refs)
-    : { available: false, byHost: new Map<number, never>() };
-  const byRequests = sortBy === "requests" && traffic.available;
   const editId = Number.parseInt(editParam ?? "", 10);
 
-  // The header counts the whole visible, searched set, not this page.
-  const [
-    hosts,
-    total,
-    counts,
-    tags,
-    certificates,
-    caCertificates,
-    accessLists,
-    authentikDefaults,
-    forwardAuthDefaults,
-    tailscaleSettings,
-    generalSettings,
-    agents,
-    // Safe to fail before the RBAC migration has run.
-    mtlsRoles,
-    issuedClientCerts,
-    allUsers,
-    allGroups,
-    wafPresets,
-    crsPlugins,
-  ] = await Promise.all([
-    byRequests
-      ? getProxyHostsByIds(
-          sortIdsByRequests(
-            refs.map((ref) => ref.id),
-            traffic.byHost,
-            sortDir,
-          ).slice(offset, offset + PER_PAGE),
-        )
-      : listProxyHostsPaginated(
-          PER_PAGE,
-          offset,
-          search,
-          sortBy,
-          sortDir,
-          visibleIds,
-          enabled,
-          tag,
-        ),
-    countProxyHosts(search, visibleIds, enabled, tag),
+  // Everything independent starts now; the insights' slow inputs (signals, the agents' certificate
+  // inventory) run under their budgets alongside the list rather than after it.
+  const insightInputs = analyticsOn ? startListInsightInputs() : undefined;
+  insightInputs?.catch(() => {});
+  const listed = () =>
+    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled, tag);
+  const pageByCreated = sortBy === "requests" ? null : listed();
+  // Awaited below; this only keeps a failure while something else is awaited from going unhandled.
+  pageByCreated?.catch(() => {});
+  const trafficPromise = (async () => {
+    const refs = analyticsOn ? await listProxyHostDomainRefs(search, visibleIds, enabled, tag) : [];
+    const traffic = analyticsOn
+      ? await getTrafficForList(refs)
+      : { available: false, byHost: new Map<number, never>() };
+    return { refs, traffic };
+  })();
+  const [{ refs, traffic }, counts, tags, certificates, agents] = await Promise.all([
+    trafficPromise,
+    // The header counts the whole visible, searched set, not this page; the tab's own count is
+    // the total under its state filter.
     countProxyHostsByState(search, visibleIds, tag),
     listProxyHostTags(visibleIds),
-    listCertificates(),
-    listCaCertificates(),
-    listAccessLists(),
-    getAuthentikSettings(),
-    getForwardAuthSettings(),
-    getTailscaleSettings(),
-    getGeneralSettings(),
+    listCertificateSummaries(),
     listAgentOptions().catch(() => []),
-    listMtlsRoles().catch(() => []),
-    listIssuedClientCertificates().catch(() => []),
-    listUsers().catch(() => []),
-    listGroups().catch(() => []),
-    listWafPresets(),
-    listCrsPlugins(),
   ]);
+  const byRequests = sortBy === "requests" && traffic.available;
+  const hosts = byRequests
+    ? await getProxyHostsByIds(
+        sortIdsByRequests(
+          refs.map((ref) => ref.id),
+          traffic.byHost,
+          sortDir,
+        ).slice(offset, offset + PER_PAGE),
+      )
+    : await (pageByCreated ?? listed());
+  const total = enabled === undefined ? counts.total : enabled ? counts.enabled : counts.disabled;
 
   // The editor opened from a host's page, which may sit on another page of the list.
   const editHost = Number.isInteger(editId)
@@ -164,86 +121,40 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
 
   // Assignments for this page's hosts only, not the fleet. Insights are best-effort: unavailable
   // analytics drops the columns instead of failing the list.
-  const faHosts = dialogHosts.filter((h) => h.cpmForwardAuth?.enabled);
-  const [assignments, insights, faAccessEntries] = await Promise.all([
+  const [assignments, insights] = await Promise.all([
     agentIdsForHosts(
       "http",
       dialogHosts.map((host) => host.id),
     ).catch(() => new Map<number, number[]>()),
-    listInsights({ pageHosts: hosts, traffic, certificates }).catch(
+    listInsights({ pageHosts: hosts, traffic, certificates, inputs: insightInputs }).catch(
       () => ({ available: false }) as const,
     ),
-    Promise.all(faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => []))),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
-  const forwardAuthAccessMap: Record<number, { userIds: number[]; groupIds: number[] }> = {};
-  faHosts.forEach((h, i) => {
-    const entries = faAccessEntries[i];
-    forwardAuthAccessMap[h.id] = {
-      userIds: entries.filter((e) => e.userId !== null).map((e) => e.userId!),
-      groupIds: entries.filter((e) => e.groupId !== null).map((e) => e.groupId!),
-    };
-  });
-
-  const forwardAuthUsers = allUsers.map((u) => ({
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    role: u.role,
-  }));
-  const forwardAuthGroups = allGroups.map((g) => ({
-    id: g.id,
-    name: g.name,
-    description: g.description,
-    member_count: g.members.length,
-  }));
 
   return (
-    <WafPresetOptionsProvider
-      presets={wafPresets.map(toWafPresetOption)}
-      plugins={crsPlugins.map(toCrsPluginOption)}
-    >
-      <ProxyHostsClient
-        hosts={hosts}
-        certificates={certificates.map(toCertificatePickerOption)}
-        caCertificates={caCertificates}
-        accessLists={accessLists}
-        authentikDefaults={authentikDefaults}
-        forwardAuthDefaults={forwardAuthDefaults}
-        // Empty before setup has run: the field just starts blank.
-        defaultDomain={generalSettings?.defaultDomain ?? ""}
-        // Never the key itself. Never null: unsaved settings mean off with no key, exactly when
-        // the warnings matter, and null cannot tell "off" from "not known".
-        tailscaleDefaults={{
-          enabled: tailscaleSettings?.enabled ?? false,
-          hasAuthKey: (tailscaleSettings?.authKey ?? "").trim().length > 0,
-          defaultNode: tailscaleSettings?.defaultNode ?? "",
-        }}
-        pagination={{ total, page, perPage: PER_PAGE }}
-        initialSearch={search ?? ""}
-        tags={tags}
-        activeTag={tag ?? null}
-        activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
-        initialSort={{
-          sortBy: sortBy === "requests" && !byRequests ? "createdAt" : (sortBy ?? "createdAt"),
-          sortDir,
-        }}
-        mtlsRoles={mtlsRoles}
-        issuedClientCerts={issuedClientCerts}
-        forwardAuthUsers={forwardAuthUsers}
-        forwardAuthGroups={forwardAuthGroups}
-        forwardAuthAccessMap={forwardAuthAccessMap}
-        agents={agents}
-        agentAssignments={agentAssignments}
-        counts={counts}
-        insights={insights}
-        editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
-        canCreate={canCreate(access)}
-        manageableIds={dialogHosts
-          .filter((h) => canManage(access, "proxyHost", h.id))
-          .map((h) => h.id)}
-        canEditRawConfig={access.isAdmin}
-      />
-    </WafPresetOptionsProvider>
+    <ProxyHostsClient
+      hosts={hosts}
+      certificates={certificates.map(toCertificatePickerOption)}
+      pagination={{ total, page, perPage: PER_PAGE }}
+      initialSearch={search ?? ""}
+      tags={tags}
+      activeTag={tag ?? null}
+      activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
+      initialSort={{
+        sortBy: sortBy === "requests" && !byRequests ? "createdAt" : (sortBy ?? "createdAt"),
+        sortDir,
+      }}
+      agents={agents}
+      agentAssignments={agentAssignments}
+      counts={counts}
+      insights={insights}
+      editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
+      canCreate={canCreate(access)}
+      manageableIds={dialogHosts
+        .filter((h) => canManage(access, "proxyHost", h.id))
+        .map((h) => h.id)}
+      canEditRawConfig={access.isAdmin}
+    />
   );
 }

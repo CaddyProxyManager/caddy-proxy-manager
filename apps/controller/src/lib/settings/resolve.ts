@@ -15,13 +15,17 @@ import {
   type SettingValue,
 } from "./registry";
 import { currentStagingScope } from "./staging-context";
+import { invalidateProcessMemos } from "./process-memo";
+import { forgetRequestMemo } from "../request-memo";
 
 /** The promise, not the map, so concurrent cold reads share one query. */
 let cache: Promise<Map<string, SettingValue>> | null = null;
 
-/** For the tests and the migration flow. */
+/** After any write that bypasses setSetting: the tests, imports, restores and staged applies. */
 export function invalidateSettingsCache(): void {
   cache = null;
+  invalidateProcessMemos();
+  forgetRequestMemo("setting:");
 }
 
 function decode(definition: SettingDefinition, raw: string): SettingValue | undefined {

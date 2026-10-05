@@ -176,6 +176,13 @@
       "when": 1791230464285,
       "tag": "0024_audit_chain_keyed",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1791232442414,
+      "tag": "0025_query_indexes",
+      "breakpoints": true
     }
   ]
 }

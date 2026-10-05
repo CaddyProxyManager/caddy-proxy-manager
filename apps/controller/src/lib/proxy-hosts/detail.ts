@@ -38,7 +38,7 @@ export async function getProxyHostDetail(
   now = Date.now(),
 ): Promise<ProxyHostDetail> {
   const [
-    { listCertificates },
+    { listCertificateSummaries },
     { listAccessLists },
     { agentIdsForHost },
     { listAgentOptions },
@@ -59,7 +59,7 @@ export async function getProxyHostDetail(
     await Promise.all([
       collectAttention(access, { proxyHostId: host.id, now }),
       getHostTrafficReport(host, now),
-      listCertificates(),
+      listCertificateSummaries(),
       listAccessLists().catch(() => []),
       agentIdsForHost("http", host.id).catch(() => [] as number[]),
       listAgentOptions().catch(() => []),

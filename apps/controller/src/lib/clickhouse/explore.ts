@@ -13,7 +13,16 @@ import {
   type TimeWindow,
   type TopDimension,
 } from "../analytics/explore-state";
-import { type QueryParams, queryRow, queryRows, safeUint, timeFilter, timeParams } from "./client";
+import {
+  type QueryParams,
+  queryRow,
+  queryRows,
+  queryRowsWithTotals,
+  safeUint,
+  timeFilter,
+  timeParams,
+  usesSqliteAnalytics,
+} from "./client";
 
 /** The path without its query string. ClickHouse's own path() wants a scheme. */
 export const PATH_SQL =
@@ -114,25 +123,7 @@ export type ExploreTotals = {
   avgDurationMs: number | null;
 };
 
-export async function queryExploreTotals(
-  window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
-): Promise<ExploreTotals> {
-  const where = buildWhere(window, filters, trafficCondition);
-  const row = await queryRow<Record<string, unknown>>(
-    `
-    SELECT
-      count() AS requests,
-      sum(bytes_sent) AS bytes,
-      uniq(client_ip) AS unique_ips,
-      countIf(${MITIGATED_SQL}) AS mitigated,
-      countIf(status >= 500) AS server_errors,
-      avg(duration_ms) AS avg_duration
-    FROM traffic_events
-    WHERE ${where.sql}
-  `,
-    where.params,
-  );
+function toTotals(row: Record<string, unknown> | null | undefined): ExploreTotals {
   const duration = row?.avg_duration;
   return {
     requests: num(row?.requests),
@@ -145,6 +136,43 @@ export async function queryExploreTotals(
         ? null
         : Math.round(Number(duration)),
   };
+}
+
+const TOTALS_COLUMNS = `
+      count() AS requests,
+      sum(bytes_sent) AS bytes,
+      uniq(client_ip) AS unique_ips,
+      countIf(${MITIGATED_SQL}) AS mitigated,
+      countIf(status >= 500) AS server_errors,
+      avg(duration_ms) AS avg_duration`;
+
+export async function queryExploreTotals(
+  window: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+): Promise<ExploreTotals> {
+  const where = buildWhere(window, filters, trafficCondition);
+  const row = await queryRow<Record<string, unknown>>(
+    `SELECT ${TOTALS_COLUMNS} FROM traffic_events WHERE ${where.sql}`,
+    where.params,
+  );
+  return toTotals(row);
+}
+
+/**
+ * The totals and how many clients the mitigated ones came from, in one scan: `uniqIf` keeps the
+ * state `uniq` would over the mitigated rows alone, so it answers as a second query would.
+ */
+export async function queryExploreTotalsWithMitigatedIps(
+  window: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+): Promise<ExploreTotals & { mitigatedIps: number }> {
+  const where = buildWhere(window, filters, trafficCondition);
+  const row = await queryRow<Record<string, unknown>>(
+    `SELECT ${TOTALS_COLUMNS}, uniqIf(client_ip, ${MITIGATED_SQL}) AS mitigated_ips
+     FROM traffic_events WHERE ${where.sql}`,
+    where.params,
+  );
+  return { ...toTotals(row), mitigatedIps: num(row?.mitigated_ips) };
 }
 
 // ── Timeline ───────────────────────────────────────────────────────────────
@@ -166,27 +194,25 @@ export function bucketStarts(window: TimeWindow, bucketSeconds: number): number[
   return starts;
 }
 
-export async function queryExploreTimeline(
-  window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
-  bucketSeconds: number,
-): Promise<ExploreBucket[]> {
-  const where = buildWhere(window, filters, trafficCondition);
-  const rows = await queryRows<Record<string, unknown>>(
-    `
+function timelineQuery(where: Clause, extra = ""): string {
+  return `
     SELECT
       intDiv(toUInt32(ts), {p_bucket:UInt32}) AS bucket,
       count() AS requests,
       sum(bytes_sent) AS bytes,
       uniq(client_ip) AS unique_ips,
       countIf(${MITIGATED_SQL}) AS mitigated,
-      countIf(status >= 500) AS server_errors
+      countIf(status >= 500) AS server_errors${extra}
     FROM traffic_events
     WHERE ${where.sql}
-    GROUP BY bucket
-  `,
-    { ...where.params, p_bucket: safeUint(bucketSeconds) },
-  );
+    GROUP BY bucket`;
+}
+
+function toTimeline(
+  rows: Record<string, unknown>[],
+  window: TimeWindow,
+  bucketSeconds: number,
+): ExploreBucket[] {
   const byStart = new Map(rows.map((row) => [Math.floor(num(row.bucket)) * bucketSeconds, row]));
   return bucketStarts(window, bucketSeconds).map((ts) => {
     const row = byStart.get(ts);
@@ -199,6 +225,44 @@ export async function queryExploreTimeline(
       serverErrors: num(row?.server_errors),
     };
   });
+}
+
+export async function queryExploreTimeline(
+  window: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+  bucketSeconds: number,
+): Promise<ExploreBucket[]> {
+  const where = buildWhere(window, filters, trafficCondition);
+  const rows = await queryRows<Record<string, unknown>>(timelineQuery(where), {
+    ...where.params,
+    p_bucket: safeUint(bucketSeconds),
+  });
+  return toTimeline(rows, window, bucketSeconds);
+}
+
+/**
+ * The timeline and the window's totals in one scan: `WITH TOTALS` aggregates every row the buckets
+ * came from, `uniq` included, so it answers as queryExploreTotals would. The SQLite store has no
+ * WITH TOTALS, so there it is the two queries.
+ */
+export async function queryExploreTimelineWithTotals(
+  window: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+  bucketSeconds: number,
+): Promise<{ timeline: ExploreBucket[]; totals: ExploreTotals }> {
+  if (await usesSqliteAnalytics()) {
+    const [timeline, totals] = await Promise.all([
+      queryExploreTimeline(window, filters, bucketSeconds),
+      queryExploreTotals(window, filters),
+    ]);
+    return { timeline, totals };
+  }
+  const where = buildWhere(window, filters, trafficCondition);
+  const { rows, totals } = await queryRowsWithTotals<Record<string, unknown>>(
+    `${timelineQuery(where, ", avg(duration_ms) AS avg_duration")} WITH TOTALS`,
+    { ...where.params, p_bucket: safeUint(bucketSeconds) },
+  );
+  return { timeline: toTimeline(rows, window, bucketSeconds), totals: toTotals(totals) };
 }
 
 export type ExploreSeries = { key: string; counts: number[] };
@@ -304,7 +368,7 @@ export async function queryExploreTop(
       FROM waf_events
       WHERE ${where.sql}
       GROUP BY top_key
-      ORDER BY requests DESC
+      ORDER BY requests DESC, top_key
       LIMIT {p_limit:UInt32}
     `,
       { ...where.params, p_limit: safeLimit },
@@ -337,7 +401,7 @@ export async function queryExploreTop(
     FROM traffic_events
     WHERE ${where.sql}
     GROUP BY top_key
-    ORDER BY requests DESC
+    ORDER BY requests DESC, top_key
     LIMIT {p_limit:UInt32}
   `,
     { ...where.params, p_limit: safeLimit },
@@ -351,6 +415,115 @@ export async function queryExploreTop(
     bytes: num(row.bytes),
     uniqueIps: num(row.unique_ips),
   }));
+}
+
+type TrafficDimension = Exclude<TopDimension, "rule">;
+
+/** What each traffic list groups by in the combined query; a top key is always a string there. */
+const GROUPING_KEYS: Record<TrafficDimension, { column: string; select?: string }> = {
+  host: { column: "host" },
+  path: { column: "path_key", select: `${PATH_SQL} AS path_key` },
+  country: { column: "country_key", select: "ifNull(country_code, 'XX') AS country_key" },
+  asn: { column: "asn" },
+  status: { column: "status" },
+  ip: { column: "client_ip" },
+  ua: { column: "ua_family" },
+  method: { column: "method" },
+  proto: { column: "proto" },
+};
+
+/** Numbers tie-break as numbers, as the single-list query orders them. */
+const NUMERIC_DIMENSIONS = new Set<TrafficDimension>(["asn", "status"]);
+
+/**
+ * Every traffic list in one scan: `GROUPING SETS` aggregates each grouping alone, as its own query
+ * would, and a window ranks each list to its limit. ASN 0 is a grouping here rather than filtered
+ * out, so it is dropped before ranking. The SQLite store has no GROUPING SETS, so there it is one
+ * query per list.
+ */
+export async function queryExploreTopLists(
+  window: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+  limits: Partial<Record<TrafficDimension, number>>,
+): Promise<Partial<Record<TrafficDimension, TopRow[]>>> {
+  const dimensions = Object.keys(limits) as TrafficDimension[];
+  if (dimensions.length === 0) return {};
+  const safeLimit = (dimension: TrafficDimension) =>
+    Math.min(Math.max(1, safeUint(limits[dimension] ?? 0)), TOP_MAX_LIMIT);
+  if (await usesSqliteAnalytics()) {
+    const lists = await Promise.all(
+      dimensions.map((dimension) =>
+        queryExploreTop(window, filters, dimension, safeLimit(dimension)),
+      ),
+    );
+    return Object.fromEntries(dimensions.map((dimension, i) => [dimension, lists[i]]));
+  }
+
+  const where = buildWhere(window, filters, trafficCondition);
+  const keys = dimensions.map((dimension) => ({ dimension, ...GROUPING_KEYS[dimension] }));
+  const dim = `multiIf(${keys
+    .slice(0, -1)
+    .map(({ dimension, column }) => `grouping(${column}) = 0, '${dimension}'`)
+    .join(", ")}${keys.length > 1 ? ", " : ""}'${keys[keys.length - 1].dimension}')`;
+  const topKey = `multiIf(${keys
+    .slice(0, -1)
+    .map(({ dimension, column }) => `dim = '${dimension}', toString(${column})`)
+    .join(", ")}${keys.length > 1 ? ", " : ""}toString(${keys[keys.length - 1].column}))`;
+  const numeric = keys
+    .filter(({ dimension }) => NUMERIC_DIMENSIONS.has(dimension))
+    .map(({ dimension }) => `'${dimension}'`);
+  const numericOrder =
+    numeric.length > 0 ? `if(dim IN (${numeric.join(", ")}), toUInt64OrZero(top_key), 0), ` : "";
+  const limitOf = `multiIf(${dimensions
+    .map((dimension) => `dim = '${dimension}', ${safeLimit(dimension)}`)
+    .join(", ")}, 0)`;
+  const selects = keys.flatMap(({ select }) => (select ? [select] : []));
+
+  const rows = await queryRows<Record<string, unknown>>(
+    `
+    SELECT dim, top_key, label, requests, mitigated, server_errors, bytes, unique_ips
+    FROM (
+      SELECT *, row_number() OVER (
+        PARTITION BY dim ORDER BY requests DESC, ${numericOrder}top_key
+      ) AS rank
+      FROM (
+        SELECT
+          ${dim} AS dim,
+          ${topKey} AS top_key,
+          any(asn_org) AS label,
+          count() AS requests,
+          countIf(${MITIGATED_SQL}) AS mitigated,
+          countIf(status >= 500) AS server_errors,
+          sum(bytes_sent) AS bytes,
+          uniq(client_ip) AS unique_ips
+        FROM (SELECT *${selects.map((select) => `, ${select}`).join("")} FROM traffic_events WHERE ${where.sql})
+        GROUP BY GROUPING SETS (${keys.map(({ column }) => `(${column})`).join(", ")})
+      )
+      WHERE NOT (dim = 'asn' AND top_key = '0')
+    )
+    WHERE rank <= ${limitOf}
+    ORDER BY dim, rank
+    SETTINGS force_grouping_standard_compatibility = 1
+  `,
+    where.params,
+  );
+
+  const lists: Partial<Record<TrafficDimension, TopRow[]>> = Object.fromEntries(
+    dimensions.map((dimension) => [dimension, [] as TopRow[]]),
+  );
+  for (const row of rows) {
+    const dimension = String(row.dim) as TrafficDimension;
+    lists[dimension]?.push({
+      key: String(row.top_key ?? ""),
+      label: dimension === "asn" && typeof row.label === "string" && row.label ? row.label : null,
+      requests: num(row.requests),
+      mitigated: num(row.mitigated),
+      serverErrors: num(row.server_errors),
+      bytes: num(row.bytes),
+      uniqueIps: num(row.unique_ips),
+    });
+  }
+  return lists;
 }
 
 // ── Latest requests ────────────────────────────────────────────────────────

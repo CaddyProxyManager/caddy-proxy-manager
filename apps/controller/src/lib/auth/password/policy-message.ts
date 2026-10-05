@@ -3,7 +3,8 @@
  * four screens report the rule.
  */
 
-import en from "../../../../messages/en.json";
+// Named, so a client bundle carries this namespace and not the whole catalog.
+import { passwordPolicy } from "../../../../messages/en.json";
 import {
   MIN_PASSWORD_LENGTH,
   type PasswordPolicyViolation,
@@ -54,6 +55,6 @@ export function passwordPolicyMessage(
  */
 export function passwordPolicyViolationsInEnglish(password: string): string[] {
   return passwordPolicyViolations(password).map((violation) =>
-    en.passwordPolicy.violation[violation].replace("{min}", String(MIN_PASSWORD_LENGTH)),
+    passwordPolicy.violation[violation].replace("{min}", String(MIN_PASSWORD_LENGTH)),
   );
 }

@@ -57,20 +57,8 @@ export async function getTrafficForList(
   return getTrafficByProxyHost(to - 86400, to, [...refs]);
 }
 
-export async function listInsights(input: {
-  pageHosts: readonly ProxyHost[];
-  traffic: { available: boolean; byHost: ReadonlyMap<number, Traffic> };
-  certificates: readonly {
-    id: number;
-    name: string;
-    type: string;
-    domainNames: string[];
-    certificatePem: string | null;
-  }[];
-  now?: number;
-}): Promise<ListInsights> {
-  if (!input.traffic.available) return { available: false };
-  const now = input.now ?? Date.now();
+/** The slow inputs, each under its own budget; started by the page before the list is read. */
+export async function startListInsightInputs(now = Date.now()) {
   const [{ detectTrafficSignals }, expiry, { getCrowdSecSettings }] = await Promise.all([
     import("../analytics/signals"),
     import("../certificates/expiry"),
@@ -83,6 +71,29 @@ export async function listInsights(input: {
     expiry.managedCertificates(LIST_BUDGET_MS).catch(() => null),
     expiry.certificateTroubleDays().catch(() => expiry.DEFAULT_TROUBLE_DAYS),
     getCrowdSecSettings().catch(() => null),
+  ]);
+  return { signals, managed, days, crowdsec };
+}
+
+export async function listInsights(input: {
+  pageHosts: readonly ProxyHost[];
+  traffic: { available: boolean; byHost: ReadonlyMap<number, Traffic> };
+  certificates: readonly {
+    id: number;
+    name: string;
+    type: string;
+    domainNames: string[];
+    certificatePem: string | null;
+  }[];
+  now?: number;
+  /** From `startListInsightInputs`, when the caller started it early. */
+  inputs?: ReturnType<typeof startListInsightInputs>;
+}): Promise<ListInsights> {
+  if (!input.traffic.available) return { available: false };
+  const now = input.now ?? Date.now();
+  const [expiry, { signals, managed, days, crowdsec }] = await Promise.all([
+    import("../certificates/expiry"),
+    input.inputs ?? startListInsightInputs(now),
   ]);
 
   const imported = new Map(

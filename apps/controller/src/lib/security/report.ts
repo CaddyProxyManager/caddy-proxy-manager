@@ -18,11 +18,11 @@ import {
   bucketStarts,
   queryExploreGroups,
   queryExploreTop,
-  queryExploreTotals,
+  queryExploreTotalsWithMitigatedIps,
 } from "../clickhouse/explore";
 import {
   type SecuritySource,
-  queryMitigatedByOutcome,
+  queryMitigatedByOutcomeCompared,
   queryTopMitigatedSources,
   queryTopWafSources,
   queryWafEventPage,
@@ -109,12 +109,19 @@ export type SecurityReport = {
 
 const MITIGATED_FILTER: AnalyticsFilter = { field: "outcome", op: "not", value: "served" };
 
-async function ruleSetSummary(): Promise<SecurityRuleSet> {
-  const [settings, hosts, exclusions, blocked] = await Promise.all([
+type RuleSetLists = {
+  exclusions: Awaited<ReturnType<typeof listWafExclusionRules>>;
+  blocked: Awaited<ReturnType<typeof listActiveBlockedSources>>;
+};
+
+/** The lists are the report's own too: read once for both. */
+async function ruleSetSummary(
+  lists: Promise<RuleSetLists> = loadRuleSetLists(),
+): Promise<SecurityRuleSet> {
+  const [settings, hosts, { exclusions, blocked }] = await Promise.all([
     getWafSettings(),
     listProxyHosts(),
-    listWafExclusionRules(),
-    listActiveBlockedSources(),
+    lists,
   ]);
   const tuning = effectiveTuning(settings);
   const globalMode: WafEngineMode =
@@ -135,6 +142,14 @@ async function ruleSetSummary(): Promise<SecurityRuleSet> {
     exclusions: exclusions.length,
     blockedSources: blocked.length,
   };
+}
+
+async function loadRuleSetLists(): Promise<RuleSetLists> {
+  const [exclusions, blocked] = await Promise.all([
+    listWafExclusionRules(),
+    listActiveBlockedSources(),
+  ]);
+  return { exclusions, blocked };
 }
 
 function emptyReport(
@@ -215,12 +230,20 @@ export async function getSecurityReport(
   const window = resolveWindow(state, now);
   const bucketSeconds = bucketSizeForDuration(window.to - window.from);
   const safePage = Math.max(1, Math.floor(page) || 1);
-  const ruleSetPromise = ruleSetSummary();
+  const listsPromise = loadRuleSetLists();
+  const ruleSetPromise = ruleSetSummary(listsPromise);
   if (!(await isAnalyticsEnabled())) {
     return emptyReport(window, bucketSeconds, await ruleSetPromise, safePage);
   }
   try {
-    return await analyticsReport(state, window, bucketSeconds, safePage, ruleSetPromise);
+    return await analyticsReport(
+      state,
+      window,
+      bucketSeconds,
+      safePage,
+      ruleSetPromise,
+      listsPromise,
+    );
   } catch (error) {
     if (!isConnectionError(error)) throw error;
     console.warn("[security] ClickHouse unavailable; showing the rule set only.");
@@ -234,34 +257,35 @@ async function analyticsReport(
   bucketSeconds: number,
   safePage: number,
   ruleSetPromise: Promise<SecurityRuleSet>,
+  listsPromise: Promise<RuleSetLists>,
 ): Promise<SecurityReport> {
   const previous = previousWindow(window);
   const { filters } = state;
   const mitigatedFilters = [...filters, MITIGATED_FILTER];
-  const traffic = await Promise.all([
-    queryExploreTotals(window, filters),
-    queryExploreTotals(window, mitigatedFilters),
-    queryExploreTotals(previous, mitigatedFilters),
-    queryMitigatedByOutcome(window, filters),
-    queryMitigatedByOutcome(previous, filters),
-  ]).catch((error: unknown) => {
-    console.warn("[security] access-log outcomes unavailable; showing WAF events only:", error);
-    return null;
-  });
-  const [wafTotals, previousWafTotals, eventPage, wafRules] = await Promise.all([
-    queryWafTotals(window, filters),
-    queryWafTotals(previous, filters),
-    queryWafEventPage(
-      window,
-      filters,
-      SECURITY_EVENTS_PER_PAGE,
-      (safePage - 1) * SECURITY_EVENTS_PER_PAGE,
-    ),
-    queryExploreTop(window, filters, "rule", TOP_LIMIT),
+  // Independent of each other: the outcomes and the WAF events are read side by side.
+  const [traffic, [wafTotals, previousWafTotals, eventPage, wafRules]] = await Promise.all([
+    Promise.all([
+      queryExploreTotalsWithMitigatedIps(window, filters),
+      queryMitigatedByOutcomeCompared(window, previous, filters),
+    ]).catch((error: unknown) => {
+      console.warn("[security] access-log outcomes unavailable; showing WAF events only:", error);
+      return null;
+    }),
+    Promise.all([
+      queryWafTotals(window, filters),
+      queryWafTotals(previous, filters),
+      queryWafEventPage(
+        window,
+        filters,
+        SECURITY_EVENTS_PER_PAGE,
+        (safePage - 1) * SECURITY_EVENTS_PER_PAGE,
+      ),
+      queryExploreTop(window, filters, "rule", TOP_LIMIT),
+    ]),
   ]);
 
   // An agent that predates outcomes logs a WAF block as served, so its blocks outnumber them.
-  const wafOutcomes = traffic?.[3].find((row) => row.outcome === "waf")?.count ?? 0;
+  const wafOutcomes = traffic?.[1].current.find((row) => row.outcome === "waf")?.count ?? 0;
   const source: "traffic" | "waf" = traffic && wafOutcomes >= wafTotals.blocked ? "traffic" : "waf";
   const buckets = bucketStarts(window, bucketSeconds);
 
@@ -269,7 +293,8 @@ async function analyticsReport(
   let series: ExploreSeries[];
   let topSources: SecuritySource[];
   if (source === "traffic" && traffic) {
-    const [all, mitigated, previousMitigated, byOutcome, previousByOutcome] = traffic;
+    const [all, { current: byOutcome, previous: previousByOutcome }] = traffic;
+    const sum = (rows: { count: number }[]) => rows.reduce((total, row) => total + row.count, 0);
     const [groups, hosts, sources] = await Promise.all([
       queryExploreGroups(window, mitigatedFilters, bucketSeconds, "outcome"),
       queryExploreTop(window, mitigatedFilters, "host", 1),
@@ -277,9 +302,10 @@ async function analyticsReport(
     ]);
     totals = {
       requests: all.requests,
-      mitigated: mitigated.requests,
-      previousMitigated: previousMitigated.requests,
-      sources: mitigated.uniqueIps,
+      mitigated: all.mitigated,
+      // Every mitigated request has an outcome, so the groups add up to the window's count.
+      previousMitigated: sum(previousByOutcome),
+      sources: all.mitigatedIps,
       byOutcome: byOutcome.map((row) => ({
         ...row,
         previous: previousByOutcome.find((p) => p.outcome === row.outcome)?.count ?? 0,
@@ -314,7 +340,7 @@ async function analyticsReport(
     topSources = sources;
   }
 
-  const [ruleSet, peak, blocked, exclusions, reviews] = await Promise.all([
+  const [ruleSet, peak, { blocked, exclusions }, reviews] = await Promise.all([
     ruleSetPromise,
     explainPeak(
       buckets,
@@ -323,8 +349,7 @@ async function analyticsReport(
       filters,
       source,
     ),
-    listActiveBlockedSources(),
-    listWafExclusionRules(),
+    listsPromise,
     getWafEventReviews(eventPage.items.map((event) => event.key)),
   ]);
   const blockedIps = new Set(blocked.filter((b) => b.kind === "ip").map((b) => b.value));

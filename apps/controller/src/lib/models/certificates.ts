@@ -78,6 +78,33 @@ export async function listCertificates(): Promise<Certificate[]> {
   return rows.map(parseCertificate);
 }
 
+/** What a list needs: no private key, so nothing is decrypted to name a certificate. */
+export type CertificateSummary = Pick<
+  Certificate,
+  "id" | "name" | "type" | "domainNames" | "certificatePem" | "sourceError" | "sourceReadAt"
+>;
+
+export async function listCertificateSummaries(): Promise<CertificateSummary[]> {
+  const rows = await db
+    .select({
+      id: certificates.id,
+      name: certificates.name,
+      type: certificates.type,
+      domainNames: certificates.domainNames,
+      certificatePem: certificates.certificatePem,
+      sourceError: certificates.sourceError,
+      sourceReadAt: certificates.sourceReadAt,
+    })
+    .from(certificates)
+    .orderBy(desc(certificates.createdAt));
+  return rows.map((row) => ({
+    ...row,
+    type: row.type as CertificateType,
+    domainNames: JSON.parse(row.domainNames),
+    sourceReadAt: toIso(row.sourceReadAt),
+  }));
+}
+
 export async function getCertificate(id: number): Promise<Certificate | null> {
   const cert = await db.query.certificates.findFirst({
     where: (table, { eq }) => eq(table.id, id),

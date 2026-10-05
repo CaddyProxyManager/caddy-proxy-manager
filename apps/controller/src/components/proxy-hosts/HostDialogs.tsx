@@ -54,6 +54,7 @@ import { useTranslations } from "next-intl";
 import { HostNotesField } from "./HostNotesField";
 import { HostTagsField } from "./HostTagsField";
 import { UpstreamHealthPanel } from "./upstreams/UpstreamHealthPanel";
+import { NONE_VALUE, accessListOptions, accessListStatus, toOptions } from "./host-pickers";
 import {
   EDITOR_SECTIONS,
   type EditorSection,
@@ -71,8 +72,6 @@ type ForwardAuthGroup = {
 };
 type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
-export const NONE_VALUE = "__none__";
-
 /** Keyed on status alone: `onClose` is new each render and would re-arm an uncleared timer. */
 function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   const onCloseRef = useRef(onClose);
@@ -89,38 +88,6 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
 function ActionStatus({ status, message }: { status: string; message?: string }) {
   if (status === "idle" || !message) return null;
   return <Banner status={status === "error" ? "error" : "success"} title={message} />;
-}
-
-export function toOptions(items: { id: number; name: string }[], noneLabel: string) {
-  return [
-    { value: NONE_VALUE, label: noneLabel },
-    ...items.map((item) => ({ value: String(item.id), label: item.name })),
-  ];
-}
-
-type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
-
-/** A list with neither users nor IP rules admits nobody. */
-export function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">): boolean {
-  return list.entries.length === 0 && (list.ipRules?.length ?? 0) === 0;
-}
-
-/** Names the empty ones: picking one closes the host rather than guarding it. */
-export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
-  return toOptions(
-    accessLists.map((list) => ({
-      id: list.id,
-      name: accessListIsEmpty(list) ? t("accessListNoMembers", { name: list.name }) : list.name,
-    })),
-    t("none"),
-  );
-}
-
-export function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
-  const chosen = accessLists.find((list) => String(list.id) === accessListId);
-  return chosen && accessListIsEmpty(chosen)
-    ? { type: "warning" as const, message: t("accessListEmptyWarning") }
-    : undefined;
 }
 
 /** The create dialog's anchors differ: it stays mounted beside an open editor. */

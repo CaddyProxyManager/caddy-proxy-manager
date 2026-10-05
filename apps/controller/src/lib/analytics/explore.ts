@@ -12,11 +12,12 @@ import {
   type TopRow,
   queryExploreGroups,
   queryExploreRequests,
-  queryExploreTimeline,
+  queryExploreTimelineWithTotals,
   queryExploreTop,
-  queryExploreTotals,
+  queryExploreTopLists,
   TOP_MAX_LIMIT,
 } from "../clickhouse/explore";
+import { processMemo } from "../settings/process-memo";
 import {
   type ExploreState,
   type TimeWindow,
@@ -26,6 +27,7 @@ import {
   TOP_VIEW_ALL_LIMIT,
   previousWindow,
   resolveWindow,
+  serializeExploreState,
 } from "./explore-state";
 import { isLoggingActive } from "./db";
 
@@ -71,10 +73,23 @@ function emptyTop(): Record<TopDimension, TopRow[]> {
   ) as unknown as Record<TopDimension, TopRow[]>;
 }
 
+/** Under the page's 30s auto-refresh, so two tabs or a quick reload share one set of scans. */
+const REPORT_MEMO_MS = 10_000;
+
+/** `now` is for tests, and bypasses the memo: production reads the clock. */
 export async function getAnalyticsReport(
   state: ExploreState,
-  now = Math.floor(Date.now() / 1000),
+  now?: number,
 ): Promise<AnalyticsReport> {
+  if (now !== undefined) return buildAnalyticsReport(state, now);
+  return processMemo(
+    `analytics-report:${serializeExploreState(state).toString()}`,
+    () => buildAnalyticsReport(state, Math.floor(Date.now() / 1000)),
+    { ttlMs: REPORT_MEMO_MS },
+  );
+}
+
+async function buildAnalyticsReport(state: ExploreState, now: number): Promise<AnalyticsReport> {
   const window = resolveWindow(state, now);
   const previous = state.compare ? previousWindow(window) : null;
   const bucketSeconds = bucketSizeForDuration(window.to - window.from);
@@ -99,26 +114,27 @@ export async function getAnalyticsReport(
   }
 
   const { filters } = state;
-  const [totals, previousTotals, timeline, previousTimeline, groups, requests, ...tops] =
-    await Promise.all([
-      queryExploreTotals(window, filters),
-      previous ? queryExploreTotals(previous, filters) : Promise.resolve(null),
-      queryExploreTimeline(window, filters, bucketSeconds),
-      previous ? queryExploreTimeline(previous, filters, bucketSeconds) : Promise.resolve(null),
-      state.group === "none"
-        ? Promise.resolve([])
-        : queryExploreGroups(window, filters, bucketSeconds, state.group),
-      queryExploreRequests(window, filters, state.mitigatedOnly),
-      ...TOP_DIMENSIONS.map((dimension) =>
-        queryExploreTop(
-          window,
-          filters,
-          dimension,
-          dimension === "country" ? TOP_MAX_LIMIT : TOP_LIMIT,
-        ),
-      ),
-    ]);
-  const countries = tops[TOP_DIMENSIONS.indexOf("country")] ?? [];
+  const trafficLimits = Object.fromEntries(
+    TOP_DIMENSIONS.filter((dimension) => dimension !== "rule").map((dimension) => [
+      dimension,
+      dimension === "country" ? TOP_MAX_LIMIT : TOP_LIMIT,
+    ]),
+  );
+  const [current, before, groups, requests, trafficTops, ruleTop] = await Promise.all([
+    queryExploreTimelineWithTotals(window, filters, bucketSeconds),
+    previous
+      ? queryExploreTimelineWithTotals(previous, filters, bucketSeconds)
+      : Promise.resolve(null),
+    state.group === "none"
+      ? Promise.resolve([])
+      : queryExploreGroups(window, filters, bucketSeconds, state.group),
+    queryExploreRequests(window, filters, state.mitigatedOnly),
+    queryExploreTopLists(window, filters, trafficLimits),
+    // From the WAF table, so not one of the groupings above.
+    queryExploreTop(window, filters, "rule", TOP_LIMIT),
+  ]);
+  const listOf = (dimension: TopDimension): TopRow[] =>
+    dimension === "rule" ? ruleTop : (trafficTops[dimension] ?? []);
 
   return {
     analyticsDisabled: false,
@@ -126,18 +142,15 @@ export async function getAnalyticsReport(
     window,
     previousWindow: previous,
     bucketSeconds,
-    totals,
-    previousTotals,
-    timeline,
-    previousTimeline,
+    totals: current.totals,
+    previousTotals: before?.totals ?? null,
+    timeline: current.timeline,
+    previousTimeline: before?.timeline ?? null,
     groups,
     top: Object.fromEntries(
-      TOP_DIMENSIONS.map((dimension, index) => [
-        dimension,
-        (tops[index] ?? []).slice(0, TOP_LIMIT),
-      ]),
+      TOP_DIMENSIONS.map((dimension) => [dimension, listOf(dimension).slice(0, TOP_LIMIT)]),
     ) as Record<TopDimension, TopRow[]>,
-    countries,
+    countries: listOf("country"),
     requests,
   };
 }

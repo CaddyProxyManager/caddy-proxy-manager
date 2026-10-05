@@ -1,16 +1,32 @@
 import type { Session } from "../index";
 import { getTwoFactorPolicySettings } from "../../settings";
-import { type MfaStanding, coveredByMfaPolicy, mfaStanding, readMfaPolicy } from "./mfa-policy";
-import { accountMfaFacts } from "./facts";
+import { processMemo } from "../../settings/process-memo";
+import { currentStagingScope } from "../../settings/staging-context";
+import {
+  type MfaStanding,
+  type TwoFactorPolicySettings,
+  coveredByMfaPolicy,
+  mfaStanding,
+  readMfaPolicy,
+} from "./mfa-policy";
+import { accountMfaFacts, accountPasskeyCount } from "./facts";
 
 export { TWO_FACTOR_SETUP_PATH } from "./error";
+
+/** Every gated request asks; held for the process, and dropped by any settings write. */
+function currentMfaPolicy(): Promise<TwoFactorPolicySettings> {
+  const read = async () => readMfaPolicy(await getTwoFactorPolicySettings());
+  // A staged policy is a preview for one operator, never the one the proxy enforces.
+  if (currentStagingScope()) return read();
+  return processMemo("two_factor_policy", read);
+}
 
 /** Cheapest checks first: this runs for every request the proxy gates. */
 export async function mfaStandingFor(session: Session | null): Promise<MfaStanding> {
   const user = session?.user;
   if (!user?.hasPassword) return { status: "exempt" };
   if (user.twoFactorEnabled) return { status: "satisfied" };
-  const policy = readMfaPolicy(await getTwoFactorPolicySettings());
+  const policy = await currentMfaPolicy();
   // The real role: "View as" narrows user.role, and must not narrow its way past this gate.
   const role = session?.realRole ?? user.role;
   const subject = {
@@ -21,7 +37,11 @@ export async function mfaStandingFor(session: Session | null): Promise<MfaStandi
     createdAt: null,
   };
   if (!coveredByMfaPolicy(policy, subject)) return { status: "exempt" };
-  const facts = await accountMfaFacts(Number(user.id));
+  const userId = Number(user.id);
+  // The session read the account row already; a hand-built one has to look it up.
+  const facts = session?.account
+    ? { passkeyCount: await accountPasskeyCount(userId), createdAt: session.account.createdAt }
+    : await accountMfaFacts(userId);
   return mfaStanding(policy, { ...subject, ...facts });
 }
 
@@ -34,7 +54,7 @@ export async function mfaStandingForAccount(account: {
 }): Promise<MfaStanding> {
   if (!account.hasPassword) return { status: "exempt" };
   if (account.twoFactorEnabled) return { status: "satisfied" };
-  const policy = readMfaPolicy(await getTwoFactorPolicySettings());
+  const policy = await currentMfaPolicy();
   const subject = {
     role: account.role,
     hasPassword: true,

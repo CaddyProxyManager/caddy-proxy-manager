@@ -7,6 +7,7 @@ import type { NextRequest } from "next/server";
 import { type ApiAuthResult, ApiAuthError, authenticateApiRequest } from "../api/auth";
 import { checkSameOrigin } from "../auth";
 import { type Access, accessFor } from "../users/permissions";
+import { type ApplyFailures, getApplyFailures } from "../caddy/apply-status";
 
 export type GraphQLContext = {
   /** Authentication failures are per-field, not per-request. */
@@ -18,6 +19,8 @@ export type GraphQLContext = {
    */
   rawBody: () => Promise<string>;
   request: NextRequest;
+  /** Once per request, not once per agent in a list. Absent on a context a test builds. */
+  applyFailures?: () => Promise<ApplyFailures>;
 };
 
 /** Lazy, memoised auth: a malformed request pays nothing, and twenty fields authenticate once. */
@@ -47,7 +50,13 @@ export function createContext(
     return accessPromise;
   };
 
-  return { viewer, access, rawBody, request };
+  let failuresPromise: Promise<ApplyFailures> | null = null;
+  const applyFailures = () => {
+    failuresPromise ??= getApplyFailures();
+    return failuresPromise;
+  };
+
+  return { viewer, access, rawBody, request, applyFailures };
 }
 
 export async function requireUser(context: GraphQLContext): Promise<ApiAuthResult> {

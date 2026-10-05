@@ -70,13 +70,13 @@ const certificates: AttentionProvider = {
   id: "certificates",
   adminOnly: false,
   async run({ now, hosts }) {
-    const [{ listCertificates }, expiry, { isDomainCoveredByCert }] = await Promise.all([
+    const [{ listCertificateSummaries }, expiry, { isDomainCoveredByCert }] = await Promise.all([
       import("../models/certificates"),
       import("../certificates/expiry"),
       import("../certificates/domain-match"),
     ]);
     const [rows, hostRows, days] = await Promise.all([
-      listCertificates(),
+      listCertificateSummaries(),
       hosts(),
       expiry.certificateTroubleDays(),
     ]);

@@ -30,12 +30,18 @@ async function withinBudget(
   run: () => Promise<ProviderResult>,
   budgetMs: number,
 ): Promise<ProviderResult | null> {
+  const abort = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), budgetMs);
+    timer = setTimeout(() => {
+      resolve(null);
+      // Cancels the provider's ClickHouse queries rather than leaving them to finish unread.
+      abort.abort();
+    }, budgetMs);
   });
+  const { withQueryAbort } = await import("../clickhouse/client");
   try {
-    return await Promise.race([run(), deadline]);
+    return await Promise.race([withQueryAbort(abort.signal, run), deadline]);
   } catch (error) {
     console.warn(`[attention] the ${provider.id} provider failed:`, error);
     return null;

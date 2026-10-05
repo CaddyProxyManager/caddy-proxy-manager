@@ -60,7 +60,8 @@ async function expandCaRow(page: Page, caName: string): Promise<void> {
 export async function openCreateHostDialog(page: Page): Promise<void> {
   await expect(async () => {
     await page.getByRole('button', { name: /create host/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 2_000 });
+    // The dialog opens once its pickers' options are read, a round trip after the click.
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
   }).toPass({ timeout: 30_000 });
 }
 

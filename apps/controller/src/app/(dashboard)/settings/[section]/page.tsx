@@ -59,7 +59,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { storedErrorMessage } from "@/src/lib/errors/action-error";
 import { dashboardHostFormView } from "@/src/lib/dashboard-host/options";
-import { listCertificates } from "@/src/lib/models/certificates";
+import { listCertificateSummaries } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
 import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
@@ -231,7 +231,7 @@ export default async function SettingsSectionPage({
       wafPresets,
       crsPlugins,
     ] = await Promise.all([
-      listCertificates(),
+      listCertificateSummaries(),
       listCaCertificates(),
       listAccessLists(),
       listMtlsRoles().catch(() => []),

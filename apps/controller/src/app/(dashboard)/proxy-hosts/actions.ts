@@ -31,6 +31,11 @@ import { parseProxyHostCreateForm, parseProxyHostUpdateForm } from "@/src/lib/pr
 import { revertedFields } from "@/src/lib/host-review/diff";
 import { previewProxyHostChange, revertProxyHostInput } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
+import {
+  type HostEditorOptions,
+  loadForwardAuthAccess,
+  loadHostEditorOptions,
+} from "@/src/lib/proxy-hosts/editor-options";
 
 export async function createProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
@@ -188,6 +193,43 @@ export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promi
     const t = await getTranslations();
     console.error("Failed to change proxy hosts in bulk:", error);
     return actionError(t, error, t("errors.bulkHostsFailed"));
+  }
+}
+
+/** What the editor and the bulk bar choose from, read when one first opens. */
+export async function hostEditorOptionsAction(): Promise<
+  { ok: true; options: HostEditorOptions } | { ok: false; message: string }
+> {
+  try {
+    await requireAccess();
+    return { ok: true, options: await loadHostEditorOptions() };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to read the host editor's options:", error);
+    return {
+      ok: false,
+      message: extractErrorMessage(t, error, t("errors.hostEditorOptionsFailed")),
+    };
+  }
+}
+
+/** A host's forward-auth grants, read as its editor opens; seeing the host is enough. */
+export async function hostForwardAuthAccessAction(
+  id: number,
+): Promise<
+  { ok: true; access: { userIds: number[]; groupIds: number[] } } | { ok: false; message: string }
+> {
+  try {
+    const access = await requireAccess();
+    assertCanView(access, "proxyHost", id);
+    return { ok: true, access: await loadForwardAuthAccess(id) };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to read forward auth access:", id, error);
+    return {
+      ok: false,
+      message: extractErrorMessage(t, error, t("errors.hostEditorOptionsFailed")),
+    };
   }
 }
 

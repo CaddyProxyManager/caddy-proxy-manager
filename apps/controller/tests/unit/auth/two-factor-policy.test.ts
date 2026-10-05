@@ -12,7 +12,16 @@ vi.mock('../../../src/lib/settings', () => ({
 
 vi.mock('../../../src/lib/auth/two-factor/facts', () => ({
   accountMfaFacts: async () => policy.facts,
+  accountPasskeyCount: async () => policy.facts.passkeyCount,
 }));
+
+const { invalidateProcessMemos } = await import('../../../src/lib/settings/process-memo');
+
+/** A save, as far as the policy's process memo is concerned. */
+function store(value: Record<string, unknown>) {
+  policy.stored = value;
+  invalidateProcessMemos();
+}
 
 const { mfaStandingFor, mustEnrollTwoFactor } = await import(
   '../../../src/lib/auth/two-factor/policy'
@@ -66,20 +75,20 @@ describe('the policy modes', () => {
 
   it('covers every password account under "all", within its grace period first', async () => {
     const recently = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    policy.stored = { mode: 'all', graceDays: 7, since: recently };
+    store({ mode: 'all', graceDays: 7, since: recently });
     const user = { user: { ...admin.user, role: 'user' } };
     const standing = await mfaStandingFor(user);
     expect(standing.status).toBe('grace');
     expect(await mustEnrollTwoFactor(user)).toBe(false);
 
-    policy.stored = { mode: 'all', graceDays: 0, since: recently };
+    store({ mode: 'all', graceDays: 0, since: recently });
     expect(await mustEnrollTwoFactor(user)).toBe(true);
-    policy.stored = { requireForAdmins: true };
+    store({ requireForAdmins: true });
   });
 
   it('leaves everyone alone when off', async () => {
-    policy.stored = { mode: 'off', graceDays: 7, since: null };
+    store({ mode: 'off', graceDays: 7, since: null });
     expect(await mustEnrollTwoFactor(admin)).toBe(false);
-    policy.stored = { requireForAdmins: true };
+    store({ requireForAdmins: true });
   });
 });

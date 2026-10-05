@@ -32,6 +32,8 @@ import {
   normalizeHttpCacheSettings,
 } from "../proxy-hosts/http-cache";
 import { currentStagingScope } from "./staging-context";
+import { invalidateProcessMemos } from "./process-memo";
+import { forgetRequestMemo, requestMemo } from "../request-memo";
 import type { GlobalRateLimitSettings } from "../proxy-hosts/rate-limit";
 import {
   normalizeGlobalRateLimitInput,
@@ -186,11 +188,20 @@ export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
   }
 }
 
-async function storedSettingValue(key: string): Promise<string | null> {
-  const setting = await db.query.settings.findFirst({
-    where: (table, { eq }) => eq(table.key, key),
+/** Under the staging overlay, which getSetting checks first, so a staged value still wins. */
+function storedSettingValue(key: string): Promise<string | null> {
+  return requestMemo(`setting:${key}`, async () => {
+    const setting = await db.query.settings.findFirst({
+      where: (table, { eq }) => eq(table.key, key),
+    });
+    return setting?.value ?? null;
   });
-  return setting?.value ?? null;
+}
+
+/** After a direct write to the row. */
+export function settingWritten(key: string): void {
+  forgetRequestMemo(`setting:${key}`);
+  invalidateProcessMemos();
 }
 
 export async function setSetting<T>(key: string, value: T): Promise<void> {
@@ -218,6 +229,7 @@ export async function setSetting<T>(key: string, value: T): Promise<void> {
         updatedAt: now,
       },
     });
+  settingWritten(key);
 }
 
 export async function clearSetting(key: string): Promise<void> {
@@ -228,6 +240,7 @@ export async function clearSetting(key: string): Promise<void> {
     return;
   }
   await db.delete(settings).where(eq(settings.key, key));
+  settingWritten(key);
 }
 
 /**

@@ -11,6 +11,7 @@ import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/users/theme-mode";
 import { requestDisplayPreferences } from "@/src/lib/users/display-preferences";
 import { numberLocaleFor } from "@/src/lib/locale/number-format";
+import { clientMessages } from "@/src/lib/locale/client-messages";
 
 // From the same cookie `<html data-theme>` is rendered from, so the browser's own chrome is tinted
 // with the mode the page is actually in rather than the one the OS would have chosen.
@@ -42,7 +43,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // Resolved in src/i18n/request.ts alone. The preference is read separately, since the switcher
   // must tell "chose English" from "we guessed English".
   const locale = await getLocale();
-  const messages = await getMessages();
+  // Without what only the server renders: this goes out in every document's RSC payload.
+  const messages = clientMessages(await getMessages());
   // Resolved from the time zone cookie in the same request config, and handed to the client
   // provider so the browser formats timestamps in the zone the server just did.
   const timeZone = await getTimeZone();

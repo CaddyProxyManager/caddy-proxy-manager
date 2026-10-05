@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { TrafficOutcome } from "@cpm/shared";
 import { userAgentFamily } from "../analytics/user-agent";
@@ -126,6 +127,8 @@ export async function getClient(): Promise<ClickHouseClient> {
     username: user,
     password,
     database,
+    // The default 10 queues an analytics page's parallel reads behind the inserts.
+    max_open_connections: 20,
     clickhouse_settings: {
       async_insert: 1,
       wait_for_async_insert: 0,
@@ -581,12 +584,47 @@ export function safeUint(n: number): number {
   return Math.floor(n);
 }
 
+const queryAbort = new AsyncLocalStorage<AbortSignal>();
+
+/**
+ * Every query `run` issues is cancelled on the server when `signal` aborts, rather than left
+ * running after a budget gave up on it. Nested scopes abort with either signal.
+ */
+export function withQueryAbort<T>(signal: AbortSignal, run: () => Promise<T>): Promise<T> {
+  const outer = queryAbort.getStore();
+  return queryAbort.run(outer ? AbortSignal.any([outer, signal]) : signal, run);
+}
+
 export async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
+  const abort_signal = queryAbort.getStore();
   if (!(await isAnalyticsEnabled())) return [];
+  abort_signal?.throwIfAborted();
+  // Synchronous, so there is nothing to cancel once it starts.
   if ((await chConfig()).sqlite) return sqliteStore.querySqliteStore<T>(query, query_params);
   return withSchema(async (ch) => {
-    const result = await ch.query({ query, query_params, format: "JSONEachRow" });
+    abort_signal?.throwIfAborted();
+    const result = await ch.query({ query, query_params, format: "JSONEachRow", abort_signal });
     return result.json<T>();
+  });
+}
+
+/**
+ * A `WITH TOTALS` query: the rows, and the totals row ClickHouse adds, which JSONEachRow drops.
+ * ClickHouse only - the SQLite store cannot answer one, so its callers ask `usesSqliteAnalytics`.
+ */
+export async function queryRowsWithTotals<T>(
+  query: string,
+  query_params?: QueryParams,
+): Promise<{ rows: T[]; totals: T | null }> {
+  const abort_signal = queryAbort.getStore();
+  if (!(await isAnalyticsEnabled())) return { rows: [], totals: null };
+  if ((await chConfig()).sqlite)
+    throw new Error("WITH TOTALS is not available in the SQLite store");
+  abort_signal?.throwIfAborted();
+  return withSchema(async (ch) => {
+    const result = await ch.query({ query, query_params, format: "JSON", abort_signal });
+    const body = await result.json<T>();
+    return { rows: body.data, totals: (body.totals as T | undefined) ?? null };
   });
 }
 

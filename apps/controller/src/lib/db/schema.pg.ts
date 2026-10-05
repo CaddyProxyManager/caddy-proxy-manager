@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { uuidv7 } from "./uuidv7";
 import { isoTimestamp } from "./columns.pg";
 
@@ -368,6 +369,10 @@ export const accessListIpRules = pgTable(
   },
   (table) => ({
     accessListIdIdx: index("access_list_ip_rules_list_idx").on(table.accessListId),
+    // The expiry prune's scan; partial, since most rules never expire.
+    expiresAtIdx: index("access_list_ip_rules_expires_at_idx")
+      .on(table.expiresAt)
+      .where(sql`"expiresAt" IS NOT NULL`),
   }),
 );
 
@@ -510,6 +515,12 @@ export const auditEvents = pgTable(
   (table) => ({
     createdAtIdx: index("audit_events_created_at_idx").on(table.createdAt),
     seqIdx: uniqueIndex("audit_events_seq_idx").on(table.seq),
+    // One entity's history, newest first: a host's page.
+    entityIdx: index("audit_events_entity_idx").on(
+      table.entityType,
+      table.entityId,
+      table.createdAt,
+    ),
   }),
 );
 

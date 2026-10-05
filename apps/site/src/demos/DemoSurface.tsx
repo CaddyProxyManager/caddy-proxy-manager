@@ -4,7 +4,7 @@ import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import { LinkProvider } from "@astryxdesign/core/Link";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { IntlProvider } from "use-intl";
-import messages from "@cpm/controller/messages/en.json";
+import { messages } from "./catalog";
 import { DemoLink } from "./DemoLink";
 import "./demo.css";
 

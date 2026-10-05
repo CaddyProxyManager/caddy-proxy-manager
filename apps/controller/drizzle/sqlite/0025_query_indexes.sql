@@ -1,0 +1,2 @@
+CREATE INDEX `access_list_ip_rules_expires_at_idx` ON `access_list_ip_rules` (`expiresAt`) WHERE "expiresAt" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `audit_events_entity_idx` ON `audit_events` (`entityType`,`entityId`,`createdAt`);

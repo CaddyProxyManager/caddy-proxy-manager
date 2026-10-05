@@ -79,6 +79,50 @@ export async function queryMitigatedByOutcome(
   return rows.map((row) => ({ outcome: String(row.outcome ?? ""), count: num(row.requests) }));
 }
 
+export type OutcomeComparison = { current: OutcomeCount[]; previous: OutcomeCount[] };
+
+function byCount(rows: OutcomeCount[]): OutcomeCount[] {
+  return rows
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count || (a.outcome < b.outcome ? -1 : 1));
+}
+
+/**
+ * Two windows' mitigated outcomes in one scan. A `rule` filter matches WAF events in the queried
+ * window, so with one the windows stay two queries, or a span would match across both.
+ */
+export async function queryMitigatedByOutcomeCompared(
+  window: TimeWindow,
+  previous: TimeWindow,
+  filters: readonly AnalyticsFilter[],
+): Promise<OutcomeComparison> {
+  if (filters.some((filter) => filter.field === "rule")) {
+    const [current, before] = await Promise.all([
+      queryMitigatedByOutcome(window, filters),
+      queryMitigatedByOutcome(previous, filters),
+    ]);
+    return { current: byCount(current), previous: byCount(before) };
+  }
+  const span = { from: Math.min(window.from, previous.from), to: Math.max(window.to, previous.to) };
+  const where = buildWhere(span, filters, trafficCondition, [MITIGATED]);
+  const within = (prefix: string) =>
+    `ts >= toDateTime({${prefix}_from:UInt32}) AND ts <= toDateTime({${prefix}_to:UInt32})`;
+  const rows = await queryRows<Record<string, unknown>>(
+    `SELECT outcome, countIf(${within("w")}) AS current, countIf(${within("pw")}) AS previous
+     FROM traffic_events WHERE ${where.sql} GROUP BY outcome`,
+    {
+      ...where.params,
+      w_from: safeUint(window.from),
+      w_to: safeUint(window.to),
+      pw_from: safeUint(previous.from),
+      pw_to: safeUint(previous.to),
+    },
+  );
+  const pick = (column: string) =>
+    byCount(rows.map((row) => ({ outcome: String(row.outcome ?? ""), count: num(row[column]) })));
+  return { current: pick("current"), previous: pick("previous") };
+}
+
 export type WafTotals = { events: number; blocked: number; sources: number };
 
 export async function queryWafTotals(

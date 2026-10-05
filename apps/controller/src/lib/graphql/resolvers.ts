@@ -172,8 +172,9 @@ export const resolvers = {
   Agent: {
     // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
     connected: (agent: PairedAgent) => isConnected(agent.agentId),
-    lastApplyFailure: async (agent: PairedAgent) => {
-      const failure = (await getApplyFailures())[agent.agentId];
+    lastApplyFailure: async (agent: PairedAgent, _: unknown, context: GraphQLContext) => {
+      const failures = await (context.applyFailures?.() ?? getApplyFailures());
+      const failure = failures[agent.agentId];
       return failure ? { at: failure.at, error: failure.error } : null;
     },
   },

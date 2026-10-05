@@ -4,10 +4,10 @@
  */
 
 import { ipVersion } from "../http/ip-version";
-import { asc, count, eq, isNotNull, lte, and } from "drizzle-orm";
-import db, { nowIso, toIso } from "../db";
+import { asc, count, eq, inArray, isNotNull, lte, and } from "drizzle-orm";
+import db, { nowIso, runInTransaction, toIso } from "../db";
 import { blockedSources, users } from "../db/schema";
-import { logAuditEvent } from "../audit";
+import { auditEventRow, chainedAuditInsert, logAuditEvent } from "../audit";
 import { diffAuditRecords } from "../audit/changes";
 import { domainError } from "../errors/domain-error";
 import { normalizeCidr } from "../access-lists/rules";
@@ -226,16 +226,27 @@ export async function pruneExpiredBlockedSources(
       ),
     );
   if (expired.length === 0) return 0;
-  for (const row of expired) {
-    await db.delete(blockedSources).where(eq(blockedSources.id, row.id));
-    await logAuditEvent({
-      userId: null,
-      action: "delete",
-      entityType: "blocked_source",
-      entityId: row.id,
-      summary: `The block on ${row.kind} ${row.value} expired`,
-    });
-  }
+  // One statement and one chained write for the batch, still an event per entry.
+  await runInTransaction((tx) => [
+    tx.delete(blockedSources).where(
+      inArray(
+        blockedSources.id,
+        expired.map((row) => row.id),
+      ),
+    ),
+    chainedAuditInsert(
+      tx,
+      expired.map((row) =>
+        auditEventRow({
+          userId: null,
+          action: "delete",
+          entityType: "blocked_source",
+          entityId: row.id,
+          summary: `The block on ${row.kind} ${row.value} expired`,
+        }),
+      ),
+    ),
+  ]);
   await applyConfig();
   return expired.length;
 }

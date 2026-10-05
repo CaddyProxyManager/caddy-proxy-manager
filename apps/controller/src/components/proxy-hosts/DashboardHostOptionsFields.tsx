@@ -23,7 +23,7 @@ import { DnsResolverFields } from "./upstreams/DnsResolverFields";
 import { UpstreamTimeoutsFields } from "./upstreams/UpstreamTimeoutsFields";
 import { ErrorPagesFields } from "./routing/ErrorPagesFields";
 import { GeoBlockFields } from "./protection/GeoBlockFields";
-import { accessListOptions, accessListStatus, NONE_VALUE, toOptions } from "./HostDialogs";
+import { accessListOptions, accessListStatus, NONE_VALUE, toOptions } from "./host-pickers";
 import { LoadBalancerFields } from "./upstreams/LoadBalancerFields";
 import { LocationRulesFields } from "./routing/LocationRulesFields";
 import { MtlsFields } from "./protection/MtlsConfig";

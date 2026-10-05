@@ -11,6 +11,7 @@ import { getProxyHostDetail } from "@/src/lib/proxy-hosts/detail";
 import { hostTrafficNames } from "@/src/lib/proxy-hosts/traffic-status";
 import { canManage, canView, requireAccess } from "@/src/lib/users/permissions";
 import { ProxyHostDetailView } from "@/src/components/proxy-hosts/detail/ProxyHostDetailView";
+import { requestMemo } from "@/src/lib/request-memo";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -19,13 +20,16 @@ function parseId(raw: string): number | null {
   return /^\d{1,9}$/.test(raw) ? Number(raw) : null;
 }
 
+/** Once for the metadata and the page both. */
 async function viewableHost(raw: string) {
   const id = parseId(raw);
   if (id === null) return null;
-  const access = await requireAccess();
-  if (!canView(access, "proxyHost", id)) return null;
-  const host = await getProxyHost(id);
-  return host ? { access, host } : null;
+  return requestMemo(`proxy-host-view:${id}`, async () => {
+    const access = await requireAccess();
+    if (!canView(access, "proxyHost", id)) return null;
+    const host = await getProxyHost(id);
+    return host ? { access, host } : null;
+  });
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

@@ -1319,6 +1319,7 @@
     "certificateFileNoNames": "The certificate names no domains or IP addresses.",
     "bulkHostsFailed": "Failed to change the selected hosts.",
     "upstreamHealthFailed": "Could not read the health of this host's upstreams.",
+    "hostEditorOptionsFailed": "Could not load what the host editor offers. Try opening it again.",
     "bulkRequestInvalid": "The batch request is malformed: it needs an action and a list of host ids.",
     "bulkTooManyHosts": "Choose at most {max} hosts at a time.",
     "certificateInUseByDashboard": "The certificate is still used by the dashboard host. Choose another certificate there first.",

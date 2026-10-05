@@ -4,6 +4,7 @@
  */
 
 import type { Session } from "../auth";
+import { requestMemo } from "../request-memo";
 import { DomainError, domainErrorMessage } from "../errors/domain-error";
 import {
   type EffectiveGrants,
@@ -105,9 +106,11 @@ export function assertCanView(access: Access, kind: ResourceKind, id: number): v
   throw new ForbiddenError();
 }
 
+/** Once per page render, like the session it is resolved from. */
 export async function requireAccess(): Promise<Access> {
   const { requireManager } = await import("../auth");
-  return resolveAccess(await requireManager());
+  const session = await requireManager();
+  return requestMemo("auth:access", () => resolveAccess(session));
 }
 
 /** Gates navigation. An operator with no grants still gets the pages, empty, not a redirect. */
