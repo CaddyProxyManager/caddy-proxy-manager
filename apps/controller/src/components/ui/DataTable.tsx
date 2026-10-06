@@ -20,6 +20,7 @@ import {
   useTableRowStatus,
   useTableSelection,
   useTableSelectionState,
+  type ColumnWidth,
   type TableColumn,
   type TablePlugin,
   type TableRowStatus,
@@ -40,7 +41,8 @@ export type Column<T> = {
   id: string;
   label: string;
   align?: "left" | "right" | "center";
-  width?: string | number;
+  /** A number is pixels; `proportional(...)` shares what the fixed columns leave. */
+  width?: string | number | ColumnWidth;
   sortKey?: string;
   render?: (row: T) => ReactNode;
 };
@@ -140,7 +142,8 @@ function isInteractiveTarget(event: MouseEvent): boolean {
   );
 }
 
-function toColumnWidth(width: Column<unknown>["width"]) {
+function toColumnWidth(width: Column<unknown>["width"]): ColumnWidth {
+  if (typeof width === "object") return width;
   if (typeof width === "number") return pixel(width);
   if (typeof width === "string") {
     const parsed = Number.parseInt(width, 10);

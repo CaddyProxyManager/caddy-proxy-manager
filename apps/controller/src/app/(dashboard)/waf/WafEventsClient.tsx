@@ -24,6 +24,7 @@ import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList"
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Field } from "@astryxdesign/core/Field";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
+import { proportional } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
@@ -1000,18 +1001,20 @@ export default function WafEventsClient({
     {
       id: "blocked",
       label: t("action"),
-      width: 120,
+      width: 104,
       render: (r) => <BlockedChip blocked={r.blocked} />,
     },
     {
       id: "severity",
       label: t("severity"),
-      width: 120,
+      width: 104,
       render: (r) => <SeverityChip severity={r.severity} />,
     },
     {
       id: "host",
       label: t("host"),
+      // Mins in the same ratio as the shares, so neither one alone widens the table.
+      width: proportional(1, { minWidth: 100 }),
       render: (r) =>
         r.host ? (
           <Tooltip content={r.host}>
@@ -1041,17 +1044,17 @@ export default function WafEventsClient({
     {
       id: "method",
       label: tCommon("request"),
+      width: proportional(1.5, { minWidth: 150 }),
+      // One line, so a squeezed column ellipsizes the path rather than stacking the method.
       render: (r) => (
-        <HStack gap={2} vAlign="center">
-          <Text type="code" size="sm" weight="bold" color={r.method ? "accent" : "secondary"}>
-            {r.method || emptyValue}
+        <Tooltip content={r.uri ?? ""}>
+          <Text type="code" size="sm" color="secondary" maxLines={1} hasTruncateTooltip={false}>
+            <Text type="code" size="sm" weight="bold" color={r.method ? "accent" : "secondary"}>
+              {r.method || emptyValue}
+            </Text>{" "}
+            {r.uri || emptyValue}
           </Text>
-          <Tooltip content={r.uri ?? ""}>
-            <Text type="code" size="sm" color="secondary" maxLines={1}>
-              {r.uri || emptyValue}
-            </Text>
-          </Tooltip>
-        </HStack>
+        </Tooltip>
       ),
     },
     {
