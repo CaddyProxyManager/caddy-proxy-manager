@@ -72,10 +72,12 @@ back as mutations to the same endpoint, and pairing is the one plain REST route
 (`/api/agent/v1/pair`), because it runs before the secret every signed call needs exists. Three
 consequences worth knowing before touching either side:
 
-- **`lib/agent/registry.ts` is the only way to reach an agent.** It is in-memory, because a
-  connection is a property of *this* process. "Configured" and "reachable" are therefore the same
-  question, and a second controller replica would each hold half the fleet - that file is where a
-  broker would go, not the callers.
+- **`lib/agent/registry.ts` is the only way to reach an agent.** A stream belongs to the process
+  it reached, so "configured" and "reachable" are the same question. With several replicas, one
+  another holds is mirrored here and reached through it (`lib/agent/broker.ts`): commands and
+  pushed state cross in `agent_outbox`, answers come back in `agent_command_results`, and the
+  callers never ask which replica holds what. `localAgents()` is for work each replica does for
+  its own streams, such as the Caddy health monitor.
 - **Everything is desired state except Caddy admin.** The controller pushes the full desired state
   and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
   The one exception is a Caddy admin call, which the controller blocks on: it goes down the stream
@@ -287,6 +289,29 @@ the same app code:
   opens the database on import.
 - **Transactions go through `runInTransaction`.** bun:sqlite commits when its synchronous callback
   returns, so an async `db.transaction` body would commit before its first `await`.
+
+## More than one controller
+
+Replicas share one PostgreSQL database and coordinate through it (`src/lib/cluster`); under SQLite
+the same calls are local. Agent streams are routed between them (above). Keep new code from
+assuming it is the only process:
+
+- **A background job is `runAsLeader`, not a bare `setInterval`.** One replica holds an advisory
+  lock and runs the jobs; give the job a stop as well as a start, since leadership moves.
+- **A cache a write makes stale is dropped with `announce(name)`.** It runs this process's
+  `onAnnouncement` handlers at once and every other replica's moments later. `invalidateSettingsCache`
+  already does, so a `processMemo` is covered.
+- **Guess limits and single-use values live in the database**: `rate_limit_counters` through
+  `auth/rate-limit.ts`, `spent_nonces` through `cluster/nonces.ts`. A count each replica keeps for
+  itself multiplies what a guesser gets. Flood budgets (`takeFromWindow`) may stay in memory.
+- **Nothing signed may depend on per-process state.** A random boot salt in a key makes a pass
+  minted on one replica fail on the next.
+- **A startup pass that rewrites rows runs under the startup lock**, which `instrumentation.ts`
+  holds until the first Caddy apply. A replica with another `SESSION_SECRET` is refused before
+  them, since its re-encryption would break the rest.
+- **What only a lone controller may do checks `otherReplicasLive()`**, as the direct Caddy
+  transport does. Under SQLite there is never another: `lib/db/single-process.ts` refuses a second
+  process on the same file with a lock the OS drops on exit.
 
 ## Tests
 

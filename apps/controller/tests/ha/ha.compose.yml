@@ -1,0 +1,82 @@
+# The stack ./run.ts runs: two controllers on one database behind HAProxy, with the bundled agent
+# dialling HAProxy. The agent reads this file too (COMPOSE_EXTRA_FILE), as ../upgrade's does.
+x-ha-web-environment: &ha-web-environment
+  # One secret for both: a replica holding another is refused at startup.
+  SESSION_SECRET: "ha-test-session-secret-32chars-xxxxxxxx"
+  ADMIN_USERNAME: haadmin
+  ADMIN_PASSWORD: "Ha-Admin-Password-2026!"
+  BASE_URL: http://localhost:3000
+  NEXTAUTH_URL: http://localhost:3000
+  AUTH_RATE_LIMIT_ENABLED: "false"
+  UPDATE_CHECK_ENABLED: "false"
+
+services:
+  web:
+    image: ${CPM_HA_WEB_IMAGE:-cpm-ha/web:current}
+    hostname: web-a
+    # HAProxy has 3000; each replica keeps a port of its own so the test can pick one.
+    ports: !override
+      - "3101:3000"
+    environment:
+      <<: *ha-web-environment
+
+  web-b:
+    image: ${CPM_HA_WEB_IMAGE:-cpm-ha/web:current}
+    container_name: caddy-proxy-manager-web-b
+    hostname: web-b
+    restart: unless-stopped
+    ports:
+      - "3102:3000"
+    environment:
+      <<: *ha-web-environment
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm
+      CADDY_API_URL: http://caddy-admin:2019
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
+      CLICKHOUSE_PASSWORD: ""
+    group_add:
+      - "${CADDY_GID:-10000}"
+    # The same data volume: the bundled agent reads its bootstrap token from it.
+    volumes:
+      - caddy-manager-data:/app/data
+      - caddy-logs:/logs
+      - acme-ca:/acme-ca
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+      - caddy-admin
+      - database
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  haproxy:
+    image: haproxy:3.2-alpine
+    container_name: caddy-proxy-manager-ha-proxy
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/controller/tests/ha/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - caddy-network
+
+  agent:
+    image: ${CPM_HA_AGENT_IMAGE:-cpm-ha/agent:current}
+    environment:
+      CONTROLLER_URL: http://haproxy:3000
+      COMPOSE_SKIP_OVERRIDE: "1"
+      COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/ha/ha.compose.yml
+      # Never a rebuild: the test is about the controllers, not Caddy's modules.
+      CADDY_BUILD_MODE: external
+
+  caddy:
+    image: ${CADDY_IMAGE:-ghcr.io/caddyproxymanager/caddy:latest}

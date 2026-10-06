@@ -145,6 +145,7 @@ export default defineConfig({
             { label: "Email", slug: "features/email" },
             { label: "Users, roles & groups", slug: "features/users-and-groups" },
             { label: "The agent", slug: "features/agent" },
+            { label: "High availability", slug: "features/high-availability" },
             { label: "Caddy Build", slug: "features/caddy-build" },
             { label: "Tailscale", slug: "features/tailscale" },
             { label: "API", slug: "features/api" },

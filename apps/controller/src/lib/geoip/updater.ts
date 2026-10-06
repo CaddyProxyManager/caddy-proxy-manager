@@ -11,6 +11,7 @@ import { geoipDatabasePath, geoipEnabled } from "../agent/geoip";
 import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
+import { shareGeoipDatabase } from "./replicas";
 import { checkGeoipUpdates, geoipCredentials } from "./update-check";
 
 const DOWNLOAD_URL = "https://download.maxmind.com/geoip/databases";
@@ -229,6 +230,9 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
       const archive = await fetchGeoipArchive(edition, accountId, licenseKey, fetchImpl);
       const { bytes, build } = await extractGeoipDatabase(archive, edition);
       installGeoipDatabase(edition, bytes);
+      await shareGeoipDatabase(edition, bytes).catch((error: unknown) => {
+        console.error(`[geoip] could not share ${edition} with the other replicas:`, error);
+      });
       const stamp = build ?? available;
       if (stamp) builds[edition] = stamp;
       else delete builds[edition];

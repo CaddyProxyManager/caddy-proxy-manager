@@ -1,0 +1,148 @@
+---
+title: High availability
+description: Run several controllers on one PostgreSQL database behind a load balancer, so the dashboard, the API and the agents keep working when one goes down.
+---
+
+Caddy keeps serving when the controller is down: each agent holds the configuration it last
+applied. What stops is everything the controller does - the dashboard, the API, config changes,
+certificate and log views, alerts. To keep those up, run more than one controller.
+
+Every controller is the same container, pointed at the same PostgreSQL database and the same
+`SESSION_SECRET`, behind a load balancer. Any of them answers any request; none is the primary.
+
+## What they share
+
+- **Everything stored**, through the database: hosts, settings, users, sessions, API tokens, the
+  audit log. A setting saved through one is read by the others at once.
+- **Sign-in limits and lockouts.** A second controller is not a fresh set of guesses.
+- **The agents.** An agent holds one connection, to whichever controller it reached. The others
+  reach it through that one, so a host saved anywhere is applied to every agent.
+- **The background jobs** - GeoIP downloads, certificate alerts, notifications, expiring blocks -
+  run on one controller at a time. If it stops, another takes them over within about 20 seconds.
+- **GeoIP databases.** The controller running the jobs downloads them; the others copy them from
+  the database, so every one serves agents the same files.
+
+## Requirements
+
+- **PostgreSQL.** SQLite runs one controller only: a second started on the same file refuses to
+  start. To move an existing install, see [Database](/start/database/).
+- **One `SESSION_SECRET` for all of them.** A controller started with a different one refuses to
+  start while another is running, since it would re-encrypt every stored secret out from under the
+  rest. To rotate it, stop them all and start them again with the new value.
+- **Agents.** Each controller reaches Caddy through an agent. A lone controller with no agent
+  configures Caddy directly; with others running it refuses to, since each would load its own
+  config onto the same Caddy. Changes then wait until an agent is connected.
+- **A load balancer** in front of them, for the browsers, the API and the agents:
+  - No sticky sessions: any controller can answer any request.
+  - Long idle timeouts. An agent holds one request open for hours; it pings every 20 seconds, so
+    anything over a minute works.
+  - A health check on `GET /api/health`.
+  - A retry on another controller when one refuses the connection, as one that has just stopped
+    does (HAProxy's `option redispatch`).
+
+`BASE_URL` is the load balancer's address, the same on every controller. Agents use it too, set as
+their `CONTROLLER_URL`.
+
+## Example
+
+Two controllers and HAProxy, added to the bundled stack with an override file. Both controllers
+mount the same data volume, so the bundled agent pairs itself as it does with one; a remote agent
+pairs with a code as usual.
+
+```yaml title="docker-compose.ha.yml"
+services:
+  web:
+    ports: !reset []
+
+  web-2:
+    image: ghcr.io/caddyproxymanager/web:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:?ERROR - SESSION_SECRET is required}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-cpm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-cpm}
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
+    group_add:
+      - "${CADDY_GID:-10000}"
+    volumes:
+      - caddy-manager-data:/app/data
+      - caddy-logs:/logs
+      - acme-ca:/acme-ca
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+      - caddy-admin
+      - database
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+
+  haproxy:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - caddy-network
+
+  agent:
+    environment:
+      CONTROLLER_URL: http://haproxy:3000
+```
+
+```text title="haproxy.cfg"
+defaults
+  mode http
+  timeout connect 5s
+  timeout http-request 30s
+  timeout client 1h
+  timeout server 1h
+
+resolvers docker
+  nameserver dns 127.0.0.11:53
+  hold valid 2s
+
+frontend controllers
+  bind :3000
+  default_backend web
+
+backend web
+  balance roundrobin
+  retries 3
+  option redispatch
+  option httpchk GET /api/health
+  http-check expect status 200
+  default-server check inter 2s fall 2 rise 2 resolvers docker init-addr libc,none
+  server web-1 web:3000
+  server web-2 web-2:3000
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d
+```
+
+A third controller is one more service like `web-2` and one more `server` line. Give each the
+other settings your `web` service sets in `.env`; the override above only shows what it needs.
+
+## When one goes down
+
+- Requests in flight to it fail; the load balancer sends the next ones elsewhere.
+- Its agents reconnect, through the load balancer, to one that is up - usually within seconds.
+  Until they do, those agents keep serving what they last applied.
+- If it was running the background jobs, another takes them over within about 20 seconds.
+- When it comes back it joins the others; agents stay where they are.
+
+## What this does not cover
+
+- **PostgreSQL itself.** Every controller depends on it. Use a database with its own replication
+  or failover, such as a managed one, for that.
+- **Caddy.** Each agent runs its own Caddy, and a host down takes its Caddy with it. Running
+  [agents](/features/agent/) on more than one host, with DNS or a load balancer in front, keeps
+  traffic flowing through that.

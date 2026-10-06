@@ -809,6 +809,18 @@ Starting with `DATABASE_URL` still pointed at the old file fails immediately, wi
 so. Today's SQLite schema has its own migration history, and running it over the old file would
 leave the app on a schema it does not know.
 
+### More than one controller
+
+Several controllers can share one PostgreSQL database behind a load balancer, so the dashboard,
+the API and the agents keep working when one goes down. Each needs the same `SESSION_SECRET`, and
+Caddy is reached through agents. Any controller answers any request: sessions, sign-in limits and
+settings are shared through the database, an agent connected to one is reached through it by the
+others, and one at a time runs the background jobs. SQLite runs one controller only, and a second
+on the same file refuses to start; a controller with others running never configures Caddy
+without an agent. The
+[high availability guide](https://caddyproxy.com/features/high-availability/) has an example with
+HAProxy.
+
 ### Working on the schema
 
 `apps/controller/src/lib/db/schema.pg.ts` is the source of truth, hand-edited.

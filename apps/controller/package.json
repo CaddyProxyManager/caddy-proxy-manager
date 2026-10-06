@@ -18,6 +18,7 @@
     "test:watch": "bun scripts/with-test-db.ts bun test --watch tests/unit tests/integration",
     "test:upgrade": "bun scripts/with-test-db.ts bun tests/upgrade/run.ts",
     "test:upgrade:agent": "bun tests/upgrade/mixed-agent.ts",
+    "test:ha": "bun tests/ha/run.ts",
     "test:coverage": "bun scripts/with-test-db.ts bun test --isolate --coverage tests/unit tests/integration && bun scripts/coverage-ratchet.ts",
     "test:e2e": "playwright test --config tests/playwright.config.ts",
     "test:e2e:ui": "playwright test --ui --config tests/playwright.config.ts",
