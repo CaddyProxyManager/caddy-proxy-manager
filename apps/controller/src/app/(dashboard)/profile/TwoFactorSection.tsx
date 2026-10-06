@@ -231,9 +231,7 @@ export function TwoFactorSection({
               width={200}
               height={200}
             />
-            <Text type="body" size="xsm" color="secondary">
-              {t("manualEntry")}
-            </Text>
+            <Text type="supporting">{t("manualEntry")}</Text>
             <CodeBlock code={secretOf(flow.totpURI)} size="sm" width="100%" />
             <TextInput
               startIcon={ShieldCheck}

@@ -423,7 +423,7 @@ export function CaddyBuildFields({
                 label={`${customModules.filter((c) => c.enabled).length}/${customModules.length}`}
               />
             </HStack>
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="supporting">
               {t("customModuleHelp")} {t("moduleVersionHelp")}
             </Text>
 
@@ -512,7 +512,7 @@ function ModuleToggle({
       <HStack gap={3} vAlign="center" wrap="wrap">
         <Switch label={caddyModuleName(t, module)} value={value} onChange={onChange} />
         {module.docsUrl && (
-          <Text type="body" size="xsm">
+          <Text type="body" size="sm">
             <Link href={module.docsUrl} target="_blank" rel="noreferrer">
               {module.modulePath}
             </Link>
@@ -572,7 +572,7 @@ function RebuildBanner({
       description={
         <VStack gap={2}>
           {status.state === "failed" && status.error && (
-            <Text type="body" size="xsm">
+            <Text type="body" size="sm">
               {status.error}
             </Text>
           )}
@@ -597,7 +597,7 @@ function RebuildBanner({
             </HStack>
           )}
           {!inFlight && (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="supporting">
               {t(external ? "externalRebuildDescription" : "rebuildDescription")}
             </Text>
           )}

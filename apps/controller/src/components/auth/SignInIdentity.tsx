@@ -39,7 +39,7 @@ export function SignInIdentity({
               {username}
             </Text>
             {description && (
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {description}
               </Text>
             )}

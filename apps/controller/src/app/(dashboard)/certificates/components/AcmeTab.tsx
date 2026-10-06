@@ -43,7 +43,7 @@ function acmeMobileCard(r: AcmeHost) {
         <Text type="body" size="sm" weight="semibold">
           {r.name}
         </Text>
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {domainSummary(r)}
         </Text>
         <StatusChip status={r.enabled ? "active" : "inactive"} />
@@ -181,7 +181,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
               {r.name}
             </Text>
             <Tooltip content={r.domains.join(", ")}>
-              <Text type="code" size="xsm" color="secondary" maxLines={1}>
+              <Text type="code" size="sm" color="secondary" maxLines={1}>
                 {domainSummary(r)}
               </Text>
             </Tooltip>
@@ -263,9 +263,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
   return (
     <VStack gap={3}>
       {inventory && inventory.unreadable > 0 && (
-        <Text type="body" size="xsm" color="secondary">
-          {t("inventoryPartial", { count: inventory.unreadable })}
-        </Text>
+        <Text type="supporting">{t("inventoryPartial", { count: inventory.unreadable })}</Text>
       )}
       <DataTable
         columns={columns}

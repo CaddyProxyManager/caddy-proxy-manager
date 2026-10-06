@@ -436,12 +436,10 @@ export default function OAuthProvidersSection({
           {editingProvider?.hasClientSecret && !rotateClientSecret ? (
             <HStack justify="between" vAlign="center" gap={3}>
               <VStack gap={1}>
-                <Text type="label" size="xsm">
+                <Text type="label" size="sm">
                   {t("secretLabel")}
                 </Text>
-                <Text type="body" size="xsm" color="secondary">
-                  {t("storedSecretHelp")}
-                </Text>
+                <Text type="supporting">{t("storedSecretHelp")}</Text>
               </VStack>
               <Button
                 type="button"
@@ -546,7 +544,7 @@ export default function OAuthProvidersSection({
 
           {editingProvider && (
             <VStack gap={1}>
-              <Text type="label" size="xsm" color="secondary">
+              <Text type="label" size="sm" color="secondary">
                 {t("callbackUrl")}
               </Text>
               <CodeBlock code={callbackUrl(editingProvider.id)} width="100%" />
@@ -555,13 +553,11 @@ export default function OAuthProvidersSection({
 
           {/* Shown before saving too: it goes into the IdP's form beside the callback URL. */}
           <VStack gap={1}>
-            <Text type="label" size="xsm" color="secondary">
+            <Text type="label" size="sm" color="secondary">
               {t("backChannelLogoutUrl")}
             </Text>
             <CodeBlock code={backchannelLogoutUrl} width="100%" />
-            <Text type="body" size="xsm" color="secondary">
-              {t("backChannelLogoutHelp")}
-            </Text>
+            <Text type="supporting">{t("backChannelLogoutHelp")}</Text>
           </VStack>
         </VStack>
       </AppDialog>

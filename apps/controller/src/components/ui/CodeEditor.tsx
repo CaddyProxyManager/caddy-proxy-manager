@@ -357,13 +357,13 @@ export function CodeEditor({
                   issue.severity === "error" ? "codeEditor.errorLabel" : "codeEditor.warningLabel",
                 )}
               />
-              <Text type="body" size="xsm">
+              <Text type="body" size="sm">
                 {t("codeEditor.issueAt", { line: String(issue.line), message: issue.message })}
               </Text>
             </HStack>
           ))}
           {issues.length > MAX_LISTED_ISSUES && (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {t("codeEditor.moreIssues", { count: issues.length - MAX_LISTED_ISSUES })}
             </Text>
           )}
@@ -373,10 +373,10 @@ export function CodeEditor({
       {/* Tab-to-indent must be discoverable in the open, not only via `aria-keyshortcuts`. */}
       {!isFooterHidden && (
         <HStack justify="between" gap={2}>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {readOnly ? "" : t("codeEditor.keyboardHint")}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}
           </Text>
         </HStack>

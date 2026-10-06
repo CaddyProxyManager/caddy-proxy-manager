@@ -191,7 +191,7 @@ function ProxyHostsTableDemoContent() {
               </Text>
               <HostNotesHint notes={r.notes} />
             </HStack>
-            <Text type="code" size="xsm" color="secondary">
+            <Text type="code" size="sm" color="secondary">
               {r.upstreams}
             </Text>
             <HostTagList tags={r.tags} />

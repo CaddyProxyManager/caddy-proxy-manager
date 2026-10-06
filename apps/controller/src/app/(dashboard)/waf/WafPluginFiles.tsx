@@ -183,7 +183,7 @@ export function WafPluginFiles({
                   description={t("pluginDisabledDescription")}
                   endContent={
                     <HStack gap={2} vAlign="center">
-                      <Text type="body" size="xsm" color="secondary">
+                      <Text type="body" size="sm" color="secondary">
                         <Timestamp value={plugin.loadFailedAt} />
                       </Text>
                       <Button

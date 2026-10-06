@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, type RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { Ellipsis, type LucideIcon } from "lucide-react";
+import { Text } from "@astryxdesign/core/Text";
 import { canSee, DESTINATIONS, type DestinationId } from "@/src/lib/nav/destinations";
 import { ACCENTS } from "@/src/components/ui/accent";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "./nav-icons";
@@ -32,6 +33,23 @@ const TABS: TabSpec[] = [
   { key: "agents", destination: "agents", labelKey: "agents", owns: ["/agents"] },
   { key: "analytics", destination: "analytics", labelKey: "analytics", owns: ["/analytics"] },
 ];
+
+/** Ellipsizes rather than overlapping a neighbour; the tab's accessible name keeps the whole label. */
+function TabLabel({ isActive, children }: { isActive: boolean; children: string }) {
+  return (
+    <Text
+      size="sm"
+      color="inherit"
+      weight={isActive ? "semibold" : "medium"}
+      justify="center"
+      maxLines={1}
+      hasTruncateTooltip={false}
+      className="cpm-tab-label"
+    >
+      {children}
+    </Text>
+  );
+}
 
 function owns(pathname: string, path: string): boolean {
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
@@ -98,7 +116,7 @@ export function MobileTabBar({
               aria-hidden="true"
               className={ACCENTS[DESTINATION_HUES[tab.destination]].text}
             />
-            <span className="cpm-tab-label">{t(tab.labelKey)}</span>
+            <TabLabel isActive={isActive}>{t(tab.labelKey)}</TabLabel>
           </Link>
         );
       })}
@@ -113,7 +131,7 @@ export function MobileTabBar({
       >
         <span className="cpm-tab-bar-mark" aria-hidden="true" />
         <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
-        <span className="cpm-tab-label">{t("more.title")}</span>
+        <TabLabel isActive={isMoreActive}>{t("more.title")}</TabLabel>
       </button>
     </nav>
   );

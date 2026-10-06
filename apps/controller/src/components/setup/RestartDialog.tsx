@@ -255,9 +255,7 @@ export default function RestartDialog({
                   </VStack>
                 )}
 
-                <Text size="xsm" color="secondary">
-                  {copy.note}
-                </Text>
+                <Text type="supporting">{copy.note}</Text>
               </VStack>
             </LayoutContent>
           }

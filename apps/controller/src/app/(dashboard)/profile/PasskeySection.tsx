@@ -166,7 +166,7 @@ export function PasskeySection({
                 <HStack gap={2} wrap="wrap" vAlign="center">
                   {passkey.createdAt && (
                     <UtcTooltip value={passkey.createdAt}>
-                      <Text type="body" size="xsm" color="secondary">
+                      <Text type="body" size="sm" color="secondary">
                         {t("added", {
                           date: format.dateTime(new Date(passkey.createdAt), TIMESTAMP_STYLES.date),
                         })}

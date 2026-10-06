@@ -62,7 +62,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
             {row.name}
           </Text>
           {row.description && (
-            <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            <Text type="body" size="sm" color="secondary" maxLines={1}>
               {row.description}
             </Text>
           )}
@@ -76,7 +76,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
       render: (row) => {
         const labels = usageLabel(row);
         return labels.length === 0 ? (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("presetUnused")}
           </Text>
         ) : (
@@ -93,7 +93,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
       label: t("presetUpdatedAt"),
       width: 200,
       render: (row) => (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           <Timestamp value={row.updatedAt} />
         </Text>
       ),

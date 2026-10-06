@@ -23,16 +23,12 @@ export function WafRuleExclusions({ value }: Props) {
         <Text type="body" size="sm" weight="semibold">
           {t("wafExclusionsTitle")}
         </Text>
-        <Text type="body" size="xsm" color="secondary">
-          {t("wafExclusionsMoved")}
-        </Text>
+        <Text type="supporting">{t("wafExclusionsMoved")}</Text>
       </VStack>
       <Link href="/waf">{t("wafExclusionsManage")}</Link>
       {legacy.length > 0 && (
         <VStack gap={1}>
-          <Text type="body" size="xsm" color="secondary">
-            {t("wafLegacyExclusions")}
-          </Text>
+          <Text type="supporting">{t("wafLegacyExclusions")}</Text>
           <HStack gap={2} wrap="wrap">
             {legacy.map((id) => (
               <Token key={id} size="sm" label={String(id)} />

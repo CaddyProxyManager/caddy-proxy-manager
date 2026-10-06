@@ -53,7 +53,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
     <VStack gap={3} padding={4}>
       <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
         <HStack gap={2} vAlign="center">
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
+          <Text type="label" size="sm" weight="semibold" color="secondary">
             {t("issuedClientCertificates")}
           </Text>
           <Badge variant="success" label={t("activeCount", { count: active.length })} />
@@ -265,7 +265,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
                 })}
               />
             )}
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {formatRelativeDate(t, ca.createdAt)}
             </Text>
           </HStack>

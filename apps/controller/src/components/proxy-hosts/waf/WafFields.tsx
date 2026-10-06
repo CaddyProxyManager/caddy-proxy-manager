@@ -112,11 +112,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
           </ModuleGated>
         </HStack>
 
-        {moduleDisabledReason && (
-          <Text type="body" size="xsm" color="secondary">
-            {moduleDisabledReason}
-          </Text>
-        )}
+        {moduleDisabledReason && <Text type="supporting">{moduleDisabledReason}</Text>}
 
         {/* Unmounted when off, so nothing below is focusable or submitted. Not gated on
             moduleDisabledReason: a missing wafExcludedRuleIds input reads as "no exclusions"
@@ -164,9 +160,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               <Text type="body" size="sm" weight="bold">
                 {t("requestBodyLimits")}
               </Text>
-              <Text type="body" size="xsm" color="secondary">
-                {t("wafBodyLimitsDescription")}
-              </Text>
+              <Text type="supporting">{t("wafBodyLimitsDescription")}</Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
                   startIcon={HardDrive}

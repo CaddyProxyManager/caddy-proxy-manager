@@ -245,7 +245,7 @@ function MembersTab({
       width: pixel(180),
       renderCell: (row) => (
         <HStack gap={1} vAlign="center">
-          <Text type="code" size="xsm" color="secondary">
+          <Text type="code" size="sm" color="secondary">
             ••••••••••••
           </Text>
           <IconButton
@@ -264,7 +264,7 @@ function MembersTab({
       header: t("columnAdded"),
       width: pixel(140),
       renderCell: (row) => (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {row.createdAt ? <Timestamp value={row.createdAt} style="date" /> : emptyValue}
         </Text>
       ),
@@ -585,7 +585,7 @@ function SettingsTab({
         collapsible={{ defaultIsOpen: true }}
       >
         <VStack gap={3}>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="supporting">
             {usageCount > 0
               ? t("deleteInUseWarning", { count: usageCount })
               : t("deleteUnusedWarning")}
@@ -896,7 +896,7 @@ function NewListDialog({
         />
 
         <VStack gap={2}>
-          <Text type="label" size="xsm" color="secondary">
+          <Text type="label" size="sm" color="secondary">
             {t("seedMembersOptional")}
           </Text>
           {seed.map((s, i) => (

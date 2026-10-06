@@ -242,7 +242,7 @@ function RoleCard({
               <Text type="body" size="sm" weight="semibold">
                 {role.name}
               </Text>
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {certCountLabel}
                 {role.description && ` · ${role.description}`}
               </Text>
@@ -294,7 +294,7 @@ function RoleCard({
         <Divider />
 
         <VStack gap={2}>
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
+          <Text type="label" size="sm" weight="semibold" color="secondary">
             {tNav("certificates")}{" "}
           </Text>
 

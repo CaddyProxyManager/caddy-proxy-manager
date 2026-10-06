@@ -91,9 +91,7 @@ export function ViewAsDialog({
                 />
               ))
             )}
-            <Text type="body" size="xsm" color="secondary">
-              {t("groupsHelp")}
-            </Text>
+            <Text type="supporting">{t("groupsHelp")}</Text>
           </VStack>
         )}
       </VStack>

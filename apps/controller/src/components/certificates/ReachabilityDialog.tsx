@@ -93,12 +93,12 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
                   : t(`results.${result.result}`)}
               </Text>
               {result.addresses.length > 0 && (
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {t("addresses", { addresses: result.addresses.join(", ") })}
                 </Text>
               )}
               {result.caa.length > 0 && (
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {t("caa", { records: result.caa.join("; ") })}
                 </Text>
               )}
@@ -113,24 +113,24 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
                 </HStack>
               )}
               {check === "pending" && (
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {t("outsidePending")}
                 </Text>
               )}
               {check && check !== "pending" && check.state === "unavailable" && (
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {t("outsideUnavailable")}
                 </Text>
               )}
               {check && check !== "pending" && check.state === "done" && (
                 <VStack gap={1}>
                   {check.problems.length === 0 ? (
-                    <Text type="body" size="xsm">
+                    <Text type="body" size="sm">
                       {t("outsideNoProblems")}
                     </Text>
                   ) : (
                     check.problems.map((problem) => (
-                      <Text key={problem.name} type="body" size="xsm">
+                      <Text key={problem.name} type="body" size="sm">
                         {t("outsideProblem", problem)}
                       </Text>
                     ))
@@ -140,9 +140,7 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
             </VStack>
           );
         })}
-        <Text type="body" size="xsm" color="secondary">
-          {t("outsidePrivacy")}
-        </Text>
+        <Text type="supporting">{t("outsidePrivacy")}</Text>
       </VStack>
     </AppDialog>
   );

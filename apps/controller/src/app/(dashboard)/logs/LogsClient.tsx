@@ -190,7 +190,7 @@ export default function LogsClient({
       ) : (
         <CodeBlock code={text} size="sm" width="100%" />
       )}
-      <Text type="body" size="xsm" color="secondary">
+      <Text type="body" size="sm" color="secondary">
         {t("showing", { shown: shown.length, kept: lines.length })}
       </Text>
     </VStack>

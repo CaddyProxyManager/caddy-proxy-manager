@@ -70,11 +70,7 @@ export function EnvLabelledField({
         <StackItem size="fill">
           <VStack gap={0}>
             {labelLine}
-            {description && (
-              <Text size="xsm" color="secondary">
-                {description}
-              </Text>
-            )}
+            {description && <Text type="supporting">{description}</Text>}
           </VStack>
         </StackItem>
       </HStack>
@@ -84,11 +80,7 @@ export function EnvLabelledField({
   return (
     <VStack gap={1}>
       {labelLine}
-      {description && (
-        <Text size="xsm" color="secondary">
-          {description}
-        </Text>
-      )}
+      {description && <Text type="supporting">{description}</Text>}
       {control}
     </VStack>
   );

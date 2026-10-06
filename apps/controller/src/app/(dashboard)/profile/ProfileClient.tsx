@@ -599,25 +599,25 @@ export default function ProfileClient({
                     <HStack gap={3} wrap="wrap" vAlign="center">
                       {withUtc(
                         s.createdAt,
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {t("signedIn", {
                             when: format.relativeTime(new Date(s.createdAt), now),
                           })}
                         </Text>,
                       )}
                       {s.ipAddress && (
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {t("ipAddress", { address: s.ipAddress })}
                         </Text>
                       )}
                       {s.place && (
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {placeLine(s.place)}
                         </Text>
                       )}
                       {withUtc(
                         s.expiresAt,
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {tCommon("expiresOn", { date: formatDate(s.expiresAt) })}
                         </Text>,
                       )}

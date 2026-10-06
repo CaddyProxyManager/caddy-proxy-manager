@@ -193,7 +193,7 @@ function CustomRange({
           value={toInput(from)}
           onChange={(next) => commit(next ? dayjs(next).unix() : null, to)}
         />
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           -
         </Text>
         <DateTimeInput
@@ -206,7 +206,7 @@ function CustomRange({
         />
       </HStack>
       {(tooLong || backwards) && (
-        <Text type="body" size="xsm" color="secondary" role="alert">
+        <Text type="body" size="sm" color="secondary" role="alert">
           {tooLong ? t("customRangeTooLong", { days: 92 }) : t("customRangeBackwards")}
         </Text>
       )}
@@ -564,7 +564,7 @@ export default function AnalyticsClient() {
     <VStack gap={6}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={0}>
-          <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
+          <Text type="label" size="sm" color="secondary" className="cpm-desktop-only">
             {t("trafficIntelligence")}
           </Text>
           <Heading level={1}>{tNav("analytics")}</Heading>

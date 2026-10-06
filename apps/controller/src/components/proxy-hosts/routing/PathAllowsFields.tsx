@@ -70,9 +70,7 @@ export function PathAllowsFields({ initialData = [] }: Props) {
         />
       </HStack>
 
-      <Text type="body" size="xsm" color="secondary">
-        {t("pathAllowsHelp")}
-      </Text>
+      <Text type="supporting">{t("pathAllowsHelp")}</Text>
     </VStack>
   );
 }

@@ -126,7 +126,7 @@ export function WafEventInsight({
           marks={[{ value: explanation.threshold, label: t("thresholdMark") }]}
           variant={reached ? "error" : "warning"}
         />
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {explanation.decidingRuleId !== null
             ? t("decidingRule", { id: String(explanation.decidingRuleId) })
             : event.blocked
@@ -134,14 +134,14 @@ export function WafEventInsight({
               : t("detectedOnly")}
         </Text>
         {relayedBy && (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {relayedBy.name
               ? t("relayedBy", { name: relayedBy.name })
               : t("relayedByUnpaired", { agentId: relayedBy.agentId })}
           </Text>
         )}
         {!explanation.scoreReported && explanation.rules.length > 0 && (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("scoreSummed")}
           </Text>
         )}
@@ -174,12 +174,12 @@ export function WafEventInsight({
                     {rule.message}
                   </Text>
                   {rule.variable && (
-                    <Text type="code" size="xsm" color="secondary">
+                    <Text type="code" size="sm" color="secondary">
                       {t("matchedIn", { variable: rule.variable })}
                     </Text>
                   )}
                   {rule.data && (
-                    <Text type="code" size="xsm" color="secondary" maxLines={3}>
+                    <Text type="code" size="sm" color="secondary" maxLines={3}>
                       {rule.data}
                     </Text>
                   )}

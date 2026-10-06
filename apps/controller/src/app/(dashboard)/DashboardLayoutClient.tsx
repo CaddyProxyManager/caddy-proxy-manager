@@ -117,7 +117,7 @@ function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
           <Text type="body" size="sm" weight="medium" maxLines={1}>
             {user.name ?? t("defaultUserName")}
           </Text>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
             {user.email}
           </Text>
         </VStack>

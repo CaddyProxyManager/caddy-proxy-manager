@@ -326,7 +326,7 @@ function DiffHeading({ title, diff, code }: { title: string; diff: ConfigDiff; c
     <HStack gap={2} vAlign="center">
       <Heading level={5}>{title}</Heading>
       {code && (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {code}
         </Text>
       )}

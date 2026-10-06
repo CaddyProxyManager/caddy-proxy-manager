@@ -263,7 +263,7 @@ export default function AgentsClient({
 
               <HStack gap={6} wrap="wrap">
                 <VStack gap={0}>
-                  <Text type="body" size="xsm" color="secondary">
+                  <Text type="body" size="sm" color="secondary">
                     {t("assignedHosts")}
                   </Text>
                   <Text type="body" size="sm">
@@ -271,7 +271,7 @@ export default function AgentsClient({
                   </Text>
                 </VStack>
                 <VStack gap={0}>
-                  <Text type="body" size="xsm" color="secondary">
+                  <Text type="body" size="sm" color="secondary">
                     {t("buildState")}
                   </Text>
                   <Text type="body" size="sm">
@@ -279,7 +279,7 @@ export default function AgentsClient({
                   </Text>
                 </VStack>
                 <VStack gap={0}>
-                  <Text type="body" size="xsm" color="secondary">
+                  <Text type="body" size="sm" color="secondary">
                     {tCommon("lastSeen")}
                   </Text>
                   <Text type="body" size="sm">
@@ -296,9 +296,7 @@ export default function AgentsClient({
                 </VStack>
               </HStack>
 
-              <Text type="body" size="xsm" color="secondary">
-                {t("unassignedHint")}
-              </Text>
+              <Text type="supporting">{t("unassignedHint")}</Text>
 
               {agent.logAccessFixes.length > 0 && (
                 <Banner status="warning" title={t("logAccessTitle")}>

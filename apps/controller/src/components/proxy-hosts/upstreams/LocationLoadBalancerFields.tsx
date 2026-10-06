@@ -111,9 +111,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             <Text type="body" size="sm" weight="semibold">
               {t("loadBalancer")}
             </Text>
-            <Text type="body" size="xsm" color="secondary">
-              {t("locationLoadBalancerDescription")}
-            </Text>
+            <Text type="supporting">{t("locationLoadBalancerDescription")}</Text>
           </VStack>
           <Switch
             label={t("locationLoadBalancerLabel")}

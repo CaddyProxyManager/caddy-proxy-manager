@@ -40,7 +40,7 @@ function CheckStatus({ check, checking }: { check?: DelegationCheck; checking: b
     return (
       <HStack gap={2} vAlign="center">
         <StatusDot variant="neutral" label={tCommon("checking")} />
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {tCommon("checking")}
         </Text>
       </HStack>
@@ -50,7 +50,7 @@ function CheckStatus({ check, checking }: { check?: DelegationCheck; checking: b
     return (
       <HStack gap={2} vAlign="center">
         <StatusDot variant="neutral" label={t("statusNone")} />
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {t("statusNone")}
         </Text>
       </HStack>
@@ -65,7 +65,7 @@ function CheckStatus({ check, checking }: { check?: DelegationCheck; checking: b
   return (
     <HStack gap={2} vAlign="center">
       <StatusDot variant={check.status === "ok" ? "success" : "warning"} label={text} />
-      <Text type="body" size="xsm" color="secondary">
+      <Text type="body" size="sm" color="secondary">
         {text}
       </Text>
     </HStack>
@@ -150,11 +150,11 @@ export function DnsDelegationSection({
       width: proportional(2),
       renderCell: (row) =>
         row.target ? (
-          <Text type="code" size="xsm">
+          <Text type="code" size="sm">
             {t("cnameRecord", { record: row.record, target: row.target })}
           </Text>
         ) : (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("noCnameNeeded")}
           </Text>
         ),
@@ -280,9 +280,7 @@ export function DnsDelegationSection({
               value={provider}
               onChange={setProvider}
             />
-            <Text type="body" size="xsm" color="secondary">
-              {t("rfc2136Hint")}
-            </Text>
+            <Text type="supporting">{t("rfc2136Hint")}</Text>
           </VStack>
         </form>
       </FormCard>

@@ -119,9 +119,7 @@ function DownloadCard() {
           value={settingsHistory}
           onChange={setSettingsHistory}
         />
-        <Text type="body" size="xsm" color="secondary">
-          {t("notIncluded")}
-        </Text>
+        <Text type="supporting">{t("notIncluded")}</Text>
         <Button
           icon={<Download />}
           label={tCommon("download")}

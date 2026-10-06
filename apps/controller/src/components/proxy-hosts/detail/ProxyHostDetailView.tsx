@@ -197,7 +197,7 @@ export function ProxyHostDetailView({
           <Text type="body" size="sm" maxLines={1}>
             {row.summary}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {row.actor ?? tAuditLog("systemActor")}
           </Text>
         </VStack>

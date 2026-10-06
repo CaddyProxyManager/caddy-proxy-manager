@@ -101,7 +101,7 @@ export function MoreDrawer({
                 <Text type="label" size="sm" justify="center">
                   {tMore("allPages")}
                 </Text>
-                <Text type="supporting" size="2xs" justify="center">
+                <Text type="supporting" justify="center">
                   {tMore("allPagesCount", { count: totalPages })}
                 </Text>
               </VStack>

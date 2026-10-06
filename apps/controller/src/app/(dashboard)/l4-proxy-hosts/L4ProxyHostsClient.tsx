@@ -14,7 +14,7 @@ import { HostTagFilter, HostTagList } from "@/components/proxy-hosts/HostTagsFie
 import { duplicateL4ProxyHostDraft } from "@/src/lib/proxy-hosts/duplicate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import type { L4AccessListOption } from "@/src/lib/models/access-lists";
 import { toggleL4ProxyHostAction } from "./actions";
@@ -302,7 +302,7 @@ export default function L4ProxyHostsClient({
               <AccessListBadge host={host} accessLists={accessLists} />
             </HStack>
             <Tooltip content={formatMatcher(host, t)}>
-              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+              <Text type="body" size="sm" color="secondary" maxLines={1}>
                 {formatMatcher(host, t)}
               </Text>
             </Tooltip>
@@ -330,7 +330,7 @@ export default function L4ProxyHostsClient({
               {host.listenAddress}
             </Text>
             {count !== null && (
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {t("listenPortCount", { count })}
               </Text>
             )}
@@ -373,25 +373,27 @@ export default function L4ProxyHostsClient({
   const mobileCard = (host: L4ProxyHost) => (
     <Card className={ACCENTS[host.enabled ? "green" : "gray"].edge}>
       <HStack justify="between" vAlign="start" gap={2}>
-        <VStack gap={1}>
-          <HStack gap={2} vAlign="center">
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
+        <StackItem size="fill">
+          <VStack gap={1}>
+            <HStack gap={2} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+              <ProtocolBadge protocol={host.protocol} />
+              <AccessListBadge host={host} accessLists={accessLists} />
+            </HStack>
+            <Text type="code" size="sm" color="secondary" maxLines={1}>
+              {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
             </Text>
-            <ProtocolBadge protocol={host.protocol} />
-            <AccessListBadge host={host} accessLists={accessLists} />
-          </HStack>
-          <Text type="code" size="xsm" color="secondary" maxLines={1}>
-            {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
-          </Text>
-          {host.description && (
-            <Text type="body" size="xsm" color="secondary" maxLines={2}>
-              {host.description}
-            </Text>
-          )}
-          <HostTagList tags={host.tags} />
-          <StatusChip status={host.enabled ? "active" : "inactive"} />
-        </VStack>
+            {host.description && (
+              <Text type="body" size="sm" color="secondary" maxLines={2}>
+                {host.description}
+              </Text>
+            )}
+            <HostTagList tags={host.tags} />
+            <StatusChip status={host.enabled ? "active" : "inactive"} />
+          </VStack>
+        </StackItem>
         {actionsFor(host)}
       </HStack>
     </Card>

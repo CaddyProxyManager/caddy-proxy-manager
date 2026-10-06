@@ -238,7 +238,7 @@ function SeverityChip({ severity }: { severity: string | null }) {
   const emptyValue = useEmptyValue();
   if (!severity) {
     return (
-      <Text type="body" size="xsm" color="secondary">
+      <Text type="body" size="sm" color="secondary">
         {emptyValue}
       </Text>
     );
@@ -260,7 +260,7 @@ function BlockedChip({ blocked }: { blocked: boolean }) {
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <VStack gap={0}>
-      <Text type="label" size="3xs" weight="bold" color="secondary">
+      <Text type="label" size="sm" weight="bold" color="secondary">
         {label}
       </Text>
       {children}
@@ -323,7 +323,7 @@ function WafStatusCard({ stats, isEnabled }: { stats: WafEventStats; isEnabled: 
           <Text type="display-3" color="accent" hasTabularNumbers>
             {stats.blocked}
           </Text>
-          <Text type="body" size="xsm" weight="medium" color="secondary">
+          <Text type="body" size="sm" weight="medium" color="secondary">
             {t("blocked")}
           </Text>
         </VStack>
@@ -333,7 +333,7 @@ function WafStatusCard({ stats, isEnabled }: { stats: WafEventStats; isEnabled: 
               <Text type="body" weight="semibold" hasTabularNumbers>
                 {value}
               </Text>
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {label}
               </Text>
             </VStack>
@@ -349,7 +349,7 @@ function HeadersGrid({ headers }: { headers?: Record<string, string | string[]> 
   const emptyValue = useEmptyValue();
   if (!headers || Object.keys(headers).length === 0) {
     return (
-      <Text type="body" size="xsm" color="secondary">
+      <Text type="body" size="sm" color="secondary">
         {emptyValue}
       </Text>
     );
@@ -358,7 +358,7 @@ function HeadersGrid({ headers }: { headers?: Record<string, string | string[]> 
     <MetadataList>
       {Object.entries(headers).map(([k, v]) => (
         <MetadataListItem key={k} label={k}>
-          <Text type="code" size="xsm">
+          <Text type="code" size="sm">
             {Array.isArray(v) ? v.join(", ") : v}
           </Text>
         </MetadataListItem>
@@ -434,7 +434,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
             <>
               <MetadataList columns="multi">
                 <MetadataListItem label={t("transactionId")}>
-                  <Text type="code" size="xsm">
+                  <Text type="code" size="sm">
                     {tx.id ?? emptyValue}
                   </Text>
                 </MetadataListItem>
@@ -444,12 +444,12 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={tCommon("client")}>
-                  <Text type="code" size="xsm">
+                  <Text type="code" size="sm">
                     {tx.client_ip ?? emptyValue}:{tx.client_port ?? 0}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("server")}>
-                  <Text type="code" size="xsm">
+                  <Text type="code" size="sm">
                     {tx.server_id ?? emptyValue}:{tx.host_port ?? 0}
                   </Text>
                 </MetadataListItem>
@@ -458,23 +458,23 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                 <>
                   <Divider />
                   <VStack gap={2}>
-                    <Text type="label" size="3xs" weight="bold" color="secondary">
+                    <Text type="label" size="sm" weight="bold" color="secondary">
                       {t("matchedRules")}
                     </Text>
                     {msgs.map((m) => (
                       <Card key={m.rowId} variant="red" padding={3}>
                         <VStack gap={2}>
                           <HStack gap={2} vAlign="center">
-                            <Text type="code" size="xsm" weight="semibold">
+                            <Text type="code" size="sm" weight="semibold">
                               {t("ruleLabel", { id: m.details?.ruleId ?? emptyValue })}
                             </Text>
                             <SeverityChip severity={m.details?.severity ?? null} />
                           </HStack>
-                          <Text type="body" size="xsm">
+                          <Text type="body" size="sm">
                             {m.message}
                           </Text>
                           {m.details?.match && (
-                            <Text type="code" size="xsm" color="secondary">
+                            <Text type="code" size="sm" color="secondary">
                               &#8627; {m.details.match}
                             </Text>
                           )}
@@ -495,14 +495,14 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               <Card padding={2}>
                 <HStack gap={2} vAlign="center" wrap="wrap" justify="between">
                   <HStack gap={2} vAlign="center">
-                    <Text type="code" size="xsm" weight="semibold" color="accent">
+                    <Text type="code" size="sm" weight="semibold" color="accent">
                       {req.method}
                     </Text>
-                    <Text type="code" size="xsm">
+                    <Text type="code" size="sm">
                       {req.uri}
                     </Text>
                   </HStack>
-                  <Text type="code" size="xsm" color="secondary">
+                  <Text type="code" size="sm" color="secondary">
                     {req.protocol}
                   </Text>
                 </HStack>
@@ -521,7 +521,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                 </DetailRow>
               )}
               <DetailRow label={t("contentLength")}>
-                <Text type="code" size="xsm">
+                <Text type="code" size="sm">
                   {t("contentLengthBytes", { length: req.length ?? 0 })}
                 </Text>
               </DetailRow>
@@ -542,7 +542,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     }
                     label={String(res.status || emptyValue)}
                   />
-                  <Text type="code" size="xsm" color="secondary">
+                  <Text type="code" size="sm" color="secondary">
                     {res.protocol}
                   </Text>
                 </HStack>
@@ -564,7 +564,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                 <VStack key={m.rowId} gap={2}>
                   <MetadataList columns="multi">
                     <MetadataListItem label={tProxyHosts("ruleId")}>
-                      <Text type="code" size="xsm" weight="semibold">
+                      <Text type="code" size="sm" weight="semibold">
                         {m.details?.ruleId ?? emptyValue}
                       </Text>
                     </MetadataListItem>
@@ -572,22 +572,22 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                       <SeverityChip severity={m.details?.severity ?? null} />
                     </MetadataListItem>
                     <MetadataListItem label={t("message")}>
-                      <Text type="body" size="xsm">
+                      <Text type="body" size="sm">
                         {m.message}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("logData")}>
-                      <Text type="code" size="xsm">
+                      <Text type="code" size="sm">
                         {m.details?.logdata ?? emptyValue}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("file")}>
-                      <Text type="code" size="xsm" color="secondary">
+                      <Text type="code" size="sm" color="secondary">
                         {m.details?.file ?? emptyValue}:{m.details?.lineNumber ?? ""}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("reference")}>
-                      <Text type="code" size="xsm" color="secondary">
+                      <Text type="code" size="sm" color="secondary">
                         {m.details?.reference ?? emptyValue}
                       </Text>
                     </MetadataListItem>
@@ -682,7 +682,7 @@ function EventDetailPanel({
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("uri")}>
-              <Text type="code" size="xsm" color="secondary">
+              <Text type="code" size="sm" color="secondary">
                 {event.uri || emptyValue}
               </Text>
             </MetadataListItem>
@@ -709,7 +709,7 @@ function EventDetailPanel({
         <Divider />
 
         <VStack gap={2}>
-          <Text type="label" size="3xs" weight="bold" color="secondary">
+          <Text type="label" size="sm" weight="bold" color="secondary">
             {t("auditData")}
           </Text>
           <AuditPanel rawData={event.rawData} />
@@ -970,15 +970,15 @@ export default function WafEventsClient({
             <BlockedChip blocked={event.blocked} />
             <SeverityChip severity={event.severity} />
           </HStack>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             <Timestamp value={event.ts * 1000} />
           </Text>
         </HStack>
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {event.host || emptyValue}
         </Text>
         {event.ruleId && (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("ruleNumber", { id: event.ruleId })}
           </Text>
         )}
@@ -992,7 +992,7 @@ export default function WafEventsClient({
       label: tCommon("time"),
       width: 220,
       render: (r) => (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           <Timestamp value={r.ts * 1000} />
         </Text>
       ),
@@ -1015,12 +1015,12 @@ export default function WafEventsClient({
       render: (r) =>
         r.host ? (
           <Tooltip content={r.host}>
-            <Text type="code" size="xsm" maxLines={1}>
+            <Text type="code" size="sm" maxLines={1}>
               {r.host}
             </Text>
           </Tooltip>
         ) : (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {emptyValue}
           </Text>
         ),
@@ -1031,7 +1031,7 @@ export default function WafEventsClient({
       width: 200,
       render: (r) => (
         <HStack gap={1} vAlign="center">
-          <Text type="code" size="xsm">
+          <Text type="code" size="sm">
             {r.clientIp}
           </Text>
           {r.countryCode && <Badge label={r.countryCode} />}
@@ -1043,11 +1043,11 @@ export default function WafEventsClient({
       label: tCommon("request"),
       render: (r) => (
         <HStack gap={2} vAlign="center">
-          <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
+          <Text type="code" size="sm" weight="bold" color={r.method ? "accent" : "secondary"}>
             {r.method || emptyValue}
           </Text>
           <Tooltip content={r.uri ?? ""}>
-            <Text type="code" size="xsm" color="secondary" maxLines={1}>
+            <Text type="code" size="sm" color="secondary" maxLines={1}>
               {r.uri || emptyValue}
             </Text>
           </Tooltip>
@@ -1059,7 +1059,7 @@ export default function WafEventsClient({
       label: tProxyHosts("ruleId"),
       width: 80,
       render: (r) => (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {r.ruleId ?? emptyValue}
         </Text>
       ),

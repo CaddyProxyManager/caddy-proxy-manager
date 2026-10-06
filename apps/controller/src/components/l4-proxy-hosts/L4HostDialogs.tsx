@@ -493,7 +493,7 @@ function L4HostForm({
               onChange={set("lbTryInterval")}
             />
 
-            <Text type="label" size="xsm" weight="semibold" color="secondary">
+            <Text type="label" size="sm" weight="semibold" color="secondary">
               {t("activeHealthCheck")}
             </Text>
             <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
@@ -532,7 +532,7 @@ function L4HostForm({
               onChange={set("lbActiveHealthTimeout")}
             />
 
-            <Text type="label" size="xsm" weight="semibold" color="secondary">
+            <Text type="label" size="sm" weight="semibold" color="secondary">
               {t("passiveHealthCheck")}
             </Text>
             <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
@@ -672,7 +672,7 @@ function L4HostForm({
               onChange={setGeoblockMode}
             />
 
-            <Text type="label" size="xsm" weight="semibold" color="secondary">
+            <Text type="label" size="sm" weight="semibold" color="secondary">
               {tProxyHosts("blockRules")}
             </Text>
             <TextInput
@@ -723,7 +723,7 @@ function L4HostForm({
               onChange={set("geoblockBlockIps")}
             />
 
-            <Text type="label" size="xsm" weight="semibold" color="secondary">
+            <Text type="label" size="sm" weight="semibold" color="secondary">
               {t("allowRulesOverrideBlocks")}
             </Text>
             <TextInput
@@ -952,12 +952,12 @@ export function DeleteL4HostDialog({
                 />
               </MetadataListItem>
               <MetadataListItem label={t("listen")}>
-                <Text type="code" size="xsm">
+                <Text type="code" size="sm">
                   {host.listenAddress}
                 </Text>
               </MetadataListItem>
               <MetadataListItem label={tProxyHosts("upstreams")}>
-                <Text type="code" size="xsm">
+                <Text type="code" size="sm">
                   {host.upstreams.join(", ")}
                 </Text>
               </MetadataListItem>

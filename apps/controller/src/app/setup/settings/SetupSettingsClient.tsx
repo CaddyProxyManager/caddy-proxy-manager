@@ -440,7 +440,7 @@ function LabeledSwitch({
         <VStack gap={0}>
           <FieldLabel label={label} env={env} fromEnvironment={fromEnvironment} />
           {description && (
-            <Text size="xsm" color="secondary">
+            <Text size="sm" color="secondary">
               {description}
             </Text>
           )}
@@ -676,7 +676,7 @@ function IdentityProviderCard({
           }
         >
           <VStack gap={3} padding={2}>
-            <Text size="xsm" color="secondary">
+            <Text size="sm" color="secondary">
               {t("manualEndpointsHelp")}
             </Text>
             <LabeledTextInput

@@ -44,7 +44,7 @@ function RankedList({ title, rows, color }: { title: string; rows: Row[]; color:
             <Text type="body" size="sm" maxLines={1}>
               {row.label}
             </Text>
-            <Text type="code" size="xsm" color="secondary" hasTabularNumbers>
+            <Text type="code" size="sm" color="secondary" hasTabularNumbers>
               {format.number(row.count)}
             </Text>
           </HStack>

@@ -54,7 +54,7 @@ export function AttentionList({
       <VStack gap={2}>
         <EmptyState title={emptyTitle} icon={<CircleCheck />} isCompact />
         {list.skipped.length > 0 && (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("skipped", { count: list.skipped.length })}
           </Text>
         )}
@@ -87,7 +87,7 @@ export function AttentionList({
         })}
       </List>
       {(list.skipped.length > 0 || list.truncated > 0) && (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {list.truncated > 0 ? t("truncated", { count: list.truncated }) : null}
           {list.truncated > 0 && list.skipped.length > 0 ? " " : null}
           {list.skipped.length > 0 ? t("skipped", { count: list.skipped.length }) : null}

@@ -49,7 +49,7 @@ export function SettingsSearch() {
           <Text type="body" size="sm" weight="medium">
             {item.label}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {item.auxiliaryData.context}
           </Text>
         </VStack>

@@ -156,7 +156,7 @@ export default function ApiExplorerDemo() {
             <VStack gap={2}>
               <HStack gap={2} vAlign="center">
                 <Badge variant="success" label="200 OK" />
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   Bearer token, admin role
                 </Text>
               </HStack>

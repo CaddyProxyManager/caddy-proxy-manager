@@ -24,9 +24,7 @@ export function WafPresetPicker({ value, onChange, description, isReadOnly }: Pr
         <Text type="body" size="sm" weight="semibold">
           {t("presetsLabel")}
         </Text>
-        <Text type="body" size="xsm" color="secondary">
-          {t("presetsNoneYet")}
-        </Text>
+        <Text type="supporting">{t("presetsNoneYet")}</Text>
       </VStack>
     );
   }

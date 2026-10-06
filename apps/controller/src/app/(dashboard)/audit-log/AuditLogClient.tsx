@@ -158,7 +158,7 @@ export default function AuditLogClient({
           <Text type="body" size="sm">
             {r.entityType}
           </Text>
-          <Text type="code" size="xsm" color="secondary">
+          <Text type="code" size="sm" color="secondary">
             {r.action}
           </Text>
         </VStack>
@@ -194,7 +194,7 @@ export default function AuditLogClient({
       <VStack gap={1}>
         <HStack justify="between" vAlign="center" gap={2}>
           <Badge label={r.user} />
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             <Timestamp value={r.createdAt} />
           </Text>
         </HStack>

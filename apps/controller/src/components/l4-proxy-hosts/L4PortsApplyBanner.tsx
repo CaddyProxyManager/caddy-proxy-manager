@@ -134,7 +134,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
             </>
           )}
           {status.state === "failed" && status.error && (
-            <Text type="body" size="xsm">
+            <Text type="body" size="sm">
               {status.error}
             </Text>
           )}

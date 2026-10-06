@@ -559,7 +559,7 @@ export default function WorldMapInner({
                       </HStack>
                     )}
                     {info.total === 0 && (
-                      <Text type="supporting" size="xsm" color="disabled">
+                      <Text type="supporting" color="disabled">
                         {t("noTrafficRecorded")}
                       </Text>
                     )}
@@ -572,7 +572,7 @@ export default function WorldMapInner({
 
       {max > 0 && (
         <HStack gap={2} vAlign="center">
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("low")}{" "}
           </Text>
           {/* The map's own stops, so the key stays true after a theme flip inverts the ramp. */}
@@ -582,7 +582,7 @@ export default function WorldMapInner({
               background: `linear-gradient(to right, ${palette.ramp[0]}, ${palette.ramp[1]}, ${palette.ramp[2]})`,
             }}
           />
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("high")}{" "}
           </Text>
         </HStack>

@@ -204,7 +204,7 @@ export function WafPluginsPanel({
             {row.name}
           </Text>
           {row.description && (
-            <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            <Text type="body" size="sm" color="secondary" maxLines={1}>
               {row.description}
             </Text>
           )}
@@ -243,7 +243,7 @@ export function WafPluginsPanel({
       render: (row) => {
         const labels = usageLabels(row);
         return labels.length === 0 ? (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("presetUnused")}
           </Text>
         ) : (
@@ -276,7 +276,7 @@ export function WafPluginsPanel({
       label: t("pluginRegistryColumn"),
       width: 160,
       render: (row) => (
-        <Text type="body" size="xsm" color={row.unsupported ? "disabled" : "secondary"}>
+        <Text type="body" size="sm" color={row.unsupported ? "disabled" : "secondary"}>
           {row.registryName}
         </Text>
       ),
@@ -312,7 +312,7 @@ export function WafPluginsPanel({
       label: t("pluginLicense"),
       width: 140,
       render: (row) => (
-        <Text type="body" size="xsm" color={row.unsupported ? "disabled" : "secondary"}>
+        <Text type="body" size="sm" color={row.unsupported ? "disabled" : "secondary"}>
           {row.license || emptyValue}
         </Text>
       ),
@@ -322,7 +322,7 @@ export function WafPluginsPanel({
       label: t("pluginRuleIds"),
       width: 180,
       render: (row) => (
-        <Text type="body" size="xsm" color={row.unsupported ? "disabled" : "secondary"}>
+        <Text type="body" size="sm" color={row.unsupported ? "disabled" : "secondary"}>
           {t("pluginRuleIdRange", { start: row.ruleIdStart, end: row.ruleIdEnd })}
         </Text>
       ),
@@ -414,7 +414,7 @@ export function WafPluginsPanel({
                 {t("pluginRegistryDescription")}
               </Text>
               {registry && (
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {registry.checkedAt
                     ? t.rich("pluginRegistryLastChecked", {
                         time: () => <Timestamp value={registry.checkedAt ?? ""} />,

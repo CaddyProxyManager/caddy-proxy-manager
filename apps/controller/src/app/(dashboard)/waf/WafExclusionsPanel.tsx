@@ -61,7 +61,7 @@ export function WafExclusionsPanel({
           <Text type="code" size="sm" weight="semibold">
             {row.ruleId}
           </Text>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
             {ruleMessages[row.ruleId] ?? t("noRuleDescription")}
           </Text>
         </VStack>
@@ -86,18 +86,18 @@ export function WafExclusionsPanel({
         row.path || row.target ? (
           <VStack gap={0}>
             {row.path && (
-              <Text type="code" size="xsm">
+              <Text type="code" size="sm">
                 {row.path}
               </Text>
             )}
             {row.target && (
-              <Text type="code" size="xsm" color="secondary">
+              <Text type="code" size="sm" color="secondary">
                 {row.target}
               </Text>
             )}
           </VStack>
         ) : (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("exclusionEverywhere")}
           </Text>
         ),
@@ -110,10 +110,10 @@ export function WafExclusionsPanel({
           <Text type="body" size="sm" maxLines={2}>
             {row.reason || emptyValue}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {row.createdBy ? t("exclusionBy", { name: row.createdBy }) : t("exclusionMigrated")}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             <Timestamp value={row.updatedAt} />
           </Text>
         </VStack>

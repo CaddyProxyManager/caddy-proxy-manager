@@ -224,7 +224,7 @@ export function MtlsFields({
                               value={allSelected ? true : someSelected ? "indeterminate" : false}
                               onChange={() => toggleAllFromCA(caId)}
                             />
-                            <Text type="body" size="xsm" color="secondary">
+                            <Text type="body" size="sm" color="secondary">
                               {selectedCount}/{certs.length}
                             </Text>
                           </HStack>
@@ -250,7 +250,7 @@ export function MtlsFields({
                                 value={String(cert.id)}
                                 label={cert.commonName}
                                 endContent={
-                                  <Text type="body" size="xsm" color="secondary">
+                                  <Text type="body" size="sm" color="secondary">
                                     {tCommon("expiresOnInline", {
                                       date: format.dateTime(
                                         new Date(cert.validTo),
@@ -286,9 +286,7 @@ export function MtlsFields({
                     <Text type="body" size="sm" weight="semibold">
                       {t("pathBasedAccessRules")}
                     </Text>
-                    <Text type="body" size="xsm" color="secondary">
-                      {t("mtlsPathRulesHelp")}
-                    </Text>
+                    <Text type="supporting">{t("mtlsPathRulesHelp")}</Text>
                   </VStack>
                   <Button
                     size="sm"
@@ -336,7 +334,7 @@ export function MtlsFields({
                               })}
                               {rule.allowedRoleIds.length === 0 &&
                                 rule.allowedCertIds.length === 0 && (
-                                  <Text type="body" size="xsm" color="secondary">
+                                  <Text type="body" size="sm" color="secondary">
                                     {t("mtlsRuleDeniedSummary")}
                                   </Text>
                                 )}

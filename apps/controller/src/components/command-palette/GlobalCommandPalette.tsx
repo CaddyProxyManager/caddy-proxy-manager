@@ -210,7 +210,7 @@ export function GlobalCommandPaletteProvider({
                   {item.label}
                 </Text>
                 {item.auxiliaryData.desc && (
-                  <Text type="body" size="xsm" color="secondary" maxLines={1}>
+                  <Text type="body" size="sm" color="secondary" maxLines={1}>
                     {item.auxiliaryData.desc}
                   </Text>
                 )}

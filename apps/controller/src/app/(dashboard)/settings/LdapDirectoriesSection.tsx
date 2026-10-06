@@ -280,7 +280,7 @@ export default function LdapDirectoriesSection({
                 {directory.roleMappingEnabled && <Badge label={tSettings("groupRoles")} />}
                 {!directory.enabled && <Badge variant="warning" label={t("badgeDisabled")} />}
               </HStack>
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {directory.url}
               </Text>
             </VStack>
@@ -358,7 +358,7 @@ export default function LdapDirectoriesSection({
             gap={2}
             startContent={
               <>
-                <Text type="body" size="xsm" color="secondary">
+                <Text type="body" size="sm" color="secondary">
                   {t("presetLabel")}
                 </Text>
                 {/* Product names, the same in every language. */}
@@ -590,9 +590,7 @@ export default function LdapDirectoriesSection({
                 <Text type="body" size="sm" weight="semibold">
                   {t("test.title")}
                 </Text>
-                <Text type="body" size="xsm" color="secondary">
-                  {t("test.help")}
-                </Text>
+                <Text type="supporting">{t("test.help")}</Text>
               </VStack>
               <Grid columns={{ minWidth: 160, max: 2 }} gap={2}>
                 <TextInput

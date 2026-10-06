@@ -179,7 +179,7 @@ function StatsBar({ stats }: { stats: Stats }) {
             <Text type="display-3" color={color} hasTabularNumbers>
               {value}
             </Text>
-            <Text type="body" size="xsm" weight="medium" color="secondary">
+            <Text type="body" size="sm" weight="medium" color="secondary">
               {label}
             </Text>
           </VStack>
@@ -212,7 +212,7 @@ function WafStatusCard({ stats }: { stats: Stats }) {
           <Text type="display-3" color="accent" hasTabularNumbers>
             {stats.blocked}
           </Text>
-          <Text type="body" size="xsm" weight="medium" color="secondary">
+          <Text type="body" size="sm" weight="medium" color="secondary">
             {t("blocked")}
           </Text>
         </VStack>
@@ -222,7 +222,7 @@ function WafStatusCard({ stats }: { stats: Stats }) {
               <Text type="body" weight="semibold" hasTabularNumbers>
                 {value}
               </Text>
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {label}
               </Text>
             </VStack>
@@ -255,7 +255,7 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
         </HStack>
 
         <VStack gap={0}>
-          <Text type="label" size="3xs" weight="bold" color="secondary">
+          <Text type="label" size="sm" weight="bold" color="secondary">
             {t("ruleMessage")}
           </Text>
           <Text type="body" size="sm">
@@ -264,10 +264,10 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
         </VStack>
 
         <VStack gap={0}>
-          <Text type="label" size="3xs" weight="bold" color="secondary">
+          <Text type="label" size="sm" weight="bold" color="secondary">
             Matched data
           </Text>
-          <Text type="code" size="xsm">
+          <Text type="code" size="sm">
             {event.matchedData}
           </Text>
         </VStack>
@@ -362,7 +362,7 @@ function WafEventLogDemoContent() {
       label: tCommon("time"),
       width: 170,
       render: (r) => (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           <Timestamp value={r.ts * 1000} />
         </Text>
       ),
@@ -391,7 +391,7 @@ function WafEventLogDemoContent() {
       label: t("host"),
       width: 150,
       render: (r) => (
-        <Text type="code" size="xsm" maxLines={1}>
+        <Text type="code" size="sm" maxLines={1}>
           {r.host}
         </Text>
       ),
@@ -402,7 +402,7 @@ function WafEventLogDemoContent() {
       width: 150,
       render: (r) => (
         <HStack gap={1} vAlign="center">
-          <Text type="code" size="xsm">
+          <Text type="code" size="sm">
             {r.clientIp}
           </Text>
           {r.countryCode !== "-" && <Badge label={r.countryCode} />}
@@ -415,10 +415,10 @@ function WafEventLogDemoContent() {
       width: 220,
       render: (r) => (
         <HStack gap={2} vAlign="center">
-          <Text type="code" size="xsm" weight="bold" color="accent">
+          <Text type="code" size="sm" weight="bold" color="accent">
             {r.method}
           </Text>
-          <Text type="code" size="xsm" color="secondary" maxLines={1}>
+          <Text type="code" size="sm" color="secondary" maxLines={1}>
             {r.uri}
           </Text>
         </HStack>
@@ -429,7 +429,7 @@ function WafEventLogDemoContent() {
       label: tProxyHosts("ruleId"),
       width: 80,
       render: (r) => (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {r.ruleId}
         </Text>
       ),

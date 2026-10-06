@@ -134,7 +134,7 @@ export function SavedViews({
             {row.name}
           </Text>
           {!row.own && (
-            <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            <Text type="body" size="sm" color="secondary" maxLines={1}>
               {t("viewSharedBy", { name: row.ownerName ?? t("viewUnknownOwner") })}
             </Text>
           )}

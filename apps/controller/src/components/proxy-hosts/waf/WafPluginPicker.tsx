@@ -26,9 +26,7 @@ export function WafPluginPicker({ value, onChange, description, crsLoaded, isRea
         <Text type="body" size="sm" weight="semibold">
           {t("pluginsLabel")}
         </Text>
-        <Text type="body" size="xsm" color="secondary">
-          {t("pluginsNoneYet")}
-        </Text>
+        <Text type="supporting">{t("pluginsNoneYet")}</Text>
       </VStack>
     );
   }

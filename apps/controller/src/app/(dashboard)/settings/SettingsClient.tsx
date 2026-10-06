@@ -970,11 +970,7 @@ function DnsProviderCredentialFields({ providerDef }: { providerDef: DnsProvider
 
   return (
     <>
-      {description && (
-        <Text type="body" size="xsm" color="secondary">
-          {description}
-        </Text>
-      )}
+      {description && <Text type="supporting">{description}</Text>}
       {providerDef.fields.map((field) => {
         const text = dnsProviderFieldText(t, providerDef, field);
         return (
@@ -2189,7 +2185,7 @@ function UpdatesSection({
             <UtcTooltip value={updates.checkedAt}>
               {/* The server and the browser read the clock moments apart, so "3 minutes ago" can
                   differ by a second between the two renders. */}
-              <Text size="xsm" color="secondary">
+              <Text size="sm" color="secondary">
                 <span suppressHydrationWarning>
                   {t("updateLastChecked", {
                     when: format.relativeTime(new Date(updates.checkedAt), now),
@@ -2198,7 +2194,7 @@ function UpdatesSection({
               </Text>
             </UtcTooltip>
           ) : (
-            <Text size="xsm" color="secondary">
+            <Text size="sm" color="secondary">
               {!updates.enabled ? t("updateNotChecking") : t("updateNeverChecked")}
             </Text>
           )}
@@ -2577,7 +2573,7 @@ function AgentRow({
               {name}
             </Text>
             {status ? (
-              <Text size="xsm" color="secondary">
+              <Text size="sm" color="secondary">
                 {t("agentRowSummary", {
                   version: status.version,
                   mode: status.mode,
@@ -2588,13 +2584,13 @@ function AgentRow({
               <Badge variant="error" label={t("notAnswering")} />
             )}
           </HStack>
-          <Text size="xsm" color="secondary">
+          <Text size="sm" color="secondary">
             {t("agentLastReported", {
               when: whenText(format, lastSeenAt, t("agentNeverReported")),
             })}
           </Text>
           {status && (
-            <Text size="xsm" color="secondary">
+            <Text size="sm" color="secondary">
               {t("agentRowPorts", {
                 count: status.l4Ports.applied.length,
                 portsState: status.l4Ports.status.state,
@@ -2722,7 +2718,7 @@ function AgentSection({
           )}
 
           {usingPaired && (
-            <Text size="xsm" color="secondary">
+            <Text type="supporting">
               {t("agentsAnsweringNote", { answering, total: paired.length })}
             </Text>
           )}
@@ -2755,7 +2751,7 @@ function AgentSection({
               <Text size="xl" weight="semibold">
                 {code.code}
               </Text>
-              <Text size="xsm" color="secondary">
+              <Text size="sm" color="secondary">
                 {t("pairingCodeExpires", {
                   minutes: Math.max(1, Math.round((code.expiresAt - Date.now()) / 60000)),
                 })}
@@ -2771,9 +2767,7 @@ function AgentSection({
                 width="100%"
               />
               {pairingHost?.insecure && (
-                <Text size="xsm" color="secondary">
-                  {t("pairingHostInsecureHint")}
-                </Text>
+                <Text type="supporting">{t("pairingHostInsecureHint")}</Text>
               )}
             </VStack>
           ) : (

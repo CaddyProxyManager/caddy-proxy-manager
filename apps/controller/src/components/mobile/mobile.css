@@ -131,6 +131,7 @@
     .cpm-tab {
       position: relative;
       flex: 1;
+      min-width: 0;
       min-height: var(--cpm-tabbar-height);
       display: flex;
       flex-direction: column;
@@ -172,14 +173,9 @@
       background: var(--cpm-accent-text);
     }
 
+    /* With the tab's min-width, a long label ellipsizes instead of widening its tab. */
     .cpm-tab-label {
-      font-size: 10px;
-      line-height: 1.2;
-      font-weight: 500;
-    }
-
-    .cpm-tab[data-active] .cpm-tab-label {
-      font-weight: 600;
+      max-width: 100%;
     }
 
     /* ---- More drawer --------------------------------------------------------------------- */

@@ -258,7 +258,7 @@ function MitigatedCard({ report }: { report: SecurityReport }) {
             </Text>
           )}
         </HStack>
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {change === null
             ? t("noPreviousPeriod")
             : t("changeFromPrevious", {
@@ -362,7 +362,7 @@ export default function SecurityClient({
           <Text type="code" size="sm" weight="semibold">
             {row.ruleId}
           </Text>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
             {row.message ?? tWaf("noRuleDescription")}
           </Text>
         </VStack>
@@ -450,7 +450,7 @@ export default function SecurityClient({
               onClick={() => addFilter({ field: "ip", op: "is", value: row.ip })}
             />
           </HStack>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
             {[
               row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : null,
               row.asn ? `AS${row.asn}${row.asnOrg ? ` ${row.asnOrg}` : ""}` : null,
@@ -466,7 +466,7 @@ export default function SecurityClient({
       label: t("rulesHit"),
       render: (row) =>
         row.rules.length === 0 ? (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {emptyValue}
           </Text>
         ) : (
@@ -493,7 +493,7 @@ export default function SecurityClient({
       label: tCommon("lastSeen"),
       width: 180,
       render: (row) => (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           <Timestamp value={row.lastSeen * 1000} />
         </Text>
       ),
@@ -524,7 +524,7 @@ export default function SecurityClient({
       label: tCommon("time"),
       width: 200,
       render: (row) => (
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           <Timestamp value={row.ts * 1000} />
         </Text>
       ),
@@ -544,7 +544,7 @@ export default function SecurityClient({
       id: "host",
       label: tWaf("host"),
       render: (row) => (
-        <Text type="code" size="xsm" maxLines={1}>
+        <Text type="code" size="sm" maxLines={1}>
           {row.host || emptyValue}
         </Text>
       ),
@@ -554,7 +554,7 @@ export default function SecurityClient({
       label: tCommon("clientIp"),
       width: 170,
       render: (row) => (
-        <Text type="code" size="xsm">
+        <Text type="code" size="sm">
           {row.clientIp}
         </Text>
       ),
@@ -563,7 +563,7 @@ export default function SecurityClient({
       id: "request",
       label: tCommon("request"),
       render: (row) => (
-        <Text type="code" size="xsm" color="secondary" maxLines={1}>
+        <Text type="code" size="sm" color="secondary" maxLines={1}>
           {`${row.method} ${row.uri}`}
         </Text>
       ),
@@ -573,7 +573,7 @@ export default function SecurityClient({
       label: tProxyHosts("ruleId"),
       width: 110,
       render: (row) => (
-        <Text type="code" size="xsm">
+        <Text type="code" size="sm">
           {row.ruleId ?? emptyValue}
         </Text>
       ),

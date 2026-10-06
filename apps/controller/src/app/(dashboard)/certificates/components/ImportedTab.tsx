@@ -89,7 +89,7 @@ function SourceCell({ cert }: { cert: ImportedCertView }) {
           file.agentName ? t("sourceAgentBadge", { agent: file.agentName }) : t("sourceAgentGone")
         }
       />
-      <Text type="body" size="xsm" color="secondary">
+      <Text type="body" size="sm" color="secondary">
         {file.readAt
           ? t.rich("sourceReadAt", { time: () => <Timestamp value={file.readAt!} /> })
           : t("sourceNeverRead")}
@@ -97,7 +97,7 @@ function SourceCell({ cert }: { cert: ImportedCertView }) {
       {file.error && (
         <HStack gap={1} vAlign="center">
           <Icon icon={AlertTriangle} size="sm" color="warning" />
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {tErrors(certificateFileErrorMessage(file.error))}
           </Text>
         </HStack>
@@ -212,7 +212,7 @@ function importedMobileCard(c: ImportedCertView, onEdit: () => void) {
           </HStack>
           <ActionsMenu cert={c} onEdit={onEdit} />
         </HStack>
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {c.domains.slice(0, 2).join(", ")}
           {c.domains.length > 2 ? ` +${c.domains.length - 2}` : ""}
         </Text>

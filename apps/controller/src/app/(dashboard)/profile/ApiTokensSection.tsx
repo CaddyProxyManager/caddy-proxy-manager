@@ -123,19 +123,19 @@ export function ApiTokensSection({
                     <HStack gap={3} wrap="wrap" vAlign="center">
                       {withUtc(
                         token.createdAt,
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {t("createdOn", { date: formatDate(token.createdAt) })}
                         </Text>,
                       )}
                       {withUtc(
                         token.lastUsedAt,
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {t("used", { when: formatDate(token.lastUsedAt) })}
                         </Text>,
                       )}
                       {withUtc(
                         token.expiresAt,
-                        <Text type="body" size="xsm" color="secondary">
+                        <Text type="body" size="sm" color="secondary">
                           {token.expiresAt === null
                             ? t("apiTokenNeverExpires")
                             : expired

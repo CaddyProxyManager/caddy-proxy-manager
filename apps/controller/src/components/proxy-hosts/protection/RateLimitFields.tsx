@@ -333,9 +333,7 @@ export function RateLimitFields({
           />
         </div>
 
-        <Text type="body" size="xsm" color="secondary">
-          {t("rateLimitHelp")}
-        </Text>
+        <Text type="supporting">{t("rateLimitHelp")}</Text>
       </VStack>
     </Card>
   );

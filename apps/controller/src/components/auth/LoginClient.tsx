@@ -394,7 +394,7 @@ export default function LoginClient({
           )}
 
           <VStack hAlign="center">
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {formatAppVersion()}
             </Text>
           </VStack>

@@ -44,7 +44,7 @@ export function WafHostModesPanel({ hosts }: { hosts: WafHostMode[] }) {
       render: (row) => (
         <VStack gap={0}>
           <Link href={editorSectionHref(row.id, "protection")}>{row.name}</Link>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
             {row.domains.join(", ")}
           </Text>
         </VStack>

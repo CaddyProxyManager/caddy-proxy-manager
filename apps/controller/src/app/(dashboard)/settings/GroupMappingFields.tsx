@@ -49,9 +49,7 @@ export function GroupMappingFields({
           <Text type="body" size="sm" weight="semibold">
             {t("groupMapping")}
           </Text>
-          <Text type="body" size="xsm" color="secondary">
-            {description ?? t("groupMappingHelp")}
-          </Text>
+          <Text type="supporting">{description ?? t("groupMappingHelp")}</Text>
         </VStack>
 
         {/* No <code> in the help: Astryx types a description as a string, and only
@@ -116,9 +114,7 @@ export function GroupMappingFields({
                 placeholder={value.groupPrefix ? `${value.groupPrefix}Viewer` : "auditors"}
               />
             </Grid>
-            <Text type="body" size="xsm" color="secondary">
-              {t("roleGroupNamesHelp")}
-            </Text>
+            <Text type="supporting">{t("roleGroupNamesHelp")}</Text>
 
             <Selector
               label={t("defaultRoleLabel")}

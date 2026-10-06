@@ -24,10 +24,10 @@ export function PasswordPolicyChecklist({ password }: { password: string }) {
   return (
     <VStack gap={1}>
       <HStack justify="between" vAlign="center" paddingInline={1}>
-        <Text type="label" size="3xs" color="secondary">
+        <Text type="label" size="sm" color="secondary">
           {t("auth.passwordChange.policyTitle")}
         </Text>
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {t("auth.passwordChange.policyProgress", { met: metCount, total: RULES.length })}
         </Text>
       </HStack>

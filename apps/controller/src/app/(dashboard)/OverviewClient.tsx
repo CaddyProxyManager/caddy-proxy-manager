@@ -513,7 +513,7 @@ export default function OverviewClient({
                 {row.uri}
               </Text>
               {/* One line: nine columns will not fit a table that also carries audit rows. */}
-              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+              <Text type="body" size="sm" color="secondary" maxLines={1}>
                 {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
                 {row.countryCode ?? emptyValue} &middot; {row.clientIp}
               </Text>
@@ -523,7 +523,7 @@ export default function OverviewClient({
               <Text type="body" size="sm" maxLines={1}>
                 {row.summary}
               </Text>
-              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+              <Text type="body" size="sm" color="secondary" maxLines={1}>
                 {row.actor ?? t("actorSystem")} &middot; {row.entityType}
               </Text>
             </VStack>
@@ -744,7 +744,7 @@ export default function OverviewClient({
             // overflow-y to auto too, which added a stray vertical scrollbar.
             <Table data={logRows} columns={logColumns} idKey="id" density={density} />
           )}
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="supporting">
             {isEventsOnly
               ? t("logSourceEvents")
               : blendsEvents
@@ -756,7 +756,7 @@ export default function OverviewClient({
 
       {/* The 24h headline stays even when a longer range is selected. */}
       {trafficSummary && trafficSummary.totalRequests > 0 && (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {t("traffic24hSummary", {
             total: format.number(trafficSummary.totalRequests),
             percent: trafficSummary.blockedPercent,

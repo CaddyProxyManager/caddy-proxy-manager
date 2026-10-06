@@ -242,21 +242,21 @@ export default function SetupMigrateClient({
                           {entry.path}
                         </Text>
                         <HStack gap={3}>
-                          <Text size="xsm" color="secondary">
+                          <Text size="sm" color="secondary">
                             {t("migrationCandidateUsers", { count: entry.users })}
                           </Text>
-                          <Text size="xsm" color="secondary">
+                          <Text size="sm" color="secondary">
                             {t("migrationCandidateProxyHosts", { count: entry.proxyHosts })}
                           </Text>
-                          <Text size="xsm" color="secondary">
+                          <Text size="sm" color="secondary">
                             {tCommon("certificateCount", { count: entry.certificates })}
                           </Text>
-                          <Text size="xsm" color="secondary">
+                          <Text size="sm" color="secondary">
                             {formatSize(entry.sizeBytes)}
                           </Text>
                         </HStack>
                         {entry.lastUpdatedAt && (
-                          <Text size="xsm" color="secondary">
+                          <Text size="sm" color="secondary">
                             {t("migrationCandidateLastWritten", { date: entry.lastUpdatedAt })}
                           </Text>
                         )}
@@ -271,7 +271,7 @@ export default function SetupMigrateClient({
               <FormCard title={t("skippedFilesTitle")}>
                 <VStack gap={2}>
                   {rejected.map((entry) => (
-                    <Text key={entry.path} size="xsm" color="secondary">
+                    <Text key={entry.path} size="sm" color="secondary">
                       {t("skippedFile", { path: entry.path, reason: rejectionReason(entry) })}
                     </Text>
                   ))}

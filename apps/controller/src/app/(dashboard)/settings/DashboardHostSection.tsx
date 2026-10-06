@@ -149,9 +149,7 @@ export function DashboardHostSection({
                 }
               >
                 <VStack gap={3} padding={2}>
-                  <Text size="xsm" color="secondary">
-                    {t("dashboardProxyOptionsHelp")}
-                  </Text>
+                  <Text type="supporting">{t("dashboardProxyOptionsHelp")}</Text>
                   <DashboardHostOptionsFields data={options} />
                 </VStack>
               </Collapsible>

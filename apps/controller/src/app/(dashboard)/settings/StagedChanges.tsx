@@ -237,7 +237,7 @@ function ReviewSheet({
                 </HStack>
                 {view.revisions.map((revision) => (
                   <HStack key={revision.id} gap={2} vAlign="center">
-                    <Text type="code" size="xsm" color="secondary">
+                    <Text type="code" size="sm" color="secondary">
                       #{revision.id}
                     </Text>
                     <Text type="supporting" color="secondary" maxLines={1}>

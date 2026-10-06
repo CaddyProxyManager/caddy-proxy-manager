@@ -91,7 +91,7 @@ export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
             <Text type="body" size="sm" weight="semibold">
               {t("title")}
             </Text>
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {health
                 ? t.rich("checkedAt", {
                     when: () => <Timestamp value={health.checkedAt} style="time" />,
@@ -109,11 +109,7 @@ export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
           />
         </HStack>
         {error && <Banner status="error" title={error} />}
-        {health && !health.healthChecks && (
-          <Text type="body" size="xsm" color="secondary">
-            {t("noHealthChecks")}
-          </Text>
-        )}
+        {health && !health.healthChecks && <Text type="supporting">{t("noHealthChecks")}</Text>}
         {silent.length > 0 && (
           <Banner
             status="warning"

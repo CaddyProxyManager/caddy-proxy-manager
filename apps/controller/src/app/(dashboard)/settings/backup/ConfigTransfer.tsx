@@ -213,7 +213,7 @@ function ItemLine({ item }: { item: ConfigImportItem }) {
         <Token size="sm" label={t(`actions.${item.action}`)} color={ACTION_COLOR[item.action]} />
       }
       endContent={
-        <Text type="code" size="xsm" color="secondary">
+        <Text type="code" size="sm" color="secondary">
           {item.table}
         </Text>
       }

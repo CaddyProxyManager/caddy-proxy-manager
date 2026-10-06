@@ -240,9 +240,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
       </HStack>
 
       {rows.length === 0 ? (
-        <Text type="body" size="xsm" color="secondary">
-          {t("responseHeadersEmptyDescription")}
-        </Text>
+        <Text type="supporting">{t("responseHeadersEmptyDescription")}</Text>
       ) : (
         <VStack gap={2}>
           {rows.map((row, i) => (
@@ -477,11 +475,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
           </ModuleGated>
         </HStack>
 
-        {moduleDisabledReason && (
-          <Text type="body" size="xsm" color="secondary">
-            {moduleDisabledReason}
-          </Text>
-        )}
+        {moduleDisabledReason && <Text type="supporting">{moduleDisabledReason}</Text>}
 
         {/* Deliberately NOT gated on moduleDisabledReason: `geoblockPresent` always submits and a
             missing rule input parses as empty, so unmounting these would erase every stored rule
@@ -504,7 +498,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
             {!showModeSelector && <Divider />}
 
             <HStack gap={2} vAlign="center">
-              <Text type="body" size="xsm" color="secondary">
+              <Text type="body" size="sm" color="secondary">
                 {t("presets")}
               </Text>
               <Button
@@ -529,9 +523,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </div>
               <div hidden={activeTab !== "allow"}>
                 <VStack gap={3}>
-                  <Text type="body" size="xsm" color="secondary">
-                    {t("geoblockAllowPrecedenceHelp")}
-                  </Text>
+                  <Text type="supporting">{t("geoblockAllowPrecedenceHelp")}</Text>
                   <RulesPanel prefix="allow" initial={initial} resetKey={resetKey} />
                 </VStack>
               </div>

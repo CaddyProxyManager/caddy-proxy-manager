@@ -47,7 +47,7 @@ import {
   type EditorSection,
 } from "@/lib/proxy-hosts/editor-sections";
 import { Text } from "@astryxdesign/core/Text";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { setProxyHostMaintenanceAction, toggleProxyHostAction } from "./actions";
@@ -433,7 +433,7 @@ export default function ProxyHostsClient({
               <HostNotesHint notes={host.description} />
             </HStack>
             <Tooltip content={host.domains.join(", ")}>
-              <Text type="code" size="xsm" color="secondary" maxLines={1}>
+              <Text type="code" size="sm" color="secondary" maxLines={1}>
                 {summarize(host.domains)}
               </Text>
             </Tooltip>
@@ -617,30 +617,32 @@ export default function ProxyHostsClient({
       }
     >
       <HStack justify="between" vAlign="start" gap={2}>
-        <VStack gap={1}>
-          <AstryxLink href={proxyHostDetailHref(host.id)}>
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
+        <StackItem size="fill">
+          <VStack gap={1}>
+            <AstryxLink href={proxyHostDetailHref(host.id)}>
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+            </AstryxLink>
+            <Text type="code" size="sm" color="secondary" maxLines={1}>
+              {summarize(host.domains)} &rarr; {host.upstreams[0]}
             </Text>
-          </AstryxLink>
-          <Text type="code" size="xsm" color="secondary" maxLines={1}>
-            {summarize(host.domains)} &rarr; {host.upstreams[0]}
-          </Text>
-          {host.description && (
-            <Text type="body" size="xsm" color="secondary" maxLines={2}>
-              {host.description}
-            </Text>
-          )}
-          <HostTagList tags={host.tags} />
-          <HStack gap={2} vAlign="center">
-            {insightFor(host) ? (
-              <HostStatusCell status={insightFor(host)!.status} />
-            ) : (
-              <HostStatus host={host} />
+            {host.description && (
+              <Text type="body" size="sm" color="secondary" maxLines={2}>
+                {host.description}
+              </Text>
             )}
-            {host.certificateId && <Badge variant="info" label={t("tls")} />}
-          </HStack>
-        </VStack>
+            <HostTagList tags={host.tags} />
+            <HStack gap={2} vAlign="center">
+              {insightFor(host) ? (
+                <HostStatusCell status={insightFor(host)!.status} />
+              ) : (
+                <HostStatus host={host} />
+              )}
+              {host.certificateId && <Badge variant="info" label={t("tls")} />}
+            </HStack>
+          </VStack>
+        </StackItem>
         <HostActions
           host={host}
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}

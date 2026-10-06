@@ -173,7 +173,7 @@ export function SignInOverviewClient({
                 label={row.name}
                 description={
                   <HStack gap={2} wrap="wrap" vAlign="center">
-                    <Text type="body" size="xsm" color="secondary">
+                    <Text type="body" size="sm" color="secondary">
                       {t(`kinds.${row.kind}`)} · {t(`status.${row.status}`)} ·{" "}
                       {t("accountCount", { count: row.accounts })}
                     </Text>

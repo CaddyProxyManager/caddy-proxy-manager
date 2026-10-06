@@ -77,9 +77,7 @@ export function PathRewritesFields({ initialData = [] }: Props) {
         />
       </HStack>
 
-      <Text type="body" size="xsm" color="secondary">
-        {t("internalRewriteHelp")}
-      </Text>
+      <Text type="supporting">{t("internalRewriteHelp")}</Text>
     </VStack>
   );
 }

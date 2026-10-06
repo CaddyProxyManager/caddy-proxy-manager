@@ -135,9 +135,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
         />
       </HStack>
 
-      <Text type="body" size="xsm" color="secondary">
-        {t("errorPagesHelp")}
-      </Text>
+      <Text type="supporting">{t("errorPagesHelp")}</Text>
     </VStack>
   );
 }

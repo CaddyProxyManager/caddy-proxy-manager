@@ -44,7 +44,7 @@ function ManagedStatus({ managed }: { managed: ManagedServiceView | null }) {
         </Text>
       </HStack>
       {state === "failed" && message && (
-        <Text type="body" size="xsm" color="secondary">
+        <Text type="body" size="sm" color="secondary">
           {message}
         </Text>
       )}

@@ -177,7 +177,7 @@ export function LocationRulesFields({ initialData = [], accessLists }: Props) {
                 </HStack>
 
                 <VStack gap={2}>
-                  <Text type="body" size="xsm" color="secondary" weight="medium">
+                  <Text type="body" size="sm" color="secondary" weight="medium">
                     {t("upstreams")}
                   </Text>
                   {rule.upstreams.map((up, j) => {

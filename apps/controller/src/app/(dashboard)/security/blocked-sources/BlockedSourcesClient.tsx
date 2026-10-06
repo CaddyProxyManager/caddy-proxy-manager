@@ -62,7 +62,7 @@ export default function BlockedSourcesClient({
             {row.reason || emptyValue}
           </Text>
           {row.createdBy && (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {tWaf("exclusionBy", { name: row.createdBy })}
             </Text>
           )}
@@ -75,11 +75,11 @@ export default function BlockedSourcesClient({
       width: 200,
       render: (row) =>
         row.expiresAt ? (
-          <Text type="body" size="xsm">
+          <Text type="body" size="sm">
             <Timestamp value={row.expiresAt} />
           </Text>
         ) : (
-          <Text type="body" size="xsm" color="secondary">
+          <Text type="body" size="sm" color="secondary">
             {t("neverExpires")}
           </Text>
         ),
