@@ -5,7 +5,8 @@
  */
 
 import type { ConnectedAgent } from "../agent/registry";
-import { connectedAgents } from "../agent/registry";
+import { connectedAgents, localAgents } from "../agent/registry";
+import { otherReplicasLive } from "../cluster/replicas";
 import {
   applyCaddyConfig,
   applyCaddyConfigToAgent,
@@ -40,9 +41,11 @@ let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
 
 function targets(): Target[] {
-  const agents = connectedAgents();
-  if (agents.length === 0) return [{ key: DIRECT, agent: null }];
-  return agents.map((agent) => ({ key: agent.agentId, agent }));
+  // With other controllers, no agent means nothing to watch: none of them configures Caddy directly.
+  if (connectedAgents().length === 0)
+    return otherReplicasLive() ? [] : [{ key: DIRECT, agent: null }];
+  // The streams this replica holds; another replica watches its own.
+  return localAgents().map((agent) => ({ key: agent.agentId, agent }));
 }
 
 async function checkTarget(target: Target, now: number, reapplyDelayMs: number): Promise<void> {

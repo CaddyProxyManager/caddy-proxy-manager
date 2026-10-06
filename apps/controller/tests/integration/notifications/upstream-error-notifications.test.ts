@@ -146,16 +146,19 @@ describe('upstream error notifications', () => {
     expect(await flush(T0)).toEqual([]);
   });
 
-  it('waits a whole window after a restart before calling anything recovered', async () => {
+  it('adds up what agents reported to different replicas, and any of them sees it recover', async () => {
     await host(['app.example.com']);
-    await recordUpstreamErrors([errors('app.example.com', 20, T0)], T0);
-    expect(await flush(T0)).toHaveLength(1);
+    await recordUpstreamErrors([errors('app.example.com', 6, T0)], T0);
+    // A second replica: its own host cache, the same counts.
     resetUpstreamErrorsForTests();
-    await watchUpstreamErrors(T0 + 10 * MINUTE);
-    await watchUpstreamErrors(T0 + 14 * MINUTE);
-    expect(await flush(T0 + 14 * MINUTE)).toEqual([]);
-    await watchUpstreamErrors(T0 + 15 * MINUTE);
-    expect(await flush(T0 + 15 * MINUTE)).toHaveLength(1);
+    await recordUpstreamErrors([errors('app.example.com', 4, T0)], T0);
+    expect(await flush(T0)).toHaveLength(1);
+
+    resetUpstreamErrorsForTests();
+    await watchUpstreamErrors(T0 + 4 * MINUTE);
+    expect(await flush(T0 + 4 * MINUTE)).toEqual([]);
+    await watchUpstreamErrors(T0 + 6 * MINUTE);
+    expect(await flush(T0 + 6 * MINUTE)).toHaveLength(1);
   });
 
   it('is ingested with analytics off, and asked of the agents only while wanted', async () => {

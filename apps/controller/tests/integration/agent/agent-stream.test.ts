@@ -118,6 +118,28 @@ describe('status', () => {
 });
 
 describe('commands', () => {
+  it('drops a stream nobody has read for a keepalive, so a command fails rather than waits', async () => {
+    // Attached, but never read: what a transport that died without telling Yoga looks like.
+    attach({
+      agentId: 'stalled',
+      agentRowId: 1,
+      name: 'stalled',
+      controllerId: 'c1',
+      controllerName: 'Test',
+      initialState: STATE,
+    });
+    const realNow = Date.now;
+    Date.now = () => realNow() + 25_000;
+    try {
+      await expect(
+        dispatchCaddyAdmin('stalled', { path: '/config/', method: 'GET' }),
+      ).rejects.toBeInstanceOf(AgentNotConnectedError);
+      expect(isConnected('stalled')).toBe(false);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   it('delivers a command and resolves with the agent’s answer', async () => {
     const { frames } = connect('a1');
     await Bun.sleep(5);

@@ -125,10 +125,14 @@ export function agentCredentialFingerprint(secret: string): string {
 
 /**
  * Closes the streams the agents table no longer vouches for: gone, disabled, a different row, or
- * a different secret. Run after anything that rewrites the table, before config is pushed.
+ * a different secret. Run after anything that rewrites the table, before config is pushed; the
+ * other replicas are asked to check theirs, unless `local` because one of them asked.
  */
-export async function reconcileAgentConnections(): Promise<string[]> {
+export async function reconcileAgentConnections(
+  options: { local?: boolean } = {},
+): Promise<string[]> {
   const { reconcileConnections } = await import("../agent/registry");
+  if (!options.local) (await import("../agent/broker")).requestReconcile();
   const rows = new Map<string, { id: number; fingerprint: string | null }>();
   for (const row of await db.select().from(agents)) {
     if (!row.enabled) continue;

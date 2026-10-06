@@ -1,7 +1,7 @@
 /**
  * Agent notifications: one gone longer than the threshold, and what an agent reports failing on
- * its own host. The registry is per process, so "gone" is timed from when this process first saw
- * it gone; after a restart every agent gets the whole threshold to reconnect.
+ * its own host. "Gone" is timed from when the leading replica first saw it connected nowhere; after
+ * a restart or a change of leader every agent gets the whole threshold to reconnect.
  */
 
 import type { AgentOperationStatus, AgentStatus } from "@cpm/shared";

@@ -19,13 +19,7 @@ import {
 } from "@cpm/shared";
 import { AnalyticsIngestError, ingestAnalytics } from "../agent/analytics-ingest";
 import { modulesChanged, portsReapplied, reapplyAfterRecreate } from "../agent/module-change";
-import {
-  attach,
-  connectedAgents,
-  isConnected,
-  recordStatus,
-  settleResults,
-} from "../agent/registry";
+import { attach, isConnectedAnywhere, recordStatus, settleResults } from "../agent/registry";
 import {
   buildDesiredState,
   DESIRED_STATE_CAPABILITIES,
@@ -127,16 +121,14 @@ export const agentResolvers = {
       const agent = await requireAgent(context, MAX_STATUS_BYTES);
 
       // Without a subscription the host is unreachable; recording this would claim otherwise.
-      if (!isConnected(agent.agentId)) {
+      if (!(await isConnectedAnywhere(agent.agentId))) {
         throw new GraphQLError("That agent is not connected.", {
           extensions: { code: "AGENT_NOT_CONNECTED" },
         });
       }
 
       const status = decodeOrRefuse(() => decodeAgentStatus(args.status));
-      const previous =
-        connectedAgents().find((candidate) => candidate.agentId === agent.agentId)?.status ?? null;
-      recordStatus(agent.agentId, status);
+      const previous = await recordStatus(agent.agentId, status);
       if (modulesChanged(previous, status) || portsReapplied(previous, status)) {
         reapplyAfterRecreate(agent.agentId);
       }
@@ -160,7 +152,7 @@ export const agentResolvers = {
     ): Promise<boolean> => {
       const agent = await requireAgent(context, MAX_CADDY_CONFIG_BYTES);
 
-      settleResults(
+      await settleResults(
         agent.agentId,
         decodeOrRefuse(() => decodeCommandResults(args.results)),
       );
