@@ -2,6 +2,7 @@ import { authPolicy } from "./policy";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { genericOAuth, twoFactor, username } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { announce, onAnnouncement } from "../cluster/announcements";
 import db from "../db";
 import * as schema from "../db/schema";
 import { and, eq, ne } from "drizzle-orm";
@@ -639,9 +640,14 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
   return await cachedAuth;
 }
 
-export function invalidateProviderCache(): void {
+onAnnouncement("oauth-providers", () => {
   cachedProviders = null;
   cachedTrustedProviderIds = [];
   providersLoadedSuccessfully = false;
   cachedAuth = null;
+});
+
+/** After a provider changes; every replica rebuilds Better Auth on its next request. */
+export function invalidateProviderCache(): void {
+  announce("oauth-providers");
 }

@@ -235,7 +235,7 @@ describe('/api/auth route', () => {
         { cookie: `${CAPTCHA_PASS_COOKIE}=${pass}` },
       );
       expect(throttled.status).toBe(429);
-      expect(isValidCaptchaPass(pass, 'alice')).toBe(true);
+      expect(await isValidCaptchaPass(pass, 'alice')).toBe(true);
     });
 
     it('spends the pass on a successful sign-in', async () => {

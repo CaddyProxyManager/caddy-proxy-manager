@@ -2718,14 +2718,14 @@ export async function restoreRevisionAction(revision: number): Promise<ActionRes
  */
 export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
   await requireAdmin();
-  const { code, expiresAt } = ensurePairingCode();
+  const { code, expiresAt } = await ensurePairingCode();
   return { code, expiresAt };
 }
 
 /** Throw the live code away, so the next read mints a fresh one. */
 export async function revokePairingCodeAction(): Promise<void> {
   await requireAdmin();
-  revokePairingCode();
+  await revokePairingCode();
   revalidatePath("/settings");
 }
 
@@ -2739,7 +2739,7 @@ export async function unpairAgentAction(formData: FormData): Promise<void> {
   if (Number.isNaN(id)) return;
   const agentId = await deleteAgent(id);
   if (agentId) {
-    revokeRepairCode(agentId);
+    await revokeRepairCode(agentId);
     await forgetBootstrapAgent(agentId);
     detach(agentId);
   }
@@ -2760,9 +2760,9 @@ export async function repairAgentAction(agentRowId: number): Promise<RepairAgent
   const agent = await findAgentById(agentRowId);
   if (!agent) return { kind: "failed" };
   if (await isBundledAgent(agent.agentId)) {
-    return issueBootstrapToken(agent.agentId) ? { kind: "bootstrap" } : { kind: "failed" };
+    return (await issueBootstrapToken(agent.agentId)) ? { kind: "bootstrap" } : { kind: "failed" };
   }
-  const { code, expiresAt } = mintRepairCode(agent.agentId);
+  const { code, expiresAt } = await mintRepairCode(agent.agentId);
   return { kind: "code", code, expiresAt };
 }
 

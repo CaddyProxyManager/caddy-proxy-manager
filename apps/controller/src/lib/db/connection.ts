@@ -74,6 +74,12 @@ export const client: SQL | Database =
     ? openSqlite(target.path)
     : new SQL({ ...driverOptions(target), max: poolMax }));
 
+/**
+ * For what only PostgreSQL does (advisory locks, LISTEN); null under SQLite. Decided here because
+ * `instanceof SQL` throws: Bun's SQL is not a class with a prototype to test against.
+ */
+export const postgresClient: SQL | null = client instanceof Database ? null : client;
+
 export const db: Db =
   globalForDrizzle.__DRIZZLE_DB__ ??
   ((client instanceof Database

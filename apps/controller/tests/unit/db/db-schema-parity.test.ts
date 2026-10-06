@@ -26,11 +26,15 @@ type Shape = {
   foreignKeys: Array<{ columns: string[]; target: string; onDelete: string | undefined }>;
 };
 
-/** SQLite stores booleans, serials and 64-bit numbers as integers and a bounded string as text(n). */
+/**
+ * SQLite stores booleans, serials and 64-bit numbers as integers, bytes as a blob, and a bounded
+ * string as text(n).
+ */
 const TYPE_ALIASES: Record<string, string> = {
   boolean: 'integer',
   PgSerial: 'integer',
   PgBigInt53: 'integer',
+  bytea: 'blob',
 };
 
 function shape(config: any): Shape {
@@ -43,6 +47,7 @@ function shape(config: any): Shape {
         type: (
           TYPE_ALIASES[column.columnType] ??
           TYPE_ALIASES[column.dataType] ??
+          TYPE_ALIASES[column.getSQLType()] ??
           column.getSQLType()
         ).replace(/^varchar\(/, 'text('),
         notNull: column.notNull,

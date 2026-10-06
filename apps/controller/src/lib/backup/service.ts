@@ -30,6 +30,19 @@ export const BACKUP_NEVER = [
   "access_list_dns_cache",
   // Re-derived from the restored audit events (reanchorAuditChain), whichever side they came from.
   "audit_chain",
+  // The running cluster's own state: replicas, streams, messages in flight, counters and nonces
+  // that expire within the day. Restoring them would name replicas and streams that are gone.
+  "controller_replicas",
+  "cluster_generations",
+  "agent_connections",
+  "agent_outbox",
+  "agent_command_results",
+  "rate_limit_counters",
+  "spent_nonces",
+  "agent_pairing_secrets",
+  "upstream_error_counts",
+  // Tens of megabytes the leader downloads again; the files on the data volume are what serve.
+  "geoip_databases",
 ] as const;
 
 /** History rather than configuration: large, and only included when asked for. */

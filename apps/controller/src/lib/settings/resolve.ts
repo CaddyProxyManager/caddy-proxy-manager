@@ -17,15 +17,23 @@ import {
 import { currentStagingScope } from "./staging-context";
 import { invalidateProcessMemos } from "./process-memo";
 import { forgetRequestMemo } from "../request-memo";
+import { announce, onAnnouncement } from "../cluster/announcements";
 
 /** The promise, not the map, so concurrent cold reads share one query. */
 let cache: Promise<Map<string, SettingValue>> | null = null;
 
-/** After any write that bypasses setSetting: the tests, imports, restores and staged applies. */
-export function invalidateSettingsCache(): void {
+onAnnouncement("settings", () => {
   cache = null;
   invalidateProcessMemos();
   forgetRequestMemo("setting:");
+});
+
+/**
+ * After any write that bypasses setSetting: the tests, imports, restores and staged applies. Every
+ * replica drops its copy, this one before returning.
+ */
+export function invalidateSettingsCache(): void {
+  announce("settings");
 }
 
 function decode(definition: SettingDefinition, raw: string): SettingValue | undefined {

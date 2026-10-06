@@ -4,32 +4,22 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { eq, sql } from "drizzle-orm";
+import db from "../db";
+import { rateLimitCounters } from "../db/schema";
 import { derivePurposeKey } from "../secrets/derived-key";
 
 export const PORTAL_CHALLENGE_TTL_MS = 5 * 60_000;
 /** Codes one challenge may try before the password has to be entered again. */
 export const PORTAL_CHALLENGE_ATTEMPTS = 5;
 
-/** Attempts per live nonce; spent ones stay until they would have expired anyway. */
-const ATTEMPTS = new Map<string, { count: number; expiresAt: number }>();
-const MAX_TRACKED = 100_000;
-/** Expired entries go at most this often, so a long-lived process doesn't keep every nonce. */
-const PRUNE_INTERVAL_MS = 60_000;
-let lastPrune = 0;
-
-/** A restart invalidates every challenge, since ATTEMPTS starts empty again. */
-const bootSalt = randomBytes(32);
+/** Attempts per nonce, shared so a second replica is no fresh budget; pruned once expired. */
+const attemptsKey = (nonce: string) => `portal-2fa:${nonce}`;
 
 function signature(userId: number, rid: string, expiresAt: number, nonce: string): string {
-  const key = createHmac("sha256", derivePurposeKey("portal-2fa:v1")).update(bootSalt).digest();
-  return createHmac("sha256", key)
+  return createHmac("sha256", derivePurposeKey("portal-2fa:v1"))
     .update(`${userId}\n${rid}\n${expiresAt}\n${nonce}`)
     .digest("base64url");
-}
-
-function prune(now: number) {
-  lastPrune = now;
-  for (const [nonce, entry] of ATTEMPTS) if (entry.expiresAt <= now) ATTEMPTS.delete(nonce);
 }
 
 export function issuePortalChallenge(userId: number, rid: string, now = Date.now()): string {
@@ -39,11 +29,11 @@ export function issuePortalChallenge(userId: number, rid: string, now = Date.now
 }
 
 /** Counts as one attempt; null when forged, expired, for another intent, or out of attempts. */
-export function redeemPortalChallenge(
+export async function redeemPortalChallenge(
   challenge: string | null | undefined,
   rid: string,
   now = Date.now(),
-): { userId: number; nonce: string } | null {
+): Promise<{ userId: number; nonce: string } | null> {
   if (!challenge || !rid) return null;
   const [id, expiry, nonce, sig, ...rest] = challenge.split(".");
   if (rest.length > 0 || !id || !expiry || !nonce || !sig) return null;
@@ -56,16 +46,22 @@ export function redeemPortalChallenge(
   const given = Buffer.from(sig);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
 
-  if (ATTEMPTS.size >= MAX_TRACKED || now - lastPrune >= PRUNE_INTERVAL_MS) prune(now);
-  const entry = ATTEMPTS.get(nonce) ?? { count: 0, expiresAt };
-  if (entry.count >= PORTAL_CHALLENGE_ATTEMPTS) return null;
-  entry.count += 1;
-  ATTEMPTS.set(nonce, entry);
+  const [row] = await db
+    .insert(rateLimitCounters)
+    .values({ key: attemptsKey(nonce), count: 1, resetAt: expiresAt })
+    .onConflictDoUpdate({
+      target: rateLimitCounters.key,
+      set: { count: sql`${rateLimitCounters.count} + 1` },
+    })
+    .returning({ count: rateLimitCounters.count });
+  if (!row || row.count > PORTAL_CHALLENGE_ATTEMPTS) return null;
   return { userId, nonce };
 }
 
 /** Spent on sign-in, so the challenge can't be replayed for the rest of its TTL. */
-export function spendPortalChallenge(nonce: string) {
-  const entry = ATTEMPTS.get(nonce);
-  if (entry) entry.count = PORTAL_CHALLENGE_ATTEMPTS;
+export async function spendPortalChallenge(nonce: string): Promise<void> {
+  await db
+    .update(rateLimitCounters)
+    .set({ count: PORTAL_CHALLENGE_ATTEMPTS })
+    .where(eq(rateLimitCounters.key, attemptsKey(nonce)));
 }

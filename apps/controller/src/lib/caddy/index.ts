@@ -4062,6 +4062,10 @@ async function loadOne(agent: ConnectedAgentRef | null, who: string): Promise<vo
     });
   } catch (requestError) {
     logCaddyApplyFailure("Caddy admin request failed", requestError);
+    const { AgentRequiredError } = await import("../agent/client");
+    if (requestError instanceof AgentRequiredError) {
+      throw new CaddyApplyError(domainError("caddyNeedsAgent"), "CADDY_UNREACHABLE");
+    }
     if (isConnectionError(requestError)) {
       throw new CaddyApplyError(domainError("caddyUnreachable"), "CADDY_UNREACHABLE");
     }

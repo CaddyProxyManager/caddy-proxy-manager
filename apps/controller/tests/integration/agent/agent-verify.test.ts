@@ -27,7 +27,7 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import * as schema from '../../../src/lib/db/schema';
 const { encryptSecret } = await import('../../../src/lib/secrets');
-const { verifyAgentRequest, resetReplayCache } = await import('../../../src/lib/agent/verify');
+const { verifyAgentRequest } = await import('../../../src/lib/agent/verify');
 
 const AGENT_ID = 'f'.repeat(32);
 const SECRET = 'e'.repeat(64);
@@ -61,7 +61,7 @@ function arriving(headers: Record<string, string>): Request {
 }
 
 beforeEach(async () => {
-  resetReplayCache();
+  await ctx.db.delete(schema.spentNonces);
   await ctx.db.delete(schema.agents);
   const now = new Date().toISOString();
   await ctx.db.insert(schema.agents).values({

@@ -160,7 +160,8 @@ export async function POST(request: Request) {
   // No name, no pass: an empty one would be the account key of the username "@localhost".
   if (
     captcha &&
-    (!name || !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), name))
+    (!name ||
+      !(await redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), name)))
   ) {
     const t = await getTranslations("auth.apiErrors");
     return Response.json(
@@ -178,7 +179,7 @@ export async function POST(request: Request) {
         pathname === `/api/auth${LDAP_SIGN_IN_PATH}` &&
         (directoryId !== null || (await localUsersDisabled()));
       await recordAccountFailure(account, directory ? "directory" : "local");
-    } else if (response.ok) resetAccountFailures(account);
+    } else if (response.ok) await resetAccountFailures(account);
   }
   if (captcha) response.headers.append("Set-Cookie", CAPTCHA_PASS_CLEAR_COOKIE);
   if (response.ok) {

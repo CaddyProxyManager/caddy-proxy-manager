@@ -1,15 +1,21 @@
-type RateLimitEntry = {
-  attempts: number;
-  firstAttemptTimestamp: number;
-  blockedUntil?: number;
-};
+/**
+ * Guess limits are shared by every replica, in `rate_limit_counters`: a second controller holding
+ * its own count would double what a guesser gets. Flood budgets (`takeFromWindow`) and in-flight
+ * reservations stay per process, where N replicas only means N times the budget.
+ */
+import { and, eq, gt, inArray, isNull, like, lte, or, sql } from "drizzle-orm";
+import db from "../db";
+import { rateLimitCounters } from "../db/schema";
 
 type RateLimitOutcome = {
   blocked: boolean;
   retryAfterMs?: number;
 };
 
-const ATTEMPTS = new Map<string, RateLimitEntry>();
+const counters = rateLimitCounters;
+const ATTEMPT_PREFIX = "attempt:";
+const ACCOUNT_PREFIX = "account:";
+const SHARED_WINDOW_PREFIX = "window:";
 
 /**
  * Per call, so a settings change needs no restart (cached, so cheap). Imported lazily: a static
@@ -28,71 +34,78 @@ async function limits(): Promise<{ maxAttempts: number; windowMs: number; blockM
   return { maxAttempts, windowMs, blockMs };
 }
 
-function getEntry(key: string, now: number, windowMs: number): RateLimitEntry | undefined {
-  const entry = ATTEMPTS.get(key);
-  if (!entry) {
-    return undefined;
-  }
+type Counter = { count: number; resetAt: number; blockedUntil: number | null };
 
-  if (entry.blockedUntil && entry.blockedUntil <= now) {
-    ATTEMPTS.delete(key);
-    return undefined;
-  }
+/** A block that has run out, or an unblocked count past its window. */
+function lapsed(row: Counter, now: number): boolean {
+  return row.blockedUntil !== null ? row.blockedUntil <= now : row.resetAt <= now;
+}
 
-  if (!entry.blockedUntil && entry.firstAttemptTimestamp + windowMs <= now) {
-    ATTEMPTS.delete(key);
-    return undefined;
-  }
+/** `lapsed` as SQL, for an upsert to start a lapsed row over in the same statement. */
+function lapsedSql(now: number) {
+  return sql`(case when ${counters.blockedUntil} is not null then ${counters.blockedUntil} <= ${now} else ${counters.resetAt} <= ${now} end)`;
+}
 
-  return entry;
+async function readCounter(key: string): Promise<Counter | undefined> {
+  const [row] = await db
+    .select({
+      count: counters.count,
+      resetAt: counters.resetAt,
+      blockedUntil: counters.blockedUntil,
+    })
+    .from(counters)
+    .where(eq(counters.key, key))
+    .limit(1);
+  return row;
+}
+
+async function readAttempt(key: string, now: number): Promise<Counter | undefined> {
+  const row = await readCounter(`${ATTEMPT_PREFIX}${key}`);
+  return row && !lapsed(row, now) ? row : undefined;
 }
 
 export async function isRateLimited(key: string): Promise<RateLimitOutcome> {
   const now = Date.now();
-  const { windowMs } = await limits();
-  const entry = getEntry(key, now, windowMs);
-  if (!entry) {
-    return { blocked: false };
-  }
-
-  if (entry.blockedUntil && entry.blockedUntil > now) {
+  const entry = await readAttempt(key, now);
+  if (entry?.blockedUntil && entry.blockedUntil > now) {
     return { blocked: true, retryAfterMs: entry.blockedUntil - now };
   }
-
   return { blocked: false };
 }
 
 export async function registerFailedAttempt(key: string): Promise<RateLimitOutcome> {
   const now = Date.now();
   const { maxAttempts, windowMs, blockMs } = await limits();
-  const existing = getEntry(key, now, windowMs);
+  const rowKey = `${ATTEMPT_PREFIX}${key}`;
+  const fresh = lapsedSql(now);
+  const [row] = await db
+    .insert(counters)
+    .values({ key: rowKey, count: 1, resetAt: now + windowMs, blockedUntil: null })
+    .onConflictDoUpdate({
+      target: counters.key,
+      set: {
+        count: sql`case when ${fresh} then 1 when ${counters.blockedUntil} is not null then ${counters.count} else ${counters.count} + 1 end`,
+        resetAt: sql`case when ${fresh} then ${now + windowMs} else ${counters.resetAt} end`,
+        blockedUntil: sql`case when ${fresh} then null else ${counters.blockedUntil} end`,
+      },
+    })
+    .returning({ count: counters.count, blockedUntil: counters.blockedUntil });
 
-  if (!existing) {
-    ATTEMPTS.set(key, {
-      attempts: 1,
-      firstAttemptTimestamp: now,
-    });
-    return { blocked: false };
+  if (row?.blockedUntil && row.blockedUntil > now) {
+    return { blocked: true, retryAfterMs: row.blockedUntil - now };
   }
+  if (!row || row.count < maxAttempts) return { blocked: false };
 
-  if (existing.blockedUntil && existing.blockedUntil > now) {
-    return { blocked: true, retryAfterMs: existing.blockedUntil - now };
-  }
-
-  existing.attempts += 1;
-
-  if (existing.attempts >= maxAttempts) {
-    existing.attempts = 0;
-    existing.firstAttemptTimestamp = now;
-    existing.blockedUntil = now + blockMs;
-    return { blocked: true, retryAfterMs: blockMs };
-  }
-
-  return { blocked: false };
+  // The window starts over behind the block, as it always has.
+  await db
+    .update(counters)
+    .set({ count: 0, resetAt: now + windowMs, blockedUntil: now + blockMs })
+    .where(and(eq(counters.key, rowKey), isNull(counters.blockedUntil)));
+  return { blocked: true, retryAfterMs: blockMs };
 }
 
-export function resetAttempts(key: string): void {
-  ATTEMPTS.delete(key);
+export async function resetAttempts(key: string): Promise<void> {
+  await db.delete(counters).where(eq(counters.key, `${ATTEMPT_PREFIX}${key}`));
 }
 
 /** Attempts still being checked, per key; an entry lives only while its requests are in flight. */
@@ -116,19 +129,15 @@ function holdSlot(map: Map<string, number>, key: string): () => void {
  * the attempt ends, and register a failure separately.
  */
 export async function reserveAttempt(key: string): Promise<(() => void) | null> {
-  const { maxAttempts, windowMs } = await limits();
+  const { maxAttempts } = await limits();
   const now = Date.now();
-  const entry = getEntry(key, now, windowMs);
+  const entry = await readAttempt(key, now);
   if (entry?.blockedUntil && entry.blockedUntil > now) return null;
-  if ((entry?.attempts ?? 0) + (RESERVED.get(key) ?? 0) >= maxAttempts) return null;
+  if ((entry?.count ?? 0) + (RESERVED.get(key) ?? 0) >= maxAttempts) return null;
   return holdSlot(RESERVED, key);
 }
 
 // ─── Per account ─────────────────────────────────────────────────────────────
-
-type AccountEntry = { failures: number; lockedUntil: number; lastFailureAt: number };
-
-const ACCOUNTS = new Map<string, AccountEntry>();
 
 export type AccountLockPolicy = {
   enabled: boolean;
@@ -148,9 +157,8 @@ export const DEFAULT_ACCOUNT_LOCK: AccountLockPolicy = {
   maxDelayMs: 15 * 60_000,
   disableAfter: null,
 };
+/** From the last failure: a row's `resetAt`, past which security housekeeping prunes it. */
 const ACCOUNT_FORGET_MS = 24 * 60 * 60_000;
-/** Keys are attacker-chosen names, so the map is bounded; the least recently failed goes first. */
-const MAX_TRACKED_ACCOUNTS = 10_000;
 
 /** Per call, like `limits`, so a settings change needs no restart. */
 export async function accountLockPolicy(): Promise<AccountLockPolicy> {
@@ -182,6 +190,11 @@ export function accountKey(emailOrUsername: string): string {
   return normalized.includes("@") ? normalized : `${normalized}@localhost`;
 }
 
+async function readAccount(account: string, now: number): Promise<Counter | undefined> {
+  const row = await readCounter(`${ACCOUNT_PREFIX}${account}`);
+  return row && row.resetAt > now ? row : undefined;
+}
+
 /** 0 when it may try now. */
 export async function accountRetryAfterMs(
   account: string,
@@ -190,13 +203,8 @@ export async function accountRetryAfterMs(
 ): Promise<number> {
   const { enabled } = policy ?? (await accountLockPolicy());
   if (!enabled) return 0;
-  const entry = ACCOUNTS.get(account);
-  if (!entry) return 0;
-  if (now - entry.lastFailureAt > ACCOUNT_FORGET_MS) {
-    ACCOUNTS.delete(account);
-    return 0;
-  }
-  return Math.max(0, entry.lockedUntil - now);
+  const entry = await readAccount(account, now);
+  return Math.max(0, (entry?.blockedUntil ?? 0) - now);
 }
 
 /** Returns the delay now imposed. */
@@ -209,50 +217,66 @@ export async function registerAccountFailure(
     policy ?? (await accountLockPolicy());
   // Counted with the lock off too, while auto-disable reads the count.
   if (!enabled && disableAfter === null) return 0;
-  let entry = ACCOUNTS.get(account);
-  if (!entry || now - entry.lastFailureAt > ACCOUNT_FORGET_MS) {
-    entry = { failures: 0, lockedUntil: 0, lastFailureAt: now };
-  }
-  ACCOUNTS.delete(account);
-  entry.failures += 1;
-  entry.lastFailureAt = now;
-  const over = entry.failures - freeFailures;
+  const key = `${ACCOUNT_PREFIX}${account}`;
+  const forgotten = sql`${counters.resetAt} <= ${now}`;
+  const [row] = await db
+    .insert(counters)
+    .values({ key, count: 1, resetAt: now + ACCOUNT_FORGET_MS, blockedUntil: null })
+    .onConflictDoUpdate({
+      target: counters.key,
+      set: {
+        count: sql`case when ${forgotten} then 1 else ${counters.count} + 1 end`,
+        blockedUntil: sql`case when ${forgotten} then null else ${counters.blockedUntil} end`,
+        resetAt: now + ACCOUNT_FORGET_MS,
+      },
+    })
+    .returning({ count: counters.count, blockedUntil: counters.blockedUntil });
+  let lockedUntil = row?.blockedUntil ?? 0;
+  const over = (row?.count ?? 1) - freeFailures;
   if (enabled && over > 0) {
-    entry.lockedUntil = now + Math.min(maxDelayMs, baseDelayMs * 2 ** (over - 1));
+    lockedUntil = now + Math.min(maxDelayMs, baseDelayMs * 2 ** (over - 1));
+    await db.update(counters).set({ blockedUntil: lockedUntil }).where(eq(counters.key, key));
   }
-  ACCOUNTS.set(account, entry);
-  if (ACCOUNTS.size > MAX_TRACKED_ACCOUNTS) {
-    const oldest = ACCOUNTS.keys().next().value;
-    if (oldest !== undefined) ACCOUNTS.delete(oldest);
-  }
-  return Math.max(0, entry.lockedUntil - now);
+  return Math.max(0, lockedUntil - now);
 }
 
-export function resetAccountFailures(account: string): void {
-  ACCOUNTS.delete(account);
+export async function resetAccountFailures(account: string): Promise<void> {
+  await db.delete(counters).where(eq(counters.key, `${ACCOUNT_PREFIX}${account}`));
 }
 
 /** Accounts made to wait right now. Keys include names nobody owns; the caller matches users. */
-export function lockedAccounts(now = Date.now()): { account: string; until: number }[] {
-  const locked: { account: string; until: number }[] = [];
-  for (const [account, entry] of ACCOUNTS) {
-    if (entry.lockedUntil > now && now - entry.lastFailureAt <= ACCOUNT_FORGET_MS) {
-      locked.push({ account, until: entry.lockedUntil });
-    }
-  }
-  return locked;
+export async function lockedAccounts(
+  now = Date.now(),
+): Promise<{ account: string; until: number }[]> {
+  const rows = await db
+    .select({ key: counters.key, blockedUntil: counters.blockedUntil })
+    .from(counters)
+    .where(
+      and(
+        like(counters.key, `${ACCOUNT_PREFIX}%`),
+        gt(counters.blockedUntil, now),
+        gt(counters.resetAt, now),
+      ),
+    );
+  return rows.map((row) => ({
+    account: row.key.slice(ACCOUNT_PREFIX.length),
+    until: row.blockedUntil ?? now,
+  }));
 }
 
 /** Failures counted against the account since it last signed in, or was forgotten. */
-export function accountFailureCount(account: string, now = Date.now()): number {
-  const entry = ACCOUNTS.get(account);
-  if (!entry || now - entry.lastFailureAt > ACCOUNT_FORGET_MS) return 0;
-  return entry.failures;
+export async function accountFailureCount(account: string, now = Date.now()): Promise<number> {
+  return (await readAccount(account, now))?.count ?? 0;
 }
 
 /** Every key an account's names reach, so re-enabling it cannot leave a count behind. */
-export function resetAccountFailuresFor(names: ReadonlyArray<string | null | undefined>): void {
-  for (const name of names) if (name?.trim()) ACCOUNTS.delete(accountKey(name));
+export async function resetAccountFailuresFor(
+  names: ReadonlyArray<string | null | undefined>,
+): Promise<void> {
+  const keys = names
+    .filter((name): name is string => !!name?.trim())
+    .map((name) => `${ACCOUNT_PREFIX}${accountKey(name)}`);
+  if (keys.length > 0) await db.delete(counters).where(inArray(counters.key, keys));
 }
 
 const ACCOUNTS_RESERVED = new Map<string, number>();
@@ -268,9 +292,9 @@ export async function reserveAccountAttempt(
 ): Promise<(() => void) | null> {
   const resolved = policy ?? (await accountLockPolicy());
   if (!resolved.enabled) return () => {};
-  if ((await accountRetryAfterMs(account, now, resolved)) > 0) return null;
-  const failures = ACCOUNTS.get(account)?.failures ?? 0;
-  const inFlight = Math.max(1, resolved.freeFailures - failures);
+  const entry = await readAccount(account, now);
+  if ((entry?.blockedUntil ?? 0) > now) return null;
+  const inFlight = Math.max(1, resolved.freeFailures - (entry?.count ?? 0));
   if ((ACCOUNTS_RESERVED.get(account) ?? 0) >= inFlight) return null;
   return holdSlot(ACCOUNTS_RESERVED, account);
 }
@@ -313,7 +337,59 @@ export function resetWindows(prefix: string): void {
   for (const key of WINDOWS.keys()) if (key.startsWith(prefix)) WINDOWS.delete(key);
 }
 
+// ─── Shared windows ──────────────────────────────────────────────────────────
+
+/** `takeFromWindow` across replicas, for a window that bounds guesses rather than load. */
+export async function takeFromSharedWindow(
+  key: string,
+  limit: number,
+  windowMs: number,
+  now = Date.now(),
+): Promise<boolean> {
+  const over = sql`${counters.resetAt} <= ${now}`;
+  const [row] = await db
+    .insert(counters)
+    .values({ key: `${SHARED_WINDOW_PREFIX}${key}`, count: 1, resetAt: now + windowMs })
+    .onConflictDoUpdate({
+      target: counters.key,
+      set: {
+        count: sql`case when ${over} then 1 else ${counters.count} + 1 end`,
+        resetAt: sql`case when ${over} then ${now + windowMs} else ${counters.resetAt} end`,
+      },
+    })
+    .returning({ count: counters.count });
+  return (row?.count ?? 0) <= limit;
+}
+
+/** Without counting anything. */
+export async function sharedWindowSpent(
+  key: string,
+  limit: number,
+  now = Date.now(),
+): Promise<boolean> {
+  const row = await readCounter(`${SHARED_WINDOW_PREFIX}${key}`);
+  return row !== undefined && row.resetAt > now && row.count >= limit;
+}
+
+/** Test seam: forget every shared window whose key starts with `prefix`. */
+export async function resetSharedWindows(prefix: string): Promise<void> {
+  await db.delete(counters).where(like(counters.key, `${SHARED_WINDOW_PREFIX}${prefix}%`));
+}
+
+/** Security housekeeping, on the leader: rows nothing reads again. */
+export async function pruneRateLimitCounters(now = Date.now()): Promise<void> {
+  await db
+    .delete(counters)
+    .where(
+      and(
+        lte(counters.resetAt, now),
+        or(isNull(counters.blockedUntil), lte(counters.blockedUntil, now)),
+      ),
+    );
+}
+
 /** Test seam: forget every attempt, account, reservation and window. */
-export function resetRateLimitsForTests(): void {
-  for (const map of [ATTEMPTS, RESERVED, ACCOUNTS, ACCOUNTS_RESERVED, WINDOWS]) map.clear();
+export async function resetRateLimitsForTests(): Promise<void> {
+  for (const map of [RESERVED, ACCOUNTS_RESERVED, WINDOWS]) map.clear();
+  await db.delete(counters);
 }

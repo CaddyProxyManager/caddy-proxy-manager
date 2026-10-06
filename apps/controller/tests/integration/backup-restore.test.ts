@@ -134,6 +134,20 @@ describe('backup contents', () => {
     expect(summary.counts.sessions).toBeUndefined();
   });
 
+  it("leaves out the running cluster's state and the stored GeoIP databases", async () => {
+    await ctx.db.insert(schema.geoipDatabases).values({
+      edition: 'GeoLite2-Country',
+      sha256: 'x',
+      data: new Uint8Array([1, 2, 3]),
+      updatedAt: new Date().toISOString(),
+    });
+    await ctx.db.insert(schema.spentNonces).values({ key: 'n', expiresAt: Date.now() + 60_000 });
+    const summary = describeBackup(await createBackup(PASSPHRASE));
+    expect(summary.counts.geoip_databases).toBeUndefined();
+    expect(summary.counts.spent_nonces).toBeUndefined();
+    expect(summary.counts.agent_connections).toBeUndefined();
+  });
+
   it('refuses a short passphrase', async () => {
     await expect(createBackup('short')).rejects.toMatchObject({ code: 'backupPassphraseTooShort' });
   });

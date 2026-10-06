@@ -1,7 +1,8 @@
 /**
  * The one seam to the Caddy admin API, so tests swap in an in-memory adapter. Requests go through
  * an agent: dialling `CADDY_API_URL` directly could configure this host's Caddy while a remote agent
- * runs the real one. The direct transport is only for a deployment with no agent.
+ * runs the real one. The direct transport is only for a deployment with no agent, and one
+ * controller: several would each load their own config onto it, and agents are how they share.
  */
 import http from "node:http";
 import https from "node:https";
@@ -120,7 +121,9 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
 /** Falls back to `direct` when no agent answers, for a Caddy running without an agent. */
 export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): CaddyAdminTransport {
   return async (request) => {
-    const { caddyAdminViaAgent, AgentUnavailableError } = await import("../agent/client");
+    const { caddyAdminViaAgent, AgentRequiredError, AgentUnavailableError } = await import(
+      "../agent/client"
+    );
     try {
       const response = await caddyAdminViaAgent(
         {
@@ -134,10 +137,10 @@ export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): Caddy
       return { status: response.status, text: response.text, headers: response.headers };
     } catch (error) {
       // Never for a pinned request: an agent going away mid-apply must not redirect it here.
-      if (error instanceof AgentUnavailableError && request.agentId === undefined) {
-        return direct(request);
-      }
-      throw error;
+      if (!(error instanceof AgentUnavailableError) || request.agentId !== undefined) throw error;
+      const { otherReplicasLive } = await import("../cluster/replicas");
+      if (otherReplicasLive()) throw new AgentRequiredError();
+      return direct(request);
     }
   };
 }

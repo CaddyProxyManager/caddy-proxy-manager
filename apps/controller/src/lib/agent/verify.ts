@@ -13,6 +13,7 @@ import {
   AGENT_TIMESTAMP_HEADER,
   signatureBase,
 } from "@cpm/shared";
+import { claimNonce } from "../cluster/nonces";
 import { type AgentCredentials, findAgentByAgentId } from "../models/agents";
 
 export type VerifyResult =
@@ -44,38 +45,11 @@ async function sha256Hex(body: string): Promise<string> {
 // ─── Replay ──────────────────────────────────────────────────────────────────
 
 /**
- * In memory like the registry it protects: a replayed subscription would displace the real agent's
- * stream. Past `timestamp + skew` the timestamp check refuses a replay alone, bounding an entry.
+ * Shared by every replica: a subscription replayed to another one would displace the real agent's
+ * stream. Past `timestamp + skew` the timestamp check refuses a replay alone, bounding a record.
  */
-const seen = new Map<string, number>();
-
-/** Past this, refuse rather than evict: dropping a live entry early lets its replay through. */
-const MAX_SEEN = 100_000;
-let claimsSinceSweep = 0;
-
-function sweep(now: number): void {
-  for (const [key, expiresAt] of seen) {
-    if (expiresAt <= now) seen.delete(key);
-  }
-  claimsSinceSweep = 0;
-}
-
-function claimNonce(key: string, timestamp: number, now: number): boolean {
-  const expiresAt = seen.get(key);
-  if (expiresAt !== undefined && expiresAt > now) return false;
-
-  claimsSinceSweep += 1;
-  if (claimsSinceSweep >= 1024 || seen.size >= MAX_SEEN) sweep(now);
-  if (seen.size >= MAX_SEEN) return false;
-
-  seen.set(key, timestamp + AGENT_CLOCK_SKEW_MS + 1);
-  return true;
-}
-
-/** Test seam: forget every accepted nonce. */
-export function resetReplayCache(): void {
-  seen.clear();
-  claimsSinceSweep = 0;
+function claimReplayKey(key: string, timestamp: number, now: number): Promise<boolean> {
+  return claimNonce(`agent:${key}`, timestamp + AGENT_CLOCK_SKEW_MS + 1, now);
 }
 
 // ─── Verification ────────────────────────────────────────────────────────────
@@ -130,7 +104,7 @@ async function verify(request: Request, body: string, now: number): Promise<Veri
   // Agents before 3.0.0-rc.4 sign without a nonce. A replay is byte-identical, so its signature
   // rejects it as well as a nonce would. Remove this fallback in the first release after 3.0.0.
   const replayKey = `${agent.agentId}\n${nonce ?? `sig:${signature}`}`;
-  if (!claimNonce(replayKey, timestamp, now)) return DENY;
+  if (!(await claimReplayKey(replayKey, timestamp, now))) return DENY;
 
   return { ok: true, agent };
 }

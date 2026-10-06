@@ -239,3 +239,9 @@ export function startCrsRegistryUpdater(extraRepositories: () => Promise<readonl
   timer = setInterval(wake, WAKE_MS);
   timer.unref();
 }
+
+/** On losing the lead (lib/cluster); a pass already running finishes. */
+export function stopCrsRegistryUpdater(): void {
+  if (timer) clearInterval(timer);
+  timer = null;
+}

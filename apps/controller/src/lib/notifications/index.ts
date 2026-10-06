@@ -376,7 +376,8 @@ const watchers: Watcher[] = [];
 
 /** Something a tick checks, e.g. how long an agent has been gone. */
 export function addNotificationWatcher(watcher: Watcher): void {
-  watchers.push(watcher);
+  // Once, though a replica that takes the lead again starts this module over.
+  if (!watchers.includes(watcher)) watchers.push(watcher);
 }
 
 /** One pass: every watcher, then whatever is due. */
@@ -404,4 +405,10 @@ export function startNotifications(): void {
     void notificationTick();
   }, TICK_MS);
   timer.unref();
+}
+
+/** On losing the lead (lib/cluster); a pass already running finishes. */
+export function stopNotifications(): void {
+  if (timer) clearInterval(timer);
+  timer = null;
 }

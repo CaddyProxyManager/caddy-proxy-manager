@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    resetAttempts(rateLimitKey);
+    await resetAttempts(rateLimitKey);
 
     const newPasswordHash = await hashPassword(newPassword);
 

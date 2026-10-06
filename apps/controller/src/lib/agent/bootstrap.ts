@@ -4,10 +4,13 @@
  * never after an operator unpaired the bundled agent. Remote agents use the six-letter code.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { chmodSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { chmodSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared";
+import { and, eq } from "drizzle-orm";
+import db from "../db";
+import { agentPairingSecrets } from "../db/schema";
 import { isDemoMode } from "../demo/mode";
 import { findAgentRowByAgentId, listAgents } from "../models/agents";
 import { clearSetting, getSetting, setSetting } from "../settings";
@@ -20,10 +23,28 @@ const BUNDLED_AGENT_KEY = "agent_bootstrap_agent_id";
 /** Set when an operator unpairs the bundled agent, so it does not pair itself straight back. */
 const AUTO_PAIR_DISABLED_KEY = "agent_bootstrap_disabled";
 
-type IssuedToken = { token: string; expiresAt: number; agentId: string | null };
+/**
+ * Only a token a controller wrote is accepted, whatever else lands on the volume. Its hash is
+ * stored, so the bundled agent can redeem it through any replica.
+ */
+const SLOT = "bootstrap";
 
-/** Only this process's token is accepted; a file anything else wrote redeems nothing. */
-let issued: IssuedToken | null = null;
+type IssuedToken = { hash: string; expiresAt: number; agentId: string | null };
+
+const hashToken = (token: string) => createHash("sha256").update(token, "utf8").digest("hex");
+
+async function issuedToken(): Promise<IssuedToken | null> {
+  const [row] = await db
+    .select({
+      hash: agentPairingSecrets.secret,
+      expiresAt: agentPairingSecrets.expiresAt,
+      agentId: agentPairingSecrets.agentId,
+    })
+    .from(agentPairingSecrets)
+    .where(eq(agentPairingSecrets.slot, SLOT))
+    .limit(1);
+  return row ?? null;
+}
 
 /** Named for the setting it first served, which every test rig points at a scratch directory. */
 function dataDir(): string {
@@ -41,8 +62,8 @@ function secureEquals(a: string, b: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-function removeToken(): void {
-  issued = null;
+async function removeToken(): Promise<void> {
+  await db.delete(agentPairingSecrets).where(eq(agentPairingSecrets.slot, SLOT));
   try {
     rmSync(bootstrapPath(), { force: true });
   } catch (error) {
@@ -55,7 +76,10 @@ function removeToken(): void {
  * agent via the controller's group; chmodded again because writeFileSync's mode applies only on
  * create, and a 0600 file from a root-agent release would stay unreadable.
  */
-export function issueBootstrapToken(agentId: string | null, now = Date.now()): boolean {
+export async function issueBootstrapToken(
+  agentId: string | null,
+  now = Date.now(),
+): Promise<boolean> {
   // The bundled agent would pair and start a real Caddy.
   if (isDemoMode()) return false;
   const path = bootstrapPath();
@@ -67,10 +91,14 @@ export function issueBootstrapToken(agentId: string | null, now = Date.now()): b
   } catch (error) {
     // No shared volume or a read-only mount: not an error, that deployment pairs with a code.
     console.warn(`[cpm] could not write the agent bootstrap token to ${path}:`, error);
-    issued = null;
+    await db.delete(agentPairingSecrets).where(eq(agentPairingSecrets.slot, SLOT));
     return false;
   }
-  issued = { token, expiresAt: now + BOOTSTRAP_TOKEN_TTL_MS, agentId };
+  const row = { secret: hashToken(token), expiresAt: now + BOOTSTRAP_TOKEN_TTL_MS, agentId };
+  await db
+    .insert(agentPairingSecrets)
+    .values({ slot: SLOT, ...row })
+    .onConflictDoUpdate({ target: agentPairingSecrets.slot, set: { ...row, failures: 0 } });
   return true;
 }
 
@@ -97,46 +125,44 @@ async function wantsToken(): Promise<boolean> {
 
 /** Startup: a token an operator bound to one agent is left alone, since that was asked for. */
 export async function ensureBootstrapToken(now = Date.now()): Promise<boolean> {
+  const issued = await issuedToken();
   if (!(await wantsToken())) {
-    if (!issued?.agentId) removeToken();
-    return issued !== null && issued.expiresAt > now;
+    if (!issued?.agentId) await removeToken();
+    return issued !== null && issued.agentId !== null && issued.expiresAt > now;
   }
   if (issued && issued.expiresAt > now) return true;
   return issueBootstrapToken(null, now);
 }
 
 /**
- * Synchronous to the claim so two redemptions cannot both see it live; the rename claims it across
- * processes. A wrong guess leaves it, or anyone could keep the bundled agent from ever pairing.
+ * Deleting the row is the claim, so of two redemptions at once, on any replicas, one gets it. A
+ * wrong guess leaves it, or anyone could keep the bundled agent from ever pairing.
  */
-export function redeemBootstrapToken(
+export async function redeemBootstrapToken(
   submitted: string,
   agentId: string,
   alreadyPaired: boolean,
   now = Date.now(),
-): boolean {
-  const live = issued;
+): Promise<boolean> {
+  const live = await issuedToken();
   if (!live) return false;
   if (live.expiresAt <= now) {
-    removeToken();
+    await removeToken();
     return false;
   }
-  if (!secureEquals(live.token, submitted.trim())) return false;
+  if (!secureEquals(live.hash, hashToken(submitted.trim()))) return false;
   // Displacing an existing agent takes an operator's re-pair, which binds the token.
   if (live.agentId === null ? alreadyPaired : live.agentId !== agentId) return false;
 
-  issued = null;
-  const path = bootstrapPath();
-  const claimed = `${path}.redeemed-${randomBytes(6).toString("hex")}`;
+  const claimed = await db
+    .delete(agentPairingSecrets)
+    .where(and(eq(agentPairingSecrets.slot, SLOT), eq(agentPairingSecrets.secret, live.hash)))
+    .returning({ slot: agentPairingSecrets.slot });
+  if (claimed.length === 0) return false;
   try {
-    renameSync(path, claimed);
+    rmSync(bootstrapPath(), { force: true });
   } catch {
-    return false;
-  }
-  try {
-    rmSync(claimed, { force: true });
-  } catch {
-    // Already claimed; a leftover file holding a dead token redeems nothing.
+    // Another replica's volume, or gone already; a leftover file holds a dead token.
   }
   return true;
 }
@@ -154,7 +180,7 @@ export async function forgetBootstrapAgent(agentId: string): Promise<void> {
   const bundled = await bundledAgentId();
   if (bundled !== null && bundled !== agentId) return;
   await setSetting(AUTO_PAIR_DISABLED_KEY, true);
-  removeToken();
+  await removeToken();
 }
 
 /** Explicit, so it writes a token whatever is paired. */
@@ -168,7 +194,7 @@ export function looksLikeBootstrapToken(value: string): boolean {
   return AGENT_BOOTSTRAP_TOKEN_PATTERN.test(value.trim());
 }
 
-/** Test seam: touches neither the disk nor the database. */
-export function resetBootstrapState(): void {
-  issued = null;
+/** Test seam: forgets the token without touching the disk. */
+export async function resetBootstrapState(): Promise<void> {
+  await db.delete(agentPairingSecrets).where(eq(agentPairingSecrets.slot, SLOT));
 }

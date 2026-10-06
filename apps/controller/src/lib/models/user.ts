@@ -655,7 +655,7 @@ export async function updateUserStatus(
     await deleteUserForwardAuthSessions(userId);
   } else if (updated) {
     // Or an account auto-disabled for its failed sign-ins is disabled again by the next typo.
-    resetAccountFailuresFor([updated.email, updated.username]);
+    await resetAccountFailuresFor([updated.email, updated.username]);
   }
 
   // Once, on the change: disabling a disabled account tells nobody anything.

@@ -13,7 +13,7 @@ import {
 export type PortalLoginAttempt = {
   /** Counts against the client, the (account, client) pair and the account. */
   fail(source: SignInSource): Promise<void>;
-  succeed(): void;
+  succeed(): Promise<void>;
   /** Ends it uncounted, e.g. when checking it threw. */
   release(): void;
 };
@@ -73,12 +73,17 @@ export async function beginPortalLoginAttempt(
         releaseAll();
       }
     },
-    succeed() {
+    async succeed() {
       if (!claim()) return;
-      resetAttempts(ip);
-      resetAttempts(pairKey);
-      resetAccountFailures(account);
-      releaseAll();
+      try {
+        await Promise.all([
+          resetAttempts(ip),
+          resetAttempts(pairKey),
+          resetAccountFailures(account),
+        ]);
+      } finally {
+        releaseAll();
+      }
     },
     release() {
       if (claim()) releaseAll();

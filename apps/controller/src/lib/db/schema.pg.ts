@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { uuidv7 } from "./uuidv7";
-import { isoTimestamp } from "./columns.pg";
+import { binary, isoTimestamp } from "./columns.pg";
 
 export const users = pgTable(
   "users",
@@ -1000,3 +1000,142 @@ export const analyticsViews = pgTable(
     userIdx: index("analytics_views_user_idx").on(table.userId),
   }),
 );
+
+// ── Cluster ──────────────────────────────────────────────────────────
+
+/** One row per running controller (lib/cluster); a crashed one's row lingers until pruned. */
+export const controllerReplicas = pgTable("controller_replicas", {
+  id: text("id").primaryKey(),
+  hostname: text("hostname").notNull(),
+  /** Of the key SESSION_SECRET derives: replicas disagreeing would each break the other's secrets. */
+  keyFingerprint: text("keyFingerprint").notNull(),
+  startedAt: bigint("startedAt", { mode: "number" }).notNull(),
+  heartbeatAt: bigint("heartbeatAt", { mode: "number" }).notNull(),
+});
+
+/** Bumped per cache a write invalidates, so a replica that missed the NOTIFY still catches up. */
+export const clusterGenerations = pgTable("cluster_generations", {
+  name: text("name").primaryKey(),
+  generation: bigint("generation", { mode: "number" }).notNull(),
+});
+
+/** Guess limits every replica must share (auth/rate-limit.ts); flood budgets stay in memory. */
+export const rateLimitCounters = pgTable(
+  "rate_limit_counters",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    /** Epoch ms; the count is forgotten from then. */
+    resetAt: bigint("resetAt", { mode: "number" }).notNull(),
+    blockedUntil: bigint("blockedUntil", { mode: "number" }),
+  },
+  (table) => ({
+    resetAtIdx: index("rate_limit_counters_reset_at_idx").on(table.resetAt),
+  }),
+);
+
+/** Single-use values (request nonces, CAPTCHA passes, logout jtis) until they could verify no more. */
+export const spentNonces = pgTable(
+  "spent_nonces",
+  {
+    key: text("key").primaryKey(),
+    expiresAt: bigint("expiresAt", { mode: "number" }).notNull(),
+  },
+  (table) => ({
+    expiresAtIdx: index("spent_nonces_expires_at_idx").on(table.expiresAt),
+  }),
+);
+
+/** Agent pairing credentials, so any replica redeems what another showed (lib/agent/pairing-codes.ts). */
+export const agentPairingSecrets = pgTable("agent_pairing_secrets", {
+  /** `code`, `repair:<agentId>` or `bootstrap`. */
+  slot: text("slot").primaryKey(),
+  /** A code encrypted, since the page shows it again; a bootstrap token's SHA-256. */
+  secret: text("secret").notNull(),
+  /** The one agent a bootstrap token may pair; null for a never-seen one. */
+  agentId: text("agentId"),
+  expiresAt: bigint("expiresAt", { mode: "number" }).notNull(),
+  failures: integer("failures").notNull().default(0),
+});
+
+/** Which replica holds each agent's stream (lib/agent/broker.ts); the stream itself is in memory. */
+export const agentConnections = pgTable(
+  "agent_connections",
+  {
+    agentId: text("agentId").primaryKey(),
+    replicaId: text("replicaId").notNull(),
+    agentRowId: integer("agentRowId").notNull(),
+    /** For messages, never for routing. */
+    name: text("name").notNull(),
+    /** Fingerprint of the secret the stream authenticated with. */
+    credential: text("credential"),
+    connectedAt: bigint("connectedAt", { mode: "number" }).notNull(),
+    lastSeenAt: bigint("lastSeenAt", { mode: "number" }).notNull(),
+    /** The agent's last AgentStatus, as JSON. */
+    status: text("status"),
+  },
+  (table) => ({
+    replicaIdx: index("agent_connections_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** Server events for an agent whose stream another replica holds; drained by that replica. */
+export const agentOutbox = pgTable(
+  "agent_outbox",
+  {
+    id: text("id").primaryKey(),
+    /** The replica holding the stream when this was written. */
+    replicaId: text("replicaId").notNull(),
+    agentId: text("agentId").notNull(),
+    /** An AgentServerEvent, as JSON. */
+    event: text("event").notNull(),
+    createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+  },
+  (table) => ({
+    replicaIdx: index("agent_outbox_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** A command's result for the replica that issued it, when the agent answered through another. */
+export const agentCommandResults = pgTable(
+  "agent_command_results",
+  {
+    commandId: text("commandId").primaryKey(),
+    replicaId: text("replicaId").notNull(),
+    result: text("result").notNull(),
+    createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+  },
+  (table) => ({
+    replicaIdx: index("agent_command_results_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** 502/503/504 answers per proxy host and minute, from whichever replica the agent reported to. */
+export const upstreamErrorCounts = pgTable(
+  "upstream_error_counts",
+  {
+    id: serial("id").primaryKey(),
+    proxyHostId: integer("proxyHostId")
+      .references(() => proxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Epoch ms at the start of the minute. */
+    minute: bigint("minute", { mode: "number" }).notNull(),
+    count: integer("count").notNull(),
+  },
+  (table) => ({
+    hostMinuteUnique: uniqueIndex("upstream_error_counts_host_minute_unique").on(
+      table.proxyHostId,
+      table.minute,
+    ),
+    minuteIdx: index("upstream_error_counts_minute_idx").on(table.minute),
+  }),
+);
+
+/** The leader's MaxMind downloads, for the other replicas to install (lib/geoip/replicas.ts). */
+export const geoipDatabases = pgTable("geoip_databases", {
+  edition: text("edition").primaryKey(),
+  /** Of `data`, so a replica compares hashes rather than reading the file each heartbeat. */
+  sha256: text("sha256").notNull(),
+  data: binary("data").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});

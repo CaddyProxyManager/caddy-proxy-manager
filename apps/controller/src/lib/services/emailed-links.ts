@@ -177,7 +177,7 @@ export async function completeEmailedLink(
 
   const account = await findAccount(eq(users.id, user.id));
   for (const name of [user.email, account?.username]) {
-    if (name) resetAccountFailures(accountKey(name));
+    if (name) await resetAccountFailures(accountKey(name));
   }
 
   await createAuditEvent({

@@ -67,7 +67,7 @@ beforeEach(async () => {
   await ctx.db.delete(settings);
   await ctx.db.delete(users);
   for (const name of ['alice', 'alice@example.com', 'root', 'root@example.com', 'bob', 'dora']) {
-    resetAccountFailures(accountKey(name));
+    await resetAccountFailures(accountKey(name));
   }
 });
 
@@ -185,7 +185,7 @@ describe('re-enabling', () => {
     expect(await statusOf(alice)).toBe('disabled');
 
     await updateUserStatus(alice, 'active');
-    expect(accountFailureCount(accountKey('alice'))).toBe(0);
+    expect(await accountFailureCount(accountKey('alice'))).toBe(0);
     await fail('alice', 1);
     expect(await statusOf(alice)).toBe('active');
   });

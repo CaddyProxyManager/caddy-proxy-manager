@@ -221,6 +221,11 @@ let timer: NodeJS.Timeout | null = null;
 let running = false;
 
 /** Idempotent. A pass still running when the next wake comes is not overlapped. */
+export function stopAccessListDnsRefresher(): void {
+  if (timer) clearInterval(timer);
+  timer = null;
+}
+
 export function startAccessListDnsRefresher(): void {
   if (timer) return;
   const wake = () => {

@@ -3,7 +3,7 @@
  * the bundled agent, per-agent module selections and the rebuild button. A fake agent attaches to
  * the real registry, so what reaches an agent is what the controller would send it.
  */
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -81,8 +81,8 @@ async function pairFakeAgent(): Promise<number> {
 beforeEach(async () => {
   ctx.db = await createTestDb();
   invalidateSettingsCache();
-  resetPairingCodes();
-  resetBootstrapState();
+  await resetPairingCodes();
+  await resetBootstrapState();
   dataDir = mkdtempSync(join(tmpdir(), 'cpm-agent-actions-'));
   vi.stubEnv('L4_PORTS_DIR', dataDir);
   admin = await seedUser(ctx.db, 'admin@example.com', 'admin');
@@ -94,10 +94,6 @@ afterEach(async () => {
   await agent.stop();
   vi.unstubAllEnvs();
   rmSync(dataDir, { recursive: true, force: true });
-});
-
-afterAll(() => {
-  resetBootstrapState();
 });
 
 describe('the pairing code', () => {
@@ -122,7 +118,7 @@ describe('unpairing', () => {
 
     expect(await findAgentById(id)).toBeNull();
     expect(connectedAgents().map((connected) => connected.agentId)).not.toContain(agent.agentId);
-    expect(redeemRepairCode(agent.agentId, code).ok).toBe(false);
+    expect((await redeemRepairCode(agent.agentId, code)).ok).toBe(false);
   });
 
   it('turns auto-pairing off for the bundled agent, so it does not pair straight back', async () => {
@@ -160,8 +156,8 @@ describe('re-pairing', () => {
 
     expect(result.kind).toBe('code');
     const { code } = result as { kind: 'code'; code: string };
-    expect(redeemRepairCode('another-agent', code).ok).toBe(false);
-    expect(redeemRepairCode(agent.agentId, code).ok).toBe(true);
+    expect((await redeemRepairCode('another-agent', code)).ok).toBe(false);
+    expect((await redeemRepairCode(agent.agentId, code)).ok).toBe(true);
   });
 
   it('gives the bundled agent a bootstrap token on the shared volume', async () => {

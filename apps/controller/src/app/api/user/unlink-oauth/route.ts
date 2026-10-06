@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-    resetAttempts(rateLimitKey);
+    await resetAttempts(rateLimitKey);
 
     const previousProvider = oauthAccounts[0].providerId;
 

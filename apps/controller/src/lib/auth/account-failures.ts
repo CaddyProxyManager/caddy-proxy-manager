@@ -78,7 +78,7 @@ export async function recordAccountFailure(
 ): Promise<AccountFailureOutcome> {
   const resolved = policy ?? (await accountLockPolicy());
   const delayMs = await registerAccountFailure(account, now, resolved);
-  const failures = accountFailureCount(account, now);
+  const failures = await accountFailureCount(account, now);
   const outcome: AccountFailureOutcome = {
     delayMs,
     failures,

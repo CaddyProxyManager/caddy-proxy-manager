@@ -128,7 +128,10 @@ export async function POST(request: NextRequest) {
       (await getActiveCaptcha()) !== null && (await redirectIntentWantsCaptcha(rid));
     if (
       captchaGated &&
-      !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), username)
+      !(await redeemCaptchaPass(
+        captchaPassFromCookieHeader(request.headers.get("cookie")),
+        username,
+      ))
     ) {
       return NextResponse.json(
         { error: t("captchaRequired"), code: "CAPTCHA_REQUIRED" },
@@ -206,7 +209,7 @@ export async function POST(request: NextRequest) {
         { status: 401, headers: spentHeaders },
       );
     }
-    attempt.succeed();
+    await attempt.succeed();
 
     // Half a sign-in with 2FA on: the intent stays unspent until the code checks out.
     if (user.twoFactorEnabled) {

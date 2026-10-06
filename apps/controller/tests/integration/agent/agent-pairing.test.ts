@@ -55,87 +55,87 @@ async function secretOf(response: Response): Promise<string> {
 }
 
 beforeEach(async () => {
-  resetPairingCodes();
-  bootstrap.resetBootstrapState();
+  await resetPairingCodes();
+  await bootstrap.resetBootstrapState();
   await ctx.db.delete(schema.agents);
   await ctx.db.delete(schema.settings);
   invalidateSettingsCache();
 });
 
-afterEach(() => {
-  resetPairingCodes();
-  bootstrap.resetBootstrapState();
+afterEach(async () => {
+  await resetPairingCodes();
+  await bootstrap.resetBootstrapState();
 });
 
 describe('pairing codes', () => {
-  it('mints a six-letter code and keeps returning the same one until it expires', () => {
-    const first = ensurePairingCode();
+  it('mints a six-letter code and keeps returning the same one until it expires', async () => {
+    const first = await ensurePairingCode();
     expect(first.code).toMatch(/^[A-Z]{6}$/);
-    expect(ensurePairingCode().code).toBe(first.code);
+    expect((await ensurePairingCode()).code).toBe(first.code);
   });
 
-  it('draws only from an alphabet with no I or O, so a code can be read aloud', () => {
+  it('draws only from an alphabet with no I or O, so a code can be read aloud', async () => {
     for (let i = 0; i < 50; i += 1) {
-      resetPairingCodes();
-      expect(ensurePairingCode().code).not.toMatch(/[IO]/);
+      await resetPairingCodes();
+      expect((await ensurePairingCode()).code).not.toMatch(/[IO]/);
     }
   });
 
-  it('burns the code on success, so it cannot be used twice', () => {
-    const { code } = ensurePairingCode();
-    expect(redeemPairingCode(code).ok).toBe(true);
-    expect(redeemPairingCode(code).ok).toBe(false);
+  it('burns the code on success, so it cannot be used twice', async () => {
+    const { code } = await ensurePairingCode();
+    expect((await redeemPairingCode(code)).ok).toBe(true);
+    expect((await redeemPairingCode(code)).ok).toBe(false);
   });
 
-  it('refuses an expired code and does not resurrect it', () => {
-    const { code } = ensurePairingCode();
+  it('refuses an expired code and does not resurrect it', async () => {
+    const { code } = await ensurePairingCode();
     const later = Date.now() + 6 * 60_000;
-    expect(redeemPairingCode(code, later).ok).toBe(false);
-    expect(redeemPairingCode(code).ok).toBe(false);
+    expect((await redeemPairingCode(code, later)).ok).toBe(false);
+    expect((await redeemPairingCode(code)).ok).toBe(false);
   });
 
-  it('survives 199 wrong guesses, so one noisy client cannot burn it', () => {
-    const { code } = ensurePairingCode();
-    for (let i = 0; i < 199; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
-    expect(redeemPairingCode(code).ok).toBe(true);
+  it('survives 199 wrong guesses, so one noisy client cannot burn it', async () => {
+    const { code } = await ensurePairingCode();
+    for (let i = 0; i < 199; i += 1) expect((await redeemPairingCode('ZZZZZZ')).ok).toBe(false);
+    expect((await redeemPairingCode(code)).ok).toBe(true);
   });
 
-  it('burns the code after 200 wrong guesses in total, bounding a guessing botnet', () => {
-    const { code } = ensurePairingCode();
-    for (let i = 0; i < 200; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
-    expect(redeemPairingCode(code).ok).toBe(false);
+  it('burns the code after 200 wrong guesses in total, bounding a guessing botnet', async () => {
+    const { code } = await ensurePairingCode();
+    for (let i = 0; i < 200; i += 1) expect((await redeemPairingCode('ZZZZZZ')).ok).toBe(false);
+    expect((await redeemPairingCode(code)).ok).toBe(false);
   });
 
-  it('accepts a code typed in lower case with stray spaces', () => {
-    const { code } = ensurePairingCode();
-    expect(redeemPairingCode(`  ${code.toLowerCase()} `).ok).toBe(true);
+  it('accepts a code typed in lower case with stray spaces', async () => {
+    const { code } = await ensurePairingCode();
+    expect((await redeemPairingCode(`  ${code.toLowerCase()} `)).ok).toBe(true);
   });
 
-  it('keeps a re-pair code to the agent it was minted for', () => {
-    const { code } = mintRepairCode(AGENT_ID);
-    expect(redeemRepairCode(OTHER_ID, code).ok).toBe(false);
+  it('keeps a re-pair code to the agent it was minted for', async () => {
+    const { code } = await mintRepairCode(AGENT_ID);
+    expect((await redeemRepairCode(OTHER_ID, code)).ok).toBe(false);
     // Neither is the live code, nor does it stand in for one.
-    expect(redeemPairingCode(code).ok).toBe(false);
-    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
-    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(false);
+    expect((await redeemPairingCode(code)).ok).toBe(false);
+    expect((await redeemRepairCode(AGENT_ID, code)).ok).toBe(true);
+    expect((await redeemRepairCode(AGENT_ID, code)).ok).toBe(false);
   });
 
-  it('throttles a client after five wrong guesses in a minute, and forgets it after', () => {
+  it('throttles a client after five wrong guesses in a minute, and forgets it after', async () => {
     const now = Date.now();
     for (let i = 0; i < 5; i += 1) {
-      expect(clientThrottled('203.0.113.9', now)).toBe(false);
-      recordFailedGuess('203.0.113.9', now);
+      expect(await clientThrottled('203.0.113.9', now)).toBe(false);
+      await recordFailedGuess('203.0.113.9', now);
     }
-    expect(clientThrottled('203.0.113.9', now)).toBe(true);
-    expect(clientThrottled('198.51.100.7', now)).toBe(false);
-    expect(clientThrottled('203.0.113.9', now + 61_000)).toBe(false);
+    expect(await clientThrottled('203.0.113.9', now)).toBe(true);
+    expect(await clientThrottled('198.51.100.7', now)).toBe(false);
+    expect(await clientThrottled('203.0.113.9', now + 61_000)).toBe(false);
   });
 });
 
 describe('POST /api/agent/v1/pair', () => {
   it('introduces the controller by its Application name', async () => {
     await saveSettings({ [appName.key]: 'Branch Office' });
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     const response = await pair(code);
     expect(((await response.json()) as { controllerName: string }).controllerName).toBe(
       'Branch Office',
@@ -143,7 +143,7 @@ describe('POST /api/agent/v1/pair', () => {
   });
 
   it('stores the agent and returns a secret it did not receive', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     const response = await POST(
       pairRequest({ code, agentId: AGENT_ID, agentName: 'edge', agentVersion: '3.0.0' }),
     );
@@ -160,7 +160,7 @@ describe('POST /api/agent/v1/pair', () => {
   });
 
   it('never stores the secret in the clear', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     const secret = await secretOf(await pair(code));
 
     const [row] = await ctx.db.select().from(schema.agents);
@@ -170,14 +170,14 @@ describe('POST /api/agent/v1/pair', () => {
   });
 
   it('refuses a wrong code with 401 and stores nothing', async () => {
-    ensurePairingCode();
+    await ensurePairingCode();
     const response = await pair('ZZZZZZ');
     expect(response.status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
   it('refuses a code that was already redeemed', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     await pair(code);
     const second = await pair(code, OTHER_ID);
     expect(second.status).toBe(401);
@@ -185,21 +185,21 @@ describe('POST /api/agent/v1/pair', () => {
   });
 
   it('rejects an agent id that is not one, before touching the code', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     const response = await POST(pairRequest({ code, agentId: '../etc', agentVersion: '3.0.0' }));
     expect(response.status).toBe(400);
     // The code survives: a malformed request must not burn the operator's code for them.
-    expect(redeemPairingCode(code).ok).toBe(true);
+    expect((await redeemPairingCode(code)).ok).toBe(true);
   });
 
   it('names an agent that did not name itself', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     await pair(code);
     expect((await listAgents())[0].name).toBe(`Agent ${AGENT_ID.slice(0, 8)}`);
   });
 
   it('refuses a body that is not JSON', async () => {
-    ensurePairingCode();
+    await ensurePairingCode();
     const response = await POST(
       new Request('http://controller.test/api/agent/v1/pair', { method: 'POST', body: 'nonsense' }),
     );
@@ -209,10 +209,10 @@ describe('POST /api/agent/v1/pair', () => {
 
 describe('an agent that is already paired', () => {
   it('cannot be displaced with the shared code, which stays usable for a new agent', async () => {
-    const original = await secretOf(await pair(ensurePairingCode().code));
+    const original = await secretOf(await pair((await ensurePairingCode()).code));
 
-    resetPairingCodes();
-    const { code } = ensurePairingCode();
+    await resetPairingCodes();
+    const { code } = await ensurePairingCode();
     const hijack = await pair(code);
     expect(hijack.status).toBe(401);
     expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(original);
@@ -222,9 +222,9 @@ describe('an agent that is already paired', () => {
   });
 
   it('is never re-enabled by pairing, even with a code minted for it', async () => {
-    await pair(ensurePairingCode().code);
+    await pair((await ensurePairingCode()).code);
     await ctx.db.update(schema.agents).set({ enabled: false });
-    const { code } = mintRepairCode(AGENT_ID);
+    const { code } = await mintRepairCode(AGENT_ID);
 
     const response = await pair(code);
     expect(response.status).toBe(403);
@@ -234,15 +234,15 @@ describe('an agent that is already paired', () => {
       .where(eq(schema.agents.agentId, AGENT_ID));
     expect(row.enabled).toBe(false);
     // Nothing was spent on a refusal.
-    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
+    expect((await redeemRepairCode(AGENT_ID, code)).ok).toBe(true);
   });
 
   it('recovers with a re-pair code minted for it, keeping its row and its name', async () => {
-    const first = await secretOf(await pair(ensurePairingCode().code));
+    const first = await secretOf(await pair((await ensurePairingCode()).code));
     const [row] = await listAgents();
     await renameAgent(row.id, 'edge-renamed');
 
-    const { code } = mintRepairCode(AGENT_ID);
+    const { code } = await mintRepairCode(AGENT_ID);
     const response = await pair(code);
     expect(response.status).toBe(200);
     const second = await secretOf(response);
@@ -256,10 +256,10 @@ describe('an agent that is already paired', () => {
   });
 
   it('cannot be re-paired with a code minted for a different agent', async () => {
-    await pair(ensurePairingCode().code);
-    resetPairingCodes();
-    await pair(ensurePairingCode().code, OTHER_ID);
-    const { code } = mintRepairCode(OTHER_ID);
+    await pair((await ensurePairingCode()).code);
+    await resetPairingCodes();
+    await pair((await ensurePairingCode()).code, OTHER_ID);
+    const { code } = await mintRepairCode(OTHER_ID);
 
     expect((await pair(code, AGENT_ID)).status).toBe(401);
   });
@@ -270,7 +270,7 @@ describe('guessing from one address', () => {
   const from = { 'x-forwarded-for': '203.0.113.9' };
 
   it('stops a client after five wrong codes, even when its sixth is right', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     for (let i = 0; i < 5; i += 1) expect((await pair('ZZZZZZ', AGENT_ID, from)).status).toBe(401);
 
     expect((await pair(code, AGENT_ID, from)).status).toBe(429);
@@ -335,7 +335,7 @@ describe('bootstrap token', () => {
     expect(await listAgents()).toHaveLength(0);
   });
 
-  it('accepts no token this process did not write, whatever is on the volume', async () => {
+  it('accepts no token a controller did not write, whatever is on the volume', async () => {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(bootstrap.bootstrapPath(), 'e'.repeat(64));
     expect((await pair('e'.repeat(64))).status).toBe(401);
@@ -343,14 +343,14 @@ describe('bootstrap token', () => {
 
   it('does not let a bootstrap token stand in for a typed code when none was written', async () => {
     // Must not fall through to comparing against the live six-letter code.
-    ensurePairingCode();
+    await ensurePairingCode();
     expect((await pair('e'.repeat(64))).status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
   it('leaves the typed-code path working alongside it', async () => {
     await bootstrap.ensureBootstrapToken();
-    expect((await pair(ensurePairingCode().code)).status).toBe(200);
+    expect((await pair((await ensurePairingCode()).code)).status).toBe(200);
   });
 
   it('lets exactly one of two simultaneous redemptions through', async () => {
@@ -364,13 +364,22 @@ describe('bootstrap token', () => {
     expect(await listAgents()).toHaveLength(1);
   });
 
-  it('refuses a token whose file was already claimed by another process', async () => {
+  it('refuses a token another replica already redeemed', async () => {
+    await bootstrap.ensureBootstrapToken();
+    const token = await readToken();
+    await ctx.db.delete(schema.agentPairingSecrets);
+
+    expect((await pair(token)).status).toBe(401);
+  });
+
+  it('redeems a token whose file another replica wrote', async () => {
     const { rmSync } = await import('node:fs');
     await bootstrap.ensureBootstrapToken();
     const token = await readToken();
+    // This replica's volume never had the file; the stored hash is what counts.
     rmSync(bootstrap.bootstrapPath());
 
-    expect((await pair(token)).status).toBe(401);
+    expect((await pair(token)).status).toBe(200);
   });
 
   it('expires', async () => {
@@ -378,7 +387,7 @@ describe('bootstrap token', () => {
     const token = await readToken();
     const later = Date.now() + bootstrap.BOOTSTRAP_TOKEN_TTL_MS + 1;
 
-    expect(bootstrap.redeemBootstrapToken(token, AGENT_ID, false, later)).toBe(false);
+    expect(await bootstrap.redeemBootstrapToken(token, AGENT_ID, false, later)).toBe(false);
     expect(await tokenOnDisk()).toBe(false);
     expect((await pair(token)).status).toBe(401);
   });
@@ -387,13 +396,13 @@ describe('bootstrap token', () => {
     await bootstrap.ensureBootstrapToken();
     await pair(await readToken());
 
-    bootstrap.resetBootstrapState();
+    await bootstrap.resetBootstrapState();
     expect(await bootstrap.ensureBootstrapToken()).toBe(false);
     expect(await tokenOnDisk()).toBe(false);
   });
 
   it('cannot displace an agent that is already paired', async () => {
-    const original = await secretOf(await pair(ensurePairingCode().code));
+    const original = await secretOf(await pair((await ensurePairingCode()).code));
     await bootstrap.enableAutoPairing();
 
     expect((await pair(await readToken())).status).toBe(401);
@@ -404,7 +413,7 @@ describe('bootstrap token', () => {
     await bootstrap.ensureBootstrapToken();
     const first = await secretOf(await pair(await readToken()));
 
-    expect(bootstrap.issueBootstrapToken(AGENT_ID)).toBe(true);
+    expect(await bootstrap.issueBootstrapToken(AGENT_ID)).toBe(true);
     const bound = await readToken();
     expect((await pair(bound, OTHER_ID)).status).toBe(401);
 
@@ -424,7 +433,7 @@ describe('bootstrap token', () => {
     await bootstrap.forgetBootstrapAgent(AGENT_ID);
 
     // A restart is when a fresh token would let the agent pair back.
-    bootstrap.resetBootstrapState();
+    await bootstrap.resetBootstrapState();
     expect(await bootstrap.ensureBootstrapToken()).toBe(false);
     expect(await tokenOnDisk()).toBe(false);
     expect(await bootstrap.autoPairingDisabled()).toBe(true);
@@ -437,7 +446,7 @@ describe('bootstrap token', () => {
   it('leaves auto-pairing alone when a remote agent is unpaired', async () => {
     await bootstrap.ensureBootstrapToken();
     await pair(await readToken());
-    await pair(ensurePairingCode().code, OTHER_ID);
+    await pair((await ensurePairingCode()).code, OTHER_ID);
 
     await bootstrap.forgetBootstrapAgent(OTHER_ID);
     expect(await bootstrap.autoPairingDisabled()).toBe(false);
@@ -458,7 +467,7 @@ describe('POST /api/agent/v1/pair/preview', () => {
   it('names the controller for a right code without spending it', async () => {
     // The Application name, not a separate branding value.
     await saveSettings({ [appName.key]: 'Edge Controller' });
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
 
     const response = await preview(code);
     expect(response.status).toBe(200);
@@ -476,14 +485,14 @@ describe('POST /api/agent/v1/pair/preview', () => {
   });
 
   it('says nothing about the controller for a wrong code', async () => {
-    ensurePairingCode();
+    await ensurePairingCode();
     const response = await preview('ZZZZZZ');
     expect(response.status).toBe(401);
     expect(await response.text()).not.toContain('Caddy Proxy Manager');
   });
 
   it('counts a wrong guess against the same throttle as pairing', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     for (let i = 0; i < 5; i += 1) expect((await preview('ZZZZZZ')).status).toBe(401);
     // The sixth attempt - right or not, preview or pair - is refused for this address.
     expect((await preview(code)).status).toBe(429);
@@ -491,25 +500,25 @@ describe('POST /api/agent/v1/pair/preview', () => {
   });
 
   it('reports a re-pair for an agent that is already known', async () => {
-    const first = ensurePairingCode();
+    const first = await ensurePairingCode();
     expect((await pair(first.code)).status).toBe(200);
-    const { code } = mintRepairCode(AGENT_ID);
+    const { code } = await mintRepairCode(AGENT_ID);
 
     const response = await preview(code);
     expect(response.status).toBe(200);
     expect(((await response.json()) as { repair: boolean }).repair).toBe(true);
     // And the re-pair code is still there to use.
-    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
+    expect((await redeemRepairCode(AGENT_ID, code)).ok).toBe(true);
   });
 
   it('says nothing about a disabled agent to a caller without its code', async () => {
-    const first = ensurePairingCode();
+    const first = await ensurePairingCode();
     expect((await pair(first.code)).status).toBe(200);
     await ctx.db
       .update(schema.agents)
       .set({ enabled: false })
       .where(eq(schema.agents.agentId, AGENT_ID));
-    const { code } = mintRepairCode(AGENT_ID);
+    const { code } = await mintRepairCode(AGENT_ID);
 
     // A wrong code is refused as wrong, exactly as for an enabled agent.
     expect((await preview('ZZZZZZ')).status).toBe(401);
@@ -525,7 +534,7 @@ describe('POST /api/agent/v1/pair/preview', () => {
 
 describe('agent contact', () => {
   it('stamps lastSeenAt and carries no error field nothing would ever set', async () => {
-    const { code } = ensurePairingCode();
+    const { code } = await ensurePairingCode();
     expect((await pair(code)).status).toBe(200);
     const [before] = await listAgents();
     expect(before.lastSeenAt).toBeNull();

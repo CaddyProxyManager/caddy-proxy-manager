@@ -9,3 +9,8 @@ export const isoTimestamp = customType<{ data: string; driverData: string }>({
   // Wider than the column's `string` on purpose: the values needing this are exactly the Dates.
   toDriver: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
 });
+
+/** Raw bytes; Bun.SQL hands bytea back as a Buffer, which is a Uint8Array. */
+export const binary = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+});

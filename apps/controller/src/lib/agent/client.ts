@@ -50,6 +50,16 @@ export class AgentUnavailableError extends Error {
   }
 }
 
+/** No agent, and other controllers running: the direct transport is for a lone controller. */
+export class AgentRequiredError extends AgentUnavailableError {
+  constructor() {
+    super(
+      "No agent is connected. With more than one controller running, Caddy is reached only through an agent.",
+    );
+    this.name = "AgentRequiredError";
+  }
+}
+
 export class AgentRequestError extends Error {
   constructor(
     message: string,

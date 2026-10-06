@@ -4,6 +4,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { claimNonce, isNonceSpent } from "../cluster/nonces";
 import { derivePurposeKey } from "../secrets/derived-key";
 import { accountKey } from "../auth/rate-limit";
 
@@ -14,17 +15,13 @@ export const CAPTCHA_PASS_TTL_MS = 10 * 60_000;
 export const CAPTCHA_PASS_PATH = "/api";
 export const CAPTCHA_PASS_CLEAR_COOKIE = `${CAPTCHA_PASS_COOKIE}=; Path=${CAPTCHA_PASS_PATH}; Max-Age=0; HttpOnly; SameSite=Strict`;
 
-/** In memory: a pass is only redeemed by the controller that minted it. */
-const SPENT = new Map<string, number>();
-/** Each entry took a real solve, so this is never reached by accident. */
-const MAX_SPENT = 100_000;
-
-/** A restart empties SPENT, so it must also invalidate every pass minted before it. */
-let bootSalt = randomBytes(32);
+/** Spent passes are shared, so a pass solved through one replica redeems once on any. */
+const spentKey = (nonce: string) => `captcha:${nonce}`;
 
 function signature(account: string, expiresAt: number, nonce: string): string {
-  const key = createHmac("sha256", derivePurposeKey("captcha-pass:v1")).update(bootSalt).digest();
-  return createHmac("sha256", key).update(`${account}\n${expiresAt}\n${nonce}`).digest("base64url");
+  return createHmac("sha256", derivePurposeKey("captcha-pass:v1"))
+    .update(`${account}\n${expiresAt}\n${nonce}`)
+    .digest("base64url");
 }
 
 export function issueCaptchaPass(username: string, now = Date.now()): string {
@@ -53,36 +50,24 @@ function verify(
 }
 
 /** Without spending it. */
-export function isValidCaptchaPass(
+export async function isValidCaptchaPass(
   pass: string | null | undefined,
   username: string,
   now = Date.now(),
-): boolean {
+): Promise<boolean> {
   const verified = verify(pass, username, now);
-  return verified !== null && !SPENT.has(verified.nonce);
+  return verified !== null && !(await isNonceSpent(spentKey(verified.nonce), now));
 }
 
-/** Synchronous from check to record, so two replays of one pass cannot both get through. */
-export function redeemCaptchaPass(
+/** One claim from check to record, so two replays of one pass cannot both get through. */
+export async function redeemCaptchaPass(
   pass: string | null | undefined,
   username: string,
   now = Date.now(),
-): boolean {
+): Promise<boolean> {
   const verified = verify(pass, username, now);
-  if (!verified || SPENT.has(verified.nonce)) return false;
-  if (SPENT.size >= MAX_SPENT) {
-    for (const [nonce, expiresAt] of SPENT) if (expiresAt <= now) SPENT.delete(nonce);
-    // Evicting a live entry would let that pass be replayed.
-    if (SPENT.size >= MAX_SPENT) return false;
-  }
-  SPENT.set(verified.nonce, verified.expiresAt);
-  return true;
-}
-
-/** Test seam: what a restart does - a new key, and nothing remembered as spent. */
-export function restartCaptchaPasses(): void {
-  bootSalt = randomBytes(32);
-  SPENT.clear();
+  if (!verified) return false;
+  return claimNonce(spentKey(verified.nonce), verified.expiresAt, now);
 }
 
 export function captchaPassFromCookieHeader(header: string | null): string | null {

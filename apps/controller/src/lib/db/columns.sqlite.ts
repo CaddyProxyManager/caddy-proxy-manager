@@ -8,3 +8,8 @@ export const isoTimestamp = customType<{ data: string; driverData: string }>({
   dataType: () => "text",
   toDriver: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
 });
+
+/** The twin of ./columns.pg.ts's `binary`. */
+export const binary = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "blob",
+});

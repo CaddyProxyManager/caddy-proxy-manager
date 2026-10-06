@@ -2,7 +2,15 @@
  * The sign-in CAPTCHA: the pass the username step issues, the provider check behind it, and the
  * CSP the sign-in page is given to load the widget.
  */
-import { describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { spentNonces } from '@/src/lib/db/schema';
+
+// Spent values are shared by every replica, so they live in the database.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 import {
   CAPTCHA_PASS_COOKIE,
   CAPTCHA_PASS_TTL_MS,
@@ -10,7 +18,6 @@ import {
   isValidCaptchaPass,
   issueCaptchaPass,
   redeemCaptchaPass,
-  restartCaptchaPasses,
 } from '@/src/lib/captcha/pass';
 import { captchaCspSources, capSiteUrl } from '@/src/lib/captcha/providers';
 import { activeCaptcha, DEFAULT_CAPTCHA_SETTINGS } from '@/src/lib/captcha/settings';
@@ -21,70 +28,75 @@ import { parseCpmForwardAuthConfig } from '@/src/lib/proxy-hosts/form';
 describe('captcha pass', () => {
   const now = 1_800_000_000_000;
 
-  it('holds for the name it was solved for, however it is cased', () => {
+  beforeEach(async () => {
+    await testDb.delete(spentNonces);
+  });
+
+  it('holds for the name it was solved for, however it is cased', async () => {
     const pass = issueCaptchaPass('Alice', now);
-    expect(isValidCaptchaPass(pass, 'alice', now)).toBe(true);
-    expect(isValidCaptchaPass(pass, ' ALICE ', now + 1000)).toBe(true);
+    expect(await isValidCaptchaPass(pass, 'alice', now)).toBe(true);
+    expect(await isValidCaptchaPass(pass, ' ALICE ', now + 1000)).toBe(true);
     // The username and its local email are one account to the throttle, and to this.
-    expect(isValidCaptchaPass(pass, 'alice@localhost', now)).toBe(true);
+    expect(await isValidCaptchaPass(pass, 'alice@localhost', now)).toBe(true);
   });
 
-  it('never matches a blank name', () => {
+  it('never matches a blank name', async () => {
     const pass = issueCaptchaPass('@localhost', now);
-    expect(isValidCaptchaPass(pass, '', now)).toBe(false);
-    expect(redeemCaptchaPass(pass, '  ', now)).toBe(false);
-    expect(redeemCaptchaPass(pass, '@localhost', now)).toBe(true);
+    expect(await isValidCaptchaPass(pass, '', now)).toBe(false);
+    expect(await redeemCaptchaPass(pass, '  ', now)).toBe(false);
+    expect(await redeemCaptchaPass(pass, '@localhost', now)).toBe(true);
   });
 
-  it('does not carry over to another name', () => {
-    expect(isValidCaptchaPass(issueCaptchaPass('alice', now), 'bob', now)).toBe(false);
+  it('does not carry over to another name', async () => {
+    expect(await isValidCaptchaPass(issueCaptchaPass('alice', now), 'bob', now)).toBe(false);
   });
 
-  it('expires', () => {
+  it('expires', async () => {
     const pass = issueCaptchaPass('alice', now);
-    expect(isValidCaptchaPass(pass, 'alice', now + CAPTCHA_PASS_TTL_MS)).toBe(false);
+    expect(await isValidCaptchaPass(pass, 'alice', now + CAPTCHA_PASS_TTL_MS)).toBe(false);
   });
 
-  it('refuses a tampered or forged pass', () => {
+  it('refuses a tampered or forged pass', async () => {
     const pass = issueCaptchaPass('alice', now);
     const [expiry, nonce, sig] = pass.split('.');
-    expect(isValidCaptchaPass(`${Number(expiry) + 1}.${nonce}.${sig}`, 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass(`${expiry}.x${nonce}.${sig}`, 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass(`${expiry}.${nonce}.${sig?.slice(1)}x`, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(`${Number(expiry) + 1}.${nonce}.${sig}`, 'alice', now)).toBe(
+      false,
+    );
+    expect(await isValidCaptchaPass(`${expiry}.x${nonce}.${sig}`, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(`${expiry}.${nonce}.${sig?.slice(1)}x`, 'alice', now)).toBe(
+      false,
+    );
     // The shape before passes carried a nonce.
-    expect(isValidCaptchaPass(`${expiry}.${sig}`, 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass(`${pass}.extra`, 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass('', 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass(null, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(`${expiry}.${sig}`, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(`${pass}.extra`, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass('', 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(null, 'alice', now)).toBe(false);
   });
 
-  it('refuses one dated further out than a pass is ever issued for', () => {
+  it('refuses one dated further out than a pass is ever issued for', async () => {
     // Signed by us, but only a stolen key could have produced it: there is no issuing path.
     const later = issueCaptchaPass('alice', now + CAPTCHA_PASS_TTL_MS);
-    expect(isValidCaptchaPass(later, 'alice', now - 1)).toBe(false);
+    expect(await isValidCaptchaPass(later, 'alice', now - 1)).toBe(false);
   });
 
-  it('admits one attempt, however many requests replay it', () => {
+  it('admits one attempt, however many requests replay it', async () => {
     const pass = issueCaptchaPass('alice', now);
-    expect(redeemCaptchaPass(pass, 'alice', now)).toBe(true);
-    expect(redeemCaptchaPass(pass, 'alice', now)).toBe(false);
-    expect(isValidCaptchaPass(pass, 'alice', now)).toBe(false);
-    expect(redeemCaptchaPass(issueCaptchaPass('alice', now), 'alice', now)).toBe(true);
+    expect(await redeemCaptchaPass(pass, 'alice', now)).toBe(true);
+    expect(await redeemCaptchaPass(pass, 'alice', now)).toBe(false);
+    expect(await isValidCaptchaPass(pass, 'alice', now)).toBe(false);
+    expect(await redeemCaptchaPass(issueCaptchaPass('alice', now), 'alice', now)).toBe(true);
   });
 
-  it('does not survive a restart, which forgets what was spent', () => {
+  it('can be spent again once its record has expired, since it no longer verifies by then', async () => {
     const pass = issueCaptchaPass('alice', now);
-    expect(redeemCaptchaPass(pass, 'alice', now)).toBe(true);
-    restartCaptchaPasses();
-    expect(redeemCaptchaPass(pass, 'alice', now)).toBe(false);
-    // Only what was minted before: a pass issued after the restart is good.
-    expect(redeemCaptchaPass(issueCaptchaPass('alice', now), 'alice', now)).toBe(true);
+    expect(await redeemCaptchaPass(pass, 'alice', now)).toBe(true);
+    expect(await redeemCaptchaPass(pass, 'alice', now + CAPTCHA_PASS_TTL_MS)).toBe(false);
   });
 
-  it('is not spent by a redemption for another name', () => {
+  it('is not spent by a redemption for another name', async () => {
     const pass = issueCaptchaPass('alice', now);
-    expect(redeemCaptchaPass(pass, 'bob', now)).toBe(false);
-    expect(redeemCaptchaPass(pass, 'alice', now)).toBe(true);
+    expect(await redeemCaptchaPass(pass, 'bob', now)).toBe(false);
+    expect(await redeemCaptchaPass(pass, 'alice', now)).toBe(true);
   });
 
   it('is read from a Cookie header among others', () => {

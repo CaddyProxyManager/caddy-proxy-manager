@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-    resetAttempts(rateLimitKey);
+    await resetAttempts(rateLimitKey);
 
     await removeUserPassword(userId);
 

@@ -254,3 +254,9 @@ export function startCertificateExpiryAlerts(): void {
   }, FIRST_WAKE_MS);
   timer.unref();
 }
+
+/** On losing the lead (lib/cluster); clearTimeout and clearInterval take either handle. */
+export function stopCertificateExpiryAlerts(): void {
+  if (timer) clearTimeout(timer);
+  timer = null;
+}

@@ -44,12 +44,12 @@ export async function POST(request: Request) {
   const existing = await findAgentRowByAgentId(agentId);
 
   const client = (await getClientIp(request.headers)) ?? "unknown";
-  if (clientThrottled(client)) {
+  if (await clientThrottled(client)) {
     return bad("Too many wrong pairing codes from this address. Try again in a minute.", 429);
   }
-  const checked = existing ? checkRepairCode(agentId, code) : checkPairingCode(code);
+  const checked = existing ? await checkRepairCode(agentId, code) : await checkPairingCode(code);
   if (!checked.ok) {
-    recordFailedGuess(client);
+    await recordFailedGuess(client);
     return bad(checked.error, 401);
   }
   // After the code check, or a wrong-code caller could probe which agent ids are disabled.

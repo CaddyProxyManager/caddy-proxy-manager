@@ -10,8 +10,8 @@ import * as mod from '@/src/lib/auth/rate-limit';
 
 const { registerFailedAttempt, isRateLimited, resetAttempts } = mod;
 
-beforeEach(() => {
-  mod.resetRateLimitsForTests();
+beforeEach(async () => {
+  await mod.resetRateLimitsForTests();
 });
 
 afterEach(() => {
@@ -86,7 +86,7 @@ describe('rate-limit', () => {
     }
     expect((await isRateLimited(KEY)).blocked).toBe(true);
 
-    resetAttempts(KEY);
+    await resetAttempts(KEY);
     expect((await isRateLimited(KEY)).blocked).toBe(false);
   });
 
@@ -134,7 +134,7 @@ describe('per-account backoff', () => {
     expect(await mod.accountRetryAfterMs(account)).toBeGreaterThan(0);
     expect(await mod.accountRetryAfterMs(mod.accountKey('carol'))).toBe(0);
 
-    mod.resetAccountFailures(account);
+    await mod.resetAccountFailures(account);
     expect(await mod.accountRetryAfterMs(account)).toBe(0);
   });
 
@@ -225,14 +225,14 @@ describe('per-account backoff', () => {
     const t0 = 6_000_000;
     for (let i = 0; i < 8; i++)
       expect(await mod.registerAccountFailure(account, t0, policy)).toBe(0);
-    expect(mod.accountFailureCount(account, t0)).toBe(8);
+    expect(await mod.accountFailureCount(account, t0)).toBe(8);
     expect(await mod.accountRetryAfterMs(account, t0, policy)).toBe(0);
     // Forgotten a day after the last failure, as the lock is.
-    expect(mod.accountFailureCount(account, t0 + 24 * 60 * 60_000 + 1)).toBe(0);
+    expect(await mod.accountFailureCount(account, t0 + 24 * 60 * 60_000 + 1)).toBe(0);
 
     const off = { ...policy, disableAfter: null };
     await mod.registerAccountFailure(mod.accountKey('hank'), t0, off);
-    expect(mod.accountFailureCount(mod.accountKey('hank'), t0)).toBe(0);
+    expect(await mod.accountFailureCount(mod.accountKey('hank'), t0)).toBe(0);
   });
 
   it('forgets every key an account is reached by', async () => {
@@ -240,9 +240,9 @@ describe('per-account backoff', () => {
     for (const name of ['ivy@example.com', 'ivy', 'IVY@localhost']) {
       await mod.registerAccountFailure(mod.accountKey(name), t0);
     }
-    mod.resetAccountFailuresFor(['ivy@example.com', 'ivy', null]);
-    expect(mod.accountFailureCount(mod.accountKey('ivy@example.com'), t0)).toBe(0);
-    expect(mod.accountFailureCount(mod.accountKey('ivy'), t0)).toBe(0);
+    await mod.resetAccountFailuresFor(['ivy@example.com', 'ivy', null]);
+    expect(await mod.accountFailureCount(mod.accountKey('ivy@example.com'), t0)).toBe(0);
+    expect(await mod.accountFailureCount(mod.accountKey('ivy'), t0)).toBe(0);
   });
 });
 

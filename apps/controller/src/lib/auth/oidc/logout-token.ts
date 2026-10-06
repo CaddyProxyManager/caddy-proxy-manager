@@ -5,6 +5,7 @@
  */
 
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { claimNonce } from "../../cluster/nonces";
 import { resolveJwksUri } from "./claims";
 
 const BACKCHANNEL_LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
@@ -105,25 +106,11 @@ export async function verifyLogoutToken(
 }
 
 /**
- * Replay protection (§2.6): a `jti` once per issuer while its token could verify. In memory: a
- * replayed logout grants nothing, so a second instance's own set costs a duplicate revocation.
+ * Replay protection (§2.6): a `jti` once per issuer while its token could verify. Shared, so a
+ * logout replayed to another replica is refused there too, as it is here.
  */
-const seenJtis = new Map<string, number>();
-
-export function rememberLogoutJti(issuer: string, jti: string): boolean {
-  const now = Date.now();
-  for (const [key, expiresAt] of seenJtis) {
-    if (expiresAt <= now) seenJtis.delete(key);
-  }
-  const key = `${issuer}\u0000${jti}`;
-  if (seenJtis.has(key)) return false;
-  seenJtis.set(key, now + MAX_TOKEN_AGE_SECONDS * 1000);
-  return true;
-}
-
-/** For tests: process-wide state. */
-export function clearLogoutJtis(): void {
-  seenJtis.clear();
+export function rememberLogoutJti(issuer: string, jti: string, now = Date.now()): Promise<boolean> {
+  return claimNonce(`logout-jti:${issuer}\n${jti}`, now + MAX_TOKEN_AGE_SECONDS * 1000, now);
 }
 
 function describe(error: unknown): string {

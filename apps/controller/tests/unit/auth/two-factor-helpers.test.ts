@@ -1,4 +1,11 @@
 import { describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+
+// A challenge counts its attempts where every replica sees them.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 import {
   CONSOLE_COMMAND_MAX_AGE_MS,
   isLoopbackAddress,
@@ -62,27 +69,27 @@ describe('console commands', () => {
 });
 
 describe('portal challenge', () => {
-  it('redeems for the intent it was issued for, a limited number of times', () => {
+  it('redeems for the intent it was issued for, a limited number of times', async () => {
     const challenge = issuePortalChallenge(7, 'rid-a');
-    expect(redeemPortalChallenge(challenge, 'rid-b')).toBeNull();
+    expect(await redeemPortalChallenge(challenge, 'rid-b')).toBeNull();
     for (let i = 0; i < PORTAL_CHALLENGE_ATTEMPTS; i++) {
-      expect(redeemPortalChallenge(challenge, 'rid-a')?.userId).toBe(7);
+      expect((await redeemPortalChallenge(challenge, 'rid-a'))?.userId).toBe(7);
     }
-    expect(redeemPortalChallenge(challenge, 'rid-a')).toBeNull();
+    expect(await redeemPortalChallenge(challenge, 'rid-a')).toBeNull();
   });
 
-  it('is finished once spent', () => {
+  it('is finished once spent', async () => {
     const challenge = issuePortalChallenge(7, 'rid-c');
-    const redeemed = redeemPortalChallenge(challenge, 'rid-c');
-    spendPortalChallenge(redeemed?.nonce ?? '');
-    expect(redeemPortalChallenge(challenge, 'rid-c')).toBeNull();
+    const redeemed = await redeemPortalChallenge(challenge, 'rid-c');
+    await spendPortalChallenge(redeemed?.nonce ?? '');
+    expect(await redeemPortalChallenge(challenge, 'rid-c')).toBeNull();
   });
 
-  it('expires, and refuses a forged user id', () => {
+  it('expires, and refuses a forged user id', async () => {
     const past = Date.now() - PORTAL_CHALLENGE_TTL_MS - 1;
-    expect(redeemPortalChallenge(issuePortalChallenge(7, 'rid-d', past), 'rid-d')).toBeNull();
+    expect(await redeemPortalChallenge(issuePortalChallenge(7, 'rid-d', past), 'rid-d')).toBeNull();
     const forged = issuePortalChallenge(7, 'rid-e').replace(/^7\./, '1.');
-    expect(redeemPortalChallenge(forged, 'rid-e')).toBeNull();
+    expect(await redeemPortalChallenge(forged, 'rid-e')).toBeNull();
   });
 });
 

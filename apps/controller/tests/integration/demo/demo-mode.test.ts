@@ -122,8 +122,8 @@ describe('nothing real gets in', () => {
     expect(response.status).toBe(403);
   });
 
-  it('writes no bootstrap token for the bundled agent', () => {
-    expect(issueBootstrapToken(null)).toBe(false);
+  it('writes no bootstrap token for the bundled agent', async () => {
+    expect(await issueBootstrapToken(null)).toBe(false);
   });
 
   it('turns an already-paired agent away without telling it to forget its pairing', async () => {

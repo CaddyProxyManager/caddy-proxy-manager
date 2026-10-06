@@ -4,6 +4,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+
+// A pass is checked against the spent ones every replica shares.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 
 const ctx = vi.hoisted(() => ({
   settings: {
@@ -74,8 +80,8 @@ describe('POST /api/sign-in/captcha', () => {
     expect(cookie).toContain('SameSite=Strict');
     expect(cookie).toContain('Path=/api;');
     expect(cookie).toContain('Secure');
-    expect(isValidCaptchaPass(passFrom(response), 'alice')).toBe(true);
-    expect(isValidCaptchaPass(passFrom(response), 'bob')).toBe(false);
+    expect(await isValidCaptchaPass(passFrom(response), 'alice')).toBe(true);
+    expect(await isValidCaptchaPass(passFrom(response), 'bob')).toBe(false);
   });
 
   it('issues nothing for a token the provider rejects', async () => {

@@ -3,7 +3,7 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { uuidv7 } from "./uuidv7";
-import { isoTimestamp } from "./columns.sqlite";
+import { binary, isoTimestamp } from "./columns.sqlite";
 
 export const users = sqliteTable(
   "users",
@@ -994,3 +994,142 @@ export const analyticsViews = sqliteTable(
     userIdx: index("analytics_views_user_idx").on(table.userId),
   }),
 );
+
+// ── Cluster ──────────────────────────────────────────────────────────
+
+/** One row per running controller (lib/cluster); a crashed one's row lingers until pruned. */
+export const controllerReplicas = sqliteTable("controller_replicas", {
+  id: text("id").primaryKey(),
+  hostname: text("hostname").notNull(),
+  /** Of the key SESSION_SECRET derives: replicas disagreeing would each break the other's secrets. */
+  keyFingerprint: text("keyFingerprint").notNull(),
+  startedAt: integer("startedAt").notNull(),
+  heartbeatAt: integer("heartbeatAt").notNull(),
+});
+
+/** Bumped per cache a write invalidates, so a replica that missed the NOTIFY still catches up. */
+export const clusterGenerations = sqliteTable("cluster_generations", {
+  name: text("name").primaryKey(),
+  generation: integer("generation").notNull(),
+});
+
+/** Guess limits every replica must share (auth/rate-limit.ts); flood budgets stay in memory. */
+export const rateLimitCounters = sqliteTable(
+  "rate_limit_counters",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    /** Epoch ms; the count is forgotten from then. */
+    resetAt: integer("resetAt").notNull(),
+    blockedUntil: integer("blockedUntil"),
+  },
+  (table) => ({
+    resetAtIdx: index("rate_limit_counters_reset_at_idx").on(table.resetAt),
+  }),
+);
+
+/** Single-use values (request nonces, CAPTCHA passes, logout jtis) until they could verify no more. */
+export const spentNonces = sqliteTable(
+  "spent_nonces",
+  {
+    key: text("key").primaryKey(),
+    expiresAt: integer("expiresAt").notNull(),
+  },
+  (table) => ({
+    expiresAtIdx: index("spent_nonces_expires_at_idx").on(table.expiresAt),
+  }),
+);
+
+/** Agent pairing credentials, so any replica redeems what another showed (lib/agent/pairing-codes.ts). */
+export const agentPairingSecrets = sqliteTable("agent_pairing_secrets", {
+  /** `code`, `repair:<agentId>` or `bootstrap`. */
+  slot: text("slot").primaryKey(),
+  /** A code encrypted, since the page shows it again; a bootstrap token's SHA-256. */
+  secret: text("secret").notNull(),
+  /** The one agent a bootstrap token may pair; null for a never-seen one. */
+  agentId: text("agentId"),
+  expiresAt: integer("expiresAt").notNull(),
+  failures: integer("failures").notNull().default(0),
+});
+
+/** Which replica holds each agent's stream (lib/agent/broker.ts); the stream itself is in memory. */
+export const agentConnections = sqliteTable(
+  "agent_connections",
+  {
+    agentId: text("agentId").primaryKey(),
+    replicaId: text("replicaId").notNull(),
+    agentRowId: integer("agentRowId").notNull(),
+    /** For messages, never for routing. */
+    name: text("name").notNull(),
+    /** Fingerprint of the secret the stream authenticated with. */
+    credential: text("credential"),
+    connectedAt: integer("connectedAt").notNull(),
+    lastSeenAt: integer("lastSeenAt").notNull(),
+    /** The agent's last AgentStatus, as JSON. */
+    status: text("status"),
+  },
+  (table) => ({
+    replicaIdx: index("agent_connections_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** Server events for an agent whose stream another replica holds; drained by that replica. */
+export const agentOutbox = sqliteTable(
+  "agent_outbox",
+  {
+    id: text("id").primaryKey(),
+    /** The replica holding the stream when this was written. */
+    replicaId: text("replicaId").notNull(),
+    agentId: text("agentId").notNull(),
+    /** An AgentServerEvent, as JSON. */
+    event: text("event").notNull(),
+    createdAt: integer("createdAt").notNull(),
+  },
+  (table) => ({
+    replicaIdx: index("agent_outbox_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** A command's result for the replica that issued it, when the agent answered through another. */
+export const agentCommandResults = sqliteTable(
+  "agent_command_results",
+  {
+    commandId: text("commandId").primaryKey(),
+    replicaId: text("replicaId").notNull(),
+    result: text("result").notNull(),
+    createdAt: integer("createdAt").notNull(),
+  },
+  (table) => ({
+    replicaIdx: index("agent_command_results_replica_idx").on(table.replicaId),
+  }),
+);
+
+/** 502/503/504 answers per proxy host and minute, from whichever replica the agent reported to. */
+export const upstreamErrorCounts = sqliteTable(
+  "upstream_error_counts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    proxyHostId: integer("proxyHostId")
+      .references(() => proxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Epoch ms at the start of the minute. */
+    minute: integer("minute").notNull(),
+    count: integer("count").notNull(),
+  },
+  (table) => ({
+    hostMinuteUnique: uniqueIndex("upstream_error_counts_host_minute_unique").on(
+      table.proxyHostId,
+      table.minute,
+    ),
+    minuteIdx: index("upstream_error_counts_minute_idx").on(table.minute),
+  }),
+);
+
+/** The leader's MaxMind downloads, for the other replicas to install (lib/geoip/replicas.ts). */
+export const geoipDatabases = sqliteTable("geoip_databases", {
+  edition: text("edition").primaryKey(),
+  /** Of `data`, so a replica compares hashes rather than reading the file each heartbeat. */
+  sha256: text("sha256").notNull(),
+  data: binary("data").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});

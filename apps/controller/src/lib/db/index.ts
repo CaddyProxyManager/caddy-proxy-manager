@@ -5,11 +5,15 @@
 import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./schema";
 import { db, isEphemeral, runSchemaMigrations } from "./connection";
+import { acquireStartupLock } from "./startup-lock";
 import { encryptSecret, isEncryptedSecret } from "../secrets";
 import { envGroupMapping } from "../auth/oidc/groups";
 
 export { db, client, runInTransaction } from "./connection";
 export type { Db } from "./connection";
+
+// Released below, after the data migrations; a replica dying in between frees it with its connection.
+const releaseStartupLock = await acquireStartupLock();
 
 try {
   await runSchemaMigrations();
@@ -339,6 +343,7 @@ try {
 } catch (error) {
   console.warn("Better Auth data migration warning:", error);
 }
+await releaseStartupLock();
 
 export { schema };
 export default db;

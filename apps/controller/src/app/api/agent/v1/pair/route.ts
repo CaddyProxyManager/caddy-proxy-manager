@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   // guessable, and the bundled agent retries a stale one every few seconds.
   const bootstrap = looksLikeBootstrapToken(code);
   if (bootstrap) {
-    if (!redeemBootstrapToken(code, agentId, existing !== null)) {
+    if (!(await redeemBootstrapToken(code, agentId, existing !== null))) {
       // Otherwise only startup writes one, and a late agent would wait forever. Written only while
       // the bundled agent still wants pairing.
       await ensureBootstrapToken();
@@ -69,12 +69,14 @@ export async function POST(request: Request) {
   } else {
     // Each code has its own budget too, for when no trusted address is known.
     const client = (await getClientIp(request.headers)) ?? "unknown";
-    if (clientThrottled(client)) {
+    if (await clientThrottled(client)) {
       return bad("Too many wrong pairing codes from this address. Try again in a minute.", 429);
     }
-    const redeemed = existing ? redeemRepairCode(agentId, code) : redeemPairingCode(code);
+    const redeemed = existing
+      ? await redeemRepairCode(agentId, code)
+      : await redeemPairingCode(code);
     if (!redeemed.ok) {
-      recordFailedGuess(client);
+      await recordFailedGuess(client);
       return bad(redeemed.error, 401);
     }
   }

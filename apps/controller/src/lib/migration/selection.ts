@@ -52,6 +52,9 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "forward_auth_access",
       "forward_auth_sessions",
       "forward_auth_exchanges",
+      // Sign-in limits and spent nonces; each row expires within a day, so nothing hangs on them.
+      "rate_limit_counters",
+      "spent_nonces",
     ],
     requires: [],
   },
@@ -70,6 +73,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "l4_proxy_host_agents",
       // With the hosts: a cleared host reference would widen an exclusion to every host.
       "waf_exclusions",
+      "upstream_error_counts",
     ],
     // Agents too: lost placement rows read as "no assignment", which means every agent.
     requires: ["certificates", "accessLists", "agents"],
@@ -114,7 +118,14 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "agents",
     label: "Agents",
     description: "Remote agents this controller had paired with, and their shared secrets.",
-    tables: ["agents"],
+    // Connections, outbox and results are claimed only for coverage: rows of a live cluster.
+    tables: [
+      "agents",
+      "agent_pairing_secrets",
+      "agent_connections",
+      "agent_outbox",
+      "agent_command_results",
+    ],
     requires: [],
   },
   {
@@ -123,7 +134,8 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     description:
       "The stored configuration the Settings page writes - primary domain, ACME details, and the " +
       "rest.",
-    // Staged and revisions are claimed only for coverage: always empty in a legacy source.
+    // Staged, revisions and the cluster tables are claimed only for coverage: always empty in a
+    // legacy source, and an old replica row is ignored once its heartbeat is stale.
     // waf_presets and crs_plugins because WAF settings select them; a lost one drops just itself.
     tables: [
       "settings",
@@ -132,6 +144,9 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "waf_presets",
       "crs_plugins",
       "blocked_sources",
+      "controller_replicas",
+      "cluster_generations",
+      "geoip_databases",
     ],
     requires: [],
   },

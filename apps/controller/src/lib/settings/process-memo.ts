@@ -1,9 +1,9 @@
 /**
- * Values held for the process: the controller is a single replica by design. Every settings write
- * ends in `invalidateProcessMemos` - setSetting, clearSetting, and invalidateSettingsCache for the
- * paths that write the table directly (staged apply, backup restore, config and migration import) -
- * so a held setting is never older than the last write. A `ttlMs` entry also expires on its own,
- * for what no write announces, such as traffic.
+ * Values held for the process. Every settings write, on any replica, ends in `invalidateProcessMemos`
+ * here - setSetting, clearSetting, and invalidateSettingsCache for the paths that write the table
+ * directly (staged apply, backup restore, config and migration import) - so a held setting is never
+ * older than the last write. A `ttlMs` entry also expires on its own, for what no write announces,
+ * such as traffic.
  */
 type Entry = { pending: Promise<unknown>; expires: number };
 

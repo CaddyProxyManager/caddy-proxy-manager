@@ -10,7 +10,14 @@ import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
 import * as providerModel from '@/src/lib/models/oauth-providers';
 import * as logoutService from '@/src/lib/services/oidc-logout';
 import { clearDiscoveryCache } from '@/src/lib/auth/oidc/claims';
-import { clearJwksCache, clearLogoutJtis } from '@/src/lib/auth/oidc/logout-token';
+import { clearJwksCache } from '@/src/lib/auth/oidc/logout-token';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { spentNonces } from '@/src/lib/db/schema';
+
+// Spent values are shared by every replica, so they live in the database.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 
 /**
  * A spy, not `vi.mock`: Bun's module mocks leak into every later file in the process, which broke
@@ -78,10 +85,10 @@ const provider = {
   clientId: CLIENT_ID,
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   clearDiscoveryCache();
   clearJwksCache();
-  clearLogoutJtis();
+  await testDb.delete(spentNonces);
   serveIdp();
   listProviders = vi
     .spyOn(providerModel, 'listEnabledOAuthProviders')

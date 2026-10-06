@@ -42,6 +42,39 @@ export async function register() {
       console.error("Failed to prepare the audit log's hash chain:", error);
     }
 
+    // Not during a build, whose workers would each take it from the others.
+    if (process.env.NEXT_PHASE !== "phase-production-build") {
+      const { claimSqliteDatabase, SqliteInUseError } = await import("./lib/db/single-process");
+      try {
+        claimSqliteDatabase();
+      } catch (error) {
+        if (error instanceof SqliteInUseError) {
+          console.error(error.message);
+          if (process.env.NODE_ENV === "production") throw error;
+        } else {
+          console.error("Could not check for another controller on the SQLite database:", error);
+        }
+      }
+    }
+
+    // Through the passes that rewrite rows, so replicas starting together take turns. Released
+    // before the apply; one dying while holding it frees it with its connection.
+    const { acquireStartupLock } = await import("./lib/db/startup-lock");
+    const releaseStartupLock = await acquireStartupLock();
+
+    // Before the passes: one re-encrypting under a different SESSION_SECRET breaks the others.
+    const cluster = await import("./lib/cluster");
+    try {
+      await cluster.registerReplica();
+    } catch (error) {
+      if (error instanceof cluster.ReplicaKeyMismatchError) {
+        console.error(error.message);
+        if (process.env.NODE_ENV === "production") throw error;
+      } else {
+        console.error("Failed to register this controller replica:", error);
+      }
+    }
+
     const { ensureAdminUser } = await import("./lib/db/init");
     try {
       await ensureAdminUser();
@@ -184,6 +217,8 @@ export async function register() {
       console.error("Failed to move suppressed WAF rules into exclusions:", error);
     }
 
+    await releaseStartupLock();
+
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {
       console.log("Applying Caddy configuration from database...");
@@ -207,6 +242,7 @@ export async function register() {
       }
     }
 
+    // Every replica: it watches the agents whose streams this process holds.
     const { startCaddyMonitoring } = await import("./lib/caddy/monitor");
     try {
       startCaddyMonitoring();
@@ -253,55 +289,74 @@ export async function register() {
       console.error("Failed to apply the optional services on the agents:", error);
     }
 
+    // The jobs below run on one replica at a time: whichever leads (lib/cluster).
+
     // A tick reaches MaxMind only while GeoIP is on with credentials set.
-    const { startGeoipUpdater } = await import("./lib/geoip/updater");
-    try {
-      startGeoipUpdater();
-    } catch (error) {
-      console.error("Failed to start the GeoIP updater:", error);
-    }
+    const { startGeoipUpdater, stopGeoipUpdater } = await import("./lib/geoip/updater");
+    cluster.runAsLeader({
+      name: "the GeoIP updater",
+      start: startGeoipUpdater,
+      stop: stopGeoipUpdater,
+    });
 
     // Looks up hostnames in access-list IP rules as their TTLs run out.
-    try {
-      startAccessListDnsRefresher();
-    } catch (error) {
-      console.error("Failed to start the access-list hostname refresher:", error);
-    }
+    const { stopAccessListDnsRefresher } = await import("./lib/access-lists/dns");
+    cluster.runAsLeader({
+      name: "the access-list hostname refresher",
+      start: startAccessListDnsRefresher,
+      stop: stopAccessListDnsRefresher,
+    });
 
     // Deletes expired blocks every 30 seconds and re-applies, so one lapses within a minute.
-    const { startSecurityHousekeeping } = await import("./lib/security/housekeeping");
-    try {
-      startSecurityHousekeeping();
-    } catch (error) {
-      console.error("Failed to start the blocked-sources expiry:", error);
-    }
+    const { startSecurityHousekeeping, stopSecurityHousekeeping } = await import(
+      "./lib/security/housekeeping"
+    );
+    cluster.runAsLeader({
+      name: "the security housekeeping",
+      start: startSecurityHousekeeping,
+      stop: stopSecurityHousekeeping,
+    });
 
-    const { startCrsRegistryUpdater } = await import("./lib/waf/crs-plugins/sync");
+    const { startCrsRegistryUpdater, stopCrsRegistryUpdater } = await import(
+      "./lib/waf/crs-plugins/sync"
+    );
     const { installedCrsPluginRepositories } = await import("./lib/models/crs-plugins");
-    try {
-      startCrsRegistryUpdater(installedCrsPluginRepositories);
-    } catch (error) {
-      console.error("Failed to start the CRS plugin registry updater:", error);
-    }
+    cluster.runAsLeader({
+      name: "the CRS plugin registry updater",
+      start: () => startCrsRegistryUpdater(installedCrsPluginRepositories),
+      stop: stopCrsRegistryUpdater,
+    });
 
     // A pass sends nothing until email is set up and the threshold is above zero.
-    const { startCertificateExpiryAlerts } = await import("./lib/email/certificate-alerts");
-    try {
-      startCertificateExpiryAlerts();
-    } catch (error) {
-      console.error("Failed to start the certificate expiry alerts:", error);
-    }
+    const { startCertificateExpiryAlerts, stopCertificateExpiryAlerts } = await import(
+      "./lib/email/certificate-alerts"
+    );
+    cluster.runAsLeader({
+      name: "the certificate expiry alerts",
+      start: startCertificateExpiryAlerts,
+      stop: stopCertificateExpiryAlerts,
+    });
 
     // Queues nothing while email is off; each tick also runs the checks the events register.
-    const { startNotifications } = await import("./lib/notifications");
+    const { startNotifications, stopNotifications } = await import("./lib/notifications");
+    cluster.runAsLeader({
+      name: "the admin notifications",
+      start: startNotifications,
+      stop: stopNotifications,
+    });
+
     try {
-      startNotifications();
+      await cluster.startCluster();
     } catch (error) {
-      console.error("Failed to start the admin notifications:", error);
+      console.error("Failed to join the controller cluster:", error);
     }
 
-    process.on("SIGTERM", () => {
+    // A listener stops Node exiting on SIGTERM by itself, and nothing else here handles it: left
+    // running, a replica that has left the cluster would keep taking agents nobody can reach.
+    process.once("SIGTERM", () => {
       closeClickHouse();
+      setTimeout(() => process.exit(0), 5_000).unref();
+      void cluster.stopCluster().finally(() => process.exit(0));
     });
   }
 }

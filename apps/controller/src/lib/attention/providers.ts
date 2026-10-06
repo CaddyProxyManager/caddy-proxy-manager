@@ -404,7 +404,7 @@ const accounts: AttentionProvider = {
     );
     const told = new Set<number>();
     const items: AttentionItem[] = [];
-    for (const { account, until } of lockedAccounts(now)) {
+    for (const { account, until } of await lockedAccounts(now)) {
       const user = byKey.get(account);
       if (!user) continue;
       if (user.status !== "active" || told.has(user.id)) continue;

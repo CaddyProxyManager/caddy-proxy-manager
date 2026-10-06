@@ -1748,7 +1748,8 @@
     "caddyRejectedWafBodyLimitZero": "Caddy rejected configuration: a WAF body limit is zero",
     "caddyRejectedOnWafBodyLimitZero": "Caddy rejected configuration on {agent}: a WAF body limit is zero",
     "caddyUnreachable": "Unable to reach Caddy API",
-    "caddyUnreachableOn": "Unable to reach Caddy API on {agents}"
+    "caddyUnreachableOn": "Unable to reach Caddy API on {agents}",
+    "caddyNeedsAgent": "No agent is connected. With more than one controller running, Caddy is reached only through an agent."
   },
   "groups": {
     "viewAsGroup": "View as an operator in this group",

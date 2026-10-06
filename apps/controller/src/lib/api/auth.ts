@@ -4,6 +4,7 @@ import { auth, checkSameOrigin } from "../auth";
 import { validateToken } from "../models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./errors";
+import { CaddyApplyError } from "../caddy/apply-error";
 import { DomainError, domainErrorMessage } from "../errors/domain-error";
 import { type TokenScope, unflattenScope } from "../api-tokens/scope";
 import { restRequirement, tokenAllows } from "../api-tokens/requirements";
@@ -133,6 +134,10 @@ export function apiErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof NotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+  // Caddy, or the agent in front of it, cannot be reached: try again later, not a server fault.
+  if (error instanceof CaddyApplyError && error.code === "CADDY_UNREACHABLE") {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 503 });
   }
   // Older models throw a plain "<resource> not found": keep the 404 without echoing the message.
   if (error instanceof Error && error.message.trim().toLowerCase().endsWith("not found")) {

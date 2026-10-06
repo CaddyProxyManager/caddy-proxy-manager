@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    if (!rememberLogoutJti(result.claims.issuer, result.claims.jti)) {
+    if (!(await rememberLogoutJti(result.claims.issuer, result.claims.jti))) {
       // Already acted on. A replay is answered 200: the sessions it names are gone, which is what
       // the provider is asking for, and a 400 would invite it to keep retrying.
       return ok();

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Counts against the challenge; a spent or forged one sends them back to the password.
-    const redeemed = redeemPortalChallenge(challenge, rid);
+    const redeemed = await redeemPortalChallenge(challenge, rid);
     if (!redeemed) {
       return NextResponse.json(
         { error: t("secondFactorExpired"), code: "CHALLENGE_EXPIRED" },
@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("invalidSecondFactor") }, { status: 401 });
     }
 
-    spendPortalChallenge(redeemed.nonce);
-    resetAttempts(ip);
+    await spendPortalChallenge(redeemed.nonce);
+    await resetAttempts(ip);
     return await completePortalLogin(user, rid, t);
   } catch (error) {
     console.error("Forward auth second factor error:", error);

@@ -6,9 +6,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { vi } from '@/tests/helpers/vi';
 import { clearDiscoveryCache } from '@/src/lib/auth/oidc/claims';
+import { createTestDb } from '@/tests/helpers/db';
+import { dbModuleMock } from '@/tests/helpers/db-module';
+import { spentNonces } from '@/src/lib/db/schema';
+
+// Spent values are shared by every replica, so they live in the database.
+const testDb = await createTestDb();
+vi.mock('@/src/lib/db', () => dbModuleMock(() => testDb));
 import {
   clearJwksCache,
-  clearLogoutJtis,
   rememberLogoutJti,
   verifyLogoutToken,
 } from '@/src/lib/auth/oidc/logout-token';
@@ -62,10 +68,10 @@ async function signLogoutToken(claims: Claims = {}, key = privateKey): Promise<s
 
 const provider = { issuer: ISSUER, clientId: CLIENT_ID };
 
-beforeEach(() => {
+beforeEach(async () => {
   clearDiscoveryCache();
   clearJwksCache();
-  clearLogoutJtis();
+  await testDb.delete(spentNonces);
   serveIdp();
 });
 
@@ -208,13 +214,13 @@ describe('verifyLogoutToken', () => {
 });
 
 describe('rememberLogoutJti', () => {
-  it('accepts a jti once and refuses it thereafter', () => {
-    expect(rememberLogoutJti(ISSUER, 'jti-1')).toBe(true);
-    expect(rememberLogoutJti(ISSUER, 'jti-1')).toBe(false);
+  it('accepts a jti once and refuses it thereafter', async () => {
+    expect(await rememberLogoutJti(ISSUER, 'jti-1')).toBe(true);
+    expect(await rememberLogoutJti(ISSUER, 'jti-1')).toBe(false);
   });
 
-  it('scopes the jti to its issuer', () => {
-    expect(rememberLogoutJti(ISSUER, 'jti-1')).toBe(true);
-    expect(rememberLogoutJti('https://other.example', 'jti-1')).toBe(true);
+  it('scopes the jti to its issuer', async () => {
+    expect(await rememberLogoutJti(ISSUER, 'jti-1')).toBe(true);
+    expect(await rememberLogoutJti('https://other.example', 'jti-1')).toBe(true);
   });
 });

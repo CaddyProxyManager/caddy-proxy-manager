@@ -98,7 +98,7 @@ describe('POST /api/internal/enable-user', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ email: 'only-admin@localhost', wasDisabled: true });
     expect(await statusOf(id)).toBe('active');
-    expect(accountFailureCount(accountKey('only-admin'))).toBe(0);
+    expect(await accountFailureCount(accountKey('only-admin'))).toBe(0);
     expect(vi.mocked(logAuditEvent).mock.calls.map(([event]) => event)).toEqual([
       expect.objectContaining({
         userId: null,
