@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
+import { type ReactNode, useActionState, useEffect, useState } from "react";
 import {
   createL4ProxyHostAction,
   deleteL4ProxyHostAction,
@@ -8,6 +8,7 @@ import {
   updateL4ProxyHostAction,
 } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
 import { HostEditorShell } from "@/components/host-review/HostEditorShell";
+import { useCloseOnSuccess } from "@/components/host-review/useCloseOnSuccess";
 import { linkEditorSection } from "@/components/host-review/section-link";
 import {
   L4_EDITOR_SECTIONS,
@@ -37,21 +38,6 @@ import { AgentAssignmentFields, type AgentOption } from "@/components/agents/Age
 import { HostNotesField } from "@/components/proxy-hosts/HostNotesField";
 import { HostTagsField } from "@/components/proxy-hosts/HostTagsField";
 import { useTranslations } from "next-intl";
-
-/**
- * Once only: onClose's identity changes every render while status stays "success", so the effect
- * would re-arm and close a dialog the user just reopened (#241).
- */
-function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
-  const scheduledRef = useRef(false);
-  useEffect(() => {
-    if (state.status === "success" && !scheduledRef.current) {
-      scheduledRef.current = true;
-      const timer = setTimeout(onClose, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [state.status, onClose]);
-}
 
 type Translator = ReturnType<typeof useTranslations<"l4ProxyHosts">>;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -61,6 +61,7 @@ import {
   editorSectionAnchor,
 } from "@/lib/proxy-hosts/editor-sections";
 import { HostEditorShell } from "@/components/host-review/HostEditorShell";
+import { useCloseOnSuccess } from "@/components/host-review/useCloseOnSuccess";
 import { linkEditorSection } from "@/components/host-review/section-link";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
@@ -71,19 +72,6 @@ type ForwardAuthGroup = {
   member_count: number;
 };
 type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
-
-/** Keyed on status alone: `onClose` is new each render and would re-arm an uncleared timer. */
-function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
-  useEffect(() => {
-    if (state.status !== "success") return;
-    const timer = setTimeout(() => onCloseRef.current(), 1000);
-    return () => clearTimeout(timer);
-  }, [state.status]);
-}
 
 function ActionStatus({ status, message }: { status: string; message?: string }) {
   if (status === "idle" || !message) return null;
