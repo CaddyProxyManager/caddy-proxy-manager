@@ -26,6 +26,7 @@ import { type useFormatter, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
@@ -513,10 +514,15 @@ export default function OverviewClient({
                 {row.uri}
               </Text>
               {/* One line: nine columns will not fit a table that also carries audit rows. */}
-              <Text type="body" size="sm" color="secondary" maxLines={1}>
-                {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
-                {row.countryCode ?? emptyValue} &middot; {row.clientIp}
-              </Text>
+              <HStack gap={1} vAlign="center">
+                <Text type="body" size="sm" color="secondary" maxLines={1}>
+                  {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;
+                </Text>
+                {row.countryCode && <CountryFlag code={row.countryCode} />}
+                <Text type="body" size="sm" color="secondary" maxLines={1} className="min-w-0">
+                  {row.clientIp}
+                </Text>
+              </HStack>
             </VStack>
           ) : (
             <VStack gap={0} className="cpm-cell-lines">

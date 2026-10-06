@@ -705,6 +705,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'analytics.unknownValue',
       'proxyHosts.upstreamHealth.state.unknown',
       'settings.history.unknownUser',
+      'ui.countryFlag.unknown',
     ],
   },
   { reason: 'agrees', keys: ['analytics.outcomes.served', 'proxyHosts.detail.chartServed'] },

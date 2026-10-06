@@ -251,12 +251,3 @@ export const COUNTRY_CODES: readonly string[] = [
   "ZM",
   "ZW",
 ];
-
-export function flagEmoji(code: string): string {
-  const offset = 0x1f1e6;
-  return code
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(offset + c.charCodeAt(0) - 65))
-    .join("");
-}

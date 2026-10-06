@@ -73,13 +73,6 @@ export const TOP_TITLE_KEY = {
   rule: "wafRules",
 } as const satisfies Record<TopDimension, string>;
 
-export function countryFlag(code: string): string {
-  if (code?.length !== 2 || code === "XX") return "🌐";
-  return String.fromCodePoint(
-    ...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
-  );
-}
-
 export function formatBucket(format: Formatter, ts: number, rangeSeconds: number): string {
   const d = new Date(ts * 1000);
   if (rangeSeconds <= 86400) return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });

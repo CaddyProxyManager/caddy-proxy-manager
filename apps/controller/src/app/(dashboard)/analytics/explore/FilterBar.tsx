@@ -15,9 +15,15 @@ import type {
   PowerSearchField,
   PowerSearchFilter,
 } from "@astryxdesign/core/PowerSearch";
+import { HStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
+import { Typeahead } from "@astryxdesign/core/Typeahead";
 import type { SearchableItem, SearchSource } from "@astryxdesign/core/Typeahead";
 import { TRAFFIC_OUTCOMES } from "@cpm/shared";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { COUNTRY_CODES } from "@/src/components/proxy-hosts/protection/countries";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
+import { regionName } from "@/src/lib/locale/region-names";
 import {
   type AnalyticsFilter,
   dedupeFilters,
@@ -62,9 +68,71 @@ function staticSource(values: readonly string[]): SearchSource {
   };
 }
 
+/** Countries by flag and name, searched by either name or code; the item id is the code. */
+function countrySource(locale: string): SearchSource {
+  const items: SearchableItem<string>[] = COUNTRY_CODES.map((code) => ({
+    code,
+    name: regionName(code, locale),
+  }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale))
+    .map(({ code, name }) => ({
+      id: code,
+      label: name,
+      auxiliaryData: code.toLowerCase(),
+      element: (
+        <HStack gap={2} vAlign="center">
+          <FlagIcon code={code} />
+          <Text type="body" size="sm">
+            {name}
+          </Text>
+        </HStack>
+      ),
+    }));
+  return {
+    search: (query) => {
+      const lower = query.trim().toLocaleLowerCase(locale);
+      return items.filter(
+        (item) =>
+          item.label.toLocaleLowerCase(locale).includes(lower) || item.auxiliaryData === lower,
+      );
+    },
+    bootstrap: () => items,
+  };
+}
+
+/** The token keeps the code, for the URL and the queries; the bar shows its name. */
+function CountryEditor({
+  value,
+  onChange,
+  placeholder,
+  isDisabled,
+}: {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  placeholder: string;
+  isDisabled?: boolean;
+}) {
+  const t = useTranslations("analytics");
+  const locale = useLocale();
+  const source = useMemo(() => countrySource(locale), [locale]);
+  return (
+    <Typeahead
+      label={t(`filterFields.${FIELD_KEY.country}`)}
+      isLabelHidden
+      searchSource={source}
+      value={value ? { id: value, label: regionName(value, locale) } : null}
+      onChange={(item) => onChange(item?.id ?? null)}
+      placeholder={placeholder}
+      isDisabled={isDisabled}
+    />
+  );
+}
+
 function filterValue(filter: PowerSearchFilter): string | null {
   const value = filter.value;
-  if (value.type === "string" || value.type === "enum") return value.value;
+  if (value.type === "string" || value.type === "enum" || value.type === "custom") {
+    return value.value;
+  }
   return null;
 }
 
@@ -79,6 +147,7 @@ export function FilterBar({
   suggestions?: Partial<Record<FilterField, readonly string[]>>;
 }) {
   const t = useTranslations("analytics");
+  const locale = useLocale();
   const outcomeLabel = useOutcomeLabel();
 
   const config = useMemo<PowerSearchConfig>(() => {
@@ -90,6 +159,13 @@ export function FilterBar({
             value: outcome,
             label: outcomeLabel(outcome),
           })),
+        };
+      }
+      if (field === "country") {
+        return {
+          type: "custom",
+          Editor: CountryEditor,
+          getString: (code) => (code === "XX" ? t("unplacedCountry") : regionName(code, locale)),
         };
       }
       const offered =
@@ -121,7 +197,7 @@ export function FilterBar({
         }),
       ),
     };
-  }, [t, outcomeLabel, suggestions]);
+  }, [t, locale, outcomeLabel, suggestions]);
 
   const tokens = useMemo<PowerSearchFilter[]>(
     () =>
@@ -131,7 +207,9 @@ export function FilterBar({
         value:
           filter.field === "outcome"
             ? { type: "enum", value: filter.value }
-            : { type: "string", value: filter.value },
+            : filter.field === "country"
+              ? { type: "custom", value: filter.value }
+              : { type: "string", value: filter.value },
       })),
     [filters],
   );

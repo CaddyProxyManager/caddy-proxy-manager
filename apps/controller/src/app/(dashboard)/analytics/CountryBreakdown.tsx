@@ -17,6 +17,7 @@ import { X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { regionName } from "@/src/lib/locale/region-names";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
 
 export type CountryBreakdownData = {
   countryCode: string;
@@ -135,9 +136,12 @@ export function CountryBreakdownView({
       <VStack gap={4}>
         <HStack gap={3} vAlign="center" justify="between">
           <HStack gap={3} vAlign="center" wrap="wrap">
-            <Text as="h2" type="body" weight="semibold">
-              {name}
-            </Text>
+            <HStack gap={2} vAlign="center">
+              <FlagIcon code={code} size="md" />
+              <Text as="h2" type="body" weight="semibold">
+                {name}
+              </Text>
+            </HStack>
             {data && (
               <Text type="supporting" color="secondary">
                 {t("breakdownSummary", {

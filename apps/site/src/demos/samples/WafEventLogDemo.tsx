@@ -10,6 +10,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useTranslations } from "next-intl";
+import { CountryFlag } from "@cpm/controller/src/components/ui/CountryFlag";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import {
   UrlPowerSearch,
@@ -405,7 +406,7 @@ function WafEventLogDemoContent() {
           <Text type="code" size="sm">
             {r.clientIp}
           </Text>
-          {r.countryCode !== "-" && <Badge label={r.countryCode} />}
+          {r.countryCode !== "-" && <CountryFlag code={r.countryCode} />}
         </HStack>
       ),
     },

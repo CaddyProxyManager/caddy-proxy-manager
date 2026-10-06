@@ -14,6 +14,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -46,9 +47,13 @@ export default function BlockedSourcesClient({
       label: t("source"),
       render: (row) => (
         <HStack gap={2} vAlign="center" wrap="wrap">
-          <Text type="code" size="sm" weight="semibold">
-            {row.kind === "asn" ? `AS${row.value}` : row.value}
-          </Text>
+          {row.kind === "country" ? (
+            <CountryFlag code={row.value} showName />
+          ) : (
+            <Text type="code" size="sm" weight="semibold">
+              {row.kind === "asn" ? `AS${row.value}` : row.value}
+            </Text>
+          )}
           <Badge label={t(`kinds.${row.kind}`)} />
         </HStack>
       ),

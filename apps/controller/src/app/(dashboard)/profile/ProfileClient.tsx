@@ -43,6 +43,7 @@ import { DisplaySection } from "./DisplaySection";
 import type { DisplayPreferences } from "@/src/lib/users/display-preferences";
 import type { ApproximatePlace } from "@/src/lib/geoip/lookup";
 import { regionName } from "@/src/lib/locale/region-names";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
 import { PasskeySection } from "./PasskeySection";
 import { type DeviceWords, describeDevice } from "./device";
 import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
@@ -611,9 +612,12 @@ export default function ProfileClient({
                         </Text>
                       )}
                       {s.place && (
-                        <Text type="body" size="sm" color="secondary">
-                          {placeLine(s.place)}
-                        </Text>
+                        <HStack gap={2} vAlign="center">
+                          {s.place.countryCode && <FlagIcon code={s.place.countryCode} />}
+                          <Text type="body" size="sm" color="secondary">
+                            {placeLine(s.place)}
+                          </Text>
+                        </HStack>
                       )}
                       {withUtc(
                         s.expiresAt,

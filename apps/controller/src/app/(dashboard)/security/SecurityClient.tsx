@@ -27,6 +27,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -54,7 +55,7 @@ import { useChartTheme } from "../analytics/chart-theme";
 import { FilterBar } from "../analytics/explore/FilterBar";
 import type { ApexChartComponent } from "../analytics/explore/KpiTiles";
 import { OUTCOME_COLOR } from "../analytics/explore/TrafficChart";
-import { countryFlag, formatBucket, formatShare, OUTCOME_KEY } from "../analytics/explore/format";
+import { formatBucket, formatShare, OUTCOME_KEY } from "../analytics/explore/format";
 import { settingsHref } from "../settings/sections";
 import { MODE_KEY } from "../waf/WafHostModesPanel";
 
@@ -450,14 +451,20 @@ export default function SecurityClient({
               onClick={() => addFilter({ field: "ip", op: "is", value: row.ip })}
             />
           </HStack>
-          <Text type="body" size="sm" color="secondary" maxLines={1}>
-            {[
-              row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : null,
-              row.asn ? `AS${row.asn}${row.asnOrg ? ` ${row.asnOrg}` : ""}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ") || emptyValue}
-          </Text>
+          {row.countryCode || row.asn ? (
+            <HStack gap={2} vAlign="center">
+              {row.countryCode && <CountryFlag code={row.countryCode} />}
+              {row.asn && (
+                <Text type="body" size="sm" color="secondary" maxLines={1} className="min-w-0">
+                  {`AS${row.asn}${row.asnOrg ? ` ${row.asnOrg}` : ""}`}
+                </Text>
+              )}
+            </HStack>
+          ) : (
+            <Text type="body" size="sm" color="secondary">
+              {emptyValue}
+            </Text>
+          )}
         </VStack>
       ),
     },

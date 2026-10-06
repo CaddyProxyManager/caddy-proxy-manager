@@ -25,6 +25,7 @@ import {
 } from "@/lib/access-lists/limits";
 import { BLOCK_EXPIRY_PRESETS, CONTINENT_CODES } from "@/lib/blocked-sources/types";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/forms/row-id";
+import { FlagIcon, isKnownCountry } from "@/components/ui/CountryFlag";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
@@ -242,7 +243,13 @@ export function NetworkTab({
     }
     return (
       <TextInput
-        startIcon={Network}
+        startIcon={
+          rule.kind === "country" && isKnownCountry(rule.target.trim()) ? (
+            <FlagIcon code={rule.target.trim()} />
+          ) : (
+            Network
+          )
+        }
         {...NO_SPELLCHECK}
         label={rule.kind === "address" ? t("ipCidr") : t("ruleTarget")}
         isLabelHidden={index > 0}

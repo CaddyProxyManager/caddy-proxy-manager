@@ -22,14 +22,15 @@ import { regionName } from "@/src/lib/locale/region-names";
 import type { FilterOp, TopDimension } from "@/src/lib/analytics/explore-state";
 import type { TopRow } from "@/src/lib/clickhouse/explore";
 import { useTableDensity } from "@/components/ui/TableDensity";
+import { FlagIcon } from "@/components/ui/CountryFlag";
 import { csvFileName, downloadCsv, toCsv } from "./csv";
-import { countryFlag, formatShare, OUTCOME_KEY, TOP_TITLE_KEY } from "./format";
+import { formatShare, OUTCOME_KEY, TOP_TITLE_KEY } from "./format";
 
 type Row = TopRow & { [k: string]: unknown };
 
 type Translate = ReturnType<typeof useTranslations<"analytics">>;
 
-/** How a row's key reads: a flag and a country name, an AS number with its network, and so on. */
+/** How a row's key reads: a country's name, an AS number with its network, and so on. */
 export function topRowLabel(
   t: Translate,
   locale: string,
@@ -38,9 +39,7 @@ export function topRowLabel(
 ): string {
   switch (dimension) {
     case "country":
-      return row.key === "XX"
-        ? t("unplacedCountry")
-        : `${countryFlag(row.key)} ${regionName(row.key, locale)}`;
+      return row.key === "XX" ? t("unplacedCountry") : regionName(row.key, locale);
     case "asn":
       return row.label ? `AS${row.key} ${row.label}` : `AS${row.key}`;
     case "rule":
@@ -109,17 +108,26 @@ export function TopListTable({
       key: "key",
       header: t(`topColumn.${TOP_TITLE_KEY[dimension]}`),
       width: proportional(1),
-      renderCell: (row) => (
-        <Tooltip content={label(row)}>
-          <Text
-            type={dimension === "path" || dimension === "ip" ? "code" : "body"}
-            size="sm"
-            maxLines={1}
-          >
-            {label(row)}
-          </Text>
-        </Tooltip>
-      ),
+      renderCell: (row) => {
+        const text = (
+          <Tooltip content={label(row)}>
+            <Text
+              type={dimension === "path" || dimension === "ip" ? "code" : "body"}
+              size="sm"
+              maxLines={1}
+            >
+              {label(row)}
+            </Text>
+          </Tooltip>
+        );
+        if (dimension !== "country") return text;
+        return (
+          <HStack gap={2} vAlign="center">
+            <FlagIcon code={row.key} />
+            {text}
+          </HStack>
+        );
+      },
     },
     {
       key: "requests",

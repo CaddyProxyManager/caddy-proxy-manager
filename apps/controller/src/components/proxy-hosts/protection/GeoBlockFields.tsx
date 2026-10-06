@@ -24,7 +24,8 @@ import type { GeoBlockSettings } from "@/lib/settings";
 import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/forms/row-id";
 import { regionName } from "@/lib/locale/region-names";
-import { COUNTRY_CODES, flagEmoji } from "./countries";
+import { COUNTRY_CODES } from "./countries";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { useLocale, useTranslations } from "next-intl";
@@ -91,11 +92,11 @@ const CONTINENTS = [
   { code: "SA", nameKey: "continentNames.southAmerica", emoji: "🌎" },
 ] as const;
 
-/** Named in the label so search matches what the reader sees; the code stays for code search. */
+/** By name and flag only: the code is what gets saved, not what anyone reads. */
 function countryOptions(locale: string) {
   return COUNTRY_CODES.map((code) => ({ code, name: regionName(code, locale) }))
     .sort((a, b) => a.name.localeCompare(b.name, locale))
-    .map(({ code, name }) => ({ value: code, label: `${flagEmoji(code)}  ${name} (${code})` }));
+    .map(({ code, name }) => ({ value: code, label: name }));
 }
 
 /** The hidden input keeps the submitted comma-joined value byte-identical for the server action. */
@@ -105,9 +106,12 @@ function CodeMultiSelect({
   options,
   initialValues = [],
   searchPlaceholder,
+  hasFlags = false,
 }: {
   name: string;
   label: string;
+  /** Values are country codes: each option leads with its flag. */
+  hasFlags?: boolean;
   options: { value: string; label: string }[];
   initialValues?: string[];
   searchPlaceholder?: string;
@@ -131,6 +135,18 @@ function CodeMultiSelect({
         triggerDisplay="badges"
         maxBadges={6}
         placeholder={t("noneSelected")}
+        renderOption={
+          hasFlags
+            ? (option) => (
+                <HStack as="span" gap={2} vAlign="center">
+                  <FlagIcon code={option.value} />
+                  <Text type="inherit" maxLines={1}>
+                    {option.label ?? option.value}
+                  </Text>
+                </HStack>
+              )
+            : undefined
+        }
       />
     </>
   );
@@ -320,6 +336,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         options={countryOptionsForLocale}
         initialValues={countries}
         searchPlaceholder={t("searchCountries")}
+        hasFlags
       />
 
       <Divider />

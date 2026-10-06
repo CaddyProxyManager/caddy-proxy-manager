@@ -34,6 +34,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
@@ -674,7 +675,7 @@ function EventDetailPanel({
                 <Text type="code" size="sm">
                   {event.clientIp}
                 </Text>
-                {event.countryCode && <Badge label={event.countryCode} />}
+                {event.countryCode && <CountryFlag code={event.countryCode} />}
               </HStack>
             </MetadataListItem>
             <MetadataListItem label={tCommon("method")}>
@@ -1037,7 +1038,7 @@ export default function WafEventsClient({
           <Text type="code" size="sm">
             {r.clientIp}
           </Text>
-          {r.countryCode && <Badge label={r.countryCode} />}
+          {r.countryCode && <CountryFlag code={r.countryCode} />}
         </HStack>
       ),
     },

@@ -13,11 +13,12 @@ import { Token } from "@astryxdesign/core/Token";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import type { ExploreRequest } from "@/src/lib/clickhouse/explore";
-import { countryFlag, formatBytes, OUTCOME_HUE } from "./format";
+import { formatBytes, OUTCOME_HUE } from "./format";
 import { useOutcomeLabel } from "./TopList";
 
 type Row = ExploreRequest & { id: string; [k: string]: unknown };
@@ -60,12 +61,14 @@ export function RequestLog({
       header: tCommon("client"),
       width: pixel(170),
       renderCell: (row) => (
-        <Tooltip content={row.asn ? `AS${row.asn} ${row.asnOrg ?? ""}`.trim() : row.clientIp}>
-          <Text type="code" size="sm" maxLines={1}>
-            {row.countryCode ? `${countryFlag(row.countryCode)} ` : ""}
-            {row.clientIp}
-          </Text>
-        </Tooltip>
+        <HStack gap={1} vAlign="center">
+          {row.countryCode && <CountryFlag code={row.countryCode} />}
+          <Tooltip content={row.asn ? `AS${row.asn} ${row.asnOrg ?? ""}`.trim() : row.clientIp}>
+            <Text type="code" size="sm" maxLines={1}>
+              {row.clientIp}
+            </Text>
+          </Tooltip>
+        </HStack>
       ),
     },
     {

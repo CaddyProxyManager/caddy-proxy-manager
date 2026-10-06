@@ -27,6 +27,7 @@ import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import { useLocale, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { regionName } from "@/src/lib/locale/region-names";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
 
 // maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling -
 // the worker never starts and the map is empty ocean. `?worker&url` bundles its module graph into
@@ -232,13 +233,6 @@ const A2N: Record<string, string> = {
   PS: "275",
 };
 const N2A: Record<string, string> = Object.fromEntries(Object.entries(A2N).map(([a, n]) => [n, a]));
-
-function flag(code: string): string {
-  if (code?.length !== 2) return "🌐";
-  return String.fromCodePoint(
-    ...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
-  );
-}
 
 // Unwrap rings so consecutive vertices never jump over 180 degrees of longitude, or MapLibre draws
 // artifacts for countries crossing the antimeridian. Out-of-range values render via world copies.
@@ -517,9 +511,7 @@ export default function WorldMapInner({
                 >
                   <VStack gap={1}>
                     <HStack gap={2} vAlign="center" paddingBlockEnd={1}>
-                      <Text type="body" size="xl">
-                        {info.alpha2 ? flag(info.alpha2) : "🌐"}
-                      </Text>
+                      <FlagIcon code={info.alpha2 ?? ""} size="lg" />
                       <Text type="body" weight="semibold">
                         {info.alpha2 ? regionName(info.alpha2, locale) : t("territory")}
                       </Text>

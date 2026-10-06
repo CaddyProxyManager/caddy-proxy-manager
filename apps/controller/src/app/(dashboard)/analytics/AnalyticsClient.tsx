@@ -72,7 +72,8 @@ import {
   useTopRowLabel,
 } from "./explore/TopList";
 import { TrafficChart } from "./explore/TrafficChart";
-import { countryFlag, TOP_TITLE_KEY } from "./explore/format";
+import { TOP_TITLE_KEY } from "./explore/format";
+import { FlagIcon } from "@/src/components/ui/CountryFlag";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -485,7 +486,7 @@ export default function AnalyticsClient() {
           onClick={() => setSelectedCountry((cur) => (cur === row.key ? null : row.key))}
         >
           <HStack gap={2} vAlign="center">
-            <span aria-hidden="true">{countryFlag(row.key)}</span>
+            <FlagIcon code={row.key} />
             <Text type="inherit" size="sm" maxLines={1}>
               {row.key === "XX" ? t("unplacedCountry") : regionName(row.key, locale)}
             </Text>
