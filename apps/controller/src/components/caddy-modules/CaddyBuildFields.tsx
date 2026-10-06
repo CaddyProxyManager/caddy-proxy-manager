@@ -448,7 +448,7 @@ export function CaddyBuildFields({
                 variant="secondary"
                 size="sm"
                 icon={<Plus />}
-                label={t("addModule")}
+                label={tCommon("add")}
                 onClick={addCustomModule}
               />
             </HStack>

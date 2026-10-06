@@ -116,7 +116,8 @@ describe('sectionSummaries', () => {
       crowdsecActive: true,
     });
     expect(found.general).toEqual(['domains', 'tags']);
-    expect(found.tls).toEqual(['certificateManaged', 'httpsForced', 'hstsOn']);
+    expect(found.upstreams).toEqual(['upstreams', 'httpsForced', 'hstsOn', 'noHealthChecks']);
+    expect(found.tls).toEqual(['certificateManaged']);
     expect(found.access).toEqual(['accessList', 'signInCpm']);
     expect(found.protection).toEqual(['waf', 'crowdsec', 'rateLimit']);
     expect(found.routing).toEqual(['redirects']);

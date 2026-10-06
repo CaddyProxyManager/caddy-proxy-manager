@@ -20,14 +20,11 @@ test.describe('Groups page', () => {
   });
 
   test('New Group button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /new group/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^new$/i }).first()).toBeVisible();
   });
 
   test('clicking New Group opens the create dialog', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /new group/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /^new$/i }).first().click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByLabel('Name')).toBeVisible();
@@ -37,10 +34,7 @@ test.describe('Groups page', () => {
   });
 
   test('clicking Cancel closes the create dialog', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /new group/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByLabel('Name')).toBeVisible();
 
@@ -49,10 +43,7 @@ test.describe('Groups page', () => {
   });
 
   test('create a new group', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /new group/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /^new$/i }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Name').fill('E2E Test Group');
@@ -85,7 +76,7 @@ test.describe('Groups page', () => {
     await waitForHydration(page);
 
     await rail(page).getByText('E2E Test Group', { exact: true }).click();
-    await page.getByRole('button', { name: 'Add member' }).first().click();
+    await page.getByRole('button', { name: 'Add', exact: true }).first().click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Choose the users to add to this group')).toBeVisible();
@@ -110,7 +101,7 @@ test.describe('Groups page', () => {
     // header's "Access - <group>" icon button.
     await page.getByRole('button', { name: /^Access\s*\d+$/ }).click();
     await expect(page.getByRole('heading', { name: 'Managed resources' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Edit access' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
   });
 
   test('remove member from group', async ({ page }) => {

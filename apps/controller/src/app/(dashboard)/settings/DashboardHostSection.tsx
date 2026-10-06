@@ -118,7 +118,7 @@ export function DashboardHostSection({
                 type="button"
                 onClick={runCheck}
                 isDisabled={checking || !domainIsSaved || domain.trim() === ""}
-                label={checking ? tCommon("checking") : t("dashboardDnsCheckLabel")}
+                label={checking ? tCommon("checking") : tCommon("check")}
               />
             </HStack>
             {!domainIsSaved && (
@@ -179,7 +179,7 @@ export function DashboardHostSection({
         open={confirmDisable}
         onClose={() => setConfirmDisable(false)}
         title={t("dashboardDisableConfirmTitle")}
-        submitLabel={t("dashboardDisableConfirmAction")}
+        submitLabel={tCommon("disable")}
         onSubmit={() => {
           setConfirmDisable(false);
           submit();

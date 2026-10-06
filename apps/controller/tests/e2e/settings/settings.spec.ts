@@ -662,7 +662,7 @@ test.describe('Settings - OAuth Providers', () => {
     await dialog.getByLabel(/client id/i).fill('test-client-id-12345');
     await dialog.getByLabel(/client secret/i).fill('test-client-secret-12345');
     // No issuer URL, so no OIDC discovery.
-    await dialog.getByRole('button', { name: /create provider/i }).click();
+    await dialog.getByRole('button', { name: /^create$/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
     await expect(page.getByText('E2E Test Provider')).toBeVisible({ timeout: 10_000 });
@@ -721,12 +721,12 @@ test.describe('Settings - OAuth Providers', () => {
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByText(/existing value cannot be viewed/i)).toBeVisible();
       await expect(dialog.getByLabel(/client secret/i)).toHaveCount(0);
-      await dialog.getByRole('button', { name: /rotate secret/i }).click();
+      await dialog.getByRole('button', { name: /^rotate$/i }).click();
       await expect(dialog.getByLabel(/new client secret/i)).toHaveValue('');
-      await dialog.getByRole('button', { name: /keep existing/i }).click();
+      await dialog.getByRole('button', { name: /^keep$/i }).click();
 
       await dialog.getByLabel(/^name/i).fill(`${providerName} renamed`);
-      await dialog.getByRole('button', { name: /update provider/i }).click();
+      await dialog.getByRole('button', { name: /^save$/i }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
       const preservedResponse = await page.request.get(
@@ -809,7 +809,7 @@ test.describe('Settings - Updates', () => {
     await expect(page.locator('input[name="updateImageRepository"]')).toHaveValue(
       /^[a-z0-9.]+\/[a-z0-9._/-]+$/,
     );
-    await expect(page.getByRole('button', { name: 'Check now' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Check', exact: true })).toBeVisible();
   });
 
   test('the repository field takes a different namespace', async ({ page }) => {

@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
-import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign/core/Layout";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Button } from "@astryxdesign/core/Button";
 import { useTranslations } from "next-intl";
@@ -19,9 +19,7 @@ type AppDialogProps = {
   isSubmitting?: boolean;
   /** Gates the submit button on form validity, independent of isSubmitting. */
   isSubmitDisabled?: boolean;
-  /** Left of the buttons, such as an unsaved-changes count. */
-  footerStart?: ReactNode;
-  /** Pinned under the title rather than scrolled with the content, such as section tabs. */
+  /** Pinned under the title rather than scrolled with the content: a Toolbar, which brings its own divider. */
   subheader?: ReactNode;
 };
 
@@ -71,7 +69,6 @@ export function AppDialog({
   onSubmit,
   isSubmitting = false,
   isSubmitDisabled = false,
-  footerStart,
   subheader,
 }: AppDialogProps) {
   const tCommon = useTranslations("common");
@@ -104,9 +101,7 @@ export function AppDialog({
           subheader ? (
             <VStack gap={0}>
               <DialogHeader title={title} onOpenChange={() => onClose()} hasDivider={false} />
-              <LayoutHeader hasDivider paddingBlockEnd={0}>
-                {subheader}
-              </LayoutHeader>
+              {subheader}
             </VStack>
           ) : (
             <DialogHeader title={title} onOpenChange={() => onClose()} />
@@ -115,18 +110,9 @@ export function AppDialog({
         content={<LayoutContent>{children}</LayoutContent>}
         footer={
           <LayoutFooter>
-            {footerStart ? (
-              <HStack gap={2} justify="between" vAlign="center" wrap="wrap">
-                {footerStart}
-                <HStack gap={2} justify="end">
-                  {buttons}
-                </HStack>
-              </HStack>
-            ) : (
-              <HStack gap={2} justify="end">
-                {buttons}
-              </HStack>
-            )}
+            <HStack gap={2} justify="end">
+              {buttons}
+            </HStack>
           </LayoutFooter>
         }
       />

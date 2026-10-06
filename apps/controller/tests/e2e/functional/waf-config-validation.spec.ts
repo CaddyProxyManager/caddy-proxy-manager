@@ -10,7 +10,7 @@ async function openNewPreset(page: Page) {
   await page.goto('/waf');
   await waitForHydration(page);
   await page.getByRole('button', { name: 'Presets', exact: true }).click();
-  await page.getByRole('button', { name: 'New preset' }).first().click();
+  await page.getByRole('button', { name: 'New', exact: true }).first().click();
   const dialog = page.getByRole('dialog', { name: 'New preset' });
   await expect(dialog).toBeVisible();
   return dialog;

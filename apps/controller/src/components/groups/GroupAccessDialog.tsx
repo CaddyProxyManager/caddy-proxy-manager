@@ -87,7 +87,7 @@ export function GroupAccessDialog({
       onClose={onClose}
       title={t("accessForGroup", { name: groupName })}
       maxWidth="lg"
-      submitLabel={t("saveAccess")}
+      submitLabel={tCommon("save")}
       onSubmit={submit}
     >
       <VStack gap={5}>

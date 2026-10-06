@@ -159,7 +159,7 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         alignment="end"
         items={[
           { label: tCommon("edit"), onClick: onEdit },
-          ...(cert.file ? [{ label: t("rereadNow"), onClick: reread }] : []),
+          ...(cert.file ? [{ label: t("reread"), onClick: reread }] : []),
           { label: t("downloadCertificate"), onClick: () => download(false) },
           { label: t("downloadKey"), onClick: () => download(true) },
           { type: "divider" },
@@ -332,12 +332,12 @@ export function ImportedTab({
         <Button
           variant="primary"
           size="sm"
-          label={t("importCertificate")}
+          label={tCommon("import")}
           icon={<Plus />}
           onClick={() => setDrawerCert(null)}
         />
       </HStack>
-      <Fab label={t("importCertificate")} onClick={() => setDrawerCert(null)} />
+      <Fab label={tCommon("import")} onClick={() => setDrawerCert(null)} />
 
       <DataTable
         columns={columns}

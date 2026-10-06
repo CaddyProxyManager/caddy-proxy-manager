@@ -266,9 +266,7 @@ export default function RestartDialog({
               <HStack gap={2} justify="end">
                 <Button
                   variant={phase === "stalled" ? "primary" : "secondary"}
-                  label={
-                    phase === "stalled" ? tCommon("continue") : t("restartContinueWithoutWaiting")
-                  }
+                  label={phase === "stalled" ? tCommon("continue") : tCommon("skip")}
                   onClick={() => goOn()}
                 />
               </HStack>

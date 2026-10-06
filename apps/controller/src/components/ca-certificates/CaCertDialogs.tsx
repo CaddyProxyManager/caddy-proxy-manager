@@ -151,7 +151,7 @@ export function IssueClientCertDialog({
         type="submit"
         form={issueFormId}
         variant="primary"
-        label={t("issueCertificate")}
+        label={tCommon("issue")}
         isLoading={isPending}
         isDisabled={isPending}
       />
@@ -179,7 +179,7 @@ export function IssueClientCertDialog({
           <Button
             variant="secondary"
             icon={<Download />}
-            label={t("downloadClientCertificateP12")}
+            label={tCommon("download")}
             onClick={() =>
               downloadFile(
                 `${issued.name}.p12`,

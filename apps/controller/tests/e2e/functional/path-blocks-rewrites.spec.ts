@@ -15,7 +15,7 @@ test.describe
     test('setup: create proxy host with path blocks and rewrites', async ({ page }) => {
       await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
-      await page.getByRole('button', { name: /create host/i }).click();
+      await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Path Blocks/Rewrites Test');
@@ -94,7 +94,7 @@ test.describe
     test('setup: create host that blocks /* but allows /secret and /public/*', async ({ page }) => {
       await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
-      await page.getByRole('button', { name: /create host/i }).click();
+      await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Path Allows Test');

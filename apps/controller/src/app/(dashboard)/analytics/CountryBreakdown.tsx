@@ -121,6 +121,7 @@ export function CountryBreakdownView({
 }) {
   const t = useTranslations("analytics");
   const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const locale = useLocale();
   const format = useAppFormatter();
 
@@ -152,8 +153,8 @@ export function CountryBreakdownView({
             variant="ghost"
             size="sm"
             icon={<X />}
-            label={t("closeBreakdown")}
-            tooltip={t("closeBreakdown")}
+            label={tCommon("close")}
+            tooltip={tCommon("close")}
             onClick={onClose}
           />
         </HStack>

@@ -279,7 +279,7 @@ in when it locks out everyone who could change it:
 - **Bot Challenge** - A proof-of-work challenge from your own [Anubis](https://anubis.techaro.lol/) instance, in its subrequest mode, per proxy host: checked after the WAF and before any sign-in, so it combines with forward auth, with exempt paths for API clients and webhooks. Never on the dashboard host
 - **CrowdSec** - Caddy as a CrowdSec bouncer, against a CrowdSec container the bundled agent runs and feeds Caddy's access log, or your own Local API: every proxy host and L4 host refuses banned addresses (403, or 429 with Retry-After for a throttle), with a per-host opt-out, optional AppSec inspection and a Test connection button. Sharing signals with CrowdSec's online API is off unless you turn it on. The bouncer key is encrypted at rest and never returned. Needs the opt-in CrowdSec module
 - **Access Lists** - Multi-account HTTP basic auth (bcrypt-hashed) and ordered allow/deny rules on the client (IPv4, IPv6, hostnames such as dynamic-DNS names, which the controller re-resolves as their TTLs expire, countries, continents and ASNs), each with a note and an optional expiry, combined as "all" or "any", assignable per proxy host or per location rule, and by their rules alone to L4 hosts. Each list sets its deny response (a status and body, or a redirect), can fail closed when the client cannot be placed, and shows the requests it stopped and failed sign-ins over the last day with analytics on. A list something uses cannot be deleted. The upstream only sees the credentials when "Pass auth to host" is on - off for new lists, on for lists made before the switch existed
-- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, Renew now, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring (a certificate a host uses cannot be deleted; unused imports go in one click), certificates read from files an agent's host keeps renewing (`CERT_FILES_HOST_DIR`), and a built-in CA for issuing and revoking internal client certificates (mTLS)
+- **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, on-demand renewal, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring (a certificate a host uses cannot be deleted; unused imports go in one click), certificates read from files an agent's host keeps renewing (`CERT_FILES_HOST_DIR`), and a built-in CA for issuing and revoking internal client certificates (mTLS)
 - **mTLS** - Mutual TLS per proxy host using built-in CA certificates. Issue, track, and revoke client certificates. Fail-closed revocation (all certs revoked = all connections rejected)
 - **mTLS RBAC** - Role-based access control for mTLS client certificates. Define roles, assign certs to roles, and create path-based access rules per proxy host (e.g. `/admin/*` requires the "ops" role)
 - **User Roles** - Four roles (Viewer, User, Operator, Admin) controlling dashboard access, API permissions, and feature visibility
@@ -345,7 +345,7 @@ screen shows how many changes are pending and in which sections, because one cha
 them all: DNS edited on one page and geo blocking on another is one apply, not two. The staged set
 is yours - another administrator's pending edits are neither shown nor applied with yours.
 
-**Review & apply** lists the staged changes and the diff of the Caddy config they would produce,
+**Review** lists the staged changes and the diff of the Caddy config they would produce,
 rendered from the staged values, with credentials masked. Applying writes them to the database and
 reloads Caddy once. Settings that do not touch the Caddy config say so instead of showing a diff.
 **Discard** drops the set, or one change at a time from the review sheet. A few forms save straight
@@ -1040,7 +1040,7 @@ Caddy automatically obtains Let's Encrypt certificates for all proxy hosts.
 and issuer of the certificate Caddy is actually serving. This needs a [current
 agent](#features-that-need-a-current-agent).
 
-- **Renew now** makes each agent's Caddy renew a host's certificate ahead of schedule. Caddy has no
+- **Renew** makes each agent's Caddy renew a host's certificate ahead of schedule. Caddy has no
   renew call, so this is a temporary renewal window plus two reloads; it lapses after 15 minutes if
   no newer certificate appears.
 - **Test reachability**, on the certificate and proxy host menus, checks DNS, CAA and an HTTP
@@ -1114,7 +1114,7 @@ rebuild, then pick where the Local API is under **Settings → CrowdSec**:
   picked up with `docker compose restart agent`, since anything on `caddy-network` could reach the
   Local API. Then create a key with `cscli bouncers add caddy` and enter the Local API URL as Caddy
   reaches it and the key. The key is encrypted at rest, never returned by the API, and kept only
-  while the Local API and AppSec addresses are unchanged. **Test connection** runs from the
+  while the Local API and AppSec addresses are unchanged. **Test** runs from the
   controller, which may not reach a Local API only Caddy's network can. The
   [CrowdSec docs](https://caddyproxy.com/features/crowdsec/#external)
   walk through it.
@@ -1196,7 +1196,7 @@ Set the mode in **WAF → Settings** - Off, Detection only (matching requests ar
 
 **Exclusions** - switch a rule off globally or on one host, optionally only under a path (decoded and normalised before it is compared) or only for one variable such as `ARGS:content`, with a reason. **False positive** on an event fills in the narrowest one. Coraza compiles the change before it is saved, and if Caddy still refuses the result it is undone. The anomaly decision rules (949110, 949111, 959100, 959101) cannot be excluded. Suppressed rule ids from older versions are moved into exclusions on startup.
 
-**Why was this blocked** - an event shows every rule it matched with the points each added and the variable it matched in, the score against the threshold and the deciding rule, with Working as intended, False positive, Block source and Copy as curl. Credential headers, cookies and password- or token-named parameters are replaced with `[redacted]` before an event is stored, and again when it is shown.
+**Why was this blocked** - an event shows every rule it matched with the points each added and the variable it matched in, the score against the threshold and the deciding rule, with Working as intended, False positive, Block and Copy as curl. Credential headers, cookies and password- or token-named parameters are replaced with `[redacted]` before an event is stored, and again when it is shown.
 
 **Security events and blocked sources** - **Security** shows what every gate stopped and from where, and keeps the global deny list: addresses and networks, and with the Geo Blocking module countries, continents and ASNs, each with a reason and an optional expiry. A match gets 403 before any other handler runs, on every HTTP host; layer-4 hosts are not covered.
 
@@ -1548,7 +1548,7 @@ alike. The config is applied first, then the selection is pushed to the agent, w
 `docker compose build caddy` at once and recreates the container. With `CADDY_BUILD_MODE=external`
 it waits for **Load built image** instead, and with no agent connected the build starts when one
 connects. Compiling Caddy takes several minutes; the proxy keeps serving on the current binary
-until the new one is ready, then restarts. **Rebuild Caddy** only retries a build that failed.
+until the new one is ready, then restarts. **Rebuild** only retries a build that failed.
 
 Because *enabling* a module only takes effect once it is actually in the binary,
 config generation uses the intersection of what you selected and what the running
@@ -1900,7 +1900,7 @@ when first-time OAuth identities may create one, tied to `objectGUID`/`entryUUID
 account with the same email is only joined with **Link accounts by email** on. Directory accounts
 have no local password. Groups (`memberOf`, or a search, nested on AD) map to roles and CPM groups as
 an OAuth claim does. Throttle, CAPTCHA, two-factor code and audit apply as for a password, and every
-refusal reads "Invalid username or password". **Test connection** reports which step failed.
+refusal reads "Invalid username or password". **Test** reports which step failed.
 
 ---
 

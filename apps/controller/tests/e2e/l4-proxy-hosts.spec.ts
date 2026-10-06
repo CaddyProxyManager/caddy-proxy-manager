@@ -40,7 +40,7 @@ test.describe('L4 Proxy Hosts page', () => {
   test('create dialog opens and contains expected fields', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await expect(page.getByLabel('Name')).toBeVisible();
@@ -101,7 +101,7 @@ test.describe('L4 Proxy Hosts page', () => {
   test('creates a new L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Test Host');
@@ -119,7 +119,7 @@ test.describe('L4 Proxy Hosts page', () => {
   test('rejects a listen address on reserved port 443', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Reserved Port Host');
@@ -137,7 +137,7 @@ test.describe('L4 Proxy Hosts page', () => {
   test('listen address field documents the reserved ports', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(
       page.getByRole('dialog').getByText(/ports 80, 443, 2019, 3000, 9090/i),
     ).toBeVisible();
@@ -168,7 +168,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     for (let i = 1; i <= 3; i++) {
       // Re-opening each time is what exercised the stale useActionState bug.
-      await page.getByRole('button', { name: /create l4 host/i }).click();
+      await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByLabel('Name').fill(`E2E Rapid Host ${i}`);
       await page.getByLabel('Listen Address').fill(`:2000${i}`);
@@ -188,7 +188,7 @@ test.describe('L4 Proxy Hosts page', () => {
   test('toggling enabled updates the row status without reload', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.getByLabel('Name').fill('E2E Toggle Host');
     await page.getByLabel('Listen Address').fill(':20010');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');

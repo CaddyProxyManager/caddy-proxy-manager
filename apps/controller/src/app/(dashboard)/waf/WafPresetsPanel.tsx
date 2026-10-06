@@ -115,7 +115,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
           }}
           items={[
             { id: "edit", label: tCommon("edit"), onClick: () => setEditing(row) },
-            { id: "delete", label: t("presetDelete"), onClick: () => setDeleting(row) },
+            { id: "delete", label: tCommon("delete"), onClick: () => setDeleting(row) },
           ]}
         />
       ),
@@ -136,7 +136,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
           <Button
             variant="primary"
             icon={<Plus />}
-            label={t("presetNew")}
+            label={tCommon("new")}
             onClick={() => setEditing("new")}
           />
         )}
@@ -150,7 +150,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
             <Button
               variant="primary"
               icon={<Plus />}
-              label={t("presetNew")}
+              label={tCommon("new")}
               onClick={() => setEditing("new")}
             />
           }

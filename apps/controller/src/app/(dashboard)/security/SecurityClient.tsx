@@ -82,6 +82,7 @@ function useOutcomeName() {
 
 function SecurityChart({ report, onShowPeak }: { report: SecurityReport; onShowPeak: () => void }) {
   const t = useTranslations("security");
+  const tCommon = useTranslations("common");
   const format = useAppFormatter();
   const theme = useChartTheme();
   const outcomeName = useOutcomeName();
@@ -155,12 +156,7 @@ function SecurityChart({ report, onShowPeak }: { report: SecurityReport; onShowP
               </Text>
             )}
             <HStack>
-              <Button
-                variant="secondary"
-                size="sm"
-                label={t("showTheseEvents")}
-                onClick={onShowPeak}
-              />
+              <Button variant="secondary" size="sm" label={tCommon("show")} onClick={onShowPeak} />
             </HStack>
           </VStack>
         )}
@@ -515,7 +511,7 @@ export default function SecurityClient({
             variant="secondary"
             size="sm"
             icon={<Ban />}
-            label={t("block")}
+            label={tCommon("block")}
             onClick={() => setBlock({ kind: "ip", value: row.ip, reason: "" })}
           />
         ),
@@ -663,7 +659,7 @@ export default function SecurityClient({
             />
             <Button
               size="sm"
-              label={tCommon("applyRange")}
+              label={tCommon("apply")}
               onClick={() => {
                 const from = fromZonedWallTime(customFrom, timeZone);
                 const to = fromZonedWallTime(customTo, timeZone);

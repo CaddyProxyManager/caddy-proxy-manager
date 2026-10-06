@@ -18,7 +18,7 @@ async function goToBranding(page: Page) {
   await goToSetting(page, 'Branding');
 }
 
-/** Saving stages; the favicon route serves only what Review & apply has made live. */
+/** Saving stages; the favicon route serves only what Review has applied. */
 async function saveAndApply(page: Page) {
   await savePage(page);
   await expectStaged(page);

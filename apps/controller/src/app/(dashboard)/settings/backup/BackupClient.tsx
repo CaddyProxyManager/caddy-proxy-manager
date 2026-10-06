@@ -41,6 +41,7 @@ const HEADLINE_TABLES = {
 
 function DownloadCard() {
   const t = useTranslations("settings.backup");
+  const tCommon = useTranslations("common");
   const [passphrase, setPassphrase] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [auditLog, setAuditLog] = useState(false);
@@ -123,7 +124,7 @@ function DownloadCard() {
         </Text>
         <Button
           icon={<Download />}
-          label={t("download")}
+          label={tCommon("download")}
           onClick={download}
           isLoading={busy}
           isDisabled={!ready || busy}

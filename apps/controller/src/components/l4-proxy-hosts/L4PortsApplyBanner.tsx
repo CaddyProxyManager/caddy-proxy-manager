@@ -146,7 +146,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
             variant="secondary"
             size="sm"
             icon={<RefreshCw />}
-            label={t("applyPorts")}
+            label={tRoot("common.apply")}
             isLoading={applying}
             isDisabled={applying || isSpinning}
             onClick={handleApply}

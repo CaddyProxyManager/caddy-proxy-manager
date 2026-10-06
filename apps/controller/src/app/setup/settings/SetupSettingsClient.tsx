@@ -333,7 +333,7 @@ export default function SetupSettingsClient({
 
             <IdentityProviderCard card={oauth} value={idp} onChange={setIdp} />
 
-            <SaveButton label={t("saveAndFinishSetup")} isDisabled={saving} />
+            <SaveButton label={t("finish")} isDisabled={saving} />
           </VStack>
         </form>
       </VStack>

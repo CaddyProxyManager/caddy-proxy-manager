@@ -1,6 +1,6 @@
 /**
  * The Settings forms that stage: each save lands in the operator's change set rather than in
- * `settings`, a refused one stages nothing, and "Review & apply" commits the set, reloads Caddy
+ * `settings`, a refused one stages nothing, and "Apply" commits the set, reloads Caddy
  * once and records a revision. Only `auth` is faked, so the real admin guard decides who may save.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';

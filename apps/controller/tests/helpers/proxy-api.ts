@@ -62,7 +62,7 @@ async function expandCaRow(page: Page, caName: string): Promise<void> {
  */
 export async function openCreateHostDialog(page: Page): Promise<void> {
   await expect(async () => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     // The dialog opens once its pickers' options are read, a round trip after the click.
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
   }).toPass({ timeout: 30_000 });
@@ -159,7 +159,7 @@ export async function importCertificate(
   config: ImportedCertificateConfig,
 ): Promise<void> {
   await openCertificatesTab(page, /^Imported/i);
-  await page.getByRole('button', { name: /import certificate/i }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.getByRole('heading', { name: /^import certificate$/i })).toBeVisible();
 
   await page.getByRole('textbox', { name: /^Name/ }).fill(config.name);
@@ -181,7 +181,7 @@ export async function importCertificate(
 
 export async function generateCaCertificate(page: Page, config: GeneratedCaConfig): Promise<void> {
   await openCertificatesTab(page, /^CA \/ mTLS/i);
-  await page.getByRole('button', { name: /add ca certificate/i }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('heading', { name: /^add ca certificate$/i })).toBeVisible();
 
   await page.getByRole('textbox', { name: /^Name/ }).fill(config.name);
@@ -211,7 +211,7 @@ export async function issueClientCertificate(
 ): Promise<Buffer> {
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, config.caName);
-  await page.getByRole('button', { name: /^issue cert$/i }).click();
+  await page.getByRole('button', { name: 'Issue', exact: true }).click();
   // Every CA row mounts a dialog that stays in the DOM closed; getByLabel would not skip them.
   const dialog = page.getByRole('dialog', { name: /issue client certificate/i });
   await expect(dialog).toBeVisible();
@@ -223,13 +223,13 @@ export async function issueClientCertificate(
   }
   await dialog.getByRole('textbox', { name: /^Export Password/ }).fill(config.exportPassword);
 
-  await dialog.getByRole('button', { name: /issue certificate/i }).click();
-  await expect(dialog.getByRole('button', { name: /download client certificate/i })).toBeVisible({
+  await dialog.getByRole('button', { name: 'Issue', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Download', exact: true })).toBeVisible({
     timeout: 15_000,
   });
 
   const downloadPromise = page.waitForEvent('download');
-  await dialog.getByRole('button', { name: /download client certificate/i }).click();
+  await dialog.getByRole('button', { name: 'Download', exact: true }).click();
   const download = await downloadPromise;
   const downloadPath = await saveDownload(download);
 
@@ -292,13 +292,13 @@ export async function createAccessList(
     await dialog.getByPlaceholder('password').first().fill(users[0].password);
 
     for (let i = 1; i < users.length; i++) {
-      await dialog.getByRole('button', { name: 'Add another member' }).click();
+      await dialog.getByRole('button', { name: 'Add', exact: true }).click();
       await dialog.getByPlaceholder('username').nth(i).fill(users[i].username);
       await dialog.getByPlaceholder('password').nth(i).fill(users[i].password);
     }
   }
 
-  await dialog.getByRole('button', { name: /create list/i }).click();
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 
   await expect(dialog).not.toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('heading', { name }).first()).toBeVisible({ timeout: 10_000 });

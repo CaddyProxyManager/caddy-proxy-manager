@@ -86,7 +86,7 @@ test.describe('Mobile layout', () => {
     await page.goto('/proxy-hosts');
     // The empty state has its own "No proxy hosts found" heading.
     const title = page.getByRole('heading', { name: /proxy hosts/i, level: 1 });
-    const button = page.getByRole('button', { name: /create host/i });
+    const button = page.getByRole('button', { name: 'New', exact: true });
     await expect(title).toBeVisible();
     await expect(button).toBeVisible();
     const titleBox = await title.boundingBox();

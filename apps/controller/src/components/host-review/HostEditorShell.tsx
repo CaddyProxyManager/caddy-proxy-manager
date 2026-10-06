@@ -1,11 +1,20 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ActionState } from "@/lib/errors/action-error";
@@ -71,6 +80,31 @@ function useActiveSection(open: boolean, sections: EditorSectionLink[]) {
   return [active, select] as const;
 }
 
+/**
+ * Arrow keys across the edge of the section tabs. TabList keeps its arrows to itself and wraps, and
+ * Toolbar's roving tabindex leaves the controls after it at -1, so without this a keyboard never
+ * reaches them. Runs in the capture phase: preventDefault there makes both components stand aside.
+ */
+function crossTabStripEdge(event: ReactKeyboardEvent<HTMLDivElement>) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  const toolbar = event.currentTarget;
+  const rtl = getComputedStyle(toolbar).direction === "rtl";
+  const forward = (event.key === "ArrowRight") !== rtl;
+  const tabs = [...toolbar.querySelectorAll<HTMLElement>("[data-tab-value]")];
+  const controls = [...toolbar.querySelectorAll<HTMLButtonElement>("button")].filter(
+    (button) => !button.closest("nav") && !button.disabled,
+  );
+  if (tabs.length === 0 || controls.length === 0) return;
+  const target = event.target as HTMLElement;
+  let next: HTMLElement | undefined;
+  if (target === tabs.at(forward ? -1 : 0)) next = controls.at(forward ? 0 : -1);
+  else if (target === controls.at(forward ? -1 : 0)) next = tabs.at(forward ? 0 : -1);
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+}
+
 /** Ctrl+S, or Cmd+S on a Mac; nothing else. */
 function isSaveShortcut(event: KeyboardEvent): boolean {
   return (
@@ -82,9 +116,9 @@ function isSaveShortcut(event: KeyboardEvent): boolean {
 }
 
 /**
- * The frame every host editor shares: section jumps, an unsaved-changes count beside the buttons,
- * a Review changes step (also on Ctrl/Cmd+S while the editor is open) and a confirmation before
- * closing over unsaved edits. Saving straight from the footer still works; the review is one step
+ * The frame every host editor shares: one toolbar with the section jumps, the unsaved-changes count
+ * and Review changes (also Ctrl/Cmd+S while the editor is open), plus a confirmation before closing
+ * over unsaved edits. Saving straight from the footer still works; the review is one step
  * away, never in the way.
  */
 export function HostEditorShell({
@@ -226,6 +260,7 @@ export function HostEditorShell({
   }, [open, unsaved, state.status]);
 
   const [activeSection, selectSection] = useActiveSection(open, sections);
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
   const jump = (section: EditorSectionLink) => {
     selectSection(section.id);
@@ -239,40 +274,61 @@ export function HostEditorShell({
         open={open}
         onClose={requestClose}
         title={title}
-        maxWidth="lg"
+        maxWidth="xl"
         subheader={
-          sections.length > 1 ? (
-            // No role="tablist": these scroll to a section rather than swap a panel in.
-            <TabList
-              aria-label={t("jumpTo")}
-              size="sm"
-              value={activeSection}
-              onChange={(id) => {
-                const section = sections.find((s) => s.id === id);
-                if (section) jump(section);
-              }}
-            >
-              {sections.map((section) => (
-                <Tab key={section.id} value={section.id} label={t(sectionKey(section.id))} />
-              ))}
-            </TabList>
-          ) : undefined
-        }
-        footerStart={
-          <Text type="supporting" size="sm" color={unsaved > 0 ? "primary" : "secondary"}>
-            {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
-          </Text>
+          <Toolbar
+            label={t("editorToolbar")}
+            size="sm"
+            dividers={["bottom"]}
+            onKeyDownCapture={crossTabStripEdge}
+            startContent={
+              sections.length > 1 ? (
+                // No role="tablist": these scroll to a section rather than swap a panel in.
+                <TabList
+                  aria-label={t("jumpTo")}
+                  value={activeSection}
+                  onChange={(id) => {
+                    const section = sections.find((s) => s.id === id);
+                    if (section) jump(section);
+                  }}
+                >
+                  {sections.map((section) => (
+                    <Tab key={section.id} value={section.id} label={t(sectionKey(section.id))} />
+                  ))}
+                </TabList>
+              ) : undefined
+            }
+            endContent={
+              <>
+                {!isNarrow && (
+                  <Text
+                    type="supporting"
+                    size="sm"
+                    textWrap="nowrap"
+                    color={unsaved > 0 ? "primary" : "secondary"}
+                  >
+                    {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
+                  </Text>
+                )}
+                <Button
+                  variant="secondary"
+                  label={tCommon("review")}
+                  tooltip={t("shortcutHint")}
+                  // A phone has no room for the count beside the tabs, so it rides on the button.
+                  endContent={isNarrow && unsaved > 0 ? <Badge label={unsaved} /> : undefined}
+                  aria-label={
+                    isNarrow && unsaved > 0 ? t("reviewUnsaved", { count: unsaved }) : undefined
+                  }
+                  onClick={openReview}
+                  isDisabled={isPending}
+                />
+              </>
+            }
+          />
         }
         actions={
           <>
             <Button variant="secondary" label={tCommon("cancel")} onClick={requestClose} />
-            <Button
-              variant="secondary"
-              label={t("reviewChanges")}
-              tooltip={t("shortcutHint")}
-              onClick={openReview}
-              isDisabled={isPending}
-            />
             <Button
               variant="primary"
               label={submitLabel}

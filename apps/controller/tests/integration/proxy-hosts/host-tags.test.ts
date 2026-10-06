@@ -1,5 +1,5 @@
 /**
- * Integration: host tags stored, searched and filtered on both host tables, the bulk "Add tag"
+ * Integration: host tags stored, searched and filtered on both host tables, the bulk "Tag"
  * (all or nothing, one audit row per host, no apply), the GraphQL fields, and live upstream
  * health read through the Caddy admin seam per agent.
  */

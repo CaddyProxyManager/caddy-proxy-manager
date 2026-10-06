@@ -6,9 +6,9 @@ export async function applyStagedChanges(page: Page): Promise<void> {
   const bar = page.getByTestId('staged-bar');
   await expect(bar).toBeVisible({ timeout: 10_000 });
 
-  await bar.getByRole('button', { name: /review & apply/i }).click();
+  await bar.getByRole('button', { name: /^review\b/i }).click();
 
-  const apply = page.getByRole('button', { name: /^apply to caddy$/i });
+  const apply = page.getByRole('dialog').getByRole('button', { name: /^apply$/i });
   await expect(apply).toBeVisible({ timeout: 10_000 });
   await apply.click();
 

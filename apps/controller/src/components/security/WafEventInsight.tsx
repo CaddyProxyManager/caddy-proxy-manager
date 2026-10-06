@@ -49,6 +49,7 @@ export function WafEventInsight({
   onChanged?: () => void;
 }) {
   const t = useTranslations("waf");
+  const tCommon = useTranslations("common");
   const [detail, setDetail] = useState<WafEventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exclusion, setExclusion] = useState<ExclusionDraft | null>(null);
@@ -220,7 +221,7 @@ export function WafEventInsight({
           size="sm"
           variant="secondary"
           icon={<Ban />}
-          label={t("blockSource")}
+          label={tCommon("block")}
           isDisabled={pending}
           onClick={() => setBlock({ kind: "ip", value: event.clientIp, reason: "" })}
         />

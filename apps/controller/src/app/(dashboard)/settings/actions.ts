@@ -2525,7 +2525,7 @@ export const updateCaddyBuildSettingsAction = serializedSettingsAction(
 export const updateFaviconAction = stagedSettingsAction(updateFaviconActionUnlocked);
 export const updateAccentColorAction = stagedSettingsAction(updateAccentColorActionUnlocked);
 export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
-// Not staged: none of these reach a Caddy config, so "Review & apply" has nothing to apply.
+// Not staged: none of these reach a Caddy config, so "Apply" has nothing to apply.
 export const updateRegistrySettingsAction = serializedSettingsAction(
   updateRegistrySettingsActionUnlocked,
 );

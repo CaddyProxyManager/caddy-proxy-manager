@@ -627,7 +627,7 @@ export default function OverviewClient({
                 variant="secondary"
                 href={settingsHref("analytics")}
                 as={Link}
-                label={t("loggingOffAction")}
+                label={tCommon("enable")}
               />
             ) : undefined
           }

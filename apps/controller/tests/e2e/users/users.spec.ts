@@ -113,11 +113,11 @@ test.describe('Users page', () => {
   // ── Create user (UI) ──────────────────────────────────────────────────
 
   test('Create User button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /create user/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^new$/i })).toBeVisible();
   });
 
   test('clicking Create User opens the create dialog', async ({ page }) => {
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
 
     await expect(page.getByTestId('create-email')).toBeVisible();
     await expect(page.getByTestId('create-name')).toBeVisible();
@@ -130,7 +130,7 @@ test.describe('Users page', () => {
 
   test('the generate button fills the password with a usable value', async ({ page }) => {
     // Generating also reveals: an admin has to pass the credential on.
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
     const password = page.getByTestId('create-password');
     await expect(password).toHaveValue('');
 
@@ -151,7 +151,7 @@ test.describe('Users page', () => {
 
   test('a generated password is accepted when the user is created', async ({ page }) => {
     const email = `generated-${Date.now()}@localhost`;
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
     await page.getByTestId('create-email').fill(email);
     await page.getByTestId('create-name').fill('Generated Password User');
     await page.getByRole('button', { name: /generate a strong password/i }).click();
@@ -164,7 +164,7 @@ test.describe('Users page', () => {
   });
 
   test('clicking Cancel closes the create dialog', async ({ page }) => {
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
     await expect(page.getByTestId('create-email')).toBeVisible();
 
     await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
@@ -179,7 +179,7 @@ test.describe('Users page', () => {
     const password = 'SecurePass2026!';
     const expectedUsername = email;
 
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
 
     await page.getByTestId('create-email').fill(email);
     await page.getByTestId('create-name').fill('New Test User');
@@ -220,7 +220,7 @@ test.describe('Users page', () => {
     const password = 'ViewerPass2026!';
     const expectedUsername = email;
 
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
 
     await page.getByTestId('create-email').fill(email);
     await page.getByTestId('create-name').fill('Viewer User');

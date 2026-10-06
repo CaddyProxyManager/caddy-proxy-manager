@@ -91,7 +91,7 @@ export async function fetchGeoipMetadata(
 /** Several readers finding the answer stale ask MaxMind once. */
 let inFlight: Promise<GeoipUpdateCheck> | null = null;
 
-/** Stores the result either way. Exported for the settings "check now" button. */
+/** Stores the result either way. Exported for the settings "Check" button. */
 export async function checkGeoipUpdates(
   editions: readonly string[],
   fetchImpl: typeof fetch = fetch,

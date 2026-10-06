@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
 import { Selector } from "@astryxdesign/core/Selector";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack } from "@astryxdesign/core/Stack";
 import { Token } from "@astryxdesign/core/Token";
+import { Tokenizer, type TokenizerChange } from "@astryxdesign/core/Tokenizer";
+import {
+  type SearchableItem,
+  type SearchSource,
+  Typeahead,
+  TypeaheadItem,
+} from "@astryxdesign/core/Typeahead";
 import { Tag } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import {
   HOST_TAG_MAX_LENGTH,
   HOST_TAGS_MAX,
@@ -16,6 +21,7 @@ import {
 } from "@/src/lib/proxy-hosts/tag-rules";
 
 type UiT = ReturnType<typeof useTranslations<"ui.hostTags">>;
+type TagItem = SearchableItem<{ typed?: boolean }>;
 
 /** The reason a typed tag cannot be added, in the reader's language; null when it can. */
 export function hostTagError(tag: string, existing: string[], t: UiT): string | null {
@@ -27,70 +33,113 @@ export function hostTagError(tag: string, existing: string[], t: UiT): string | 
   return null;
 }
 
+const SuggestionsContext = createContext<string[]>([]);
+
+/** The tags already in use on this kind of host, offered as suggestions by the fields below. */
+export function HostTagSuggestions({ tags, children }: { tags: string[]; children: ReactNode }) {
+  return <SuggestionsContext.Provider value={tags}>{children}</SuggestionsContext.Provider>;
+}
+
+/** A pasted comma-separated list is several tags. */
+function typedTags(text: string): string[] {
+  return text.split(",").map(hostTagText).filter(Boolean);
+}
+
+const asItem = (tag: string): TagItem => ({ id: tag, label: tag });
+// Stable, since a new source mid-search makes Astryx drop that search's results.
+const NONE: string[] = [];
+// A tag holds no space, so this id never meets one in use.
+const TYPED_ID = "typed ";
+
 /**
- * Chips for a host's tags, shared by the HTTP and L4 editors. Each chip is its own `tag` field;
- * the marker lets an update tell "every chip removed" from a form without the field.
+ * What was typed comes first, so Enter adds it rather than the first suggestion. Its label is the
+ * text itself, which also keeps Astryx's own untranslated "Create" row from showing beside it.
+ */
+function useTagSource(selected: string[]): SearchSource<TagItem> {
+  const inUse = useContext(SuggestionsContext);
+  return useMemo(
+    () => ({
+      search: (query: string) => {
+        const typed = hostTagText(query);
+        const matches = inUse
+          .filter((tag) => tag.includes(typed))
+          .sort((a, b) => Number(!a.startsWith(typed)) - Number(!b.startsWith(typed)));
+        const offered = inUse.includes(typed) && !selected.includes(typed);
+        const own: TagItem[] =
+          typed && !offered
+            ? [{ id: TYPED_ID + typed, label: typed, auxiliaryData: { typed: true } }]
+            : [];
+        return [...own, ...matches.map(asItem)];
+      },
+      bootstrap: () => inUse.map(asItem),
+    }),
+    [inUse, selected],
+  );
+}
+
+function TagOption({ item, t }: { item: TagItem; t: UiT }) {
+  return (
+    <TypeaheadItem
+      item={item.auxiliaryData?.typed ? { ...item, label: t("create", { tag: item.label }) } : item}
+    />
+  );
+}
+
+/**
+ * A host's tags, shared by the HTTP and L4 editors. Each token is its own `tag` field; the marker
+ * lets an update tell "every tag removed" from a form without the field.
  */
 export function HostTagsField({ initial = [] }: { initial?: string[] }) {
   const t = useTranslations("ui.hostTags");
   const [tags, setTags] = useState<string[]>(initial);
+  // What the error describes: the text being typed, or after a refusal what was refused, since
+  // the Tokenizer empties its input on every pick.
   const [draft, setDraft] = useState("");
-  // A pasted comma-separated list lands as several chips.
-  const parts = draft.split(",").map(hostTagText).filter(Boolean);
-  const error = parts.map((tag) => hostTagError(tag, tags, t)).find(Boolean) ?? null;
+  const source = useTagSource(tags);
+  // Stable for the same reason as NONE: the Tokenizer rebuilds its source from these.
+  const items = useMemo(() => tags.map(asItem), [tags]);
+  const error =
+    typedTags(draft)
+      .map((tag) => hostTagError(tag, tags, t))
+      .find(Boolean) ?? null;
 
-  function add() {
+  function onChange(kept: TagItem[], change: TokenizerChange<TagItem>) {
+    if (change.type !== "add" && change.type !== "create") {
+      setTags(kept.map((item) => item.id));
+      return;
+    }
     const next = [...tags];
-    const rejected: string[] = [];
-    for (const tag of parts) {
+    const refused: string[] = [];
+    for (const tag of typedTags(change.item.label)) {
       if (next.includes(tag)) continue;
-      if (hostTagError(tag, next, t)) rejected.push(tag);
+      if (hostTagError(tag, next, t)) refused.push(tag);
       else next.push(tag);
     }
-    setTags(next.sort());
-    // What could not be added stays in the box, beside its error.
-    setDraft(rejected.join(", "));
+    setTags(next);
+    setDraft(refused.join(", "));
   }
 
   return (
-    <VStack gap={2}>
+    <>
       <input type="hidden" name="tagsPresent" value="1" />
-      {tags.map((tag) => (
-        <input key={tag} type="hidden" name="tag" value={tag} />
-      ))}
-      <TextInput
-        {...NO_SPELLCHECK}
+      <Tokenizer
         label={t("label")}
+        description={t("help", { max: HOST_TAGS_MAX })}
+        isOptional
         startIcon={Tag}
         placeholder={t("placeholder")}
-        value={draft}
-        onChange={setDraft}
-        isOptional
-        description={t("help", { max: HOST_TAGS_MAX })}
+        htmlName="tag"
+        value={items}
+        onChange={onChange}
+        onChangeQuery={setDraft}
+        searchSource={source}
+        renderItem={(item) => <TagOption item={item} t={t} />}
+        hasCreate
+        maxEntries={HOST_TAGS_MAX}
+        debounceMs={0}
         status={error ? { type: "error", message: error } : undefined}
-        onEnter={add}
-        // Enter would otherwise submit the host form mid-edit, and a comma ends a chip.
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault();
-          if (e.key === ",") {
-            e.preventDefault();
-            add();
-          }
-        }}
       />
-      {tags.length > 0 && (
-        <HStack gap={2} wrap="wrap">
-          {tags.map((tag) => (
-            <Token
-              key={tag}
-              size="sm"
-              label={tag}
-              onRemove={() => setTags((prev) => prev.filter((other) => other !== tag))}
-            />
-          ))}
-        </HStack>
-      )}
-    </VStack>
+    </>
   );
 }
 
@@ -139,7 +188,10 @@ export function HostTagFilter({
   );
 }
 
-/** The one tag a bulk add puts on every selected host, checked as the editor checks a chip. */
+/**
+ * The one tag a bulk add puts on every selected host, checked as the editor checks one. Typed text
+ * counts without being picked, so the dialog's button applies what the field shows.
+ */
 export function BulkTagInput({
   value,
   onChange,
@@ -148,17 +200,28 @@ export function BulkTagInput({
   onChange: (v: string) => void;
 }) {
   const t = useTranslations("ui.hostTags");
+  const [picked, setPicked] = useState<TagItem | null>(null);
+  const source = useTagSource(NONE);
   const error = hostTagError(hostTagText(value), [], t);
   return (
-    <TextInput
-      {...NO_SPELLCHECK}
+    <Typeahead
       label={t("bulkLabel")}
-      startIcon={Tag}
-      placeholder={t("placeholder")}
-      value={value}
-      onChange={onChange}
-      isRequired
       description={t("bulkHelp")}
+      isRequired
+      startIcon={Tag}
+      placeholder={t("bulkPlaceholder")}
+      value={picked}
+      onChange={(item) => {
+        setPicked(item);
+        onChange(item?.label ?? "");
+      }}
+      onChangeQuery={(query) => {
+        setPicked(null);
+        onChange(query);
+      }}
+      searchSource={source}
+      renderItem={(item) => <TagOption item={item} t={t} />}
+      debounceMs={0}
       status={error ? { type: "error", message: error } : undefined}
     />
   );

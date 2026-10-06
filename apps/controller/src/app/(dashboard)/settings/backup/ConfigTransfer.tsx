@@ -224,6 +224,7 @@ function ItemLine({ item }: { item: ConfigImportItem }) {
 function ImportCard() {
   const t = useTranslations("settings.configTransfer");
   const tErrors = useTranslations("errors");
+  const tCommon = useTranslations("common");
   const [file, setFile] = useState<File | null>(null);
   const [described, setDescribed] = useState<Described | null>(null);
   const [passphrase, setPassphrase] = useState("");
@@ -382,7 +383,7 @@ function ImportCard() {
             )}
             <Button
               icon={<Upload />}
-              label={t("import")}
+              label={tCommon("import")}
               isDisabled={actionable === 0 || busy}
               onClick={() => setConfirmOpen(true)}
             />
@@ -394,7 +395,7 @@ function ImportCard() {
           onOpenChange={setConfirmOpen}
           title={t("confirmTitle")}
           description={t("confirmHelp")}
-          actionLabel={t("import")}
+          actionLabel={tCommon("import")}
           onAction={() => run("apply")}
         />
       </VStack>

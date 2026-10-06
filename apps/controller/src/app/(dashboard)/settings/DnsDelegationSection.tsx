@@ -222,7 +222,7 @@ export function DnsDelegationSection({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  label={checking ? tCommon("checking") : tCommon("checkAgain")}
+                  label={checking ? tCommon("checking") : tCommon("recheck")}
                   isDisabled={checking}
                   onClick={() => void runCheck()}
                 />
@@ -243,7 +243,7 @@ export function DnsDelegationSection({
             form="dns-delegation-form"
             variant="primary"
             size="sm"
-            label={t("add")}
+            label={tCommon("add")}
           />
         }
       >

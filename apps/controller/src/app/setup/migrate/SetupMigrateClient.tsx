@@ -456,7 +456,7 @@ export default function SetupMigrateClient({
               {t("skipMigrationDescription")}
             </Text>
             <form action={skipMigration}>
-              <Button type="submit" variant="secondary" size="sm" label={t("skipMigrationLabel")} />
+              <Button type="submit" variant="secondary" size="sm" label={tCommon("skip")} />
             </form>
           </VStack>
         </FormCard>

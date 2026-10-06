@@ -68,7 +68,7 @@ export function BlockSourceDialog({
       open={draft !== null}
       onClose={onClose}
       title={t("blockTitle")}
-      submitLabel={t("block")}
+      submitLabel={tCommon("block")}
       onSubmit={submit}
       isSubmitting={submitting}
       isSubmitDisabled={!value.trim()}

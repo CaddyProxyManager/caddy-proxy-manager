@@ -60,8 +60,8 @@ export function L4HostBulkActions({
   return (
     <>
       <BulkActionBar count={hosts.length} onClear={onClear}>
-        <Button variant="ghost" label={tb("enable")} onClick={() => open("enable")} />
-        <Button variant="ghost" label={tb("disable")} onClick={() => open("disable")} />
+        <Button variant="ghost" label={tCommon("enable")} onClick={() => open("enable")} />
+        <Button variant="ghost" label={tCommon("disable")} onClick={() => open("disable")} />
         <Button variant="ghost" label={tCommon("delete")} onClick={() => open("delete")} />
         <Button variant="ghost" label={tb("addTag")} onClick={() => open("addTag")} />
       </BulkActionBar>

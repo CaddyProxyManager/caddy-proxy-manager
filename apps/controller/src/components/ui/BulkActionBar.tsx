@@ -70,6 +70,7 @@ export function BulkConfirmDialog({
   children?: ReactNode;
 }) {
   const t = useTranslations("ui");
+  const tCommon = useTranslations("common");
   return (
     <AppDialog
       open={open}
@@ -78,7 +79,7 @@ export function BulkConfirmDialog({
       }}
       title={title}
       maxWidth="md"
-      submitLabel={confirmLabel ?? t("bulk.apply")}
+      submitLabel={confirmLabel ?? tCommon("apply")}
       onSubmit={onConfirm}
       isSubmitting={isPending}
     >

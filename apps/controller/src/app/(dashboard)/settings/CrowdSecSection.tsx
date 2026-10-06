@@ -197,7 +197,7 @@ export function CrowdSecSection({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  label={testing ? tCommon("testing") : tCommon("testConnection")}
+                  label={testing ? tCommon("testing") : tCommon("test")}
                   isDisabled={testing || !apiUrl.trim()}
                   onClick={runTest}
                 />

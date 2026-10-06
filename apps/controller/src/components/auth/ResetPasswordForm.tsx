@@ -204,7 +204,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
               </Card>
               <Button
                 type="submit"
-                label={invite ? t("common.setPassword") : t("auth.passwordReset.submit")}
+                label={invite ? t("common.setPassword") : t("common.save")}
                 isLoading={pending}
                 isDisabled={pending}
                 width="100%"

@@ -237,7 +237,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
           <IconButton
             variant="ghost"
             label={showKey ? t("hidePrivateKey") : t("showPrivateKey")}
-            tooltip={showKey ? tCommon("hide") : t("show")}
+            tooltip={showKey ? tCommon("hide") : tCommon("show")}
             icon={showKey ? <EyeOff /> : <Eye />}
             onClick={() => setShowKey((v) => !v)}
           />
@@ -325,7 +325,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
           <Button
             type="submit"
             form={FORM_ID}
-            label={isEdit ? tCommon("saveChanges") : t("importCertificate")}
+            label={isEdit ? tCommon("save") : tCommon("import")}
             isLoading={isPending}
             isDisabled={isPending || !canSubmit}
           />

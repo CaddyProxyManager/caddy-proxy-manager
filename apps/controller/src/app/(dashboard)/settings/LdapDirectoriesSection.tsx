@@ -17,6 +17,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_NEW_PASSWORD, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
@@ -351,26 +352,31 @@ export default function LdapDirectoriesSection({
             description={t("nameHelp")}
           />
 
-          <HStack gap={2} wrap="wrap" vAlign="center">
-            <Text type="body" size="xsm" color="secondary">
-              {t("presetLabel")}
-            </Text>
-            {/* Product names, the same in every language. */}
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              label="OpenLDAP"
-              onClick={() => applyPreset("openldap")}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              label="Active Directory"
-              onClick={() => applyPreset("ad")}
-            />
-          </HStack>
+          <Toolbar
+            label={t("presets")}
+            size="sm"
+            gap={2}
+            startContent={
+              <>
+                <Text type="body" size="xsm" color="secondary">
+                  {t("presetLabel")}
+                </Text>
+                {/* Product names, the same in every language. */}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  label="OpenLDAP"
+                  onClick={() => applyPreset("openldap")}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  label="Active Directory"
+                  onClick={() => applyPreset("ad")}
+                />
+              </>
+            }
+          />
 
           <TextInput
             startIcon={Link}
@@ -615,7 +621,7 @@ export default function LdapDirectoriesSection({
                   variant="secondary"
                   size="sm"
                   icon={<Plug />}
-                  label={testing ? tCommon("testing") : tCommon("testConnection")}
+                  label={testing ? tCommon("testing") : tCommon("test")}
                   isLoading={testing}
                   onClick={handleTest}
                 />

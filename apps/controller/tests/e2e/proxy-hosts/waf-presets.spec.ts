@@ -18,9 +18,9 @@ async function openPresetsTab(page: Page) {
   await expect(page.getByRole('heading', { name: 'Presets', level: 2 })).toBeVisible();
 }
 
-async function openRowMenu(page: Page, item: 'Edit' | 'Delete preset') {
+async function openRowMenu(page: Page, item: 'Edit' | 'Delete') {
   await page.getByRole('button', { name: `Actions for ${NAME}` }).click();
-  await page.getByRole('menuitem', { name: item }).click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
 }
 
 test.describe
@@ -29,7 +29,7 @@ test.describe
       page,
     }) => {
       await openPresetsTab(page);
-      await page.getByRole('button', { name: 'New preset' }).first().click();
+      await page.getByRole('button', { name: 'New', exact: true }).first().click();
 
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
@@ -83,7 +83,7 @@ test.describe
 
     test('deletes an unused preset', async ({ page }) => {
       await openPresetsTab(page);
-      await openRowMenu(page, 'Delete preset');
+      await openRowMenu(page, 'Delete');
 
       const confirm = page.getByRole('alertdialog');
       await expect(confirm.getByText(`Delete the preset "${NAME}"?`)).toBeVisible();

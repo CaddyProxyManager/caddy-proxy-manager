@@ -39,7 +39,7 @@ before it is stored, so the log never holds it.
 Every event stores a keyed hash (HMAC-SHA256) of the event before it plus its own content, under a
 key derived from `SESSION_SECRET`, so the log is a chain: changing an event, removing one or
 slipping one in breaks it from that point on, and write access to the database alone is not enough
-to rebuild it. **Verify integrity** recomputes the chain and reports the first broken link - which
+to rebuild it. **Verify** recomputes the chain and reports the first broken link - which
 event changed, which is missing, or that the newest events are gone. The check is itself logged.
 
 - Events logged before the upgrade that introduced the chain are older history, outside the

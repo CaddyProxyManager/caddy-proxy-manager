@@ -207,6 +207,7 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 /** Per browser: the switch above says whether to push at all, this which browsers get it. */
 function PushBrowserForm({ publicKey }: { publicKey: string | null }) {
   const t = useTranslations("profile.notifications");
+  const tCommon = useTranslations("common");
   const [state, setState] = useState<PushState>("checking");
   const [result, setResult] = useState<NotificationActionResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -316,7 +317,7 @@ function PushBrowserForm({ publicKey }: { publicKey: string | null }) {
             <>
               <Button
                 variant="secondary"
-                label={t("pushTest")}
+                label={tCommon("test")}
                 onClick={test}
                 isLoading={pending}
                 isDisabled={pending}

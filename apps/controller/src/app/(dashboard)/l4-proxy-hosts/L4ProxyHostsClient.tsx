@@ -415,7 +415,7 @@ export default function L4ProxyHostsClient({
         action={
           canCreate
             ? {
-                label: t("createL4Host"),
+                label: tCommon("new"),
                 onClick: openCreate,
                 isDisabled: Boolean(l4DisabledReason),
               }

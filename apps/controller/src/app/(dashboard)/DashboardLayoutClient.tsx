@@ -241,7 +241,7 @@ export default function DashboardLayoutClient({
         <Button
           variant="secondary"
           size="sm"
-          label={t("viewAsReturn")}
+          label={t("viewAsExit")}
           onClick={async () => {
             await stopViewAsAction();
             // A full load: the whole shell changes.

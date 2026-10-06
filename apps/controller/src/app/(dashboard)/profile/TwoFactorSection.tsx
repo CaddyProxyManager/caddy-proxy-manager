@@ -175,17 +175,17 @@ export function TwoFactorSection({
           <>
             <Button
               variant="secondary"
-              label={t("newBackupCodes")}
+              label={t("regenerate")}
               onClick={() => setFlow({ kind: "regenerate" })}
             />
             <Button
               variant="secondary"
-              label={t("turnOff")}
+              label={tCommon("disable")}
               onClick={() => setFlow({ kind: "disable" })}
             />
           </>
         ) : (
-          <Button label={t("turnOn")} onClick={() => setFlow({ kind: "enable-password" })} />
+          <Button label={tCommon("enable")} onClick={() => setFlow({ kind: "enable-password" })} />
         )}
       </HStack>
 
@@ -214,7 +214,7 @@ export function TwoFactorSection({
           onClose={close}
           title={t("scanTitle")}
           maxWidth="sm"
-          submitLabel={t("turnOn")}
+          submitLabel={tCommon("enable")}
           onSubmit={() => confirmEnable(flow.backupCodes)}
           isSubmitting={busy}
           isSubmitDisabled={!code.trim()}
@@ -255,7 +255,7 @@ export function TwoFactorSection({
           onClose={close}
           title={t("codesTitle")}
           maxWidth="sm"
-          submitLabel={t("done")}
+          submitLabel={tCommon("done")}
           onSubmit={close}
         >
           <VStack gap={3}>
@@ -264,7 +264,7 @@ export function TwoFactorSection({
             <HStack>
               <Button
                 variant="secondary"
-                label={t("download")}
+                label={tCommon("download")}
                 onClick={() => downloadCodes(flow.backupCodes, t("downloadFilename"))}
               />
             </HStack>
@@ -296,7 +296,7 @@ export function TwoFactorSection({
         onClose={close}
         title={t("turnOff")}
         maxWidth="sm"
-        submitLabel={t("turnOff")}
+        submitLabel={tCommon("disable")}
         onSubmit={disable}
         isSubmitting={busy}
         isSubmitDisabled={!password}

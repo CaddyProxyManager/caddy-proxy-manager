@@ -111,7 +111,6 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   { reason: 'composed', keys: ['analytics.uniqueIps', 'analytics.kpi.uniqueIps'] },
-  { reason: 'composed', keys: ['analytics.csv.download', 'analytics.csv.exportListShort'] },
   {
     reason: 'composed',
     keys: ['analytics.csv.requests', 'analytics.kpi.requests', 'common.requests'],
@@ -236,6 +235,7 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   { reason: 'composed', keys: ['common.create', 'settings.configTransfer.actions.create'] },
+  { reason: 'composed', keys: ['common.skip', 'settings.configTransfer.actions.skip'] },
   { reason: 'composed', keys: ['common.name', 'hostReview.fields.name'] },
   { reason: 'composed', keys: ['common.domains', 'hostReview.fields.domains'] },
   { reason: 'composed', keys: ['common.newPassword', 'passwordPolicy.subject.newPassword'] },
@@ -848,7 +848,8 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.stagedLabels.twoFactor',
     ],
   },
-  { reason: 'role', keys: ['hostReview.reviewChanges', 'hostReview.reviewTitle'] },
+  { reason: 'role', keys: ['common.review', 'security.review'] },
+  { reason: 'role', keys: ['common.check', 'settings.dnsDelegation.columnStatus'] },
   { reason: 'role', keys: ['nav.updateBadge', 'settings.configTransfer.actions.update'] },
   {
     reason: 'role',
@@ -891,7 +892,6 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   { reason: 'role', keys: ['settings.notAnswering', 'signInOverview.status.unreachable'] },
-  { reason: 'role', keys: ['settings.reviewTitle', 'settings.stagedReview'] },
   { reason: 'role', keys: ['settings.health.updates.detailError', 'settings.email.alertsFailed'] },
   { reason: 'role', keys: ['settings.health.ldap.valueNone', 'settings.ldap.emptyTitle'] },
   { reason: 'role', keys: ['settings.ldap.edit', 'settings.ldap.editTitle'] },
@@ -906,7 +906,8 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'role', keys: ['ui.searchPlaceholder', 'commandPalette.searchButton'] },
   { reason: 'role', keys: ['waf.reviewedIntended', 'waf.workingAsIntended'] },
   { reason: 'role', keys: ['waf.reviewedFalsePositive', 'waf.falsePositive'] },
-  { reason: 'role', keys: ['security.blockTitle', 'security.addBlock'] },
+  { reason: 'role', keys: ['setup.migrate.submit', 'setup.steps.migrate'] },
+  { reason: 'role', keys: ['ui.bulk.addTag', 'ui.hostTags.bulkLabel'] },
   {
     reason: 'sense',
     keys: [
@@ -945,7 +946,7 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   { reason: 'sense', keys: ['auth.apiErrors.forbidden', 'proxyHosts.forbidden'] },
-  { reason: 'sense', keys: ['auth.login.changeUsername', 'proxyHosts.detail.auditChange'] },
+  { reason: 'sense', keys: ['common.change', 'proxyHosts.detail.auditChange'] },
   {
     reason: 'sense',
     keys: [
@@ -974,7 +975,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'logs.sources.access',
     ],
   },
-  { reason: 'sense', keys: ['hostReview.restore', 'settings.backup.restore'] },
+  { reason: 'sense', keys: ['common.restore', 'settings.backup.restore'] },
   {
     reason: 'sense',
     keys: ['hostReview.fields.tags', 'settings.tags', 'ui.hostTags.label', 'waf.tags'],

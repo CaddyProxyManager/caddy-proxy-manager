@@ -29,7 +29,7 @@ export async function ensureL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
 
 export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): Promise<void> {
   await page.goto('/l4-proxy-hosts');
-  await page.getByRole('button', { name: /create l4 host/i }).click();
+  await page.getByRole('button', { name: 'New', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 
   await page.getByLabel('Name').fill(config.name);

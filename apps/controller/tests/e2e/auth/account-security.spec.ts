@@ -80,12 +80,12 @@ test.describe('Profile - password and picture', () => {
 
     await page.goto('/profile');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /^change password$/i }).click();
+    await page.getByRole('button', { name: /^change$/i }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Current Password', { exact: true }).fill(USER.password);
     await dialog.getByLabel('New Password', { exact: true }).fill(NEW_PASSWORD);
     await dialog.getByLabel('Confirm New Password', { exact: true }).fill(NEW_PASSWORD);
-    await dialog.getByRole('button', { name: /^change password$/i }).click();
+    await dialog.getByRole('button', { name: /^change$/i }).click();
     await expect(page.getByText(/password changed successfully/i)).toBeVisible({
       timeout: 15_000,
     });
@@ -170,7 +170,7 @@ test.describe('An OAuth-only account (Dex)', () => {
     const remove = page.getByRole('dialog', { name: /remove password/i });
     await expect(remove).toContainText('Dex');
     await remove.getByLabel(/current password/i).fill(LOCAL_PASSWORD);
-    await remove.getByRole('button', { name: /^remove password$/i }).click();
+    await remove.getByRole('button', { name: /^remove$/i }).click();
     await expect(page.getByText(/password removed/i)).toBeVisible({ timeout: 15_000 });
     await page.reload();
     await waitForHydration(page);
@@ -299,24 +299,22 @@ test.describe('Resetting a second factor and passkeys', () => {
 
     await openUser(page, EMAIL);
     const detail = page.getByRole('main');
-    await detail.getByRole('button', { name: /^reset two-factor sign-in$/i }).click();
+    await detail.getByRole('button', { name: /^reset$/i }).click();
     await page
       .getByRole('alertdialog')
       .getByRole('button', { name: /^reset two-factor sign-in$/i })
       .click();
     await expect(page.getByRole('alertdialog')).toBeHidden({ timeout: 15_000 });
-    await expect(detail.getByRole('button', { name: /^reset two-factor sign-in$/i })).toHaveCount(
-      0,
-    );
+    await expect(detail.getByRole('button', { name: /^reset$/i })).toHaveCount(0);
 
     await expect(detail.getByText('1 passkey')).toBeVisible();
-    await detail.getByRole('button', { name: /^remove passkeys$/i }).click();
+    await detail.getByRole('button', { name: /^remove$/i }).click();
     await page
       .getByRole('alertdialog')
       .getByRole('button', { name: /^remove passkeys$/i })
       .click();
     await expect(page.getByRole('alertdialog')).toBeHidden({ timeout: 15_000 });
-    await expect(detail.getByRole('button', { name: /^remove passkeys$/i })).toHaveCount(0);
+    await expect(detail.getByRole('button', { name: /^remove$/i })).toHaveCount(0);
 
     const after = await passwordWorks(browser, USER.username, USER.password);
     expect(after.ok).toBe(true);

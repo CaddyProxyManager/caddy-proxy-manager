@@ -82,9 +82,14 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
 
   facts.general.push(fact("domains", { count: host.domains.length }));
   if (host.tags.length > 0) facts.general.push(fact("tags", { count: host.tags.length }));
-  if (host.allowWebsocket) facts.general.push(fact("websocketsOn"));
 
   facts.upstreams.push(fact("upstreams", { count: host.upstreams.length }));
+  // The host options card sits under the upstream list in the editor.
+  if (host.sslForced) facts.upstreams.push(fact("httpsForced"));
+  if (host.hstsEnabled) facts.upstreams.push(fact("hstsOn"));
+  if (host.allowWebsocket) facts.upstreams.push(fact("websocketsOn"));
+  if (host.compression === "on") facts.upstreams.push(fact("compressionOn"));
+  if (host.compression === "off") facts.upstreams.push(fact("compressionOff"));
   const lb = host.loadBalancer;
   if (lb?.enabled) facts.upstreams.push(fact("loadBalancer", { policy: lb.policy }));
   const active = Boolean(lb?.enabled && lb.activeHealthCheck?.enabled);
@@ -102,8 +107,6 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
       ? fact("certificateImported", { name: lookups.certificateName })
       : fact("certificateManaged"),
   );
-  if (host.sslForced) facts.tls.push(fact("httpsForced"));
-  if (host.hstsEnabled) facts.tls.push(fact("hstsOn"));
   if (host.mtls?.enabled) facts.tls.push(fact("mtls"));
 
   const protections = hostProtections(host, lookups.crowdsecActive);
@@ -144,8 +147,6 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
       : fact("everyAgent"),
   );
   if (host.cache) facts.advanced.push(fact("cache"));
-  if (host.compression === "on") facts.advanced.push(fact("compressionOn"));
-  if (host.compression === "off") facts.advanced.push(fact("compressionOff"));
   if (host.maintenance?.enabled) facts.advanced.push(fact("maintenanceOn"));
   if (host.customCaddyfile || host.customReverseProxyJson || host.customPreHandlersJson) {
     facts.advanced.push(fact("customConfig"));

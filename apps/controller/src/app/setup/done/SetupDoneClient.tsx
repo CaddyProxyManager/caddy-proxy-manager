@@ -33,6 +33,7 @@ export default function SetupDoneClient({
 }) {
   const frame = usePageFrame();
   const t = useTranslations("setup");
+  const tCommon = useTranslations("common");
   return (
     <Center role={frame.role}>
       <VStack gap={5} padding={5}>
@@ -97,7 +98,7 @@ export default function SetupDoneClient({
             want to open in a second tab, and a button would have swallowed the middle click. */}
         <Button
           variant="primary"
-          label={t("dashboardLinkLabel")}
+          label={tCommon("continue")}
           href={dashboardOrigin ? `${dashboardOrigin}/` : "/"}
         />
       </VStack>

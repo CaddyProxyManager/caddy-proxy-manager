@@ -238,7 +238,7 @@ export default function UsersClient({
               variant="primary"
               size="lg"
               icon={<Plus />}
-              label={t("createUser")}
+              label={tCommon("new")}
               onClick={() => setCreateOpen(true)}
               className="cpm-desktop-only"
             />
@@ -336,7 +336,7 @@ export default function UsersClient({
       rail={rail}
       phoneExtras={
         localUsersEnabled ? (
-          <Fab label={t("createUser")} onClick={() => setCreateOpen(true)} />
+          <Fab label={tCommon("new")} onClick={() => setCreateOpen(true)} />
         ) : undefined
       }
       detail={
@@ -591,7 +591,7 @@ function UserDetail({
                     <Button
                       variant="ghost"
                       size="sm"
-                      label={t("resetTwoFactor")}
+                      label={t("reset")}
                       onClick={() => setConfirmKind("reset2fa")}
                     />
                   )}
@@ -607,7 +607,7 @@ function UserDetail({
                   <Button
                     variant="ghost"
                     size="sm"
-                    label={t("removePasskeys")}
+                    label={tCommon("remove")}
                     onClick={() => setConfirmKind("removePasskeys")}
                   />
                 )}
@@ -691,6 +691,7 @@ function AdminsWithoutMfaBanner({
   onShow: () => void;
 }) {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const names = format.list(admins.map(userLabel));
   return (
@@ -704,12 +705,12 @@ function AdminsWithoutMfaBanner({
       }
       endContent={
         <HStack gap={2} wrap="wrap">
-          <Button variant="secondary" size="sm" label={t("mfa.show")} onClick={onShow} />
+          <Button variant="secondary" size="sm" label={tCommon("show")} onClick={onShow} />
           {policyMode === "off" && (
             <Button
               variant="secondary"
               size="sm"
-              label={t("mfa.requireAction")}
+              label={tCommon("configure")}
               href="/settings/authentication#two-factor"
             />
           )}

@@ -512,7 +512,7 @@ function SettingsTab({
         <HStack gap={2} vAlign="center">
           <Button
             size="sm"
-            label={tCommon("saveChanges")}
+            label={tCommon("save")}
             onClick={save}
             isLoading={saving}
             isDisabled={!dirty || !name.trim() || saving}
@@ -605,7 +605,7 @@ function SettingsTab({
               variant="destructive"
               size="sm"
               icon={<Trash2 />}
-              label={t("deleteListPermanently")}
+              label={tCommon("delete")}
               isLoading={deleting}
               isDisabled={confirm !== list.name || deleting}
               onClick={handleDelete}
@@ -867,7 +867,7 @@ function NewListDialog({
       onClose={onClose}
       title={t("newAccessList")}
       maxWidth="lg"
-      submitLabel={t("createList")}
+      submitLabel={tCommon("create")}
       onSubmit={submit}
       isSubmitting={submitting}
       isSubmitDisabled={!name.trim()}
@@ -962,7 +962,7 @@ function NewListDialog({
               variant="ghost"
               size="sm"
               icon={<Plus />}
-              label={t("addAnotherMember")}
+              label={tCommon("add")}
               onClick={() => setSeed([...seed, blankSeedMember()])}
             />
           </HStack>
@@ -1042,7 +1042,7 @@ function ListsRail({
             variant="primary"
             size="lg"
             icon={<Plus />}
-            label={t("new")}
+            label={tCommon("new")}
             onClick={onNew}
             className="cpm-desktop-only"
           />
@@ -1075,7 +1075,7 @@ function ListsRail({
           title={t("noListsTitle")}
           description={t("noListsDescription")}
           isCompact
-          actions={<Button variant="ghost" size="sm" label={t("new")} onClick={onNew} />}
+          actions={<Button variant="ghost" size="sm" label={tCommon("new")} onClick={onNew} />}
         />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -1142,6 +1142,7 @@ function ListsRail({
 export default function AccessListsClient({ lists: initialLists, usage: initialUsage }: Props) {
   const t = useTranslations("accessLists");
   const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   // Before the narrow branch's early return, so the hook order never changes with the width.
   const railWidth = usePersistedPanelWidth("access-lists-rail", {
@@ -1234,7 +1235,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
                 variant="ghost"
                 size="sm"
                 icon={<ArrowLeft />}
-                label={t("backToLists")}
+                label={tCommon("back")}
                 onClick={() => setDetailOpen(false)}
               />
             </div>
@@ -1251,7 +1252,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
               setSelectedId(id);
               setDetailOpen(true);
             })}
-            <Fab label={t("new")} onClick={() => setNewOpen(true)} />
+            <Fab label={tCommon("new")} onClick={() => setNewOpen(true)} />
           </>
         )}
         {newDialog}

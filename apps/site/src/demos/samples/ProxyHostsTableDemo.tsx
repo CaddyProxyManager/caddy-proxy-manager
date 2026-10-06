@@ -112,7 +112,6 @@ function ProxyHostsTableDemoContent() {
   const t = useTranslations("proxyHosts");
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
-  const tb = useTranslations("ui.bulk");
   const [hosts, setHosts] = useState(HOSTS);
   const router = useRouter();
   const params = useSearchParams();
@@ -293,8 +292,8 @@ function ProxyHostsTableDemoContent() {
       </div>
       {selectedKeys.size > 0 ? (
         <BulkActionBar count={selectedKeys.size} onClear={() => setSelectedKeys(new Set())}>
-          <Button variant="ghost" label={tb("enable")} onClick={() => setEnabled(true)} />
-          <Button variant="ghost" label={tb("disable")} onClick={() => setEnabled(false)} />
+          <Button variant="ghost" label={tCommon("enable")} onClick={() => setEnabled(true)} />
+          <Button variant="ghost" label={tCommon("disable")} onClick={() => setEnabled(false)} />
         </BulkActionBar>
       ) : (
         <HStack gap={3} vAlign="center" wrap="wrap">

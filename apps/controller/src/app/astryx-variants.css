@@ -201,3 +201,13 @@
     }
   }
 }
+
+/* A toolbar's slot will not shrink below its content, so tabs in one would spill past the end
+   slot instead of scrolling as TabList does anywhere else. */
+@layer astryx-theme {
+  @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+    .astryx-toolbar > :has(> .astryx-tab-list) {
+      min-width: 0;
+    }
+  }
+}

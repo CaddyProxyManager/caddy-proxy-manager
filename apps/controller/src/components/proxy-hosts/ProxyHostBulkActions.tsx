@@ -74,8 +74,8 @@ export function ProxyHostBulkActions({ hosts, certificates, accessLists, onClear
   return (
     <>
       <BulkActionBar count={hosts.length} onClear={onClear}>
-        <Button variant="ghost" label={tb("enable")} onClick={() => open("enable")} />
-        <Button variant="ghost" label={tb("disable")} onClick={() => open("disable")} />
+        <Button variant="ghost" label={tCommon("enable")} onClick={() => open("enable")} />
+        <Button variant="ghost" label={tCommon("disable")} onClick={() => open("disable")} />
         <Button variant="ghost" label={tCommon("delete")} onClick={() => open("delete")} />
         <MoreMenu
           label={tb("moreActions")}

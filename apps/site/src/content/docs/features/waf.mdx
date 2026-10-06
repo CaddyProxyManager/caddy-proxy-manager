@@ -75,7 +75,7 @@ like:
   checking everything else in the request and only skips this one.
 - **Reason** - why it misfires there. The author and time are recorded with it.
 
-**WAF → Exclusions** lists them, with an **Add exclusion** button. The quicker way is from an
+**WAF → Exclusions** lists them, with an **Add** button. The quicker way is from an
 event: **False positive** fills the form with the narrowest exclusion that would have let it
 through - that rule, on that host, for that path and the variable it matched in.
 
@@ -140,7 +140,7 @@ or remove it. Plugins from every registry share one table, with a column naming 
 came from.
 
 Each registry is re-read on the interval set there (daily by default, 0 for only when you click
-**Check now**), and every plugin's latest release is checked the way an install would check it.
+**Check**), and every plugin's latest release is checked the way an install would check it.
 One that cannot run here is greyed out and marked **Unsupported**, with the reason on hover. A
 release is checked once: later checks only look for a newer one.
 
@@ -245,7 +245,7 @@ made the decision, and the agent that reported it. Then:
 - **Working as intended** marks the event reviewed.
 - **False positive** opens the narrowest [exclusion](#exclusions) for it, and marks the event a
   false positive once saved.
-- **Block source** adds the client's address to the [blocked sources](../security/#blocked-sources).
+- **Block** adds the client's address to the [blocked sources](../security/#blocked-sources).
 - **Copy as curl** copies the request as a curl command, to reproduce it. It is quoted for a POSIX
   shell such as bash or zsh, not for PowerShell or cmd, and a method that is not a plain verb is
   replaced with `GET`, since the method is whatever the client sent.

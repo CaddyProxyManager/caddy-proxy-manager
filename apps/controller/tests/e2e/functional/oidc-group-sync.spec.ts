@@ -114,7 +114,7 @@ test.describe('OIDC group sync', () => {
     await dialog.getByLabel(/group prefix/i).fill('cpm-');
     await dialog.getByRole('switch', { name: /assign roles from groups/i }).click();
     await dialog.getByRole('switch', { name: /mirror groups into cpm groups/i }).click();
-    await dialog.getByRole('button', { name: /create provider/i }).click();
+    await dialog.getByRole('button', { name: /^create$/i }).click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
     const id = await providerIdByName(page.request, name);
     expect(id, 'provider created').toBeTruthy();

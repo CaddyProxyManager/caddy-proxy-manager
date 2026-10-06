@@ -234,7 +234,7 @@ export function WafPluginFiles({
                     {config !== upstreamConfig && (
                       <Button
                         size="sm"
-                        label={t("pluginConfigRestore")}
+                        label={tCommon("restore")}
                         onClick={() => setConfig(upstreamConfig)}
                       />
                     )}

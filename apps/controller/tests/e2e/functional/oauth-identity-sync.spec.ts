@@ -185,13 +185,13 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     expect((await getAdminUser(admin)).provider).toBe(provider.id);
 
     await page.goto('/profile');
-    const unlinkButton = page.getByRole('button', { name: /unlink oauth account/i });
+    const unlinkButton = page.getByRole('button', { name: /^unlink$/i });
     await expect(unlinkButton).toBeVisible({ timeout: 15_000 });
     await unlinkButton.click();
     // Scoped: the password forms carry a current-password field too.
     const unlinkDialog = page.getByRole('dialog', { name: /unlink oauth account/i });
     await unlinkDialog.getByLabel(/current password/i).fill(ADMIN_PASSWORD);
-    await unlinkDialog.getByRole('button', { name: /^unlink oauth$/i }).click();
+    await unlinkDialog.getByRole('button', { name: /^unlink$/i }).click();
 
     await expect(page.getByText(/link an oauth provider to enable single sign-on/i)).toBeVisible({
       timeout: 30_000,

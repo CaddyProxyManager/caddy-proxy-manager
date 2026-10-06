@@ -43,6 +43,7 @@ function formatRelativeDate(t: ReturnType<typeof useTranslations<"certificates">
 
 function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
   const t = useTranslations("certificates");
+  const tCommon = useTranslations("common");
   const [issueCaOpen, setIssueCaOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
@@ -62,7 +63,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
             <Button
               size="sm"
               variant="primary"
-              label={t("issueCert")}
+              label={tCommon("issue")}
               onClick={() => setIssueCaOpen(true)}
             />
           )}
@@ -139,7 +140,7 @@ function CaActionsMenu({
         alignment="end"
         items={[
           ...(ca.hasPrivateKey
-            ? [{ label: t("issueClientCert"), onClick: () => setIssuedOpen(true) }]
+            ? [{ label: tCommon("issue"), onClick: () => setIssuedOpen(true) }]
             : []),
           { label: tCommon("edit"), onClick: onEdit },
           { label: tCommon("delete"), variant: "destructive" as const, onClick: onDelete },
@@ -281,12 +282,12 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
         <Button
           variant="primary"
           size="sm"
-          label={t("addCaCertificate")}
+          label={tCommon("add")}
           icon={<Plus />}
           onClick={() => setDrawerCert(null)}
         />
       </HStack>
-      <Fab label={t("addCaCertificate")} onClick={() => setDrawerCert(null)} />
+      <Fab label={tCommon("add")} onClick={() => setDrawerCert(null)} />
 
       {filtered.length === 0 ? (
         <Card>

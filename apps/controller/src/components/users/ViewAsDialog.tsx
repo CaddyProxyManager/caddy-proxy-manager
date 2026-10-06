@@ -53,7 +53,7 @@ export function ViewAsDialog({
       onClose={onClose}
       title={t("title")}
       maxWidth="sm"
-      submitLabel={t("start")}
+      submitLabel={tCommon("view")}
       onSubmit={start}
       isSubmitting={busy}
     >

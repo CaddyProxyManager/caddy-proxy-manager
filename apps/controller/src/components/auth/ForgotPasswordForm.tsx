@@ -84,7 +84,7 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
                 <Button
                   type="submit"
                   variant="primary"
-                  label={t("requestSubmit")}
+                  label={t("send")}
                   isLoading={pending}
                   isDisabled={pending}
                   width="100%"

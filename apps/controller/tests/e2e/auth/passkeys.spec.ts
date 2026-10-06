@@ -98,7 +98,7 @@ test.describe('Passkeys', () => {
 
     await page.goto(`${BASE}/profile`);
     await waitForHydration(page);
-    await page.getByRole('button', { name: /^add a passkey$/i }).click();
+    await page.getByRole('button', { name: /^add$/i }).click();
     const dialog = page.getByRole('dialog', { name: /add a passkey/i });
     await dialog.getByLabel(/^name/i).fill('E2E authenticator');
     await dialog.getByRole('button', { name: /^add a passkey$/i }).click();

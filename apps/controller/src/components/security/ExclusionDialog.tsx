@@ -85,7 +85,7 @@ export function ExclusionDialog({
       onClose={onClose}
       title={draft?.id ? t("exclusionEditTitle") : t("exclusionNewTitle")}
       maxWidth="md"
-      submitLabel={t("exclusionSave")}
+      submitLabel={tCommon("save")}
       onSubmit={submit}
       isSubmitting={submitting}
       isSubmitDisabled={ruleId === null || isProtected}

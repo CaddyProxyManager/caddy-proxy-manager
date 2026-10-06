@@ -26,7 +26,7 @@ async function openList(page: Page, name: string, tab: RegExp) {
 async function setRules(page: Page, name: string, action: 'Allow' | 'Deny', cidrs: string[]) {
   await openList(page, name, /^network/i);
   for (const [index, cidr] of cidrs.entries()) {
-    await page.getByRole('button', { name: /add rule/i }).click();
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
     const ranges = page.getByPlaceholder('192.168.1.0/24');
     await ranges.nth(index).fill(cidr);
     if (action === 'Deny') {
@@ -37,7 +37,7 @@ async function setRules(page: Page, name: string, action: 'Allow' | 'Deny', cidr
       await page.getByRole('option', { name: 'Deny', exact: true }).click();
     }
   }
-  await page.getByRole('button', { name: /save changes/i }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(
     page.getByRole('navigation', { name: 'Tabs' }).getByRole('button', { name: /^network/i }),
   ).toContainText(String(cidrs.length));

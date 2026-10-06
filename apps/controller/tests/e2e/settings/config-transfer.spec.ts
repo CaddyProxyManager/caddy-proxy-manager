@@ -46,7 +46,7 @@ test('exports a readable configuration with its secrets sealed, and previews imp
     });
   await expect(page.getByText(/exported by version/i)).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("The file's passphrase").fill(PASSPHRASE);
-  await page.getByRole('button', { name: /preview import/i }).click();
+  await page.getByRole('button', { name: /^preview$/i }).click();
   await expect(page.getByText(/nothing would change/i)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: /^import$/i })).toBeDisabled();
 });

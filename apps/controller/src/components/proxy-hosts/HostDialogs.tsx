@@ -167,17 +167,7 @@ export function CreateHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <VStack gap={5} id={anchor("general")}>
-            <SettingsToggles
-              sslForced={initialData?.sslForced}
-              hstsEnabled={initialData?.hstsEnabled}
-              hstsSubdomains={initialData?.hstsSubdomains}
-              allowWebsocket={initialData?.allowWebsocket}
-              preserveHostHeader={initialData?.preserveHostHeader}
-              skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
-              compression={initialData?.compression}
-              discourageIndexing={initialData?.discourageIndexing}
-              enabled={true}
-            />
+            <SettingsToggles part="enabled" enabled={true} />
             <TextInput
               label={tCommon("name")}
               htmlName="name"
@@ -202,6 +192,17 @@ export function CreateHostDialog({
           </VStack>
           <VStack gap={5} id={anchor("upstreams")}>
             <UpstreamInput defaultUpstreams={initialData?.upstreams} />
+            <SettingsToggles
+              part="options"
+              sslForced={initialData?.sslForced}
+              hstsEnabled={initialData?.hstsEnabled}
+              hstsSubdomains={initialData?.hstsSubdomains}
+              allowWebsocket={initialData?.allowWebsocket}
+              preserveHostHeader={initialData?.preserveHostHeader}
+              skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
+              compression={initialData?.compression}
+              discourageIndexing={initialData?.discourageIndexing}
+            />
             <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
             <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
             <UpstreamTimeoutsFields upstreamTimeouts={initialData?.upstreamTimeouts} />
@@ -352,7 +353,7 @@ export function EditHostDialog({
       kind="http"
       isCreate={false}
       formId="edit-host-form"
-      submitLabel={tCommon("saveChanges")}
+      submitLabel={tCommon("save")}
       state={state}
       isPending={isPending}
       preview={(data) => previewProxyHostAction(host.id, data)}
@@ -364,17 +365,7 @@ export function EditHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <VStack gap={5} id={editorSectionAnchor("general")}>
-            <SettingsToggles
-              sslForced={host.sslForced}
-              hstsEnabled={host.hstsEnabled}
-              hstsSubdomains={host.hstsSubdomains}
-              allowWebsocket={host.allowWebsocket}
-              preserveHostHeader={host.preserveHostHeader}
-              skipHttpsValidation={host.skipHttpsHostnameValidation}
-              compression={host.compression}
-              discourageIndexing={host.discourageIndexing}
-              enabled={host.enabled}
-            />
+            <SettingsToggles part="enabled" enabled={host.enabled} />
             <TextInput
               label={tCommon("name")}
               htmlName="name"
@@ -396,6 +387,17 @@ export function EditHostDialog({
           </VStack>
           <VStack gap={5} id={editorSectionAnchor("upstreams")}>
             <UpstreamInput defaultUpstreams={host.upstreams} />
+            <SettingsToggles
+              part="options"
+              sslForced={host.sslForced}
+              hstsEnabled={host.hstsEnabled}
+              hstsSubdomains={host.hstsSubdomains}
+              allowWebsocket={host.allowWebsocket}
+              preserveHostHeader={host.preserveHostHeader}
+              skipHttpsValidation={host.skipHttpsHostnameValidation}
+              compression={host.compression}
+              discourageIndexing={host.discourageIndexing}
+            />
             <UpstreamHealthPanel hostId={host.id} />
             <LoadBalancerFields loadBalancer={host.loadBalancer} />
             <DnsResolverFields dnsResolver={host.dnsResolver} />

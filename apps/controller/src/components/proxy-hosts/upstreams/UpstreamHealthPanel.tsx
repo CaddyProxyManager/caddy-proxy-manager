@@ -102,7 +102,7 @@ export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
           <IconButton
             variant="ghost"
             size="sm"
-            label={tCommon("checkAgain")}
+            label={tCommon("recheck")}
             icon={<RefreshCw />}
             onClick={load}
             isDisabled={isPending}

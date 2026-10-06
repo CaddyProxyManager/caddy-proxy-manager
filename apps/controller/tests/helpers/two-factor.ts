@@ -10,11 +10,11 @@ export async function freshTotpCode(page: Page, secret: string): Promise<string>
 }
 
 /**
- * From the "Turn on" button, on Profile or the policy's setup page, to the backup codes dismissed.
+ * From the "Enable" button, on Profile or the policy's setup page, to the backup codes dismissed.
  * Returns the TOTP secret.
  */
 export async function turnOnTwoFactor(page: Page, password: string): Promise<string> {
-  await page.getByRole('button', { name: /^turn on$/i }).click();
+  await page.getByRole('button', { name: /^enable$/i }).click();
   const passwordDialog = page.getByRole('dialog');
   await passwordDialog.getByLabel(/current password/i).fill(password);
   await passwordDialog.getByRole('button', { name: /^continue$/i }).click();
@@ -23,10 +23,10 @@ export async function turnOnTwoFactor(page: Page, password: string): Promise<str
   await expect(scan.getByRole('img', { name: /qr code/i })).toBeVisible();
   const secret = (await scan.locator('pre, code').first().innerText()).trim();
   await scan.getByLabel(/6-digit code/i).fill(await freshTotpCode(page, secret));
-  await scan.getByRole('button', { name: /^turn on$/i }).click();
+  await scan.getByRole('button', { name: /^enable$/i }).click();
 
   const codes = page.getByRole('dialog', { name: /your backup codes/i });
   await expect(codes).toBeVisible({ timeout: 15_000 });
-  await codes.getByRole('button', { name: /saved them/i }).click();
+  await codes.getByRole('button', { name: /^done$/i }).click();
   return secret;
 }

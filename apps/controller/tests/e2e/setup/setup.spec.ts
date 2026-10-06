@@ -53,8 +53,8 @@ test.describe('First-run setup', () => {
     await page.getByRole('radio', { name: 'Agent' }).click();
 
     await expect(page.getByText('Agents are set up separately')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to controller setup' }).click();
-    await expect(page.getByRole('button', { name: /create account and sign in/i })).toBeVisible();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
   });
 
   test('the OAuth option offers a provider form instead of an account form', async () => {
@@ -73,7 +73,7 @@ test.describe('First-run setup', () => {
     await field('username').fill(USERNAME);
     await field('password').fill(PASSWORD);
     await field('passwordConfirmation').fill('SomethingElse2026!');
-    await page.getByRole('button', { name: /create account and sign in/i }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(page.getByText('The two passwords do not match.')).toBeVisible();
     await expect(page).toHaveURL(/\/setup$/);
@@ -85,7 +85,7 @@ test.describe('First-run setup', () => {
     await field('username').fill(USERNAME);
     await field('password').fill(PASSWORD);
     await field('passwordConfirmation').fill(PASSWORD);
-    await page.getByRole('button', { name: /create account and sign in/i }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     // Login on purpose: prove the credentials before more configuration is entered.
     await expect(page).toHaveURL(/\/login$/, { timeout: 30_000 });
@@ -141,7 +141,7 @@ test.describe('First-run setup', () => {
   test('a half-filled provider is refused rather than quietly skipped', async () => {
     // Skipping it silently would leave the operator believing SSO was configured.
     await page.getByRole('textbox', { name: 'Display name' }).fill('Partly');
-    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+    await page.getByRole('button', { name: 'Finish', exact: true }).click();
 
     await expect(page.getByText(/needs a display name, issuer URL/i)).toBeVisible();
     await expect(page).toHaveURL(/\/setup\/settings$/);
@@ -166,7 +166,7 @@ test.describe('First-run setup', () => {
   test('enabling analytics without a password is refused rather than half-applied', async () => {
     // ClickHouse will not start without one, so analytics would be on with nothing recording.
     await expect(page.getByRole('switch', { name: 'Enable analytics' })).toBeChecked();
-    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+    await page.getByRole('button', { name: 'Finish', exact: true }).click();
 
     await expect(page.getByText(/needs a ClickHouse password/i)).toBeVisible();
     await expect(page).toHaveURL(/\/setup\/settings$/);
@@ -181,7 +181,7 @@ test.describe('First-run setup', () => {
     // A real container restart happens here.
     test.setTimeout(180_000);
 
-    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+    await page.getByRole('button', { name: 'Finish', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
       timeout: 30_000,
     });

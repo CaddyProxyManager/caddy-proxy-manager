@@ -86,7 +86,7 @@ test.describe('mTLS - deleted CA must not remain selectable', () => {
 
 /** The picker renders only once the mTLS section is enabled. */
 async function openMtlsPicker(page: import('@playwright/test').Page) {
-  await page.getByRole('button', { name: /create host/i }).click();
+  await page.getByRole('button', { name: 'New', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
 

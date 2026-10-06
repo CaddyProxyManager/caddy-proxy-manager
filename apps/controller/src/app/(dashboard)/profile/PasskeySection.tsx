@@ -212,7 +212,7 @@ export function PasskeySection({
           <Button
             variant="secondary"
             icon={<Plus />}
-            label={t("add")}
+            label={tCommon("add")}
             onClick={() => open({ kind: "add" })}
           />
         </HStack>

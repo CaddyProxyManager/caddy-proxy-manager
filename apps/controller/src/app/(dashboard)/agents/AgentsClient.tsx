@@ -158,7 +158,7 @@ export default function AgentsClient({
       {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way. */}
       <PageHeader
         title={tNav("agents")}
-        action={isAdmin ? { label: t("pairAgent"), href: "/settings/agent" } : undefined}
+        action={isAdmin ? { label: t("pair"), href: "/settings/agent" } : undefined}
       />
 
       {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}

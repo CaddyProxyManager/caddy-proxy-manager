@@ -133,7 +133,7 @@ export default function LegacyPasswordChangeForm() {
           {/* Straight after the fields, so it stays above the keyboard on a phone. */}
           <Button
             type="submit"
-            label={t("auth.passwordChange.submit")}
+            label={t("common.save")}
             isLoading={isSubmitting}
             isDisabled={isSubmitting}
             width="100%"

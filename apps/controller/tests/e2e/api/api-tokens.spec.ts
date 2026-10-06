@@ -34,13 +34,13 @@ async function createToken(
   scope?: RegExp,
 ): Promise<string> {
   await page
-    .getByRole('button', { name: /^create token$/i })
+    .getByRole('button', { name: /^create$/i })
     .first()
     .click();
   const dialog = page.getByRole('dialog');
   await dialog.getByPlaceholder('e.g. CI/CD Pipeline').fill(name);
   if (scope) await dialog.getByRole('radio', { name: scope }).check();
-  await dialog.getByRole('button', { name: /^create token$/i }).click();
+  await dialog.getByRole('button', { name: /^create$/i }).click();
   await expect(page.getByText(/copy this token now/i)).toBeVisible({ timeout: 15_000 });
   return (
     await page

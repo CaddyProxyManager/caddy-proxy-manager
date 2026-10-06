@@ -110,7 +110,7 @@ test.describe('Access Lists - create dialog', () => {
     await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('button', { name: /create list/i })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Create', exact: true })).toBeDisabled();
   });
 
   test('create list with name only - appears in rail', async ({ page }) => {
@@ -121,7 +121,7 @@ test.describe('Access Lists - create dialog', () => {
     const dialog = page.getByRole('dialog');
 
     await dialog.getByPlaceholder(/internal.*engineering/i).fill(listName);
-    await dialog.getByRole('button', { name: /create list/i }).click();
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('heading', { name: listName })).toBeVisible({ timeout: 10_000 });
@@ -141,7 +141,7 @@ test.describe('Access Lists - create dialog', () => {
 
     await dialog.getByPlaceholder(/internal.*engineering/i).fill(listName);
     await dialog.getByPlaceholder(/what is this list for/i).fill('Test description');
-    await dialog.getByRole('button', { name: /create list/i }).click();
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Test description')).toBeVisible({ timeout: 10_000 });
@@ -162,7 +162,7 @@ test.describe('Access Lists - create dialog', () => {
     await dialog.getByPlaceholder(/internal.*engineering/i).fill(listName);
     await dialog.getByPlaceholder('username').first().fill('seeduser');
     await dialog.getByPlaceholder('password').first().fill('SeedPassword!123');
-    await dialog.getByRole('button', { name: /create list/i }).click();
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('1 member', { exact: false }).first()).toBeVisible({
@@ -182,7 +182,7 @@ test.describe('Access Lists - create dialog', () => {
     const dialog = page.getByRole('dialog');
 
     await expect(dialog.getByPlaceholder('username')).toHaveCount(1);
-    await dialog.getByRole('button', { name: 'Add another member' }).click();
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(dialog.getByPlaceholder('username')).toHaveCount(2);
   });
 
@@ -636,12 +636,12 @@ test.describe('Access Lists - settings tab', () => {
   });
 
   test('Save changes button is disabled when no edits are made', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /save changes/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   });
 
   test('editing name enables Save changes button', async ({ page }) => {
     await settingsNameField(page).fill('Modified Name');
-    await expect(page.getByRole('button', { name: /save changes/i })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
   });
 
   test('Discard button appears when edits are made', async ({ page }) => {
@@ -659,26 +659,26 @@ test.describe('Access Lists - settings tab', () => {
   test('save changes updates the list name', async ({ page }) => {
     const newName = `E2E Renamed ${Date.now()}`;
     await settingsNameField(page).fill(newName);
-    await page.getByRole('button', { name: /save changes/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Saved')).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole('heading', { name: newName })).toBeVisible({ timeout: 5_000 });
   });
 
   test('delete button is disabled until confirmation name is typed', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /delete list permanently/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
   });
 
   test('typing wrong confirmation keeps delete disabled', async ({ page }) => {
     await page.getByPlaceholder(list.name).fill('wrong name');
-    await expect(page.getByRole('button', { name: /delete list permanently/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
   });
 
   test('delete list with correct confirmation removes it', async ({ page }) => {
     await page.getByPlaceholder(list.name).fill(list.name);
-    await expect(page.getByRole('button', { name: /delete list permanently/i })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
 
-    await page.getByRole('button', { name: /delete list permanently/i }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
 
     await expect(page.locator('ul').getByText(list.name)).not.toBeVisible({ timeout: 10_000 });
     list = { ...list, id: -1 };

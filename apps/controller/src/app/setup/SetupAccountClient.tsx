@@ -105,7 +105,7 @@ export default function SetupAccountClient({
               <Button
                 size="sm"
                 variant="secondary"
-                label={ta("backToController")}
+                label={tCommon("back")}
                 onClick={() => setRole("controller")}
               />
             </VStack>
@@ -163,7 +163,7 @@ export default function SetupAccountClient({
                       isRequired
                       width="100%"
                     />
-                    <SaveButton label={ta("createAccount")} />
+                    <SaveButton label={tCommon("create")} />
                   </VStack>
                 </FormCard>
               </form>
@@ -214,7 +214,7 @@ export default function SetupAccountClient({
                       isRequired
                       width="100%"
                     />
-                    <SaveButton label={ta("saveProvider")} />
+                    <SaveButton />
                   </VStack>
                 </FormCard>
               </form>

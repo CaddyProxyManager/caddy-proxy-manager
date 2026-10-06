@@ -244,7 +244,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
             size="sm"
             alignment="end"
             items={[
-              { label: t("renewNow"), onClick: () => renew(r) },
+              { label: t("renew"), onClick: () => renew(r) },
               { label: tCommon("testReachability"), onClick: () => setChecking(r) },
               ...(cert
                 ? [

@@ -45,6 +45,7 @@ export function DisplaySection({
   onError: (message: string) => void;
 }) {
   const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
   const locale = useLocale();
   const currentZone = useTimeZone();
   const density = useTableDensity();
@@ -156,7 +157,7 @@ export function DisplaySection({
           <Button
             variant="primary"
             size="sm"
-            label={t("displayPreferences.save")}
+            label={tCommon("save")}
             isDisabled={!dirty || saving}
             isLoading={saving}
             onClick={save}

@@ -64,7 +64,7 @@ test.describe('LDAP directories', () => {
 
     await dialog.getByLabel(/^test username/i).fill(LDAP_USER);
     await dialog.getByLabel(/^test password/i).fill(LDAP_PASSWORD);
-    await dialog.getByRole('button', { name: /^test connection$/i }).click();
+    await dialog.getByRole('button', { name: /^test$/i }).click();
     await expect(dialog.getByText(/the test user signed in/i)).toBeVisible({ timeout: 20_000 });
     await expect(dialog.getByText('CPM Operators')).toBeVisible();
 

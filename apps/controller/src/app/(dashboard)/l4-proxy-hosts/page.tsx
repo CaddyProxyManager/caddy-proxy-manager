@@ -1,4 +1,5 @@
 import L4ProxyHostsClient from "./L4ProxyHostsClient";
+import { HostTagSuggestions } from "@/components/proxy-hosts/HostTagsField";
 import {
   listL4ProxyHostsPaginated,
   countL4ProxyHosts,
@@ -81,21 +82,23 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   ]).catch(() => new Map<number, number[]>());
 
   return (
-    <L4ProxyHostsClient
-      hosts={hosts}
-      pagination={{ total, page, perPage: PER_PAGE }}
-      counts={counts}
-      activeProtocol={protocol ?? "all"}
-      initialSearch={search ?? ""}
-      tags={tags}
-      activeTag={tag ?? null}
-      initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
-      agents={agents}
-      accessLists={accessLists}
-      agentAssignments={Object.fromEntries(assignments)}
-      canCreate={canCreate(access)}
-      manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
-      editTarget={editHost}
-    />
+    <HostTagSuggestions tags={tags}>
+      <L4ProxyHostsClient
+        hosts={hosts}
+        pagination={{ total, page, perPage: PER_PAGE }}
+        counts={counts}
+        activeProtocol={protocol ?? "all"}
+        initialSearch={search ?? ""}
+        tags={tags}
+        activeTag={tag ?? null}
+        initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
+        agents={agents}
+        accessLists={accessLists}
+        agentAssignments={Object.fromEntries(assignments)}
+        canCreate={canCreate(access)}
+        manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
+        editTarget={editHost}
+      />
+    </HostTagSuggestions>
   );
 }

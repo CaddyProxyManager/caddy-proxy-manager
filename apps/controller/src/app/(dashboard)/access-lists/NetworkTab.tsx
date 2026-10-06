@@ -357,7 +357,7 @@ export function NetworkTab({
           variant="ghost"
           size="sm"
           icon={<Plus />}
-          label={tCommon("addRule")}
+          label={tCommon("add")}
           onClick={() =>
             setRules((current) => [
               ...current,
@@ -373,7 +373,7 @@ export function NetworkTab({
         />
         <Button
           size="sm"
-          label={tCommon("saveChanges")}
+          label={tCommon("save")}
           onClick={save}
           isLoading={saving}
           isDisabled={!dirty || saving}

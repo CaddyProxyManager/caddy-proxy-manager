@@ -393,7 +393,7 @@ export default function OAuthProvidersSection({
         onClose={() => setDialogOpen(false)}
         title={editingProvider ? t("editOauthProviderTitle") : t("addOauthProviderTitle")}
         maxWidth="lg"
-        submitLabel={editingProvider ? t("updateOauthProvider") : t("createOauthProvider")}
+        submitLabel={editingProvider ? tCommon("save") : tCommon("create")}
         onSubmit={handleSave}
         isSubmitting={saving}
       >
@@ -447,7 +447,7 @@ export default function OAuthProvidersSection({
                 type="button"
                 variant="secondary"
                 size="sm"
-                label={t("rotateSecret")}
+                label={t("rotate")}
                 onClick={() => setRotateClientSecret(true)}
               />
             </HStack>
@@ -470,7 +470,7 @@ export default function OAuthProvidersSection({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    label={t("keepExisting")}
+                    label={tCommon("keep")}
                     onClick={() => {
                       setRotateClientSecret(false);
                       updateField("clientSecret", "");

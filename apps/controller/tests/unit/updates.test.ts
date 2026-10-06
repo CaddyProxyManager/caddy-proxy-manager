@@ -336,7 +336,7 @@ describe('what the status reports', () => {
   });
 
   it('knows nothing while checks are off, rather than repeating a stale answer', async () => {
-    // The Settings page reads `latest` as authoritative, and "Check now" is disabled with the
+    // The Settings page reads `latest` as authoritative, and "Check" is disabled with the
     // setting, so a stale value could never be refreshed.
     store.cache = CACHED;
     store.enabled = false;

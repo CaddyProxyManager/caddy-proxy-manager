@@ -87,7 +87,7 @@ test.describe('Migrating an existing installation', () => {
 
   test('the confirmation says what is coming across before anything is copied', async () => {
     // Counts are restated before a one-way import. Cancel leaves the page for the test below.
-    await page.getByRole('button', { name: 'Migrate this database' }).click();
+    await page.getByRole('button', { name: 'Migrate', exact: true }).click();
     const sheet = page.getByRole('dialog');
 
     await expect(sheet.getByText(LEGACY_CONTAINER_PATH)).toBeVisible();
@@ -105,12 +105,12 @@ test.describe('Migrating an existing installation', () => {
   test('migrating restarts the app before handing them on', async () => {
     // The restart is the point: the process read its config from the empty database at boot, and
     // signing in before it restarts means signing in to the old answers.
-    await page.getByRole('button', { name: 'Migrate this database' }).click();
+    await page.getByRole('button', { name: 'Migrate', exact: true }).click();
 
     // The button opens a confirmation rather than importing: the copy is one-way, so the
     // selection above gets one last look before it stops being reversible.
     await expect(page.getByRole('heading', { name: 'Migrate this database?' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start the migration' }).click();
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
 
     // The importer copies thirty tables; the dialog is the signal it finished.
     await expect(
@@ -165,7 +165,7 @@ test.describe('Migrating an existing installation', () => {
 
     // Not the dashboard: an operator who just replaced their database is first told where the old
     // one is and what to drop from .env. Despite the dashboard host, this session keeps it here.
-    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+    await page.getByRole('button', { name: 'Finish', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
       timeout: 30_000,
     });

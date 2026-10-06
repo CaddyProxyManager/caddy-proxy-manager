@@ -10,22 +10,22 @@ const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik'
 test.describe('Proxy Hosts', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(PROXY_HOSTS_NEWEST_FIRST);
-    // The tests below click Create Host first thing; a click before hydration opens nothing.
+    // The tests below click New first thing; a click before hydration opens nothing.
     await waitForHydration(page);
   });
 
   test('page loads with Create Host button visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /create host/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New', exact: true })).toBeVisible();
   });
 
   test('clicking Create Host opens a dialog with form fields', async ({ page }) => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByLabel(/^domains/i)).toBeVisible();
   });
 
   test('create a proxy host - appears in the table', async ({ page }) => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Test Host');
@@ -63,7 +63,7 @@ test.describe('Proxy Hosts', () => {
   /** Regression (#119): the form posted camelCase field names, the action read snake_case. */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
     // Defaults: HSTS Subdomains and Skip HTTPS both off.
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Advanced Options Test');
@@ -114,7 +114,7 @@ test.describe('Proxy Hosts', () => {
       await expect(hstsSwitch).toBeChecked();
       await expect(skipSwitch).toBeChecked();
 
-      await dialog.getByRole('button', { name: /save changes/i }).click();
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
       const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.id}`);
@@ -254,7 +254,7 @@ test.describe('Proxy Hosts', () => {
 
       await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
-      await page.getByRole('button', { name: /create host/i }).click();
+      await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const dialog = page.getByRole('dialog');
@@ -451,7 +451,7 @@ test.describe('Proxy Hosts', () => {
 
   /** Regression: `parseGeoBlockConfig` returned `geoblock_mode`, but the input reads camelCase. */
   test('per-host geoblock override mode persists after save', async ({ page }) => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Geoblock Override Host');
@@ -497,10 +497,7 @@ test.describe('Proxy Hosts', () => {
     await expect(editGeoCard.getByRole('radio', { name: 'Override global' })).toBeChecked();
 
     await editGeoCard.getByRole('radio', { name: 'Merge with global' }).click();
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: /save changes/i })
-      .click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
     const listResp2 = await page.request.get(API_PROXY_HOSTS);
@@ -510,7 +507,7 @@ test.describe('Proxy Hosts', () => {
   });
 
   test('delete proxy host removes it from table', async ({ page }) => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Host To Delete');
@@ -597,7 +594,7 @@ test.describe('Proxy Hosts', () => {
    * hide that from value assertions, so nodes are stamped with an expando React never touches.
    */
   test('removing an upstream keeps every other row on its own DOM node', async ({ page }) => {
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     const addresses = page.getByPlaceholder('10.0.0.5:8080');

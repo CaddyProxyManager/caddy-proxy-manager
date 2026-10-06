@@ -89,7 +89,7 @@ export function ApiTokensSection({
           variant="secondary"
           size="sm"
           icon={<Plus />}
-          label={t("createToken")}
+          label={tCommon("create")}
           isDisabled={atLimit}
           tooltip={atLimit ? t("apiTokenLimit", { max: TOKEN_LIMIT }) : undefined}
           onClick={() => setDialogOpen(true)}
@@ -271,7 +271,7 @@ function CreateTokenDialog({
       onClose={onClose}
       title={t("createToken")}
       maxWidth="md"
-      submitLabel={t("createToken")}
+      submitLabel={tCommon("create")}
       onSubmit={submit}
       isSubmitting={submitting}
       isSubmitDisabled={incomplete}

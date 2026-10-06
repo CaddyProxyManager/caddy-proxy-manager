@@ -36,7 +36,7 @@ test.describe('Generic forward auth', () => {
 
       await page.goto('/proxy-hosts');
       await waitForHydration(page);
-      await page.getByRole('button', { name: /create host/i }).click();
+      await page.getByRole('button', { name: /^new$/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const dialog = page.getByRole('dialog');
@@ -70,7 +70,7 @@ test.describe('Generic forward auth', () => {
   test('a host configured in the dialog keeps its split and bypass headers', async ({ page }) => {
     await page.goto('/proxy-hosts');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     const dialog = page.getByRole('dialog');

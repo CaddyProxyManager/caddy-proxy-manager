@@ -1,4 +1,5 @@
 import ProxyHostsClient from "./ProxyHostsClient";
+import { HostTagSuggestions } from "@/components/proxy-hosts/HostTagsField";
 import {
   listProxyHostsPaginated,
   countProxyHostsByState,
@@ -133,28 +134,30 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const agentAssignments = Object.fromEntries(assignments);
 
   return (
-    <ProxyHostsClient
-      hosts={hosts}
-      certificates={certificates.map(toCertificatePickerOption)}
-      pagination={{ total, page, perPage: PER_PAGE }}
-      initialSearch={search ?? ""}
-      tags={tags}
-      activeTag={tag ?? null}
-      activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
-      initialSort={{
-        sortBy: sortBy === "requests" && !byRequests ? "createdAt" : (sortBy ?? "createdAt"),
-        sortDir,
-      }}
-      agents={agents}
-      agentAssignments={agentAssignments}
-      counts={counts}
-      insights={insights}
-      editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
-      canCreate={canCreate(access)}
-      manageableIds={dialogHosts
-        .filter((h) => canManage(access, "proxyHost", h.id))
-        .map((h) => h.id)}
-      canEditRawConfig={access.isAdmin}
-    />
+    <HostTagSuggestions tags={tags}>
+      <ProxyHostsClient
+        hosts={hosts}
+        certificates={certificates.map(toCertificatePickerOption)}
+        pagination={{ total, page, perPage: PER_PAGE }}
+        initialSearch={search ?? ""}
+        tags={tags}
+        activeTag={tag ?? null}
+        activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
+        initialSort={{
+          sortBy: sortBy === "requests" && !byRequests ? "createdAt" : (sortBy ?? "createdAt"),
+          sortDir,
+        }}
+        agents={agents}
+        agentAssignments={agentAssignments}
+        counts={counts}
+        insights={insights}
+        editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
+        canCreate={canCreate(access)}
+        manageableIds={dialogHosts
+          .filter((h) => canManage(access, "proxyHost", h.id))
+          .map((h) => h.id)}
+        canEditRawConfig={access.isAdmin}
+      />
+    </HostTagSuggestions>
   );
 }

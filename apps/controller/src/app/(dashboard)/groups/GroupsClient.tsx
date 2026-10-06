@@ -171,7 +171,7 @@ export default function GroupsClient({
             variant="primary"
             size="lg"
             icon={<Plus />}
-            label={t("newGroup")}
+            label={tCommon("new")}
             onClick={() => setCreateOpen(true)}
             className="cpm-desktop-only"
           />
@@ -196,7 +196,7 @@ export default function GroupsClient({
             <Button
               variant="ghost"
               size="sm"
-              label={t("newGroup")}
+              label={tCommon("new")}
               onClick={() => setCreateOpen(true)}
             />
           }
@@ -264,7 +264,7 @@ export default function GroupsClient({
       backLabel={t("backToGroups")}
       hasSelection={selected !== null}
       rail={rail}
-      phoneExtras={<Fab label={t("newGroup")} onClick={() => setCreateOpen(true)} />}
+      phoneExtras={<Fab label={tCommon("new")} onClick={() => setCreateOpen(true)} />}
       detail={
         selected ? (
           <GroupDetail
@@ -373,7 +373,7 @@ function GroupDetail({
             variant="primary"
             size="sm"
             icon={<UserPlus />}
-            label={tCommon("addMember")}
+            label={tCommon("add")}
             onClick={() => setAddOpen(true)}
           />
           <IconButton
@@ -565,9 +565,7 @@ function MembersTab({
         icon={<Users />}
         title={tCommon("noMembersYet")}
         description={t("noMembersDescription")}
-        actions={
-          <Button size="sm" variant="secondary" label={tCommon("addMember")} onClick={onAdd} />
-        }
+        actions={<Button size="sm" variant="secondary" label={tCommon("add")} onClick={onAdd} />}
       />
     );
   }
@@ -639,6 +637,7 @@ function AccessTab({
 }) {
   const t = useTranslations("groups");
   const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const counts = grantCounts(access);
   const nameOf = (list: NamedResource[], ids: number[]) =>
     ids.map((id) => list.find((item) => item.id === id)?.name ?? `#${id}`);
@@ -675,7 +674,7 @@ function AccessTab({
               size="sm"
               variant="secondary"
               icon={<Pencil />}
-              label={t("editAccess")}
+              label={tCommon("edit")}
               onClick={onEdit}
             />
           </HStack>

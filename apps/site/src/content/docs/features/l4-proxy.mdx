@@ -31,7 +31,7 @@ the `bulkL4ProxyHosts` mutation.
 - **PROXY protocol** - connections that arrive wrapped in a PROXY protocol header, from a load
   balancer in front of Caddy.
 
-<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send; Review changes shows the diff first.">
+<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send; Review shows the diff first.">
   <L4HostEditorDemo client:visible />
 </Demo>
 
@@ -39,7 +39,7 @@ The editor is in four parts - General, Listener, Upstreams and Protection - with
 to jump between them; an existing host's editor puts the part in the address bar, as
 `/l4-proxy-hosts?edit=<id>#upstreams`. It has the same
 [review step](../reverse-proxy/#reviewing-a-change-before-saving) as an HTTP host: an
-unsaved-change count in the footer, **Review changes** (or Ctrl+S, Cmd+S on a Mac) listing each
+unsaved-change count at the end of the tab bar, **Review** beside it (or Ctrl+S, Cmd+S on a Mac) listing each
 changed field before and after with Undo, the agents that reload and whether the host is pinned,
 and warnings when the save removes the access list, geo blocking or CrowdSec, switches to an access
 list with geo rules, or disables the host. A new listen address, protocol or agent pinning also
@@ -105,7 +105,7 @@ log before relying on a rule. The same applies to HTTP hosts.
 A published port has to exist on the container, and container ports are fixed when the container is
 created. Adding an L4 host therefore needs the Caddy container recreated - the [agent](../agent/)
 writes a compose override with the new port list and recreates Caddy, so the port appears without
-you editing a compose file. The dashboard shows when a port change is pending, and **Apply Ports**
+you editing a compose file. The dashboard shows when a port change is pending, and **Apply**
 is what recreates the container - it is not done behind your back.
 
 An agent publishes at most 2000 ports. Docker starts a `docker-proxy` process for every published

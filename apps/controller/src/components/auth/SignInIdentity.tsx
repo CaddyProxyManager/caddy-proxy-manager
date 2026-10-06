@@ -25,7 +25,7 @@ export function SignInIdentity({
   onChange?: () => void;
   isDisabled?: boolean;
 }) {
-  const t = useTranslations("auth.login");
+  const tCommon = useTranslations("common");
 
   return (
     // The default variant, not `muted`: in this theme the muted fill is the same colour as the
@@ -49,7 +49,7 @@ export function SignInIdentity({
           <Button
             variant="ghost"
             size="sm"
-            label={t("changeUsername")}
+            label={tCommon("change")}
             isDisabled={isDisabled}
             onClick={onChange}
           />

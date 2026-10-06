@@ -9,6 +9,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
@@ -124,29 +125,34 @@ export function WafPluginRegistrySettings({
               />
             </HStack>
           ))}
-          <HStack gap={2} wrap="wrap">
-            <Button
-              size="sm"
-              icon={<Plus />}
-              label={t("pluginRegistryAdd")}
-              onClick={() =>
-                setDrafts((prev) => [...prev, { key: draftKey(), id: null, name: "", url: "" }])
-              }
-            />
-            {!hasOfficial && (
-              <Button
-                size="sm"
-                variant="ghost"
-                label={t("pluginRegistryAddOfficial")}
-                onClick={() =>
-                  setDrafts((prev) => [
-                    ...prev,
-                    { key: draftKey(), id: null, name: "OWASP CRS", url: OFFICIAL_URL },
-                  ])
-                }
-              />
-            )}
-          </HStack>
+          <Toolbar
+            label={t("pluginRegistryActions")}
+            size="sm"
+            gap={2}
+            startContent={
+              <>
+                <Button
+                  icon={<Plus />}
+                  label={tCommon("add")}
+                  onClick={() =>
+                    setDrafts((prev) => [...prev, { key: draftKey(), id: null, name: "", url: "" }])
+                  }
+                />
+                {!hasOfficial && (
+                  <Button
+                    variant="ghost"
+                    label={t("pluginRegistryAddOfficial")}
+                    onClick={() =>
+                      setDrafts((prev) => [
+                        ...prev,
+                        { key: draftKey(), id: null, name: "OWASP CRS", url: OFFICIAL_URL },
+                      ])
+                    }
+                  />
+                )}
+              </>
+            }
+          />
         </VStack>
 
         <Divider />
@@ -184,7 +190,7 @@ export function WafPluginRegistrySettings({
               <Button
                 size="sm"
                 variant="ghost"
-                label={t("pluginRegistryTokenRemove")}
+                label={tCommon("remove")}
                 onClick={() => {
                   setRemoveToken(true);
                   setToken("");

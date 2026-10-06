@@ -27,8 +27,8 @@ up to 2000 characters. They show as an icon beside the host's name in the list, 
 hover, and the search box finds them. Anyone who can see the host can read them.
 
 Hosts can also carry **tags**, such as `prod`, `team:web` or `customer/acme`, to find them again
-in a long list. Type one in the editor and press Enter or a comma; a pasted comma-separated list
-becomes several. A tag is stored in lowercase and must start with a letter or digit, followed by
+in a long list. Type one in the editor and press Enter, or pick one other hosts already carry from
+the suggestions; a pasted comma-separated list becomes several. A tag is stored in lowercase and must start with a letter or digit, followed by
 letters, digits and `. _ : / -`, up to 40 characters, with at most 16 per host. Tags show under
 the host's name, the search box finds them, and the tag filter beside the tabs narrows the list to
 the hosts carrying one. They label hosts and nothing more: Caddy's configuration never sees them,
@@ -78,18 +78,19 @@ need a manage grant.
   <ProxyHostDetailDemo client:visible />
 </Demo>
 
-<Demo title="Tags in the host editor" note="Add a tag with Enter or a comma, or type one that starts with a dash to see it refused.">
+<Demo title="Tags in the host editor" note="Type a tag and press Enter, or pick one other hosts already carry; start one with a dash to see it refused.">
   <HostTagsDemo client:visible />
 </Demo>
 
 ## Reviewing a change before saving
 
-The editor is grouped into the same parts as the host's page, with tabs under the title that jump
-to each and follow the scroll. In an existing host's editor a jump also lands in the address bar,
-as `/proxy-hosts?edit=<id>#protection`, so the link opens the editor there again.
+The editor is grouped into the same parts as the host's page. The bar under the title holds tabs
+that jump to each part and follow the scroll, and at its end a count of the fields you have changed
+beside **Review**; on a phone the count rides on the button. The arrow keys move along the
+bar, from the last tab on to the button. In an existing host's editor a jump also lands in the
+address bar, as `/proxy-hosts?edit=<id>#protection`, so the link opens the editor there again.
 
-The footer counts the fields you have changed. **Review changes**, or Ctrl+S (Cmd+S on a Mac)
-anywhere in the open editor, asks the server what the save would do without saving anything. The
+**Review**, or Ctrl+S (Cmd+S on a Mac) anywhere in the open editor, asks the server what the save would do without saving anything. The
 answer runs every check the save runs, so a refusal shows here first, and lists:
 
 - **each changed field** under its part of the editor, with what it was and what it becomes. A
@@ -108,8 +109,8 @@ answer runs every check the save runs, so a refusal shows here first, and lists:
   apply, an access list with its own deny response, fail-closed behaviour or geo rules, an imported
   certificate that does not cover a domain, and a host being disabled or put into maintenance.
 
-**Save changes** in the review saves what it shows; Ctrl+S there saves too. The footer's own save
-button still saves straight away. Closing the editor, or the browser tab, with unsaved changes asks
+**Save** in the review saves what it shows; Ctrl+S there saves too. The save button in the
+editor's footer still saves straight away. Closing the editor, or the browser tab, with unsaved changes asks
 first. Notes and tags reach no Caddy config, so a change to only those reloads nothing.
 
 The same preview is in the [API](../api/#previewing-a-change).
@@ -193,7 +194,7 @@ Retries let a failed request try another upstream rather than surfacing the erro
 ### Live upstream health
 
 A host's editor shows how Caddy sees each of its upstreams right now, asked from every agent that
-serves the host when the editor opens and again on **Check again**:
+serves the host when the editor opens and again on **Recheck**:
 
 - **Healthy** - no recent failures.
 - **Failing** - the number of recent failures, and whether that took the upstream out of

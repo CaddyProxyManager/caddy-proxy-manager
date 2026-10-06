@@ -20,7 +20,7 @@ test.describe('Audit Log', () => {
   test('creating a proxy host creates audit log entry', async ({ page }) => {
     await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Audit Test Host');
@@ -51,14 +51,14 @@ test.describe('Audit Log', () => {
   test('verifies the hash chain on request', async ({ page }) => {
     await page.goto('/audit-log');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /verify integrity/i }).click();
+    await page.getByRole('button', { name: 'Verify', exact: true }).click();
     await expect(page.getByText(/the audit log is intact/i)).toBeVisible({ timeout: 15_000 });
   });
 
   test("shows a host change's before and after, unified or side by side", async ({ page }) => {
     await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create host/i }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByLabel('Name').fill('Audit Diff Host');
     await page.getByLabel(/^domains/i).fill('audit-diff.local');

@@ -519,7 +519,7 @@ export default function ProfileClient({
                 <HStack gap={2} wrap="wrap">
                   <Button
                     variant="secondary"
-                    label={t("changePassword")}
+                    label={tCommon("change")}
                     onClick={() => setPasswordDialogOpen(true)}
                   />
                   {/* With a provider it sits beside the link, under single sign-on instead. */}
@@ -678,7 +678,7 @@ export default function ProfileClient({
                         <Button
                           variant="secondary"
                           icon={<Unlink />}
-                          label={t("unlinkOauthAccount")}
+                          label={t("unlink")}
                           onClick={() => setUnlinkDialogOpen(true)}
                         />
                       )}
@@ -736,7 +736,7 @@ export default function ProfileClient({
         onClose={() => setPasswordDialogOpen(false)}
         title={hasPassword ? t("changePassword") : tCommon("setPassword")}
         maxWidth="sm"
-        submitLabel={hasPassword ? t("changePassword") : tCommon("setPassword")}
+        submitLabel={hasPassword ? tCommon("change") : tCommon("setPassword")}
         onSubmit={handlePasswordChange}
         isSubmitting={loading}
       >
@@ -781,7 +781,7 @@ export default function ProfileClient({
         }}
         title={t("unlinkOauthAccount")}
         maxWidth="sm"
-        submitLabel={t("unlinkOauth")}
+        submitLabel={t("unlink")}
         onSubmit={handleUnlinkOAuth}
         isSubmitting={loading}
       >
@@ -809,7 +809,7 @@ export default function ProfileClient({
         }}
         title={t("removePassword")}
         maxWidth="sm"
-        submitLabel={t("removePassword")}
+        submitLabel={tCommon("remove")}
         onSubmit={handleRemovePassword}
         isSubmitting={loading}
       >

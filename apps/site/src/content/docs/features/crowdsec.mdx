@@ -128,14 +128,14 @@ reach it are yours to set up, and either archive works.
 4. Open **Settings → CrowdSec**, switch it on, choose **External**, and enter the **Local API URL**
    as Caddy reaches it (for example `http://crowdsec:8080`) and the bouncer key. For
    [AppSec](#appsec), also enter its URL (for example `http://crowdsec:7422`); CrowdSec needs an
-   `appsec` acquisition listening there. **Test connection** asks the LAPI whether it accepts the
+   `appsec` acquisition listening there. **Test** asks the LAPI whether it accepts the
    key.
 
 5. Save and apply. Every proxy host and L4 host now checks its clients.
 
 </Steps>
 
-**Test connection** runs from the controller, not from Caddy. A LAPI that only Caddy's network can
+**Test** runs from the controller, not from Caddy. A LAPI that only Caddy's network can
 reach - a `crowdsec` container attached to `caddy-network`, say - reads as unreachable there while
 Caddy reaches it fine. Look for CrowdSec lines in Caddy's log after applying instead.
 
@@ -188,7 +188,7 @@ encrypted, never shown again, and left out of REST and GraphQL reads (they repor
 and of the config diff in the review sheet. Leaving the field blank keeps the stored key, but only
 while both the Local API and AppSec addresses stay the same - move either and the key has to be
 entered again, so a stored key cannot be redirected to another server. A Caddy placeholder such as
-`{env.CROWDSEC_API_KEY}` works too and keeps the key out of the database, though **Test connection**
+`{env.CROWDSEC_API_KEY}` works too and keeps the key out of the database, though **Test**
 cannot check it. The variable has to be in Caddy's own environment, which the bundled `caddy`
 service does not pass: add it under `caddy.environment` in a `docker-compose.override.yml`. The
 agent never reads `.env`, so a `${CROWDSEC_API_KEY}` there also needs the variable forwarded under

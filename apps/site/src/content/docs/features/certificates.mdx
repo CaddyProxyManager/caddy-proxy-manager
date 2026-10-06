@@ -24,7 +24,7 @@ older than this feature leaves the column empty rather than guessing.
 
 Each host's menu has three tools:
 
-- **Renew now.** Caddy has no renew button of its own, so CPM puts the host's names under a
+- **Renew.** Caddy has no renew button of its own, so CPM puts the host's names under a
   renewal window wide enough to include their current certificates and reloads twice: once
   without them, so Caddy forgets the certificates it has cached, and once with them, so it reads
   them back and renews. HTTPS to those names fails for the moment between the two reloads; after
@@ -153,7 +153,7 @@ read once before it is saved, so a wrong path or a key that does not match is re
 then.
 
 From then on the agent reads the files every six hours, when it starts, and when you choose
-**Re-read now** in the row's menu. A renewed certificate is loaded into that agent's Caddy; an
+**Re-read** in the row's menu. A renewed certificate is loaded into that agent's Caddy; an
 unchanged one changes nothing. The domains come from the certificate's own names, and a change
 to them is recorded in the audit log. If a read fails - a file gone, a key that no longer matches -
 the row says why and the last good certificate keeps serving.

@@ -30,7 +30,7 @@ test.describe('View as', () => {
     await page.getByRole('button', { name: /view as a role/i }).click();
     const dialog = page.getByRole('dialog', { name: /view the dashboard as/i });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: /^view as$/i }).click();
+    await dialog.getByRole('button', { name: /^view$/i }).click();
 
     const banner = page.getByText(/viewing as an operator/i);
     await expect(banner).toBeVisible({ timeout: 15_000 });
@@ -41,7 +41,7 @@ test.describe('View as', () => {
 
     await page.goto(`${BASE}/`);
     await waitForHydration(page);
-    await page.getByRole('button', { name: /return to my view/i }).click();
+    await page.getByRole('button', { name: /^exit$/i }).click();
     await expect(page.getByText(/viewing as an operator/i)).not.toBeVisible({ timeout: 15_000 });
 
     await page.goto(`${BASE}/users`);

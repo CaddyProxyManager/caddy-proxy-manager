@@ -372,7 +372,7 @@ export function MtlsFields({
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
                     title={t("addAccessRule")}
-                    submitLabel={tCommon("addRule")}
+                    submitLabel={tCommon("add")}
                     onSaved={loadRules}
                   />
                 )}

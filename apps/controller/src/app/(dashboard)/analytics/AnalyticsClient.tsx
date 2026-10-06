@@ -261,7 +261,7 @@ function ViewAllDialog({
           <Button
             variant="secondary"
             icon={<Download />}
-            label={t("csv.download")}
+            label={tCommon("download")}
             isDisabled={!rows || rows.length === 0}
             onClick={() => rows && topListCsv(t, dimension, rows, label)}
           />

@@ -277,7 +277,7 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
         <HStack gap={2} wrap="wrap">
           <Button variant="secondary" size="sm" label={t("workingAsIntended")} />
           <Button variant="secondary" size="sm" label={t("falsePositive")} />
-          <Button variant="secondary" size="sm" label={t("blockSource")} />
+          <Button variant="secondary" size="sm" label={tCommon("block")} />
           <Button variant="ghost" size="sm" label={t("copyAsCurl")} />
         </HStack>
       </VStack>
@@ -483,7 +483,7 @@ function WafEventLogDemoContent() {
               variant="ghost"
               size="sm"
               icon={<ArrowLeft />}
-              label={t("backToEvents")}
+              label={tCommon("back")}
               onClick={() => setSelectedId(null)}
             />
           </div>

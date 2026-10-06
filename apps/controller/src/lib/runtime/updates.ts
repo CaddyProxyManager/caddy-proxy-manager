@@ -321,7 +321,7 @@ export async function checkForUpdates(): Promise<CachedCheck> {
 export async function getUpdateStatus(): Promise<UpdateStatus> {
   const { enabled, repository } = await settings();
 
-  // Hide the cached answer while off (it may be months stale and "Check now" is disabled), but
+  // Hide the cached answer while off (it may be months stale and "Check" is disabled), but
   // keep the row so re-enabling shows it at once.
   if (!enabled) {
     return {

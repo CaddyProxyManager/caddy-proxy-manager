@@ -148,7 +148,7 @@ export function WafExclusionsPanel({
                   reason: row.reason,
                 }),
             },
-            { id: "delete", label: t("exclusionDelete"), onClick: () => setDeleting(row) },
+            { id: "delete", label: tCommon("remove"), onClick: () => setDeleting(row) },
           ]}
         />
       ),
@@ -167,7 +167,7 @@ export function WafExclusionsPanel({
         <Button
           variant="primary"
           icon={<Plus />}
-          label={t("exclusionNew")}
+          label={tCommon("add")}
           onClick={() => setEditing(NEW_EXCLUSION)}
         />
       </HStack>

@@ -135,10 +135,6 @@ export function UpstreamInput({
           />
         </HStack>
       </VStack>
-
-      <Text type="body" size="xsm" color="secondary">
-        {t("upstreamsHelp")}
-      </Text>
     </VStack>
   );
 }

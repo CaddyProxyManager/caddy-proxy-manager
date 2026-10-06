@@ -1985,6 +1985,7 @@ function BrandingSection({
   faviconFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [preview, setPreview] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -2076,7 +2077,7 @@ function BrandingSection({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  label={t("faviconKeep")}
+                  label={tCommon("keep")}
                   onClick={() => setRemoving(false)}
                 />
               )}
@@ -2207,7 +2208,7 @@ function UpdatesSection({
               type="button"
               size="sm"
               variant="secondary"
-              label={checking ? tCommon("checking") : tCommon("checkNow")}
+              label={checking ? tCommon("checking") : tCommon("check")}
               isDisabled={!enabled || checking}
               onClick={async () => {
                 setChecking(true);
@@ -2412,7 +2413,7 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
         <Button
           variant="secondary"
           size="sm"
-          label={pending ? tCommon("checking") : tCommon("checkNow")}
+          label={pending ? tCommon("checking") : tCommon("check")}
           onClick={checkNow}
           isDisabled={pending}
         />

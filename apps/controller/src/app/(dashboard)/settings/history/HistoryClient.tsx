@@ -132,6 +132,7 @@ function RevisionListRow({
   onView: () => void;
 }) {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   return (
     <>
@@ -176,7 +177,7 @@ function RevisionListRow({
         <Button
           variant="ghost"
           size="sm"
-          label={t("history.view")}
+          label={tCommon("view")}
           onClick={onView}
           isDisabled={isSelected}
         />

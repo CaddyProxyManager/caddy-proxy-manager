@@ -230,7 +230,7 @@ export function SignInOverviewClient({
               <Button
                 variant="secondary"
                 size="sm"
-                label={t("mfaConfigure")}
+                label={tCommon("configure")}
                 href="/settings/authentication#two-factor"
               />
             </HStack>

@@ -37,7 +37,7 @@ describe('diffHostFields', () => {
       },
       {
         field: 'sslForced',
-        section: 'general',
+        section: 'upstreams',
         before: true,
         after: false,
         leaves: null,

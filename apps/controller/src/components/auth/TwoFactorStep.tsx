@@ -76,7 +76,7 @@ export function TwoFactorStep({
         <Button
           type="submit"
           variant="primary"
-          label={pending ? tCommon("verifying") : t("verify")}
+          label={pending ? tCommon("verifying") : tCommon("verify")}
           isLoading={pending}
           isDisabled={pending}
           width="100%"

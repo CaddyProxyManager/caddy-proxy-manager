@@ -46,7 +46,7 @@ test.describe('Proxy host review before save', () => {
         timeout: 15_000,
       });
 
-      await review.getByRole('button', { name: 'Save changes' }).click();
+      await review.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(editor).not.toBeVisible({ timeout: 15_000 });
 
       const host = (await (await page.request.get(`${API_PROXY_HOSTS}/${id}`)).json()) as {

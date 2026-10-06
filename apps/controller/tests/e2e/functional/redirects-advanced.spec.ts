@@ -28,7 +28,7 @@ test.describe
     test('setup: create proxy host with advanced redirect rules', async ({ page }) => {
       await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
-      await page.getByRole('button', { name: /create host/i }).click();
+      await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Advanced Redirects Test');

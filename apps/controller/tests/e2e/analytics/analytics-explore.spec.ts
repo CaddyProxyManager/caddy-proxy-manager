@@ -124,20 +124,20 @@ test.describe('Analytics explore', () => {
   test('a saved view can be saved, opened and deleted', async ({ page }) => {
     const name = `Explore view ${Date.now()}`;
     await page.goto('/analytics?range=7d&group=status');
-    await page.getByRole('button', { name: 'Saved views' }).click();
-    await page.getByRole('menuitem', { name: 'Save current view…' }).click();
+    await page.getByRole('button', { name: 'Views', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Save…', exact: true }).click();
     await page.getByRole('textbox', { name: 'Name' }).fill(name);
     await page.getByRole('button', { name: 'Save view' }).click();
     await expect(page.getByText(`Saved view ${name}`)).toBeVisible({ timeout: 10_000 });
 
     await page.goto('/analytics');
-    await page.getByRole('button', { name: 'Saved views' }).click();
+    await page.getByRole('button', { name: 'Views', exact: true }).click();
     await page.getByRole('menuitem', { name }).click();
     await expect(page).toHaveURL(/range=7d/);
     await expect(page).toHaveURL(/group=status/);
 
-    await page.getByRole('button', { name: 'Saved views' }).click();
-    await page.getByRole('menuitem', { name: 'Manage views…' }).click();
+    await page.getByRole('button', { name: 'Views', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Manage…', exact: true }).click();
     await page.getByRole('button', { name: `Actions for ${name}` }).click();
     await page.getByRole('menuitem', { name: 'Delete' }).click();
     await expect(page.getByText('View deleted')).toBeVisible({ timeout: 10_000 });

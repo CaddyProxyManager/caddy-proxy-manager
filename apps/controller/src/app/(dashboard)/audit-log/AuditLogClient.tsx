@@ -288,7 +288,7 @@ export default function AuditLogClient({
               variant="secondary"
               size="sm"
               icon={<ShieldCheck />}
-              label={t("verifyChain")}
+              label={tCommon("verify")}
               onClick={verify}
               isLoading={verifying}
             />

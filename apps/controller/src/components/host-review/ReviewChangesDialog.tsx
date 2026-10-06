@@ -101,7 +101,6 @@ export function ReviewChangesDialog({
   const t = useTranslations("hostReview");
   const tAgents = useTranslations("agents");
   const tCommon = useTranslations("common");
-  const tProxyHosts = useTranslations("proxyHosts");
   const sectionLabel = (section: string) => t(key(`sections.${kind}.${section}`));
   const fieldLabel = (field: string) => t(key(`fields.${field}`));
 
@@ -118,10 +117,10 @@ export function ReviewChangesDialog({
       maxWidth="lg"
       actions={
         <>
-          <Button variant="secondary" label={t("backToEditor")} onClick={onBack} />
+          <Button variant="secondary" label={tCommon("back")} onClick={onBack} />
           <Button
             variant="primary"
-            label={isCreate ? tProxyHosts("createHost") : tCommon("saveChanges")}
+            label={isCreate ? tCommon("create") : tCommon("save")}
             onClick={onSave}
             isLoading={isSaving}
             isDisabled={isSaving || isLoading || preview === null || nothingToSave}
@@ -202,7 +201,7 @@ export function ReviewChangesDialog({
                     <Button
                       variant="ghost"
                       size="sm"
-                      label={t("restore")}
+                      label={tCommon("restore")}
                       tooltip={t("restoreLabel", { field: fieldLabel(field) })}
                       onClick={() => onRestore(field)}
                       isDisabled={isSaving}

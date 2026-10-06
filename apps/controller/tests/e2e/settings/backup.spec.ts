@@ -12,7 +12,7 @@ test('downloads an encrypted backup, and previews it for restoring', async ({ pa
   await page.goto('/settings/backup');
   await waitForHydration(page);
 
-  const download = page.getByRole('button', { name: /download backup/i });
+  const download = page.getByRole('button', { name: /^download$/i });
   await expect(download).toBeDisabled();
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
   await page.getByLabel(/confirm the passphrase/i).fill(PASSPHRASE);

@@ -27,7 +27,6 @@ import { applyStagedSettingsAction, discardStagedSettingsAction } from "./action
 /** In the rail (the header on a phone), so the apply control has one address and covers no field. */
 /** `fill`: as wide as the rail, the buttons sharing it by the length of their labels. */
 export function StagedControls({ view, fill = false }: { view: StagedView; fill?: boolean }) {
-  const t = useTranslations("settings");
   const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -61,7 +60,7 @@ export function StagedControls({ view, fill = false }: { view: StagedView; fill?
       <Button
         size="sm"
         className={fill ? "grow" : undefined}
-        label={t("stagedReview")}
+        label={tCommon("review")}
         endContent={<Badge variant="warning" label={String(view.changes.length)} />}
         onClick={() => setOpen(true)}
       />
@@ -295,7 +294,7 @@ function ReviewSheet({
             isDisabled={pending}
           />
           <Button
-            label={pending ? t("reviewApplying") : t("reviewApply")}
+            label={pending ? t("reviewApplying") : tCommon("apply")}
             onClick={apply}
             isDisabled={pending}
           />

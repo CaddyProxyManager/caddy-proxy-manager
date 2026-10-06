@@ -216,11 +216,7 @@ test.describe('Certificates', () => {
         .getByRole('button', { name: /imported/i })
         .click();
 
-      // The trigger's label varies by viewport.
-      await page
-        .getByRole('button', { name: /import certificate|add certificate|^import$|^add$/i })
-        .first()
-        .click();
+      await page.getByRole('button', { name: 'Import', exact: true }).first().click();
 
       const drawer = page.getByRole('dialog');
       await expect(drawer).toBeVisible();
@@ -237,7 +233,7 @@ test.describe('Certificates', () => {
       expect(await keyField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
       expect(await keyField.inputValue()).toBe(normalizedPrivateKeyPem);
 
-      await drawer.getByRole('button', { name: /import certificate|save changes/i }).click();
+      await drawer.getByRole('button', { name: 'Import', exact: true }).click();
       await expect(drawer).not.toBeVisible({ timeout: 10_000 });
 
       // The API confirms a key is stored but must never return it.

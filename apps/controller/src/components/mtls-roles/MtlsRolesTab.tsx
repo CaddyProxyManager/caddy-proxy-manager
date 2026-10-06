@@ -32,6 +32,7 @@ type Props = {
 
 export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
   const t = useTranslations("mtlsRoles");
+  const tCommon = useTranslations("common");
   const [createOpen, setCreateOpen] = useState(false);
   const activeCerts = issuedCerts.filter((c) => !c.revokedAt);
 
@@ -51,7 +52,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
           variant="primary"
           width="100%"
           icon={<Plus />}
-          label={t("createNewRole")}
+          label={tCommon("new")}
           onClick={() => setCreateOpen(true)}
         />
       )}
@@ -142,7 +143,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
           <Button
             variant="primary"
             size="sm"
-            label={t("createRole")}
+            label={tCommon("create")}
             onClick={handleCreate}
             isLoading={submitting}
             isDisabled={submitting}
@@ -284,7 +285,7 @@ function RoleCard({
             <Button
               variant="ghost"
               size="sm"
-              label={t("deleteRole")}
+              label={tCommon("delete")}
               onClick={() => setDeleteOpen(true)}
             />
           </HStack>

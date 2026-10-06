@@ -47,7 +47,7 @@ test.describe('Two-factor sign-in', () => {
     await page.goto(`${BASE}/profile`);
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: /^turn on$/i }).click();
+    await page.getByRole('button', { name: /^enable$/i }).click();
     const passwordDialog = page.getByRole('dialog');
     await passwordDialog.getByLabel(/current password/i).fill(PASSWORD);
     await passwordDialog.getByRole('button', { name: /^continue$/i }).click();
@@ -58,7 +58,7 @@ test.describe('Two-factor sign-in', () => {
     expect(secret).toMatch(/^[A-Z2-7]+=*$/);
 
     await scan.getByLabel(/6-digit code/i).fill(await freshCode(page));
-    await scan.getByRole('button', { name: /^turn on$/i }).click();
+    await scan.getByRole('button', { name: /^enable$/i }).click();
 
     const codes = page.getByRole('dialog', { name: /your backup codes/i });
     await expect(codes).toBeVisible({ timeout: 15_000 });
@@ -67,7 +67,7 @@ test.describe('Two-factor sign-in', () => {
       .map((line) => line.trim())
       .filter(Boolean);
     expect(backupCodes.length).toBeGreaterThanOrEqual(5);
-    await codes.getByRole('button', { name: /saved them/i }).click();
+    await codes.getByRole('button', { name: /^done$/i }).click();
 
     await expect(page.getByText(/^on$/i).first()).toBeVisible({ timeout: 15_000 });
     await page.context().close();

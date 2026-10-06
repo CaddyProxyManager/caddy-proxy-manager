@@ -74,7 +74,7 @@ test.describe('Email - SMTP, password reset and invitations', () => {
       await page.goto(`${BASE}/login/forgot-password`);
       await waitForHydration(page);
       await page.getByRole('textbox', { name: /username or email/i }).fill(RESET_USER.username);
-      await page.getByRole('button', { name: /send reset link/i }).click();
+      await page.getByRole('button', { name: /^send$/i }).click();
       await expect(page.getByText(/check your email/i)).toBeVisible({ timeout: 15_000 });
 
       const mail = await waitForMail(RESET_EMAIL);
@@ -88,12 +88,12 @@ test.describe('Email - SMTP, password reset and invitations', () => {
       // No special character: refused before anything is sent.
       await password.fill('NoSpecialChar2026');
       await confirm.fill('NoSpecialChar2026');
-      await page.getByRole('button', { name: /save new password/i }).click();
+      await page.getByRole('button', { name: /^save$/i }).click();
       await expect(page.getByRole('alert').filter({ hasText: /special/i })).toBeVisible();
 
       await password.fill(NEW_PASSWORD);
       await confirm.fill(NEW_PASSWORD);
-      await page.getByRole('button', { name: /save new password/i }).click();
+      await page.getByRole('button', { name: /^save$/i }).click();
       await expect(page.getByText(/password saved/i)).toBeVisible({ timeout: 15_000 });
 
       expect(await canSignIn(browser, RESET_USER.username, RESET_USER.password)).toBe(false);
@@ -135,7 +135,7 @@ test.describe('Email - SMTP, password reset and invitations', () => {
     const email = `invited-${Date.now()}@example.com`;
     await page.goto('/users');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByRole('button', { name: /^new$/i }).click();
     await page.getByTestId('create-email').fill(email);
     await page.getByTestId('create-name').fill('Invited User');
     await page.getByRole('radio', { name: /email an invitation/i }).click();

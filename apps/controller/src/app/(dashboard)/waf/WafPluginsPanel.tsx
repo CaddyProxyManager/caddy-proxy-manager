@@ -426,7 +426,7 @@ export function WafPluginsPanel({
             <HStack gap={2}>
               <Button
                 icon={<RefreshCw />}
-                label={tCommon("checkNow")}
+                label={tCommon("check")}
                 isLoading={checkingRegistry}
                 isDisabled={!registry}
                 onClick={() => void checkRegistryNow()}

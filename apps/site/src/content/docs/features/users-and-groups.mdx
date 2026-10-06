@@ -60,7 +60,7 @@ group** on a group. Pick operator, user or viewer, and for an operator, the grou
 - **It can only narrow.** Pages, menus and every permission check follow the chosen role and
   groups, over the REST and GraphQL APIs with the same session too. It can't be used to gain
   anything.
-- **A banner says so on every page**, with **Return to my view**. The view also ends by itself
+- **A banner says so on every page**, with **Exit**. The view also ends by itself
   after an hour.
 - **Two things wait until you return:** creating an API token, which would carry your real role,
   and signing in to a host behind CPM's forward auth.
@@ -312,7 +312,7 @@ Nothing about a directory is set by environment variable.
   per-account lockout, asks for a two-factor code when the account has one, and is audited once
   it completes. Every refusal - a wrong password, an unknown name, a name matching two entries, a
   filter finding someone other than who bound, a directory that is down - answers "Invalid username or password"; the reason is in the server log.
-- **Test before saving.** **Test connection** checks the address, the TLS handshake, the bind and
+- **Test before saving.** **Test** checks the address, the TLS handshake, the bind and
   the base DN, and with a test username and password signs in as that user and shows the groups
   and role it would get. Binding as the user has no account to test with, so without a test user
   it checks only the address and TLS, and says so. A stored bind password is only ever sent to the address and bind DN it

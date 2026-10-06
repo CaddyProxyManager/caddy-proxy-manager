@@ -122,7 +122,7 @@ export default function BlockedSourcesClient({
         <Button
           variant="primary"
           icon={<Plus />}
-          label={t("addBlock")}
+          label={tCommon("add")}
           onClick={() => setAdding(NEW_BLOCK)}
         />
       </HStack>

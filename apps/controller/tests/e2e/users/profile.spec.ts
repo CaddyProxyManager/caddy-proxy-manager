@@ -18,14 +18,14 @@ test.describe('Profile', () => {
 
   test('Change Password button is visible', async ({ page }) => {
     await page.goto('/profile');
-    await expect(page.getByRole('button', { name: /change password|set password/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(change|set password)$/i })).toBeVisible();
   });
 
   test('change password: wrong current password shows error', async ({ page }) => {
     await page.goto('/profile');
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: /change password|set password/i }).click();
+    await page.getByRole('button', { name: /^(change|set password)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Current Password', { exact: true }).fill('WrongCurrentPassword!');
@@ -33,7 +33,7 @@ test.describe('Profile', () => {
     await page.getByLabel('Confirm New Password', { exact: true }).fill('NewPassword2026!');
 
     await page
-      .getByRole('button', { name: /change password|set password/i })
+      .getByRole('button', { name: /^(change|set password)$/i })
       .last()
       .click();
 
@@ -46,14 +46,14 @@ test.describe('Profile', () => {
     await page.goto('/profile');
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: /change password|set password/i }).click();
+    await page.getByRole('button', { name: /^(change|set password)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('New Password', { exact: true }).fill('short');
     await page.getByLabel('Confirm New Password', { exact: true }).fill('short');
 
     await page
-      .getByRole('button', { name: /change password|set password/i })
+      .getByRole('button', { name: /^(change|set password)$/i })
       .last()
       .click();
 

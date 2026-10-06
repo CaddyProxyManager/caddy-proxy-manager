@@ -1110,7 +1110,7 @@ export default function WafEventsClient({
             button={{
               variant: "ghost",
               icon: <MoreHorizontal />,
-              label: t("views"),
+              label: tCommon("views"),
               isIconOnly: true,
             }}
             items={views.map((view) => ({
@@ -1206,7 +1206,7 @@ export default function WafEventsClient({
                 />
                 <Button
                   size="sm"
-                  label={tCommon("applyRange")}
+                  label={tCommon("apply")}
                   onClick={() => pushRange("custom", customFrom, customTo)}
                 />
               </HStack>
@@ -1219,7 +1219,7 @@ export default function WafEventsClient({
                   variant="ghost"
                   size="sm"
                   icon={<ArrowLeft />}
-                  label={t("backToEvents")}
+                  label={tCommon("back")}
                   onClick={() => setSelected(null)}
                 />
               </div>

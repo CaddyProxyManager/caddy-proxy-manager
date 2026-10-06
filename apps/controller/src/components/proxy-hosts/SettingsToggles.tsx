@@ -56,6 +56,8 @@ type SettingsTogglesProps = {
   compression?: HostCompressionMode;
   /** Off for the dashboard host, whose form already posts its own `enabled` field. */
   showEnabled?: boolean;
+  /** The host editor renders the enabled banner and the options card in different sections. */
+  part?: "both" | "enabled" | "options";
 };
 
 // HSTS follows NPM: it pins browsers to HTTPS, which is only safe once HTTP is redirected.
@@ -110,6 +112,7 @@ export function SettingsToggles({
   enabled = true,
   compression: initialCompression = "inherit",
   showEnabled = true,
+  part = "both",
 }: SettingsTogglesProps) {
   const t = useTranslations("proxyHosts");
   const [compression, setCompression] = useState<HostCompressionMode>(initialCompression);
@@ -135,7 +138,7 @@ export function SettingsToggles({
 
   return (
     <VStack gap={6}>
-      {showEnabled && (
+      {showEnabled && part !== "options" && (
         <>
           <input type="hidden" name="enabledPresent" value="1" />
           <input type="hidden" name="enabled" value={values.enabled ? "on" : ""} />
@@ -158,59 +161,61 @@ export function SettingsToggles({
         </>
       )}
 
-      <Card>
-        <VStack gap={3}>
-          <Text type="body" size="sm" weight="semibold">
-            {t("advancedOptions")}
-          </Text>
-          <Divider />
-          {settings.map((setting, index) => {
-            const blocked = isBlocked(setting);
-            return (
-              <VStack key={setting.key} gap={3}>
-                {index > 0 && <Divider />}
-                <input type="hidden" name={`${setting.key}Present`} value="1" />
-                <Switch
-                  label={t(setting.labelKey)}
-                  description={t(setting.descriptionKey)}
-                  htmlName={setting.key}
-                  labelPosition="start"
-                  labelSpacing="spread"
-                  value={blocked ? false : values[setting.key]}
-                  isDisabled={blocked}
-                  onChange={handleChange(setting.key)}
-                />
-              </VStack>
-            );
-          })}
-          {showEnabled && (
-            <>
-              <Divider />
-              <input type="hidden" name="compression" value={compression} />
-              <HStack justify="between" vAlign="center" gap={4}>
-                <VStack gap={1}>
-                  <Text type="body" size="sm">
-                    {t("compression")}
-                  </Text>
-                  <Text type="body" size="sm" color="secondary">
-                    {t("compressionHelp")}
-                  </Text>
+      {part !== "enabled" && (
+        <Card>
+          <VStack gap={3}>
+            <Text type="body" size="sm" weight="semibold">
+              {t("advancedOptions")}
+            </Text>
+            <Divider />
+            {settings.map((setting, index) => {
+              const blocked = isBlocked(setting);
+              return (
+                <VStack key={setting.key} gap={3}>
+                  {index > 0 && <Divider />}
+                  <input type="hidden" name={`${setting.key}Present`} value="1" />
+                  <Switch
+                    label={t(setting.labelKey)}
+                    description={t(setting.descriptionKey)}
+                    htmlName={setting.key}
+                    labelPosition="start"
+                    labelSpacing="spread"
+                    value={blocked ? false : values[setting.key]}
+                    isDisabled={blocked}
+                    onChange={handleChange(setting.key)}
+                  />
                 </VStack>
-                <SegmentedControl
-                  label={t("compression")}
-                  size="sm"
-                  value={compression}
-                  onChange={(next) => setCompression(next as HostCompressionMode)}
-                >
-                  <SegmentedControlItem value="inherit" label={t("compressionInherit")} />
-                  <SegmentedControlItem value="on" label={t("compressionOn")} />
-                  <SegmentedControlItem value="off" label={t("compressionOff")} />
-                </SegmentedControl>
-              </HStack>
-            </>
-          )}
-        </VStack>
-      </Card>
+              );
+            })}
+            {showEnabled && (
+              <>
+                <Divider />
+                <input type="hidden" name="compression" value={compression} />
+                <HStack justify="between" vAlign="center" gap={4}>
+                  <VStack gap={1}>
+                    <Text type="body" size="sm">
+                      {t("compression")}
+                    </Text>
+                    <Text type="body" size="sm" color="secondary">
+                      {t("compressionHelp")}
+                    </Text>
+                  </VStack>
+                  <SegmentedControl
+                    label={t("compression")}
+                    size="sm"
+                    value={compression}
+                    onChange={(next) => setCompression(next as HostCompressionMode)}
+                  >
+                    <SegmentedControlItem value="inherit" label={t("compressionInherit")} />
+                    <SegmentedControlItem value="on" label={t("compressionOn")} />
+                    <SegmentedControlItem value="off" label={t("compressionOff")} />
+                  </SegmentedControl>
+                </HStack>
+              </>
+            )}
+          </VStack>
+        </Card>
+      )}
     </VStack>
   );
 }

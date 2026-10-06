@@ -183,11 +183,11 @@ test('a failed sign-in is announced', async ({ browser }) => {
 });
 
 for (const [path, trigger] of [
-  ['/proxy-hosts', 'Create Host'],
-  ['/l4-proxy-hosts', 'Create L4 Host'],
+  ['/proxy-hosts', 'New'],
+  ['/l4-proxy-hosts', 'New'],
   ['/access-lists', 'New'],
-  ['/groups', 'New Group'],
-  ['/users', 'Create User'],
+  ['/groups', 'New'],
+  ['/users', 'New'],
   ['/settings/authentication', 'Add Provider'],
 ] as const) {
   test(`the dialog behind "${trigger}" on ${path} is named, closes on Escape and returns focus`, async ({

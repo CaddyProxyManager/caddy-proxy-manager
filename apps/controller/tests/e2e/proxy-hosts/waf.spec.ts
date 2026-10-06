@@ -57,7 +57,7 @@ test.describe('WAF', () => {
       await field.blur();
     }
 
-    await page.getByRole('button', { name: /apply range/i }).click();
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
 
     await expect(page).toHaveURL(
       new RegExp(`range=custom.*from=${expectedFrom}.*to=${expectedTo}`),
@@ -147,18 +147,18 @@ test.describe('WAF', () => {
     await page.goto('/waf');
     await waitForHydration(page);
     await page.getByRole('button', { name: /exclusions/i }).click();
-    await page.getByRole('button', { name: 'Add exclusion' }).click();
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Rule ID').fill('920350');
     await dialog.getByLabel('Path').fill('/e2e-upload');
     await dialog.getByLabel('Reason').fill('e2e');
-    await dialog.getByRole('button', { name: 'Save exclusion' }).click();
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 
     const row = page.getByRole('row').filter({ hasText: '/e2e-upload' });
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: /actions for the exclusion/i }).click();
-    await page.getByRole('menuitem', { name: 'Remove exclusion' }).click();
+    await page.getByRole('menuitem', { name: 'Remove', exact: true }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Remove exclusion' }).click();
     await expect(row).toHaveCount(0);
   });

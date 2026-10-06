@@ -69,7 +69,7 @@ test.describe('Legacy password gate', () => {
     await page.getByRole('textbox', { name: /^Current Password/ }).fill(OLD_PASSWORD);
     await page.getByRole('textbox', { name: /^New Password/ }).fill(NEW_PASSWORD);
     await page.getByRole('textbox', { name: /^Confirm New Password/ }).fill(NEW_PASSWORD);
-    await page.getByRole('button', { name: /update password/i }).click();
+    await page.getByRole('button', { name: /^save$/i }).click();
 
     await expect(page).not.toHaveURL(/\/password-change/, { timeout: 15_000 });
     expect(getUserHashAlgorithm(EMAIL)).toBe('$argon2id');
@@ -84,7 +84,7 @@ test.describe('Legacy password gate', () => {
     await page.getByRole('textbox', { name: /^Current Password/ }).fill(OLD_PASSWORD);
     await page.getByRole('textbox', { name: /^New Password/ }).fill(NEW_PASSWORD);
     await page.getByRole('textbox', { name: /^Confirm New Password/ }).fill(NEW_PASSWORD);
-    await page.getByRole('button', { name: /update password/i }).click();
+    await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page).not.toHaveURL(/\/password-change/, { timeout: 15_000 });
 
     await page.context().clearCookies();

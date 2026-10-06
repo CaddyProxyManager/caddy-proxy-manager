@@ -34,10 +34,13 @@ test.describe('Proxy host tags and duplicate', () => {
         await page.getByRole('checkbox', { name: `Select ${name}` }).check();
       const bar = page.getByRole('toolbar', { name: 'Bulk actions' });
       await bar.getByRole('button', { name: 'More bulk actions' }).click();
-      await page.getByRole('menuitem', { name: 'Add tag' }).click();
+      await page.getByRole('menuitem', { name: 'Tag', exact: true }).click();
 
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('textbox', { name: 'Tag' }).fill('E2E-Batch');
+      const tagField = dialog.getByRole('combobox', { name: 'Tag' });
+      await tagField.fill('E2E-Batch');
+      // Picks the typed tag and closes the suggestions, which could cover the button.
+      await tagField.press('Enter');
       await dialog.getByRole('button', { name: 'Apply' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 

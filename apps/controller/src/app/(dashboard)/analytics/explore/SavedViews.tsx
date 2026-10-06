@@ -205,7 +205,7 @@ export function SavedViews({
     <>
       <DropdownMenu
         alignment="end"
-        button={{ variant: "secondary", size: "sm", icon: <Bookmark />, label: t("savedViews") }}
+        button={{ variant: "secondary", size: "sm", icon: <Bookmark />, label: tCommon("views") }}
         items={[
           ...views.slice(0, 15).map((view) => ({
             id: `view-${view.id}`,

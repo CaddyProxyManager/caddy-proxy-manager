@@ -662,7 +662,7 @@ export default function ProxyHostsClient({
         action={
           canCreate
             ? {
-                label: t("createHost"),
+                label: tCommon("new"),
                 onClick: () => {
                   setDialogKey((k) => k + 1);
                   setCreateOpen(true);

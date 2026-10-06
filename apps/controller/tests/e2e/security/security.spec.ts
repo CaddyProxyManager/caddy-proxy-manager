@@ -19,7 +19,7 @@ test.describe('Security', () => {
     const address = '198.51.100.77';
     await page.goto('/security/blocked-sources');
     await waitForHydration(page);
-    await page.getByRole('button', { name: 'Block a source' }).first().click();
+    await page.getByRole('button', { name: 'Add', exact: true }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('textbox', { name: /^Source/ }).fill(address);
@@ -36,7 +36,7 @@ test.describe('Security', () => {
   test('refuses a /0 network', async ({ page }) => {
     await page.goto('/security/blocked-sources');
     await waitForHydration(page);
-    await page.getByRole('button', { name: 'Block a source' }).first().click();
+    await page.getByRole('button', { name: 'Add', exact: true }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('combobox', { name: 'Type' }).click();

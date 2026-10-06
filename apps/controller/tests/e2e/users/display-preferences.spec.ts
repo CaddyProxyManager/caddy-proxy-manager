@@ -27,7 +27,7 @@ test('a time zone chosen on Profile follows the account to another browser', asy
   await page.getByRole('button', { name: 'Time zone' }).click();
   await page.keyboard.type('Tokyo');
   await page.getByRole('option', { name: 'Asia/Tokyo' }).click();
-  await page.getByRole('button', { name: 'Save display preferences' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText(/now showing asia\/tokyo/i)).toBeVisible({ timeout: 15_000 });
 
   // A browser that never chose: the account's zone, not its own.

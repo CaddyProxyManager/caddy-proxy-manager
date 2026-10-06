@@ -24,12 +24,12 @@ test('L4 review shows the listen change and the port apply it needs', async ({ p
     await expect(editor).toBeVisible({ timeout: 10_000 });
 
     await editor.getByLabel('Listen Address').fill(':19872');
-    await editor.getByRole('button', { name: 'Review changes' }).click();
+    await editor.getByRole('button', { name: 'Review', exact: true }).click();
 
     const review = page.getByRole('dialog', { name: 'Review changes' });
     await expect(review.getByText(':19871 to :19872')).toBeVisible({ timeout: 15_000 });
     await expect(review.getByText(/apply the ports from the banner/i)).toBeVisible();
-    await review.getByRole('button', { name: 'Back to editor' }).click();
+    await review.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(review).not.toBeVisible();
     await expect(editor).toBeVisible();
   } finally {
