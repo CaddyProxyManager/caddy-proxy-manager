@@ -39,7 +39,7 @@ export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
     await page.getByRole('option', { name: new RegExp(config.protocol, 'i') }).click();
   }
 
-  await page.getByLabel('Listen Address').fill(config.listenAddress);
+  await page.getByLabel('Listen address').fill(config.listenAddress);
   await page.getByRole('textbox', { name: /^Upstreams/ }).fill(config.upstream);
 
   if (config.matcherType && config.matcherType !== 'none') {

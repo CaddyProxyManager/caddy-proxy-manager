@@ -37,7 +37,7 @@ HTTP/3 the node connects in the background and a load finishes at once. Leave it
 tailnet clients need QUIC.
 :::
 
-HTTP/2 on the tailnet listeners follows the global switch in **Settings → Network → HTTP Versions**,
+HTTP/2 on the tailnet listeners follows the global switch in **Settings → Network → HTTP versions**,
 with no opt-in of its own.
 
 ## Per host
@@ -51,7 +51,8 @@ on your tailnet.
 </Demo>
 
 Routing is still by `Host` header, so add the node's MagicDNS name to the host's domains. Caddy gets
-the certificate for that name from Tailscale - no ACME, no DNS provider, nothing to configure. A
+the certificate for that name from Tailscale, without ACME or a DNS provider, and there is nothing
+to configure. A
 `.ts.net` name is never sent to a public CA, which could not validate it anyway.
 
 **Require a Tailscale identity** admits only devices signed in to your tailnet, identified by their

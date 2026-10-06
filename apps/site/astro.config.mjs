@@ -76,7 +76,7 @@ export default defineConfig({
     starlight({
       title: "Caddy Proxy Manager",
       description:
-        "A modern web interface for Caddy Server: reverse proxy, WAF, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.",
+        "A web interface for Caddy Server: reverse proxy, WAF, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.",
       social: [
         {
           icon: "github",
@@ -146,7 +146,7 @@ export default defineConfig({
             { label: "Users, roles & groups", slug: "features/users-and-groups" },
             { label: "The agent", slug: "features/agent" },
             { label: "High availability", slug: "features/high-availability" },
-            { label: "Caddy Build", slug: "features/caddy-build" },
+            { label: "Caddy build", slug: "features/caddy-build" },
             { label: "Tailscale", slug: "features/tailscale" },
             { label: "API", slug: "features/api" },
             { label: "Audit log", slug: "features/audit-log" },

@@ -6,7 +6,7 @@ test('searching "smtp" leads to the email settings', async ({ page }) => {
   await page.goto('/settings');
   await waitForHydration(page);
   await page.getByRole('combobox', { name: 'Search settings' }).fill('smtp');
-  await page.getByRole('option', { name: /SMTP Server/ }).click();
+  await page.getByRole('option', { name: /SMTP server/ }).click();
   await expect(page).toHaveURL(/\/settings\/email/);
 });
 

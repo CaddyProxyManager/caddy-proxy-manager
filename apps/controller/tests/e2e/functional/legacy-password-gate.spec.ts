@@ -66,9 +66,9 @@ test.describe('Legacy password gate', () => {
     await signIn(page, OLD_PASSWORD);
     await expect(page).toHaveURL(/\/password-change/, { timeout: 15_000 });
 
-    await page.getByRole('textbox', { name: /^Current Password/ }).fill(OLD_PASSWORD);
-    await page.getByRole('textbox', { name: /^New Password/ }).fill(NEW_PASSWORD);
-    await page.getByRole('textbox', { name: /^Confirm New Password/ }).fill(NEW_PASSWORD);
+    await page.getByRole('textbox', { name: /^Current password/ }).fill(OLD_PASSWORD);
+    await page.getByRole('textbox', { name: /^New password/ }).fill(NEW_PASSWORD);
+    await page.getByRole('textbox', { name: /^Confirm new password/ }).fill(NEW_PASSWORD);
     await page.getByRole('button', { name: /^save$/i }).click();
 
     await expect(page).not.toHaveURL(/\/password-change/, { timeout: 15_000 });
@@ -81,9 +81,9 @@ test.describe('Legacy password gate', () => {
 
   test('the new password works on a fresh sign-in', async ({ page }) => {
     await signIn(page, OLD_PASSWORD);
-    await page.getByRole('textbox', { name: /^Current Password/ }).fill(OLD_PASSWORD);
-    await page.getByRole('textbox', { name: /^New Password/ }).fill(NEW_PASSWORD);
-    await page.getByRole('textbox', { name: /^Confirm New Password/ }).fill(NEW_PASSWORD);
+    await page.getByRole('textbox', { name: /^Current password/ }).fill(OLD_PASSWORD);
+    await page.getByRole('textbox', { name: /^New password/ }).fill(NEW_PASSWORD);
+    await page.getByRole('textbox', { name: /^Confirm new password/ }).fill(NEW_PASSWORD);
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page).not.toHaveURL(/\/password-change/, { timeout: 15_000 });
 

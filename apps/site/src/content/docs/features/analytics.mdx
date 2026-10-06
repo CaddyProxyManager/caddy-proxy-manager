@@ -82,7 +82,7 @@ runs out is reported as skipped rather than holding the answer up.
 ## Turning it on
 
 Open **Settings → Observability → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
-starts the container - nothing to change in `.env`, no compose profile to list, because the
+starts the container. You do not change `.env` or list a compose profile, because the
 [agent](../agent/) runs the compose command for you with the saved credentials.
 
 Three things to expect:
@@ -106,7 +106,7 @@ CLICKHOUSE_PASSWORD=your-clickhouse-password   # openssl rand -base64 32
 
 30 days by default, enforced by ClickHouse's own TTL. Change it under **Settings → Observability →
 Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored). Saving it re-checks the schema
-on the next write, which migrates the existing tables' TTL and purges expired data - no restart.
+on the next write, which migrates the existing tables' TTL and purges expired data, without a restart.
 
 ## Disk writes
 

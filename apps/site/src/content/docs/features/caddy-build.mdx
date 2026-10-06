@@ -1,5 +1,5 @@
 ---
-title: Caddy Build
+title: Caddy build
 description: Choosing which plugins your Caddy binary is compiled with, rebuilding from the UI or building the image yourself, the HTTP cache storage and the global Caddyfile.
 ---
 
@@ -8,7 +8,7 @@ import CaddyBuildDemo from "../../../demos/samples/CaddyBuildDemo";
 
 Caddy is a single static binary. A plugin either was compiled in with
 [xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime - there is no
-loading one later. **Settings → Caddy Build** makes that list editable from the dashboard.
+loading one later. **Settings → Caddy build** makes that list editable from the dashboard.
 
 The default image ships with every supported module except the opt-in ones - Rate Limit, CrowdSec
 and the HTTP caching modules - so an existing install behaves exactly as it did before this page
@@ -19,7 +19,7 @@ existed.
 Each supported plugin has a toggle: Layer 4 Proxy, Tailscale, Request Blocker, Coraza WAF, and every DNS
 provider. Turning one off does two things:
 
-- **The app stops generating config that uses it, immediately.** The handler simply stops being
+- **The app stops generating config that uses it, immediately.** The handler stops being
   emitted, which is what lets you remove a plugin without Caddy rejecting the stored config on the
   way out.
 - **Every setting that depends on it is disabled**, with a tooltip naming the module. Geo blocking
@@ -38,7 +38,7 @@ with Layer 4 Proxy switched off.
 [Cache assets](/features/reverse-proxy/#cache-assets); the storage modules beside it give that
 cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-storage)).
 
-<Demo title="Settings → Caddy Build" note="Nothing saves here, so the build stays current and Rebuild is never offered.">
+<Demo title="Settings → Caddy build" note="Nothing saves here, so the build stays current and Rebuild is never offered.">
   <CaddyBuildDemo client:visible />
 </Demo>
 
@@ -97,7 +97,7 @@ plugins, so the config stays loadable and every feature needing a module stays o
 
 ## HTTP cache storage
 
-**Settings → Caddy Build → HTTP Cache** picks where the Caddy cache keeps entries. Memory is
+**Settings → Caddy build → HTTP cache** picks where the Caddy cache keeps entries. Memory is
 built in; each other storage is its own module, and can be chosen once that module is selected above:
 
 | Storage | Kept | Shared between Caddys |
@@ -125,7 +125,7 @@ Once either is set, CPM writes the `cache` app itself and the global one is refu
 
 ## Global Caddyfile
 
-**Settings → Caddy Build → Global Caddyfile** takes raw Caddyfile text - a global options block,
+**Settings → Caddy build → Global Caddyfile** takes raw Caddyfile text - a global options block,
 site blocks, or both - and adds it to every agent's config. Each agent's Caddy adapts it, so a
 directive from a module that agent was built with works there.
 

@@ -82,9 +82,9 @@ test.describe('Profile - password and picture', () => {
     await waitForHydration(page);
     await page.getByRole('button', { name: /^change$/i }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Current Password', { exact: true }).fill(USER.password);
-    await dialog.getByLabel('New Password', { exact: true }).fill(NEW_PASSWORD);
-    await dialog.getByLabel('Confirm New Password', { exact: true }).fill(NEW_PASSWORD);
+    await dialog.getByLabel('Current password', { exact: true }).fill(USER.password);
+    await dialog.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
+    await dialog.getByLabel('Confirm new password', { exact: true }).fill(NEW_PASSWORD);
     await dialog.getByRole('button', { name: /^change$/i }).click();
     await expect(page.getByText(/password changed successfully/i)).toBeVisible({
       timeout: 15_000,
@@ -158,8 +158,8 @@ test.describe('An OAuth-only account (Dex)', () => {
     // A fresh Dex sign-in is the proof a first password asks for.
     await page.getByRole('button', { name: /^set password$/i }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('New Password', { exact: true }).fill(LOCAL_PASSWORD);
-    await dialog.getByLabel('Confirm New Password', { exact: true }).fill(LOCAL_PASSWORD);
+    await dialog.getByLabel('New password', { exact: true }).fill(LOCAL_PASSWORD);
+    await dialog.getByLabel('Confirm new password', { exact: true }).fill(LOCAL_PASSWORD);
     await dialog.getByRole('button', { name: /^set password$/i }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });
     await page.reload();

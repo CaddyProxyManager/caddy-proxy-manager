@@ -22,9 +22,8 @@ GeoLite2 databases, which CPM can keep updated for you.
 
 ## Allow beats block
 
-Rules are either **block** or **allow**, and allow rules take precedence. That ordering is what
-makes the useful shape possible: block an entire continent, then allow the two ASNs or addresses
-that should still get through.
+Rules are either **block** or **allow**, and allow rules take precedence. That lets you block an
+entire continent, then allow the two ASNs or addresses that should still get through.
 
 <Demo title="Geo blocking on a proxy host" note="Every country and continent is really in there.">
   <GeoBlockDemo client:visible />
@@ -59,7 +58,7 @@ cannot silently disagree.
 
 2. Generate a licence key with `GeoLite2-Country`, `GeoLite2-City` and `GeoLite2-ASN` permissions.
 
-3. Open **Settings → Geo-blocking → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and key.
+3. Open **Settings → Geo-blocking → GeoIP databases**, tick **Use GeoIP**, and enter the account ID and key.
 
 </Steps>
 

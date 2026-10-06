@@ -35,7 +35,7 @@ that the model layer owns - load balancing, WAF and geoblock overrides, location
 travels as a `JSON` scalar: readable through `config` on a host, and passed back as `input` on a
 mutation.
 
-That split is deliberate. Those shapes change with the product and are already validated by code
+That split is deliberate. Those settings change with the product and are already validated by code
 that exists; restating them in the schema would be thousands of lines that can drift out of step
 with the validator while looking authoritative.
 
@@ -121,7 +121,7 @@ query {
 }
 ```
 
-There is no REST route for it: new API surface goes into GraphQL only.
+There is no REST route for it: new queries and mutations are added to GraphQL only.
 
 ## Analytics
 
@@ -209,7 +209,8 @@ Global rate-limit zones and the never-limited list are the `rate-limit` settings
 
 ## Authentication
 
-Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session. That
+Requests authenticate with a Bearer token, created from **Profile → API tokens** in an authenticated
+dashboard session. That
 restriction is deliberate: an existing token cannot mint replacement credentials, so a leaked one
 cannot extend its own life. An account holds at most ten, and each expires in 30 days, 90 days (the
 default), a year, on a date you pick, or never. A token stops working while its owner is overdue

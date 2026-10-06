@@ -114,7 +114,7 @@ test.describe('Role-based access control', () => {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
       await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Proxy Hosts' })).not.toBeVisible();
+      await expect(page.getByRole('link', { name: 'Proxy hosts' })).not.toBeVisible();
       await expect(page.getByRole('link', { name: 'Settings' })).not.toBeVisible();
       await expect(page.getByRole('link', { name: 'Users' })).not.toBeVisible();
     } finally {
@@ -165,7 +165,7 @@ test.describe('Role-based access control', () => {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
       await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Proxy Hosts' })).not.toBeVisible();
+      await expect(page.getByRole('link', { name: 'Proxy hosts' })).not.toBeVisible();
       await expect(page.getByRole('link', { name: 'Settings' })).not.toBeVisible();
     } finally {
       await page.close();
@@ -263,7 +263,7 @@ test.describe('Role-based access control', () => {
       const page = await adminContext.newPage();
       await page.goto('/');
       await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Proxy Hosts', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Proxy hosts', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Users' })).toBeVisible();
       await page.close();

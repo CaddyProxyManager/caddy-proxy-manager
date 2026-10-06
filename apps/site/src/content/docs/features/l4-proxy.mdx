@@ -60,8 +60,8 @@ blocking and CrowdSec apply to a range host as to any other.
 
 ## PROXY protocol
 
-Sent to the backend in v1 or v2, so it sees the real client address instead of Caddy's, and
-accepted from a load balancer in front for the same reason. The backend has to
+Caddy can send it to the backend in v1 or v2, so the backend sees the real client address instead
+of Caddy's, and accept it from a load balancer in front for the same reason. The backend has to
 be configured to expect it - sending PROXY protocol to something that is not listening for it
 breaks the connection outright.
 
@@ -115,5 +115,5 @@ controller is sent a range one port at a time, and takes it just the same.
 
 :::note
 Layer 4 is a compiled-in Caddy module. If L4 hosts are greyed out, turn the module on in
-[Caddy Build](../caddy-build/) and rebuild.
+[Caddy build](../caddy-build/) and rebuild.
 :::

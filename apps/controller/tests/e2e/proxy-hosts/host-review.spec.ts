@@ -24,7 +24,7 @@ test.describe('Proxy host review before save', () => {
     try {
       await page.goto(`/proxy-hosts?edit=${id}#upstreams`);
       await waitForHydration(page);
-      const editor = page.getByRole('dialog', { name: 'Edit Proxy Host' });
+      const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
       await expect(editor.getByText('No unsaved changes')).toBeVisible();
 
@@ -65,7 +65,7 @@ test.describe('Proxy host review before save', () => {
     try {
       await page.goto(`/proxy-hosts?edit=${id}`);
       await waitForHydration(page);
-      const editor = page.getByRole('dialog', { name: 'Edit Proxy Host' });
+      const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
 
       await editor.getByLabel('Name').fill('Never saved');

@@ -28,9 +28,9 @@ skips that demotion - even when two of them happen at the same moment.
 
 ## Operator is the delegating role
 
-Its baseline is nothing, and it reaches exactly what its groups were granted. That shape is what
-makes grants safe to add: viewer and user gain nothing from a grant, so creating one can never
-widen an existing account. Someone has to be made an operator deliberately.
+Its baseline is nothing, and it reaches exactly what its groups were granted. Starting from nothing
+is what makes grants safe to add: viewer and user gain nothing from a grant, so creating one can
+never widen an existing account. Someone has to be made an operator deliberately.
 
 Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only - an
 operator's [API token](../api/) gets the same user-scoped endpoints a user's does.
@@ -147,7 +147,7 @@ answered only on the container's own loopback. It removes the user's passkeys to
 
 ### The two-factor policy
 
-**Settings → Authentication → Two-factor Sign-in** decides who must have a second factor: nobody,
+**Settings → Authentication → Two-factor sign-in** decides who must have a second factor: nobody,
 **administrators**, or **every password account**. An authenticator app or a passkey satisfies it.
 
 - **Accounts without a local password are exempt.** Single sign-on and directory accounts are
@@ -237,15 +237,15 @@ no policy on, leads to [requiring a second factor](#the-two-factor-policy).
 zone and the number format are stored on the account, so they follow it to every browser: times
 show in the zone you pick (or the browser's, by default), and large numbers group the way you
 choose - `1,234.5`, `1.234,5`, `1 234,5` or `1'234.5` - whatever language the pages are in. A
-browser you have not set a zone for still tells the server its own, as before.
+browser you have not set a zone for tells the server its own.
 
 The session list on the same page shows each session's approximate place, such as "Near Lyon,
 France", when the [GeoIP](../geo-blocking/) City or Country database is on the controller.
 
 ## OAuth / SSO
 
-Any OAuth2/OIDC provider - Authentik, Keycloak, Auth0, and others. Accounts can be linked from the
-Profile page, so an existing local account gains SSO rather than becoming a duplicate.
+Any OAuth2/OIDC provider works: Authentik, Keycloak, Auth0 and others. Accounts can be linked from
+the Profile page, so an existing local account gains SSO rather than becoming a duplicate.
 
 A provider sign-in that is refused comes back to the sign-in screen with the reason. The common one
 is an email that already belongs to an account the provider is not linked to: sign in with the
@@ -257,8 +257,8 @@ Two options worth knowing:
 - **Group-based role mapping.** Members of a claimed group become admins, operators, users or
   viewers automatically, so role changes happen in your IdP rather than here. **Role when no
   group matches**, per provider, sets the role for anyone in none of them; it defaults to user.
-- **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in -
-  every identity comes from the provider.
+- **OIDC-only mode.** Disables local accounts entirely. There is no bootstrap admin and no
+  credential sign-in: every identity comes from the provider.
 
 ## LDAP and Active Directory
 

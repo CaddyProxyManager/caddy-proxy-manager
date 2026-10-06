@@ -69,7 +69,7 @@ test.describe('Analytics country breakdown', () => {
 
       // A host filter in the URL, as a shared link or saved view carries it.
       await page.goto(`/analytics?range=1h&f=${encodeURIComponent(`host:is:${host}`)}`);
-      await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Traffic by country')).toBeVisible({ timeout: 15_000 });
 
       const open = page.getByRole('button', { name: `Show the breakdown for ${COUNTRY}` });
       await expect(open).toBeVisible({ timeout: 15_000 });

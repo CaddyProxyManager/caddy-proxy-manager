@@ -16,7 +16,7 @@ const API = `${BASE_URL}/api/v1`;
 let proxyHostId: number;
 
 test.describe
-  .serial('Forward Auth', () => {
+  .serial('Forward auth', () => {
     test('setup: create proxy host with forward auth via API', async ({ page }) => {
       const res = await page.request.post(`${API}/proxy-hosts`, {
         data: {

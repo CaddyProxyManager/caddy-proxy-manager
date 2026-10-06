@@ -10,7 +10,7 @@ import { waitForHydration } from '../../helpers/hydration';
 const DOMAIN = 'func-rewrite.test';
 
 test.describe
-  .serial('Path Prefix Rewrite', () => {
+  .serial('Path prefix rewrite', () => {
     test('setup: create proxy host with path prefix rewrite', async ({ page }) => {
       await page.goto(PROXY_HOSTS_NEWEST_FIRST);
       await waitForHydration(page);
@@ -22,7 +22,7 @@ test.describe
       // whoami-server listens on port 80 by default
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
-      await page.getByLabel('Path Prefix Rewrite').fill('/api');
+      await page.getByLabel('Path prefix rewrite').fill('/api');
 
       await turnOffForceHttps(page);
       await page.getByRole('button', { name: /^create$/i }).click();

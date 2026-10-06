@@ -84,7 +84,7 @@ test.describe('Proxy host tags and duplicate', () => {
 
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue(
-        'Duplicate E2E (Copy)',
+        'Duplicate E2E (copy)',
       );
       await expect(dialog.getByRole('textbox', { name: 'Domains' })).toHaveValue('');
       await expect(dialog.getByText('dup', { exact: true })).toBeVisible();

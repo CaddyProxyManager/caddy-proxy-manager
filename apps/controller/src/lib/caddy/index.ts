@@ -1624,7 +1624,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       console.warn(
         `Skipping proxy host "${row.name}": it is set to serve only on the tailnet, but Tailscale ` +
           "is not usable. Enable it in Settings → Network → Tailscale and make sure the Tailscale module is " +
-          "in Settings → Caddy Build, then rebuild Caddy.",
+          "in Settings → Caddy build, then rebuild Caddy.",
       );
       continue;
     }
@@ -1696,7 +1696,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     } else if (rateLimit.pre || rateLimit.postAuth) {
       console.warn(
         `Skipping rate limiting on proxy host "${row.name}": the Rate Limit module is not in ` +
-          "Caddy. Enable it in Settings → Caddy Build and rebuild Caddy.",
+          "Caddy. Enable it in Settings → Caddy build and rebuild Caddy.",
       );
     }
 
@@ -2753,7 +2753,7 @@ export async function buildTlsAutomation(
     if (isDnsProviderUsable(availability, providerName)) return true;
     console.warn(
       `Skipping the ACME DNS-01 challenge for "${providerName}": its Caddy DNS module is not ` +
-        "enabled in Settings → Caddy Build, or the caddy image has not been rebuilt with it yet.",
+        "enabled in Settings → Caddy build, or the caddy image has not been rebuilt with it yet.",
     );
     return false;
   };
@@ -3522,7 +3522,7 @@ export async function buildCaddyDocument(
   ) {
     console.warn(
       "Blocked sources by country, continent or network are skipped: they need the Geo Blocking " +
-        "module. Enable it in Settings → Caddy Build and rebuild Caddy.",
+        "module. Enable it in Settings → Caddy build and rebuild Caddy.",
     );
   }
 
@@ -3535,7 +3535,7 @@ export async function buildCaddyDocument(
   if (crowdsec && !crowdsecUsable) {
     console.warn(
       "CrowdSec is enabled in settings but its Caddy module is not in the running binary. " +
-        "Enable it in Settings → Caddy Build and rebuild Caddy.",
+        "Enable it in Settings → Caddy build and rebuild Caddy.",
     );
   }
   const crowdsecApp =
@@ -3556,7 +3556,7 @@ export async function buildCaddyDocument(
   if (tailscaleSettings.enabled && !tailscaleCompiledIn) {
     console.warn(
       "Tailscale is enabled in settings but its Caddy module is not in the running binary. " +
-        "Enable it in Settings → Caddy Build and rebuild Caddy.",
+        "Enable it in Settings → Caddy build and rebuild Caddy.",
     );
   }
   const tailscaleRuntime: TailscaleRuntime = {
@@ -3637,7 +3637,7 @@ export async function buildCaddyDocument(
   if (!blockerUsable && skippedGeoLists.length > 0) {
     console.warn(
       `Access-list rules by country, continent or ASN are skipped on ${skippedGeoLists.length} ` +
-        "list(s): they need the Geo Blocking module. Enable it in Settings → Caddy Build and " +
+        "list(s): they need the Geo Blocking module. Enable it in Settings → Caddy build and " +
         "rebuild Caddy.",
     );
   }

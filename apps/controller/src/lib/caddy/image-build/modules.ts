@@ -56,7 +56,7 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     name: "Layer 4 Proxy",
     modulePath: "github.com/mholt/caddy-l4",
     description:
-      "TCP/UDP proxying. Required by L4 Proxy Hosts and by the agent that binds their ports.",
+      "TCP/UDP proxying. Required by L4 proxy hosts and by the agent that binds their ports.",
     docsUrl: "https://github.com/mholt/caddy-l4",
     category: "proxy",
     features: ["l4"],

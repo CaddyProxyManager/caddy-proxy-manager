@@ -74,7 +74,7 @@ test.describe('Analytics API failures', () => {
     await page.goto('/analytics');
     await pageShellRendered(page);
 
-    await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Traffic by country')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 15_000 });
     expect(errors, `uncaught errors crashed the page: ${JSON.stringify(errors)}`).toEqual([]);
   });

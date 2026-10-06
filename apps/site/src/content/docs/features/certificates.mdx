@@ -44,7 +44,7 @@ Each host's menu has three tools:
   <AcmeCertificatesDemo client:visible />
 </Demo>
 
-For an internal CA, set the ACME directory URL under **Settings → General → ACME Server** and supply its root
+For an internal CA, set the ACME directory URL under **Settings → General → ACME server** and supply its root
 so Caddy trusts it.
 
 ## DNS-01
@@ -54,8 +54,8 @@ certificates and internal-only hosts possible.
 
 Twenty-two providers are supported, including Cloudflare, Route 53, DigitalOcean, Hetzner, Vultr,
 Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns, INWX, ClouDNS and RFC2136 (BIND/TSIG).
-Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider
-- netcup ships with slow-propagation defaults because it needs them.
+Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider.
+The netcup provider ships with slow-propagation defaults because it needs them.
 
 A provider can be overridden per certificate when one domain lives somewhere else - through the
 REST [API](../api/) only (`providerOptions.provider`); the dashboard uses the global provider. The
@@ -65,7 +65,7 @@ override needs that provider's credentials saved in Settings, or the global prov
 
 A domain whose DNS host has no API can still use DNS-01. Create a CNAME from its
 `_acme-challenge` name to a record in a zone you *can* write through a supported provider, and add
-a delegation under **Settings → DNS → DNS Providers → Challenge delegation**:
+a delegation under **Settings → DNS → DNS providers → Challenge delegation**:
 
 - **Domain** - covers itself and every name under it; the longest matching domain wins. A
   wildcard `*.example.com` answers at `_acme-challenge.example.com`, so it shares the apex's record.
@@ -115,7 +115,7 @@ awake when it runs. A CNAME is created once. Delegation covers every case the ma
 
 :::note
 A DNS provider is a compiled-in Caddy module. If the one you want is greyed out, turn it on in
-[Caddy Build](../caddy-build/) and rebuild.
+[Caddy build](../caddy-build/) and rebuild.
 :::
 
 ## Manual imports

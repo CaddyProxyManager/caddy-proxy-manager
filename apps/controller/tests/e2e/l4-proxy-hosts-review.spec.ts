@@ -20,10 +20,10 @@ test('L4 review shows the listen change and the port apply it needs', async ({ p
   try {
     await page.goto(`/l4-proxy-hosts?edit=${id}#listener`);
     await waitForHydration(page);
-    const editor = page.getByRole('dialog', { name: 'Edit L4 Proxy Host' });
+    const editor = page.getByRole('dialog', { name: 'Edit L4 proxy host' });
     await expect(editor).toBeVisible({ timeout: 10_000 });
 
-    await editor.getByLabel('Listen Address').fill(':19872');
+    await editor.getByLabel('Listen address').fill(':19872');
     await editor.getByRole('button', { name: 'Review', exact: true }).click();
 
     const review = page.getByRole('dialog', { name: 'Review changes' });
@@ -53,7 +53,7 @@ test('a deep-linked L4 editor closes after saving', async ({ page }) => {
   try {
     await page.goto(`/l4-proxy-hosts?edit=${id}`);
     await waitForHydration(page);
-    const editor = page.getByRole('dialog', { name: 'Edit L4 Proxy Host' });
+    const editor = page.getByRole('dialog', { name: 'Edit L4 proxy host' });
     await expect(editor).toBeVisible({ timeout: 10_000 });
 
     await editor.getByLabel('Notes').fill('Saved from a deep link');

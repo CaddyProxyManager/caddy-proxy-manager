@@ -9,7 +9,7 @@ const MAP_CANVAS = 'canvas.maplibregl-canvas';
 
 async function gotoAnalyticsMap(page: Page) {
   await page.goto('/analytics');
-  await expect(page.getByText('Traffic by Country')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Traffic by country')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(MAP_CANVAS)).toBeVisible({ timeout: 15_000 });
 }
 

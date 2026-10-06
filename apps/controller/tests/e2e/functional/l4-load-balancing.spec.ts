@@ -1,7 +1,7 @@
 /**
  * Functional: L4 (TCP) load balancing (upstream #301). Load balancing used to send
  * reverse_proxy's schema (`selection_policy`, `retries`) to caddy-l4, and Caddy refused the whole
- * config. Two upstreams, the first dead, "First Available", a try window and an active health
+ * config. Two upstreams, the first dead, "First available", a try window and an active health
  * check: every connection only echoes if caddy-l4 applied all of it.
  *
  * Port TCP 15434; upstreams tcp-echo:9999 (nothing listening) and tcp-echo:9000 (echo).
@@ -24,22 +24,22 @@ test.describe
       await expect(dialog).toBeVisible();
 
       await dialog.getByLabel('Name').fill(HOST_NAME);
-      await dialog.getByLabel('Listen Address').fill(`:${TCP_PORT}`);
+      await dialog.getByLabel('Listen address').fill(`:${TCP_PORT}`);
       await dialog
         .getByRole('textbox', { name: /^Upstreams/ })
         .fill('tcp-echo:9999\ntcp-echo:9000');
 
-      await dialog.getByRole('button', { name: 'Load Balancer' }).click();
+      await dialog.getByRole('button', { name: 'Load balancer' }).click();
       await dialog.getByRole('switch', { name: 'Enable Load Balancing' }).click();
       await dialog.getByRole('combobox', { name: 'Policy' }).click();
-      await page.getByRole('option', { name: 'First Available' }).click();
-      await dialog.getByLabel('Try Duration').fill('5s');
-      await dialog.getByLabel('Try Interval').fill('250ms');
-      await dialog.getByRole('switch', { name: 'Enable Active Health Check' }).click();
+      await page.getByRole('option', { name: 'First available' }).click();
+      await dialog.getByLabel('Try duration').fill('5s');
+      await dialog.getByLabel('Try interval').fill('250ms');
+      await dialog.getByRole('switch', { name: 'Enable active health check' }).click();
 
       // Fields caddy-l4 does not support must not be offered.
       await expect(dialog.getByLabel('Retries')).toHaveCount(0);
-      await expect(dialog.getByLabel('Unhealthy Latency')).toHaveCount(0);
+      await expect(dialog.getByLabel('Unhealthy latency')).toHaveCount(0);
 
       await dialog.getByRole('button', { name: /^create$/i }).click();
 

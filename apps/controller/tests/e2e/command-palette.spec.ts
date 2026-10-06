@@ -25,7 +25,7 @@ test.describe('Global command palette', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Pages', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Settings', { exact: true }).first()).toBeVisible();
-    await expect(dialog.getByText('Audit Log', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Audit log', { exact: true })).toBeVisible();
   });
 
   test('the rail button opens it', async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe('Global command palette', () => {
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
     await input.pressSequentially('audit');
-    await expect(dialog.getByRole('option').first()).toContainText('Audit Log');
+    await expect(dialog.getByRole('option').first()).toContainText('Audit log');
     // Nothing is highlighted - no arrow key, no pointer over the list - and Enter still takes the
     // top result, which is what typing a name and pressing Enter means.
     await expect(input).not.toHaveAttribute('aria-activedescendant', /.+/);
@@ -60,7 +60,7 @@ test.describe('Global command palette', () => {
 
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('DASHBOARD_DOMAIN');
-    await dialog.getByText('Dashboard Host', { exact: true }).click();
+    await dialog.getByText('Dashboard host', { exact: true }).click();
 
     await expect(page).toHaveURL(/\/settings\/dashboard$/);
   });

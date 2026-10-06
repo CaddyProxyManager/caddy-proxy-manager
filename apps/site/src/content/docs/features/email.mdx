@@ -16,7 +16,7 @@ reset link, and **Users** has no invitation option.
 
 ## Setting it up
 
-**Settings → Email → SMTP Server** takes the server, its port and encryption, an optional username
+**Settings → Email → SMTP server** takes the server, its port and encryption, an optional username
 and password, and the address mail is sent from. The application name is shown as the sender.
 
 - **STARTTLS** (port 587) is the default, and refuses a server that does not offer it rather than
@@ -124,12 +124,12 @@ administrator or after failed sign-ins, and nothing more while it stays disabled
 
 The controller times an agent from when it first saw it disconnected. After the controller itself
 restarts, every agent gets the whole threshold to reconnect before anyone is told. An agent that
-never connected, is switched off or has been unpaired is no news.
+never connected, is switched off or has been unpaired triggers no notification.
 
 ### Upstream errors
 
 These are counted from Caddy's access log, so **access logging must be on**, in JSON, under
-**Settings → Observability → Access Logging**; the block says so when it is not. ClickHouse is not
+**Settings → Observability → Access logging**; the block says so when it is not. ClickHouse is not
 needed: while this notification is on and it can be sent somewhere, each agent reads its access log and
 sends the controller counts of 502, 503 and 504 answers per host and minute, analytics or not. A
 logged name that is not one of your proxy hosts is ignored. The access log does not record which

@@ -27,7 +27,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByRole('link', { name: /l4 proxy hosts/i }).click();
     await expect(page).toHaveURL(/\/l4-proxy-hosts/);
     // Non-exact would also match the empty state's "No L4 proxy hosts found".
-    await expect(page.getByRole('heading', { name: 'L4 Proxy Hosts', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'L4 proxy hosts', exact: true })).toBeVisible();
   });
 
   test('shows empty state when search has no results', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await expect(page.getByLabel('Name')).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Protocol' }).first()).toBeVisible();
-    await expect(page.getByLabel('Listen Address')).toBeVisible();
+    await expect(page.getByLabel('Listen address')).toBeVisible();
     await expect(page.getByRole('textbox', { name: /^Upstreams/ })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Matcher' }).first()).toBeVisible();
   });
@@ -68,7 +68,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     test('clicking Name / Matcher header sorts the table', async ({ page }) => {
       await page.goto('/l4-proxy-hosts');
-      const sortBtn = page.getByRole('button', { name: 'Name / Matcher' });
+      const sortBtn = page.getByRole('button', { name: 'Name / matcher' });
       await expect(sortBtn).toBeVisible();
 
       await sortBtn.click();
@@ -105,7 +105,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Test Host');
-    await page.getByLabel('Listen Address').fill(':19999');
+    await page.getByLabel('Listen address').fill(':19999');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
     await page.getByRole('button', { name: /^create$/i }).click();
@@ -123,7 +123,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Reserved Port Host');
-    await page.getByLabel('Listen Address').fill(':443');
+    await page.getByLabel('Listen address').fill(':443');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:8443');
 
     await page.getByRole('button', { name: /^create$/i }).click();
@@ -171,7 +171,7 @@ test.describe('L4 Proxy Hosts page', () => {
       await page.getByRole('button', { name: 'New', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByLabel('Name').fill(`E2E Rapid Host ${i}`);
-      await page.getByLabel('Listen Address').fill(`:2000${i}`);
+      await page.getByLabel('Listen address').fill(`:2000${i}`);
       await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
       await page.getByRole('button', { name: /^create$/i }).click();
@@ -190,7 +190,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await waitForHydration(page);
     await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.getByLabel('Name').fill('E2E Toggle Host');
-    await page.getByLabel('Listen Address').fill(':20010');
+    await page.getByLabel('Listen address').fill(':20010');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });

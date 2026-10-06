@@ -60,7 +60,7 @@ currently stands for, or why it stands for nothing.
   admits nobody; a deny rule with nothing behind it denies nobody, and the Network tab warns about
   it. A list whose only rule is an unresolved allow shuts everyone out - on an L4 host too.
 - A name counts as one rule towards a list's limit of 500, and stands for at most 16 addresses.
-  Lookups go to the servers under **Settings → DNS → DNS Resolvers** when those are enabled, and
+  Lookups go to the servers under **Settings → DNS → DNS resolvers** when those are enabled, and
   to the controller's own resolver otherwise - so a name that only resolves inside a network needs
   a controller that can see that network's DNS.
 
@@ -81,8 +81,8 @@ blocking, and a client it cannot place counts as matching no rule.
 #### Notes and expiry
 
 Every rule takes a note, and an optional expiry: in an hour, a day, a week or a month. Past it the
-rule stops applying at once and is deleted within a minute, recorded in the audit log. Useful for a
-contractor's address or a team travelling.
+rule stops applying at once and is deleted within a minute, recorded in the audit log. Use it for a
+contractor's address or a team that is travelling.
 
 <Demo title="An access list's Network tab" note="Reorder, add or remove rules, set an expiry or a deny response and save; nothing leaves the page.">
   <AccessListNetworkDemo client:visible />
@@ -133,8 +133,7 @@ header before forwarding the request. Turn on **Pass auth to host** for an appli
 the username from it itself. Lists made before this setting existed have it on, which is how they
 always behaved.
 
-Simple, and appropriate for exactly the cases basic auth is appropriate for: an internal tool, a
-staging site, something you want off the open internet without standing up an identity provider.
+Access lists are simple, and fit the cases basic auth fits: an internal tool, a staging site, something you want off the open internet without standing up an identity provider.
 
 <Demo title="Adding an account to an access list" note="Generate, reveal and copy all work.">
   <PasswordFieldDemo client:visible />

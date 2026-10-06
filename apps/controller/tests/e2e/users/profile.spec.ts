@@ -28,9 +28,9 @@ test.describe('Profile', () => {
     await page.getByRole('button', { name: /^(change|set password)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    await page.getByLabel('Current Password', { exact: true }).fill('WrongCurrentPassword!');
-    await page.getByLabel('New Password', { exact: true }).fill('NewPassword2026!');
-    await page.getByLabel('Confirm New Password', { exact: true }).fill('NewPassword2026!');
+    await page.getByLabel('Current password', { exact: true }).fill('WrongCurrentPassword!');
+    await page.getByLabel('New password', { exact: true }).fill('NewPassword2026!');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('NewPassword2026!');
 
     await page
       .getByRole('button', { name: /^(change|set password)$/i })
@@ -49,8 +49,8 @@ test.describe('Profile', () => {
     await page.getByRole('button', { name: /^(change|set password)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    await page.getByLabel('New Password', { exact: true }).fill('short');
-    await page.getByLabel('Confirm New Password', { exact: true }).fill('short');
+    await page.getByLabel('New password', { exact: true }).fill('short');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('short');
 
     await page
       .getByRole('button', { name: /^(change|set password)$/i })

@@ -118,7 +118,7 @@ The same preview is in the [API](../api/#previewing-a-change).
 ## Duplicating a host
 
 **Duplicate** in a host's row menu opens a new host's editor filled in from that one, named with
-"(Copy)" on the end. The domains are left empty, since two hosts cannot answer for the same name,
+"(copy)" on the end. The domains are left empty, since two hosts cannot answer for the same name,
 and so is a sticky-session cookie secret: a secret is not copied into a new host. Whatever the host
 shares with others by reference - its certificate, access list, mTLS roles - stays selected. Like
 creating a host, it is for administrators.
@@ -158,7 +158,7 @@ Each host has switches at the top of its editor:
   <HostTogglesDemo client:visible />
 </Demo>
 
-HTTP/2 and HTTP/3 are offered on every host. **Settings → Network → HTTP Versions** turns either
+HTTP/2 and HTTP/3 are offered on every host. **Settings → Network → HTTP versions** turns either
 off, for all hosts at once: Caddy decides this per listening port, and every host shares one.
 HTTP/1.1 always stays on. Hosts served on a [tailnet](../tailscale/) get HTTP/2 from the same
 switch, but HTTP/3 only when **Serve HTTP/3 on tailnet listeners** is on as well.
@@ -243,8 +243,8 @@ others. The server-side read, write and idle timeouts belong to the listener rat
 </Demo>
 
 
-Path-based routing inside one host: send `/api/*` to one backend and `/ws/*` to another, each with
-its own upstreams, load balancing and health checks. A rule can also use an
+Location rules route by path inside one host: send `/api/*` to one backend and `/ws/*` to another,
+each with its own upstreams, load balancing and health checks. A rule can also use an
 [access list](../access-control/#per-path-lists) of its own, or none, instead of the host's.
 
 <Demo title="Location rules" note="Expand a rule to give it its own load balancer, or change the access list it uses.">
@@ -253,8 +253,8 @@ its own upstreams, load balancing and health checks. A rule can also use an
 
 ## Redirects and rewrites
 
-Per-host redirect rules with a status of 301, 302, 307 or 308 - 307 and 308 preserve the request
-method, which matters for anything but a GET. **Keep path** carries the rest of the request
+Each host can have redirect rules with a status of 301, 302, 307 or 308. 307 and 308 preserve the
+request method, which matters for anything but a GET. **Keep path** carries the rest of the request
 along: **Full path** appends the whole path and query to the target, and **After prefix** drops
 the part of the pattern before its `*` first, so `/blog/*` sends `/blog/2024/post` to
 `https://blog.example.com/2024/post`. A path prefix can be prepended before the request
@@ -293,11 +293,11 @@ maintenance keeps its certificate and tells visitors, and crawlers, that it will
 
 - **Bypass addresses** - IP addresses or CIDR ranges, one per line, that still reach the upstream,
   so you can check the site before reopening it. The client address is the one Caddy resolves
-  through **Settings → Network → Trusted Proxies**. Access lists, sign-in and the WAF still apply
+  through **Settings → Network → Trusted proxies**. Access lists, sign-in and the WAF still apply
   to a bypassing request.
 - **Retry-After** - seconds, sent as the `Retry-After` header when set.
 - **Page** - the HTML visitors see. Left empty, the host's own custom error page for a 503 is used,
-  then the global one from **Settings → Responses → Error Pages**, then a short built-in page.
+  then the global one from **Settings → Responses → Error pages**, then a short built-in page.
 
 The 503 comes before everything else in the host's configuration but the WebSocket refusal - geo
 blocking, the WAF, forward auth and location rules included - and is sent with
@@ -340,16 +340,16 @@ A host has one or more zones, and each counts on its own:
 A header name is a plain token: braces, and so any placeholder of your own, are refused. Header
 and user values are never logged and never become metric labels.
 
-The client IP is the one Caddy resolves through **Settings → Network → Trusted Proxies**, so a
+The client IP is the one Caddy resolves through **Settings → Network → Trusted proxies**, so a
 load balancer in front does not make every visitor look like one client. The limit is checked
 before geo blocking and the WAF, so a flood never costs a WAF inspection. The 429 keeps its
 `Retry-After` and is rendered by the host's custom error page for it, or the global one from
-**Settings → Responses → Error Pages**. Counters are kept per Caddy and survive a configuration
+**Settings → Responses → Error pages**. Counters are kept per Caddy and survive a configuration
 reload; each agent counts on its own.
 
 ### Global zones
 
-**Settings → Rate Limiting** holds zones every host can take. Each host chooses under **Global
+**Settings → Rate limiting** holds zones every host can take. Each host chooses under **Global
 zones**:
 
 - **Inherit** (the default for a new host) - only the global zones, none of its own.

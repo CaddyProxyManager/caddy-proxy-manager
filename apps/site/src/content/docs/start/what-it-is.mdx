@@ -15,7 +15,7 @@ Caddy JSON configuration and applies it over Caddy's admin API.
 | ----- | ---------- |
 | **Controller** | The web app and API. Holds the database and decides what the configuration should be |
 | **Agent** | Runs beside Caddy on each host. Applies configuration, recreates the container, and reports back |
-| **Caddy** | The server actually handling traffic |
+| **Caddy** | The server that handles the traffic |
 | **PostgreSQL** | Where everything is stored. SQLite instead, when `DATABASE_URL` names a file |
 | **Socket proxy** | The only thing that touches the Docker socket; the agent reaches Docker through it |
 | **ClickHouse** | Optional. Only for [analytics](../../features/analytics/) |
@@ -28,7 +28,7 @@ is what lets a Caddy host sit behind NAT with no inbound port.
 
 Configuration lives in the database, not in a Caddyfile. Caddy's running configuration is generated
 from the database on every apply, so the database is the source of truth and the Caddy config is
-derived - editing Caddy directly will be overwritten on the next apply.
+derived. The next apply overwrites anything you change in Caddy directly.
 
 Secrets - DNS provider credentials, private keys, auth keys - are encrypted at rest under the
 deployment's `SESSION_SECRET`. **Settings → Backup** exports all of it as one file sealed with a

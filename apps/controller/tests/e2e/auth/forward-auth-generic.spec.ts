@@ -25,7 +25,7 @@ test.describe('Generic forward auth', () => {
     const original = (await originalResp.json()) as ForwardAuthSettings | null;
 
     try {
-      await goToSetting(page, 'Forward Auth Defaults');
+      await goToSetting(page, 'Forward auth defaults');
 
       await page.locator('input[name="forwardAuthUpstream"]').fill(defaults.authUpstream);
       await page.locator('input[name="forwardAuthEndpoint"]').fill(defaults.authEndpoint);

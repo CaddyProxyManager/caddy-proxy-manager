@@ -7,7 +7,7 @@ import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik';
 
-test.describe('Proxy Hosts', () => {
+test.describe('Proxy hosts', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     // The tests below click New first thing; a click before hydration opens nothing.
@@ -41,7 +41,7 @@ test.describe('Proxy Hosts', () => {
   });
 
   test('clicking Name / Domain header sorts the table', async ({ page }) => {
-    const sortBtn = page.getByRole('button', { name: 'Name / Domain' });
+    const sortBtn = page.getByRole('button', { name: 'Name / domain' });
     await expect(sortBtn).toBeVisible({ timeout: 10_000 });
 
     await sortBtn.click();
@@ -242,7 +242,7 @@ test.describe('Proxy Hosts', () => {
     const originalSettings = (await originalSettingsResp.json()) as Partial<typeof defaultSettings>;
 
     try {
-      await goToSetting(page, 'Authentik Defaults');
+      await goToSetting(page, 'Authentik defaults');
 
       await page.locator('input[name="outpostDomain"]').fill(defaultSettings.outpostDomain);
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
@@ -538,7 +538,7 @@ test.describe('Proxy Hosts', () => {
   }) => {
     const origin = new URL(page.url()).origin;
 
-    // Names avoid "Forward Auth" so the exact badge assertions never match a name cell.
+    // Names avoid "Forward auth" so the exact badge assertions never match a name cell.
     const withResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -570,7 +570,7 @@ test.describe('Proxy Hosts', () => {
       await page.reload();
 
       // With analytics on, the list's protection badges call it "Sign-in".
-      const badge = /^(Forward Auth|Sign-in)$/;
+      const badge = /^(Forward auth|Sign-in)$/;
       const enabledRow = page.locator('tr', { hasText: 'FwdAuth Badge Host' });
       await expect(enabledRow.getByText(badge)).toBeVisible({
         timeout: 10000,

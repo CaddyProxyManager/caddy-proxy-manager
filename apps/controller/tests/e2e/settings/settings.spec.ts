@@ -64,15 +64,15 @@ test.describe('Settings - page load & layout', () => {
     const expectedItems = [
       'General',
       'Responses',
-      'Caddy Build',
-      'Dashboard Host',
+      'Caddy build',
+      'Dashboard host',
       'Agent',
       'DNS',
       'Network',
       'Authentication',
-      'Forward Auth',
+      'Forward auth',
       'Geo-blocking',
-      'Rate Limiting',
+      'Rate limiting',
       'Observability',
     ];
     for (const name of expectedItems) {
@@ -112,7 +112,7 @@ test.describe('Settings - sidebar navigation', () => {
 
     await page.locator(SETTINGS_SIDEBAR).getByRole('link', { name: 'DNS', exact: true }).click();
     await expect(breadcrumb.getByText('Networking')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS providers' })).toBeVisible();
   });
 
   test('navigating through all sections renders correct headings', async ({ page }) => {
@@ -125,9 +125,9 @@ test.describe('Settings - sidebar navigation', () => {
       'DNS',
       'Network',
       'Authentication',
-      'Forward Auth',
+      'Forward auth',
       'Geo-blocking',
-      'Rate Limiting',
+      'Rate limiting',
       'Observability',
     ];
 
@@ -145,10 +145,10 @@ test.describe('Settings - sidebar navigation', () => {
       page.getByRole('heading', { level: 1, name: 'General', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'ACME Server', exact: true }),
+      page.getByRole('heading', { level: 2, name: 'ACME server', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Trusted Proxies', exact: true }),
+      page.getByRole('heading', { level: 2, name: 'Trusted proxies', exact: true }),
     ).not.toBeVisible();
     await expect(pageSave(page)).toHaveCount(0);
 
@@ -157,10 +157,10 @@ test.describe('Settings - sidebar navigation', () => {
       .getByRole('link', { name: 'Network', exact: true })
       .click();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Trusted Proxies', exact: true }),
+      page.getByRole('heading', { level: 2, name: 'Trusted proxies', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'ACME Server', exact: true }),
+      page.getByRole('heading', { level: 2, name: 'ACME server', exact: true }),
     ).not.toBeVisible();
   });
 });
@@ -212,7 +212,7 @@ test.describe('Settings - Cmd-K palette', () => {
     await input.fill('logging');
     await sectionResult(dialog, 'Observability').click();
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Access logging' })).toBeVisible();
   });
 
   test('Escape closes the palette', async ({ page }) => {
@@ -295,7 +295,7 @@ test.describe('Settings - General', () => {
 
 test.describe('Settings - Default Response', () => {
   test('shows all supported behaviors and conditional custom fields', async ({ page }) => {
-    await goToSection(page, 'Default Response');
+    await goToSection(page, 'Default response');
     const behavior = page.getByRole('combobox', { name: 'Behavior' });
     await expect(behavior).toBeVisible();
     await behavior.click();
@@ -313,7 +313,7 @@ test.describe('Settings - Default Response', () => {
   });
 
   test('saves and reloads a custom response through the settings form', async ({ page }) => {
-    await goToSection(page, 'Default Response');
+    await goToSection(page, 'Default response');
     let behavior = page.getByRole('combobox', { name: 'Behavior' });
     await behavior.click();
     await page.getByRole('option', { name: 'Custom HTTP response' }).click();
@@ -329,7 +329,7 @@ test.describe('Settings - Default Response', () => {
       timeout: 10_000,
     });
 
-    await goToSection(page, 'Default Response');
+    await goToSection(page, 'Default response');
     behavior = page.getByRole('combobox', { name: 'Behavior' });
     await expect(behavior).toContainText('Custom HTTP response');
     await expect(page.locator('input[name="status"]')).toHaveValue('451');
@@ -364,23 +364,23 @@ test.describe('Settings - ACME Server', () => {
   });
 
   test('shows the custom directory URL and CA root fields', async ({ page }) => {
-    await goToSection(page, 'ACME Server');
+    await goToSection(page, 'ACME server');
     await expect(page.locator('input[name="caUrl"]')).toBeVisible();
     await expect(page.locator('textarea[name="caRootPem"]')).toBeVisible();
   });
 
   test('saves a custom directory URL and persists it', async ({ page }) => {
     const customDir = directoryUrl();
-    await goToSection(page, 'ACME Server');
+    await goToSection(page, 'ACME server');
     await saveSetting(page, page.locator('input[name="caUrl"]'), customDir);
     await expectStaged(page, 10_000);
 
-    await goToSection(page, 'ACME Server');
+    await goToSection(page, 'ACME server');
     await expect(page.locator('input[name="caUrl"]')).toHaveValue(customDir);
   });
 
   test('rejects a non-HTTPS directory URL', async ({ page }) => {
-    await goToSection(page, 'ACME Server');
+    await goToSection(page, 'ACME server');
     await saveSetting(
       page,
       page.locator('input[name="caUrl"]'),
@@ -391,7 +391,7 @@ test.describe('Settings - ACME Server', () => {
 
   test('UI save is reflected in the REST API once applied', async ({ page }) => {
     const customDir = directoryUrl();
-    await goToSection(page, 'ACME Server');
+    await goToSection(page, 'ACME server');
     await saveSetting(page, page.locator('input[name="caUrl"]'), customDir);
     await expectStaged(page, 10_000);
 
@@ -417,7 +417,7 @@ test.describe('Settings - Dashboard Host', () => {
     if ((await domain.inputValue()) === '') await domain.fill('dashboard-e2e.example.test');
 
     await page.getByText('Proxy options', { exact: true }).click();
-    const hstsSubdomains = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    const hstsSubdomains = page.getByRole('switch', { name: 'HSTS subdomains' });
     await expect(hstsSubdomains).toBeVisible();
     const before = await hstsSubdomains.isChecked();
     await hstsSubdomains.click();
@@ -430,7 +430,7 @@ test.describe('Settings - Dashboard Host', () => {
     await page.reload();
     await waitForHydration(page);
     await page.getByText('Proxy options', { exact: true }).click();
-    const reloaded = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    const reloaded = page.getByRole('switch', { name: 'HSTS subdomains' });
     if (before) await expect(reloaded).not.toBeChecked();
     else await expect(reloaded).toBeChecked();
   });
@@ -440,14 +440,14 @@ test.describe('Settings - Dashboard Host', () => {
 
 test.describe('Settings - DNS Providers', () => {
   test('shows provider selector and add form', async ({ page }) => {
-    await goToSection(page, 'DNS Providers');
-    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
+    await goToSection(page, 'DNS providers');
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS providers' })).toBeVisible();
     // Not text matching /select/ - hidden option labels match too, and need not be visible.
     await expect(page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]')).toBeVisible();
   });
 
   test('selecting a provider reveals its credential fields', async ({ page }) => {
-    await goToSection(page, 'DNS Providers');
+    await goToSection(page, 'DNS providers');
     // With hasSearch the trigger is not a combobox - the popup's search input owns that role.
     const providerSelect = page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]');
 
@@ -469,15 +469,15 @@ test.describe('Settings - DNS Providers', () => {
 
 test.describe('Settings - DNS Resolvers', () => {
   test('shows enable checkbox and resolver textareas', async ({ page }) => {
-    await goToSection(page, 'DNS Resolvers');
-    await expect(page.getByRole('heading', { level: 2, name: 'DNS Resolvers' })).toBeVisible();
+    await goToSection(page, 'DNS resolvers');
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS resolvers' })).toBeVisible();
     await expect(page.getByLabel('Enable custom DNS resolvers')).toBeVisible();
     await expect(page.locator('textarea[name="resolvers"]')).toBeVisible();
     await expect(page.locator('textarea[name="fallbacks"]')).toBeVisible();
   });
 
   test('timeout field is visible', async ({ page }) => {
-    await goToSection(page, 'DNS Resolvers');
+    await goToSection(page, 'DNS resolvers');
     await expect(page.locator('input[name="timeout"]')).toBeVisible();
   });
 });
@@ -486,15 +486,15 @@ test.describe('Settings - DNS Resolvers', () => {
 
 test.describe('Settings - Upstream DNS Pinning', () => {
   test('shows enable checkbox and address family selector', async ({ page }) => {
-    await goToSection(page, 'Upstream DNS Pinning');
+    await goToSection(page, 'Upstream DNS pinning');
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Upstream DNS Pinning' }),
+      page.getByRole('heading', { level: 2, name: 'Upstream DNS pinning' }),
     ).toBeVisible();
     await expect(page.getByLabel('Enable upstream DNS pinning')).toBeVisible();
   });
 
   test('address family selector shows three options', async ({ page }) => {
-    await goToSection(page, 'Upstream DNS Pinning');
+    await goToSection(page, 'Upstream DNS pinning');
     await page.getByRole('combobox', { name: 'Address family' }).click();
     await expect(page.getByRole('option', { name: /both/i })).toBeVisible();
     await expect(page.getByRole('option', { name: /ipv6 only/i })).toBeVisible();
@@ -504,7 +504,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
   test('a changed toggle still reads as changed after the save', async ({ page }) => {
     // React 19's post-action form reset snaps a toggle back to its mounted value after the last
     // render (see ui/FormBooleanControls). It must change before saving, or the reset hides it.
-    await goToSection(page, 'Upstream DNS Pinning');
+    await goToSection(page, 'Upstream DNS pinning');
     const toggle = page.getByLabel('Enable upstream DNS pinning');
     const save = pageSave(page);
 
@@ -570,7 +570,7 @@ test.describe('Settings - Tailscale', () => {
 
 test.describe('Settings - Rate Limiting', () => {
   test('a never-limited range reaches the REST API once applied', async ({ page }) => {
-    await goToSection(page, 'Rate Limiting');
+    await goToSection(page, 'Rate limiting');
     await expect(page.getByRole('button', { name: /add zone/i })).toBeVisible();
     await saveSetting(page, page.getByLabel(/never limited/i), '10.0.0.0/8');
     await expectStaged(page, 15_000);
@@ -615,15 +615,15 @@ test.describe('Settings - Sign-in account lock', () => {
 
 test.describe('Settings - Authentik Defaults', () => {
   test('shows outpost domain, upstream, and auth endpoint fields', async ({ page }) => {
-    await goToSection(page, 'Authentik Defaults');
-    await expect(page.getByRole('heading', { level: 2, name: 'Authentik Defaults' })).toBeVisible();
+    await goToSection(page, 'Authentik defaults');
+    await expect(page.getByRole('heading', { level: 2, name: 'Authentik defaults' })).toBeVisible();
     await expect(page.locator('input[name="outpostDomain"]')).toBeVisible();
     await expect(page.locator('input[name="outpostUpstream"]')).toBeVisible();
     await expect(page.locator('input[name="authEndpoint"]')).toBeVisible();
   });
 
   test('fields have appropriate placeholders', async ({ page }) => {
-    await goToSection(page, 'Authentik Defaults');
+    await goToSection(page, 'Authentik defaults');
     await expect(page.locator('input[name="outpostDomain"]')).toHaveAttribute(
       'placeholder',
       'outpost.goauthentik.io',
@@ -639,13 +639,13 @@ test.describe('Settings - Authentik Defaults', () => {
 
 test.describe('Settings - OAuth Providers', () => {
   test('section renders with Add Provider button', async ({ page }) => {
-    await goToSection(page, 'OAuth Providers');
-    await expect(page.getByRole('heading', { level: 2, name: 'OAuth Providers' })).toBeVisible();
+    await goToSection(page, 'OAuth providers');
+    await expect(page.getByRole('heading', { level: 2, name: 'OAuth providers' })).toBeVisible();
     await expect(page.getByRole('button', { name: /add provider/i })).toBeVisible();
   });
 
   test('clicking Add Provider opens dialog', async ({ page }) => {
-    await goToSection(page, 'OAuth Providers');
+    await goToSection(page, 'OAuth providers');
     await page.getByRole('button', { name: /add provider/i }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -655,7 +655,7 @@ test.describe('Settings - OAuth Providers', () => {
   });
 
   test('create and delete an OAuth provider', async ({ page }) => {
-    await goToSection(page, 'OAuth Providers');
+    await goToSection(page, 'OAuth providers');
     await page.getByRole('button', { name: /add provider/i }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/^name/i).fill('E2E Test Provider');
@@ -714,7 +714,7 @@ test.describe('Settings - OAuth Providers', () => {
       expect(itemBody).not.toContain(secret);
       expect(itemBody).not.toContain('clientSecret');
 
-      await goToSection(page, 'OAuth Providers');
+      await goToSection(page, 'OAuth providers');
       // The accessible name carries the timestamped provider name, so no card scoping.
       await page.getByRole('button', { name: `Edit ${providerName}` }).click();
 
@@ -748,8 +748,8 @@ test.describe('Settings - OAuth Providers', () => {
 
 test.describe('Settings - Global Geoblocking', () => {
   test('section renders with save button', async ({ page }) => {
-    await goToSection(page, 'Global Geoblocking');
-    await expect(page.getByRole('heading', { level: 2, name: 'Global Geoblocking' })).toBeVisible();
+    await goToSection(page, 'Global geoblocking');
+    await expect(page.getByRole('heading', { level: 2, name: 'Global geoblocking' })).toBeVisible();
   });
 });
 
@@ -757,21 +757,21 @@ test.describe('Settings - Global Geoblocking', () => {
 
 test.describe('Settings - Metrics & Monitoring', () => {
   test('shows enable checkbox and port field', async ({ page }) => {
-    await goToSection(page, 'Metrics & Monitoring');
+    await goToSection(page, 'Metrics & monitoring');
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+      page.getByRole('heading', { level: 2, name: 'Metrics & monitoring' }),
     ).toBeVisible();
     await expect(page.getByLabel('Enable metrics endpoint')).toBeVisible();
     await expect(page.locator('input[name="port"]')).toBeVisible();
   });
 
   test('port field has default value 9090', async ({ page }) => {
-    await goToSection(page, 'Metrics & Monitoring');
+    await goToSection(page, 'Metrics & monitoring');
     await expect(page.locator('input[name="port"]')).toHaveValue('9090');
   });
 
   test('info callout mentions Docker network scrape endpoint', async ({ page }) => {
-    await goToSection(page, 'Metrics & Monitoring');
+    await goToSection(page, 'Metrics & monitoring');
     await expect(page.getByText(/Scrape http:\/\/caddy-proxy-manager-caddy/i)).toBeVisible();
   });
 });
@@ -780,20 +780,20 @@ test.describe('Settings - Metrics & Monitoring', () => {
 
 test.describe('Settings - Access Logging', () => {
   test('shows enable checkbox and format selector', async ({ page }) => {
-    await goToSection(page, 'Access Logging');
-    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
+    await goToSection(page, 'Access logging');
+    await expect(page.getByRole('heading', { level: 2, name: 'Access logging' })).toBeVisible();
     await expect(page.getByLabel('Enable access logging')).toBeVisible();
   });
 
   test('format selector has JSON and Console options', async ({ page }) => {
-    await goToSection(page, 'Access Logging');
+    await goToSection(page, 'Access logging');
     await page.getByRole('combobox', { name: 'Format' }).click();
     await expect(page.getByRole('option', { name: 'JSON' })).toBeVisible();
     await expect(page.getByRole('option', { name: /console/i })).toBeVisible();
   });
 
   test('info callout mentions docker exec command', async ({ page }) => {
-    await goToSection(page, 'Access Logging');
+    await goToSection(page, 'Access logging');
     await expect(page.getByText(/docker exec/)).toBeVisible();
   });
 });
@@ -842,11 +842,11 @@ test.describe('Settings - cross-section navigation', () => {
 
     await sidebar.getByRole('link', { name: 'Observability', exact: true }).click();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+      page.getByRole('heading', { level: 2, name: 'Metrics & monitoring' }),
     ).toBeVisible();
 
     await sidebar.getByRole('link', { name: 'Authentication', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 2, name: 'OAuth Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'OAuth providers' })).toBeVisible();
 
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
@@ -860,7 +860,7 @@ test.describe('Settings - cross-section navigation', () => {
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('access logging');
     await sectionResult(dialog, 'Observability').click();
-    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Access logging' })).toBeVisible();
 
     await page
       .locator(SETTINGS_SIDEBAR)
@@ -882,21 +882,21 @@ test.describe('Settings - mobile layout', () => {
     await page.goto('/settings/general');
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
-    await expect(page.getByRole('link', { name: 'DNS Providers', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('link', { name: 'DNS providers', exact: true })).not.toBeVisible();
 
     await page.goto('/settings');
-    const tile = page.getByTestId(/^settings-tile-/).filter({ hasText: 'DNS Providers' });
+    const tile = page.getByTestId(/^settings-tile-/).filter({ hasText: 'DNS providers' });
     await expect(tile).toBeVisible();
     await tile.click();
     await expect(page.getByRole('heading', { level: 1, name: 'DNS' })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS providers' })).toBeVisible();
   });
 
   test('a section route renders its own section at mobile width', async ({ page }) => {
     await page.goto('/settings/observability');
     await expect(page.getByRole('heading', { level: 1, name: 'Observability' })).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+      page.getByRole('heading', { level: 2, name: 'Metrics & monitoring' }),
     ).toBeVisible();
   });
 
@@ -905,7 +905,7 @@ test.describe('Settings - mobile layout', () => {
     await page.goto('/settings/metrics');
     await expect(page).toHaveURL(/\/settings\/observability#metrics$/);
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+      page.getByRole('heading', { level: 2, name: 'Metrics & monitoring' }),
     ).toBeVisible();
   });
 
@@ -950,7 +950,7 @@ test.describe('Settings - form data round-trip via API', () => {
   });
 
   test('metrics settings: enable and change port via UI, verify via API', async ({ page }) => {
-    await goToSection(page, 'Metrics & Monitoring');
+    await goToSection(page, 'Metrics & monitoring');
     const enableCheckbox = page.getByLabel('Enable metrics endpoint');
     if (!(await enableCheckbox.isChecked())) {
       await enableCheckbox.click();
@@ -973,7 +973,7 @@ test.describe('Settings - form data round-trip via API', () => {
   });
 
   test('logging settings: change format via UI, verify via API', async ({ page }) => {
-    await goToSection(page, 'Access Logging');
+    await goToSection(page, 'Access logging');
     const enableCheckbox = page.getByLabel('Enable access logging');
     if (!(await enableCheckbox.isChecked())) {
       await enableCheckbox.click();

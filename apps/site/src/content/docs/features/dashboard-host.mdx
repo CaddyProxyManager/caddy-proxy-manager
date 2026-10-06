@@ -12,8 +12,8 @@ on, with the domain filled in.
 
 ## How it differs from an ordinary host
 
-It is **managed**: generated from **Settings → Dashboard Host** every time the configuration is
-applied, rather than stored as a row in Proxy Hosts. Nothing can delete it by accident, and there is
+It is **managed**: generated from **Settings → Dashboard host** every time the configuration is
+applied, rather than stored as a row in Proxy hosts. Nothing can delete it by accident, and there is
 no second copy to drift from the setting.
 
 It is also built ahead of the stored hosts. Routes are ordered by host specificity, which settles
@@ -44,7 +44,7 @@ old host is then left as it was, shadowed on that domain.
 
 ## Proxy options
 
-**Settings → Dashboard Host → Proxy options** has the same options as an ordinary proxy host:
+**Settings → Dashboard host → Proxy options** has the same options as an ordinary proxy host:
 certificate, access list, agent assignment, redirects, rewrites and location rules, path rules,
 error pages, raw Caddy config, external forward auth, Authentik, Tailscale, load balancing, DNS
 resolution, upstream timeouts, rate limiting, geo-blocking, CrowdSec, WAF, mTLS trust and the HSTS
@@ -71,7 +71,7 @@ a stored host:
 It comes up on HTTP. Forcing HTTPS before the domain reaches you would mean a fresh install's first
 act is a certificate order failing on a name nobody has pointed at it yet.
 
-**Settings → Dashboard Host** offers a reachability check: it sends a request to the domain and
+**Settings → Dashboard host** offers a reachability check: it sends a request to the domain and
 looks for a signature only this instance can produce. Any server can return 200 and echo a nonce
 back; only yours can sign it.
 
@@ -86,7 +86,7 @@ itself, so it cannot see through split-horizon DNS (passes, and ACME still fails
 without NAT hairpinning (fails, though the outside world reaches you fine). The toggle is a default
 you can override in both.
 
-<Demo title="Settings → Dashboard Host" note="Pick what the domain points at, then check it. Change the domain and the check waits for a save.">
+<Demo title="Settings → Dashboard host" note="Pick what the domain points at, then check it. Change the domain and the check waits for a save.">
   <DashboardHostDemo client:visible />
 </Demo>
 

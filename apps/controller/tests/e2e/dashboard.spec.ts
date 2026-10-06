@@ -28,9 +28,9 @@ test.describe('Dashboard home page', () => {
   });
 
   test('shows stat cards for Proxy Hosts, Certificates, and Access Lists', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /^Proxy Hosts:\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Proxy hosts:\s*\d+/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Certificates:\s*\d+/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /^Access Lists:\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Access lists:\s*\d+/ })).toBeVisible();
   });
 
   /** The hidden <a> only names the card; the exact name keeps this off the sidebar links. */
@@ -39,7 +39,7 @@ test.describe('Dashboard home page', () => {
   }
 
   test('Proxy Hosts stat card navigates to /proxy-hosts', async ({ page }) => {
-    await clickCard(page, /^Proxy Hosts:\s*\d+/);
+    await clickCard(page, /^Proxy hosts:\s*\d+/);
     await expect(page).toHaveURL(/\/proxy-hosts/);
   });
 
@@ -49,7 +49,7 @@ test.describe('Dashboard home page', () => {
   });
 
   test('Access Lists stat card navigates to /access-lists', async ({ page }) => {
-    await clickCard(page, /^Access Lists:\s*\d+/);
+    await clickCard(page, /^Access lists:\s*\d+/);
     await expect(page).toHaveURL(/\/access-lists/);
   });
 
@@ -119,7 +119,7 @@ test.describe('Dashboard home page', () => {
   test('the Proxy Hosts shortcut counts enabled against the total', async ({ page }) => {
     // A disabled host still exists, so the card names both numbers.
     await expect(
-      page.getByRole('link', { name: /^Proxy Hosts:\s*\d+ of \d+ enabled$/ }),
+      page.getByRole('link', { name: /^Proxy hosts:\s*\d+ of \d+ enabled$/ }),
     ).toBeVisible();
   });
 

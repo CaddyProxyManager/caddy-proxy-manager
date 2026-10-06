@@ -188,7 +188,7 @@ for (const [path, trigger] of [
   ['/access-lists', 'New'],
   ['/groups', 'New'],
   ['/users', 'New'],
-  ['/settings/authentication', 'Add Provider'],
+  ['/settings/authentication', 'Add provider'],
 ] as const) {
   test(`the dialog behind "${trigger}" on ${path} is named, closes on Escape and returns focus`, async ({
     page,

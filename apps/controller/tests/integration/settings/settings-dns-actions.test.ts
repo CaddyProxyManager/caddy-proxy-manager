@@ -96,12 +96,12 @@ describe('saving a provider', () => {
     [
       'a missing required field',
       { provider: 'cloudflare' },
-      t('dnsProviderFieldRequired', { field: 'API Token', provider: 'Cloudflare' }),
+      t('dnsProviderFieldRequired', { field: 'API token', provider: 'Cloudflare' }),
     ],
     [
       'a malformed duration',
       { provider: 'cloudflare', credential_api_token: 'x', credential_propagation_delay: 'soon' },
-      t('dnsProviderFieldDuration', { field: 'Propagation Delay' }),
+      t('dnsProviderFieldDuration', { field: 'Propagation delay' }),
     ],
   ];
   for (const [name, fields, message] of REFUSALS) {

@@ -73,7 +73,7 @@ describe('DNS provider registry', () => {
     expect(provider?.fields).toEqual([
       {
         key: 'api_token',
-        label: 'API Token',
+        label: 'API token',
         type: 'password',
         required: true,
       },
@@ -110,8 +110,8 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/spaceship',
     });
     expect(provider?.fields).toEqual([
-      { key: 'api_key', label: 'API Key', type: 'password', required: true },
-      { key: 'api_secret', label: 'API Secret', type: 'password', required: true },
+      { key: 'api_key', label: 'API key', type: 'password', required: true },
+      { key: 'api_secret', label: 'API secret', type: 'password', required: true },
       ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('spaceship');
@@ -149,7 +149,7 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/desec',
     });
     expect(provider?.fields).toEqual([
-      { key: 'token', label: 'API Token', type: 'password', required: true },
+      { key: 'token', label: 'API token', type: 'password', required: true },
       ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('desec');
@@ -183,7 +183,7 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/dynu',
     });
     expect(provider?.fields).toEqual([
-      { key: 'api_token', label: 'API Token', type: 'password', required: true },
+      { key: 'api_token', label: 'API token', type: 'password', required: true },
       ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('dynu');
@@ -269,7 +269,7 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/infomaniak',
     });
     expect(provider?.fields).toEqual([
-      { key: 'api_token', label: 'API Token', type: 'password', required: true },
+      { key: 'api_token', label: 'API token', type: 'password', required: true },
       ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('infomaniak');
@@ -305,7 +305,7 @@ describe('DNS provider registry', () => {
     expect(provider?.fields).toEqual([
       { key: 'username', label: 'Username', type: 'string', required: true },
       { key: 'password', label: 'Password', type: 'password', required: true },
-      { key: 'shared_secret', label: '2FA Shared Secret', type: 'password', required: false },
+      { key: 'shared_secret', label: '2FA shared secret', type: 'password', required: false },
       { key: 'endpoint_url', label: 'Endpoint URL', type: 'string', required: false },
       ...challengeOptionFields(),
     ]);
@@ -346,9 +346,9 @@ describe('DNS provider registry', () => {
       modulePath: 'github.com/caddy-dns/netcup',
     });
     expect(provider?.fields).toEqual([
-      { key: 'customer_number', label: 'Customer Number', type: 'string', required: true },
-      { key: 'api_key', label: 'API Key', type: 'password', required: true },
-      { key: 'api_password', label: 'API Password', type: 'password', required: true },
+      { key: 'customer_number', label: 'Customer number', type: 'string', required: true },
+      { key: 'api_key', label: 'API key', type: 'password', required: true },
+      { key: 'api_password', label: 'API password', type: 'password', required: true },
       ...challengeOptionFields(NETCUP_CHALLENGE_DEFAULTS),
     ]);
     expect(provider?.challengeDefaults).toEqual(NETCUP_CHALLENGE_DEFAULTS);
@@ -411,7 +411,7 @@ describe('DNS provider registry', () => {
       },
       {
         key: 'auth_password',
-        label: 'API Password',
+        label: 'API password',
         type: 'password',
         required: true,
         description: 'Password of the API user or sub-user.',
@@ -470,7 +470,7 @@ describe('DNS provider registry', () => {
     expect(provider?.fields).toEqual([
       {
         key: 'key_name',
-        label: 'TSIG Key Name',
+        label: 'TSIG key name',
         type: 'string',
         required: true,
         placeholder: 'my-transfer-key',
@@ -478,7 +478,7 @@ describe('DNS provider registry', () => {
       },
       {
         key: 'key_alg',
-        label: 'TSIG Algorithm',
+        label: 'TSIG algorithm',
         type: 'string',
         required: true,
         placeholder: 'hmac-sha256',
@@ -486,14 +486,14 @@ describe('DNS provider registry', () => {
       },
       {
         key: 'key',
-        label: 'TSIG Key Secret',
+        label: 'TSIG key secret',
         type: 'password',
         required: true,
         description: 'The base64 shared secret from the key statement, or from `tsig-keygen`.',
       },
       {
         key: 'server',
-        label: 'DNS Server',
+        label: 'DNS server',
         type: 'string',
         required: true,
         placeholder: '1.2.3.4:53',

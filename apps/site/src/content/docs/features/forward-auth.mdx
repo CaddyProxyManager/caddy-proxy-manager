@@ -15,7 +15,7 @@ Anubis is a separate switch, checked first, so bots never reach the login page.
 
 ## The built-in portal
 
-No external identity provider required. CPM serves the login page itself, issues a session cookie,
+You need no external identity provider. CPM serves the login page itself, issues a session cookie,
 and validates each request against it. Visitors sign in with a local account or through an
 [OAuth provider](../users-and-groups/#oauth--sso). A local account with
 [two-factor sign-in](../users-and-groups/#two-factor-sign-in) is asked for its code here too, and
@@ -24,7 +24,7 @@ is refused until it finishes setup in the dashboard.
 
 ## Who gets in
 
-Access is granted per host, by **user** or by **group**. Groups are the maintainable form - add
+Access is granted per host, by **user** or by **group**. Groups are easier to maintain - add
 someone to `staff` once and they reach every host `staff` can reach, rather than being added to
 each host individually.
 
@@ -38,7 +38,7 @@ serves to machines. Excluded paths bypass the portal while the rest of the host 
 </Demo>
 
 :::caution[An excluded path is open]
-An excluded path is genuinely open. It is the right tool for a webhook that authenticates itself,
+Anyone can reach an excluded path. It is the right tool for a webhook that authenticates itself,
 and the wrong one for a page you merely think nobody will find.
 :::
 
@@ -56,7 +56,7 @@ an app that understands "trusted proxy told me who this is" does not need its ow
 
 Key an application's accounts on `X-CPM-User-Id` when it can: a username or email can be edited,
 the id cannot. Installs upgraded from before the UUID keep sending the sequential account number
-here, which their upstreams were already keyed on; **Settings → Forward Auth → Numeric forward-auth
+here, which their upstreams were already keyed on; **Settings → Forward auth → Numeric forward-auth
 user IDs** switches between the two, and changes the id every upstream sees for every user.
 
 ## Bring your own auth server
@@ -64,7 +64,7 @@ user IDs** switches between the two, and changes the id every upstream sees for 
 A host can instead be pointed at a forward-auth server you already run - [Authelia](https://www.authelia.com/),
 tinyauth, anything that answers a forward-auth subrequest. Pick the **Authelia** preset and the
 endpoint and identity headers are filled in; pick **Custom** and you supply them.
-**Settings → Forward Auth → Forward Auth Defaults** sets what new hosts inherit.
+**Settings → Forward auth → Forward auth defaults** sets what new hosts inherit.
 
 The identity headers the auth server returns are stripped from every inbound request before the
 upstream sees it, on protected and unprotected paths alike, so a caller cannot forge `Remote-User`
@@ -91,7 +91,7 @@ with a wrong value, so the upstream must reject it - list a header only if you k
 
 If you already run [Authentik](https://goauthentik.io/), CPM can point at its outpost instead of
 serving the portal itself, with configurable header forwarding and protected paths.
-**Settings → Forward Auth → Authentik Defaults** sets what new hosts inherit, and each host can override it.
+**Settings → Forward auth → Authentik defaults** sets what new hosts inherit, and each host can override it.
 
 <Demo title="Pointing a host at an Authentik outpost" note="Blank fields fall back to the global defaults.">
   <AuthentikDemo client:visible />

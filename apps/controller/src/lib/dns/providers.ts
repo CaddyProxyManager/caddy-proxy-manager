@@ -64,7 +64,7 @@ export function challengeOptionFields(defaults?: DnsProviderChallengeDefaults): 
   return [
     {
       key: "propagation_delay",
-      label: "Propagation Delay",
+      label: "Propagation delay",
       type: "duration",
       required: false,
       placeholder: defaults?.propagation_delay ?? "e.g. 60s",
@@ -76,7 +76,7 @@ export function challengeOptionFields(defaults?: DnsProviderChallengeDefaults): 
     },
     {
       key: "propagation_timeout",
-      label: "Propagation Timeout",
+      label: "Propagation timeout",
       type: "duration",
       required: false,
       placeholder: defaults?.propagation_timeout ?? "e.g. 2m",
@@ -99,7 +99,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       {
         key: "api_token",
-        label: "API Token",
+        label: "API token",
         type: "password",
         required: true,
         placeholder: "Cloudflare API token with Zone:DNS:Edit permission",
@@ -115,22 +115,22 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       {
         key: "access_key_id",
-        label: "Access Key ID",
+        label: "Access key ID",
         type: "string",
         required: false,
         placeholder: "AKIA…",
       },
-      { key: "secret_access_key", label: "Secret Access Key", type: "password", required: false },
+      { key: "secret_access_key", label: "Secret access key", type: "password", required: false },
       {
         key: "region",
-        label: "AWS Region",
+        label: "AWS region",
         type: "string",
         required: false,
         placeholder: "us-east-1",
       },
       {
         key: "hosted_zone_id",
-        label: "Hosted Zone ID",
+        label: "Hosted zone ID",
         type: "string",
         required: false,
         placeholder: "Z1234567890",
@@ -144,7 +144,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "DigitalOcean DNS API",
     docsUrl: "https://github.com/caddy-dns/digitalocean",
     modulePath: "github.com/caddy-dns/digitalocean",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "duckdns",
@@ -160,7 +160,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Hetzner DNS API",
     docsUrl: "https://github.com/caddy-dns/hetzner",
     modulePath: "github.com/caddy-dns/hetzner",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "vultr",
@@ -168,7 +168,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Vultr DNS API",
     docsUrl: "https://github.com/caddy-dns/vultr",
     modulePath: "github.com/caddy-dns/vultr",
-    fields: [{ key: "api_token", label: "API Key", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API key", type: "password", required: true }],
   },
   {
     name: "porkbun",
@@ -177,8 +177,8 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/porkbun",
     modulePath: "github.com/caddy-dns/porkbun",
     fields: [
-      { key: "api_key", label: "API Key", type: "password", required: true },
-      { key: "api_secret_key", label: "API Secret Key", type: "password", required: true },
+      { key: "api_key", label: "API key", type: "password", required: true },
+      { key: "api_secret_key", label: "API secret key", type: "password", required: true },
     ],
   },
   {
@@ -190,7 +190,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       {
         key: "api_token",
-        label: "API Key:Secret",
+        label: "API key:secret",
         type: "password",
         required: true,
         placeholder: "key:secret",
@@ -205,7 +205,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/namecheap",
     modulePath: "github.com/caddy-dns/namecheap",
     fields: [
-      { key: "api_key", label: "API Key", type: "password", required: true },
+      { key: "api_key", label: "API key", type: "password", required: true },
       { key: "user", label: "Username", type: "string", required: true },
     ],
   },
@@ -217,9 +217,9 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     modulePath: "github.com/caddy-dns/ovh",
     fields: [
       { key: "endpoint", label: "Endpoint", type: "string", required: true, placeholder: "ovh-eu" },
-      { key: "application_key", label: "Application Key", type: "string", required: true },
-      { key: "application_secret", label: "Application Secret", type: "password", required: true },
-      { key: "consumer_key", label: "Consumer Key", type: "password", required: true },
+      { key: "application_key", label: "Application key", type: "string", required: true },
+      { key: "application_secret", label: "Application secret", type: "password", required: true },
+      { key: "consumer_key", label: "Consumer key", type: "password", required: true },
     ],
   },
   {
@@ -231,7 +231,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       {
         key: "auth_api_token",
-        label: "API Token",
+        label: "API token",
         type: "password",
         required: true,
         placeholder: "prefix.secret",
@@ -244,7 +244,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Linode/Akamai DNS API",
     docsUrl: "https://github.com/caddy-dns/linode",
     modulePath: "github.com/caddy-dns/linode",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "njalla",
@@ -252,7 +252,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Njalla DNS API",
     docsUrl: "https://github.com/caddy-dns/njalla",
     modulePath: "github.com/caddy-dns/njalla",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "spaceship",
@@ -261,8 +261,8 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/spaceship",
     modulePath: "github.com/caddy-dns/spaceship",
     fields: [
-      { key: "api_key", label: "API Key", type: "password", required: true },
-      { key: "api_secret", label: "API Secret", type: "password", required: true },
+      { key: "api_key", label: "API key", type: "password", required: true },
+      { key: "api_secret", label: "API secret", type: "password", required: true },
     ],
   },
   {
@@ -271,7 +271,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "deSEC DNS API",
     docsUrl: "https://github.com/caddy-dns/desec",
     modulePath: "github.com/caddy-dns/desec",
-    fields: [{ key: "token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "token", label: "API token", type: "password", required: true }],
   },
   {
     name: "dynu",
@@ -279,7 +279,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Dynu DNS API",
     docsUrl: "https://github.com/caddy-dns/dynu",
     modulePath: "github.com/caddy-dns/dynu",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "acmedns",
@@ -307,7 +307,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Infomaniak DNS API",
     docsUrl: "https://github.com/caddy-dns/infomaniak",
     modulePath: "github.com/caddy-dns/infomaniak",
-    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
+    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {
     name: "inwx",
@@ -318,7 +318,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       { key: "username", label: "Username", type: "string", required: true },
       { key: "password", label: "Password", type: "password", required: true },
-      { key: "shared_secret", label: "2FA Shared Secret", type: "password", required: false },
+      { key: "shared_secret", label: "2FA shared secret", type: "password", required: false },
       { key: "endpoint_url", label: "Endpoint URL", type: "string", required: false },
     ],
   },
@@ -329,9 +329,9 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/netcup",
     modulePath: "github.com/caddy-dns/netcup",
     fields: [
-      { key: "customer_number", label: "Customer Number", type: "string", required: true },
-      { key: "api_key", label: "API Key", type: "password", required: true },
-      { key: "api_password", label: "API Password", type: "password", required: true },
+      { key: "customer_number", label: "Customer number", type: "string", required: true },
+      { key: "api_key", label: "API key", type: "password", required: true },
+      { key: "api_password", label: "API password", type: "password", required: true },
     ],
     // Notoriously slow propagation:
     // https://github.com/caddy-dns/netcup#attention-slow-netcup-propagation-time
@@ -362,7 +362,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
       },
       {
         key: "auth_password",
-        label: "API Password",
+        label: "API password",
         type: "password",
         required: true,
         description: "Password of the API user or sub-user.",
@@ -378,7 +378,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       {
         key: "key_name",
-        label: "TSIG Key Name",
+        label: "TSIG key name",
         type: "string",
         required: true,
         placeholder: "my-transfer-key",
@@ -386,7 +386,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
       },
       {
         key: "key_alg",
-        label: "TSIG Algorithm",
+        label: "TSIG algorithm",
         type: "string",
         required: true,
         placeholder: "hmac-sha256",
@@ -394,14 +394,14 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
       },
       {
         key: "key",
-        label: "TSIG Key Secret",
+        label: "TSIG key secret",
         type: "password",
         required: true,
         description: "The base64 shared secret from the key statement, or from `tsig-keygen`.",
       },
       {
         key: "server",
-        label: "DNS Server",
+        label: "DNS server",
         type: "string",
         required: true,
         placeholder: "1.2.3.4:53",

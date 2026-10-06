@@ -38,7 +38,7 @@ async function createToken(
     .first()
     .click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByPlaceholder('e.g. CI/CD Pipeline').fill(name);
+  await dialog.getByPlaceholder('e.g. CI/CD pipeline').fill(name);
   if (scope) await dialog.getByRole('radio', { name: scope }).check();
   await dialog.getByRole('button', { name: /^create$/i }).click();
   await expect(page.getByText(/copy this token now/i)).toBeVisible({ timeout: 15_000 });

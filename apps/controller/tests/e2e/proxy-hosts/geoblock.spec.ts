@@ -64,7 +64,7 @@ test.describe('Geo Blocking - form persistence', () => {
 
   test.beforeEach(async ({ page }) => {
     await resetGeoblock(page);
-    await goToSetting(page, 'Global Geoblocking');
+    await goToSetting(page, 'Global geoblocking');
   });
 
   test.afterEach(async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe('Geo Blocking - form persistence', () => {
 
   /**
    * Regression: Radix Tabs unmount inactive content, so only the visible tab's hidden inputs were
-   * submitted - saving on "Block Rules" wiped every allow rule. Uses RFC 5737 ranges.
+   * submitted - saving on "Block rules" wiped every allow rule. Uses RFC 5737 ranges.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
     const geoSection = geoblockForm(page);

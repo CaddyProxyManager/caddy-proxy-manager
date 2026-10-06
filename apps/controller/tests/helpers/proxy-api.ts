@@ -52,7 +52,7 @@ async function expandCaRow(page: Page, caName: string): Promise<void> {
   await row.locator('button').first().click();
   // The closed "Manage" <dialog> stays in the DOM with the same phrase; visible narrows it.
   await expect(
-    page.getByText('Issued Client Certificates', { exact: true }).filter({ visible: true }),
+    page.getByText('Issued client certificates', { exact: true }).filter({ visible: true }),
   ).toBeVisible({ timeout: 10_000 });
 }
 
@@ -187,7 +187,7 @@ export async function generateCaCertificate(page: Page, config: GeneratedCaConfi
   await page.getByRole('textbox', { name: /^Name/ }).fill(config.name);
   if (config.commonName) {
     await page
-      .getByRole('textbox', { name: 'Common Name (CN)', exact: true })
+      .getByRole('textbox', { name: 'Common name (CN)', exact: true })
       .fill(config.commonName);
   }
   if (config.validityDays !== undefined) {
@@ -217,11 +217,11 @@ export async function issueClientCertificate(
   await expect(dialog).toBeVisible();
 
   // Required fields' accessible names end in "Required", so match the prefix.
-  await dialog.getByRole('textbox', { name: /^Common Name \(CN\)/ }).fill(config.commonName);
+  await dialog.getByRole('textbox', { name: /^Common name \(CN\)/ }).fill(config.commonName);
   if (config.validityDays !== undefined) {
     await dialog.getByRole('spinbutton', { name: /^Validity/ }).fill(String(config.validityDays));
   }
-  await dialog.getByRole('textbox', { name: /^Export Password/ }).fill(config.exportPassword);
+  await dialog.getByRole('textbox', { name: /^Export password/ }).fill(config.exportPassword);
 
   await dialog.getByRole('button', { name: 'Issue', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Download', exact: true })).toBeVisible({

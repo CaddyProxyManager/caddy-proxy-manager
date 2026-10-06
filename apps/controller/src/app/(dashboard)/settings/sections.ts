@@ -65,7 +65,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           { id: "general", name: "General" },
           {
             id: "acme",
-            name: "ACME Server",
+            name: "ACME server",
             envSearch: ["ACME_CA_ROOT_DIR"],
           },
           {
@@ -85,7 +85,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           },
           {
             id: "avatars",
-            name: "User Avatars",
+            name: "User avatars",
             envSearch: ["AVATAR_GRAVATAR"],
           },
         ],
@@ -98,23 +98,23 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "default-response",
-            name: "Default Response",
+            name: "Default response",
           },
           {
             id: "error-pages",
-            name: "Error Pages",
+            name: "Error pages",
           },
         ],
       },
       {
         id: "caddy-build",
-        name: "Caddy Build",
+        name: "Caddy build",
         desc: "Which plugins the Caddy image is compiled with",
         icon: Package,
         blocks: [
           {
             id: "caddy-build",
-            name: "Caddy Build",
+            name: "Caddy build",
             env: ["CADDY_BUILD_TIMEOUT"],
           },
           {
@@ -123,19 +123,19 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           },
           {
             id: "http-cache",
-            name: "HTTP Cache",
+            name: "HTTP cache",
           },
         ],
       },
       {
         id: "dashboard",
-        name: "Dashboard Host",
+        name: "Dashboard host",
         desc: "Serve this dashboard through Caddy, on a domain of its own",
         icon: MonitorSmartphone,
         blocks: [
           {
             id: "dashboard",
-            name: "Dashboard Host",
+            name: "Dashboard host",
             envSearch: ["DASHBOARD_DOMAIN"],
           },
         ],
@@ -162,7 +162,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "email",
-            name: "SMTP Server",
+            name: "SMTP server",
             envSearch: [
               "SMTP_ENABLED",
               "SMTP_HOST",
@@ -212,15 +212,15 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "dns-providers",
-            name: "DNS Providers",
+            name: "DNS providers",
           },
           {
             id: "dns-resolvers",
-            name: "DNS Resolvers",
+            name: "DNS resolvers",
           },
           {
             id: "upstream-dns",
-            name: "Upstream DNS Pinning",
+            name: "Upstream DNS pinning",
           },
         ],
       },
@@ -232,11 +232,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "trusted-proxies",
-            name: "Trusted Proxies",
+            name: "Trusted proxies",
           },
           {
             id: "http-protocols",
-            name: "HTTP Versions",
+            name: "HTTP versions",
           },
           {
             id: "compression",
@@ -263,7 +263,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "oauth",
-            name: "OAuth Providers",
+            name: "OAuth providers",
             // Nineteen tokens would drown the heading, so only the prefix is shown.
             env: ["OAUTH_*"],
             envSearch: [
@@ -321,29 +321,29 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           },
           {
             id: "two-factor",
-            name: "Two-factor Sign-in",
+            name: "Two-factor sign-in",
           },
           {
             id: "password-policy",
-            name: "Password Policy",
+            name: "Password policy",
             envSearch: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
           },
         ],
       },
       {
         id: "forward-auth",
-        name: "Forward Auth",
+        name: "Forward auth",
         desc: "Defaults a new proxy host inherits for an external authenticator",
         icon: UserCheck,
         blocks: [
           {
             id: "authentik",
-            name: "Authentik Defaults",
+            name: "Authentik defaults",
             env: ["FORWARD_AUTH_INTERNAL_URL"],
           },
           {
             id: "forward-auth",
-            name: "Forward Auth Defaults",
+            name: "Forward auth defaults",
             envSearch: ["FORWARD_AUTH_ALLOWED_PORTS"],
           },
         ],
@@ -356,7 +356,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "geoip",
-            name: "GeoIP Databases",
+            name: "GeoIP databases",
             envSearch: [
               "GEOIP_ENABLED",
               "GEOIPUPDATE_ACCOUNT_ID",
@@ -366,19 +366,19 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           },
           {
             id: "geoblock",
-            name: "Global Geoblocking",
+            name: "Global geoblocking",
           },
         ],
       },
       {
         id: "rate-limit",
-        name: "Rate Limiting",
+        name: "Rate limiting",
         desc: "Limits every host can inherit, and addresses never limited",
         icon: Gauge,
         blocks: [
           {
             id: "rate-limit",
-            name: "Rate Limiting",
+            name: "Rate limiting",
           },
         ],
       },
@@ -418,8 +418,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "CLICKHOUSE_RETENTION_DAYS",
             ],
           },
-          { id: "metrics", name: "Metrics & Monitoring" },
-          { id: "logging", name: "Access Logging" },
+          { id: "metrics", name: "Metrics & monitoring" },
+          { id: "logging", name: "Access logging" },
         ],
       },
     ],

@@ -102,7 +102,7 @@
   "accessLists": {
     "network": "Network",
     "ipRuleCount": "{count, plural, one {# rule} other {# rules}}",
-    "ipRulesHelp": "Allow or deny by the client's IP address, checked top to bottom - the first rule that matches decides. Addresses are read after Settings > Network > Trusted Proxies, so a CDN or load balancer in front is seen through. A hostname, such as a dynamic-DNS name, is looked up again as its record expires and stands for every address it resolves to: an IPv4 address exactly, an IPv6 one with its /64 (end the name in /56, /128 and so on to change that).",
+    "ipRulesHelp": "Allow or deny by the client's IP address, checked top to bottom - the first rule that matches decides. Addresses are read after Settings > Network > Trusted proxies, so a CDN or load balancer in front is seen through. A hostname, such as a dynamic-DNS name, is looked up again as its record expires and stands for every address it resolves to: an IPv4 address exactly, an IPv6 one with its /64 (end the name in /56, /128 and so on to change that).",
     "ipAction": "Action",
     "ipAllow": "Allow",
     "ipDeny": "Deny",
@@ -220,7 +220,7 @@
     "selectionEmptyTitle": "Select an access list",
     "sortAccessLists": "Sort access lists",
     "unusedBadge": "unused",
-    "unusedListDescription": "This list is currently dormant. You can keep it for later, or delete it from Settings.",
+    "unusedListDescription": "This list is dormant. You can keep it for later, or delete it from Settings.",
     "unusedListTitle": "Not used by any proxy host",
     "usernameAlreadyExists": "Username already exists",
     "strength": {
@@ -265,7 +265,7 @@
     "createdToast": "Created \"{name}\"",
     "deleteInUseWarning": "This list is used by {count, plural, one {# host} other {# hosts}}. Choose another list on them before deleting it.",
     "deleteUnusedWarning": "Once deleted, the credentials cannot be recovered.",
-    "usageSummary": "This access list guards {count, plural, one {# host} other {# hosts}}. Removing the list, or any of its members, will affect access to these hosts.",
+    "usageSummary": "This access list guards {count, plural, one {# host} other {# hosts}}. Removing the list, or any of its members, affects access to these hosts.",
     "l4HostUsage": "L4 host on {listen} - IP rules only"
   },
   "agents": {
@@ -317,7 +317,7 @@
       "imageNarrowing": "Waiting for the controller to stop using modules the new image lacks.",
       "imageRecreateFailed": "Recreating Caddy on the new image failed; the running container was left untouched. {detail}",
       "imageModulesUnreadableAfter": "Caddy was recreated, but its module list could not be read: {detail}",
-      "imageUnhealthy": "Caddy's health check reports \"{health}\" on the new image. Check the Caddy container logs - a config referencing a module the image lacks will fail to load.",
+      "imageUnhealthy": "Caddy's health check reports \"{health}\" on the new image. Check the Caddy container logs - a config referencing a module the image lacks fails to load.",
       "imageLoaded": "{named, select, yes {Loaded {image} with {count, plural, one {# module} other {# modules}}.} other {Loaded the image with {count, plural, one {# module} other {# modules}}.}}",
       "imageLoadedNoList": "{named, select, yes {Loaded {image}} other {Loaded the image}}, which has no {path}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.",
       "imageLoadFailed": "Loading the Caddy image failed: {detail}",
@@ -326,7 +326,7 @@
       "buildTimedOut": "Caddy image build failed; the running container was left untouched. The build was abandoned after {seconds}s.",
       "buildFailedOutput": "Caddy image build failed; the running container was left untouched. {detail}",
       "buildRecreateFailed": "Caddy was built, but recreating the container failed: {detail}",
-      "buildUnhealthy": "Caddy was rebuilt but its health check reports \"{health}\". Check the Caddy container logs - a config referencing a removed module will fail to load.",
+      "buildUnhealthy": "Caddy was rebuilt but its health check reports \"{health}\". Check the Caddy container logs - a config referencing a removed module fails to load.",
       "buildApplied": "Caddy was rebuilt with the selected modules and is healthy.",
       "buildFailed": "The rebuild failed: {detail}",
       "servicesInterrupted": "The agent restarted while starting the optional services. Save the settings again to retry.",
@@ -359,12 +359,12 @@
     "noTrafficRecorded": "No traffic recorded",
     "openCountryBreakdown": "Show the breakdown for {code}",
     "periodEmptyTitle": "No data for this period",
-    "requestsOverTime": "Requests Over Time",
+    "requestsOverTime": "Requests over time",
     "timeInterval": "Time interval",
-    "topCountries": "Top Countries",
-    "topUserAgents": "Top User Agents",
-    "trafficByCountry": "Traffic by Country",
-    "trafficIntelligence": "Traffic Intelligence",
+    "topCountries": "Top countries",
+    "topUserAgents": "Top user agents",
+    "trafficByCountry": "Traffic by country",
+    "trafficIntelligence": "Traffic intelligence",
     "uniqueIps": "Unique IPs",
     "unplacedCountry": "Not placed by GeoIP",
     "hits": "Hits",
@@ -696,11 +696,11 @@
       "forbidden": "Forbidden",
       "internalServerError": "Internal server error",
       "invalidCredentials": "Invalid credentials",
-      "invalidRedirectIntent": "Invalid or expired redirect intent. Please try again.",
+      "invalidRedirectIntent": "Invalid or expired redirect intent. Try again.",
       "invalidRequestBody": "Invalid request body",
       "missingRedirectIntent": "Missing redirect intent",
       "missingAuthorizationCode": "The sign-in link is missing its authorization code.",
-      "invalidAuthorizationCode": "Invalid or expired authorization code. Please try logging in again.",
+      "invalidAuthorizationCode": "Invalid or expired authorization code. Sign in again.",
       "noAccessToApplication": "You do not have access to this application.",
       "notAuthenticated": "Not authenticated",
       "passwordSignInDisabled": "Password sign-in is disabled. Use single sign-on.",
@@ -709,8 +709,8 @@
       "usernameTooLong": "Username is too long",
       "currentPasswordIncorrect": "Current password is incorrect",
       "currentPasswordRequired": "Current password is required",
-      "passwordManagementDisabled": "Password management is disabled. Sign-in is handled by the OIDC provider.",
-      "tooManyAttempts": "Too many attempts. Please try again later.",
+      "passwordManagementDisabled": "Password management is disabled. The OIDC provider handles sign-in.",
+      "tooManyAttempts": "Too many attempts. Try again later.",
       "unauthorized": "Unauthorized",
       "userNotFound": "User not found",
       "captchaRequired": "Solve the CAPTCHA before signing in.",
@@ -735,7 +735,7 @@
       "passkeySignInFailed": "Signing in with that passkey did not work. Try again, or use your password.",
       "passkeyAddFailed": "The passkey could not be added. Try again."
     },
-    "authenticationRequired": "Authentication Required",
+    "authenticationRequired": "Authentication required",
     "authorizeFailed": "Failed to authorize access.",
     "authorizing": "Authorizing…",
     "couldNotSignIn": "Could not sign in",
@@ -744,7 +744,7 @@
       "accountNotLinked": "An account with this email already exists. Sign in with your password, then link this provider from your Profile.",
       "continueWith": "Continue with {provider}",
       "failed": "Login failed.",
-      "metaTitle": "Sign In",
+      "metaTitle": "Sign in",
       "noMethodDescription": "Single sign-on is the only way to sign in, but no provider is configured. Configure one with the OAUTH_* environment variables.",
       "oauthFailed": "Failed to sign in with OAuth",
       "oauthFailedCode": "Single sign-on did not complete ({code}). Try again, or sign in another way.",
@@ -797,7 +797,7 @@
     "signInUnavailableTitle": "No sign-in method available",
     "signingInAs": "Signing in as {account}",
     "unexpectedError": "An unexpected error occurred.",
-    "unexpectedErrorTryAgain": "An unexpected error occurred. Please try again.",
+    "unexpectedErrorTryAgain": "An unexpected error occurred. Try again.",
     "twoFactorSetup": {
       "title": "Set up a second factor",
       "description": "This instance requires a second factor for your account as well as your password: a code from an authenticator app, or a passkey. Set one up to continue.",
@@ -849,17 +849,17 @@
     }
   },
   "caCertificates": {
-    "certificateDownloadWarning": "Download the .p12 bundle now. It contains the client certificate, private key, and CA chain, and the private key will not be stored.",
-    "certificateImportHelp": "Import it using the export password you entered during issuance.",
+    "certificateDownloadWarning": "Download the .p12 bundle now. It contains the client certificate, private key and CA chain. The private key is not stored.",
+    "certificateImportHelp": "Import it with the export password you set when issuing it.",
     "clientCertificateIssued": "Client certificate issued",
     "commonNameHelp": "Identifies this client (e.g. a username or device name)",
     "couldNotDeleteCertificate": "Could not delete certificate",
     "couldNotIssueCertificate": "Could not issue certificate",
     "couldNotRevokeCertificate": "Could not revoke certificate",
-    "deleteCaCertificate": "Delete CA Certificate",
+    "deleteCaCertificate": "Delete CA certificate",
     "exportFormatHelp": "Export format: AES-256.",
-    "exportPassword": "Export Password",
-    "issueClientCertificate": "Issue Client Certificate",
+    "exportPassword": "Export password",
+    "issueClientCertificate": "Issue client certificate",
     "issueFailed": "Failed to issue certificate",
     "p12PasswordHelp": "Protects the .p12 when importing it into an OS or browser. {policy}.",
     "revoke": "Revoke",
@@ -869,7 +869,7 @@
     "showRevokedCount": "Show revoked ({count})",
     "revoked": "Revoked",
     "active": "Active",
-    "issuedCertificatesEmpty": "No issued client certificates are currently tracked for this CA. Certificates issued from this UI will appear here and can then be revoked individually.",
+    "issuedCertificatesEmpty": "No client certificates issued from this CA are tracked. Certificates issued here appear in this list, where each can be revoked.",
     "activeCertificatesEmpty": "No active client certificates. Enable \"Show revoked\" to view revoked certificates.",
     "serialLine": "Serial {serial}",
     "issuedLine": "Issued {date}",
@@ -893,7 +893,7 @@
     "loadingImage": "Loading the Caddy image…",
     "buildTarget": "Module selection for",
     "buildTargetHelp": "Agents without a selection of their own follow the fleet default.",
-    "customModuleHelp": "Any Caddy plugin published as a Go module. Compiled from source at build time, so an unreachable or non-building module fails the rebuild - the running container is left untouched when that happens.",
+    "customModuleHelp": "Any Caddy plugin published as a Go module. Compiled from source at build time, so an unreachable or non-building module fails the rebuild, which leaves the running container untouched.",
     "fleetDefault": "Fleet default (all agents)",
     "followFleetDefault": "Follow the fleet default",
     "followFleetDefaultHelp": "Clear this agent's own selection so it tracks the fleet default again.",
@@ -923,12 +923,12 @@
     "rebuildRequired": "Rebuild required",
     "customModulesTitle": "Custom modules",
     "cacheStorageNeedsHandler": "This module doesn't work without HTTP Cache",
-    "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy Build and rebuild Caddy.",
-    "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy Build.",
+    "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy build and rebuild Caddy.",
+    "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy build.",
     "modules": {
       "caddyL4": {
         "name": "Layer 4 Proxy",
-        "description": "TCP/UDP proxying. Required by L4 Proxy Hosts and by the agent that binds their ports."
+        "description": "TCP/UDP proxying. Required by L4 proxy hosts and by the agent that binds their ports."
       },
       "caddyTailscale": {
         "name": "Tailscale",
@@ -1054,34 +1054,34 @@
     },
     "acme": "ACME",
     "acmeNote": "{count} on enabled hosts",
-    "addCaCertificate": "Add CA Certificate",
+    "addCaCertificate": "Add CA certificate",
     "caCertificateHelp": "PEM-encoded X.509 CA certificate (no private key needed)",
     "caCertificatePemHelp": "PEM-encoded X.509 CA certificate",
     "caMtls": "CA / mTLS",
     "caNameHelp": "Display name in this UI",
-    "caNamePlaceholder": "My Client CA",
+    "caNamePlaceholder": "My client CA",
     "caNote": "{count, plural, one {# client certificate issued} other {# client certificates issued}}",
     "certificateChainHelp": "Full chain recommended (cert + intermediates)",
     "certificateDomainsHelp": "Domains covered by this certificate",
     "certificatePem": "Certificate PEM",
     "clientCertificatesEmptyTitle": "No active client certificates for this CA.",
-    "commonNameCn": "Common Name (CN)",
+    "commonNameCn": "Common name (CN)",
     "commonNameHelp": "CN field in the certificate. Defaults to the name above if left blank.",
-    "deleteCertificate": "Delete Certificate",
+    "deleteCertificate": "Delete certificate",
     "deleteFailed": "Failed to delete certificate",
-    "deleteImportedCertificate": "Delete Imported Certificate",
+    "deleteImportedCertificate": "Delete imported certificate",
     "domainsOnePerLine": "Domains (one per line)",
     "expiredAccent": "{count} expired",
     "expiringAccent": "{count} expiring",
     "generate": "Generate",
-    "importCertificate": "Import Certificate",
+    "importCertificate": "Import certificate",
     "importPem": "Import PEM",
     "imported": "Imported",
     "importedCertificateNameHelp": "Descriptive name to identify this certificate",
     "importedExpiredNote": "At least one has already lapsed",
     "importedNoneNote": "None imported",
     "importedNote": "Next lapses in {count, plural, one {# day} other {# days}}",
-    "issuedClientCertificates": "Issued Client Certificates",
+    "issuedClientCertificates": "Issued client certificates",
     "keyStored": "Key stored",
     "legacyCertificatesDescription": "These are redundant. Caddy handles HTTPS automatically, so consider deleting them.",
     "legacyCertificatesTitle": "Legacy managed certificate entries detected",
@@ -1093,15 +1093,15 @@
     "noImportedCertificatesMatch": "No imported certificates match",
     "noLegacyManagedCertificates": "No legacy managed certificates",
     "none": "None",
-    "privateKeyPem": "Private Key PEM",
+    "privateKeyPem": "Private key PEM",
     "privateKeyWarning": "Keep this secure. Never share your private key.",
     "roles": "Roles",
     "rolesNote": "Grant paths to client certificates",
     "searchCertificates": "Search certificates",
-    "sslTlsCertificates": "SSL/TLS Certificates",
+    "sslTlsCertificates": "SSL/TLS certificates",
     "stored": "Stored",
     "validity": "Validity",
-    "proxyHost": "Proxy Host",
+    "proxyHost": "Proxy host",
     "disabled": "Disabled",
     "expired": "Expired",
     "active": "Active",
@@ -1113,8 +1113,8 @@
     "useManageToViewAll": "Use \"Manage\" to view all",
     "actionsForCaCertificate": "Actions for CA certificate {name}",
     "actionsForCertificate": "Actions for certificate {name}",
-    "privateKey": "Private Key",
-    "issuedCerts": "Issued Certs",
+    "privateKey": "Private key",
+    "issuedCerts": "Issued certs",
     "added": "Added",
     "noCaCertificatesConfigured": "No CA certificates configured",
     "deleteUnused": "Delete unused",
@@ -1124,9 +1124,9 @@
     "deleteImportedCertificateConfirm": "Delete imported certificate {name}? This cannot be undone.",
     "deleteImportedCertificateConfirmWithError": "Delete imported certificate {name}? This cannot be undone. {error}",
     "expires": "Expires",
-    "generateCaCertificate": "Generate CA Certificate",
-    "editCaCertificate": "Edit CA Certificate",
-    "editCertificate": "Edit Certificate",
+    "generateCaCertificate": "Generate CA certificate",
+    "editCaCertificate": "Edit CA certificate",
+    "editCertificate": "Edit certificate",
     "hidePrivateKey": "Hide private key",
     "showPrivateKey": "Show private key",
     "searchByHostOrDomain": "Search by host or domain…",
@@ -1162,7 +1162,7 @@
     "close": "Close",
     "rename": "Rename",
     "duplicate": "Duplicate",
-    "copyName": "{name} (Copy)",
+    "copyName": "{name} (copy)",
     "add": "Add",
     "new": "New",
     "back": "Back",
@@ -1254,9 +1254,9 @@
     "networkError": "Network error",
     "requestFailed": "Failed ({status})",
     "twoFactorSignIn": "Two-factor sign-in",
-    "currentPassword": "Current Password",
-    "newPassword": "New Password",
-    "confirmNewPassword": "Confirm New Password"
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmNewPassword": "Confirm new password"
   },
   "errors": {
     "setupStepUnknown": "That is not a setup checklist step",
@@ -1273,7 +1273,7 @@
     "accessListInUseByDashboard": "The access list is still used by the dashboard host. Choose another list there first.",
     "applyStagedFailed": "Failed to apply changes",
     "caCertificateNotFound": "CA certificate not found",
-    "caCertificatePrivateKeyMissing": "This CA has no stored private key - cannot issue client certificates",
+    "caCertificatePrivateKeyMissing": "This CA has no stored private key, so it cannot issue client certificates",
     "caCertificatePrivateKeyUnavailable": "This CA's private key cannot be decrypted with the current SESSION_SECRET. Set SESSION_SECRET_PREVIOUS to the secret it was stored under and restart, or create a new CA.",
     "acmeDnsServerUrlInvalid": "The acme-dns server URL must be an http(s) URL without credentials, query or fragment",
     "acmeDnsServerUrlHttps": "The acme-dns server URL must use HTTPS unless the server is on a private address",
@@ -1326,11 +1326,11 @@
     "certificatePemRequired": "Certificate PEM is required",
     "commonNameRequired": "Common name is required",
     "createL4HostFailed": "Failed to create L4 proxy host.",
-    "createProxyHostFailed": "Failed to create proxy host. Please check the logs for details.",
+    "createProxyHostFailed": "Failed to create proxy host. Check the logs for details.",
     "createUserFailed": "Failed to create user",
     "customModulesUnreadable": "Custom modules could not be read. Try re-entering them.",
     "deleteL4HostFailed": "Failed to delete L4 proxy host.",
-    "deleteProxyHostFailed": "Failed to delete proxy host. Please check the logs for details.",
+    "deleteProxyHostFailed": "Failed to delete proxy host. Check the logs for details.",
     "deleteUserFailed": "Failed to delete user",
     "demoAdminProtected": "The demo administrator cannot be disabled, deleted, demoted or have its password or two-factor sign-in changed.",
     "lastActiveAdmin": "That would leave no active administrator. Make someone else an administrator first.",
@@ -1391,7 +1391,7 @@
     "proxyHostDomainInvalid": "Invalid domain \"{domain}\". Wildcards are supported only as the left-most label, for example \"*.example.com\".",
     "proxyHostNotFound": "Proxy host not found",
     "twoFactorRequired": "Turn on two-factor sign-in before doing anything else. It is required for administrators.",
-    "apiTokenNeedsSecondFactor": "Turn on two-factor sign-in before creating an API token. Your account is required to have it, and a token would outlast the deadline.",
+    "apiTokenNeedsSecondFactor": "Turn on two-factor sign-in before creating an API token. Your account must have it, and a token would outlast the deadline.",
     "apiTokenOwnerNeedsSecondFactor": "This API token's owner must turn on two-factor sign-in before the token can be used again.",
     "viewAsStartFailed": "Could not switch views",
     "viewAsRoleInvalid": "View as an operator, a user or a viewer",
@@ -1439,14 +1439,14 @@
     "renameAgentFailed": "Failed to rename the agent",
     "setupAlreadyCompleted": "Setup has already been completed.",
     "toggleL4HostFailed": "Failed to toggle L4 proxy host.",
-    "toggleProxyHostFailed": "Failed to toggle proxy host. Please check the logs for details.",
-    "toggleMaintenanceFailed": "Failed to switch maintenance mode. Please check the logs for details.",
+    "toggleProxyHostFailed": "Failed to toggle proxy host. Check the logs for details.",
+    "toggleMaintenanceFailed": "Failed to switch maintenance mode. Check the logs for details.",
     "tokenExpiryInPast": "expires_at must be in the future",
     "tokenExpiryInvalid": "expires_at must be a valid ISO 8601 date",
     "tooManyRedirectIntents": "Too many sign-in attempts are in progress. Try again in a few minutes.",
     "udpTlsTerminationUnsupported": "TLS termination is only supported with the TCP protocol",
     "updateL4HostFailed": "Failed to update L4 proxy host.",
-    "updateProxyHostFailed": "Failed to update proxy host. Please check the logs for details.",
+    "updateProxyHostFailed": "Failed to update proxy host. Check the logs for details.",
     "updateUserInfoFailed": "Failed to update the user",
     "updateUserRoleFailed": "Failed to change the user's role",
     "updateUserStatusFailed": "Failed to change the user's status",
@@ -1499,7 +1499,7 @@
     "wafPresetNameTaken": "A WAF preset named \"{name}\" already exists",
     "wafPresetDirectivesRequired": "A WAF preset needs at least one directive",
     "wafPresetDirectiveBodyLimitOutOfRange": "The preset has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
-    "wafPresetDirectivesDropped": "The preset has {count} directive(s) that would be dropped and never sent to Caddy: {details}. Remove or rewrite them for them to take effect.",
+    "wafPresetDirectivesDropped": "The preset has {count} directive(s) that would be dropped and never sent to Caddy: {details}. Remove them, or rewrite them so they take effect.",
     "wafPresetInUseGlobally": "The preset is still selected in the global WAF settings. Deselect it there first.",
     "wafPresetInUseByDashboard": "The preset is still selected by the dashboard host. Deselect it there first.",
     "wafPresetInUseByHosts": "The preset is still selected by these hosts: {hosts}. Deselect it there first.",
@@ -1532,7 +1532,7 @@
     "crsRegistryDuplicate": "The registry {url} is listed twice.",
     "crsRegistryIntervalInvalid": "The refresh interval must be a whole number of hours from 0 to {max}.",
     "wafDirectiveBodyLimitOutOfRange": "waf.custom_directives has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
-    "wafDirectivesDropped": "waf.custom_directives has {count} line(s) that would be dropped and never sent to Caddy: {details}. Remove or rewrite them for them to take effect.",
+    "wafDirectivesDropped": "waf.custom_directives has {count} line(s) that would be dropped and never sent to Caddy: {details}. Remove them, or rewrite them so they take effect.",
     "wafDirectiveDroppedInclude": "Include is not allowed (it would read arbitrary files from the container filesystem)",
     "wafDirectiveDroppedRuleMutation": "rule-mutation and engine directives are not allowed (they can disable WAF protections or override rule actions)",
     "wafDirectiveDroppedCtlRuleEngine": "ctl:ruleEngine is not allowed (it can conditionally disable the WAF)",
@@ -1655,7 +1655,7 @@
     "wildcardDomainNeedsDnsProvider": "Wildcard domain \"{domain}\" requires a DNS provider for the ACME DNS-01 challenge. Configure a default DNS provider in settings, or assign a certificate to this host.",
     "upstreamProtocolInvalid": "Invalid upstream protocol \"{scheme}://\". Only http:// and https:// are allowed",
     "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
-    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Network → Tailscale first.",
+    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration, which would stop updates to every proxy host, this one included. Add an auth key in Settings → Network → Tailscale first.",
     "tailscaleKeyCheckNeedsToken": "Checking auth keys needs a Tailscale API access token (tskey-api-…). Add one, or turn the check off.",
     "tailscaleKeyCheckUnreachable": "Could not reach the Tailscale API to check the key ({detail}). Try again, or turn the check off to save without it.",
     "tailscaleKeyCheckTokenRefused": "Tailscale refused the API access token. Check the token itself - this says nothing about the auth key.",
@@ -1775,7 +1775,7 @@
     "memberPickerLabel": "Choose the users to add to this group",
     "membersExhaustedMessage": "All users are already in this group.",
     "namePlaceholder": "e.g. Developers",
-    "newGroup": "New Group",
+    "newGroup": "New group",
     "noGrants": "This group manages nothing",
     "noGrantsHelp": "Members with the Operator role will see empty lists until something is ticked here.",
     "noGroupsYet": "No groups yet",
@@ -1966,35 +1966,35 @@
     "accessListHelp": "Connections from clients the list denies are closed. Only its rules apply here, by address, country, continent or ASN - there is no request to ask a password in or answer, so lists without rules are not offered and the list's deny response does not apply.",
     "ipRulesBadge": "IP rules",
     "ipRulesBadgeTooltip": "IP rules from the access list {name}",
-    "activeHealthCheck": "Active Health Check",
+    "activeHealthCheck": "Active health check",
     "allowAsns": "Allow ASNs",
     "allowCidrs": "Allow CIDRs",
-    "allowContinents": "Allow Continents",
-    "allowCountries": "Allow Countries",
+    "allowContinents": "Allow continents",
+    "allowCountries": "Allow countries",
     "allowIps": "Allow IPs",
-    "allowRulesOverrideBlocks": "Allow Rules (override blocks)",
+    "allowRulesOverrideBlocks": "Allow rules (override blocks)",
     "allowedContinentsPlaceholder": "EU, NA",
     "allowedCountriesPlaceholder": "US, DE",
     "blockAsns": "Block ASNs",
     "blockCidrs": "Block CIDRs",
-    "blockContinents": "Block Continents",
-    "blockCountries": "Block Countries",
+    "blockContinents": "Block continents",
+    "blockCountries": "Block countries",
     "blockIps": "Block IPs",
     "blockedContinentsPlaceholder": "AF, AS",
     "blockedCountriesPlaceholder": "CN, RU, KP",
     "continentCodesHelp": "AF, AN, AS, EU, NA, OC, SA",
     "countryCodesHelp": "ISO 3166-1 alpha-2 codes, comma-separated",
-    "deleteL4ProxyHost": "Delete L4 Proxy Host",
+    "deleteL4ProxyHost": "Delete L4 proxy host",
     "deleteWarning": "This action cannot be undone.",
-    "dnsPinningDescription": "When enabled, upstream hostnames are resolved to IP addresses at config time, pinning DNS resolution.",
-    "dnsResolversHelp": "One per line. Used for upstream hostname resolution.",
-    "editL4ProxyHost": "Edit L4 Proxy Host",
-    "enableActiveHealthCheck": "Enable Active Health Check",
-    "enableCustomDns": "Enable Custom DNS",
+    "dnsPinningDescription": "When enabled, upstream hostnames are resolved to IP addresses at config time, which pins DNS resolution.",
+    "dnsResolversHelp": "One per line. Used to resolve upstream hostnames.",
+    "editL4ProxyHost": "Edit L4 proxy host",
+    "enableActiveHealthCheck": "Enable active health check",
+    "enableCustomDns": "Enable custom DNS",
     "crowdsec": "CrowdSec",
     "crowdsecHelp": "Close connections from addresses your CrowdSec Local API has a decision against. Applies once CrowdSec is set up under Settings > CrowdSec. Behind PROXY protocol, the client's address is checked.",
     "enableHostLabel": "Enable this L4 host",
-    "enablePassiveHealthCheck": "Enable Passive Health Check",
+    "enablePassiveHealthCheck": "Enable passive health check",
     "enabledNote": "{count} enabled",
     "fallbackResolversHelp": "Fallback DNS servers (one per line).",
     "filterAll": "All",
@@ -2002,7 +2002,7 @@
     "geoblockClientIpTitle": "Geo blocking uses the client's direct IP at L4",
     "l4DisabledTitle": "Layer 4 proxying is switched off",
     "listen": "Listen",
-    "listenAddress": "Listen Address",
+    "listenAddress": "Listen address",
     "listenAddressHelp": "Format: :PORT, HOST:PORT, or [IPv6]:PORT - an IPv6 address must be bracketed. PORT can be a range such as 27015-27030, up to 1000 ports. The agent publishes the ports on the Caddy container for you. Ports 80, 443, 2019, 3000, 9090 and the metrics port are reserved.",
     "listenPortCount": "{count, plural, one {# port} other {# ports}}",
     "samePortUpstream": "Upstreams get the listen port",
@@ -2015,9 +2015,9 @@
     "matcherHelp": "Match incoming connections before proxying. 'None' matches all connections on this port.",
     "matcherHostnamesHelp": "Comma-separated list of hostnames to match.",
     "matcherHostnamesPlaceholder": "db.example.com, api.example.com",
-    "maxFails": "Max Fails",
+    "maxFails": "Max fails",
     "mode": "Mode",
-    "namePlaceholder": "PostgreSQL Proxy",
+    "namePlaceholder": "PostgreSQL proxy",
     "optDnsDisabled": "Disabled",
     "optDnsEnabled": "Enabled",
     "optDnsFamilyBoth": "Both (IPv6 + IPv4)",
@@ -2028,36 +2028,36 @@
     "optGeoblockOverride": "Override global settings",
     "optMatcherHttpHost": "HTTP Host",
     "optMatcherNone": "None (catch-all)",
-    "optMatcherProxyProtocol": "Proxy Protocol",
+    "optMatcherProxyProtocol": "PROXY protocol",
     "optMatcherTlsSni": "TLS SNI",
     "optProxyProtocolNone": "None",
-    "passiveHealthCheck": "Passive Health Check",
+    "passiveHealthCheck": "Passive health check",
     "policy": "Policy",
-    "portsApplyDescription": "The Caddy container needs to be recreated to expose L4 ports.",
+    "portsApplyDescription": "The agent must recreate the Caddy container to expose L4 ports.",
     "required": "Required:",
     "searchL4Hosts": "Search L4 hosts…",
     "tcpNote": "Connection-oriented streams",
     "tcpStreams": "TCP",
-    "tlsTermination": "TLS Termination",
+    "tlsTermination": "TLS termination",
     "udpNote": "Datagram listeners",
     "udpStreams": "UDP",
     "upstreamProxyProtocolLabel": "Send PROXY protocol to upstream",
     "upstreamsHelp": "One per line in host:port format.",
     "matcherSummarySni": "SNI: {hostnames}",
     "matcherSummaryHost": "Host: {hostnames}",
-    "columnNameMatcher": "Name / Matcher",
+    "columnNameMatcher": "Name / matcher",
     "l4DisabledDescription": "{reason} Hosts below are saved but are not being served.",
     "searchEmptyMessage": "No L4 hosts match your search",
     "emptyMessage": "No L4 proxy hosts found",
     "disabled": "Disabled",
-    "hostEnabledTitle": "L4 Host Enabled",
-    "hostPausedTitle": "L4 Host Paused",
+    "hostEnabledTitle": "L4 host enabled",
+    "hostPausedTitle": "L4 host paused",
     "hostEnabledDescription": "This host is active and proxying connections",
-    "hostPausedDescription": "This host is disabled and will not accept connections",
-    "sniHostnames": "SNI Hostnames",
-    "httpHostnames": "HTTP Hostnames",
-    "duplicateL4ProxyHost": "Duplicate L4 Proxy Host",
-    "createL4ProxyHost": "Create L4 Proxy Host",
+    "hostPausedDescription": "This host is disabled and does not accept connections",
+    "sniHostnames": "SNI hostnames",
+    "httpHostnames": "HTTP hostnames",
+    "duplicateL4ProxyHost": "Duplicate L4 proxy host",
+    "createL4ProxyHost": "Create L4 proxy host",
     "deleteConfirm": "Are you sure you want to delete the L4 proxy host <strong>{name}</strong>?",
     "portsChangesPending": "Docker port changes pending",
     "portsStatus": "Docker port status",
@@ -2088,11 +2088,11 @@
     "viewAsBannerDescription": "Pages, menus and actions follow that role's permissions. Anything you change is still recorded as you. This view ends on its own after an hour.",
     "viewAsExit": "Exit",
     "viewAsRoles": { "operator": "an operator", "user": "a user", "viewer": "a viewer" },
-    "accessLists": "Access Lists",
+    "accessLists": "Access lists",
     "agents": "Agents",
     "analytics": "Analytics",
-    "apiDocs": "API Docs",
-    "auditLog": "Audit Log",
+    "apiDocs": "API docs",
+    "auditLog": "Audit log",
     "avatarAlt": "User",
     "certificates": "Certificates",
     "defaultUserName": "Administrator",
@@ -2100,7 +2100,7 @@
     "demoBannerTitle": "Demo mode",
     "groups": "Groups",
     "hosts": "Hosts",
-    "l4ProxyHosts": "L4 Proxy Hosts",
+    "l4ProxyHosts": "L4 proxy hosts",
     "mobileNavLabel": "Main navigation",
     "more": {
       "allPages": "All pages",
@@ -2124,7 +2124,7 @@
     },
     "overview": "Overview",
     "profile": "Profile",
-    "proxyHosts": "Proxy Hosts",
+    "proxyHosts": "Proxy hosts",
     "railGroupAccess": "Access",
     "railGroupObservability": "Observability",
     "railGroupSystem": "System",
@@ -2304,23 +2304,23 @@
       "regenerateHelp": "Your old backup codes stop working as soon as the new ones are made.",
       "disableHelp": "Signing in will only ask for your password again."
     },
-    "accountInformation": "Account Information",
-    "activeSessions": "Active Sessions",
-    "apiTokenCreated": "API token created successfully",
-    "apiTokens": "API Tokens",
-    "apiTokensDescription": "Create tokens for programmatic access to the API using the header Authorization: Bearer '<token>'",
-    "authenticationMethod": "Authentication Method",
+    "accountInformation": "Account information",
+    "activeSessions": "Active sessions",
+    "apiTokenCreated": "API token created",
+    "apiTokens": "API tokens",
+    "apiTokensDescription": "Create tokens to call the API with the header Authorization: Bearer '<token>'",
+    "authenticationMethod": "Authentication method",
     "avatarDeleteError": "An error occurred while deleting the avatar",
     "avatarDeleteFailed": "Failed to delete avatar",
-    "avatarMustBeImage": "Please upload an image file",
-    "avatarRemoved": "Avatar removed successfully. Refreshing…",
+    "avatarMustBeImage": "Upload an image file",
+    "avatarRemoved": "Avatar removed. Refreshing…",
     "avatarTooLarge": "Image must be smaller than {max} KB",
-    "avatarUpdated": "Avatar updated successfully. Refreshing…",
+    "avatarUpdated": "Avatar updated. Refreshing…",
     "avatarUploadError": "An error occurred while uploading the avatar",
     "avatarUploadFailed": "Failed to upload avatar",
     "avatarUploadHelp": "Recommended: square image, max {max} KB",
-    "changePassword": "Change Password",
-    "createToken": "Create Token",
+    "changePassword": "Change password",
+    "createToken": "Create token",
     "deleteToken": "Delete token",
     "deviceBrowser": "Browser",
     "deviceOnOs": "{browser} on {os}",
@@ -2329,27 +2329,27 @@
     "expiresAt": "Expires at",
     "linkError": "An error occurred while linking OAuth",
     "passwordRemoved": "Password removed. Reloading…",
-    "removePassword": "Remove Password",
+    "removePassword": "Remove password",
     "removePasswordDescription": "After this you can only sign in with {providers}. If that provider stops working, an admin has to set a password for you. Enter your current password to confirm.",
     "removePasswordFailed": "Failed to remove password",
     "linkStartFailed": "Failed to start OAuth linking.",
     "noApiTokensYet": "No API tokens yet",
     "notSet": "Not set",
-    "oauthConnections": "OAuth Connections",
+    "oauthConnections": "OAuth connections",
     "oauthLinkDescription": "Link an OAuth provider to enable single sign-on",
     "oauthOnlyDescription": "Single sign-on is the only authentication method on this instance.",
     "oauthOnlyTitle": "You are using OAuth-only authentication",
-    "oauthPasswordDescription": "Setting a password will allow you to sign in with either OAuth or credentials.",
-    "oauthUnlinked": "OAuth account unlinked successfully. Reloading…",
+    "oauthPasswordDescription": "With a password set, you can sign in either through OAuth or with your username and password.",
+    "oauthUnlinked": "OAuth account unlinked. Reloading…",
     "passwordChangeError": "An error occurred while changing the password",
     "passwordChanged": "Password changed successfully",
     "passwordIsSet": "Password is set",
-    "passwordManagement": "Password Management",
-    "passwordManagementDescription": "Change your password to maintain account security",
+    "passwordManagement": "Password management",
+    "passwordManagementDescription": "Change the password you sign in with",
     "passwordsDoNotMatch": "Passwords do not match",
-    "profilePicture": "Profile Picture",
+    "profilePicture": "Profile picture",
     "reauthRequiredToSetPassword": "To set a password, sign out and sign in again with your single sign-on provider, then set it within {minutes} minutes.",
-    "providerCredentials": "Username/Password",
+    "providerCredentials": "Username/password",
     "removePicture": "Remove picture",
     "removeProfilePicture": "Remove profile picture",
     "revokeOtherSessionsLabel": "Sign out all other sessions",
@@ -2358,23 +2358,23 @@
     "sessionsDescription": "Devices currently signed in to your account. Revoke any you don't recognise.",
     "thisDevice": "This device",
     "tokenCopyWarning": "Copy this token now - it will not be shown again.",
-    "tokenNamePlaceholder": "e.g. CI/CD Pipeline",
+    "tokenNamePlaceholder": "e.g. CI/CD pipeline",
     "tokensEmptyDescription": "Create one below.",
     "unlinkDisabledTitle": "This connection cannot be unlinked",
     "unlinkError": "An error occurred while unlinking OAuth",
     "unlinkFailed": "Failed to unlink OAuth",
     "unlink": "Unlink",
-    "unlinkOauthAccount": "Unlink OAuth Account",
+    "unlinkOauthAccount": "Unlink OAuth account",
     "unlinkOauthConfirm": "After this you can only sign in with your username and password, not {providers}. Enter your current password to confirm.",
     "unlinkPasswordRequired": "Cannot unlink OAuth: you must set a password first",
-    "unlinkPasswordRequiredDescription": "To unlink OAuth, you must first set a password as a fallback authentication method.",
+    "unlinkPasswordRequiredDescription": "Set a password first, so you can still sign in once OAuth is unlinked.",
     "unlinkPasswordRequiredTitle": "Set a password first",
     "unlinkSignInUnavailable": "Cannot unlink OAuth: the login page cannot sign you in with a password yet. Set your password again, or ask an administrator to give you a username.",
     "uploadProfilePicture": "Upload profile picture",
     "used": "Used {when}",
     "linkProvider": "Link {provider}",
     "deleteTokenNamed": "Delete token {name}",
-    "title": "Profile & Account Settings",
+    "title": "Profile & account settings",
     "signedIn": "Signed in {when}",
     "ipAddress": "IP {address}",
     "createdOn": "Created {date}",
@@ -2590,32 +2590,32 @@
     "locationAccessListInherit": "Same as the host",
     "locationAccessListNone": "None for this path",
     "activeCertificatesEmptyTitle": "No active client certificates.",
-    "activeHealthChecks": "Active Health Checks",
+    "activeHealthChecks": "Active health checks",
     "activeHealthChecksHelp": "Periodically probe upstreams to check health",
-    "addAccessRule": "Add Access Rule",
-    "addErrorPage": "Add Error Page",
-    "addLocationRule": "Add Location Rule",
-    "addPathAllow": "Add Path Allow",
-    "addPathBlock": "Add Path Block",
-    "addPathRewrite": "Add Path Rewrite",
-    "addRedirect": "Add Redirect",
+    "addAccessRule": "Add access rule",
+    "addErrorPage": "Add error page",
+    "addLocationRule": "Add location rule",
+    "addPathAllow": "Add path allow",
+    "addPathBlock": "Add path block",
+    "addPathRewrite": "Add path rewrite",
+    "addRedirect": "Add redirect",
     "addResponseHeader": "Add response header",
-    "addUpstream": "Add Upstream",
-    "addressFamilyPreference": "Address Family Preference",
-    "advancedOptions": "Advanced Options",
+    "addUpstream": "Add upstream",
+    "addressFamilyPreference": "Address family preference",
+    "advancedOptions": "Advanced options",
     "agentsConnectedNote": "{count} connected",
-    "allowRules": "Allow Rules",
-    "allowedGroups": "Allowed Groups",
-    "allowedRoles": "Allowed Roles",
-    "allowedSpecificCertificates": "Allowed Specific Certificates",
-    "allowedUsers": "Allowed Users",
+    "allowRules": "Allow rules",
+    "allowedGroups": "Allowed groups",
+    "allowedRoles": "Allowed roles",
+    "allowedSpecificCertificates": "Allowed specific certificates",
+    "allowedUsers": "Allowed users",
     "analyticsOffNote": "Analytics is not recording traffic",
     "asns": "ASNs",
     "authentikDescription": "Proxy authentication via Authentik outpost",
-    "authentikForwardAuth": "Authentik Forward Auth",
-    "authentikHostHeaderHelp": "Recommended: keep enabled. Only disable if using IP-based outpost access or troubleshooting routing issues.",
-    "authentikHostHeaderLabel": "Set Host Header for Outpost",
-    "blockRules": "Block Rules",
+    "authentikForwardAuth": "Authentik forward auth",
+    "authentikHostHeaderHelp": "Recommended: leave it on. Turn it off only if you reach the outpost by IP address or are troubleshooting routing.",
+    "authentikHostHeaderLabel": "Set Host header for outpost",
+    "blockRules": "Block rules",
     "blockedCount": "{count} blocked",
     "blockedShareNote": "{percent}% blocked",
     "body": "Body",
@@ -2623,45 +2623,45 @@
     "certificate": "Certificate",
     "certificatesEmptyTitle": "No client certificates issued yet",
     "certificatesNote": "{count, plural, one {# host on this page carries one} other {# hosts on this page carry one}}",
-    "checkInterval": "Check Interval",
-    "checkTimeout": "Check Timeout",
+    "checkInterval": "Check interval",
+    "checkTimeout": "Check timeout",
     "checkingGeoipDatabases": "Checking GeoIP databases",
     "cidrs": "CIDRs",
     "contentType": "Content type",
     "continents": "Continents",
-    "cookieName": "Cookie Name",
-    "cookieSecret": "Cookie Secret",
+    "cookieName": "Cookie name",
+    "cookieSecret": "Cookie secret",
     "countries": "Countries",
-    "cpmForwardAuth": "CPM Forward Auth",
-    "cpmForwardAuthDescription": "Require users to authenticate via Caddy Proxy Manager before accessing this host",
+    "cpmForwardAuth": "CPM forward auth",
+    "cpmForwardAuthDescription": "Require users to sign in to Caddy Proxy Manager before they reach this host",
     "cpmForwardAuthRequireCaptcha": "Require the sign-in CAPTCHA",
     "cpmForwardAuthRequireCaptchaHelp": "When a CAPTCHA is configured under Settings → Authentication, the portal asks for it before the password for this host. Turn off only for a host whose users cannot solve one - it leaves this host's sign-in open to scripted password guessing.",
     "customCaddyfile": "Custom Caddyfile",
     "customCaddyfileHelp": "Caddyfile directives for this host, adapted by Caddy and inserted before the reverse proxy. Rejected on save if Caddy cannot parse them.",
-    "customDnsResolvers": "Custom DNS Resolvers",
+    "customDnsResolvers": "Custom DNS resolvers",
     "customPreHandlersHelp": "JSON array of Caddy handlers, run before the reverse proxy.",
-    "customPreHandlersJson": "Custom Pre-Handlers (JSON)",
-    "customResponseHeaders": "Custom Response Headers",
+    "customPreHandlersJson": "Custom pre-handlers (JSON)",
+    "customResponseHeaders": "Custom response headers",
     "customReverseProxyHelp": "Deep-merged into the reverse_proxy handler itself (proxy mode only).",
-    "customReverseProxyJson": "Custom Reverse Proxy (JSON)",
-    "customSeclangDirectives": "Custom SecLang Directives",
+    "customReverseProxyJson": "Custom reverse proxy (JSON)",
+    "customSeclangDirectives": "Custom SecLang directives",
     "customWafDirectivesHelp": "ModSecurity SecLang syntax. Appended after OWASP CRS if enabled.",
     "deleteDescription": "This will remove the configuration for:",
-    "deleteProxyHost": "Delete Proxy Host",
+    "deleteProxyHost": "Delete proxy host",
     "deleteWarning": "This action cannot be undone",
-    "dnsPinningInfoDescription": "When enabled, hostname upstreams are written to Caddy as concrete IP dials. If this handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid SNI mismatch.",
+    "dnsPinningInfoDescription": "When enabled, hostname upstreams are written to Caddy as IP dials. If this handler has more than one distinct HTTPS upstream hostname, those HTTPS upstreams are not pinned, to avoid an SNI mismatch.",
     "dnsPinningInfoTitle": "Hostname upstreams are resolved at config-apply time",
     "dnsPinningModeHelp": "Inherit uses the global setting. Enabled/Disabled overrides per host.",
     "dnsConnectTimeout": "Connect timeout",
     "dnsConnectTimeoutHelp": "Caps name lookup and connecting together, e.g. 5s. A connect timeout under Upstream timeouts wins over it",
     "dnsResolverOverrideDescription": "Useful for upstream services that require specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).",
     "dnsResolverOverrideTitle": "Per-host resolvers override global DNS settings",
-    "dnsResolvers": "DNS Resolvers",
+    "dnsResolvers": "DNS resolvers",
     "dnsResolversDescription": "Configure per-host DNS resolution for upstream discovery and health checks",
     "dnsResolversHelp": "One resolver per line (e.g., 1.1.1.1, 9.9.9.9). Used for dynamic upstream DNS resolution.",
     "domainsHelp": "One per line or comma-separated. Wildcards like *.example.com are supported.",
-    "editAccessRule": "Edit Access Rule",
-    "editProxyHost": "Edit Proxy Host",
+    "editAccessRule": "Edit access rule",
+    "editProxyHost": "Edit proxy host",
     "enableAuthentikForwardAuth": "Enable Authentik forward auth",
     "enableCpmForwardAuth": "Enable CPM forward auth",
     "enableForwardAuth": "Enable forward auth",
@@ -2670,21 +2670,21 @@
     "enableMtls": "Enable mTLS",
     "enableWebApplicationFirewall": "Enable web application firewall",
     "enabledDisabledNote": "{enabled} enabled, {disabled} disabled",
-    "engineMode": "Engine Mode",
+    "engineMode": "Engine mode",
     "errorPageBodyPlaceholder": "<h1>Service temporarily unavailable</h1>",
     "errorPageContentTypePlaceholder": "text/html; charset=utf-8",
     "errorPageStatusCodesPlaceholder": "502, 503, 504 (blank = all errors)",
-    "errorPages": "Error Pages",
-    "errorPagesHelp": "Serve a custom response body when a request errors (e.g. 502/503 when the upstream is down, or 404). Comma-separate status codes, or leave blank to match every error. The original status code is preserved.",
-    "excludedPaths": "Excluded Paths",
-    "expectedBody": "Expected Body",
+    "errorPages": "Error pages",
+    "errorPagesHelp": "Serve a custom response body when a request errors (e.g. 502/503 when the upstream is down, or 404). Comma-separate status codes, or leave blank to match every error. The response keeps the original status code.",
+    "excludedPaths": "Excluded paths",
+    "expectedBody": "Expected body",
     "expectedHttpStatus": "Expected HTTP status",
     "expectedResponseBody": "Expected response body",
-    "expectedStatus": "Expected Status",
-    "expectedStatusCode": "Expected Status Code",
-    "failDuration": "Fail Duration",
+    "expectedStatus": "Expected status",
+    "expectedStatusCode": "Expected status code",
+    "failDuration": "Fail duration",
     "failDurationHelp": "How long to remember failures",
-    "fallbackDnsResolvers": "Fallback DNS Resolvers",
+    "fallbackDnsResolvers": "Fallback DNS resolvers",
     "fallbackResolversHelp": "Fallback resolvers if primary fails. One per line.",
     "filterAll": "All",
     "filterDisabled": "Disabled",
@@ -2692,23 +2692,23 @@
     "forbidden": "Forbidden",
     "forwardAuthAccessDeniedDescription": "No users or groups are selected, so forward auth will reject every request.",
     "forwardAuthAccessDeniedTitle": "Nobody can access this host",
-    "forwardAuth": "Forward Auth",
+    "forwardAuth": "Forward auth",
     "forwardAuthApiSplitHelp": "A caller that did not ask for HTML - an API client, a WebSocket handshake - gets 401 instead of a redirect to the login page, which it cannot follow.",
     "forwardAuthApiSplitLabel": "Answer non-browser callers with 401",
     "forwardAuthBypassHeaders": "Bypass headers",
-    "forwardAuthBypassHeadersHelp": "A request carrying any of these headers skips forward auth entirely, leaving the upstream to check the credential itself. Comma-separated.",
+    "forwardAuthBypassHeadersHelp": "A request carrying any of these headers skips forward auth entirely, and the upstream has to check the credential itself. Comma-separated.",
     "forwardAuthCopyHeadersHelp": "Headers taken from the auth server's answer and set on the request sent upstream. One per line. The same headers are stripped from every inbound request, so they cannot be forged.",
     "forwardAuthDescription": "Authenticate through an external forward-auth server, such as Authelia",
-    "forwardAuthExcludedPathsHelp": "Paths to exclude from authentication. These paths bypass forward auth while all other paths remain protected. Ignored if Protected Paths is set.",
+    "forwardAuthExcludedPathsHelp": "Paths that bypass forward auth. Every other path stays protected. Ignored if Protected paths is set.",
     "forwardAuthGroupsEmptyDescription": "Create groups on the Groups page.",
     "forwardAuthProviderAuthelia": "Authelia",
     "forwardAuthProviderCustom": "Custom",
-    "forwardAuthProtectedPathsHelp": "Leave empty to protect the entire domain. Comma-separated paths to protect specific routes only.",
+    "forwardAuthProtectedPathsHelp": "Leave empty to protect the whole domain, or list comma-separated paths to protect only those routes.",
     "forwardAuthUpstreamHelp": "Where the auth server listens, as seen from Caddy, e.g. http://authelia:9091.",
     "forwardAuthSubjectsEmptyTitle": "No groups or users yet",
     "forwardTheIdentityUpstream": "Forward the identity upstream",
-    "fromPath": "From Path",
-    "geoBlocking": "Geo Blocking",
+    "fromPath": "From path",
+    "geoBlocking": "Geo blocking",
     "geoblockAllowPrecedenceHelp": "Allow rules take precedence over block rules.",
     "geoblockDescription": "Block or allow traffic by country, continent, ASN, CIDR, or IP",
     "geoblockFailClosedHelp": "Blocks requests where the real client IP cannot be determined, e.g. behind a trusted proxy with no usable X-Forwarded-For. Default: off (fail-open).",
@@ -2721,20 +2721,20 @@
     "globalDefault": "Global default",
     "globalRuleHandling": "Global rule handling",
     "header": "Header",
-    "headerFieldName": "Header Field Name",
-    "headersToCopy": "Headers to Copy",
+    "headerFieldName": "Header field name",
+    "headersToCopy": "Headers to copy",
     "healthCheckIntervalHelp": "How often to check",
-    "healthCheckPort": "Health Check Port",
+    "healthCheckPort": "Health check port",
     "healthCheckTimeoutHelp": "Timeout for health probe",
-    "healthCheckUri": "Health Check URI",
+    "healthCheckUri": "Health check URI",
     "healthCheckUriHelp": "Path to probe for health",
     "identityProtectedPathsHelp": "Leave empty to require an identity for the whole host. Comma-separated paths gate only those routes.",
     "inherit": "Inherit",
     "internalRewriteHelp": "Internally rewrite the request URI before proxying. The client URL is unchanged; the upstream sees the target URI.",
-    "internalTargetUri": "Internal Target URI",
+    "internalTargetUri": "Internal target URI",
     "interval": "Interval",
-    "ipAddresses": "IP Addresses",
-    "lanOnlyRfc1918": "LAN Only (RFC1918)",
+    "ipAddresses": "IP addresses",
+    "lanOnlyRfc1918": "LAN only (RFC1918)",
     "lbChoose": "Choose from",
     "lbChooseHelp": "How many upstreams to pick between at random, then send to the least loaded of them.",
     "lbHealthFails": "Fails",
@@ -2745,30 +2745,30 @@
     "lbHealthPassesHelp": "Consecutive successful probes before an upstream is used again.",
     "lbHealthRequestBody": "Probe body",
     "lbHealthRequestBodyHelp": "Sent with the probe. Distinct from the expected response body.",
-    "lbPolicyClientIpHash": "Client IP Hash",
+    "lbPolicyClientIpHash": "Client IP hash",
     "lbPolicyClientIpHashHelp": "Real client IP - set trusted proxies first",
     "lbPolicyCookie": "Cookie",
     "lbPolicyCookieHelp": "Cookie-based sticky sessions",
-    "lbPolicyFirst": "First Available",
+    "lbPolicyFirst": "First available",
     "lbPolicyFirstHelp": "First available upstream",
-    "lbPolicyHeader": "Header Hash",
+    "lbPolicyHeader": "Header hash",
     "lbPolicyHeaderHelp": "Hash based on request header",
-    "lbPolicyIpHash": "IP Hash",
+    "lbPolicyIpHash": "IP hash",
     "lbPolicyIpHashHelp": "Peer IP-based sticky sessions",
-    "lbPolicyLeastConn": "Least Connections",
+    "lbPolicyLeastConn": "Least connections",
     "lbPolicyLeastConnHelp": "Fewest active connections",
-    "lbPolicyQuery": "Query Hash",
+    "lbPolicyQuery": "Query hash",
     "lbPolicyQueryHelp": "Hash on a query parameter",
     "lbPolicyRandom": "Random",
     "lbPolicyRandomChoose": "Random (choose N)",
     "lbPolicyRandomChooseHelp": "Least loaded of N at random",
     "lbPolicyRandomDefault": "Random (default)",
     "lbPolicyRandomHelp": "Random selection (default)",
-    "lbPolicyRoundRobin": "Round Robin",
+    "lbPolicyRoundRobin": "Round robin",
     "lbPolicyRoundRobinHelp": "Sequential distribution",
-    "lbPolicyUriHash": "URI Hash",
+    "lbPolicyUriHash": "URI hash",
     "lbPolicyUriHashHelp": "URI path-based distribution",
-    "lbPolicyWeightedRoundRobin": "Weighted Round Robin",
+    "lbPolicyWeightedRoundRobin": "Weighted round robin",
     "lbPolicyWeightedRoundRobinHelp": "Sequential, in proportion to per-upstream weights",
     "lbQueryKey": "Query parameter",
     "lbQueryKeyHelp": "Requests with the same value for this parameter go to the same upstream.",
@@ -2776,17 +2776,17 @@
     "lbUnhealthyRequestCountHelp": "Concurrent requests to one upstream before it is considered unhealthy.",
     "lbWeights": "Weights",
     "lbWeightsHelp": "Comma-separated, one per upstream and in the same order. A list that does not match the upstreams is ignored.",
-    "loadBalancer": "Load Balancer",
+    "loadBalancer": "Load balancer",
     "loadBalancerDescription": "Configure load balancing and health checks for multiple upstreams",
     "loadBalancerHeaderHelp": "The request header to hash for upstream selection",
     "loadBalancerHeaderPlaceholder": "X-Custom-Header",
     "loadingAccessRules": "Loading access rules",
     "locationLoadBalancerDescription": "Health checks & balancing for this path's upstreams",
     "locationLoadBalancerLabel": "Enable load balancing for this path",
-    "locationRules": "Location Rules",
-    "maxFailures": "Max Failures",
+    "locationRules": "Location rules",
+    "maxFailures": "Max failures",
     "maxFailuresHelp": "Failures before marking unhealthy",
-    "maxRetries": "Max Retries",
+    "maxRetries": "Max retries",
     "maxRetriesHelp": "Maximum retry attempts",
     "mergeWithGlobal": "Merge with global",
     "mtlsAccessDeniedTitle": "mTLS will block all connections",
@@ -2796,15 +2796,15 @@
     "mtlsDefaultAccessHelp": "All trusted certificates and roles have equal access to every path.",
     "mtlsDenyPathLabel": "Deny all access to this path",
     "mtlsDescription": "Require clients to present a trusted certificate to connect",
-    "mtlsExcludedPathsHelp": "Paths to exclude from mTLS. These paths bypass client certificate enforcement while all other paths remain protected. Ignored if Protected Paths is set.",
+    "mtlsExcludedPathsHelp": "Paths that bypass client certificate checks. Every other path stays protected. Ignored if Protected paths is set.",
     "mtlsPathPatternHelp": "Use * for all paths, /admin/* for prefix match",
     "mtlsPathRulesHelp": "Restrict specific paths to certain roles or certificates. Paths without rules allow any trusted cert/role above.",
     "mtlsRolesEmptyDescription": "No mTLS roles yet. Create roles on the Certificates page.",
-    "mtlsRuleDeniedSummary": "No roles/certs - effectively denied",
+    "mtlsRuleDeniedSummary": "No roles or certs, so access is denied",
     "mtlsSubjectsEmptyDescription": "No roles or certificates are selected.",
     "mtlsTlsRequiredTitle": "mTLS requires TLS on this host",
     "mutualTlsMtls": "Mutual TLS (mTLS)",
-    "namePlaceholder": "My Service",
+    "namePlaceholder": "My service",
     "noAccessRulesConfigured": "No access rules configured",
     "nodeName": "Node name",
     "noneSelected": "None selected",
@@ -2813,11 +2813,11 @@
     "on": "On",
     "optDnsDisabled": "Disabled",
     "optDnsEnabled": "Enabled",
-    "optDnsFamilyBoth": "Both (Prefer IPv6)",
-    "optDnsFamilyInherit": "Inherit Global",
+    "optDnsFamilyBoth": "Both (prefer IPv6)",
+    "optDnsFamilyInherit": "Inherit global",
     "optDnsFamilyIpv4": "IPv4 only",
     "optDnsFamilyIpv6": "IPv6 only",
-    "outpostUpstreamUrl": "Outpost Upstream URL",
+    "outpostUpstreamUrl": "Outpost upstream URL",
     "overLimitAction": "Over-limit action",
     "overLimitActionHelpInherit": "Uses the action set on the WAF settings page.",
     "overLimitActionHelpPartial": "The request is forwarded whole, but only the part of its body within the limit is inspected - the rest reaches the upstream unchecked.",
@@ -2827,16 +2827,16 @@
     "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE and hundreds of other attack patterns",
     "owaspCrsLabel": "Load OWASP Core Rule Set",
     "partial": "Partial",
-    "passiveHealthChecks": "Passive Health Checks",
+    "passiveHealthChecks": "Passive health checks",
     "passiveHealthChecksHelp": "Mark upstreams unhealthy based on response failures",
     "path": "Path",
-    "pathAllows": "Path Allows",
-    "pathAllowsHelp": "Paths that bypass any matching Path Block and reach the upstream. Allows are folded into every block's matcher: a block fires only for requests that match its pattern and do not match any allow. Example: allow /secret + block /* means only /secret reaches the upstream; everything else returns the block status. Allows do not affect Path Rewrites.",
-    "pathBasedAccessRules": "Path-Based Access Rules",
-    "pathBlocks": "Path Blocks",
+    "pathAllows": "Path allows",
+    "pathAllowsHelp": "Paths that bypass any matching path block and reach the upstream. Allows are folded into every block's matcher: a block fires only for requests that match its pattern and do not match any allow. Example: allow /secret + block /* means only /secret reaches the upstream; everything else returns the block status. Allows do not affect path rewrites.",
+    "pathBasedAccessRules": "Path-based access rules",
+    "pathBlocks": "Path blocks",
     "pathBlocksHelp": "Return a static response (no proxying) for matching paths. Supports Caddy path patterns like /dns-query or /admin/*.",
-    "pathPattern": "Path Pattern",
-    "pathPrefixRewrite": "Path Prefix Rewrite",
+    "pathPattern": "Path pattern",
+    "pathPrefixRewrite": "Path prefix rewrite",
     "pathPrefixRewriteHelp": "Prepend this prefix to every request before proxying (e.g. /recipes → /recipes/original/path)",
     "cacheAssets": "Cache assets",
     "cacheAssetsDescription": "Cache stylesheets, scripts, images and fonts. Pages and API responses are never cached.",
@@ -2849,25 +2849,25 @@
     "cacheCaddyUnavailable": "Falling back to browser caching",
     "cacheMaxAge": "Max age",
     "cacheMaxAgeHelp": "How long an asset stays cached: 60 seconds to one year. 86400 is a day.",
-    "pathRewrites": "Path Rewrites",
+    "pathRewrites": "Path rewrites",
     "presets": "Presets:",
     "priority": "Priority",
-    "protectedPaths": "Protected Paths",
+    "protectedPaths": "Protected paths",
     "protections": "Protections",
     "protocol": "Protocol",
     "proxyHostEnabled": "Proxy host enabled",
     "redirectUrl": "Redirect URL",
     "redirects": "Redirects",
     "reject": "Reject",
-    "requestBodyLimits": "Request Body Limits",
+    "requestBodyLimits": "Request body limits",
     "requests24h": "Requests, 24h",
     "requireATailscaleIdentity": "Require a Tailscale identity",
-    "resolutionMode": "Resolution Mode",
+    "resolutionMode": "Resolution mode",
     "responseHeadersEmptyDescription": "No custom headers - use the + button to add one.",
-    "retrySettings": "Retry Settings",
+    "retrySettings": "Retry settings",
     "ruleId": "Rule ID",
     "searchHosts": "Search hosts…",
-    "selectionPolicy": "Selection Policy",
+    "selectionPolicy": "Selection policy",
     "serveOnTailnet": "Serve on tailnet",
     "servedByEveryAgent": "Every agent",
     "someAgentsOffline": "one or more offline",
@@ -2883,9 +2883,9 @@
     "tailscaleDescription": "Serve this host on your tailnet instead of, or as well as, the public internet",
     "tailscaleDisabledDescription": "This host will not be served at all until Settings → Network → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
     "tailscaleDisabledTitle": "Tailscale is switched off in Settings",
-    "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.",
+    "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale, without ACME or a DNS provider.",
     "tailscaleDomainRequirementTitle": "Add the node's MagicDNS name to Domains",
-    "tailscaleExcludedPathsHelp": "Paths that bypass the identity check while everything else stays gated. Ignored if Protected Paths is set.",
+    "tailscaleExcludedPathsHelp": "Paths that bypass the identity check while everything else stays gated. Ignored if Protected paths is set.",
     "tailscaleForwardIdentityHelp": "Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first.",
     "tailscaleIdentityHelp": "Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them.",
     "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Network → Tailscale. Several hosts can share one node.",
@@ -2893,36 +2893,36 @@
     "tailscaleUpstreamNodeLabel": "Reach upstreams over the tailnet",
     "timeout": "Timeout",
     "tls": "TLS",
-    "toUrlPath": "To URL / Path",
+    "toUrlPath": "To URL / path",
     "preservePath": "Keep path",
     "notes": "Notes",
     "notesHelp": "Anything worth remembering about this host. Only people who can see the host can read them.",
     "preservePathNone": "No",
     "preservePathFull": "Full path",
     "preservePathSuffix": "After prefix",
-    "trustedCertificates": "Trusted Certificates",
-    "trustedProxies": "Trusted Proxies",
+    "trustedCertificates": "Trusted certificates",
+    "trustedProxies": "Trusted proxies",
     "trustedProxiesPlaceholder": "private_ranges, 10.0.0.0/8…",
-    "trustedRoles": "Trusted Roles",
-    "tryDuration": "Try Duration",
+    "trustedRoles": "Trusted roles",
+    "tryDuration": "Try duration",
     "tryDurationHelp": "How long to try upstreams",
-    "tryInterval": "Try Interval",
+    "tryInterval": "Try interval",
     "tryIntervalHelp": "Wait between attempts",
-    "unhealthyLatency": "Unhealthy Latency",
+    "unhealthyLatency": "Unhealthy latency",
     "unhealthyLatencyHelp": "Latency above which an upstream is marked unhealthy",
-    "unhealthyStatusCodes": "Unhealthy Status Codes",
+    "unhealthyStatusCodes": "Unhealthy status codes",
     "unhealthyStatusCodesHelp": "Comma-separated status codes",
-    "upstreamDnsPinning": "Upstream DNS Pinning",
+    "upstreamDnsPinning": "Upstream DNS pinning",
     "upstreams": "Upstreams",
     "uri": "URI",
     "value": "Value",
     "wafBodyLimitsDescription": "Coraza buffers request bodies for inspection and rejects anything larger than its limit - 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large uploads. Leave blank to inherit.",
     "wafDescription": "Inspect and block malicious requests via Coraza / OWASP CRS",
-    "webApplicationFirewall": "Web Application Firewall",
+    "webApplicationFirewall": "Web application firewall",
     "features": {
       "auth": "Auth",
       "authentik": "Authentik",
-      "forwardAuth": "Forward Auth",
+      "forwardAuth": "Forward auth",
       "tailnet": "Tailnet",
       "waf": "WAF",
       "geo": "Geo",
@@ -2933,32 +2933,32 @@
       "blocks": "Blocks"
     },
     "enableHostLabel": "Enable {name}",
-    "nameDomain": "Name / Domain",
+    "nameDomain": "Name / domain",
     "upstream": "Upstream",
     "noHostsMatchSearch": "No hosts match your search",
     "noProxyHostsFound": "No proxy hosts found",
     "none": "None",
-    "duplicateProxyHost": "Duplicate Proxy Host",
-    "createProxyHost": "Create Proxy Host",
+    "duplicateProxyHost": "Duplicate proxy host",
+    "createProxyHost": "Create proxy host",
     "managedByCaddyAuto": "Managed by Caddy (Auto)",
     "forceHttps": "Force HTTPS",
     "forceHttpsHelp": "Redirect plain HTTP requests to HTTPS",
     "hsts": "HSTS",
     "hstsHelp": "Tell browsers to only ever use HTTPS for this host. Requires Force HTTPS",
-    "hstsSubdomains": "HSTS Subdomains",
-    "websocketSupport": "WebSocket Support",
+    "hstsSubdomains": "HSTS subdomains",
+    "websocketSupport": "WebSocket support",
     "websocketSupportHelp": "Allow WebSocket upgrades. The WAF checks the handshake but not the messages after it",
-    "preserveHostHeader": "Preserve Host Header",
+    "preserveHostHeader": "Preserve Host header",
     "preserveHostHeaderHelp": "Send the original Host header to the upstream instead of the upstream's own address",
     "hstsSubdomainsHelp": "Include subdomains in the Strict-Transport-Security header",
-    "skipHttpsValidation": "Skip HTTPS Validation",
+    "skipHttpsValidation": "Skip HTTPS validation",
     "skipHttpsValidationHelp": "Skip SSL certificate hostname verification for backend connections",
     "maintenance": "Maintenance mode",
     "maintenanceDescription": "Answer every request with a 503 while the upstream is being worked on. The domain keeps its certificate, and addresses in the bypass list still reach the upstream",
     "maintenanceActiveTitle": "Visitors get a 503",
     "maintenanceActiveDescription": "Only the bypass addresses reach the upstream. Access lists, sign-in and the WAF still apply to them",
     "maintenanceBypass": "Bypass addresses",
-    "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page - yours, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted Proxies",
+    "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page - yours, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted proxies",
     "maintenanceRetryAfter": "Retry-After",
     "maintenanceRetryAfterHelp": "Tells clients and crawlers when to come back. Leave it empty to send none",
     "maintenanceBody": "Page",
@@ -3002,12 +3002,12 @@
       "override": "Only this host's own zones"
     },
     "rateLimitModeHelp": {
-      "inherit": "This host is limited by the zones in Settings > Rate Limiting, and has none of its own.",
-      "merge": "The zones in Settings > Rate Limiting apply, and so do the ones below. Each keeps its own count.",
+      "inherit": "This host is limited by the zones in Settings > Rate limiting, and has none of its own.",
+      "merge": "The zones in Settings > Rate limiting apply, and so do the ones below. Each keeps its own count.",
       "override": "Only the zones below apply. Turn it off to have no rate limiting on this host at all."
     },
     "rateLimitIpv6Prefix": "IPv6 prefix",
-    "rateLimitHelp": "Each zone allows a number of requests per client in a sliding window. A request over the limit gets a 429 with Retry-After, rendered by this host's 429 error page when it has one. The client IP honours trusted proxies. An IPv6 prefix such as 64 counts a whole network as one client. Addresses on the never-limited list in Settings > Rate Limiting are never counted.",
+    "rateLimitHelp": "Each zone allows a number of requests per client in a sliding window. A request over the limit gets a 429 with Retry-After, rendered by this host's 429 error page when it has one. The client IP honours trusted proxies. An IPv6 prefix such as 64 counts a whole network as one client. Addresses on the never-limited list in Settings > Rate limiting are never counted.",
     "crowdsec": "CrowdSec",
     "crowdsecDescription": "Refuse clients your CrowdSec Local API has a decision against, before rate limiting, geo blocking and the WAF. Applies once CrowdSec is set up under Settings > CrowdSec.",
     "enableCrowdsec": "Check clients against CrowdSec",
@@ -3047,17 +3047,17 @@
         "help": "How long upgraded connections survive a config reload. Closed at once by default"
       }
     },
-    "discourageIndexing": "Discourage Search Engines",
+    "discourageIndexing": "Discourage search engines",
     "discourageIndexingHelp": "Ask search engines not to index this host: every response gets X-Robots-Tag: noindex, nofollow, and /robots.txt disallows everything, even behind a sign-in. Well-behaved crawlers honour it; it doesn't keep anyone out",
     "compression": "Compression",
     "compressionHelp": "Compress text responses with zstd or gzip. Default follows Settings → Network → Compression",
     "compressionInherit": "Default",
     "compressionOn": "On",
     "compressionOff": "Off",
-    "proxyHostEnabledTitle": "Proxy Host Enabled",
-    "proxyHostPausedTitle": "Proxy Host Paused",
+    "proxyHostEnabledTitle": "Proxy host enabled",
+    "proxyHostPausedTitle": "Proxy host paused",
     "proxyHostActiveDescription": "This host is active and routing traffic",
-    "proxyHostPausedDescription": "This host is disabled and will not respond to requests",
+    "proxyHostPausedDescription": "This host is disabled and does not respond to requests",
     "maxBodySizeMib": "Max body size (up to {max})",
     "caFallbackName": "CA #{id}",
     "certificatesIssuedBy": "Certificates issued by {name}",
@@ -3073,8 +3073,8 @@
       "ready": "GeoIP ready",
       "missing": "GeoIP missing",
       "partial": "GeoIP partial",
-      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP Databases - country, continent and ASN blocking will not work.",
-      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP Databases.",
+      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP databases - country, continent and ASN blocking will not work.",
+      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP databases.",
       "countryMissingHelp": "GeoLite2-Country database missing - country/continent blocking disabled",
       "asnMissingHelp": "GeoLite2-ASN database missing - ASN blocking disabled",
       "loadedHelp": "GeoLite2-Country and GeoLite2-ASN databases loaded"
@@ -3094,7 +3094,7 @@
     "asnsHelp": "Autonomous System Numbers - press Enter to add",
     "pressEnterToAdd": "Press Enter to add",
     "trustedProxiesHelp": "Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges.",
-    "trustedProxiesBlockResponse": "Trusted Proxies & Block Response",
+    "trustedProxiesBlockResponse": "Trusted proxies & block response",
     "removeErrorPageLabel": "Remove error page {index}",
     "pathLabel": "Path {index}",
     "removePathAllowLabel": "Remove path allow {index}",
@@ -3110,11 +3110,11 @@
     "dnsPinningSummaryInherit": "Using global upstream DNS pinning defaults",
     "dnsPinningSummaryOverride": "Override: {mode, select, inherit {inherit mode} enabled {enabled} disabled {disabled} other {{mode}}}, {family, select, inherit {inherit family} both {both} ipv6 {ipv6} ipv4 {ipv4} other {{family}}}",
     "hostCreated": "Proxy host created and queued for Caddy reload.",
-    "hostCreatedAutoCert": "Proxy host created using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
-    "hostCreatedAutoCertNoCloudflare": "Proxy host created using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)'. Note: Without Cloudflare DNS integration, wildcard certificates require port 80 to be accessible for HTTP-01 challenges. Configure Cloudflare in Settings to enable DNS-01 challenges.",
+    "hostCreatedAutoCert": "Proxy host created. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
+    "hostCreatedAutoCertNoCloudflare": "Proxy host created. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)'. Without Cloudflare DNS integration, wildcard certificates need port 80 reachable for HTTP-01 challenges. Configure Cloudflare in Settings to use DNS-01 challenges.",
     "hostUpdated": "Proxy host updated.",
-    "hostUpdatedAutoCert": "Proxy host updated using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
-    "hostUpdatedAutoCertNoCloudflare": "Proxy host updated using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)'. Note: Without Cloudflare DNS integration, wildcard certificates require port 80 to be accessible for HTTP-01 challenges. Configure Cloudflare in Settings to enable DNS-01 challenges.",
+    "hostUpdatedAutoCert": "Proxy host updated. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
+    "hostUpdatedAutoCertNoCloudflare": "Proxy host updated. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)'. Without Cloudflare DNS integration, wildcard certificates need port 80 reachable for HTTP-01 challenges. Configure Cloudflare in Settings to use DNS-01 challenges.",
     "hostDeleted": "Proxy host deleted.",
     "hostEnabledResult": "Proxy host enabled.",
     "hostDisabledResult": "Proxy host disabled.",
@@ -3226,7 +3226,7 @@
       "confirmTitle": "Import this configuration?",
       "confirmHelp": "The rows listed are created or updated and Caddy is reloaded. Nothing else here changes."
     },
-    "abortResponseDescription": "Caddy writes no status line or body - the native equivalent of a “444 / no response” policy.",
+    "abortResponseDescription": "Caddy writes no status line or body - the native equivalent of a \"444 / no response\" policy.",
     "abortResponseTitle": "Unmatched connections are closed without a response",
     "accessLogsCommand": "View with: docker exec caddy-proxy-manager-caddy tail -f /logs/access.log",
     "accessLogsInfoTitle": "Access logs live in the caddy-logs Docker volume",
@@ -3235,7 +3235,7 @@
     "acmeDirectoryUrl": "ACME directory URL",
     "acmeEmailHelp": "Used by Let's Encrypt for expiry notifications.",
     "acmeRootCertificateHelp": "If the ACME endpoint's TLS certificate is signed by an internal root not in the system trust store, paste the root (or chain) here so Caddy can connect to it.",
-    "addProvider": "Add Provider",
+    "addProvider": "Add provider",
     "addressFamily": "Address family",
     "adminGroups": "Admin groups",
     "agentManagementUnavailableTitle": "No agent is answering, so the container cannot be managed from here",
@@ -3279,7 +3279,7 @@
     "couldNotSaveProvider": "Could not save provider",
     "credentialsAreAlreadyConfigured": "Credentials are already configured",
     "credentialsMissingStatus": "Not configured here yet",
-    "customAcmeDirectory": "Custom ACME Directory",
+    "customAcmeDirectory": "Custom ACME directory",
     "dashboardCheckNeedsSaveDescription": "The check asks the domain that is saved, not the one in the field. Save first, then check.",
     "dashboardCheckNeedsSaveTitle": "Save the domain before checking it",
     "dashboardDisableConfirmBody": "You are reading this page on {domain}, which is the domain about to stop being served. Saving will take this route away while you are using it.",
@@ -3298,11 +3298,11 @@
     "dashboardHostTitle": "Dashboard host",
     "dashboardProxyOptions": "Proxy options",
     "dashboardProxyOptionsHelp": "Everything a proxy host can be configured with, applied to this dashboard's route: certificate, access list, agents, headers, WAF, geo-blocking and the rest. The upstream is always this controller. CPM forward auth and mTLS access rules are not offered here, because they are stored against a proxy host.",
-    "dashboardPortEscapeDescription": "This host is generated from the settings above rather than stored in Proxy Hosts, so nothing can delete it by accident. The controller also publishes its own port, so http://'<host>':3000 reaches this page whatever happens to the route.",
+    "dashboardPortEscapeDescription": "This host is generated from the settings above rather than stored in Proxy hosts, so nothing can delete it by accident. The controller also publishes its own port, so http://'<host>':3000 reaches this page whatever happens to the route.",
     "dashboardPortEscapeTitle": "You cannot lock yourself out with this",
     "dashboardTlsHelp": "Forces HTTPS and asks Caddy for a certificate. Only useful once requests to the domain arrive here.",
     "dashboardTlsLabel": "Serve it over HTTPS",
-    "dashboardTlsUnverifiedDescription": "The last check did not confirm that this domain reaches here. Caddy will keep retrying the certificate order, and the domain will not serve over HTTPS until it succeeds.",
+    "dashboardTlsUnverifiedDescription": "The last check did not confirm that this domain reaches here. Caddy keeps retrying the certificate order, and the domain does not serve over HTTPS until it succeeds.",
     "dashboardTlsUnverifiedTitle": "HTTPS is on, but reachability was not confirmed",
     "default": "Default",
     "defaultDomain": "Default domain",
@@ -3310,7 +3310,7 @@
     "defaultGeoblockTrustedProxies": "Default geoblock trusted proxies from this list",
     "defaultNodeName": "Default node name",
     "defaultRedirectStatusHelp": "307 and 308 preserve the original request method.",
-    "defaultRedirectUrlHelp": "Absolute, relative, and Caddy placeholder-based targets are supported.",
+    "defaultRedirectUrlHelp": "Targets can be absolute, relative or built from Caddy placeholders.",
     "defaultResponseBehaviorHelp": "Applied only when no configured proxy host matches the request.",
     "defaultResponseBodyHelp": "Plain text, JSON, or custom HTML. Empty is allowed.",
     "defaultResponseHeadersHelp": "Optional Name: value pairs, one per line. For custom HTML, set Content-Type: text/html; charset=utf-8.",
@@ -3322,10 +3322,10 @@
     "deleteOauthProvider": "Delete OAuth provider",
     "deleteProvider": "Delete provider",
     "disabled": "Disabled",
-    "dnsAddressFamilyHelp": "Both resolves AAAA + A with IPv6 preferred ordering.",
+    "dnsAddressFamilyHelp": "Both resolves AAAA and A records and orders IPv6 addresses first.",
     "dnsPinningHelp": "Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config.",
     "dnsPinningInfoDescription": "Resolution happens at config save/reload time, and resolved IPs are written into Caddy's active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid SNI mismatch.",
-    "dnsProviderModuleDisabledDescription": "Enable it under Settings → Caddy Build and rebuild Caddy before using it for DNS-01 challenges. Credentials saved now will not be used until then.",
+    "dnsProviderModuleDisabledDescription": "Enable it under Settings → Caddy build and rebuild Caddy before using it for DNS-01 challenges. Credentials saved now will not be used until then.",
     "dnsProviderModuleDisabledTitle": "This provider's Caddy module is disabled",
     "dnsProviderPlaceholder": "Select a DNS provider…",
     "dnsQueryTimeoutHelp": "e.g. 5s, 10s",
@@ -3412,7 +3412,7 @@
     "imageRepositoryHelp": "Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, or it will report releases you cannot pull.",
     "imageRepositoryPlaceholder": "ghcr.io/owner",
     "issuerUrl": "Issuer URL",
-    "issuerUrlHelp": "For OIDC providers, the issuer URL enables automatic discovery of endpoints.",
+    "issuerUrlHelp": "For OIDC providers, the issuer URL lets CPM discover the endpoints automatically.",
     "legacyPasswordHashes": "Legacy password hashes",
     "legacyPasswordResetHelp": "New passwords are hashed with argon2id. Accounts created before that change still use bcrypt, which caps the password at 72 bytes. Turning this on sends those users to a reset screen at their next sign-in; choosing a new password upgrades the hash and clears the prompt. Users who sign in through an OAuth/OIDC provider have no password and are never asked.",
     "legacyPasswordResetLabel": "Require a password change for users still on an older hash",
@@ -3491,7 +3491,7 @@
         "label": "Longest account lock (milliseconds)"
       },
       "analytics_enabled": {
-        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
+        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container, without a Compose profile. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
       },
       "accent_color": {
@@ -3536,7 +3536,7 @@
         "label": "Force a reset for legacy password hashes"
       },
       "auth_trust_host": {
-        "description": "Build URLs from the request's Host header. Only behind a proxy that rewrites it, and only when the public URL above cannot cover the setup.",
+        "description": "Build URLs from the request's Host header. Use it only behind a proxy that rewrites it, and only when the public URL above cannot cover the setup.",
         "label": "Trust the Host header"
       },
       "avatar_gravatar": {
@@ -3788,7 +3788,7 @@
     "statusCode": "Status code",
     "storedCredentialsHelp": "Leave fields blank to keep existing values.",
     "storedSecretHelp": "A secret is configured. Its existing value cannot be viewed.",
-    "strictTrustedProxiesHelp": "Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers.",
+    "strictTrustedProxiesHelp": "Trust the client IP headers only from the configured proxies, and reject spoofed values from untrusted peers.",
     "tags": "Tags",
     "tailnet": "Tailnet",
     "tailscaleControlServerHelp": "Point at a Headscale or other coordination server. Empty uses Tailscale's own.",
@@ -3821,7 +3821,7 @@
     "trustedProxyRangesHelp": "CIDRs, IPs, or the private_ranges shorthand - one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour.",
     "type": "Type",
     "unexpectedError": "An error occurred",
-    "unknownHostHandling": "Unknown Host Handling",
+    "unknownHostHandling": "Unknown host handling",
     "unpair": "Unpair",
     "useGeoip": "Use GeoIP",
     "useTailscale": "Use Tailscale",
@@ -3850,7 +3850,7 @@
     "redirectStatus308": "308 Permanent",
     "dnsProviderSelectPlaceholder": "Select…",
     "dnsProviderOptionUpdate": "{name} (update)",
-    "dnsProviderModuleDisabledOption": "Its caddy-dns module is disabled in Settings → Caddy Build",
+    "dnsProviderModuleDisabledOption": "Its caddy-dns module is disabled in Settings → Caddy build",
     "addOrUpdateDnsProviderTitle": "Add or update provider",
     "addDnsProviderTitle": "Add a provider",
     "dnsProvidersSupported": "{count} providers supported",
@@ -3874,7 +3874,7 @@
     "localAgentName": "Local agent",
     "logFormatConsole": "Console (Common Log Format)",
     "oauthTypeOidc": "OIDC (OpenID Connect)",
-    "oauthProviderRequiredFields": "Name, Client ID, and Client Secret are required.",
+    "oauthProviderRequiredFields": "Name, Client ID, and Client secret are required.",
     "localUsersDisabledWithProviders": "All accounts are provisioned by the providers below.",
     "localUsersDisabledNoProvider": "No provider is enabled, so nobody can sign in.",
     "providerSourceEnv": "ENV",
@@ -3883,19 +3883,19 @@
     "editProvider": "Edit provider",
     "envProviderCannotDelete": "Environment-sourced providers cannot be deleted",
     "deleteProviderConfirm": "Delete \"{name}\"? Users who sign in through it will lose access.",
-    "editOauthProviderTitle": "Edit OAuth Provider",
-    "addOauthProviderTitle": "Add OAuth Provider",
-    "updateOauthProvider": "Update Provider",
-    "newClientSecret": "New Client Secret",
+    "editOauthProviderTitle": "Edit OAuth provider",
+    "addOauthProviderTitle": "Add OAuth provider",
+    "updateOauthProvider": "Update provider",
+    "newClientSecret": "New client secret",
     "dnsChallengeOptions": {
       "propagationDelay": {
-        "label": "Propagation Delay",
+        "label": "Propagation delay",
         "placeholder": "e.g. 60s",
         "description": "How long to wait before starting the DNS propagation checks, e.g. 60s or 5m.",
         "descriptionWithDefault": "How long to wait before starting the DNS propagation checks, e.g. 60s or 5m. Defaults to {duration} for this provider."
       },
       "propagationTimeout": {
-        "label": "Propagation Timeout",
+        "label": "Propagation timeout",
         "placeholder": "e.g. 2m",
         "description": "Maximum time to wait for the challenge TXT record to propagate, e.g. 2m or 15m. Use -1 to disable the propagation check.",
         "descriptionWithDefault": "Maximum time to wait for the challenge TXT record to propagate, e.g. 2m or 15m. Use -1 to disable the propagation check. Defaults to {duration} for this provider."
@@ -3917,11 +3917,11 @@
         "desc": "What Caddy answers for an unknown host, and when a host fails"
       },
       "caddyBuild": {
-        "name": "Caddy Build",
+        "name": "Caddy build",
         "desc": "Which plugins the Caddy image is compiled with"
       },
       "dashboard": {
-        "name": "Dashboard Host",
+        "name": "Dashboard host",
         "desc": "Serve this dashboard through Caddy, on a domain of its own"
       },
       "agent": {
@@ -3941,7 +3941,7 @@
         "desc": "How people sign in to this dashboard"
       },
       "forwardAuth": {
-        "name": "Forward Auth",
+        "name": "Forward auth",
         "desc": "Defaults a new proxy host inherits for an external authenticator"
       },
       "geo": {
@@ -3949,7 +3949,7 @@
         "desc": "Country lookups, and the default rules every host merges with"
       },
       "rateLimit": {
-        "name": "Rate Limiting",
+        "name": "Rate limiting",
         "desc": "Limits every host can inherit, and addresses never limited"
       },
       "crowdsec": {
@@ -3970,7 +3970,7 @@
         "name": "General"
       },
       "acme": {
-        "name": "ACME Server"
+        "name": "ACME server"
       },
       "updates": {
         "name": "Updates"
@@ -3982,76 +3982,76 @@
         "name": "Instance"
       },
       "avatars": {
-        "name": "User Avatars"
+        "name": "User avatars"
       },
       "defaultResponse": {
-        "name": "Default Response"
+        "name": "Default response"
       },
       "errorPages": {
-        "name": "Error Pages"
+        "name": "Error pages"
       },
       "caddyBuild": {
-        "name": "Caddy Build"
+        "name": "Caddy build"
       },
       "globalCaddyConfig": {
         "name": "Global Caddyfile"
       },
       "httpCache": {
-        "name": "HTTP Cache"
+        "name": "HTTP cache"
       },
       "dashboard": {
-        "name": "Dashboard Host"
+        "name": "Dashboard host"
       },
       "agent": {
         "name": "Agent"
       },
       "dnsProviders": {
-        "name": "DNS Providers"
+        "name": "DNS providers"
       },
       "dnsResolvers": {
-        "name": "DNS Resolvers"
+        "name": "DNS resolvers"
       },
       "upstreamDns": {
-        "name": "Upstream DNS Pinning"
+        "name": "Upstream DNS pinning"
       },
       "trustedProxies": {
-        "name": "Trusted Proxies"
+        "name": "Trusted proxies"
       },
       "httpProtocols": {
-        "name": "HTTP Versions"
+        "name": "HTTP versions"
       },
       "compression": {
         "name": "Compression"
       },
       "twoFactor": {
-        "name": "Two-factor Sign-in"
+        "name": "Two-factor sign-in"
       },
       "tailscale": {
         "name": "Tailscale"
       },
       "oauth": {
-        "name": "OAuth Providers"
+        "name": "OAuth providers"
       },
       "signIn": {
         "name": "Sign-in"
       },
       "passwordPolicy": {
-        "name": "Password Policy"
+        "name": "Password policy"
       },
       "authentik": {
-        "name": "Authentik Defaults"
+        "name": "Authentik defaults"
       },
       "forwardAuth": {
-        "name": "Forward Auth Defaults"
+        "name": "Forward auth defaults"
       },
       "geoip": {
-        "name": "GeoIP Databases"
+        "name": "GeoIP databases"
       },
       "geoblock": {
-        "name": "Global Geoblocking"
+        "name": "Global geoblocking"
       },
       "rateLimit": {
-        "name": "Rate Limiting"
+        "name": "Rate limiting"
       },
       "crowdsec": {
         "name": "CrowdSec"
@@ -4060,16 +4060,16 @@
         "name": "Analytics"
       },
       "metrics": {
-        "name": "Metrics & Monitoring"
+        "name": "Metrics & monitoring"
       },
       "logging": {
-        "name": "Access Logging"
+        "name": "Access logging"
       },
       "captcha": {
         "name": "CAPTCHA"
       },
       "email": {
-        "name": "SMTP Server"
+        "name": "SMTP server"
       },
       "certificateAlerts": {
         "name": "Notifications"
@@ -4114,14 +4114,14 @@
       "registeredTitle": "Registered. Create this record at your DNS host:",
       "registeredDescription": "Certificates for this domain use the account once the change is applied and the record exists.",
       "acmeDnsModuleDisabledTitle": "The acme-dns module is disabled",
-      "acmeDnsModuleDisabledDescription": "Enable it under Settings → Caddy Build and rebuild Caddy before registering."
+      "acmeDnsModuleDisabledDescription": "Enable it under Settings → Caddy build and rebuild Caddy before registering."
     },
     "dnsProviders": {
       "cloudflare": {
         "description": "Cloudflare DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token",
+            "label": "API token",
             "placeholder": "Cloudflare API token with Zone:DNS:Edit permission"
           }
         }
@@ -4130,16 +4130,16 @@
         "description": "AWS Route 53 DNS API (supports IAM roles when fields are empty)",
         "fields": {
           "accessKeyId": {
-            "label": "Access Key ID"
+            "label": "Access key ID"
           },
           "secretAccessKey": {
-            "label": "Secret Access Key"
+            "label": "Secret access key"
           },
           "region": {
-            "label": "AWS Region"
+            "label": "AWS region"
           },
           "hostedZoneId": {
-            "label": "Hosted Zone ID",
+            "label": "Hosted zone ID",
             "description": "Optional. Required only if you have multiple zones for the same domain."
           }
         }
@@ -4148,7 +4148,7 @@
         "description": "DigitalOcean DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4164,7 +4164,7 @@
         "description": "Hetzner DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4172,7 +4172,7 @@
         "description": "Vultr DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Key"
+            "label": "API key"
           }
         }
       },
@@ -4180,10 +4180,10 @@
         "description": "Porkbun DNS API",
         "fields": {
           "apiKey": {
-            "label": "API Key"
+            "label": "API key"
           },
           "apiSecretKey": {
-            "label": "API Secret Key"
+            "label": "API secret key"
           }
         }
       },
@@ -4191,7 +4191,7 @@
         "description": "GoDaddy DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Key:Secret",
+            "label": "API key:secret",
             "description": "Format: API_KEY:API_SECRET"
           }
         }
@@ -4200,7 +4200,7 @@
         "description": "Namecheap DNS API",
         "fields": {
           "apiKey": {
-            "label": "API Key"
+            "label": "API key"
           },
           "user": {
             "label": "Username"
@@ -4214,13 +4214,13 @@
             "label": "Endpoint"
           },
           "applicationKey": {
-            "label": "Application Key"
+            "label": "Application key"
           },
           "applicationSecret": {
-            "label": "Application Secret"
+            "label": "Application secret"
           },
           "consumerKey": {
-            "label": "Consumer Key"
+            "label": "Consumer key"
           }
         }
       },
@@ -4228,7 +4228,7 @@
         "description": "IONOS DNS API",
         "fields": {
           "authApiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4236,7 +4236,7 @@
         "description": "Linode/Akamai DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4244,7 +4244,7 @@
         "description": "Njalla DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4252,10 +4252,10 @@
         "description": "Spaceship DNS API",
         "fields": {
           "apiKey": {
-            "label": "API Key"
+            "label": "API key"
           },
           "apiSecret": {
-            "label": "API Secret"
+            "label": "API secret"
           }
         }
       },
@@ -4263,7 +4263,7 @@
         "description": "deSEC DNS API",
         "fields": {
           "token": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4271,7 +4271,7 @@
         "description": "Dynu DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4296,7 +4296,7 @@
         "description": "Infomaniak DNS API",
         "fields": {
           "apiToken": {
-            "label": "API Token"
+            "label": "API token"
           }
         }
       },
@@ -4310,7 +4310,7 @@
             "label": "Password"
           },
           "sharedSecret": {
-            "label": "2FA Shared Secret"
+            "label": "2FA shared secret"
           },
           "endpointUrl": {
             "label": "Endpoint URL"
@@ -4321,13 +4321,13 @@
         "description": "netcup CCP DNS API",
         "fields": {
           "customerNumber": {
-            "label": "Customer Number"
+            "label": "Customer number"
           },
           "apiKey": {
-            "label": "API Key"
+            "label": "API key"
           },
           "apiPassword": {
-            "label": "API Password"
+            "label": "API password"
           }
         }
       },
@@ -4343,7 +4343,7 @@
             "description": "API sub-user ID. Required unless an API user ID is provided."
           },
           "authPassword": {
-            "label": "API Password",
+            "label": "API password",
             "description": "Password of the API user or sub-user."
           }
         }
@@ -4352,27 +4352,27 @@
         "description": "RFC 2136 dynamic DNS updates via a TSIG key (BIND 9 and compatible servers)",
         "fields": {
           "keyName": {
-            "label": "TSIG Key Name",
+            "label": "TSIG key name",
             "description": "Name of the TSIG key as defined on the DNS server."
           },
           "keyAlg": {
-            "label": "TSIG Algorithm",
+            "label": "TSIG algorithm",
             "description": "HMAC algorithm of the TSIG key, e.g. hmac-sha256, hmac-sha512 or hmac-md5."
           },
           "key": {
-            "label": "TSIG Key Secret",
+            "label": "TSIG key secret",
             "description": "The base64 shared secret from the key statement, or from `tsig-keygen`."
           },
           "server": {
-            "label": "DNS Server",
+            "label": "DNS server",
             "description": "Authoritative server that accepts RFC 2136 dynamic updates, as host:port."
           }
         }
       }
     },
     "tailscaleModuleDisabledBody": "{reason} These settings still save, but no host is served on the tailnet until the module is compiled in.",
-    "tailscaleUserspaceNote": "The node runs in userspace inside the Caddy container - no <code>tailscaled</code>, no TUN device, no extra ports published. Its identity is kept in the state directory below, so it survives a container recreate.",
-    "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one - that is only discovered when Caddy tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
+    "tailscaleUserspaceNote": "The node runs in userspace inside the Caddy container, so it needs no <code>tailscaled</code>, TUN device or extra published ports. Its identity is kept in the state directory below, so it survives a container recreate.",
+    "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one: Caddy finds out only when it tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
     "faviconSelected": "Selected: {name}. Save to apply it.",
     "faviconCustomSet": "A custom favicon is set. Click it to replace it.",
     "faviconNone": "No custom favicon - browsers show their own default. Click the tile to upload one.",
@@ -4552,30 +4552,30 @@
     },
     "stagedLabels": {
       "general": "General",
-      "acme": "ACME Server",
-      "defaultResponse": "Default Response",
-      "avatars": "User Avatars",
+      "acme": "ACME server",
+      "defaultResponse": "Default response",
+      "avatars": "User avatars",
       "branding": "Branding",
       "updates": "Updates",
-      "caddyBuild": "Caddy Build",
+      "caddyBuild": "Caddy build",
       "globalCaddyConfig": "Global Caddyfile",
-      "httpCache": "HTTP Cache",
-      "dashboard": "Dashboard Host",
-      "dnsProviders": "DNS Providers",
-      "dnsResolvers": "DNS Resolvers",
+      "httpCache": "HTTP cache",
+      "dashboard": "Dashboard host",
+      "dnsProviders": "DNS providers",
+      "dnsResolvers": "DNS resolvers",
       "upstreamDns": "Upstream DNS",
-      "trustedProxies": "Trusted Proxies",
-      "httpProtocols": "HTTP Versions",
+      "trustedProxies": "Trusted proxies",
+      "httpProtocols": "HTTP versions",
       "compression": "Compression",
-      "twoFactor": "Two-factor Sign-in",
+      "twoFactor": "Two-factor sign-in",
       "tailscale": "Tailscale",
       "geoblock": "Geo-Block",
-      "rateLimit": "Rate Limiting",
+      "rateLimit": "Rate limiting",
       "crowdsec": "CrowdSec",
-      "errorPages": "Error Pages",
+      "errorPages": "Error pages",
       "authentik": "Authentik",
-      "forwardAuth": "Forward Auth",
-      "passwordPolicy": "Password Policy",
+      "forwardAuth": "Forward auth",
+      "passwordPolicy": "Password policy",
       "metrics": "Metrics",
       "logging": "Logging",
       "waf": "WAF"
@@ -4583,14 +4583,14 @@
     "results": {
       "unknownError": "Unknown error",
       "applyFailed": "Settings saved, but could not apply to Caddy: {error}",
-      "generalSaved": "General settings saved successfully",
+      "generalSaved": "General settings saved",
       "generalFailed": "Failed to save general settings",
       "acmeInvalidUrl": "Invalid ACME directory URL.",
       "acmeHttpsRequired": "ACME directory URL must use HTTPS.",
-      "acmeSaved": "ACME settings saved successfully",
+      "acmeSaved": "ACME settings saved",
       "acmeFailed": "Failed to save ACME settings",
-      "cloudflareSaved": "Cloudflare settings saved and applied to Caddy successfully",
-      "cloudflareApplyFailed": "Settings saved, but could not apply to Caddy: {error}. You may need to start Caddy or check your configuration.",
+      "cloudflareSaved": "Cloudflare settings saved and applied to Caddy",
+      "cloudflareApplyFailed": "Settings saved, but could not apply to Caddy: {error}. Start Caddy or check your configuration.",
       "cloudflareFailed": "Failed to save Cloudflare settings",
       "dnsProviderNothingToRemove": "No provider to remove",
       "dnsProviderRemoved": "{name} removed.",
@@ -4617,15 +4617,15 @@
       "acmeDnsRegisterFailed": "Failed to register with acme-dns",
       "authentikRequired": "Outpost domain and upstream are required",
       "forwardAuthRequired": "The auth server URL is required",
-      "forwardAuthSaved": "Forward auth defaults saved successfully",
+      "forwardAuthSaved": "Forward auth defaults saved",
       "forwardAuthFailed": "Failed to save forward auth defaults",
-      "authentikSaved": "Authentik defaults saved successfully",
+      "authentikSaved": "Authentik defaults saved",
       "authentikFailed": "Failed to save Authentik settings",
       "tailscaleKeyRejected": "Tailscale did not accept this key. {reason}",
-      "tailscaleSaved": "Tailscale settings saved successfully",
+      "tailscaleSaved": "Tailscale settings saved",
       "tailscaleFailed": "Failed to save Tailscale settings",
       "passwordPolicyFromEnv": "This policy is controlled by the AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH environment variable and cannot be changed here.",
-      "passwordPolicyRequireChange": "Users with an older password hash will be asked to choose a new password at next sign-in",
+      "passwordPolicyRequireChange": "Users with an older password hash are asked to choose a new password at their next sign-in",
       "passwordPolicyPromptDisabled": "Password migration prompt disabled",
       "passwordPolicyFailed": "Failed to save password policy settings",
       "avatarsFromEnv": "Gravatar is controlled by the AVATAR_GRAVATAR environment variable and cannot be changed here.",
@@ -4641,21 +4641,21 @@
       "faviconChooseFile": "Choose an image file to upload.",
       "faviconUpdated": "Favicon updated",
       "faviconFailed": "Failed to save the favicon",
-      "updatesDisabled": "Update checks disabled - no requests will be made.",
+      "updatesDisabled": "Update checks disabled. No requests are made.",
       "updatesSavedCheckFailed": "Saved, but the check failed: {error}",
       "updatesSavedLatest": "Saved. Newest release published: {latest}",
       "updatesFailed": "Failed to save update settings",
       "updatesLatest": "Newest release published: {latest}",
       "updatesCheckFailed": "The update check failed",
-      "metricsSaved": "Metrics settings saved and applied successfully",
+      "metricsSaved": "Metrics settings saved and applied",
       "metricsFailed": "Failed to save metrics settings",
       "loggingInvalidFormat": "Invalid log format. Must be 'json' or 'console'",
-      "loggingSaved": "Logging settings saved and applied successfully",
+      "loggingSaved": "Logging settings saved and applied",
       "loggingFailed": "Failed to save logging settings",
-      "dashboardSaved": "Dashboard host saved and applied successfully",
+      "dashboardSaved": "Dashboard host saved and applied",
       "dashboardApplyFailed": "Saved, but could not apply to Caddy: {error}",
       "dashboardFailed": "Failed to save dashboard settings",
-      "trustedProxiesSaved": "Trusted proxies settings saved and applied successfully",
+      "trustedProxiesSaved": "Trusted proxies settings saved and applied",
       "trustedProxiesFailed": "Failed to save trusted proxies settings",
       "httpProtocolsSaved": "HTTP versions saved and applied",
       "globalCaddyConfigSaved": "Global Caddyfile saved and applied",
@@ -4678,20 +4678,20 @@
       "twoFactorPolicySaved": "Two-factor policy saved",
       "twoFactorPolicyFailed": "Failed to save the two-factor policy",
       "dnsResolverRequired": "At least one DNS resolver is required when enabled",
-      "dnsSaved": "DNS settings saved and applied successfully",
+      "dnsSaved": "DNS settings saved and applied",
       "dnsFailed": "Failed to save DNS settings",
       "upstreamDnsInvalidFamily": "Invalid address family selection",
-      "upstreamDnsSaved": "Upstream DNS resolution settings saved and applied successfully",
+      "upstreamDnsSaved": "Upstream DNS resolution settings saved and applied",
       "upstreamDnsFailed": "Failed to save upstream DNS resolution settings",
-      "geoblockSaved": "Geoblocking settings saved and applied successfully",
-      "rateLimitSaved": "Rate limiting settings saved and applied successfully",
+      "geoblockSaved": "Geoblocking settings saved and applied",
+      "rateLimitSaved": "Rate limiting settings saved and applied",
       "rateLimitFailed": "Failed to save rate limiting settings",
       "geoblockFailed": "Failed to save geoblocking settings",
       "errorPagesInvalid": "Invalid error pages payload",
-      "errorPagesSaved": "Error pages saved and applied successfully",
+      "errorPagesSaved": "Error pages saved and applied",
       "errorPagesFailed": "Failed to save error pages settings",
       "defaultResponseInvalidMode": "Invalid default response mode",
-      "defaultResponseSaved": "Default response saved and applied successfully",
+      "defaultResponseSaved": "Default response saved and applied",
       "defaultResponseFailed": "Failed to save default response settings",
       "wafBodyLimitExceeded": "In-memory body limit must not exceed the request body limit.",
       "wafSaved": "WAF settings saved.",
@@ -4719,7 +4719,7 @@
       "captchaFailed": "Failed to save CAPTCHA settings"
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
-    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
+    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard host first.",
     "onThisPage": "On this page",
     "envOverride": "From the environment",
     "envPinned": "Set by the environment",
@@ -4731,8 +4731,8 @@
     "httpCache": {
       "moduleOffTitle": "The Caddy cache is not available",
       "storage": "Storage",
-      "storageHelp": "Where hosts in Caddy cache mode keep cached assets. Each option but memory is its own module under Caddy Build.",
-      "storageModuleOff": "Select its module under Caddy Build and rebuild. Until then the cache stays in memory.",
+      "storageHelp": "Where hosts in Caddy cache mode keep cached assets. Each option but memory is its own module under Caddy build.",
+      "storageModuleOff": "Select its module under Caddy build and rebuild. Until then the cache stays in memory.",
       "storageFallbackTitle": "Caching in memory for now",
       "storages": {
         "memory": {
@@ -4839,7 +4839,7 @@
       "appsecFailOpen": "Let requests through when AppSec is unavailable",
       "appsecFailOpenHelp": "Off by default: while AppSec cannot be reached or answers with an error, requests are refused.",
       "trustedProxiesTitle": "Decisions match the real client address",
-      "trustedProxiesBody": "The bouncer reads the client IP after Settings > Network > Trusted Proxies has been applied. Behind a load balancer or CDN, trust its ranges there, or every request is matched on the proxy's address.",
+      "trustedProxiesBody": "The bouncer reads the client IP after Settings > Network > Trusted proxies has been applied. Behind a load balancer or CDN, trust its ranges there, or every request is matched on the proxy's address.",
       "mode": "Local API",
       "modeHelp": "Managed runs CrowdSec in a container beside Caddy, started by the bundled agent and fed Caddy's access log, which stays on and in JSON while it is managed. External uses a CrowdSec you run yourself.",
       "modes": {
@@ -4902,11 +4902,11 @@
       "notificationsTitle": "Events to notify about",
       "notificationsPerUser": "These turn an event off for everyone. Each administrator chooses their own events, and email or browser, under Profile → Notifications.",
       "unavailable": {
-        "accessLogOff": "Counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access Logging.",
+        "accessLogOff": "Counted from Caddy's access log, in JSON, which is off. Turn it on under Observability → Access logging.",
         "accountLockOff": "Needs accounts to lock after failed sign-ins, which is off under Authentication → Sign-in.",
         "accountDisableOff": "Needs accounts to be disabled after repeated failed sign-ins, which is off under Authentication → Sign-in.",
         "updateCheckOff": "Needs the update check, which is off under General → Updates.",
-        "geoipOff": "The controller downloads GeoIP databases only with GeoIP on and a MaxMind account ID and licence key set, under Geo-blocking → GeoIP Databases."
+        "geoipOff": "The controller downloads GeoIP databases only with GeoIP on and a MaxMind account ID and licence key set, under Geo-blocking → GeoIP databases."
       },
       "testNotification": "Send a test notification",
       "testNotificationHelp": "Sends one to the recipients above, or every active administrator, straight away.",
@@ -5103,7 +5103,7 @@
   },
   "setup": {
     "account": {
-      "agentDescription": "An agent no longer shares this application's setup. Finish the controller first, then pair the agent to it from Settings.",
+      "agentDescription": "Agents do not use this setup screen. Finish the controller first, then pair the agent to it from Settings.",
       "agentDocsLink": "Agent setup instructions",
       "agentTitle": "Agents are set up separately",
       "confirmPassword": "Confirm password",
@@ -5182,7 +5182,7 @@
     "importedFromEnvironment": "Imported from env",
     "issuerUrlHelp": "The provider's OIDC issuer. Its endpoints are discovered from here.",
     "legacyDatabaseBackupTitle": "Keep a copy of the old database",
-    "legacyDatabaseUnusedDescription": "The application no longer opens it, so any change made there from now on is invisible to it.",
+    "legacyDatabaseUnusedDescription": "The application does not open it, so it never sees a change made there.",
     "legacyDatabaseUnusedTitle": "Nothing reads this file any more",
     "legacySecretHelp": "From the .env that installation ran with, exactly as it appears there. It is checked before anything is written, used to re-encrypt these values under this deployment's own key, and not stored.",
     "legacySecretLabel": "The old SESSION_SECRET",
@@ -5448,7 +5448,7 @@
     "removePasskeys": "Remove passkeys",
     "removePasskeysConfirm": "{name} will be signed out everywhere, and their passkeys will no longer sign them in. They sign in with a password or single sign-on until they add a new one. Only do this once you're sure it's really them asking.",
     "passkeysRemovedDone": "Passkeys removed",
-    "createUser": "Create User",
+    "createUser": "Create user",
     "deleteUser": "Delete user",
     "demoAdminRoleLocked": "The demo administrator stays an administrator.",
     "disableUser": "Disable user",
@@ -5544,12 +5544,12 @@
     }
   },
   "waf": {
-    "auditData": "Audit Data",
+    "auditData": "Audit data",
     "auditDataEmptyTitle": "No audit data available for this event.",
     "blocked": "Blocked",
     "body": "Body",
-    "bodySizeLimitHelp": "Largest request body the WAF will inspect.",
-    "contentLength": "Content Length",
+    "bodySizeLimitHelp": "Largest request body the WAF inspects.",
+    "contentLength": "Content length",
     "corazaDefault": "Coraza default",
     "customDirectivesHelp": "ModSecurity SecLang syntax. Applied after OWASP CRS if enabled.",
     "detected": "Detected",
@@ -5567,36 +5567,36 @@
     "droppedDirectiveHostFromGlobal": "Global WAF settings, as merged into proxy host {name} ({domains})",
     "file": "File",
     "firewall": "Firewall",
-    "globalSettingsDescription": "Configure the global Web Application Firewall. Per-host settings can merge with or override these defaults. Powered by Coraza with the optional OWASP Core Rule Set.",
+    "globalSettingsDescription": "Configure the global web application firewall. Per-host settings can merge with or override these defaults. The engine is Coraza, with the OWASP Core Rule Set as an option.",
     "headers": "Headers",
     "host": "Host",
     "invalidTimeRangeError": "Choose a valid custom time range",
-    "logData": "Log Data",
-    "matchedRules": "Matched Rules",
+    "logData": "Log data",
+    "matchedRules": "Matched rules",
     "maxBodySizeMib": "Max body size",
     "memoryBodyLimitHelp": "Must not exceed the request body limit.",
     "message": "Message",
     "moduleDisabledTitle": "The Coraza WAF module is disabled",
     "overLimitActionHelpDefault": "Coraza's own behaviour, which refuses the request with 413 Payload Too Large.",
-    "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE - recommended.",
-    "queryArgs": "Query Args",
-    "quickTemplates": "Quick Templates",
+    "owaspCrsHelp": "Recommended. Covers SQLi, XSS, LFI and RCE.",
+    "queryArgs": "Query args",
+    "quickTemplates": "Quick templates",
     "rawJson": "Raw JSON",
     "reference": "Reference",
     "response": "Response",
-    "ruleMessage": "Rule Message",
+    "ruleMessage": "Rule message",
     "searchWafEvents": "Search WAF events",
     "server": "Server",
     "severity": "Severity",
     "statCritical": "Critical",
-    "statRuleIdsTriggered": "Rule IDs Triggered",
-    "statTotalEvents": "Total Events",
-    "statUniqueHosts": "Unique Hosts",
+    "statRuleIdsTriggered": "Rule IDs triggered",
+    "statTotalEvents": "Total events",
+    "statUniqueHosts": "Unique hosts",
     "tags": "Tags",
     "timestamp": "Timestamp",
     "transactionId": "Transaction ID",
     "uri": "URI",
-    "wafEvent": "WAF Event",
+    "wafEvent": "WAF event",
     "matchesTab": "Matches ({count})",
     "noRuleDescription": "No description available - the rule has not triggered yet",
     "rangeAllTime": "All time",
@@ -5611,7 +5611,7 @@
     "action": "Action",
     "selected": "Selected",
     "waf": "WAF",
-    "wafSettings": "WAF Settings",
+    "wafSettings": "WAF settings",
     "ruleLabel": "Rule {id}",
     "ruleNumber": "Rule #{id}",
     "contentLengthBytes": "{length} bytes",
@@ -5658,7 +5658,7 @@
     "pluginSource": "Open repository",
     "pluginUninstall": "Uninstall",
     "pluginUninstallConfirm": "Uninstall the plugin {name}? Its rules stop loading.",
-    "pluginRegistry": "Plugin Registry",
+    "pluginRegistry": "Plugin registry",
     "pluginRegistryDescription": "Registration allocates a plugin its rule ids and records who vetted it; it is not a code audit. Plugins that need a Lua script or data file cannot run in Caddy and are refused at install.",
     "pluginRegistryLoading": "Loading the registry...",
     "pluginRegistrySearch": "Search the plugin registry",
@@ -6018,7 +6018,7 @@
     "unblockConfirm": "Requests from {value} will be served again.",
     "blockedSourcesDescription": "One deny list for every HTTP host, checked before anything else. A match gets 403. Layer-4 hosts are not covered.",
     "geoUnavailableTitle": "Country, continent and network entries are not enforced",
-    "geoUnavailableDescription": "They need the Geo Blocking module. Enable it in Settings → Caddy Build and rebuild Caddy. Address and network entries work without it.",
+    "geoUnavailableDescription": "They need the Geo Blocking module. Enable it in Settings → Caddy build and rebuild Caddy. Address and network entries work without it.",
     "blockedSourcesEmptyTitle": "Nothing is blocked",
     "blockedSourcesEmptyDescription": "Block an address, network, country, continent or provider network here, or from a source on the security events page.",
     "analyticsUnavailableTitle": "Analytics could not be reached",

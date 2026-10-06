@@ -43,10 +43,10 @@ test.describe('Access Lists - page load', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 
-  test('shows the left rail with "Access Lists" heading', async ({ page }) => {
+  test('shows the left rail with "Access lists" heading', async ({ page }) => {
     await page.goto('/access-lists');
     // Level 1: with no lists, the rail's "No access lists yet" heading matches the name too.
-    await expect(page.getByRole('heading', { name: 'Access Lists', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Access lists', level: 1 })).toBeVisible();
   });
 
   test('shows a "New" button in the rail', async ({ page }) => {

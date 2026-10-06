@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { PROXY_HOSTS_NEWEST_FIRST } from '../helpers/proxy-api';
 import { waitForHydration } from '../helpers/hydration';
 
-test.describe('Audit Log', () => {
+test.describe('Audit log', () => {
   test('audit log page loads without redirecting to login', async ({ page }) => {
     await page.goto('/audit-log');
     await expect(page).not.toHaveURL(/login/);

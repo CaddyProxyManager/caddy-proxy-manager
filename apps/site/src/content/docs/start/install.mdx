@@ -79,9 +79,8 @@ Settings: the base URL, OAuth, analytics, GeoIP, the dashboard host. Those value
 database rather than in a file, encrypted at rest where they are secrets, and they win over
 anything `.env` says.
 
-Prefer that over writing variables by hand, for reasons the file cannot match. Setup makes you sign
-in before the rest of the configuration is entered, so a mistyped password is found immediately
-rather than at the end. It shows the exact OAuth callback URL to register, which is derived and not
+Prefer that over writing variables by hand. Setup makes you sign in before the rest of the
+configuration is entered, so a mistyped password is found immediately rather than at the end. It shows the exact OAuth callback URL to register, which is derived and not
 guessable. And a credential saved there is handed to `docker compose` in the environment of the
 command the agent runs, instead of sitting in plaintext on the host for as long as the file exists.
 
@@ -228,7 +227,7 @@ It still works. Resolution order is stored value → `.env` → built-in default
 there is honoured and still beats the default - it is only overridden once the same setting is
 saved in the app, at which point the line can be deleted.
 
-But it is no longer the shape of a new install. Most settings now live in the database, so a copied
+A new install rarely needs it. Most settings live in the database, so a copied
 `.env.example` is mostly commented-out lines that duplicate what the setup page will ask you for
 anyway, and every secret written into it is a plaintext copy that the Settings path would not have
 made. Use it when you are provisioning unattended and there is no browser to reach the setup page
