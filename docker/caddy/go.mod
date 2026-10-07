@@ -102,7 +102,7 @@ require (
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0 // indirect
-	github.com/corazawaf/coraza/v3 v3.7.0 // indirect
+	github.com/corazawaf/coraza/v3 v3.8.1 // indirect
 	github.com/corazawaf/libinjection-go v0.3.3 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
