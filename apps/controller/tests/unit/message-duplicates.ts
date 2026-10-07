@@ -25,6 +25,31 @@ export const SEPARATE_DUPLICATES: readonly {
   keys: readonly string[];
 }[] = [
   {
+    reason: 'casing',
+    keys: ['errors.hostReferenceCertificate', 'hostHistory.references.certificate'],
+  },
+  {
+    reason: 'casing',
+    keys: ['errors.hostReferenceAccessList', 'hostHistory.references.accessList'],
+  },
+  {
+    reason: 'casing',
+    keys: ['errors.hostReferenceAgent', 'hostHistory.references.agent'],
+  },
+  {
+    reason: 'casing',
+    keys: ['errors.hostReferenceCaCertificate', 'hostHistory.references.caCertificate'],
+  },
+  {
+    reason: 'casing',
+    keys: ['errors.hostReferenceClientCertificate', 'hostHistory.references.clientCertificate'],
+  },
+  {
+    reason: 'casing',
+    keys: ['errors.hostReferenceMtlsRole', 'hostHistory.references.mtlsRole'],
+  },
+  { reason: 'sense', keys: ['hostHistory.overviewTab', 'nav.overview'] },
+  {
     reason: 'composed',
     keys: [
       'attention.items.caddyApplyFailed.detail',
@@ -474,6 +499,7 @@ export const SEPARATE_DUPLICATES: readonly {
     keys: [
       'nav.settings',
       'settings.search.pages.backup.context',
+      'settings.search.pages.auditStreaming.context',
       'settings.search.pages.settingsHistory.context',
       'setup.steps.settings',
       'setup.migrationGroups.settings.label',
@@ -763,6 +789,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.health.on',
       'users.twoFactorOn',
       'signInOverview.status.on',
+      'alerts.rules.state.on',
     ],
   },
   {
@@ -777,6 +804,8 @@ export const SEPARATE_DUPLICATES: readonly {
       'users.twoFactorOff',
       'waf.modeOff',
       'signInOverview.status.off',
+      'alerts.rules.state.off',
+      'alerts.channels.state.off',
     ],
   },
   {
@@ -786,9 +815,38 @@ export const SEPARATE_DUPLICATES: readonly {
       'l4ProxyHosts.optDnsEnabled',
       'proxyHosts.filterEnabled',
       'proxyHosts.optDnsEnabled',
+      'settings.backupSchedules.enabled',
       'settings.enabled',
       'settings.ldap.enabled',
       'waf.enabled',
+    ],
+  },
+  // A backup destination's S3 fields beside the DNS provider family's, read by provider name.
+  {
+    reason: 'composed',
+    keys: ['settings.backupSchedules.endpoint', 'settings.dnsProviders.ovh.fields.endpoint.label'],
+  },
+  {
+    reason: 'composed',
+    keys: [
+      'settings.backupSchedules.accessKeyId',
+      'settings.dnsProviders.route53.fields.accessKeyId.label',
+    ],
+  },
+  {
+    reason: 'composed',
+    keys: [
+      'settings.backupSchedules.secretAccessKey',
+      'settings.dnsProviders.route53.fields.secretAccessKey.label',
+    ],
+  },
+  {
+    reason: 'composed',
+    keys: [
+      'settings.backupSchedules.status.failed',
+      'settings.history.failed',
+      'alerts.history.statuses.failed',
+      'alerts.digests.runStatus.failed',
     ],
   },
   { reason: 'agrees', keys: ['l4ProxyHosts.filterAll', 'proxyHosts.filterAll', 'users.filterAll'] },
@@ -803,7 +861,10 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   { reason: 'agrees', keys: ['setup.tristateNotRequired', 'signInOverview.mfaModes.off'] },
-  { reason: 'role', keys: ['attention.title', 'settings.homeStatusAttention'] },
+  {
+    reason: 'role',
+    keys: ['attention.title', 'settings.homeStatusAttention', 'alerts.rules.sources.attention'],
+  },
   {
     reason: 'role',
     keys: [
@@ -877,6 +938,10 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   {
     reason: 'role',
+    keys: ['settings.auditStreaming.navLabel', 'settings.search.pages.auditStreaming.title'],
+  },
+  {
+    reason: 'role',
     keys: [
       'settings.checkForUpdates',
       'settings.registry.update_check_enabled.label',
@@ -934,7 +999,10 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   { reason: 'sense', keys: ['accessLists.denyBody', 'proxyHosts.body', 'waf.body'] },
   { reason: 'sense', keys: ['analytics.uri', 'proxyHosts.uri', 'waf.uri'] },
-  { reason: 'sense', keys: ['analytics.rule', 'analytics.topColumn.wafRules'] },
+  {
+    reason: 'sense',
+    keys: ['analytics.rule', 'analytics.topColumn.wafRules', 'alerts.history.rule'],
+  },
   {
     reason: 'sense',
     keys: [
@@ -1003,7 +1071,10 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.responseHeaders',
     ],
   },
-  { reason: 'sense', keys: ['settings.type', 'waf.pluginType', 'security.sourceKind'] },
+  {
+    reason: 'sense',
+    keys: ['settings.type', 'waf.pluginType', 'security.sourceKind', 'alerts.history.type'],
+  },
   { reason: 'sense', keys: ['ui.codeEditor.plaintextLabel', 'waf.filterText'] },
   { reason: 'family', keys: ['analytics.total', 'analytics.groupNone'] },
   {
@@ -1033,4 +1104,25 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'casing', keys: ['settings.homeEnvBadge', 'settings.providerSourceEnv'] },
   { reason: 'short', keys: ['certificates.manage', 'groups.capabilityManageShort'] },
   { reason: 'short', keys: ['groups.capabilityView', 'groups.capabilityViewShort'] },
+  // Alerts: families read by a runtime key, and words another screen uses for its own thing.
+  { reason: 'composed', keys: ['common.events', 'alerts.rules.sources.event'] },
+  { reason: 'composed', keys: ['waf.exclusionAllHosts', 'alerts.rules.scopes.all'] },
+  {
+    reason: 'composed',
+    keys: ['proxyHosts.insights.problem.certificateExpired', 'alerts.codes.certificateExpired'],
+  },
+  {
+    reason: 'composed',
+    keys: ['proxyHosts.upstreamHealth.state.failing', 'alerts.channels.state.failing'],
+  },
+  {
+    reason: 'composed',
+    keys: ['settings.backupSchedules.status.running', 'alerts.digests.runStatus.running'],
+  },
+  { reason: 'composed', keys: ['alerts.history.statuses.sent', 'alerts.digests.runStatus.sent'] },
+  { reason: 'sense', keys: ['profile.apiTokenScope.label', 'alerts.rules.scope'] },
+  { reason: 'sense', keys: ['settings.configTransfer.preview', 'alerts.digests.preview'] },
+  { reason: 'sense', keys: ['settings.history.navLabel', 'alerts.tabs.history'] },
+  { reason: 'sense', keys: ['waf.severity', 'alerts.rules.severity'] },
+  { reason: 'sense', keys: ['waf.thresholdMark', 'alerts.rules.threshold'] },
 ];

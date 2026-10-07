@@ -1,0 +1,3 @@
+CPMBAK1
+{"format":"cpm-backup","version":2,"appVersion":"3.6.2","createdAt":"2026-01-01T00:00:00.000Z","counts":{"proxy_hosts":1},"kdf":{"name":"scrypt","N":32768,"r":8,"p":1,"salt":"aTB83yNMXkcSXixKIJkgeg=="},"cipher":{"name":"aes-256-gcm","iv":"Z1jF4H60axLE7eBQ","tag":"5Hv0djLFN10a9rXbnkT6GQ=="}}
+whdO8njLHEeO9rk4asc4axK6CprVr+8p7f3lPraxPAq7kkBUeEoYG7o8QVZ3WbtGwljxSv7oIu+tin7AjTopV23FBUkXXYwG2+cQKdI0jPkm1jzZivB5wmtYHQd5g6FrqPO07Z60AGCYydtxLXTdzhaum1SKjIinumiSi2PYqzyPVJyYrOffx8+elPHqYEVsb7QbzVzHA04M/BF8mGPdEltGG2z3UbWqHvu1AsxV9kcqicHRlbcU8ORAVn1UefEu

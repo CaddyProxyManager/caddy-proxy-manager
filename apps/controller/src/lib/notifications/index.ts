@@ -1,75 +1,80 @@
 /**
- * Tells the administrators what happened while nobody was looking, by email and browser push.
- * Callers report events; this decides whether each is wanted (its Settings switch, a channel being
- * set up), deduplicates it, and batches a minute's worth into one email and one push. It never throws into a caller: a notification is
- * never worth failing the sign-in, the apply or the agent report it came from.
+ * Tells the administrators what happened while nobody was looking: callers report events, rules
+ * decide whether each is wanted and where it goes, and each channel batches a minute's worth. It
+ * never throws into a caller: a notification is never worth failing the sign-in, the apply or the
+ * agent report it came from.
  *
- * State is one JSON row in `settings`, like the certificate alerts', so a restart neither repeats
- * an alert nor loses a queued one. In memory, per process, like the agent registry it watches.
+ * State lives in the alert tables (./state.ts), so a restart neither repeats an alert nor loses a
+ * queued one, and every replica sees the same. Sending runs on the leader only.
  */
 
 import { randomUUID } from "node:crypto";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import db from "../db";
+import {
+  alertDeliveries,
+  alertDigestRuns,
+  alertDigests,
+  alertEvents,
+  alertKeys,
+  alertRules,
+  notificationChannels,
+  settings,
+} from "../db/schema";
 import { isDemoMode } from "../demo/mode";
 import { emailReady } from "../email/config";
 import { sendEmail } from "../email/transport";
 import { hasAdminPushTarget } from "../models/push-subscriptions";
-import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
-import { outsideStagingScope } from "../settings/staging-context";
+import { builtins, forgetBuiltins } from "./builtins";
 import {
-  categoryOf,
   NOTIFICATION_CATEGORIES,
   type NotificationCategory,
   type NotificationEvent,
 } from "./events";
+import { LEGACY_STATE_KEY, moveLegacyState } from "./legacy";
+import type { AlertRule } from "./rules";
 import {
-  EMPTY_STATE,
-  type NotificationState,
-  normalizeState,
-  planBatch,
-  planDropped,
-  planFailure,
-  planNotice,
-  planDelivered,
-  type PendingNotice,
-  planRaise,
-  planResolve,
-  planSendFailed,
-  planSent,
-  planSuccess,
+  clearFailures,
+  countFailure,
+  openKeys,
+  pruneKeys,
+  queueNotice,
   type Recovery,
-} from "./plan";
+  raiseOpen,
+  resolveOpen,
+} from "./state";
 
 export type { NotificationEvent } from "./events";
+export type { Recovery } from "./state";
 
-const STATE_KEY = "admin_notifications";
 const TICK_MS = 15_000;
 
 let chain: Promise<unknown> = Promise.resolve();
 
-/** One writer at a time: every change is a read, a plan and a write of the same row. */
+/** One change at a time in this process, so events keep their order; replicas meet in the tables. */
 function serialized<T>(work: () => Promise<T>): Promise<T> {
   const next = chain.then(work, work);
   chain = next.catch(() => {});
   return next;
 }
 
-async function readState(): Promise<NotificationState> {
-  // A cache of what was sent, not configuration: it must never land in a staged change set.
-  return normalizeState(await outsideStagingScope(() => getStoredJson<unknown>(STATE_KEY)));
+let moved: Promise<unknown> | null = null;
+
+/** The settings row an older release kept everything in, moved over before anything reads. */
+function carriedOver(now = Date.now()): Promise<unknown> {
+  moved ??= builtins(now)
+    .then((ids) => moveLegacyState(ids, new Date(now).toISOString()))
+    .catch((error: unknown) => {
+      moved = null;
+      throw error;
+    });
+  return moved;
 }
 
-function writeState(state: NotificationState): Promise<void> {
-  return outsideStagingScope(() => setStoredJson(STATE_KEY, state));
-}
-
-async function update(
-  plan: (state: NotificationState) => NotificationState,
-): Promise<NotificationState> {
+function update(work: () => Promise<void>, now: number): Promise<void> {
   return serialized(async () => {
-    const state = await readState();
-    const next = plan(state);
-    if (next !== state) await writeState(next);
-    return next;
+    await carriedOver(now);
+    await work();
   });
 }
 
@@ -87,7 +92,18 @@ async function categorySwitches() {
     geoip: registry.notifyGeoipFailed,
     crsPlugin: registry.notifyCrsPluginDisabled,
     updateAvailable: registry.notifyUpdateAvailable,
+    backups: registry.notifyBackupFailed,
+    auditSinks: registry.notifyAuditSinkFailed,
+    channels: registry.notifyChannelFailing,
   } satisfies Record<NotificationCategory, typeof registry.notifyAccountDisabled>;
+}
+
+/** Each category's Settings key, which also names its built-in rule's label. */
+export async function categorySettingKeys(): Promise<Record<NotificationCategory, string>> {
+  const switches = await categorySwitches();
+  return Object.fromEntries(
+    NOTIFICATION_CATEGORIES.map((category) => [category, switches[category].key]),
+  ) as Record<NotificationCategory, string>;
 }
 
 export async function notificationCategoryEnabled(
@@ -118,14 +134,35 @@ export async function notificationCategoryStates(): Promise<
 }
 
 /**
- * Wanted at all: with neither email nor a subscribed browser nothing is queued, so nothing floods
- * out once one is set up.
+ * Whether anything would carry this kind of event: its category's switch on with email or push
+ * ready, or a rule naming it with an added channel switched on. Sources that cost work to watch
+ * (the access log's upstream errors, the release check) ask this before doing it.
  */
-async function wanted(event: NotificationEvent): Promise<boolean> {
-  if (isDemoMode()) return false;
-  const category = categoryOf(event);
-  if (category && !(await notificationCategoryEnabled(category))) return false;
-  return notificationChannelReady();
+export async function eventKindDeliverable(
+  kind: NotificationEvent["kind"],
+  category: NotificationCategory,
+  now = Date.now(),
+): Promise<boolean> {
+  if ((await notificationCategoryEnabled(category)) && (await notificationChannelReady())) {
+    return true;
+  }
+  const [{ loadRules, ruleSilenced, ruleSwitchedOn }, channels] = await Promise.all([
+    import("./rules"),
+    db
+      .select({ id: notificationChannels.id, enabled: notificationChannels.enabled })
+      .from(notificationChannels)
+      .where(isNull(notificationChannels.builtin)),
+  ]);
+  const usable = new Set(channels.filter((row) => row.enabled).map((row) => row.id));
+  for (const rule of await loadRules()) {
+    if (rule.source !== "event" || ruleSilenced(rule, now)) continue;
+    const kinds = Array.isArray(rule.config.kinds) ? rule.config.kinds : [];
+    const categories = Array.isArray(rule.config.categories) ? rule.config.categories : [];
+    if (!kinds.includes(kind) && !categories.includes(category)) continue;
+    if (!rule.channelIds.some((id) => usable.has(id))) continue;
+    if (await ruleSwitchedOn(rule)) return true;
+  }
+  return false;
 }
 
 /** Email set up, or an administrator's browser subscribed: either can carry a notification. */
@@ -149,10 +186,10 @@ export function notify(
   quietMs: number | "forever" = 0,
   now = Date.now(),
 ): Promise<void> {
-  return quietly("queue a notification", async () => {
-    if (!(await wanted(event))) return;
-    await update((state) => planNotice(state, { key, event, quietMs }, now, randomUUID()));
-  });
+  if (isDemoMode()) return Promise.resolve();
+  return quietly("queue a notification", () =>
+    update(() => queueNotice(key, event, quietMs, now), now),
+  );
 }
 
 /** A problem that lasts until `resolveProblem`; told once however often it is raised. */
@@ -161,16 +198,52 @@ export function raiseProblem(
   event: NotificationEvent,
   now = Date.now(),
 ): Promise<void> {
-  return quietly("queue a notification", async () => {
-    if (!(await wanted(event))) return;
-    await update((state) => planRaise(state, key, event, now, randomUUID()));
+  if (isDemoMode()) return Promise.resolve();
+  return quietly("queue a notification", () => update(() => raiseOpen(key, event, now), now));
+}
+
+/** A problem a rule found by watching for itself, routed to that rule's channels only. */
+export function raiseRuleProblem(
+  rule: AlertRule,
+  key: string,
+  event: NotificationEvent,
+  now = Date.now(),
+): Promise<void> {
+  if (isDemoMode()) return Promise.resolve();
+  return quietly("queue a notification", () => update(() => raiseOpen(key, event, now, rule), now));
+}
+
+/** "Send test" on a rule: queued through its channels like anything it raises. */
+export async function queueRuleTest(
+  rule: AlertRule,
+  name: string,
+  now = Date.now(),
+): Promise<number> {
+  return serialized(async () => {
+    await carriedOver(now);
+    const { recordEvent } = await import("./state");
+    const channels = await db
+      .select({ id: notificationChannels.id, enabled: notificationChannels.enabled })
+      .from(notificationChannels);
+    const usable = rule.channelIds.filter((id) =>
+      channels.some((channel) => channel.id === id && channel.enabled),
+    );
+    if (usable.length === 0) return 0;
+    const { eventIds } = await recordEvent(
+      `rule-test:${rule.id}:${now}`,
+      { kind: "ruleTest", rule: name },
+      "notice",
+      [{ rule, channels: usable }],
+      now,
+    );
+    return eventIds[0] ?? 0;
   });
 }
 
-/** Queues `recovery` if the problem was told about; nothing at all if it was not. */
+/** Queues `recovery` where the problem was told; nothing at all if it was not. */
 export function resolveProblem(key: string, recovery: Recovery, now = Date.now()): Promise<void> {
   return quietly("resolve a notification", () =>
-    update((state) => planResolve(state, key, recovery, now, randomUUID())),
+    update(() => resolveOpen(key, recovery, now), now),
   );
 }
 
@@ -181,29 +254,26 @@ export function recordJobFailure(
   event: (failures: number) => NotificationEvent,
   now = Date.now(),
 ): Promise<void> {
-  return quietly("count a failure", async () => {
-    // Counted with the switch off too, so turning it on mid-streak tells at the right time.
-    const probe = event(threshold);
-    const tell = await wanted(probe);
-    await update((state) =>
-      tell
-        ? planFailure(state, key, threshold, event, now, randomUUID())
-        : { ...state, streaks: { ...state.streaks, [key]: (state.streaks[key] ?? 0) + 1 } },
-    );
-  });
+  return quietly("count a failure", () =>
+    update(async () => {
+      // Counted with the switch off too, so turning it on mid-streak tells at the right time.
+      const failures = await countFailure(key, now);
+      if (failures >= threshold && !isDemoMode()) await raiseOpen(key, event(failures), now);
+    }, now),
+  );
 }
 
 export function recordJobSuccess(key: string, recovery: Recovery, now = Date.now()): Promise<void> {
-  return quietly("clear a failure", () =>
-    update((state) => planSuccess(state, key, recovery, now, randomUUID())),
-  );
+  return quietly("clear a failure", () => update(() => clearFailures(key, recovery, now), now));
 }
 
 /** Keys of the problems currently open, for a watcher that must close ones it no longer sees. */
 export async function openProblemKeys(prefix: string): Promise<string[]> {
   try {
-    const state = await serialized(readState);
-    return Object.keys(state.open).filter((key) => key.startsWith(prefix));
+    return await serialized(async () => {
+      await carriedOver();
+      return openKeys(prefix);
+    });
   } catch (error) {
     console.error("[notifications] could not read the open problems:", error);
     return [];
@@ -221,111 +291,17 @@ export function flushNotifications(now = Date.now()): Promise<void> {
 }
 
 async function flush(now: number): Promise<void> {
-  let batch: NotificationState["pending"] = [];
-  await update((state) => {
-    const picked = planBatch(state, now);
-    if (!picked) return state;
-    batch = picked.batch;
-    return picked.state;
+  await serialized(async () => {
+    // Every pass: an older backup restored since may have brought the row back.
+    const ids = await builtins(now);
+    moved = moveLegacyState(ids, new Date(now).toISOString());
+    await moved;
   });
-  if (batch.length === 0) return;
-
-  const ready = await emailReady();
-  const { notificationAudiences, audienceWants } = await import("./audience");
-  const audiences = await notificationAudiences({ email: ready });
-  const keep: typeof batch = [];
-  const drop: string[] = [];
-  for (const notice of batch) {
-    const category = categoryOf(notice.event);
-    const on =
-      (ready || audiences.length > 0) &&
-      (!category || (await notificationCategoryEnabled(category)));
-    if (on) keep.push(notice);
-    else drop.push(notice.id);
-  }
-  if (keep.length === 0) {
-    await update((state) => planDropped(state, drop, now, null));
-    return;
-  }
-  if (audiences.length === 0) {
-    await update((state) =>
-      planDropped(
-        state,
-        batch.map((notice) => notice.id),
-        now,
-        "noRecipients",
-      ),
-    );
-    return;
-  }
-
-  const owed = (key: string, wants: (category: ReturnType<typeof categoryOf>) => boolean) =>
-    keep.filter((notice) => !notice.delivered?.includes(key) && wants(categoryOf(notice.event)));
-  const reached = new Map<string, string[]>();
-  const mark = (notices: readonly PendingNotice[], keys: readonly string[]) => {
-    for (const notice of notices)
-      reached.set(notice.id, [...(reached.get(notice.id) ?? []), ...keys]);
-  };
-
-  // Once each: a failed email is retried, a push is not worth repeating.
-  // In parallel: each waits on push services; one shared cache renders each payload once.
-  const { sendPush } = await import("./push");
-  const payloads = new Map<string, string>();
-  await Promise.all(
-    audiences.map(async (audience) => {
-      if (audience.kind !== "push") return;
-      const notices = owed(audience.key, (category) => audienceWants(audience, category));
-      if (notices.length === 0) return;
-      await sendPush(notices, audience.targets, payloads);
-      mark(notices, [audience.key]);
-    }),
-  );
-
-  // One email per distinct set of notices, so muting a category costs no one else their copy.
-  const emails = new Map<string, { notices: PendingNotice[]; to: string[]; keys: string[] }>();
-  for (const audience of audiences) {
-    if (audience.kind !== "email") continue;
-    const notices = owed(audience.key, (category) => audienceWants(audience, category));
-    if (notices.length === 0) continue;
-    const signature = notices.map((notice) => notice.id).join(",");
-    const email = emails.get(signature) ?? { notices, to: [], keys: [] };
-    email.to.push(audience.address);
-    email.keys.push(audience.key);
-    emails.set(signature, email);
-  }
-  let failure: string | null = null;
-  if (emails.size > 0) {
-    const { notificationEmail } = await import("./email");
-    for (const email of emails.values()) {
-      try {
-        await sendEmail(await notificationEmail({ to: email.to, notices: email.notices }));
-        mark(email.notices, email.keys);
-      } catch (error) {
-        failure = error instanceof Error ? error.message : String(error);
-      }
-    }
-  }
-
-  if (failure !== null) {
-    const message = failure;
-    console.error("[notifications] send failed; retrying later:", message);
-    await update((state) =>
-      planDropped(planSendFailed(planDelivered(state, reached), message, now), drop, now, null),
-    );
-    return;
-  }
-  await update((state) =>
-    planDropped(
-      planSent(
-        state,
-        keep.map((notice) => notice.id),
-        now,
-      ),
-      drop,
-      now,
-      null,
-    ),
-  );
+  const { flushBuiltin } = await import("./flush");
+  await flushBuiltin(now);
+  const { flushChannels } = await import("../alerts/deliver");
+  await flushChannels(now);
+  await pruneKeys(now);
 }
 
 /**
@@ -350,25 +326,66 @@ export async function sendTestNotification(now = Date.now()): Promise<string[]> 
   return recipients;
 }
 
-export type NotificationStatus = Pick<
-  NotificationState,
-  "lastSentAt" | "lastError" | "lastErrorAt" | "lastErrorCode"
-> & { pending: number };
+export type NotificationStatus = {
+  lastSentAt: string | null;
+  /** English, as the SMTP server or the job said it; null after a good send. */
+  lastError: string | null;
+  lastErrorAt: string | null;
+  /** Set when nothing was sent because there was no one to send to. */
+  lastErrorCode: "noRecipients" | null;
+  pending: number;
+};
 
+/** The built-in email and push channels, which Settings reports on together. */
 export async function getNotificationStatus(): Promise<NotificationStatus> {
-  const state = await readState().catch(() => EMPTY_STATE);
-  return {
-    lastSentAt: state.lastSentAt,
-    lastError: state.lastError,
-    lastErrorAt: state.lastErrorAt,
-    lastErrorCode: state.lastErrorCode,
-    pending: state.pending.length,
-  };
+  try {
+    await carriedOver();
+    const { email, push } = await builtins();
+    const [row] = await db
+      .select()
+      .from(notificationChannels)
+      .where(eq(notificationChannels.id, email));
+    const pending = await db
+      .selectDistinct({ eventId: alertDeliveries.eventId })
+      .from(alertDeliveries)
+      .where(
+        and(
+          inArray(alertDeliveries.channelId, [email, push]),
+          eq(alertDeliveries.status, "pending"),
+        ),
+      );
+    return {
+      lastSentAt: row?.lastSentAt ?? null,
+      lastError: row?.lastError ?? null,
+      lastErrorAt: row?.lastErrorAt ?? null,
+      lastErrorCode: row?.lastErrorCode === "noRecipients" ? "noRecipients" : null,
+      pending: pending.length,
+    };
+  } catch {
+    return {
+      lastSentAt: null,
+      lastError: null,
+      lastErrorAt: null,
+      lastErrorCode: null,
+      pending: 0,
+    };
+  }
 }
 
-/** Test seam: wait for queued writes, then forget the stored state. */
+/** Test seam: wait for queued writes, then forget every alert, rule and channel. */
 export async function resetNotificationsForTests(): Promise<void> {
-  await serialized(() => writeState(EMPTY_STATE));
+  await serialized(async () => {
+    await db.delete(alertDigestRuns);
+    await db.delete(alertDigests);
+    await db.delete(alertDeliveries);
+    await db.delete(alertEvents);
+    await db.delete(alertKeys);
+    await db.delete(alertRules);
+    await db.delete(notificationChannels);
+    await db.delete(settings).where(eq(settings.key, LEGACY_STATE_KEY));
+    forgetBuiltins();
+    moved = null;
+  });
 }
 
 type Watcher = (now: number) => Promise<void>;
@@ -392,12 +409,28 @@ let timer: NodeJS.Timeout | null = null;
 export function startNotifications(): void {
   if (timer) return;
   // Imported here: each reaches back into this module, and the agent registry.
-  void Promise.all([import("./agents"), import("./jobs"), import("./upstream-errors")])
-    .then(([{ watchAgents }, { watchReleases }, { watchUpstreamErrors }]) => {
-      addNotificationWatcher(watchAgents);
-      addNotificationWatcher(watchReleases);
-      addNotificationWatcher(watchUpstreamErrors);
-    })
+  void Promise.all([
+    import("./agents"),
+    import("./jobs"),
+    import("./upstream-errors"),
+    import("../alerts/watch"),
+    import("../alerts/history"),
+  ])
+    .then(
+      ([
+        { watchAgents },
+        { watchReleases },
+        { watchUpstreamErrors },
+        { watchRuleSources },
+        { pruneHistoryHourly },
+      ]) => {
+        addNotificationWatcher(watchAgents);
+        addNotificationWatcher(watchReleases);
+        addNotificationWatcher(watchUpstreamErrors);
+        addNotificationWatcher(watchRuleSources);
+        addNotificationWatcher(pruneHistoryHourly);
+      },
+    )
     .catch((error: unknown) => {
       console.error("[notifications] could not start the agent watch:", error);
     });

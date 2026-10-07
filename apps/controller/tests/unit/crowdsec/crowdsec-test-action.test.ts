@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { outboundViaGlobalFetch } from '@/tests/helpers/outbound';
 import { nextIntlServerMock, testTranslator } from '@/tests/helpers/next-intl';
 import { type CrowdSecSettings, DEFAULT_CROWDSEC_SETTINGS } from '@/src/lib/caddy/crowdsec';
 import { encryptSecret } from '@/src/lib/secrets';
@@ -24,6 +25,7 @@ vi.mock('@/src/lib/settings', () => ({
   getCrowdSecSettings: getCrowdSecMock,
 }));
 vi.mock('@/src/lib/caddy', () => ({ applyCaddyConfig: vi.fn(async () => ({ ok: true })) }));
+vi.mock('@/src/lib/http/outbound', outboundViaGlobalFetch);
 
 import { testCrowdSecConnectionAction } from '@/src/app/(dashboard)/settings/actions';
 

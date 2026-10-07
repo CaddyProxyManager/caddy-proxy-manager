@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
+import type { EditorRollback } from "@/components/host-history/RollbackNotice";
 import type { EditorSection } from "@/lib/proxy-hosts/editor-sections";
 import type { HostEditorOptions } from "@/lib/proxy-hosts/editor-options";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
@@ -58,6 +59,7 @@ export default function HostEditors({
   duplicateHost,
   onCloseCreate,
   editHost,
+  editRollback = null,
   editSection,
   onCloseEdit,
   deleteHost,
@@ -74,6 +76,7 @@ export default function HostEditors({
   duplicateHost: ProxyHost | null;
   onCloseCreate: () => void;
   editHost: ProxyHost | null;
+  editRollback?: EditorRollback | null;
   editSection: EditorSection | null;
   onCloseEdit: () => void;
   deleteHost: ProxyHost | null;
@@ -111,6 +114,7 @@ export default function HostEditors({
             <EditHostDialog
               open
               host={editHost}
+              rollback={editRollback}
               initialSection={editSection}
               onClose={onCloseEdit}
               certificates={options.certificates}

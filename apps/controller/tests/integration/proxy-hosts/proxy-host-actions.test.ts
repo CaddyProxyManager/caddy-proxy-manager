@@ -23,6 +23,7 @@ import { desc, eq } from 'drizzle-orm';
 import * as schema from '../../../src/lib/db/schema';
 import { auth } from '../../../src/lib/auth';
 import { logAuditEvent } from '../../../src/lib/audit';
+import { auditEvents } from '../../helpers/audit-events';
 import { MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from '../../../src/lib/waf/caddy';
 import { agentIdsForHost } from '../../../src/lib/models/host-agents';
 import { getForwardAuthAccessForHost } from '../../../src/lib/models/forward-auth';
@@ -108,12 +109,14 @@ async function seedHost(entries: Record<string, string | string[]> = BASIC) {
     .orderBy(desc(schema.proxyHosts.id))
     .limit(1);
   audit.mockClear();
+  await logged.clear();
   caddy.reset();
   return row;
 }
 
 const hostRows = () => db.select().from(schema.proxyHosts);
-const auditCalls = () => audit.mock.calls.map(([event]) => event as Record<string, unknown>);
+const logged = auditEvents(() => db);
+const auditCalls = () => logged.list();
 
 function loadedDomains(): string[] {
   return JSON.stringify(caddy.lastConfig() ?? {}).match(/[a-z0-9-]+\.example\.com/g) ?? [];
@@ -123,6 +126,7 @@ beforeEach(async () => {
   db = await createTestDb();
   caddy = installFakeCaddy();
   audit.mockClear();
+  logged.reset();
   users.admin = await insertUser('admin');
   users.operator = await insertUser('operator');
   users.viewer = await insertUser('viewer');
@@ -162,7 +166,7 @@ describe('createProxyHostAction', () => {
     expect(host?.domains).toEqual(['app.example.com', 'www.example.com']);
     expect(host?.upstreams).toEqual(['app:8080', 'app:8081']);
 
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         userId: users.admin,
         action: 'create',
@@ -362,6 +366,7 @@ describe('createProxyHostAction', () => {
     expect(result).toEqual({ status: 'error', message: t('errors.adminRequired') });
     expect(await hostRows()).toEqual([]);
     expect(audit).not.toHaveBeenCalled();
+    expect(await auditCalls()).toEqual([]);
     expect(caddy.loads).toEqual([]);
   });
 
@@ -387,7 +392,7 @@ describe('createProxyHostAction', () => {
     const result = await createProxyHostAction(undefined, form(BASIC));
     expect(result.status).toBe('error');
     expect(await hostRows()).toHaveLength(1);
-    expect(auditCalls().map((event) => event.action)).toEqual(['create']);
+    expect((await auditCalls()).map((event) => event.action)).toEqual(['create']);
   });
 });
 
@@ -411,7 +416,7 @@ describe('updateProxyHostAction', () => {
       redirects: [{ from: '/a', to: '/b', status: 302 }],
       maintenance: { bypassCidrs: ['10.0.0.0/8'] },
     });
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         userId: users.admin,
         action: 'update',
@@ -523,7 +528,7 @@ describe('updateProxyHostAction', () => {
 
     expect(result.status).toBe('success');
     expect((await getProxyHost(host.id))?.name).toBe('ops-edit');
-    expect(auditCalls()[0]).toMatchObject({ userId: users.operator, action: 'update' });
+    expect((await auditCalls())[0]).toMatchObject({ userId: users.operator, action: 'update' });
   });
 
   it('refuses an operator whose grant is view-only, or who has none', async () => {
@@ -538,6 +543,7 @@ describe('updateProxyHostAction', () => {
     }
     expect((await hostRows()).map((row) => row.name).sort()).toEqual(['app', 'other']);
     expect(audit).not.toHaveBeenCalled();
+    expect(await auditCalls()).toEqual([]);
     expect(caddy.loads).toEqual([]);
   });
 
@@ -583,7 +589,7 @@ describe('deleteProxyHostAction', () => {
 
     expect(result).toEqual({ status: 'success', message: tHosts('hostDeleted') });
     expect((await hostRows()).map((row) => row.id)).toEqual([keep.id]);
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         action: 'delete',
         entityId: gone.id,
@@ -631,7 +637,7 @@ describe('toggleProxyHostAction', () => {
     });
     expect((await getProxyHost(host.id))?.enabled).toBe(true);
     expect(loadedDomains()).toContain('app.example.com');
-    expect(auditCalls().map((event) => event.action)).toEqual(['update', 'update']);
+    expect((await auditCalls()).map((event) => event.action)).toEqual(['update', 'update']);
   });
 
   it('refuses an operator without a manage grant', async () => {
@@ -659,7 +665,7 @@ describe('setProxyHostMaintenanceAction', () => {
       enabled: true,
       bypassCidrs: ['192.0.2.0/24'],
     });
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         summary: 'Turned on maintenance mode for proxy host app',
         data: { maintenance: { enabled: true } },

@@ -474,6 +474,20 @@ export const SETTING_FIELDS: Array<{
     value: "ghcr.io/caddyproxymanager",
   },
   {
+    key: "config:host_history_keep_revisions",
+    env: "HOST_HISTORY_KEEP_REVISIONS",
+    group: "application",
+    kind: "number",
+    value: 100,
+  },
+  {
+    key: "config:host_history_keep_days",
+    env: "HOST_HISTORY_KEEP_DAYS",
+    group: "application",
+    kind: "number",
+    value: 365,
+  },
+  {
     key: "config:auth_allow_self_registration",
     env: "AUTH_ALLOW_SELF_REGISTRATION",
     group: "authentication",
@@ -765,6 +779,27 @@ export const SETTING_FIELDS: Array<{
   {
     key: "config:notify_update_available",
     env: "NOTIFY_UPDATE_AVAILABLE",
+    group: "email",
+    kind: "boolean",
+    value: true,
+  },
+  {
+    key: "config:notify_backup_failed",
+    env: "NOTIFY_BACKUP_FAILED",
+    group: "email",
+    kind: "boolean",
+    value: true,
+  },
+  {
+    key: "config:notify_audit_sink_failed",
+    env: "NOTIFY_AUDIT_SINK_FAILED",
+    group: "email",
+    kind: "boolean",
+    value: true,
+  },
+  {
+    key: "config:notify_channel_failing",
+    env: "NOTIFY_CHANNEL_FAILING",
     group: "email",
     kind: "boolean",
     value: true,

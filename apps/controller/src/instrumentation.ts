@@ -345,6 +345,32 @@ export async function register() {
       stop: stopNotifications,
     });
 
+    // One cron job per enabled digest, in its own zone; on taking over, sends the slot each missed.
+    const { startDigestScheduler, stopDigestScheduler } = await import(
+      "./lib/alerts/digest-runner"
+    );
+    cluster.runAsLeader({
+      name: "the alert digests",
+      start: startDigestScheduler,
+      stop: stopDigestScheduler,
+    });
+
+    // One cron job per enabled schedule; on taking over, runs the slot each schedule missed.
+    const { startBackupScheduler, stopBackupScheduler } = await import("./lib/backup/runner");
+    cluster.runAsLeader({
+      name: "the backup scheduler",
+      start: startBackupScheduler,
+      stop: stopBackupScheduler,
+    });
+
+    // Sends each audit sink what lies past its cursor; a lease per sink keeps a flip from doubling.
+    const { startAuditStreaming, stopAuditStreaming } = await import("./lib/audit-stream");
+    cluster.runAsLeader({
+      name: "the audit streaming",
+      start: startAuditStreaming,
+      stop: stopAuditStreaming,
+    });
+
     try {
       await cluster.startCluster();
     } catch (error) {

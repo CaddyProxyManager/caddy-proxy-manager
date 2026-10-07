@@ -1,0 +1,111 @@
+---
+title: Audit streaming
+description: Send the audit log, and optionally security events, to a SIEM, a syslog server, an HTTP receiver or a file.
+---
+
+The [audit log](../audit-log/) can be streamed as it is written to places outside this instance:
+a syslog server, an HTTP collector, or a file a local log shipper picks up. Each place is a
+**sink**, set up under **Settings → Audit streaming**.
+
+## Sinks
+
+| Transport | What is sent |
+| --- | --- |
+| Syslog over UDP | RFC 5424 messages, one per datagram (RFC 5426). Default port 514. |
+| Syslog over TCP | RFC 5424 messages with octet-counting framing (RFC 6587). Default port 514. |
+| Syslog over TLS | The same framing over TLS (RFC 5425). Default port 6514. |
+| HTTP | Batches of records POSTed as newline-delimited JSON (`application/x-ndjson`). |
+| JSON lines file | One record per line, appended to a file under `audit-stream/` on the data volume. |
+
+- **TLS** checks the server's certificate against the host name you entered before anything is
+  written; a certificate that does not match, or that no trusted authority signed, ends the
+  connection with nothing sent. A sink can trust one extra CA, as a PEM certificate, for a
+  receiver with a certificate from a private CA.
+- **HTTP** sends an auth header of your choice (`Authorization` unless you name another) with
+  every batch. The URL and the header's value are stored encrypted and never shown again;
+  pointing the sink at another address asks for the value again. Plain http is allowed only to an
+  address on your own network.
+- **Request compression** is a setting per HTTP sink - none, gzip or zstd - because a request body
+  has no negotiation. If the receiver answers **415**, that batch is sent again uncompressed, the
+  sink keeps sending uncompressed, and its page says so until the sink is saved again.
+- **UDP** has a largest datagram per sink, 2048 bytes unless set (480 to 65,507). A longer record
+  is cut: the header and structured data stay whole, so `seq`, `hash` and `prevHash` always
+  arrive, structured data gains `truncated` with the JSON's full length, and the JSON is cut on a
+  character boundary. Nothing confirms a datagram arrived, so prefer TCP or TLS where you can.
+- Names are resolved and checked on every connection, and cloud metadata and link-local addresses
+  are refused, as for every address an administrator enters.
+
+**Test** sends a single record of kind `test`, from the form as typed or from a saved sink.
+
+## What a receiver gets
+
+Each record is one JSON object. An audit record carries the event as the hash chain covers it:
+
+```json
+{"v":1,"kind":"audit","seq":1042,"prevHash":"9f2c…","hash":"41d0…","actorId":3,
+ "action":"update","entityType":"proxy_host","entityId":17,
+ "summary":"Updated proxy host shop","data":"{\"changes\":[…]}","createdAt":"2026-10-06T12:00:00.000Z"}
+```
+
+`data` is the stored JSON text, not a parsed object, so the hash can be recomputed from the record
+exactly as sent. Over syslog the same object is the message body, with `seq`, `prevHash` and
+`hash` repeated as structured data under the SD-ID `cpm@32473` (the RFC 5612 documentation
+number), facility 13 (log audit), and the record's kind as the MSGID.
+
+## Order and delivery
+
+- Records go out in `seq` order, in batches, from the controller running the background jobs,
+  every few seconds.
+- Delivery is **at least once**: a sink's position only moves once a batch is through, so a batch
+  that failed, or that was sent just before a restart, is sent again. A receiver should keep the
+  highest `seq` it has and skip anything at or below it.
+- A sink keeps its position across restarts and [failovers](../high-availability/). Each sink is
+  leased to one controller at a time, so a change of leader neither skips records nor sends them
+  twice over, beyond the one batch that may repeat.
+- A new sink starts from the oldest event the log still holds.
+- The page shows each sink's backlog, when it last delivered, and its last error. A sink that keeps
+  failing backs off and raises an [alert](../alerts/) (**Audit streaming failing or falling
+  behind**), resolved once it catches up.
+
+## Checking the chain at the receiver
+
+Each audit record's `prevHash` is the `hash` of the record before it, so a receiver can check that
+nothing is missing, reordered or inserted without any key. The `hash` itself is an HMAC-SHA256
+keyed from `SESSION_SECRET`, over `prevHash` followed by
+`[1, seq, actorId, action, entityType, entityId, summary, data, createdAt]` as compact JSON, so
+only something holding that key can recompute it. **Verify** on the audit log page does that check
+on the controller.
+
+## Gaps
+
+Pruning never waits for a slow sink. If events a sink had not received are removed first, the sink
+is sent a record of kind `gap` in their place - `{"kind":"gap","stream":"audit","from":5,"to":12}` -
+and the next audit record links to the last one removed, which the receiver never saw. The page
+shows the gap and how many records the sink has missed in all, and an alert is raised.
+
+## Security events
+
+**Include security events**, off by default, adds WAF events and other mitigated requests (geo,
+access list, rate limit, CrowdSec and the rest) to the same sink as records of kind `security`:
+
+```json
+{"v":1,"kind":"security","seq":88,"chained":false,"type":"waf","createdAt":"…",
+ "host":"shop.example","clientIp":"203.0.113.9","method":"POST","uri":"/login?password=[redacted]",
+ "ruleId":942100,"ruleMessage":"SQL Injection Attack Detected","severity":"critical","blocked":true}
+```
+
+- They are not audit events and not part of the hash chain, and say so with `"chained": false`.
+  Their `seq` is their own sequence, with its own position per sink.
+- Credentials are redacted as they are stored: a query string's tokens and passwords, and what the
+  WAF matched in them, never leave.
+- They come from [analytics](../analytics/), so they need analytics switched on, and only requests
+  relayed after the switch is turned on are sent.
+- They wait for the sinks that include them for at most a day, and at most 100,000 of them; past
+  that the oldest go, and a sink that had not taken them gets a `gap` record for the
+  `security` stream.
+
+## API
+
+`auditSinks` and `createAuditSink`, `updateAuditSink`, `deleteAuditSink` and `testAuditSink` in
+[GraphQL](../api/). Reading needs the audit area; changing a sink needs a full-access token, since
+a sink receives the whole log.

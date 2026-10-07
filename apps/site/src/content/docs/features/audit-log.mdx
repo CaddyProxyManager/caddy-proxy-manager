@@ -34,6 +34,10 @@ by name rather than id; anything secret-looking (passwords, tokens, keys, creden
 custom JSON or Caddyfile snippets, and every value encrypted at rest) is masked on both sides
 before it is stored, so the log never holds it.
 
+A proxy or L4 host event also names the [revision](../host-history/) its change made. Its
+**Revert** opens the host's history comparing that change with the state before it, ready to roll
+back; a deletion's **Restore** opens a deleted host's history, ready to bring it back.
+
 ## Tamper evidence
 
 Every event stores a keyed hash (HMAC-SHA256) of the event before it plus its own content, under a
@@ -64,6 +68,11 @@ event changed, which is missing, or that the newest events are gone. The check i
 
 `verifyAuditChain` in [GraphQL](../api/) runs the same check, and each event's `changes` field
 carries its diff.
+
+## Streaming it elsewhere
+
+[Audit streaming](../audit-streaming/) sends every event, as it is written, to a syslog server, an
+HTTP receiver or a file, with the chain fields a receiver needs to check nothing is missing.
 
 ## Reading it
 

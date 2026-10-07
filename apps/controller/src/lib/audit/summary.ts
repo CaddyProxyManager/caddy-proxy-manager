@@ -46,6 +46,15 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("ldap_directory", "directory", "ldapDirectory"),
   // models/analytics-views.ts
   ...lifecycle("analytics_view", "analytics view", "analyticsView"),
+  // backup/manage.ts
+  ...lifecycle("backup_destination", "backup destination", "backupDestination"),
+  ...lifecycle("backup_schedule", "backup schedule", "backupSchedule"),
+  // alerts/channel-store.ts, alerts/rule-store.ts and alerts/digests.ts
+  ...lifecycle("alert_channel", "alert channel", "alertChannel"),
+  ...lifecycle("alert_rule", "alert rule", "alertRule"),
+  ...lifecycle("alert_digest", "alert digest", "alertDigest"),
+  // audit-stream/sinks.ts
+  ...lifecycle("audit_sink", "audit sink", "auditSink"),
   // models/api-tokens.ts; a token is never updated.
   ...lifecycle("api_token", "API token", "apiToken").filter(
     (pattern) => pattern.action !== "update",
@@ -176,6 +185,27 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     message: "proxyHostMaintenanceOff",
     pattern: /^Turned off maintenance mode for proxy host (?<name>.+)$/s,
   },
+
+  // host-history and the editors' rollback
+  ...(
+    [
+      ["proxy_host", "proxy host", "proxyHost"],
+      ["l4_proxy_host", "L4 proxy host", "l4ProxyHost"],
+    ] as const
+  ).flatMap(([entityType, noun, prefix]): AuditSummaryPattern[] => [
+    {
+      entityType,
+      action: "update",
+      message: `${prefix}RolledBack`,
+      pattern: new RegExp(`^Rolled back ${noun} (?<name>.+) to revision (?<revision>\\S+)$`, "s"),
+    },
+    {
+      entityType,
+      action: "restore",
+      message: `${prefix}Restored`,
+      pattern: new RegExp(`^Restored ${noun} (?<name>.+)$`, "s"),
+    },
+  ]),
 
   // models/crs-plugins.ts
   {
@@ -528,6 +558,12 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "backup_created",
     message: "backupCreated",
     pattern: /^Downloaded a configuration backup$/,
+  },
+  {
+    entityType: "backup_schedule",
+    action: "backup_run",
+    message: "backupRunNow",
+    pattern: /^Ran backup schedule (?<name>.+) now$/s,
   },
   {
     entityType: "backup",

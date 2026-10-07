@@ -163,6 +163,13 @@ export async function sendPush(
   return outcome;
 }
 
+/** "Send test" on the Alerts page: every administrator's browsers. */
+export function sendTestPush(now = Date.now()): Promise<PushOutcome> {
+  return sendPush([
+    { id: "test", key: "test", at: new Date(now).toISOString(), event: { kind: "test" } },
+  ]);
+}
+
 /**
  * Never the endpoint or keys, which are bearer credentials: a push service's status and body, or
  * else only the error's kind, since a database error's message carries its bound parameters.

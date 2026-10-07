@@ -17,6 +17,7 @@ export type DestinationId =
   | "security"
   | "audit-log"
   | "logs"
+  | "alerts"
   | "api-docs"
   | "settings"
   | "profile";
@@ -47,6 +48,7 @@ export type NavLabelKey =
   | "security"
   | "auditLog"
   | "logs"
+  | "alerts"
   | "apiDocs"
   | "settings"
   | "profile";
@@ -165,6 +167,15 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "logs",
     href: "/logs",
     labelKey: "logs",
+    railGroup: "observability",
+    adminOnly: true,
+    operator: false,
+    moreGroup: "reference",
+  },
+  {
+    id: "alerts",
+    href: "/alerts",
+    labelKey: "alerts",
     railGroup: "observability",
     adminOnly: true,
     operator: false,

@@ -43,10 +43,25 @@ export const BACKUP_NEVER = [
   "upstream_error_counts",
   // Tens of megabytes the leader downloads again; the files on the data volume are what serve.
   "geoip_databases",
+  // What this deployment's scheduler did; the destinations and schedules themselves are kept.
+  "backup_runs",
+  // What this deployment raised and sent, and when its digests went; channels and rules are kept.
+  "alert_keys",
+  "alert_events",
+  "alert_deliveries",
+  "alert_digest_runs",
+  // Security records waiting for a sink: this deployment's traffic, sent or pruned within the day.
+  "audit_security_records",
+  "audit_security_head",
 ] as const;
 
 /** History rather than configuration: large, and only included when asked for. */
-export const BACKUP_OPTIONAL = { auditLog: "audit_events", settingsHistory: "settings_revisions" };
+export const BACKUP_OPTIONAL = {
+  auditLog: "audit_events",
+  settingsHistory: "settings_revisions",
+  // Asked for together with settings history: one choice for "the history of my configuration".
+  hostHistory: "host_revisions",
+};
 
 export type BackupOptions = { auditLog?: boolean; settingsHistory?: boolean };
 
@@ -55,7 +70,10 @@ const RESTORE_BATCH = 250;
 function tablesToBackUp(options: BackupOptions): Described[] {
   const skip = new Set<string>(BACKUP_NEVER);
   if (!options.auditLog) skip.add(BACKUP_OPTIONAL.auditLog);
-  if (!options.settingsHistory) skip.add(BACKUP_OPTIONAL.settingsHistory);
+  if (!options.settingsHistory) {
+    skip.add(BACKUP_OPTIONAL.settingsHistory);
+    skip.add(BACKUP_OPTIONAL.hostHistory);
+  }
   return inFkOrder(describeTables()).filter((table) => !skip.has(table.name));
 }
 
@@ -191,6 +209,14 @@ export async function restoreBackup(
   // users being replaced.
   const clearing = [...all].reverse().filter((table) => {
     if (table.name === "sessions" || table.name.startsWith("forward_auth_")) return true;
+    // Restored schedules reuse ids, and a run left behind would be credited to another schedule.
+    if (table.name === "backup_runs") {
+      return prepared.some((entry) => entry.table.name === "backup_schedules");
+    }
+    // Restored hosts reuse ids, so revisions left behind would read as another host's past.
+    if (table.name === BACKUP_OPTIONAL.hostHistory) {
+      return prepared.some((entry) => ["proxy_hosts", "l4_proxy_hosts"].includes(entry.table.name));
+    }
     return prepared.some((entry) => entry.table.name === table.name);
   });
   await runInTransaction((tx) => [

@@ -17,6 +17,7 @@ import { config } from "../config";
 import db, { nowIso, runInTransaction } from "../db";
 import { auditChain, auditEvents, schemaDialect } from "../db/schema";
 import { derivePurposeKey } from "../secrets/derived-key";
+import { type Step, readingStep } from "../db/reading-step";
 import { noteAuditFilterValues } from "./filter-options";
 
 export const GENESIS_HASH = "0".repeat(64);
@@ -166,47 +167,8 @@ export function linkAuditRows(
 
 // ── Running reads inside runInTransaction ─────────────────────────────────
 
-/** `all` returns rows; `run` is a write. */
-type Step = { all: unknown } | { run: unknown };
-
 // biome-ignore lint/suspicious/noExplicitAny: builder types are per-dialect
 type Builder = any;
-
-/**
- * A statement for runInTransaction that reads before it writes. One generator drives both
- * dialects: bun:sqlite's `.all()`/`.run()` synchronously, PostgreSQL's builders awaited.
- */
-function readingStep(
-  body: () => Generator<Step, void, unknown[]>,
-): PromiseLike<void> & { run: () => void } {
-  return {
-    run() {
-      const steps = body();
-      let next = steps.next([]);
-      while (!next.done) {
-        const step = next.value;
-        if ("all" in step) {
-          next = steps.next((step.all as Builder).all());
-        } else {
-          (step.run as Builder).run();
-          next = steps.next([]);
-        }
-      }
-    },
-    // biome-ignore lint/suspicious/noThenProperty: runInTransaction awaits PostgreSQL statements
-    then(onFulfilled, onRejected) {
-      return (async () => {
-        const steps = body();
-        let next = steps.next([]);
-        while (!next.done) {
-          const step = next.value;
-          const result = await ("all" in step ? step.all : step.run);
-          next = steps.next(Array.isArray(result) ? result : []);
-        }
-      })().then(onFulfilled, onRejected);
-    },
-  };
-}
 
 function* lockHead(tx: Builder): Generator<Step, Head, unknown[]> {
   const select = () => {
@@ -229,26 +191,32 @@ function* lockHead(tx: Builder): Generator<Step, Head, unknown[]> {
 
 /** Use in place of `tx.insert(auditEvents)`: the rows join the chain in this transaction. */
 export function chainedAuditInsert(tx: Builder, rows: AuditRow[]) {
-  return readingStep(function* () {
-    if (rows.length === 0) return;
-    const key = chainKey();
-    const head = yield* lockHead(tx);
-    const linked = linkAuditRows(head, rows, key);
-    yield { run: tx.insert(auditEvents).values(linked.values) };
-    noteAuditFilterValues(rows);
-    const next = { ...head, headSeq: linked.headSeq, headHash: linked.headHash };
-    yield {
-      run: tx
-        .update(auditChain)
-        .set({
-          headSeq: next.headSeq,
-          headHash: next.headHash,
-          seal: carrySeal(head, next, key),
-          updatedAt: nowIso(),
-        })
-        .where(eq(auditChain.id, HEAD_ID)),
-    };
-  });
+  return readingStep(() => chainedAuditSteps(tx, rows));
+}
+
+/** As chainedAuditInsert, for a reading step that builds its rows from what it read. */
+export function* chainedAuditSteps(
+  tx: Builder,
+  rows: AuditRow[],
+): Generator<Step, void, unknown[]> {
+  if (rows.length === 0) return;
+  const key = chainKey();
+  const head = yield* lockHead(tx);
+  const linked = linkAuditRows(head, rows, key);
+  yield { run: tx.insert(auditEvents).values(linked.values) };
+  noteAuditFilterValues(rows);
+  const next = { ...head, headSeq: linked.headSeq, headHash: linked.headHash };
+  yield {
+    run: tx
+      .update(auditChain)
+      .set({
+        headSeq: next.headSeq,
+        headHash: next.headHash,
+        seal: carrySeal(head, next, key),
+        updatedAt: nowIso(),
+      })
+      .where(eq(auditChain.id, HEAD_ID)),
+  };
 }
 
 /**

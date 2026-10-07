@@ -1,5 +1,6 @@
 "use client";
 
+import type { EditorRollback } from "@/components/host-history/RollbackNotice";
 import { clearEditorLink } from "@/components/host-review/section-link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -87,6 +88,8 @@ type Props = {
   insights: ListInsights;
   /** Opened in the editor on arrival, from a section link on the host's page. */
   editTarget?: ProxyHost | null;
+  /** Set when `editTarget` is a revision loaded for a rollback rather than the stored host. */
+  rollback?: EditorRollback | null;
   activeState: "all" | "enabled" | "disabled";
   /** False for an operator: grants name existing hosts. Duplicating goes with it. */
   canCreate?: boolean;
@@ -289,6 +292,7 @@ export default function ProxyHostsClient({
   counts,
   insights,
   editTarget = null,
+  rollback = null,
   activeState,
   canCreate = true,
   canEditRawConfig = false,
@@ -350,6 +354,7 @@ export default function ProxyHostsClient({
     }
     const params = new URLSearchParams(searchParams.toString());
     params.delete("edit");
+    params.delete("revision");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname);
   }
@@ -777,6 +782,7 @@ export default function ProxyHostsClient({
             setTimeout(() => setDuplicateHost(null), 200);
           }}
           editHost={editHost}
+          editRollback={rollback && editHost === editTarget ? rollback : null}
           editSection={editSection}
           onCloseEdit={closeEditor}
           deleteHost={deleteHost}

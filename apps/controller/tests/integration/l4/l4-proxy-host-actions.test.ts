@@ -22,6 +22,7 @@ import { desc, eq } from 'drizzle-orm';
 import * as schema from '../../../src/lib/db/schema';
 import { auth } from '../../../src/lib/auth';
 import { logAuditEvent } from '../../../src/lib/audit';
+import { auditEvents } from '../../helpers/audit-events';
 import { agentIdsForHost } from '../../../src/lib/models/host-agents';
 import { getL4ProxyHost } from '../../../src/lib/models/l4-proxy-hosts';
 
@@ -125,18 +126,21 @@ async function seedHost(entries: Record<string, string | string[]> = BASIC) {
     .orderBy(desc(schema.l4ProxyHosts.id))
     .limit(1);
   audit.mockClear();
+  await logged.clear();
   caddy.reset();
   return row;
 }
 
 const hostRows = () => db.select().from(schema.l4ProxyHosts);
-const auditCalls = () => audit.mock.calls.map(([event]) => event as Record<string, unknown>);
+const logged = auditEvents(() => db);
+const auditCalls = () => logged.list();
 const loaded = () => JSON.stringify(caddy.lastConfig() ?? {});
 
 beforeEach(async () => {
   db = await createTestDb();
   caddy = installFakeCaddy();
   audit.mockClear();
+  logged.reset();
   users.admin = await insertUser('admin');
   users.operator = await insertUser('operator');
   users.viewer = await insertUser('viewer');
@@ -172,7 +176,7 @@ describe('createL4ProxyHostAction', () => {
       geoblockMode: 'merge',
     });
     expect(row.ownerUserId).toBe(users.admin);
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         userId: users.admin,
         action: 'create',
@@ -325,6 +329,7 @@ describe('createL4ProxyHostAction', () => {
     expect(result).toEqual({ status: 'error', message: t('errors.adminRequired') });
     expect(await hostRows()).toEqual([]);
     expect(audit).not.toHaveBeenCalled();
+    expect(await auditCalls()).toEqual([]);
     expect(caddy.loads).toEqual([]);
   });
 
@@ -394,7 +399,7 @@ describe('updateL4ProxyHostAction', () => {
       upstreams: ['pgbouncer:6432'],
       enabled: true,
     });
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         userId: users.admin,
         action: 'update',
@@ -540,7 +545,7 @@ describe('updateL4ProxyHostAction', () => {
 
     expect(result.status).toBe('success');
     expect((await getL4ProxyHost(host.id))?.name).toBe('op');
-    expect(auditCalls()[0]).toMatchObject({ userId: users.operator });
+    expect((await auditCalls())[0]).toMatchObject({ userId: users.operator });
   });
 
   it('refuses an operator with a view-only grant or none, and a viewer', async () => {
@@ -559,6 +564,7 @@ describe('updateL4ProxyHostAction', () => {
     }
     expect((await hostRows()).map((row) => row.name).sort()).toEqual(['postgres', 'redis']);
     expect(audit).not.toHaveBeenCalled();
+    expect(await auditCalls()).toEqual([]);
   });
 
   it("refuses an operator's upstream on the Caddy admin port", async () => {
@@ -597,7 +603,7 @@ describe('deleteL4ProxyHostAction', () => {
       message: tL4('hostDeleted'),
     });
     expect((await hostRows()).map((row) => row.id)).toEqual([keep.id]);
-    expect(auditCalls()).toEqual([
+    expect(await auditCalls()).toEqual([
       expect.objectContaining({
         action: 'delete',
         entityType: 'l4_proxy_host',
@@ -648,7 +654,7 @@ describe('toggleL4ProxyHostAction', () => {
       message: tL4('hostEnabledMessage'),
     });
     expect(loaded()).toContain('db:5432');
-    expect(auditCalls().map((event) => event.action)).toEqual(['update', 'update']);
+    expect((await auditCalls()).map((event) => event.action)).toEqual(['update', 'update']);
   });
 
   it('refuses to switch on a host whose port another host took meanwhile', async () => {

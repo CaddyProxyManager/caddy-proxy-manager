@@ -36,6 +36,7 @@ export type SettingsSearchEntry = {
 export const EXTRA_SEARCH_PAGES = [
   { id: "backup", href: "/settings/backup" },
   { id: "portable-config", href: "/settings/backup#portable-config" },
+  { id: "audit-streaming", href: "/settings/audit-streaming" },
   { id: "settings-history", href: "/settings/history" },
   { id: "waf-tuning", href: "/waf?tab=settings" },
   { id: "waf-host-modes", href: "/waf?tab=hosts" },

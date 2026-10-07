@@ -814,6 +814,27 @@ export const notifyUpdateAvailable = notifySetting(
   "Once per release, while the update check under General is on.",
 );
 
+export const notifyBackupFailed = notifySetting(
+  "notify_backup_failed",
+  "NOTIFY_BACKUP_FAILED",
+  "Scheduled backup failing",
+  "When a scheduled backup fails, and when the schedule's next run works again.",
+);
+
+export const notifyAuditSinkFailed = notifySetting(
+  "notify_audit_sink_failed",
+  "NOTIFY_AUDIT_SINK_FAILED",
+  "Audit streaming failing",
+  "When an audit sink keeps failing or falls behind, and when it catches up again.",
+);
+
+export const notifyChannelFailing = notifySetting(
+  "notify_channel_failing",
+  "NOTIFY_CHANNEL_FAILING",
+  "Alert channel failing",
+  "When sends to an alert channel keep failing, told on the other channels, and when it works again.",
+);
+
 /** Off by default, unlike the rest: it mails someone who is not an administrator. */
 export const notifyDisabledAccountOwner = booleanSetting({
   name: "notify_disabled_account_owner",
@@ -912,6 +933,36 @@ export const clickhouseRetentionDays = numberSetting({
   max: 3650,
 });
 
+// ── Host history ─────────────────────────────────────────────────────────────
+
+/** With hostHistoryKeepDays: a revision goes only once both would let it. */
+export const hostHistoryKeepRevisions = numberSetting({
+  name: "host_history_keep_revisions",
+  env: "HOST_HISTORY_KEEP_REVISIONS",
+  group: "application",
+  label: "Host revisions kept",
+  description:
+    "Each host keeps at least this many of its latest revisions, however old. Older ones go " +
+    "once they are also past the age below.",
+  default: 100,
+  min: 1,
+  max: 10000,
+});
+
+export const hostHistoryKeepDays = numberSetting({
+  name: "host_history_keep_days",
+  unit: "days",
+  env: "HOST_HISTORY_KEEP_DAYS",
+  group: "application",
+  label: "Host history kept (days)",
+  description:
+    "Revisions younger than this are kept, however many a host has. A deleted host keeps its " +
+    "history too, so it can be restored.",
+  default: 365,
+  min: 1,
+  max: 3650,
+});
+
 // ── GeoIP ────────────────────────────────────────────────────────────────────
 
 /** Unset keeps meaning "on if the databases are on disk"; see `geoipEnabled()` (agent/geoip.ts). */
@@ -973,6 +1024,8 @@ export const SETTING_DEFINITIONS = [
   caddyBuildTimeout,
   updateCheckEnabled,
   updateImageRepository,
+  hostHistoryKeepRevisions,
+  hostHistoryKeepDays,
   allowSelfRegistration,
   allowOauthRegistration,
   allowOauthRoleFromClaims,
@@ -1015,6 +1068,9 @@ export const SETTING_DEFINITIONS = [
   notifyGeoipFailed,
   notifyCrsPluginDisabled,
   notifyUpdateAvailable,
+  notifyBackupFailed,
+  notifyAuditSinkFailed,
+  notifyChannelFailing,
   notifyDisabledAccountOwner,
   analyticsEnabled,
   clickhouseUrl,

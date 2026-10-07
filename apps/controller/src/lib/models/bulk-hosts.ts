@@ -5,9 +5,14 @@
  */
 
 import { eq, inArray } from "drizzle-orm";
-import db, { nowIso, runInTransaction } from "../db";
+import db, { nowIso } from "../db";
+import type { Step } from "../db/reading-step";
 import { applyCaddyConfig } from "../caddy";
-import { auditEventRow, chainedAuditInsert, type AuditEventParams } from "../audit";
+import { auditEventRow, type AuditEventParams } from "../audit";
+import { chainedAuditSteps } from "../audit/chain";
+import { recordHostRevision, runHostWrite, withRevisionId } from "../host-history/record";
+import { pruneHostRevisions } from "../host-history/retention";
+import type { HostKind } from "../host-history/types";
 import { accessLists, certificates, l4ProxyHosts, proxyHosts } from "../db/schema";
 import { domainError } from "../errors/domain-error";
 import { assertCertificatesServable } from "../certificates/placement";
@@ -136,6 +141,44 @@ function proxyHostAuditData(request: ProxyHostBulkRequest): Record<string, unkno
 }
 
 /**
+ * One revision per host and its audit event naming it. A delete's revisions are taken before the
+ * rows go, so each holds what restoring that host brings back.
+ */
+function* bulkRevisions(
+  // biome-ignore lint/suspicious/noExplicitAny: `tx` is the per-dialect transaction handle
+  tx: any,
+  kind: HostKind,
+  request: { action: string; tag?: string },
+  audits: AuditEventParams[],
+  actorUserId: number,
+  writes: unknown[],
+): Generator<Step, void, unknown[]> {
+  const detail = { action: request.action, ...(request.tag ? { tag: request.tag } : {}) };
+  const record = function* () {
+    const rows = [];
+    for (const audit of audits) {
+      const revisionId = yield* recordHostRevision(tx, {
+        kind,
+        hostId: audit.entityId as number,
+        operation: "bulk",
+        detail,
+        userId: actorUserId,
+      });
+      rows.push(auditEventRow(withRevisionId(audit, revisionId)));
+    }
+    return rows;
+  };
+  if (request.action === "delete") {
+    const rows = yield* record();
+    for (const write of writes) yield { run: write };
+    yield* chainedAuditSteps(tx, rows);
+    return;
+  }
+  for (const write of writes) yield { run: write };
+  yield* chainedAuditSteps(tx, yield* record());
+}
+
+/**
  * All or nothing: an id that does not exist, or a target the hosts could not be served with,
  * refuses the whole batch before anything is written. Permission checks are the caller's.
  */
@@ -210,7 +253,7 @@ export async function bulkUpdateProxyHosts(
     data: proxyHostAuditData(request),
   }));
 
-  await runInTransaction((tx) => {
+  await runHostWrite(function* (tx) {
     const writes = (() => {
       switch (request.action) {
         case "enable":
@@ -260,8 +303,9 @@ export async function bulkUpdateProxyHosts(
           );
       }
     })();
-    return [...writes, chainedAuditInsert(tx, audits.map(auditEventRow))];
+    yield* bulkRevisions(tx, "http", request, audits, actorUserId, writes);
   });
+  await pruneHostRevisions("http", ids);
 
   // Tags never reach the config, so there is nothing to reload.
   if (request.action !== "addTag") await applyCaddyConfig();
@@ -305,8 +349,8 @@ export async function bulkUpdateL4ProxyHosts(
       : null;
 
   const where = inArray(l4ProxyHosts.id, ids);
-  const audits = rows.map((row) =>
-    auditEventRow({
+  const audits = rows.map(
+    (row): AuditEventParams => ({
       userId: actorUserId,
       action: request.action === "delete" ? "delete" : "update",
       entityType: "l4_proxy_host",
@@ -325,24 +369,26 @@ export async function bulkUpdateL4ProxyHosts(
   );
 
   const now = nowIso();
-  await runInTransaction((tx) => [
-    ...(request.action === "delete"
-      ? [tx.delete(l4ProxyHosts).where(where)]
-      : request.action === "addTag"
-        ? rows.map((row) =>
-            tx
-              .update(l4ProxyHosts)
-              .set({ tags: taggedTo?.get(row.id), updatedAt: now })
-              .where(eq(l4ProxyHosts.id, row.id)),
-          )
-        : [
-            tx
-              .update(l4ProxyHosts)
-              .set({ enabled: request.action === "enable", updatedAt: now })
-              .where(where),
-          ]),
-    chainedAuditInsert(tx, audits),
-  ]);
+  await runHostWrite(function* (tx) {
+    const writes =
+      request.action === "delete"
+        ? [tx.delete(l4ProxyHosts).where(where)]
+        : request.action === "addTag"
+          ? rows.map((row) =>
+              tx
+                .update(l4ProxyHosts)
+                .set({ tags: taggedTo?.get(row.id), updatedAt: now })
+                .where(eq(l4ProxyHosts.id, row.id)),
+            )
+          : [
+              tx
+                .update(l4ProxyHosts)
+                .set({ enabled: request.action === "enable", updatedAt: now })
+                .where(where),
+            ];
+    yield* bulkRevisions(tx, "l4", request, audits, actorUserId, writes);
+  });
+  await pruneHostRevisions("l4", ids);
 
   // Published ports are derived from the enabled hosts: the ports banner picks this up unaided.
   if (request.action !== "addTag") await applyCaddyConfig();

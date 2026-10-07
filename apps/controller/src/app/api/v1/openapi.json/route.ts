@@ -378,6 +378,38 @@ const spec = {
       },
     },
 
+    "/api/v1/proxy-hosts/{id}/revisions": {
+      get: {
+        tags: ["Proxy Hosts"],
+        summary: "List a proxy host's revisions",
+        description:
+          "Newest first, one per write. Summaries only: GraphQL's hostRevision answers a revision in full, and rollbackHost and restoreHost go back to one.",
+        operationId: "listProxyHostRevisions",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 200 } },
+          { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+        ],
+        responses: {
+          "200": {
+            description: "One page of revisions and how many there are",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    items: { type: "array", items: { $ref: "#/components/schemas/HostRevision" } },
+                    total: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+
     "/api/v1/proxy-hosts/bulk": {
       post: {
         tags: ["Proxy Hosts"],
@@ -576,6 +608,38 @@ const spec = {
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
+    "/api/v1/l4-proxy-hosts/{id}/revisions": {
+      get: {
+        tags: ["L4 Proxy Hosts"],
+        summary: "List an L4 proxy host's revisions",
+        description:
+          "Newest first, one per write. Summaries only: GraphQL's hostRevision answers a revision in full, and rollbackHost and restoreHost go back to one.",
+        operationId: "listL4ProxyHostRevisions",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 200 } },
+          { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+        ],
+        responses: {
+          "200": {
+            description: "One page of revisions and how many there are",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    items: { type: "array", items: { $ref: "#/components/schemas/HostRevision" } },
+                    total: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
     },
@@ -2581,6 +2645,32 @@ const spec = {
           },
         },
         required: ["action", "ids"],
+      },
+      HostRevision: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          hostKind: { type: "string", enum: ["http", "l4"] },
+          hostId: { type: "integer" },
+          operation: {
+            type: "string",
+            enum: [
+              "create",
+              "update",
+              "maintenance",
+              "delete",
+              "bulk",
+              "import",
+              "rollback",
+              "restore",
+            ],
+          },
+          detail: { type: ["object", "null"] },
+          userId: { type: ["integer", "null"] },
+          userName: { type: ["string", "null"] },
+          createdAt: { type: "string", format: "date-time" },
+          name: { type: "string" },
+        },
       },
       HostChangePreview: {
         type: "object",

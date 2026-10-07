@@ -19,6 +19,7 @@ export const ATTENTION_PROVIDERS = [
   "crsPlugins",
   "geoip",
   "security",
+  "backups",
 ] as const;
 export type AttentionProviderId = (typeof ATTENTION_PROVIDERS)[number];
 
@@ -44,6 +45,8 @@ export const ATTENTION_CODES = [
   "wafDetectionOnly",
   "blockedSourcesUnenforced",
   "accessListGeoUnenforced",
+  "backupFailed",
+  "backupOverdue",
 ] as const;
 export type AttentionCode = (typeof ATTENTION_CODES)[number];
 

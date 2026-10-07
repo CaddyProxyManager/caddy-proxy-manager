@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { outboundViaGlobalFetch } from '@/tests/helpers/outbound';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 import { createTestDb, type TestDb } from '@/tests/helpers/db';
@@ -19,6 +20,7 @@ ctx.db = await createTestDb();
 vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('@/src/lib/http/outbound', outboundViaGlobalFetch);
 
 const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({

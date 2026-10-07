@@ -17,3 +17,8 @@ export function l4EditorSectionAnchor(section: L4EditorSection): string {
 export function l4EditorSectionHref(hostId: number, section?: L4EditorSection): string {
   return `/l4-proxy-hosts?edit=${hostId}${section ? `#${section}` : ""}`;
 }
+
+/** Optionally opened on one revision, compared with the one before it. */
+export function l4ProxyHostHistoryHref(hostId: number, revisionId?: number): string {
+  return `/l4-proxy-hosts/${hostId}/history${revisionId ? `?to=${revisionId}` : ""}`;
+}

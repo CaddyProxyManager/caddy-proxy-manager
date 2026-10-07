@@ -24,6 +24,8 @@ import {
   disableLocalUsers,
   forwardAuthAllowedPorts,
   forwardAuthSequentialUserIds,
+  hostHistoryKeepDays,
+  hostHistoryKeepRevisions,
   loginBlockMs,
   loginMaxAttempts,
   loginWindowMs,
@@ -35,6 +37,9 @@ import {
   notifyAgentProblems,
   notifyCaddyApply,
   notifyCrsPluginDisabled,
+  notifyBackupFailed,
+  notifyAuditSinkFailed,
+  notifyChannelFailing,
   notifyDisabledAccountOwner,
   notifyGeoipFailed,
   notifyUpdateAvailable,
@@ -61,6 +66,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
   branding: [accentColor] as AnySetting[],
+  "host-history": [hostHistoryKeepRevisions, hostHistoryKeepDays] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
   "forward-auth": [forwardAuthAllowedPorts, forwardAuthSequentialUserIds] as AnySetting[],
   "sign-in": [
@@ -97,6 +103,9 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
     notifyGeoipFailed,
     notifyCrsPluginDisabled,
     notifyUpdateAvailable,
+    notifyBackupFailed,
+    notifyAuditSinkFailed,
+    notifyChannelFailing,
     notifyDisabledAccountOwner,
   ] as AnySetting[],
 };

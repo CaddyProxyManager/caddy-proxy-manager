@@ -1139,3 +1139,387 @@ export const geoipDatabases = pgTable("geoip_databases", {
   data: binary("data").notNull(),
   updatedAt: text("updatedAt").notNull(),
 });
+
+/** Where scheduled backups are written: an S3-compatible bucket or a folder on the data volume. */
+export const backupDestinations = pgTable(
+  "backup_destinations",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** `s3` or `local`. */
+    kind: text("kind").notNull(),
+    /** Empty for AWS itself, where the region picks the host. */
+    endpoint: text("endpoint").notNull().default(""),
+    region: text("region").notNull().default(""),
+    bucket: text("bucket").notNull().default(""),
+    /** Prepended to every key, e.g. `cpm/`. */
+    prefix: text("prefix").notNull().default(""),
+    accessKeyId: text("accessKeyId").notNull().default(""),
+    secretAccessKey: text("secretAccessKey").notNull().default(""),
+    virtualHostedStyle: boolean("virtualHostedStyle").notNull().default(false),
+    /** For `local`: a folder under the data volume's backups/. */
+    path: text("path").notNull().default(""),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("backup_destinations_name_unique").on(table.name),
+  }),
+);
+
+export const backupSchedules = pgTable(
+  "backup_schedules",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    destinationId: integer("destinationId")
+      .references(() => backupDestinations.id, { onDelete: "restrict" })
+      .notNull(),
+    cron: text("cron").notNull(),
+    timeZone: text("timeZone").notNull().default("UTC"),
+    /** Under the destination's prefix; retention never looks outside it. */
+    prefix: text("prefix").notNull().default(""),
+    includeAuditLog: boolean("includeAuditLog").notNull().default(false),
+    includeSettingsHistory: boolean("includeSettingsHistory").notNull().default(false),
+    keepLast: integer("keepLast"),
+    keepDays: integer("keepDays"),
+    /** Encrypted, so a run needs nobody present. */
+    passphrase: text("passphrase").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    /** When the timing last changed: catch-up never runs a slot from before it. */
+    scheduledSince: text("scheduledSince").notNull(),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("backup_schedules_name_unique").on(table.name),
+  }),
+);
+
+/** One row per slot, claimed before the run starts, so a leadership flip never runs it twice. */
+export const backupRuns = pgTable(
+  "backup_runs",
+  {
+    id: serial("id").primaryKey(),
+    scheduleId: integer("scheduleId")
+      .references(() => backupSchedules.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Epoch ms of the cron occurrence; a manual run's own start. */
+    slot: bigint("slot", { mode: "number" }).notNull(),
+    /** `schedule`, `catch-up` or `manual`. */
+    trigger: text("trigger").notNull(),
+    /** `running`, `succeeded` or `failed`. */
+    status: text("status").notNull(),
+    objectKey: text("objectKey"),
+    bytes: bigint("bytes", { mode: "number" }),
+    durationMs: integer("durationMs"),
+    error: text("error"),
+    errorCode: text("errorCode"),
+    replica: text("replica"),
+    startedAt: text("startedAt").notNull(),
+    finishedAt: text("finishedAt"),
+  },
+  (table) => ({
+    slotUnique: uniqueIndex("backup_runs_schedule_slot_unique").on(table.scheduleId, table.slot),
+    startedIdx: index("backup_runs_started_at_idx").on(table.startedAt),
+  }),
+);
+
+/**
+ * A full snapshot after every proxy and L4 host write, in that write's transaction. No foreign key
+ * to the host: a deleted host's last revision is what restores it.
+ */
+export const hostRevisions = pgTable(
+  "host_revisions",
+  {
+    id: serial("id").primaryKey(),
+    /** `http` or `l4`. */
+    hostKind: text("hostKind").notNull(),
+    hostId: integer("hostId").notNull(),
+    /** `create`, `update`, `maintenance`, `delete`, `bulk`, `import`, `rollback` or `restore`. */
+    operation: text("operation").notNull(),
+    /** JSON: the bulk action, or the revision a rollback or restore came from. */
+    detail: text("detail"),
+    /** JSON `{ row, agentIds }`: the row as stored, secrets still in their `enc:v1` form. */
+    snapshot: text("snapshot").notNull(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    /** Kept beside the id, so a deleted user's revisions still say who. */
+    userName: text("userName"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    hostIdx: index("host_revisions_host_idx").on(table.hostKind, table.hostId, table.id),
+    createdIdx: index("host_revisions_created_at_idx").on(table.createdAt),
+  }),
+);
+
+// ── Alerts (lib/notifications, lib/alerts) ───────────────────────────
+
+/** Where alerts go. `email` and `push` are built in; the rest an administrator adds. */
+export const notificationChannels = pgTable(
+  "notification_channels",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** `email`, `push`, `webhook`, `discord`, `slack`, `teams` or `ntfy`. */
+    kind: text("kind").notNull(),
+    /** `email` or `push` for the two every install has; null for one an administrator added. */
+    builtin: text("builtin"),
+    /** JSON of what may be shown back: ntfy's server and topic, a webhook's header names. */
+    config: text("config").notNull().default("{}"),
+    /** `enc:v1` JSON of what may not: URLs that embed a token, signing keys, header values. */
+    secret: text("secret").notNull().default(""),
+    enabled: boolean("enabled").notNull().default(true),
+    /** Failed sends in a row; the backoff grows with it. */
+    failures: integer("failures").notNull().default(0),
+    /** No send before this, after a failed one. */
+    retryAt: text("retryAt"),
+    lastSentAt: text("lastSentAt"),
+    /** As the receiver said it, in English; null after a good send. */
+    lastError: text("lastError"),
+    lastErrorAt: text("lastErrorAt"),
+    /** `noRecipients` when there was nobody to send to. */
+    lastErrorCode: text("lastErrorCode"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("notification_channels_name_unique").on(table.name),
+    builtinUnique: uniqueIndex("notification_channels_builtin_unique").on(table.builtin),
+  }),
+);
+
+/**
+ * What is worth telling, and where. Each notification category is a built-in rule whose on switch
+ * stays its Settings toggle, so an upgrade changes nothing until someone edits one.
+ */
+export const alertRules = pgTable(
+  "alert_rules",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** The category a built-in rule stands for; null for one an administrator added. */
+    builtin: text("builtin"),
+    /** `event`, `attention`, `signal` or `metric`. */
+    source: text("source").notNull(),
+    /** JSON, by source: event kinds, an attention code, a signal kind, a metric threshold. */
+    sourceConfig: text("sourceConfig").notNull().default("{}"),
+    /** `all`, `hosts` or `tags`. */
+    scope: text("scope").notNull().default("all"),
+    /** JSON: proxy host ids, or tags. */
+    scopeValues: text("scopeValues").notNull().default("[]"),
+    /** `critical`, `warning` or `info`. */
+    severity: text("severity").notNull().default("warning"),
+    /** JSON channel ids; deleting a channel takes it out of every rule in the same transaction. */
+    channelIds: text("channelIds").notNull().default("[]"),
+    /** After telling, the same rule stays quiet about the same thing this long. */
+    quietMinutes: integer("quietMinutes").notNull().default(0),
+    /** Ignored for a built-in rule: its Settings switch decides. */
+    enabled: boolean("enabled").notNull().default(true),
+    silencedUntil: text("silencedUntil"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    builtinUnique: uniqueIndex("alert_rules_builtin_unique").on(table.builtin),
+  }),
+);
+
+/** Per deduplication key: a problem still open, a quiet period, a failure streak. */
+export const alertKeys = pgTable("alert_keys", {
+  key: text("key").primaryKey(),
+  /** Set while a problem raised under this key is not over. */
+  openAt: text("openAt"),
+  /** JSON: the event that raised it, for the recovery to name the same thing. */
+  openEvent: text("openEvent"),
+  /** JSON: the alert_events rows it raised, and the rules they came from. */
+  openEventIds: text("openEventIds").notNull().default("[]"),
+  openRuleIds: text("openRuleIds").notNull().default("[]"),
+  /** ISO, or `never`. */
+  quietUntil: text("quietUntil"),
+  streak: integer("streak").notNull().default(0),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+/** Every alert raised, resolved or told once: one row per rule it matched. */
+export const alertEvents = pgTable(
+  "alert_events",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    ruleId: integer("ruleId").references(() => alertRules.id, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    category: text("category"),
+    severity: text("severity").notNull(),
+    /** `notice`, `problem` or `recovery`. */
+    type: text("type").notNull(),
+    /** JSON NotificationEvent. */
+    event: text("event").notNull(),
+    at: text("at").notNull(),
+    /** For a problem: when it was over. */
+    resolvedAt: text("resolvedAt"),
+  },
+  (table) => ({
+    atIdx: index("alert_events_at_idx").on(table.at),
+    ruleKeyIdx: index("alert_events_rule_key_idx").on(table.ruleId, table.key),
+  }),
+);
+
+/**
+ * One event to one channel. Claimed before it is sent, so two workers never both send it; an
+ * expired claim is a worker that died, and the row is sent again.
+ */
+export const alertDeliveries = pgTable(
+  "alert_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("eventId")
+      .references(() => alertEvents.id, { onDelete: "cascade" })
+      .notNull(),
+    channelId: integer("channelId")
+      .references(() => notificationChannels.id, { onDelete: "cascade" })
+      .notNull(),
+    /** `pending`, `sent`, `failed`, `dropped` or `withdrawn`. */
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("lastError"),
+    /** JSON: recipients a partly failed send already reached, so a retry skips them. */
+    reached: text("reached").notNull().default("[]"),
+    claimedBy: text("claimedBy"),
+    claimedUntil: text("claimedUntil"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+    sentAt: text("sentAt"),
+  },
+  (table) => ({
+    eventChannelUnique: uniqueIndex("alert_deliveries_event_channel_unique").on(
+      table.eventId,
+      table.channelId,
+    ),
+    channelStatusIdx: index("alert_deliveries_channel_status_idx").on(
+      table.channelId,
+      table.status,
+    ),
+  }),
+);
+
+/** A daily report: when, in which zone, to which channels. */
+export const alertDigests = pgTable(
+  "alert_digests",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** `HH:MM`, read in timeZone. */
+    time: text("time").notNull(),
+    timeZone: text("timeZone").notNull().default("UTC"),
+    channelIds: text("channelIds").notNull().default("[]"),
+    enabled: boolean("enabled").notNull().default(true),
+    /** When the timing last changed: catch-up never sends a slot from before it. */
+    scheduledSince: text("scheduledSince").notNull(),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("alert_digests_name_unique").on(table.name),
+  }),
+);
+
+/** One row per digest slot, claimed before anything is sent. */
+export const alertDigestRuns = pgTable(
+  "alert_digest_runs",
+  {
+    id: serial("id").primaryKey(),
+    digestId: integer("digestId")
+      .references(() => alertDigests.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Epoch ms of the occurrence; a "send now" run's own start. */
+    slot: bigint("slot", { mode: "number" }).notNull(),
+    /** `schedule`, `catch-up` or `manual`. */
+    trigger: text("trigger").notNull(),
+    /** `running`, `sent`, `partial` or `failed`. */
+    status: text("status").notNull(),
+    /** JSON: per channel, whether it went and why not. */
+    results: text("results").notNull().default("[]"),
+    error: text("error"),
+    replica: text("replica"),
+    startedAt: text("startedAt").notNull(),
+    finishedAt: text("finishedAt"),
+  },
+  (table) => ({
+    slotUnique: uniqueIndex("alert_digest_runs_digest_slot_unique").on(table.digestId, table.slot),
+  }),
+);
+
+// ── Audit streaming (lib/audit-stream) ───────────────────────────────
+
+/** Where the audit log is streamed: syslog over UDP, TCP or TLS, HTTP, or a file. */
+export const auditSinks = pgTable(
+  "audit_sinks",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** `syslog-udp`, `syslog-tcp`, `syslog-tls`, `http` or `file`. */
+    kind: text("kind").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    /** JSON of what may be shown back: host, port, URL, encoding, file name, size limit, CA. */
+    config: text("config").notNull().default("{}"),
+    /** `enc:v1` JSON of the HTTP auth header's value. */
+    secret: text("secret").notNull().default(""),
+    /** WAF events and other mitigated requests, outside the hash chain. */
+    includeSecurity: boolean("includeSecurity").notNull().default(false),
+    /** The last audit `seq` delivered. */
+    auditCursor: integer("auditCursor").notNull().default(0),
+    /** The last security record delivered (audit_security_records.seq). */
+    securityCursor: integer("securityCursor").notNull().default(0),
+    /** After a 415: requests go uncompressed until the sink is saved again. */
+    encodingFallback: boolean("encodingFallback").notNull().default(false),
+    /** Failed passes in a row; the backoff grows with it. */
+    failures: integer("failures").notNull().default(0),
+    retryAt: text("retryAt"),
+    lastDeliveredAt: text("lastDeliveredAt"),
+    lastError: text("lastError"),
+    lastErrorAt: text("lastErrorAt"),
+    /** JSON StoredErrorCode, so the page renders lastError in the reader's language. */
+    lastErrorCode: text("lastErrorCode"),
+    /** The latest records pruned before this sink took them: `audit` or `security`, and seqs. */
+    gapStream: text("gapStream"),
+    gapFrom: integer("gapFrom"),
+    gapTo: integer("gapTo"),
+    gapAt: text("gapAt"),
+    /** Records lost to gaps, in total. */
+    missed: integer("missed").notNull().default(0),
+    /** The replica delivering, so a leadership flip never has two sending at once. */
+    leaseOwner: text("leaseOwner"),
+    leaseUntil: text("leaseUntil"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("audit_sinks_name_unique").on(table.name),
+  }),
+);
+
+/**
+ * Security records waiting for the sinks that include them, queued at ingest while any does.
+ * `seq` is handed out under the head row's lock, so it is commit order.
+ */
+export const auditSecurityRecords = pgTable(
+  "audit_security_records",
+  {
+    seq: integer("seq").primaryKey(),
+    /** The record as streamed, JSON, redacted as stored. */
+    record: text("record").notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    createdAtIdx: index("audit_security_records_created_at_idx").on(table.createdAt),
+  }),
+);
+
+/** One row (id 1): the last security `seq` handed out, and how far pruning has gone. */
+export const auditSecurityHead = pgTable("audit_security_head", {
+  id: integer("id").primaryKey(),
+  headSeq: integer("headSeq").notNull().default(0),
+  prunedSeq: integer("prunedSeq").notNull().default(0),
+  updatedAt: text("updatedAt").notNull(),
+});

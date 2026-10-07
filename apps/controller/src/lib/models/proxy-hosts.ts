@@ -1,7 +1,14 @@
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { validateCaddyfileSnippet } from "../caddy/caddyfile";
-import { logAuditEvent } from "../audit";
+import {
+  type HostWriteOptions,
+  auditedRevision,
+  runHostWrite,
+  setHostAgentsSteps,
+  updateOperation,
+} from "../host-history/record";
+import { pruneHostRevisions } from "../host-history/retention";
 import { hostAuditChanges } from "../host-review/audit";
 import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
@@ -30,7 +37,7 @@ import { domainError } from "../errors/domain-error";
 import { assertCertificateServable } from "../certificates/placement";
 import { seclangErrors } from "../waf/seclang";
 import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf/dry-run";
-import { agentIdsForHost, setHostAgents } from "./host-agents";
+import { agentIdsForHost } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
 import { normalizeHostDescription } from "../proxy-hosts/description";
@@ -3686,22 +3693,9 @@ export async function planProxyHostChange(
   input: Partial<ProxyHostInput>,
   actorUserId: number,
 ): Promise<{ before: ProxyHost | null; after: ProxyHost; agentIdsBefore: number[] }> {
-  const now = nowIso();
   if (id === null) {
     const values = await prepareProxyHostCreate(input as ProxyHostInput, actorUserId);
-    const after = parseProxyHost({
-      ...values,
-      id: 0,
-      description: values.description ?? null,
-      tags: values.tags ?? "[]",
-      certificateId: values.certificateId ?? null,
-      accessListId: values.accessListId ?? null,
-      ownerUserId: actorUserId,
-      meta: values.meta ?? null,
-      createdAt: now,
-      updatedAt: now,
-    } as ProxyHostRow);
-    return { before: null, after, agentIdsBefore: [] };
+    return { before: null, after: plannedProxyHost(values, actorUserId), agentIdsBefore: [] };
   }
   const { existing, row, set } = await prepareProxyHostUpdate(id, input, actorUserId);
   return {
@@ -3711,40 +3705,71 @@ export async function planProxyHostChange(
   };
 }
 
+/** The host a create's values parse to, before it has an id. */
+function plannedProxyHost(
+  values: Omit<ProxyHostInsert, "createdAt" | "updatedAt">,
+  actorUserId: number,
+): ProxyHost {
+  const now = nowIso();
+  return parseProxyHost({
+    ...values,
+    id: 0,
+    description: values.description ?? null,
+    tags: values.tags ?? "[]",
+    certificateId: values.certificateId ?? null,
+    accessListId: values.accessListId ?? null,
+    ownerUserId: actorUserId,
+    meta: values.meta ?? null,
+    createdAt: now,
+    updatedAt: now,
+  } as ProxyHostRow);
+}
+
+/** A stored row as the model reads it, for a revision's snapshot. */
+export function proxyHostFromRow(row: Record<string, unknown>): ProxyHost {
+  return parseProxyHost(row as ProxyHostRow);
+}
+
 export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
   const values = await prepareProxyHostCreate(input, actorUserId);
+  const changes = await hostAuditChanges(
+    "http",
+    null,
+    { host: plannedProxyHost(values, actorUserId), agentIds: input.agentIds ?? [] },
+    blankProxyHost(),
+  );
   const now = nowIso();
-  const [record] = await db
-    .insert(proxyHosts)
-    .values({ ...values, createdAt: now, updatedAt: now })
-    .returning();
-
-  if (!record) {
-    throw domainError("failedToCreateProxyHost");
-  }
-
-  // Before the apply, so the first document each agent is sent already reflects the placement.
-  if (input.agentIds !== undefined) {
-    await setHostAgents("http", record.id, input.agentIds);
-  }
-
-  const created = (await getProxyHost(record.id))!;
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "create",
-    entityType: "proxy_host",
-    entityId: record.id,
-    summary: `Created proxy host ${input.name}`,
-    changes: await hostAuditChanges(
-      "http",
-      null,
-      { host: created, agentIds: input.agentIds ?? [] },
-      blankProxyHost(),
-    ),
+  const id = await runHostWrite(function* (tx) {
+    const [record] = (yield {
+      all: tx
+        .insert(proxyHosts)
+        .values({ ...values, createdAt: now, updatedAt: now })
+        .returning({ id: proxyHosts.id }),
+    }) as { id: number }[];
+    if (!record) {
+      throw domainError("failedToCreateProxyHost");
+    }
+    // Before the apply, so the first document each agent is sent already reflects the placement.
+    if (input.agentIds !== undefined) {
+      yield* setHostAgentsSteps(tx, "http", record.id, input.agentIds);
+    }
+    yield* auditedRevision(
+      tx,
+      { kind: "http", hostId: record.id, operation: "create", userId: actorUserId },
+      {
+        userId: actorUserId,
+        action: "create",
+        entityType: "proxy_host",
+        entityId: record.id,
+        summary: `Created proxy host ${input.name}`,
+        changes,
+      },
+    );
+    return record.id;
   });
 
   await applyCaddyConfig();
-  return (await getProxyHost(record.id))!;
+  return (await getProxyHost(id))!;
 }
 
 /** A host's `meta` blob as stored, for copying it somewhere that stores the same blob. */
@@ -3904,34 +3929,47 @@ export async function updateProxyHost(
   id: number,
   input: Partial<ProxyHostInput>,
   actorUserId: number,
+  options: HostWriteOptions = {},
 ) {
   const { existing, row, set } = await prepareProxyHostUpdate(id, input, actorUserId);
   const agentIdsBefore = await agentIdsForHost("http", id);
-  await db
-    .update(proxyHosts)
-    .set({ ...set, updatedAt: nowIso() })
-    .where(eq(proxyHosts.id, id));
-
-  if (input.agentIds !== undefined) {
-    await setHostAgents("http", id, input.agentIds);
-  }
-
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "update",
-    entityType: "proxy_host",
-    entityId: id,
-    summary: `Updated proxy host ${input.name ?? existing.name}`,
-    changes: await hostAuditChanges(
-      "http",
-      { host: existing, agentIds: agentIdsBefore },
+  const changes = await hostAuditChanges(
+    "http",
+    { host: existing, agentIds: agentIdsBefore },
+    {
+      host: parseProxyHost({ ...row, ...set } as ProxyHostRow),
+      agentIds: input.agentIds ?? agentIdsBefore,
+    },
+    blankProxyHost(),
+  );
+  const now = nowIso();
+  await runHostWrite(function* (tx) {
+    yield {
+      run: tx
+        .update(proxyHosts)
+        .set({ ...set, updatedAt: now })
+        .where(eq(proxyHosts.id, id)),
+    };
+    if (input.agentIds !== undefined) {
+      yield* setHostAgentsSteps(tx, "http", id, input.agentIds);
+    }
+    yield* auditedRevision(
+      tx,
+      { kind: "http", hostId: id, userId: actorUserId, ...updateOperation(options) },
       {
-        host: parseProxyHost({ ...row, ...set } as ProxyHostRow),
-        agentIds: input.agentIds ?? agentIdsBefore,
+        userId: actorUserId,
+        action: "update",
+        entityType: "proxy_host",
+        entityId: id,
+        summary:
+          options.rollbackFrom !== undefined
+            ? `Rolled back proxy host ${input.name ?? existing.name} to revision ${options.rollbackFrom}`
+            : `Updated proxy host ${input.name ?? existing.name}`,
+        changes,
       },
-      blankProxyHost(),
-    ),
+    );
   });
+  await pruneHostRevisions("http", [id]);
 
   await applyCaddyConfig();
   return (await getProxyHost(id))!;
@@ -3957,18 +3995,26 @@ export async function setProxyHostMaintenance(
   if (!existing) {
     throw domainError("proxyHostNotFound");
   }
-  await db
-    .update(proxyHosts)
-    .set({ meta: withMaintenance(await getProxyHostMeta(id), enabled), updatedAt: nowIso() })
-    .where(eq(proxyHosts.id, id));
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "update",
-    entityType: "proxy_host",
-    entityId: id,
-    summary: `${enabled ? "Turned on" : "Turned off"} maintenance mode for proxy host ${existing.name}`,
-    data: { maintenance: { enabled } },
+  const meta = withMaintenance(await getProxyHostMeta(id), enabled);
+  const now = nowIso();
+  await runHostWrite(function* (tx) {
+    yield {
+      run: tx.update(proxyHosts).set({ meta, updatedAt: now }).where(eq(proxyHosts.id, id)),
+    };
+    yield* auditedRevision(
+      tx,
+      { kind: "http", hostId: id, operation: "maintenance", userId: actorUserId },
+      {
+        userId: actorUserId,
+        action: "update",
+        entityType: "proxy_host",
+        entityId: id,
+        summary: `${enabled ? "Turned on" : "Turned off"} maintenance mode for proxy host ${existing.name}`,
+        data: { maintenance: { enabled } },
+      },
+    );
   });
+  await pruneHostRevisions("http", [id]);
   await applyCaddyConfig();
   return (await getProxyHost(id))!;
 }
@@ -3980,19 +4026,28 @@ export async function deleteProxyHost(id: number, actorUserId: number) {
   }
 
   const agentIdsBefore = await agentIdsForHost("http", id);
-  await db.delete(proxyHosts).where(eq(proxyHosts.id, id));
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "delete",
-    entityType: "proxy_host",
-    entityId: id,
-    summary: `Deleted proxy host ${existing.name}`,
-    changes: await hostAuditChanges(
-      "http",
-      { host: existing, agentIds: agentIdsBefore },
-      null,
-      blankProxyHost(),
-    ),
+  const changes = await hostAuditChanges(
+    "http",
+    { host: existing, agentIds: agentIdsBefore },
+    null,
+    blankProxyHost(),
+  );
+  await runHostWrite(function* (tx) {
+    // Before the row goes: a deleted host's last state is what restoring it brings back.
+    yield* auditedRevision(
+      tx,
+      { kind: "http", hostId: id, operation: "delete", userId: actorUserId },
+      {
+        userId: actorUserId,
+        action: "delete",
+        entityType: "proxy_host",
+        entityId: id,
+        summary: `Deleted proxy host ${existing.name}`,
+        changes,
+      },
+    );
+    yield { run: tx.delete(proxyHosts).where(eq(proxyHosts.id, id)) };
   });
+  await pruneHostRevisions("http", [id]);
   await applyCaddyConfig();
 }

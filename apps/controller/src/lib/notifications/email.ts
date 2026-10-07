@@ -7,6 +7,7 @@ import { createFormatter } from "next-intl";
 import { DEFAULT_LOCALE, type Locale } from "../locale";
 import { emailContext, renderBody } from "../email/messages";
 import type { EmailMessage } from "../email/transport";
+import { attentionMessageValues } from "../attention/types";
 import { storedErrorMessage } from "../errors/action-error";
 import { geoipUpdateErrorMessage } from "../geoip/messages";
 import type { NotificationEvent } from "./events";
@@ -43,7 +44,10 @@ function clean(values: Record<string, string | number>): Record<string, string |
 type RootTranslate = Parameters<typeof storedErrorMessage>[0];
 
 /** The ICU values for a kind's `item` and `title`. Errors with a stored code in `tRoot`'s language. */
-function values(event: NotificationEvent, tRoot: RootTranslate): Record<string, string | number> {
+export function values(
+  event: NotificationEvent,
+  tRoot: RootTranslate,
+): Record<string, string | number> {
   switch (event.kind) {
     case "accountDisabled":
     case "lastAdminKept":
@@ -85,6 +89,47 @@ function values(event: NotificationEvent, tRoot: RootTranslate): Record<string, 
       return { plugin: event.plugin, version: event.version };
     case "updateAvailable":
       return { version: event.version, current: event.current };
+    case "backupFailed":
+      return {
+        schedule: event.schedule,
+        error: storedErrorMessage(tRoot, event.error, event.errorCode),
+      };
+    case "backupRecovered":
+      return { schedule: event.schedule };
+    case "auditSinkFailed":
+      return { sink: event.sink, error: storedErrorMessage(tRoot, event.error, event.errorCode) };
+    case "auditSinkRecovered":
+      return { sink: event.sink };
+    case "channelFailing":
+      return { channel: event.channel, failures: event.failures, error: event.error };
+    case "channelRecovered":
+    case "channelTest":
+      return { channel: event.channel };
+    case "ruleTest":
+      return { rule: event.rule };
+    case "attention":
+    case "attentionResolved": {
+      const translate = tRoot as unknown as (
+        key: string,
+        values?: Record<string, string | number | Date>,
+      ) => string;
+      const parts = attentionMessageValues({ values: event.values });
+      return {
+        title: translate(`attention.items.${event.code}.title`, parts),
+        detail: translate(`attention.items.${event.code}.detail`, parts),
+      };
+    }
+    case "metricThreshold":
+      return {
+        host: event.host,
+        metric: event.metric,
+        comparison: event.comparison,
+        value: event.value,
+        threshold: event.threshold,
+        minutes: event.minutes,
+      };
+    case "metricRecovered":
+      return { host: event.host, metric: event.metric };
     case "geoipRecovered":
     case "test":
       return {};
@@ -104,18 +149,14 @@ export async function notificationText(notices: readonly PendingNotice[], locale
       ? t("notifications.withDetail", { text, detail: String(clean({ d: event.detail }).d) })
       : text;
   });
-  const [first] = notices;
+  const titles = notices.map(({ event }) =>
+    translate(`notifications.kinds.${event.kind}.title`, clean(values(event, tRoot))),
+  );
   const subject =
     notices.length === 1
-      ? t("notifications.subjectOne", {
-          appName,
-          title: translate(
-            `notifications.kinds.${first.event.kind}.title`,
-            clean(values(first.event, tRoot)),
-          ),
-        })
+      ? t("notifications.subjectOne", { appName, title: titles[0] })
       : t("notifications.subjectMany", { appName, count: notices.length });
-  return { ...context, subject, texts };
+  return { ...context, subject, texts, titles };
 }
 
 export async function notificationEmail(

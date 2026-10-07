@@ -89,4 +89,28 @@ describe('browser secret boundaries', () => {
     expect(profilePage).toContain('hasPassword: Boolean(passwordHash)');
     expect(profileClient).not.toContain('passwordHash');
   });
+
+  it("hands the history pages a host's parsed revisions and masked diffs, never its stored rows", () => {
+    // A snapshot keeps the stored row, secrets sealed but present; only the server reads it.
+    for (const page of [
+      'src/app/(dashboard)/proxy-hosts/[id]/history/page.tsx',
+      'src/app/(dashboard)/l4-proxy-hosts/[id]/history/page.tsx',
+    ]) {
+      const source = readFileSync(join(process.cwd(), page), 'utf8');
+      const props = source.slice(source.indexOf('<HostHistoryScreen'));
+      expect(props).not.toContain('snapshot');
+    }
+    const view = readFileSync(
+      join(process.cwd(), 'src/components/host-history/HostHistoryView.tsx'),
+      'utf8',
+    );
+    expect(view).not.toContain('snapshot');
+    // The editor gets the revision parsed, as it gets a stored host.
+    const listPage = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/proxy-hosts/page.tsx'),
+      'utf8',
+    );
+    expect(listPage).toContain('proxyHostFromRow(rollback.snapshot.row)');
+    expect(listPage).not.toMatch(/rollback=\{rollback\}/);
+  });
 });

@@ -62,6 +62,8 @@ export type HealthInput = {
   faviconSet: boolean;
   instance: { appName: string; baseUrl: string };
   gravatarEnabled: boolean;
+  /** Optional for callers that predate it; the defaults stand in. */
+  hostHistory?: { keepRevisions: number; keepDays: number };
   errorPageRules: number;
   globalCaddyfileLines: number;
   httpCacheStorage: string;
@@ -357,6 +359,16 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     "avatars",
     input.gravatarEnabled ? "ok" : "unset",
     input.gravatarEnabled ? t("health.avatars.valueGravatar") : t("health.off"),
+  );
+
+  push(
+    "host-history",
+    "hostHistory",
+    "ok",
+    t("health.hostHistory.value", {
+      count: String(input.hostHistory?.keepRevisions ?? 100),
+      days: String(input.hostHistory?.keepDays ?? 365),
+    }),
   );
 
   push(

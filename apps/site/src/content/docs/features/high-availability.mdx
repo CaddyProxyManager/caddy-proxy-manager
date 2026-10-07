@@ -17,8 +17,8 @@ Every controller is the same container, pointed at the same PostgreSQL database 
 - **Sign-in limits and lockouts.** A second controller is not a fresh set of guesses.
 - **The agents.** An agent holds one connection, to whichever controller it reached. The others
   reach it through that one, so a host saved anywhere is applied to every agent.
-- **The background jobs** - GeoIP downloads, certificate alerts, notifications, expiring blocks -
-  run on one controller at a time. If it stops, another takes them over within about 20 seconds.
+- **The background jobs** - GeoIP downloads, certificate alerts, notifications and alerts, daily
+  digests, expiring blocks, scheduled backups, audit streaming - run on one controller at a time. If it stops, another takes them over within about 20 seconds.
 - **GeoIP databases.** The controller running the jobs downloads them; the others copy them from
   the database, so every one serves agents the same files.
 

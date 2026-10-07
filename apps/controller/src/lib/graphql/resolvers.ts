@@ -67,6 +67,10 @@ import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics
 import { attentionMutationResolvers, attentionQueryResolvers } from "./attention";
 import { securityMutationResolvers, securityQueryResolvers } from "./security";
 import { auditMutationResolvers } from "./audit";
+import { alertMutationResolvers, alertQueryResolvers } from "./alerts";
+import { auditStreamMutationResolvers, auditStreamQueryResolvers } from "./audit-stream";
+import { backupMutationResolvers, backupQueryResolvers } from "./backup";
+import { hostHistoryMutationResolvers, hostHistoryQueryResolvers } from "./host-history";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -311,6 +315,10 @@ export const resolvers = {
     ...analyticsQueryResolvers,
     ...attentionQueryResolvers,
     ...securityQueryResolvers,
+    ...backupQueryResolvers,
+    ...alertQueryResolvers,
+    ...auditStreamQueryResolvers,
+    ...hostHistoryQueryResolvers,
   },
 
   Mutation: {
@@ -525,5 +533,9 @@ export const resolvers = {
     ...attentionMutationResolvers,
     ...securityMutationResolvers,
     ...auditMutationResolvers,
+    ...backupMutationResolvers,
+    ...alertMutationResolvers,
+    ...auditStreamMutationResolvers,
+    ...hostHistoryMutationResolvers,
   },
 };

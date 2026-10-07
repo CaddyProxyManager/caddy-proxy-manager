@@ -94,6 +94,17 @@ function isDiffValue(value: unknown): value is DiffValue {
 }
 
 /** The stored `data` column's changes, or null; anything malformed is dropped rather than shown. */
+/** The host revision a host event's write made; null for anything else. */
+export function parseAuditRevisionId(data: string | null): number | null {
+  if (!data) return null;
+  try {
+    const id = (JSON.parse(data) as { revisionId?: unknown } | null)?.revisionId;
+    return Number.isInteger(id) ? (id as number) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseAuditChanges(data: string | null): AuditChange[] | null {
   if (!data) return null;
   let parsed: unknown;

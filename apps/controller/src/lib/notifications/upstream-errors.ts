@@ -11,7 +11,6 @@ import { upstreamErrorCounts } from "../db/schema";
 import { hostMatchesPattern } from "../proxy-hosts/pattern-priority";
 import {
   notificationCategoryEnabled,
-  notificationChannelReady,
   openProblemKeys,
   raiseProblem,
   resolveProblem,
@@ -163,7 +162,6 @@ export function parseUpstreamErrorRow(value: unknown): UpstreamErrorRow | null {
 export async function upstreamErrorsWanted(): Promise<boolean> {
   const { isDemoMode } = await import("../demo/mode");
   if (isDemoMode()) return false;
-  return (
-    (await notificationCategoryEnabled("upstreamErrors")) && (await notificationChannelReady())
-  );
+  const { eventKindDeliverable } = await import("./index");
+  return eventKindDeliverable("upstreamErrors", "upstreamErrors");
 }

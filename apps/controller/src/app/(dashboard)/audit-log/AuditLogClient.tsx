@@ -20,6 +20,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { AuditChanges, type DiffLayout } from "@/components/audit/AuditChanges";
 import type { AuditChange } from "@/lib/audit/changes";
 import type { AuditChainVerification } from "@/lib/audit/chain";
+import type { AuditRevisionLink } from "@/lib/host-history/types";
 
 type EventRow = {
   id: number;
@@ -30,6 +31,8 @@ type EventRow = {
   summary: string;
   /** Field-level before and after, when the event recorded them. */
   changes?: AuditChange[] | null;
+  /** A host event's way back: its history, ready to roll back or restore. */
+  revisionLink?: AuditRevisionLink | null;
 };
 
 export type VerifyChainResult =
@@ -177,15 +180,19 @@ export default function AuditLogClient({
       id: "changes",
       label: t("changes"),
       width: 140,
-      render: (r) =>
-        r.changes && r.changes.length > 0 ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            label={tCommon("changeCount", { count: r.changes.length })}
-            onClick={() => setOpen(r)}
-          />
-        ) : null,
+      render: (r) => (
+        <VStack gap={1}>
+          {r.changes && r.changes.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              label={tCommon("changeCount", { count: r.changes.length })}
+              onClick={() => setOpen(r)}
+            />
+          )}
+          <RevisionLinkButton link={r.revisionLink} />
+        </VStack>
+      ),
     },
   ];
 
@@ -209,6 +216,7 @@ export default function AuditLogClient({
             onClick={() => setOpen(r)}
           />
         )}
+        <RevisionLinkButton link={r.revisionLink} />
       </VStack>
     </Card>
   );
@@ -331,5 +339,30 @@ export default function AuditLogClient({
         </VStack>
       </AppDialog>
     </VStack>
+  );
+}
+
+/** One word in the cell; the tooltip says which way back it goes. */
+function RevisionLinkButton({ link }: { link?: AuditRevisionLink | null }) {
+  const t = useTranslations("hostHistory");
+  const tCommon = useTranslations("common");
+  if (!link) return null;
+  return link.kind === "restore" ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      label={tCommon("restore")}
+      tooltip={t("auditRestore")}
+      href={link.href}
+    />
+  ) : (
+    <Button
+      variant="ghost"
+      size="sm"
+      label={t("revert")}
+      tooltip={t("auditRollback")}
+      href={link.href}
+      data-testid="audit-rollback"
+    />
   );
 }

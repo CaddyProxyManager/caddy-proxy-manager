@@ -31,6 +31,7 @@ import { parseProxyHostCreateForm, parseProxyHostUpdateForm } from "@/src/lib/pr
 import { revertedFields } from "@/src/lib/host-review/diff";
 import { previewProxyHostChange, revertProxyHostInput } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
+import { restoreHost, rollbackRevisionFrom } from "@/src/lib/host-history";
 import {
   type HostEditorOptions,
   loadForwardAuthAccess,
@@ -99,7 +100,8 @@ export async function updateProxyHostAction(
       revertedFields(formData),
       false,
     );
-    await updateProxyHost(id, input, userId);
+    const rollbackFrom = await rollbackRevisionFrom(formData, "http", id);
+    await updateProxyHost(id, input, userId, { rollbackFrom });
     if (forwardAuthAccess) {
       await setForwardAuthAccess(id, forwardAuthAccess, userId);
     }
@@ -282,5 +284,26 @@ export async function previewProxyHostAction(
   } catch (error) {
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
+  }
+}
+
+/** Admin only, as a create is: a deleted host has no grants left to check. */
+export async function restoreProxyHostAction(
+  revisionId: number,
+  dropMissingReferences: boolean,
+): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    await restoreHost(revisionId, Number(session.user.id), {
+      dropMissingReferences,
+      kind: "http",
+    });
+    revalidatePath("/proxy-hosts");
+    const t = await getTranslations("hostHistory");
+    return actionSuccess(t("restored"));
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to restore proxy host:", revisionId, error);
+    return actionError(t, error, t("errors.restoreHostFailed"));
   }
 }

@@ -12,6 +12,7 @@ import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
 import { strictId } from "@/src/lib/http/strict-id";
 import { auditSummaryText } from "@/src/lib/audit/summary";
+import { auditRevisionLinks } from "@/src/lib/host-history";
 import type { Metadata } from "next";
 import { getFormatter, getTranslations } from "next-intl/server";
 
@@ -78,6 +79,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   });
 
   const userMap = new Map(users.map((user) => [user.id, user]));
+  const revisionLinks = await auditRevisionLinks(events).catch(() => new Map());
   const t = await getTranslations("auditLog");
   // The summaries' keys are composed at runtime, which the root translator is typed for.
   const tSummaries = await getTranslations();
@@ -88,6 +90,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         id: event.id,
         createdAt: event.createdAt,
         changes: event.changes,
+        revisionLink: revisionLinks.get(event.id) ?? null,
         action: event.action,
         entityType: event.entityType,
         summary:

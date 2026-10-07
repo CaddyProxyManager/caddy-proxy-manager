@@ -8,13 +8,20 @@ import {
 } from "../caddy/utils";
 import { applyCaddyConfig } from "../caddy";
 import { getMetricsSettings } from "../settings";
-import { logAuditEvent } from "../audit";
+import {
+  type HostWriteOptions,
+  auditedRevision,
+  runHostWrite,
+  setHostAgentsSteps,
+  updateOperation,
+} from "../host-history/record";
+import { pruneHostRevisions } from "../host-history/retention";
 import { hostAuditChanges } from "../host-review/audit";
 import { accessListIpRules, accessLists, l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../errors/domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
-import { agentIdsForHost, setHostAgents } from "./host-agents";
+import { agentIdsForHost } from "./host-agents";
 import { normalizeHostDescription } from "../proxy-hosts/description";
 import { collectTags, hasTagClause, normalizeHostTags, parseStoredTags } from "../proxy-hosts/tags";
 import { assertL4PortPlan, MAX_L4_PORTS_PER_HOST } from "../l4/port-plan";
@@ -817,27 +824,9 @@ export async function planL4ProxyHostChange(
   input: Partial<L4ProxyHostInput>,
   actorUserId: number,
 ): Promise<{ before: L4ProxyHost | null; after: L4ProxyHost; agentIdsBefore: number[] }> {
-  const now = nowIso();
   if (id === null) {
     const values = await prepareL4ProxyHostCreate(input as L4ProxyHostInput, actorUserId);
-    const after = parseL4ProxyHost({
-      ...values,
-      id: 0,
-      description: values.description ?? null,
-      tags: values.tags ?? "[]",
-      matcherType: values.matcherType ?? "none",
-      matcherValue: values.matcherValue ?? null,
-      tlsTermination: values.tlsTermination ?? false,
-      proxyProtocolVersion: values.proxyProtocolVersion ?? null,
-      proxyProtocolReceive: values.proxyProtocolReceive ?? false,
-      accessListId: values.accessListId ?? null,
-      ownerUserId: actorUserId,
-      meta: values.meta ?? null,
-      enabled: values.enabled ?? true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    return { before: null, after, agentIdsBefore: [] };
+    return { before: null, after: plannedL4ProxyHost(values, actorUserId), agentIdsBefore: [] };
   }
   const { existing, row, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
   return {
@@ -847,38 +836,75 @@ export async function planL4ProxyHostChange(
   };
 }
 
+/** The host a create's values parse to, before it has an id. */
+function plannedL4ProxyHost(
+  values: Omit<L4ProxyHostInsert, "createdAt" | "updatedAt">,
+  actorUserId: number,
+): L4ProxyHost {
+  const now = nowIso();
+  return parseL4ProxyHost({
+    ...values,
+    id: 0,
+    description: values.description ?? null,
+    tags: values.tags ?? "[]",
+    matcherType: values.matcherType ?? "none",
+    matcherValue: values.matcherValue ?? null,
+    tlsTermination: values.tlsTermination ?? false,
+    proxyProtocolVersion: values.proxyProtocolVersion ?? null,
+    proxyProtocolReceive: values.proxyProtocolReceive ?? false,
+    accessListId: values.accessListId ?? null,
+    ownerUserId: actorUserId,
+    meta: values.meta ?? null,
+    enabled: values.enabled ?? true,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+/** A stored row as the model reads it, for a revision's snapshot. */
+export function l4ProxyHostFromRow(row: Record<string, unknown>): L4ProxyHost {
+  return parseL4ProxyHost(row as L4ProxyHostRow);
+}
+
 export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
   const values = await prepareL4ProxyHostCreate(input, actorUserId);
+  const changes = await hostAuditChanges(
+    "l4",
+    null,
+    { host: plannedL4ProxyHost(values, actorUserId), agentIds: input.agentIds ?? [] },
+    blankL4ProxyHost(),
+  );
   const now = nowIso();
-  const [record] = await db
-    .insert(l4ProxyHosts)
-    .values({ ...values, createdAt: now, updatedAt: now })
-    .returning();
-
-  if (!record) {
-    throw domainError("l4ProxyHostCreationFailed");
-  }
-
-  if (input.agentIds !== undefined) {
-    await setHostAgents("l4", record.id, input.agentIds);
-  }
-
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "create",
-    entityType: "l4_proxy_host",
-    entityId: record.id,
-    summary: `Created L4 proxy host ${input.name}`,
-    changes: await hostAuditChanges(
-      "l4",
-      null,
-      { host: parseL4ProxyHost(record), agentIds: input.agentIds ?? [] },
-      blankL4ProxyHost(),
-    ),
+  const id = await runHostWrite(function* (tx) {
+    const [record] = (yield {
+      all: tx
+        .insert(l4ProxyHosts)
+        .values({ ...values, createdAt: now, updatedAt: now })
+        .returning({ id: l4ProxyHosts.id }),
+    }) as { id: number }[];
+    if (!record) {
+      throw domainError("l4ProxyHostCreationFailed");
+    }
+    if (input.agentIds !== undefined) {
+      yield* setHostAgentsSteps(tx, "l4", record.id, input.agentIds);
+    }
+    yield* auditedRevision(
+      tx,
+      { kind: "l4", hostId: record.id, operation: "create", userId: actorUserId },
+      {
+        userId: actorUserId,
+        action: "create",
+        entityType: "l4_proxy_host",
+        entityId: record.id,
+        summary: `Created L4 proxy host ${input.name}`,
+        changes,
+      },
+    );
+    return record.id;
   });
 
   await applyCaddyConfig();
-  return (await getL4ProxyHost(record.id))!;
+  return (await getL4ProxyHost(id))!;
 }
 
 export async function getL4ProxyHost(id: number): Promise<L4ProxyHost | null> {
@@ -1075,31 +1101,44 @@ export async function updateL4ProxyHost(
   id: number,
   input: Partial<L4ProxyHostInput>,
   actorUserId: number,
+  options: HostWriteOptions = {},
 ) {
   const { existing, row, set } = await prepareL4ProxyHostUpdate(id, input, actorUserId);
   const agentIdsBefore = await agentIdsForHost("l4", id);
-  await db
-    .update(l4ProxyHosts)
-    .set({ ...set, updatedAt: nowIso() })
-    .where(eq(l4ProxyHosts.id, id));
-
-  if (input.agentIds !== undefined) {
-    await setHostAgents("l4", id, input.agentIds);
-  }
-
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "update",
-    entityType: "l4_proxy_host",
-    entityId: id,
-    summary: `Updated L4 proxy host ${input.name ?? existing.name}`,
-    changes: await hostAuditChanges(
-      "l4",
-      { host: existing, agentIds: agentIdsBefore },
-      { host: parseL4ProxyHost({ ...row, ...set }), agentIds: input.agentIds ?? agentIdsBefore },
-      blankL4ProxyHost(),
-    ),
+  const changes = await hostAuditChanges(
+    "l4",
+    { host: existing, agentIds: agentIdsBefore },
+    { host: parseL4ProxyHost({ ...row, ...set }), agentIds: input.agentIds ?? agentIdsBefore },
+    blankL4ProxyHost(),
+  );
+  const now = nowIso();
+  await runHostWrite(function* (tx) {
+    yield {
+      run: tx
+        .update(l4ProxyHosts)
+        .set({ ...set, updatedAt: now })
+        .where(eq(l4ProxyHosts.id, id)),
+    };
+    if (input.agentIds !== undefined) {
+      yield* setHostAgentsSteps(tx, "l4", id, input.agentIds);
+    }
+    yield* auditedRevision(
+      tx,
+      { kind: "l4", hostId: id, userId: actorUserId, ...updateOperation(options) },
+      {
+        userId: actorUserId,
+        action: "update",
+        entityType: "l4_proxy_host",
+        entityId: id,
+        summary:
+          options.rollbackFrom !== undefined
+            ? `Rolled back L4 proxy host ${input.name ?? existing.name} to revision ${options.rollbackFrom}`
+            : `Updated L4 proxy host ${input.name ?? existing.name}`,
+        changes,
+      },
+    );
   });
+  await pruneHostRevisions("l4", [id]);
 
   await applyCaddyConfig();
   return (await getL4ProxyHost(id))!;
@@ -1112,20 +1151,29 @@ export async function deleteL4ProxyHost(id: number, actorUserId: number) {
   }
 
   const agentIdsBefore = await agentIdsForHost("l4", id);
-  await db.delete(l4ProxyHosts).where(eq(l4ProxyHosts.id, id));
-  await logAuditEvent({
-    userId: actorUserId,
-    action: "delete",
-    entityType: "l4_proxy_host",
-    entityId: id,
-    summary: `Deleted L4 proxy host ${existing.name}`,
-    changes: await hostAuditChanges(
-      "l4",
-      { host: existing, agentIds: agentIdsBefore },
-      null,
-      blankL4ProxyHost(),
-    ),
+  const changes = await hostAuditChanges(
+    "l4",
+    { host: existing, agentIds: agentIdsBefore },
+    null,
+    blankL4ProxyHost(),
+  );
+  await runHostWrite(function* (tx) {
+    // Before the row goes, as for a proxy host.
+    yield* auditedRevision(
+      tx,
+      { kind: "l4", hostId: id, operation: "delete", userId: actorUserId },
+      {
+        userId: actorUserId,
+        action: "delete",
+        entityType: "l4_proxy_host",
+        entityId: id,
+        summary: `Deleted L4 proxy host ${existing.name}`,
+        changes,
+      },
+    );
+    yield { run: tx.delete(l4ProxyHosts).where(eq(l4ProxyHosts.id, id)) };
   });
+  await pruneHostRevisions("l4", [id]);
   await applyCaddyConfig();
 }
 

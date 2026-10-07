@@ -153,7 +153,11 @@ describe('bulkUpdateProxyHosts', () => {
       'Updated proxy host alpha',
       'Updated proxy host beta',
     ]);
-    expect(JSON.parse(audits[0].data!)).toEqual({ enabled: false, bulk: true });
+    expect(JSON.parse(audits[0].data!)).toEqual({
+      enabled: false,
+      bulk: true,
+      revisionId: expect.any(Number),
+    });
     expect(applyCaddyConfig).toHaveBeenCalledTimes(1);
   });
 

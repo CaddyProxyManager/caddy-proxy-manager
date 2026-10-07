@@ -1,5 +1,6 @@
 "use client";
 
+import type { EditorRollback } from "@/components/host-history/RollbackNotice";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Network, ArrowRight, Shield } from "lucide-react";
@@ -37,7 +38,11 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 import { clearEditorLink } from "@/components/host-review/section-link";
-import { type L4EditorSection, isL4EditorSection } from "@/src/lib/l4/editor-sections";
+import {
+  type L4EditorSection,
+  isL4EditorSection,
+  l4ProxyHostHistoryHref,
+} from "@/src/lib/l4/editor-sections";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -60,6 +65,8 @@ type Props = {
   manageableIds?: number[];
   /** A host to open the editor on, from an `?edit=` link. */
   editTarget?: L4ProxyHost | null;
+  /** Set when `editTarget` is a revision loaded for a rollback rather than the stored host. */
+  rollback?: EditorRollback | null;
 };
 
 function formatMatcher(
@@ -132,6 +139,8 @@ function HostActions({
 }) {
   const tCommon = useTranslations("common");
   const tProxyHosts = useTranslations("proxyHosts");
+  const tSettings = useTranslations("settings");
+  const router = useRouter();
   return (
     <HStack gap={2} vAlign="center" justify="end">
       <Switch
@@ -147,6 +156,10 @@ function HostActions({
         items={[
           { label: tCommon("edit"), onClick: onEdit },
           ...(canCreate ? [{ label: tCommon("duplicate"), onClick: onDuplicate }] : []),
+          {
+            label: tSettings("history.navLabel"),
+            onClick: () => router.push(l4ProxyHostHistoryHref(host.id)),
+          },
           { type: "divider" },
           { label: tCommon("delete"), variant: "destructive", onClick: onDelete },
         ]}
@@ -170,6 +183,7 @@ export default function L4ProxyHostsClient({
   canCreate = true,
   manageableIds = [],
   editTarget = null,
+  rollback = null,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const tNav = useTranslations("nav");
@@ -217,6 +231,7 @@ export default function L4ProxyHostsClient({
     if (searchParams.has("edit")) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("edit");
+      params.delete("revision");
       const query = params.toString();
       router.replace(query ? `${pathname}?${query}` : pathname);
       return;
@@ -509,6 +524,7 @@ export default function L4ProxyHostsClient({
         <EditL4HostDialog
           open={!!editHost}
           host={editHost}
+          rollback={rollback && editHost === editTarget ? rollback : null}
           initialSection={editSection}
           onClose={() => {
             signalBannerRefresh();

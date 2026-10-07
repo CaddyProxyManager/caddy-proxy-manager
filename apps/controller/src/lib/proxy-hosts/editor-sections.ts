@@ -33,3 +33,8 @@ export function editorSectionHref(hostId: number, section?: EditorSection): stri
 export function proxyHostDetailHref(hostId: number): string {
   return `/proxy-hosts/${hostId}`;
 }
+
+/** Optionally opened on one revision, compared with the one before it. */
+export function proxyHostHistoryHref(hostId: number, revisionId?: number): string {
+  return `/proxy-hosts/${hostId}/history${revisionId ? `?to=${revisionId}` : ""}`;
+}

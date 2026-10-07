@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   BarChart2,
+  Bell,
   Cable,
   FileJson2,
   History,
@@ -35,6 +36,7 @@ export const DESTINATION_ICONS: Record<DestinationId, LucideIcon> = {
   security: ShieldAlert,
   "audit-log": History,
   logs: ScrollText,
+  alerts: Bell,
   "api-docs": FileJson2,
   settings: Settings,
   profile: UserRound,
@@ -55,6 +57,7 @@ export const DESTINATION_HUES: Record<DestinationId, Hue> = {
   security: "orange",
   "audit-log": "orange",
   logs: "gray",
+  alerts: "red",
   "api-docs": "teal",
   settings: "gray",
   profile: "purple",

@@ -369,3 +369,246 @@ describe('the audit hash chain across a restore', () => {
     expect(await verifyAuditChain()).toMatchObject({ ok: true, checked: 3, legacy: 0 });
   });
 });
+
+describe('scheduled backup state across a restore', () => {
+  async function seedSchedule() {
+    const [destination] = await ctx.db
+      .insert(schema.backupDestinations)
+      .values({
+        name: 'bucket',
+        kind: 's3',
+        bucket: 'cpm',
+        accessKeyId: 'AKIA',
+        secretAccessKey: encryptSecret('s3-secret-key'),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    const [schedule] = await ctx.db
+      .insert(schema.backupSchedules)
+      .values({
+        name: 'nightly',
+        destinationId: destination.id,
+        cron: '0 2 * * *',
+        passphrase: encryptSecret('schedule passphrase'),
+        scheduledSince: NOW,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    await ctx.db.insert(schema.backupRuns).values({
+      scheduleId: schedule.id,
+      slot: 1,
+      trigger: 'schedule',
+      status: 'succeeded',
+      startedAt: NOW,
+    });
+    return { destination, schedule };
+  }
+
+  beforeEach(async () => {
+    await ctx.db.delete(schema.backupRuns);
+    await ctx.db.delete(schema.backupSchedules);
+    await ctx.db.delete(schema.backupDestinations);
+  });
+
+  it('carries destinations and schedules with their secrets as plaintext, and never the runs', async () => {
+    await seedSchedule();
+    const file = await createBackup(PASSPHRASE);
+    const { openBackup } = await import('../../src/lib/backup/format');
+    const opened = await openBackup(file, PASSPHRASE);
+    expect(opened.tables.backup_runs).toBeUndefined();
+    const [destination] = opened.tables.backup_destinations as { secretAccessKey: string }[];
+    const [schedule] = opened.tables.backup_schedules as { passphrase: string }[];
+    // Sealed by the backup's passphrase only: a target with another SESSION_SECRET can read them.
+    expect(destination.secretAccessKey.startsWith('cpmbak-secret:')).toBe(true);
+    expect(schedule.passphrase.startsWith('cpmbak-secret:')).toBe(true);
+  });
+
+  it("restores them re-encrypted under this deployment's key, dropping the old runs", async () => {
+    await seedSchedule();
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.backupRuns);
+    await ctx.db.delete(schema.backupSchedules);
+    await ctx.db.delete(schema.backupDestinations);
+    // A run recorded after the backup, for a schedule id the restore brings back.
+    const { schedule } = await seedSchedule();
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+
+    const [destination] = await ctx.db.select().from(schema.backupDestinations);
+    expect(destination.secretAccessKey.startsWith('enc:v1:')).toBe(true);
+    expect(decryptSecret(destination.secretAccessKey)).toBe('s3-secret-key');
+    const [restored] = await ctx.db.select().from(schema.backupSchedules);
+    expect(decryptSecret(restored.passphrase)).toBe('schedule passphrase');
+    expect(restored.name).toBe(schedule.name);
+    expect(await ctx.db.select().from(schema.backupRuns)).toHaveLength(0);
+  });
+});
+
+describe('host history', () => {
+  async function seedRevision(snapshotSecret: string) {
+    await ctx.db.delete(schema.hostRevisions);
+    await ctx.db.insert(schema.hostRevisions).values({
+      hostKind: 'http',
+      hostId: 7,
+      operation: 'update',
+      // A stored secret stays sealed in a snapshot, as the row it copies keeps it.
+      snapshot: JSON.stringify({ row: { id: 7, name: 'app', meta: snapshotSecret }, agentIds: [] }),
+      userId: 1,
+      userName: 'Admin',
+      createdAt: NOW,
+    });
+  }
+
+  it('is in a backup only when settings history is asked for', async () => {
+    await seedRevision(encryptSecret('snapshot-secret'));
+    const { openBackup } = await import('../../src/lib/backup/format');
+    const without = await openBackup(await createBackup(PASSPHRASE), PASSPHRASE);
+    expect(without.tables.host_revisions).toBeUndefined();
+    const withHistory = await openBackup(
+      await createBackup(PASSPHRASE, { settingsHistory: true }),
+      PASSPHRASE,
+    );
+    expect(withHistory.tables.host_revisions).toHaveLength(1);
+    expect(JSON.stringify(withHistory.tables.host_revisions)).not.toContain('enc:v1:');
+  });
+
+  it('restores re-sealed, and clears revisions a restore of hosts without them would misname', async () => {
+    await seedRevision(encryptSecret('snapshot-secret'));
+    const withHistory = await createBackup(PASSPHRASE, { settingsHistory: true });
+    await ctx.db.delete(schema.hostRevisions);
+    await restoreBackup(withHistory, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.hostRevisions);
+    const meta = JSON.parse(restored.snapshot).row.meta as string;
+    expect(meta.startsWith('enc:v1:')).toBe(true);
+    expect(decryptSecret(meta)).toBe('snapshot-secret');
+
+    const hostsOnly = await createBackup(PASSPHRASE);
+    await restoreBackup(hostsOnly, PASSPHRASE, { keepAgents: true });
+    expect(await ctx.db.select().from(schema.hostRevisions)).toHaveLength(0);
+  });
+});
+
+describe('older backup formats', () => {
+  it('restores a version 2 backup', async () => {
+    const { readFileSync } = await import('node:fs');
+    const file = readFileSync(join(import.meta.dir, '../unit/backup/v2-fixture.cpmbak'));
+    await restoreBackup(file, 'version two passphrase', { keepAgents: true });
+    const hosts = await ctx.db.select().from(schema.proxyHosts);
+    expect(hosts.map((host) => host.name)).toEqual(['from-v2']);
+  });
+});
+
+describe('alerting across a restore', () => {
+  async function seedAlerts() {
+    const [channel] = await ctx.db
+      .insert(schema.notificationChannels)
+      .values({
+        name: 'ops-chat',
+        kind: 'discord',
+        secret: encryptSecret(JSON.stringify({ url: 'https://discord.test/api/webhooks/1/token' })),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    const [rule] = await ctx.db
+      .insert(schema.alertRules)
+      .values({
+        name: 'errors',
+        source: 'metric',
+        channelIds: JSON.stringify([channel.id]),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    const [event] = await ctx.db
+      .insert(schema.alertEvents)
+      .values({
+        key: 'k',
+        ruleId: rule.id,
+        kind: 'test',
+        severity: 'info',
+        type: 'notice',
+        event: '{"kind":"test"}',
+        at: NOW,
+      })
+      .returning();
+    await ctx.db
+      .insert(schema.alertDeliveries)
+      .values({ eventId: event.id, channelId: channel.id, createdAt: NOW, updatedAt: NOW });
+    return { channel, rule };
+  }
+
+  beforeEach(async () => {
+    await ctx.db.delete(schema.alertDeliveries);
+    await ctx.db.delete(schema.alertEvents);
+    await ctx.db.delete(schema.alertRules);
+    await ctx.db.delete(schema.notificationChannels);
+  });
+
+  it('keeps channels and rules, secrets re-encrypted, and leaves the history behind', async () => {
+    const { channel, rule } = await seedAlerts();
+    const file = await createBackup(PASSPHRASE);
+    const { openBackup } = await import('../../src/lib/backup/format');
+    const opened = await openBackup(file, PASSPHRASE);
+    expect(opened.tables.alert_events).toBeUndefined();
+    expect(opened.tables.alert_deliveries).toBeUndefined();
+    const [carried] = opened.tables.notification_channels as { secret: string }[];
+    expect(carried.secret.startsWith('cpmbak-secret:')).toBe(true);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.notificationChannels);
+    expect(restored.id).toBe(channel.id);
+    expect(JSON.parse(decryptSecret(restored.secret))).toEqual({
+      url: 'https://discord.test/api/webhooks/1/token',
+    });
+    const [restoredRule] = await ctx.db.select().from(schema.alertRules);
+    expect(JSON.parse(restoredRule.channelIds)).toEqual([channel.id]);
+    expect(restoredRule.id).toBe(rule.id);
+  });
+});
+
+describe('audit streaming across a restore', () => {
+  beforeEach(async () => {
+    await ctx.db.delete(schema.auditSinks);
+    await ctx.db.delete(schema.auditSecurityRecords);
+    await ctx.db.delete(schema.auditSecurityHead);
+  });
+
+  it('keeps sinks, secrets re-encrypted, and leaves the queued security records behind', async () => {
+    const secret = { url: 'https://siem.test/hec', headerValue: 'Splunk token-1' };
+    const [sink] = await ctx.db
+      .insert(schema.auditSinks)
+      .values({
+        name: 'siem',
+        kind: 'http',
+        config: JSON.stringify({ encoding: 'gzip' }),
+        secret: encryptSecret(JSON.stringify(secret)),
+        includeSecurity: true,
+        auditCursor: 3,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    await ctx.db
+      .insert(schema.auditSecurityRecords)
+      .values({ seq: 1, record: '{}', createdAt: NOW });
+    await ctx.db
+      .insert(schema.auditSecurityHead)
+      .values({ id: 1, headSeq: 1, prunedSeq: 0, updatedAt: NOW });
+
+    const file = await createBackup(PASSPHRASE);
+    const { openBackup } = await import('../../src/lib/backup/format');
+    const opened = await openBackup(file, PASSPHRASE);
+    expect(opened.tables.audit_security_records).toBeUndefined();
+    expect(opened.tables.audit_security_head).toBeUndefined();
+    const [carried] = opened.tables.audit_sinks as { secret: string }[];
+    expect(carried.secret.startsWith('cpmbak-secret:')).toBe(true);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.auditSinks);
+    expect(restored).toMatchObject({ id: sink.id, auditCursor: 3, includeSecurity: true });
+    expect(JSON.parse(decryptSecret(restored.secret))).toEqual(secret);
+  });
+});

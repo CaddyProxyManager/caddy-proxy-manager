@@ -1,0 +1,106 @@
+---
+title: Backups
+description: Download a sealed backup, restore one, or let schedules write them to an S3-compatible bucket or a local folder on their own.
+---
+
+**Settings → Backup** makes a backup of the whole configuration: hosts, certificates and their
+keys, access lists, users and their two-factor secrets, groups, API tokens, agents, backup
+destinations and schedules, and every setting. The audit log and the settings history (with the
+[host history](/features/host-history/)) can be included too. What a backup holds, and how a restore works, is described under
+[Settings](/features/settings/#backup-and-restore); this page is about making them on a schedule.
+
+## The file
+
+A backup is one file, `cpm-backup-<date>.cpmbak`, sealed with a passphrase of at least 12
+characters (scrypt, then AES-256-GCM). Everything the database keeps encrypted is decrypted into
+the file before it is sealed, so it restores onto a machine whose `SESSION_SECRET` is different,
+and is encrypted again under that machine's key on the way in.
+
+The contents are compressed with zstd before they are sealed; the header says so and is
+authenticated with the rest, so it cannot be edited to skip or change that step. A restore stops
+unpacking at 512 MiB rather than filling memory. Backups made before compression was added still
+restore.
+
+## Destinations
+
+A destination is where scheduled backups go. Add one under **Backup destinations**:
+
+- **S3-compatible**: a bucket on Amazon S3 or any service that speaks its API. Enter the endpoint
+  (empty for Amazon S3 itself), the bucket, the region if the service wants one, and an access key
+  with permission to write, read, list and delete objects in the bucket. Some services want the
+  bucket in the host name (`bucket.endpoint`) rather than the path; turn on **Bucket in the host
+  name** for those. Large backups are uploaded in parts.
+- **Local folder**: a folder under `backups/` on the controller's data volume. Handy for a first
+  setup or with something else copying the folder away, but a backup on the same disk does not
+  survive losing that disk.
+
+An optional prefix keeps the backups apart from anything else in the bucket. **Test** writes a
+small file, reads it back and deletes it, so a wrong key or bucket shows up before the first run.
+
+The secret access key is stored encrypted and never sent back to the browser. Leave the field empty
+to keep it - unless the endpoint, bucket or key ID changes, in which case it must be typed again,
+so a stored key can never be pointed somewhere else.
+
+| Service | Endpoint | Bucket in the host name |
+| --- | --- | --- |
+| Amazon S3 | empty, with the region set | either |
+| Cloudflare R2 | `https://<account id>.r2.cloudflarestorage.com` | off |
+| Backblaze B2 | `https://s3.<region>.backblazeb2.com` | either |
+| MinIO | your server, e.g. `http://minio:9000` | off, unless `MINIO_DOMAIN` is set |
+
+An endpoint must be `https`, unless it is on your own network: a private address, `localhost`, or
+a single-label name such as a Compose service.
+
+## Schedules
+
+A schedule says when to back up, where to, and how many to keep:
+
+- **Runs**: every hour, every day or every week at a time you pick, or any five-field cron
+  expression (`0 */6 * * *` is every six hours). It runs in the time zone you give it, an IANA name
+  such as `Europe/Berlin`, and follows that zone's daylight-saving changes. The editor shows when it
+  will next run, and refuses an expression that would never run, such as the 30th of February.
+- **Prefix**: added after the destination's, e.g. `nightly/`. Each backup is named for the time it
+  was due, in UTC: `nightly/cpm-backup-2026-10-06-02-00-00.cpmbak`.
+- **Keep the last** and **Keep for days**: after each run, older backups are deleted until both
+  rules are met - a backup stays while either rule keeps it. Leave both empty to keep everything.
+  Only files a schedule names (`cpm-backup-*.cpmbak`), directly under its own prefix, are ever
+  deleted.
+- **Passphrase**: what each backup is sealed with. It is stored on the instance, encrypted with
+  `SESSION_SECRET`, so runs need nobody present. Anyone who has that secret can already read the
+  database the backup is made from, so this exposes nothing new; but keep a copy of the passphrase
+  somewhere else, since without it no backup can be restored. Changing it affects later backups
+  only.
+
+**Run now**, in a schedule's menu, makes a backup straight away; its file name ends in `-manual`.
+**Recent runs** lists the last twenty with their size, file or error.
+
+### When a run is missed
+
+Runs happen on the controller running the background jobs. If no controller was running when one
+was due, the next to start runs the latest missed slot of each schedule once - not every slot it
+missed. With [several controllers](/features/high-availability/) each slot is claimed in the
+database before it starts, so a controller taking over just as one was due never runs it twice.
+
+### When a run fails
+
+A failed run is listed with its error, shows on the overview under **Needs attention**, and is
+emailed to the administrators (**Settings → Email → Notifications → Scheduled backup failing**),
+along with a note when the schedule works again. A schedule whose last two slots both passed
+without a run is flagged too.
+
+## Restoring from a destination
+
+Under **Restore from a backup**, choose **A destination**, then the destination and one of its
+backups, newest first. The rest is the same as restoring a file: the header is shown before
+anything is read with the passphrase, the configuration being replaced is saved first, and
+everyone is signed out afterwards.
+
+Restoring brings back the destinations and schedules the backup had, with their secrets encrypted
+under this instance's key; the list of past runs starts empty.
+
+## Over the API
+
+GraphQL has `backupDestinations`, `backupSchedules` and `backupRuns`, and mutations to create,
+update, delete and test destinations, manage schedules and `runBackupNow`. The mutations need a
+token with full scope, since a backup carries every secret. `POST /api/v1/backup` still returns a
+backup file directly, for a script of your own.

@@ -12,11 +12,12 @@ import { invalidateProviderCache } from "@/src/lib/auth/server";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { describeBackup, restoreBackup } from "@/src/lib/backup/service";
 import { backupErrorMessage } from "@/src/lib/backup/errors";
+import { MAX_BACKUP_BYTES } from "@/src/lib/backup/format";
+import { readRemoteBackup } from "@/src/lib/backup/manage";
+import { SCHEDULES_CHANGED } from "@/src/lib/backup/schedules";
+import { announce } from "@/src/lib/cluster";
 import { reconcileAgentConnections } from "@/src/lib/models/agents";
 import { invalidateSettingsCache } from "@/src/lib/settings/resolve";
-
-/** Large enough for years of audit log; small enough that a stray upload can't fill memory. */
-const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
 
 /**
  * Settings > Backup's restore; `preview` only reads the header. A real restore replaces every
@@ -29,16 +30,27 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAdmin();
     const form = await request.formData();
-    const upload = form.get("file");
-    if (!(upload instanceof Blob) || upload.size === 0) {
-      return NextResponse.json({ error: t("backupNotRecognised") }, { status: 400 });
+    const preview = form.get("preview") === "1";
+    // From a destination: read server-side, then the same checks and steps as an upload.
+    const destinationId = Number(form.get("destinationId") ?? Number.NaN);
+    const remote = Number.isInteger(destinationId)
+      ? { destinationId, key: String(form.get("key") ?? "") }
+      : null;
+    let file: Buffer;
+    if (remote) {
+      file = await readRemoteBackup(remote.destinationId, remote.key, { headerOnly: preview });
+    } else {
+      const upload = form.get("file");
+      if (!(upload instanceof Blob) || upload.size === 0) {
+        return NextResponse.json({ error: t("backupNotRecognised") }, { status: 400 });
+      }
+      if (upload.size > MAX_BACKUP_BYTES) {
+        return NextResponse.json({ error: t("backupTooLarge") }, { status: 413 });
+      }
+      file = Buffer.from(await upload.arrayBuffer());
     }
-    if (upload.size > MAX_BACKUP_BYTES) {
-      return NextResponse.json({ error: t("backupTooLarge") }, { status: 413 });
-    }
-    const file = Buffer.from(await upload.arrayBuffer());
 
-    if (form.get("preview") === "1") {
+    if (preview) {
       return NextResponse.json(describeBackup(file));
     }
 
@@ -67,9 +79,11 @@ export async function POST(request: NextRequest) {
       action: "backup_restored",
       entityType: "backup",
       summary: "Restored the configuration from a backup",
-      data: { restoredBy: Number(session.user.id), ...result },
+      data: { restoredBy: Number(session.user.id), ...result, ...(remote && { source: remote }) },
     });
     invalidateSettingsCache();
+    // The schedules were replaced with the rest: the leader re-creates its cron jobs.
+    announce(SCHEDULES_CHANGED);
     invalidateProviderCache();
     await applyCaddyConfig().catch((error) =>
       console.error("[backup] Applying the restored configuration failed:", error),

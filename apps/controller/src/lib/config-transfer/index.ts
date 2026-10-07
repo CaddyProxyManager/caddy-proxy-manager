@@ -13,6 +13,10 @@ import { type AuditChange, diffAuditRecords } from "../audit/changes";
 import { MARKER, exportRow, importRow } from "../backup/secrets";
 import { applyCaddyConfig } from "../caddy";
 import db, { nowIso, runInTransaction } from "../db";
+import { readingStep } from "../db/reading-step";
+import { recordHostRevision } from "../host-history/record";
+import type { HostKind } from "../host-history/types";
+import { pruneHostRevisions } from "../host-history/retention";
 import { activeSchema, schemaDialect } from "../db/schema";
 import {
   type DomainError,
@@ -1020,9 +1024,19 @@ export async function applyConfigImport(
   const order = (table: string) => CONFIG_TABLES.findIndex((spec) => spec.table === table);
   writes.push(...childWrites.sort((a, b) => order(a.table) - order(b.table)));
 
+  // After their agents are replaced, so each revision holds the placement the import left.
+  const revised = plan.rows.flatMap(
+    ({ spec, item, targetId }): { kind: HostKind; id: number }[] => {
+      if (item.action === "skip") return [];
+      if (spec.table === "proxy_hosts") return [{ kind: "http" as const, id: targetId as number }];
+      if (spec.table === "l4_proxy_hosts") return [{ kind: "l4" as const, id: targetId as number }];
+      return [];
+    },
+  );
+
   if (writes.length > 0) {
-    await runInTransaction((tx) =>
-      writes.flatMap((write) => {
+    await runInTransaction((tx) => [
+      ...writes.flatMap((write) => {
         if (write.kind === "setting") {
           const settings = drizzleTable("settings") as unknown as typeof activeSchema.settings;
           return [
@@ -1047,7 +1061,23 @@ export async function applyConfigImport(
           ...(write.rows.length > 0 ? [tx.insert(target).values(write.rows)] : []),
         ];
       }),
-    );
+      readingStep(function* () {
+        for (const host of revised) {
+          yield* recordHostRevision(tx, {
+            kind: host.kind,
+            hostId: host.id,
+            operation: "import",
+            userId: actorUserId,
+          });
+        }
+      }),
+    ]);
+    for (const kind of ["http", "l4"] as const) {
+      await pruneHostRevisions(
+        kind,
+        revised.filter((host) => host.kind === kind).map((host) => host.id),
+      );
+    }
     if (schemaDialect === "postgres") {
       for (const table of created) {
         const serial = tableInfo(table).serialColumn;

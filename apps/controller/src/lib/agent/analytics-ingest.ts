@@ -12,6 +12,12 @@ import {
   isTrafficOutcome,
   redactWafEventRow,
 } from "@cpm/shared";
+import {
+  queueSecurityRecords,
+  trafficSecurityBody,
+  wafSecurityBody,
+} from "../audit-stream/security";
+import type { SecurityRecordBody } from "../audit-stream/records";
 import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
 import db from "../db";
 import { proxyHosts } from "../db/schema";
@@ -229,6 +235,7 @@ export async function ingestAnalytics(
       .filter(ours)
       .map((row) => ({ ...row, host: bareHost(row.host) }));
     await insertTrafficEvents(valid, agentId);
+    await queueSecurity(valid.map(trafficSecurityBody).filter((body) => body !== null));
     return { accepted: valid.length, rejected: rows.length - valid.length };
   }
 
@@ -237,5 +244,13 @@ export async function ingestAnalytics(
     .filter(ours)
     .map((row) => ({ ...row, host: bareHost(row.host) }));
   await insertWafEvents(valid, agentId);
+  await queueSecurity(valid.map(wafSecurityBody));
   return { accepted: valid.length, rejected: rows.length - valid.length };
+}
+
+/** After the insert, which is what the agent's resend depends on: a failure here only logs. */
+async function queueSecurity(bodies: SecurityRecordBody[]): Promise<void> {
+  await queueSecurityRecords(bodies).catch((error: unknown) => {
+    console.error("[audit-stream] could not queue security records:", error);
+  });
 }

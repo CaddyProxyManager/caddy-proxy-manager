@@ -1,0 +1,78 @@
+---
+title: Host history
+description: Every proxy and L4 host keeps a revision after each change. Compare any two, roll back through the editor's review, or bring a deleted host back.
+---
+
+Every proxy host and L4 host keeps its own history. A revision is taken after each change, whatever
+made it: a save in the editor or the API, the row menu's enable and maintenance switches, a bulk
+action, a tag added in bulk, a configuration import, a deletion, and a rollback or restore itself.
+The revision is written in the same database transaction as the change, so a save that fails leaves
+no revision behind, and the audit log and the history can never disagree about what happened.
+
+A revision is a full copy of the host as stored - every field, its options and which agents serve
+it - not a list of differences, so any one of them can be put back on its own.
+
+## The History tab
+
+A proxy host's page has **Overview** and **History** tabs; an L4 host's history is under
+**History** in its row menu. The tab lists the revisions newest first, with what made each one and
+who, and is open to everyone who may manage the host. A deleted host's history stays, for
+administrators, reached from its deletion in the [audit log](../audit-log/).
+
+Pick any two revisions to compare. The fields that differ are listed as the audit log and the
+editor's review name them - certificates, access lists and agents by name, anything secret-looking
+masked. Turn on **Show the Caddy config** to see the rendered config too: it is built twice from
+today's configuration with only this host swapped for each revision, so the diff shows what the
+host itself contributes and nothing the rest of the fleet did since. The selection is in the
+address, so a comparison is a link you can share.
+
+## Rolling back
+
+**Revert** loads the selected revision into the editor. Nothing is stored yet: the editor holds
+the old values, a banner says which revision they came from, and **Review** lists what saving
+would change from the host as it is now, with the usual undo per field. Saving records a new
+revision marked as a rollback to the one it came from. History only grows - an old revision is
+never rewritten, so a rollback can itself be rolled back.
+
+A revision may name things deleted since: a certificate, an access list (the host's own or a
+location rule's), an agent it was pinned to, or a CA, client certificate or role its mTLS trusts.
+The editor leaves each one out and lists it, so you choose a replacement or leave it unset before
+saving. If every agent a host was pinned to is gone, a host left with none is served by every agent.
+
+The audit log offers the same: a host event has **Revert**, which opens the history comparing that
+change with the revision before it, ready to go back to the state before the change.
+
+## Restoring a deleted host
+
+Deleting a host keeps its history, and its last revision holds the host exactly as it was. An
+administrator opens it from the deletion in the audit log and chooses **Restore**, which brings
+the host back under its old id, so its history carries on, and records a revision of its own. Any
+earlier revision can be restored instead.
+
+A restore is refused when one of the host's domains is now served by another proxy host, or, for
+an L4 host, when its port is now taken on an agent it shares. If the revision names anything
+deleted since, the dialog lists it and the host comes back without it.
+
+## How long history is kept
+
+Each host keeps at least its latest **100** revisions, however old, and every revision younger than
+**365 days**, however many: a revision goes only once both would let it. Change either under
+**Settings → General → Host history** (`HOST_HISTORY_KEEP_REVISIONS` and `HOST_HISTORY_KEEP_DAYS`
+until a value is stored). Pruning happens as hosts change, and a deleted host keeps its history.
+
+## Secrets, backups and the API
+
+A snapshot keeps the host's secrets as the database stores them, encrypted under `SESSION_SECRET`,
+and they are re-encrypted with everything else when the key is rotated. Nothing in the history
+decrypts one: comparisons mask them, and the API answers a revision as the parsed host its own
+query returns.
+
+Host history is history rather than configuration, so a [backup](../backups/) includes it only
+with the settings history. Restoring hosts without their history clears the history that was
+there, since the restored hosts reuse ids it names.
+
+Over GraphQL, `hostRevisions`, `hostRevision`, `compareHostRevisions` and `deletedHosts` read it,
+`rollbackHost` puts a live host back as a revision stored it - refusing while the revision names
+anything since deleted - and `restoreHost` brings a deleted one back. REST lists a host's revisions
+at `GET /api/v1/proxy-hosts/{id}/revisions` and `/api/v1/l4-proxy-hosts/{id}/revisions`. Audit
+events for host changes carry the `revisionId` their change made.

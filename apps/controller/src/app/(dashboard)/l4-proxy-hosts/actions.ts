@@ -25,6 +25,7 @@ import { parseL4CreateForm, parseL4UpdateForm } from "@/src/lib/l4/form";
 import { revertedFields, withoutReverted } from "@/src/lib/host-review/diff";
 import { previewL4HostChange } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
+import { restoreHost, rollbackRevisionFrom } from "@/src/lib/host-history";
 
 export async function createL4ProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
@@ -73,7 +74,8 @@ export async function updateL4ProxyHostAction(
       false,
     );
 
-    await updateL4ProxyHost(id, input, userId);
+    const rollbackFrom = await rollbackRevisionFrom(formData, "l4", id);
+    await updateL4ProxyHost(id, input, userId, { rollbackFrom });
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostUpdated"));
@@ -165,5 +167,26 @@ export async function previewL4ProxyHostAction(
   } catch (error) {
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
+  }
+}
+
+/** Admin only, as a create is: a deleted host has no grants left to check. */
+export async function restoreL4ProxyHostAction(
+  revisionId: number,
+  dropMissingReferences: boolean,
+): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    await restoreHost(revisionId, Number(session.user.id), {
+      dropMissingReferences,
+      kind: "l4",
+    });
+    revalidatePath("/l4-proxy-hosts");
+    const t = await getTranslations("hostHistory");
+    return actionSuccess(t("restored"));
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to restore L4 proxy host:", revisionId, error);
+    return actionError(t, error, t("errors.restoreHostFailed"));
   }
 }

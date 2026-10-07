@@ -8,6 +8,7 @@
 import { randomBytes } from "node:crypto";
 import { isCaddyPlaceholder } from "./tailscale";
 import { domainError } from "../errors/domain-error";
+import { type OutboundFetch, outboundFetch } from "../http/outbound";
 import { parseOutboundBaseUrl } from "../http/outbound-url";
 
 export const CROWDSEC_MODES = ["external", "managed"] as const;
@@ -352,7 +353,7 @@ export type CrowdSecProbeResult =
 export async function probeCrowdSecLapi(
   apiUrl: string,
   apiKey: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: OutboundFetch = outboundFetch,
 ): Promise<CrowdSecProbeResult> {
   if (isCaddyPlaceholder(apiKey)) return { status: "placeholder" };
   const parsed = parseOutboundBaseUrl(apiUrl);
@@ -364,8 +365,7 @@ export async function probeCrowdSecLapi(
       method: "GET",
       headers: { "X-Api-Key": apiKey, Accept: "application/json" },
       redirect: "manual",
-      cache: "no-store",
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      timeoutMs: PROBE_TIMEOUT_MS,
     });
   } catch {
     return { status: "unreachable" };

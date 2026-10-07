@@ -300,10 +300,12 @@ in when it locks out everyone who could change it:
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored. A search finds any setting by name or by what it is for, such as `smtp`, `prometheus` or `redis`
 - **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, a certificate expiry digest for the administrators, and admin notifications, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
 - **Notifications** - Tells the administrators by email and browser push, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications** turns it off for everyone; each administrator picks their own events and channels under **Profile → Notifications**
+- **Alerts** - Rules on those events, Needs attention items, traffic signals or a per-host ClickHouse threshold (5xx share, requests, mitigated), scoped to hosts or tags, with a quiet period and a silence, sent to email, push, Discord, Slack, Teams (Workflows), ntfy or a webhook signed per the Standard Webhooks scheme. Each channel batches, retries with backoff, honours rate limits and is reported on the others when it keeps failing; the **Alerts** page keeps every delivery for 90 days. A daily digest - traffic and mitigations, the most attacked hosts, paths and rules, new countries and networks, expiring certificates, configuration changes, backups and open items - goes out at a time and zone of your choice, in each reader's own zone
 - **Two-factor sign-in** - TOTP from any authenticator app, with single-use backup codes, for the dashboard and the forward-auth portal alike. A policy can require a second factor (an authenticator app or a passkey) of administrators or of every password account, after a grace period with a banner, with a console command to lift it; resettable by an admin or from the container console
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
-- **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`. Restores onto a new machine with a different `SESSION_SECRET`, and saves what it replaces first
+- **Host History** - A revision after every change to a proxy or L4 host, whatever made it. Compare any two, with the rendered Caddy config if wanted; roll back through the editor's review, or restore a deleted host. The audit log links each host change to its revision
+- **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`, or on a cron schedule to an S3-compatible bucket or a local folder with retention. Restores onto a new machine with a different `SESSION_SECRET`, from a file or a destination, and saves what it replaces first
 - **Portable Configuration** - Export hosts, access lists, certificates, groups, WAF rules and settings to a readable JSON file with each secret sealed under a passphrase, and import it into another instance after a dry run that lists what it would create, update or skip. Rows match by name, users by email; a domain another host already serves is reported, never overwritten
 - **Global Caddyfile** - Raw Caddyfile, global options and site blocks on their own ports, added to every agent's config. Adapted by each agent's Caddy and checked with `caddy validate` on save; anything that would replace CPM's own config (admin API, storage, certificate automation, ports 80/443) is refused by name
 - **Log Viewer** - Tail access, WAF, Caddy and certificate logs from any agent, following new lines, with a Logs action on each proxy host. Admin only
@@ -312,7 +314,8 @@ in when it locks out everyone who could change it:
 - **SQLite to PostgreSQL** - `cpm-server --copy-to-postgres` copies a SQLite install into an empty PostgreSQL database in one transaction, ids, secrets and the audit chain intact, with a dry run and a row count of every table on both sides
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. An apply that any host refuses fails and names it
 - **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. It can be switched off; the only other requests the app makes to the internet on its own are the CRS plugin registry check and the GeoIP downloads, each with a switch of its own
-- **Audit log** - Searchable configuration change history with user attribution, field-level before and after for each change (secrets masked, unified or side by side), and a SHA-256 hash chain an administrator can verify to find the first altered, removed or inserted event
+- **Audit log** - Searchable configuration change history with user attribution, field-level before and after for each change (secrets masked, unified or side by side), and a keyed HMAC-SHA256 hash chain an administrator can verify to find the first altered, removed or inserted event
+- **Audit streaming** - Send the audit log as it is written to syslog over UDP, TCP or TLS, an HTTP receiver (NDJSON, gzip or zstd) or a JSON lines file, in order and at least once, with each event's chain fields so the receiver can check nothing is missing; optionally WAF and other mitigated requests too, redacted and marked as outside the chain
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
 - **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie - no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
@@ -429,6 +432,8 @@ it win even then.
 | Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/caddyproxymanager` |
+| Revisions each host keeps at least, however old | `HOST_HISTORY_KEEP_REVISIONS` | `100` |
+| Days of host history kept, however many revisions that is | `HOST_HISTORY_KEEP_DAYS` | `365` |
 | Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
@@ -461,6 +466,9 @@ it win even then.
 | Notify: The GeoIP update failing three times in a row, and working again | `NOTIFY_GEOIP_FAILED` | `true` |
 | Notify: A CRS plugin switched off because Caddy refused it | `NOTIFY_CRS_PLUGIN_DISABLED` | `true` |
 | Notify: A new release, once each, while the update check is on | `NOTIFY_UPDATE_AVAILABLE` | `true` |
+| Notify: A scheduled backup failing, and its recovery | `NOTIFY_BACKUP_FAILED` | `true` |
+| Notify: Audit streaming failing or falling behind, and its recovery | `NOTIFY_AUDIT_SINK_FAILED` | `true` |
+| Notify: An alert channel failing, told on the others, and its recovery | `NOTIFY_CHANNEL_FAILING` | `true` |
 | Email the owner of an account, once, when it is disabled. A disabled account gets nothing else | `NOTIFY_DISABLED_ACCOUNT_OWNER` | `false` |
 
 > Compose reads `CLICKHOUSE_PASSWORD` too, to provision the `clickhouse` container. **With an agent
@@ -603,7 +611,7 @@ removed: nothing in the field breaks, and both APIs call the same model function
 disagree about what a write does. New integrations should use GraphQL.
 
 Backup is the exception: `POST /api/v1/backup` takes a passphrase and returns the encrypted file,
-for scripts and cron, and has no GraphQL counterpart. Restoring stays in **Settings → Backup**.
+for scripts and cron. GraphQL manages scheduled backups instead (destinations, schedules, runs). Restoring stays in **Settings → Backup**.
 The portable configuration is GraphQL only: `exportConfig`, `previewConfigImport` and
 `applyConfigImport` carry the file as base64, and `verifyAuditChain` checks the audit log.
 
@@ -874,6 +882,16 @@ converts the whole file before writing anything, saves the current configuration
 transaction, and signs everyone out. A backup from an older release restores onto a newer one; one
 from a newer release is refused. Turn off **Keep the agent pairings** when moving to a new machine:
 its agents then pair afresh.
+
+### Scheduled backups
+
+Destinations are S3-compatible buckets (Amazon S3, Cloudflare R2, Backblaze B2, MinIO...) or a
+folder under `backups/` on the data volume; schedules are cron expressions in a time zone of your
+choice, with "keep the last N" and "keep N days" retention. The schedule's passphrase is stored
+encrypted with `SESSION_SECRET` so runs need nobody present. One controller runs them; a slot
+missed while none was running is caught up once on the next start. Failures show under Needs
+attention and are emailed. A backup kept at a destination restores from the same page. Backups are
+zstd-compressed before they are sealed; older files still restore.
 
 ### Portable configuration
 

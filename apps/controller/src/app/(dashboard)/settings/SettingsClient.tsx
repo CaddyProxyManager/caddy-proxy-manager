@@ -325,6 +325,10 @@ export default function SettingsClient({
   // One action for both, told apart by the block the form posts with its values.
   const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [signInState, signInFormAction] = useActionState(updateRegistrySettingsAction, null);
+  const [hostHistoryState, hostHistoryFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
   const [agentRegistryState, agentRegistryFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
@@ -487,6 +491,14 @@ export default function SettingsClient({
           formAction={instanceFormAction}
         />
       </VStack>
+    ),
+    "host-history": (
+      <RegistrySettingsBlock
+        block="host-history"
+        fields={registry["host-history"] ?? []}
+        state={hostHistoryState}
+        formAction={hostHistoryFormAction}
+      />
     ),
     "sign-in": (
       <RegistrySettingsBlock

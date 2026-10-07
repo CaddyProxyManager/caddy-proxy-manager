@@ -1,7 +1,7 @@
 import db, { toIso, nowIso } from "../db";
 import { auditEvents } from "../db/schema";
 import { insertAuditRows } from "../audit";
-import { type AuditChange, parseAuditChanges } from "../audit/changes";
+import { type AuditChange, parseAuditChanges, parseAuditRevisionId } from "../audit/changes";
 import { and, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
 import { processMemo } from "../settings/process-memo";
 import { AUDIT_FILTER_OPTIONS } from "../audit/filter-options";
@@ -16,6 +16,8 @@ export type AuditEvent = {
   createdAt: string;
   /** Field-level before and after, when the event recorded them. */
   changes: AuditChange[] | null;
+  /** For a host write, the revision it made (lib/host-history). */
+  revisionId: number | null;
 };
 
 function escapeLikePattern(input: string): string {
@@ -102,6 +104,7 @@ export async function listAuditEvents(
     summary: event.summary,
     createdAt: toIso(event.createdAt)!,
     changes: parseAuditChanges(event.data),
+    revisionId: parseAuditRevisionId(event.data),
   }));
 }
 

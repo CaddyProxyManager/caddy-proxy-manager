@@ -94,3 +94,50 @@ export function parsePkcs12Identity(bundle: Buffer, password: string): Pkcs12Ide
     privateKeyPem: forge.pki.privateKeyToPem(key),
   };
 }
+
+export interface TestCa extends GeneratedCertificate {
+  issue(hostname: string): GeneratedCertificate;
+}
+
+/** A CA and leaves it signs: a self-signed leaf trusted as its own CA fails Bun's chain check. */
+export function createTestCa(validityDays = 1): TestCa {
+  const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+  const caCert = forge.pki.createCertificate();
+  const subject = [{ name: 'commonName', value: 'Caddy Proxy Manager Test CA' }];
+  caCert.publicKey = keypair.publicKey;
+  caCert.serialNumber = randomSerialNumber();
+  caCert.validity.notBefore = new Date(Date.now() - 60_000);
+  caCert.validity.notAfter = new Date(Date.now() + validityDays * 86_400_000);
+  caCert.setSubject(subject);
+  caCert.setIssuer(subject);
+  caCert.setExtensions([
+    { name: 'basicConstraints', cA: true, critical: true },
+    { name: 'keyUsage', keyCertSign: true, cRLSign: true, critical: true },
+  ]);
+  caCert.sign(keypair.privateKey, forge.md.sha256.create());
+
+  return {
+    certificatePem: forge.pki.certificateToPem(caCert),
+    privateKeyPem: forge.pki.privateKeyToPem(keypair.privateKey),
+    issue(hostname) {
+      const leafKeys = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+      const leaf = forge.pki.createCertificate();
+      leaf.publicKey = leafKeys.publicKey;
+      leaf.serialNumber = randomSerialNumber();
+      leaf.validity.notBefore = caCert.validity.notBefore;
+      leaf.validity.notAfter = caCert.validity.notAfter;
+      leaf.setSubject([{ name: 'commonName', value: hostname }]);
+      leaf.setIssuer(subject);
+      leaf.setExtensions([
+        { name: 'basicConstraints', cA: false },
+        { name: 'extKeyUsage', serverAuth: true },
+        { name: 'subjectAltName', altNames: [{ type: 2, value: hostname }] },
+      ]);
+      leaf.sign(keypair.privateKey, forge.md.sha256.create());
+      return {
+        certificatePem: forge.pki.certificateToPem(leaf),
+        privateKeyPem: forge.pki.privateKeyToPem(leafKeys.privateKey),
+      };
+    },
+  };
+}

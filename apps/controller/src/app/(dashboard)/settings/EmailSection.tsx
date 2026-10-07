@@ -3,6 +3,7 @@
 import { CalendarDays, EthernetPort, Globe, KeyRound, Mail, User } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@astryxdesign/core/Button";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
@@ -209,6 +210,7 @@ export function NotificationsSection({
 }) {
   const t = useTranslations("settings.email");
   const tSettings = useTranslations("settings");
+  const tAlerts = useTranslations("alerts");
   const format = useFormatter();
   const [days, setDays] = useState(email.alertDays);
   const [recipients, setRecipients] = useState(email.alertRecipients);
@@ -222,6 +224,11 @@ export function NotificationsSection({
           {email.status !== "ready" && (
             <InfoAlert title={t("alertsNeedEmailTitle")}>{t("alertsNeedEmailBody")}</InfoAlert>
           )}
+          <Text size="sm" color="secondary">
+            {tAlerts.rich("settingsNote", {
+              link: (chunks) => <AstryxLink href="/alerts">{chunks}</AstryxLink>,
+            })}
+          </Text>
           <EnvLabelledField label={t("alertRecipients")} env={["EMAIL_ALERT_RECIPIENTS"]}>
             <TextInput
               startIcon={Mail}

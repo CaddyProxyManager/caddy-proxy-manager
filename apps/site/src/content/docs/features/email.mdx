@@ -108,6 +108,12 @@ administrator or after failed sign-ins, and nothing more while it stays disabled
 | GeoIP update failing | The GeoIP update failing three runs in a row | It works again |
 | CRS plugin switched off | A CRS plugin Caddy refused, switched off so the rest loads | - |
 | New release | A newer release, once per version, while the update check is on | - |
+| Scheduled backup failing | A [scheduled backup](../backups/) failing | The schedule's next run works |
+| Audit streaming failing | An audit sink that keeps failing or falls behind | It catches up |
+| Alert channel failing | An [alert channel](../alerts/#batching-retries-and-failing-channels) failing three sends in a row, told on the others | It works again |
+
+Each of these is a built-in [alert rule](../alerts/): on the Alerts page it can also go to Discord,
+Slack, Teams, ntfy or a webhook, get a quiet period or be silenced for a while.
 
 - **One email and one browser notification a minute at most.** Whatever happens within a minute
   goes out together. A problem is told once however long it lasts, and its recovery once; one that

@@ -1,11 +1,12 @@
 /**
  * Registers an acme-dns account from the controller. The server URL is admin-supplied, so the
- * request is bounded: https unless the host is plainly local, no redirects, a timeout and a size
- * cap, and only the four fields the module needs are kept from the answer.
+ * request is bounded: https unless the host is plainly local, an address checked at connect time, no
+ * redirects, a timeout and a size cap, and only the four fields the module needs are kept.
  */
 
 import { type AcmeDnsAccount, normalizeDnsName } from "./challenge-delegation";
 import { domainError } from "../errors/domain-error";
+import { type OutboundFetch, OutboundError, outboundFetch } from "../http/outbound";
 import { parseOutboundBaseUrl } from "../http/outbound-url";
 
 const REGISTER_TIMEOUT_MS = 10_000;
@@ -55,7 +56,7 @@ function field(body: Record<string, unknown>, key: string): string {
 /** Throws a DomainError the Settings screen renders; never follows a redirect. */
 export async function registerAcmeDnsAccount(
   serverUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: OutboundFetch = outboundFetch,
 ): Promise<AcmeDnsAccount> {
   const base = parseAcmeDnsServerUrl(serverUrl);
 
@@ -65,10 +66,14 @@ export async function registerAcmeDnsAccount(
       method: "POST",
       headers: { Accept: "application/json" },
       redirect: "manual",
-      cache: "no-store",
-      signal: AbortSignal.timeout(REGISTER_TIMEOUT_MS),
+      timeoutMs: REGISTER_TIMEOUT_MS,
+      maxResponseBytes: MAX_RESPONSE_BYTES,
     });
-  } catch {
+  } catch (error) {
+    const code = error instanceof OutboundError ? error.code : undefined;
+    if (code === "metadata") throw domainError("outboundUrlMetadata", {}, { status: 400 });
+    if (code === "too-large")
+      throw domainError("acmeDnsRegisterTooLarge", { max: MAX_RESPONSE_BYTES });
     throw domainError("acmeDnsRegisterUnreachable", { server: base });
   }
   if (response.status !== 201 && response.status !== 200) {

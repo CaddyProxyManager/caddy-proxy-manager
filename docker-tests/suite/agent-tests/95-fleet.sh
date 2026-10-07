@@ -117,7 +117,7 @@ wait_for "the second Caddy to stop" 30 stopped "$CADDY2"
 SERVER_ACTION_TIMEOUT=240 server_action /proxy-hosts toggleProxyHostAction --args "[$shared_id, false]"
 t_contains "an apply that cannot reach a Caddy names its agent" "$agent2_name" "$ACTION_RESULT"
 API_MAX_TIME=240 api POST /api/v1/caddy/apply
-t_eq "and fails over REST too" "500" "$API_STATUS"
+t_eq "and fails over REST too as a 503" "503" "$API_STATUS"
 t_ne "while the rig's own Caddy still took it" "200" "$(via_caddy1 "$shared")"
 
 docker start "$CADDY2" >/dev/null 2>&1

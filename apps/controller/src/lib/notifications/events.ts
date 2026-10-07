@@ -3,6 +3,7 @@
  * `email.notifications.*`, so no sentence is built here and the catalog holds every language's.
  */
 
+import type { AttentionCode, AttentionValues } from "../attention/types";
 import type { StoredErrorCode } from "../errors/domain-error";
 import type { GeoipDownloadFailure } from "../geoip/updater";
 
@@ -17,8 +18,15 @@ export const NOTIFICATION_CATEGORIES = [
   "geoip",
   "crsPlugin",
   "updateAvailable",
+  "backups",
+  "auditSinks",
+  "channels",
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+/** What a metric rule measures per proxy host: a share is 0-100. */
+export const ALERT_METRICS = ["serverErrorShare", "requests", "serverErrors", "mitigated"] as const;
+export type AlertMetric = (typeof ALERT_METRICS)[number];
 
 /** What an agent reports going wrong on its own host. */
 export const AGENT_PROBLEMS = ["caddyBuild", "services", "l4Ports", "logAccess"] as const;
@@ -55,12 +63,49 @@ export type NotificationEvent =
   | { kind: "geoipRecovered" }
   | { kind: "crsPluginDisabled"; plugin: string; version: string }
   | { kind: "updateAvailable"; version: string; current: string }
+  /** As caddyApplyFailed: `errorCode` renders `error` in the reader's language. */
+  | { kind: "backupFailed"; schedule: string; error: string; errorCode?: StoredErrorCode | null }
+  | { kind: "backupRecovered"; schedule: string }
+  /** An audit sink that keeps failing, or that fell behind past what pruning keeps. */
+  | { kind: "auditSinkFailed"; sink: string; error: string; errorCode?: StoredErrorCode | null }
+  | { kind: "auditSinkRecovered"; sink: string }
+  /** An alert channel whose sends keep failing, told on the others. */
+  | { kind: "channelFailing"; channelId: number; channel: string; failures: number; error: string }
+  | { kind: "channelRecovered"; channelId: number; channel: string }
+  /** "Send test" on a channel, straight to it; and a test queued through a rule's channels. */
+  | { kind: "channelTest"; channel: string }
+  | { kind: "ruleTest"; rule: string }
+  /** From a rule on Needs attention or a traffic signal: rendered from `attention.items.<code>`. */
+  | { kind: "attention"; code: AttentionCode; values: AttentionValues; href: string | null }
+  | { kind: "attentionResolved"; code: AttentionCode; values: AttentionValues }
+  /** From a rule on a ClickHouse metric over a window, per proxy host. */
+  | {
+      kind: "metricThreshold";
+      host: string;
+      metric: AlertMetric;
+      comparison: "above" | "below";
+      value: number;
+      threshold: number;
+      minutes: number;
+    }
+  | { kind: "metricRecovered"; host: string; metric: AlertMetric }
   /** Settings' "send a test notification"; belongs to no category, so no switch stops it. */
   | { kind: "test" };
 
 export type NotificationKind = NotificationEvent["kind"];
 
-const CATEGORY: Record<Exclude<NotificationKind, "test">, NotificationCategory> = {
+/** Kinds with no category, so no Settings switch or mute: rules' own, and the tests. */
+export const RULE_KINDS = [
+  "attention",
+  "attentionResolved",
+  "metricThreshold",
+  "metricRecovered",
+  "channelTest",
+  "ruleTest",
+] as const satisfies readonly NotificationKind[];
+type RuleKind = (typeof RULE_KINDS)[number];
+
+const CATEGORY: Record<Exclude<NotificationKind, "test" | RuleKind>, NotificationCategory> = {
   accountDisabled: "accountDisabled",
   lastAdminKept: "accountDisabled",
   adminLocked: "adminLocked",
@@ -77,8 +122,44 @@ const CATEGORY: Record<Exclude<NotificationKind, "test">, NotificationCategory> 
   geoipRecovered: "geoip",
   crsPluginDisabled: "crsPlugin",
   updateAvailable: "updateAvailable",
+  backupFailed: "backups",
+  backupRecovered: "backups",
+  auditSinkFailed: "auditSinks",
+  auditSinkRecovered: "auditSinks",
+  channelFailing: "channels",
+  channelRecovered: "channels",
 };
 
 export function categoryOf(event: NotificationEvent): NotificationCategory | null {
-  return event.kind === "test" ? null : CATEGORY[event.kind];
+  return event.kind in CATEGORY ? CATEGORY[event.kind as keyof typeof CATEGORY] : null;
+}
+
+/** The kinds an event rule can name: every kind a category raises. */
+export const EVENT_KINDS = Object.keys(CATEGORY) as (keyof typeof CATEGORY)[];
+
+/** Kinds that say something is over; chat channels colour them as resolved. */
+export const RECOVERY_KINDS: ReadonlySet<NotificationKind> = new Set([
+  "agentOnline",
+  "upstreamRecovered",
+  "caddyApplyRecovered",
+  "agentProblemResolved",
+  "geoipRecovered",
+  "backupRecovered",
+  "auditSinkRecovered",
+  "channelRecovered",
+  "attentionResolved",
+  "metricRecovered",
+]);
+
+/** The proxy host an event is about, by name, for a rule scoped to hosts or tags. */
+export function hostOf(event: NotificationEvent): string | null {
+  switch (event.kind) {
+    case "upstreamErrors":
+    case "upstreamRecovered":
+    case "metricThreshold":
+    case "metricRecovered":
+      return event.host;
+    default:
+      return null;
+  }
 }

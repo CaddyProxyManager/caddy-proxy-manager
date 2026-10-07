@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { outboundViaGlobalFetch } from '@/tests/helpers/outbound';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 import type { DnsProviderSettings } from '@/src/lib/settings';
 
@@ -37,6 +38,7 @@ vi.mock('@/src/lib/settings/staging-context', () => ({
   }),
 }));
 vi.mock('@/src/lib/caddy', () => ({ applyCaddyConfig: vi.fn(async () => ({ ok: true })) }));
+vi.mock('@/src/lib/http/outbound', outboundViaGlobalFetch);
 
 import { registerAcmeDnsAccountAction } from '@/src/app/(dashboard)/settings/actions';
 

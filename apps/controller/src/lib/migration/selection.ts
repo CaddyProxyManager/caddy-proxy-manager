@@ -74,6 +74,8 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       // With the hosts: a cleared host reference would widen an exclusion to every host.
       "waf_exclusions",
       "upstream_error_counts",
+      // With the hosts, whose ids its revisions name. Claimed for coverage: a legacy source has none.
+      "host_revisions",
     ],
     // Agents too: lost placement rows read as "no assignment", which means every agent.
     requires: ["certificates", "accessLists", "agents"],
@@ -147,6 +149,18 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "controller_replicas",
       "cluster_generations",
       "geoip_databases",
+      "backup_destinations",
+      "backup_schedules",
+      // Claimed only for coverage, like the cluster tables: a legacy source has no runs.
+      "backup_runs",
+      "notification_channels",
+      "alert_rules",
+      "alert_digests",
+      // Claimed only for coverage: a legacy source has no alert history.
+      "alert_keys",
+      "alert_events",
+      "alert_deliveries",
+      "alert_digest_runs",
     ],
     requires: [],
   },
@@ -155,7 +169,15 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     label: "Audit log",
     description:
       "The history of who changed what. Usually the largest table, and never load-bearing.",
-    tables: ["audit_events", "audit_chain", "waf_event_reviews"],
+    tables: [
+      "audit_events",
+      "audit_chain",
+      "waf_event_reviews",
+      // Claimed only for coverage: a legacy source streams nowhere.
+      "audit_sinks",
+      "audit_security_records",
+      "audit_security_head",
+    ],
     requires: [],
   },
 ];

@@ -23,6 +23,7 @@ import { NextRequest } from 'next/server';
 import * as schema from '../../../src/lib/db/schema';
 import { auth } from '../../../src/lib/auth';
 import { logAuditEvent } from '../../../src/lib/audit';
+import { auditEvents } from '../../helpers/audit-events';
 import { getProxyHost } from '../../../src/lib/models/proxy-hosts';
 import { getL4ProxyHost } from '../../../src/lib/models/l4-proxy-hosts';
 import { createAccessList } from '../../../src/lib/models/access-lists';
@@ -92,14 +93,18 @@ async function seedHost(entries: Record<string, string | string[]> = BASIC) {
     .orderBy(desc(schema.proxyHosts.id))
     .limit(1);
   audit.mockClear();
+  await logged.clear();
   caddy.reset();
   return row;
 }
+
+const logged = auditEvents(() => db);
 
 beforeEach(async () => {
   db = await createTestDb();
   caddy = installFakeCaddy();
   audit.mockClear();
+  logged.reset();
   users.admin = await insertUser('admin');
   users.operator = await insertUser('operator');
   sessionUserId = users.admin;
@@ -140,6 +145,7 @@ describe('previewProxyHostAction', () => {
 
     expect(await getProxyHost(row.id)).toEqual(before);
     expect(audit).not.toHaveBeenCalled();
+    expect(await logged.list()).toEqual([]);
     expect(caddy.loads).toHaveLength(0);
   });
 
@@ -362,8 +368,8 @@ describe('previewProxyHostAction', () => {
 });
 
 describe('the audit diff a save records', () => {
-  const changesLogged = () =>
-    (audit.mock.calls.at(-1)?.[0] as { changes?: { field: string }[] } | undefined)?.changes ?? [];
+  const changesLogged = async () =>
+    ((await logged.list()).at(-1)?.changes ?? []) as { field: string }[];
 
   it('is the field diff the review showed, secrets masked', async () => {
     const row = await seedHost();
@@ -378,9 +384,9 @@ describe('the audit diff a save records', () => {
     };
     const preview = previewOf(await previewProxyHostAction(row.id, form(entries)));
     expect((await updateProxyHostAction(row.id, undefined, form(entries))).status).toBe('success');
-    const logged = changesLogged();
-    expect(logged.map((c) => c.field)).toEqual(preview.changes.map((c) => c.field));
-    expect(JSON.stringify(audit.mock.calls)).not.toContain('hunter2-very-secret');
+    const changes = await changesLogged();
+    expect(changes.map((c) => c.field)).toEqual(preview.changes.map((c) => c.field));
+    expect(JSON.stringify(await logged.list())).not.toContain('hunter2-very-secret');
   });
 
   it('records nothing changed for a save of the stored values', async () => {
@@ -388,17 +394,18 @@ describe('the audit diff a save records', () => {
     expect((await updateProxyHostAction(row.id, undefined, form({ name: 'app' }))).status).toBe(
       'success',
     );
-    expect(changesLogged()).toEqual([]);
+    expect(await changesLogged()).toEqual([]);
   });
 
   it('names the access list a create sets, not its id', async () => {
     const list = await createAccessList({ name: 'office' }, users.admin);
     audit.mockClear();
+    await logged.clear();
     expect(
       (await createProxyHostAction(undefined, form({ ...BASIC, accessListId: String(list.id) })))
         .status,
     ).toBe('success');
-    const created = (audit.mock.calls.find((call) => call[0].action === 'create')?.[0] ?? {}) as {
+    const created = ((await logged.list()).find((event) => event.action === 'create') ?? {}) as {
       changes?: { field: string; after: unknown }[];
     };
     expect(created.changes?.find((c) => c.field === 'accessListId')?.after).toBe('office');
@@ -418,6 +425,7 @@ describe('previewL4ProxyHostAction', () => {
     expect((await createL4ProxyHostAction(undefined, form(entries))).status).toBe('success');
     const rows = await db.select().from(schema.l4ProxyHosts);
     audit.mockClear();
+    await logged.clear();
     caddy.reset();
     return rows[rows.length - 1];
   }
@@ -442,6 +450,7 @@ describe('previewL4ProxyHostAction', () => {
     );
     expect(await getL4ProxyHost(row.id)).toEqual(before);
     expect(audit).not.toHaveBeenCalled();
+    expect(await logged.list()).toEqual([]);
     expect(caddy.loads).toHaveLength(0);
   });
 
@@ -471,8 +480,8 @@ describe('previewL4ProxyHostAction', () => {
     const host = await getL4ProxyHost(row.id);
     expect(host?.name).toBe('database');
     expect(host?.listenAddress).toBe(':15432');
-    const logged = audit.mock.calls.at(-1)?.[0] as { changes?: { field: string }[] };
-    expect(logged.changes?.map((c) => c.field)).toEqual(['name']);
+    const last = (await logged.list()).at(-1) as { changes?: { field: string }[] };
+    expect(last.changes?.map((c) => c.field)).toEqual(['name']);
   });
 });
 

@@ -1,0 +1,129 @@
+---
+title: Alerts
+description: Rules that decide what is worth telling and where, channels from email to Discord, Slack, Teams, ntfy and signed webhooks, the history of every delivery, and a daily digest.
+---
+
+The **Alerts** page holds three things: **rules** that decide what is worth telling, **channels**
+that carry it, and the **history** of what was raised and how each delivery went. A fourth tab sets
+up **daily digests**.
+
+Nothing changes on upgrade. Every kind of [notification](/features/email/#notifications) is a
+built-in rule routed to email and browser push, and its on switch stays where it was, under
+**Settings → Email → Notifications**, with each administrator's own choices under **Profile →
+Notifications**. Until someone edits a rule, the same people get the same emails and pushes.
+
+## Channels
+
+Email and push are built in: email goes to the Recipients list or the administrators, push to each
+administrator's subscribed browsers. Add any number of these:
+
+| Channel | What it posts | Notes |
+| --- | --- | --- |
+| Webhook | JSON, signed as below | Custom headers; plain http only to an address on your own network |
+| Discord | Native embeds, coloured by severity | Posted with `?wait=true`, so a message Discord drops is an error, not silence |
+| Slack | An incoming-webhook message: `text` plus blocks | `text` is always present, as the notification and the fallback |
+| Microsoft Teams | An Adaptive Card | The URL of a Workflows flow started by "When a Teams webhook request is received" |
+| ntfy | JSON published to the server root | Server, topic and an optional access token |
+
+Teams' old Office 365 connector webhooks were shut down in 2026 and are not offered. A Workflows
+flow can accept a request before the card is posted, so **Test** on a Teams channel says the post
+was accepted, not that it was delivered.
+
+**Test** posts straight to the channel, saved or as typed in the form. Webhook URLs, signing
+secrets, header values and ntfy tokens are stored encrypted and never shown again; the list shows a
+channel's address without its path. Leave a secret field empty when editing to keep the stored one.
+
+### Signed webhooks
+
+Webhook requests follow the Standard Webhooks scheme, so any of its verifiers works unchanged:
+
+- `webhook-id`: the message id. It is the same on every retry of the same alerts, so **drop an id
+  you have already seen** to ignore a replay.
+- `webhook-timestamp`: seconds since the epoch. **Refuse one more than five minutes from your
+  clock.** It is inside the signature, so it cannot be changed without the check failing.
+- `webhook-signature`: `v1,` and the base64 HMAC-SHA256 of `id.timestamp.body`, keyed with the
+  bytes after `whsec_` in the signing secret, base64-decoded.
+
+Leave the signing secret empty on a new channel and one is made for you and shown once; copy it then.
+The body is `{ "type": "alerts", "timestamp": ..., "data": { "subject", "url", "alerts": [...] } }`,
+each alert with its kind, severity, title, sentence, time and the event's own fields. A digest
+arrives with `"type": "digest"`.
+
+### Batching, retries and failing channels
+
+Each channel sends at most one message a minute: whatever is raised within it goes together, as
+email always has. Discord takes up to 10 alerts a message, Slack, Teams and ntfy a handful more;
+the rest follow in the next. A problem is told once while it lasts and its recovery once, and one
+that is over before it was sent costs nothing.
+
+A failed send is retried after 30 seconds, then a minute, doubling to an hour. A service asking to
+slow down is obeyed: Discord's `retry_after` (to the millisecond) and Slack's and Teams'
+`Retry-After` are waited out when short and become the retry time when long. Alerts a day old are
+dropped rather than sent late. The built-in email keeps its five-minute retry.
+
+Three failures in a row make the channel itself a problem, told on your other channels (never on
+the failing one) through the built-in **Alert channel failing** rule, and resolved when it works
+again.
+
+## Rules
+
+A rule has a **source**, a **scope**, a **severity**, its **channels**, an optional **quiet period**
+and can be **silenced** until a time.
+
+| Source | What it watches |
+| --- | --- |
+| Events | The notification events: an agent offline, upstream errors, a refused configuration, a failing backup and the rest |
+| Needs attention | Any item [Needs attention](/features/overview/) lists, such as a certificate close to expiry or an LDAP directory unreachable |
+| Traffic signal | 5xx bursts, mitigation spikes and blocked-traffic concentrations from [analytics](/features/analytics/) |
+| Metric | A threshold per proxy host over the last N minutes, read from ClickHouse: 5xx share (percent), requests, 5xx responses or mitigated requests, above or below a value |
+
+Rules on Needs attention, signals and metrics are checked once a minute. Each thing a rule finds
+(one host over its threshold, one burst) is raised once and resolved when it is gone. A source
+that could not be read resolves nothing, and metric rules wait while analytics are off.
+
+- **Scope**: all hosts, chosen proxy hosts, or hosts with any of some [tags](/features/reverse-proxy/).
+  A scoped rule only matches what names a host.
+- **Quiet period**: after telling, the rule stays quiet about the same thing for this long, so a
+  host that flaps is told once.
+- **Silence**: nothing is raised until the time you pick.
+
+A built-in rule keeps its source; its channels, severity, quiet period and silence can be changed,
+and its on switch stays the Settings toggle. **Test** on a rule queues a test alert through its
+channels, as anything it raises would go.
+
+## History
+
+Every alert is kept for 90 days with each channel's delivery: sent, waiting (with attempts and the
+last error), failed, dropped (its rule turned off, or a day old), or withdrawn (over before it was
+sent). Filter by rule, channel, severity, type or delivery status.
+
+## Daily digest
+
+A digest is sent every day at a time you pick, in a time zone you pick, to email and any added
+channel. It covers the 24 hours before it is sent:
+
+- traffic and mitigations by outcome, the most attacked hosts and paths, and the most triggered WAF
+  rules;
+- countries and networks (ASNs) seen that were not seen in the 30 days before;
+- certificates expiring within 14 days;
+- configuration changes from the audit log;
+- each scheduled backup's last run;
+- what Needs attention lists.
+
+Without analytics the traffic sections say so and the rest is sent as usual. Email goes to each
+recipient in their own time zone (their profile's, or the digest's) and language; chat channels get
+a compact form cut to fit Discord's and Teams' limits. **Preview** shows what it would say now and
+**Send** sends it at once.
+
+## More than one controller
+
+Alerts are sent by the controller running the [background jobs](/features/high-availability/).
+Every send claims its rows first, and every digest claims its day, so a change of controller mid
+send neither drops nor doubles one. A digest due while no controller was running is sent once when
+one takes over.
+
+## API
+
+GraphQL has `alertChannels`, `alertRules`, `alertHistory`, `alertDigests`, `alertDigestRuns` and
+`previewAlertDigest`, with mutations to create, update, delete and test each. They need an
+administrator, and a token scoped to settings.

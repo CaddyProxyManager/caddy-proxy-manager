@@ -636,6 +636,64 @@ const security: AttentionProvider = {
   },
 };
 
+// ── Scheduled backups ───────────────────────────────────────────────────────
+
+/** Settings > Backup, where schedules and their runs are listed. */
+export const BACKUP_SETTINGS_HREF = "/settings/backup";
+
+const backups: AttentionProvider = {
+  id: "backups",
+  adminOnly: true,
+  async run({ now }) {
+    const [{ listSchedules }, { latestRuns }, { isOverdue }] = await Promise.all([
+      import("../backup/schedules"),
+      import("../backup/runs"),
+      import("../backup/cron"),
+    ]);
+    const schedules = (await listSchedules()).filter((schedule) => schedule.enabled);
+    const latest = await latestRuns(schedules.map((schedule) => schedule.id));
+    const items: AttentionItem[] = [];
+    for (const schedule of schedules) {
+      const runs = latest.get(schedule.id);
+      const last = runs?.last ?? null;
+      if (last?.status === "failed") {
+        let code = null;
+        try {
+          code = last.errorCode ? JSON.parse(last.errorCode) : null;
+        } catch {
+          // Shown in English, as stored.
+        }
+        items.push({
+          id: `backup-failed:${schedule.id}`,
+          provider: "backups",
+          code: "backupFailed",
+          severity: "warning",
+          values: { name: schedule.name, error: last.error ?? "" },
+          errors: [{ message: last.error ?? "", code }],
+          href: BACKUP_SETTINGS_HREF,
+          at: last.finishedAt ?? last.startedAt,
+          scope: {},
+        });
+        continue;
+      }
+      const since = Date.parse(schedule.scheduledSince) || 0;
+      if (isOverdue(schedule, since, runs?.scheduledSlot ?? null, now)) {
+        items.push({
+          id: `backup-overdue:${schedule.id}`,
+          provider: "backups",
+          code: "backupOverdue",
+          severity: "warning",
+          values: { name: schedule.name },
+          href: BACKUP_SETTINGS_HREF,
+          at: last ? last.startedAt : null,
+          scope: {},
+        });
+      }
+    }
+    return { items };
+  },
+};
+
 export const ATTENTION_PROVIDER_LIST: readonly AttentionProvider[] = [
   certificates,
   caddyApply,
@@ -647,4 +705,5 @@ export const ATTENTION_PROVIDER_LIST: readonly AttentionProvider[] = [
   crsPlugins,
   geoip,
   security,
+  backups,
 ];

@@ -2933,19 +2933,36 @@ function l4HostRoutes(
   return [{ ...matchHost, handle }];
 }
 
+/** One host as a revision had it, in place of the stored row; a null row leaves it out. */
+export type HostOverride = {
+  kind: "http" | "l4";
+  id: number;
+  row: Record<string, unknown> | null;
+};
+
 async function buildL4Servers(
   context: L4BuildContext,
   agentRowId?: number,
+  override?: HostOverride,
 ): Promise<Record<string, unknown> | null> {
   // The entire layer4 app comes from caddy-l4. Without it there is no `layer4` key to
   // unmarshal, so emitting one would fail the whole config - HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
-  const [enabledL4Hosts, assignments, metrics] = await Promise.all([
+  const [storedL4Hosts, assignments, metrics] = await Promise.all([
     db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true)),
     agentRowId === undefined ? null : listHostAssignments("l4"),
     getMetricsSettings(),
   ]);
+  const overridden = override?.row
+    ? ({ ...override.row, id: override.id } as (typeof storedL4Hosts)[number])
+    : null;
+  const enabledL4Hosts = override
+    ? [
+        ...storedL4Hosts.filter((host) => host.id !== override.id),
+        ...(overridden?.enabled ? [overridden] : []),
+      ]
+    : storedL4Hosts;
   // A row on a reserved port predates validateL4Input's check. getRequiredL4Ports does not publish
   // it, so a listener here would either bind a port nobody can reach or collide with 80/443/2019.
   const metricsPort = metrics?.enabled ? (metrics.port ?? 9090) : null;
@@ -3157,15 +3174,17 @@ export async function buildCaddyDocument(
   /**
    * `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands.
    * `includeAgentFileCertificates` is for a document never loaded anywhere, such as a diff.
+   * `hostOverride` renders one host as a revision had it (null: absent), for host history.
    */
   options: {
     adaptVia?: string;
     globalCaddyfile?: string;
     includeAgentFileCertificates?: boolean;
+    hostOverride?: HostOverride;
   } = {},
 ) {
   const [
-    proxyHostRecords,
+    storedProxyHostRecords,
     certRows,
     accessListEntryRecords,
     accessListRecords,
@@ -3273,6 +3292,17 @@ export async function buildCaddyDocument(
     getDashboardSettings(),
     buildRoleMaps(),
   ]);
+
+  const override = options.hostOverride;
+  const proxyHostRecords =
+    override?.kind === "http"
+      ? [
+          ...storedProxyHostRecords.filter((host) => host.id !== override.id),
+          ...(override.row
+            ? [{ ...override.row, id: override.id } as (typeof storedProxyHostRecords)[number]]
+            : []),
+        ]
+      : storedProxyHostRecords;
 
   // Pinned elsewhere, so this agent must not serve it. Filtered here rather than in the query so
   // the fleet-wide path stays a plain select, and so "no assignments means everywhere" is decided
@@ -3721,6 +3751,7 @@ export async function buildCaddyDocument(
         crowdsec: caddyBuildContext.crowdsec,
       },
       agentRowId,
+      override?.kind === "l4" ? override : undefined,
     ),
   ]);
 

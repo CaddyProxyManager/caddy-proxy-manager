@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
+import { auditEvents } from '@/tests/helpers/audit-events';
 import type { TestDb } from '../../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
@@ -246,7 +247,8 @@ describe('quick toggle', () => {
       },
       1,
     );
-    audit.logAuditEvent.mockClear();
+    const logged = auditEvents(() => ctx.db);
+    await logged.clear();
 
     const on = await setProxyHostMaintenance(host.id, true, 1);
     expect(on.maintenance).toEqual({
@@ -255,13 +257,11 @@ describe('quick toggle', () => {
       bypassCidrs: ['203.0.113.7/32', '10.0.0.0/8'],
       body: 'Back at noon',
     });
-    const event = audit.logAuditEvent.mock.calls[0]![0] as {
-      entityType: string;
-      action: string;
-      summary: string;
-    };
+    const [event] = await logged.list();
     expect(event.summary).toBe('Turned on maintenance mode for proxy host toggle');
-    expect(matchAuditSummary(event)?.message).toBe('proxyHostMaintenanceOn');
+    expect(matchAuditSummary({ ...event, summary: event.summary ?? '' })?.message).toBe(
+      'proxyHostMaintenanceOn',
+    );
 
     expect((await setProxyHostMaintenance(host.id, false, 1)).maintenance?.enabled).toBe(false);
   });

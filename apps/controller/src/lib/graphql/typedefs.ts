@@ -273,6 +273,8 @@ export const typeDefs = /* GraphQL */ `
     createdAt: DateTime!
     """Field-level before and after, secrets masked; null when the event recorded none."""
     changes: [AuditChange!]
+    """For a proxy or L4 host write, the hostRevision it made."""
+    revisionId: Int
   }
 
   type AuditChange {
@@ -844,6 +846,416 @@ export const typeDefs = /* GraphQL */ `
     events: JSON!
   }
 
+  """An S3-compatible bucket (kind s3) or a folder under the data volume's backups/ (kind local)."""
+  type BackupDestination {
+    id: Int!
+    name: String!
+    kind: String!
+    endpoint: String!
+    region: String!
+    bucket: String!
+    prefix: String!
+    accessKeyId: String!
+    """Whether a secret access key is stored. The key itself is never answered."""
+    hasSecret: Boolean!
+    virtualHostedStyle: Boolean!
+    path: String!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  """secretAccessKey left empty keeps the stored one, unless the endpoint, bucket or key ID changed."""
+  input BackupDestinationInput {
+    name: String!
+    kind: String!
+    endpoint: String
+    region: String
+    bucket: String
+    prefix: String
+    accessKeyId: String
+    secretAccessKey: String
+    virtualHostedStyle: Boolean
+    path: String
+  }
+
+  """
+  Where alerts go. email and push are built in and set up under Settings and Profile; the rest is
+  a webhook, Discord, Slack, Teams or ntfy. No URL, token or signing secret is ever answered.
+  """
+  type AlertChannel {
+    id: Int!
+    name: String!
+    """email, push, webhook, discord, slack, teams or ntfy."""
+    kind: String!
+    """email or push for the built-in two."""
+    builtin: String
+    enabled: Boolean!
+    """Where it posts, with any path or query that may hold a token left out."""
+    target: String!
+    server: String
+    topic: String
+    headerNames: [String!]!
+    hasSigningSecret: Boolean!
+    hasToken: Boolean!
+    """Failed sends in a row."""
+    failures: Int!
+    retryAt: String
+    lastSentAt: String
+    lastError: String
+    lastErrorAt: String
+    lastErrorCode: String
+    """Only in the answer to the save that generated it: a new webhook's signing secret."""
+    signingSecret: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  """A blank value keeps that header's stored value."""
+  input AlertChannelHeaderInput {
+    name: String!
+    value: String
+  }
+
+  """
+  url for webhook, discord, slack and teams; server, topic and token for ntfy. Blank secrets keep
+  the stored ones; a webhook saved with no signingSecret gets one, answered once.
+  """
+  input AlertChannelInput {
+    name: String!
+    kind: String!
+    enabled: Boolean
+    url: String
+    signingSecret: String
+    headers: [AlertChannelHeaderInput!]
+    server: String
+    topic: String
+    token: String
+    clearToken: Boolean
+  }
+
+  """delivered, or accepted where the service only says it will post (Teams, push)."""
+  type AlertChannelTestResult {
+    outcome: String!
+    recipients: [String!]
+  }
+
+  """
+  What is worth telling, and where. builtin names the notification category a built-in rule
+  stands for: its on switch (on) is that category's Settings toggle.
+  """
+  type AlertRule {
+    id: Int!
+    name: String!
+    builtin: String
+    """event, attention, signal or metric."""
+    source: String!
+    """By source: kinds, codes, signals, or metric, comparison, threshold and minutes."""
+    config: JSON!
+    """all, hosts or tags."""
+    scope: String!
+    hostIds: [Int!]!
+    tags: [String!]!
+    """critical, warning or info."""
+    severity: String!
+    channelIds: [Int!]!
+    quietMinutes: Int!
+    enabled: Boolean!
+    on: Boolean!
+    silencedUntil: String
+    settingKey: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  """Left out of an update, a field keeps its stored value."""
+  input AlertRuleInput {
+    name: String
+    source: String
+    kinds: [String!]
+    codes: [String!]
+    signals: [String!]
+    """serverErrorShare (percent), requests, serverErrors or mitigated."""
+    metric: String
+    """above or below."""
+    comparison: String
+    threshold: Float
+    minutes: Int
+    scope: String
+    hostIds: [Int!]
+    tags: [String!]
+    severity: String
+    channelIds: [Int!]
+    quietMinutes: Int
+    enabled: Boolean
+    silencedUntil: String
+  }
+
+  type AlertDelivery {
+    id: Int!
+    channelId: Int!
+    channelName: String!
+    channelKind: String!
+    """pending, sent, failed, dropped or withdrawn."""
+    status: String!
+    attempts: Int!
+    lastError: String
+    sentAt: String
+    updatedAt: String!
+  }
+
+  """One alert as one rule raised it, with each channel's delivery."""
+  type AlertEvent {
+    id: Int!
+    key: String!
+    ruleId: Int
+    ruleName: String
+    ruleBuiltin: String
+    kind: String!
+    category: String
+    severity: String!
+    """notice, problem or recovery."""
+    type: String!
+    event: JSON!
+    at: String!
+    resolvedAt: String
+    deliveries: [AlertDelivery!]!
+  }
+
+  type AlertDigestResult {
+    channelId: Int!
+    name: String!
+    ok: Boolean!
+    error: String
+  }
+
+  """One send of a digest. slot is the occurrence it was for, or a send-now's own start."""
+  type AlertDigestRun {
+    id: Int!
+    digestId: Int!
+    slot: String!
+    """schedule, catch-up or manual."""
+    trigger: String!
+    """running, sent, partial or failed."""
+    status: String!
+    results: [AlertDigestResult!]!
+    error: String
+    startedAt: String!
+    finishedAt: String
+  }
+
+  """A daily report at time (HH:MM) in timeZone, to its channels (email and any added channel)."""
+  type AlertDigest {
+    id: Int!
+    name: String!
+    time: String!
+    timeZone: String!
+    channelIds: [Int!]!
+    enabled: Boolean!
+    nextRunAt: String
+    lastRun: AlertDigestRun
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  input AlertDigestInput {
+    name: String!
+    time: String!
+    timeZone: String
+    channelIds: [Int!]!
+    enabled: Boolean
+  }
+
+  """The plain-text form of what a digest would say now, in the caller's time zone."""
+  type AlertDigestPreview {
+    subject: String!
+    text: String!
+  }
+
+  """
+  Where the audit log is streamed: syslog over UDP, TCP or TLS, an HTTP receiver, or a JSON lines
+  file on the data volume. An HTTP sink's URL and auth header value are never answered.
+  """
+  type AuditSink {
+    id: Int!
+    name: String!
+    """syslog-udp, syslog-tcp, syslog-tls, http or file."""
+    kind: String!
+    enabled: Boolean!
+    """WAF events and other mitigated requests, as records of kind security outside the chain."""
+    includeSecurity: Boolean!
+    """Where it sends: host:port, the HTTP origin (path and query left out), or the file name."""
+    target: String!
+    host: String
+    port: Int
+    """syslog-udp: the largest datagram, in bytes."""
+    maxBytes: Int
+    """A PEM CA trusted for this sink besides the system's."""
+    ca: String
+    """http: identity, gzip or zstd."""
+    encoding: String
+    """http: set after the receiver answered 415, until the sink is saved again."""
+    encodingFallback: Boolean!
+    headerName: String
+    hasHeaderValue: Boolean!
+    fileName: String
+    """The last audit seq delivered."""
+    auditCursor: Int!
+    """The last security record delivered."""
+    securityCursor: Int!
+    """Audit events not yet delivered."""
+    auditLag: Int!
+    """Security records not yet delivered; null while they are not included."""
+    securityLag: Int
+    """Failed passes in a row."""
+    failures: Int!
+    retryAt: String
+    lastDeliveredAt: String
+    lastError: String
+    lastErrorAt: String
+    """The latest records pruned before this sink received them: audit or security, and seqs."""
+    gapStream: String
+    gapFrom: Int
+    gapTo: Int
+    gapAt: String
+    """Records lost to gaps, in total."""
+    missed: Int!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  """
+  host and port for syslog (port defaults to 514, or 6514 for TLS), maxBytes for UDP, url,
+  encoding and the auth header for http, fileName for file. A blank url or headerValue keeps the
+  stored one; the header value must be given again when the URL's origin changes.
+  """
+  input AuditSinkInput {
+    name: String!
+    kind: String!
+    enabled: Boolean
+    includeSecurity: Boolean
+    host: String
+    port: Int
+    maxBytes: Int
+    ca: String
+    url: String
+    encoding: String
+    headerName: String
+    headerValue: String
+    clearHeaderValue: Boolean
+    fileName: String
+  }
+
+  """encodingRefused: the receiver answered 415, so the test went uncompressed."""
+  type AuditSinkTestResult {
+    encodingRefused: Boolean!
+  }
+
+  """One run of a schedule. slot is the cron occurrence it ran for, or a manual run's start."""
+  type BackupRun {
+    id: Int!
+    scheduleId: Int!
+    scheduleName: String
+    slot: String!
+    """schedule, catch-up or manual."""
+    trigger: String!
+    """running, succeeded or failed."""
+    status: String!
+    objectKey: String
+    bytes: Float
+    durationMs: Int
+    error: String
+    startedAt: String!
+    finishedAt: String
+  }
+
+  type BackupSchedule {
+    id: Int!
+    name: String!
+    destinationId: Int!
+    destinationName: String!
+    """Five fields, read in timeZone."""
+    cron: String!
+    timeZone: String!
+    prefix: String!
+    includeAuditLog: Boolean!
+    includeSettingsHistory: Boolean!
+    keepLast: Int
+    keepDays: Int
+    enabled: Boolean!
+    nextRunAt: String
+    lastRun: BackupRun
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  """
+  passphrase seals every backup the schedule makes; at least 12 characters, and left empty on an
+  update to keep the stored one. It is stored encrypted so runs need nobody present.
+  """
+  input BackupScheduleInput {
+    name: String!
+    destinationId: Int!
+    cron: String!
+    timeZone: String
+    prefix: String
+    includeAuditLog: Boolean
+    includeSettingsHistory: Boolean
+    keepLast: Int
+    keepDays: Int
+    passphrase: String
+    enabled: Boolean
+  }
+
+  """
+  One stored state of a proxy (kind "http") or L4 (kind "l4") host, taken after every write.
+  operation: create, update, maintenance, delete, bulk, import, rollback or restore. A delete
+  revision holds the host as it was just before, which is what restoring it brings back.
+  """
+  type HostRevision {
+    id: Int!
+    kind: String!
+    hostId: Int!
+    operation: String!
+    """The bulk action ({ action, tag? }), or the revision a rollback or restore came from."""
+    detail: JSON
+    userId: Int
+    userName: String
+    createdAt: DateTime!
+    """The host's name in this revision."""
+    name: String!
+    """The host as stored, shaped as the proxyHost or l4ProxyHost query answers it."""
+    host: JSON!
+    agentIds: [Int!]!
+    """What the revision names that has since been deleted; rollbackHost refuses while any remain."""
+    missingReferences: [HostReference!]!
+  }
+
+  """kind: certificate, accessList, agent, caCertificate, clientCertificate or mtlsRole."""
+  type HostReference {
+    kind: String!
+    id: Int!
+  }
+
+  type HostRevisionComparison {
+    from: Int!
+    to: Int!
+    """Field changes as the audit log records them, secrets masked."""
+    changes: JSON!
+    """
+    The rendered Caddy config, this host swapped in from each side: { lines, added, removed,
+    unchanged }, secrets masked. Null unless asked for, or when it could not be rendered.
+    """
+    config: JSON
+  }
+
+  type DeletedHost {
+    hostId: Int!
+    name: String!
+    """The deletion's revision; restoreHost takes it."""
+    revisionId: Int!
+    deletedAt: DateTime!
+  }
+
   type Query {
     proxyHosts: [ProxyHost!]!
     proxyHost(id: Int!): ProxyHost
@@ -913,6 +1325,43 @@ export const typeDefs = /* GraphQL */ `
     securityReport(query: AnalyticsQueryInput, page: Int): SecurityReport!
     """The global deny list, expired entries included until the expiry pass removes them."""
     blockedSources: [BlockedSource!]!
+    backupDestinations: [BackupDestination!]!
+    backupSchedules: [BackupSchedule!]!
+    """Newest first; limit defaults to 50, at most 500."""
+    backupRuns(scheduleId: Int, limit: Int): [BackupRun!]!
+    alertChannels: [AlertChannel!]!
+    alertDigests: [AlertDigest!]!
+    """Newest first; limit defaults to 20, at most 100."""
+    alertDigestRuns(digestId: Int!, limit: Int): [AlertDigestRun!]!
+    """timeZone defaults to the digest's own."""
+    previewAlertDigest(id: Int!, timeZone: String): AlertDigestPreview!
+    alertRules: [AlertRule!]!
+    auditSinks: [AuditSink!]!
+    """Newest first; page with before (the last id seen). limit defaults to 50, at most 200."""
+    alertHistory(
+      ruleId: Int
+      channelId: Int
+      severity: String
+      type: String
+      status: String
+      from: String
+      to: String
+      before: Int
+      limit: Int
+    ): [AlertEvent!]!
+    """A host's revisions, newest first. kind is "http" or "l4"; limit defaults to 20, at most 200."""
+    hostRevisions(kind: String!, hostId: Int!, limit: Int, offset: Int): [HostRevision!]!
+    hostRevision(id: Int!): HostRevision
+    """from may be 0, before the host existed. config also renders the Caddy config diff."""
+    compareHostRevisions(
+      kind: String!
+      hostId: Int!
+      from: Int!
+      to: Int!
+      config: Boolean
+    ): HostRevisionComparison
+    """Hosts whose last revision is their deletion, newest first."""
+    deletedHosts(kind: String!): [DeletedHost!]!
   }
 
   type Mutation {
@@ -937,6 +1386,17 @@ export const typeDefs = /* GraphQL */ `
     previewL4ProxyHost(id: Int, input: JSON!, revert: [String!]): HostChangePreview!
     """As POST /api/v1/l4-proxy-hosts/bulk: { action, ids, tag? }, all or nothing."""
     bulkL4ProxyHosts(input: JSON!): Int!
+    """
+    Puts a live host back as the revision stored it, as a new revision. Refused while the revision
+    names anything since deleted; the dashboard instead loads it into the editor to choose others.
+    """
+    rollbackHost(revisionId: Int!): HostRevision!
+    """
+    Brings a deleted host back from one of its revisions, under its old id. Refused when one of
+    its domains (or, at layer 4, its listener) is now taken, or when it names anything since
+    deleted unless dropMissingReferences is true.
+    """
+    restoreHost(revisionId: Int!, dropMissingReferences: Boolean): HostRevision!
 
     """Recomputes the audit log's hash chain and reports the first broken link."""
     verifyAuditChain: AuditChainVerification!
@@ -1000,6 +1460,45 @@ export const typeDefs = /* GraphQL */ `
 
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!
+
+    createBackupDestination(input: BackupDestinationInput!): BackupDestination!
+    updateBackupDestination(id: Int!, input: BackupDestinationInput!): BackupDestination!
+    """Refused while a schedule writes to it."""
+    deleteBackupDestination(id: Int!): Boolean!
+    """
+    Writes, reads back and deletes a probe object: the saved destination id, or input unsaved
+    (with id, a blank secret means the stored one). Errors say what failed.
+    """
+    testBackupDestination(id: Int, input: BackupDestinationInput): Boolean!
+    createBackupSchedule(input: BackupScheduleInput!): BackupSchedule!
+    updateBackupSchedule(id: Int!, input: BackupScheduleInput!): BackupSchedule!
+    deleteBackupSchedule(id: Int!): Boolean!
+    """Runs the schedule now, outside its timing, and answers once the run has finished."""
+    runBackupNow(scheduleId: Int!): BackupRun
+    createAlertChannel(input: AlertChannelInput!): AlertChannel!
+    updateAlertChannel(id: Int!, input: AlertChannelInput!): AlertChannel!
+    """Also takes it out of every rule and digest."""
+    deleteAlertChannel(id: Int!): Boolean!
+    """Straight to the channel: a saved one by id, or the input as typed (blank secrets from id)."""
+    testAlertChannel(id: Int, input: AlertChannelInput): AlertChannelTestResult!
+    createAlertRule(input: AlertRuleInput!): AlertRule!
+    updateAlertRule(id: Int!, input: AlertRuleInput!): AlertRule!
+    """Built-in rules cannot be deleted."""
+    deleteAlertRule(id: Int!): Boolean!
+    """Nothing is raised until until; null lifts the silence."""
+    silenceAlertRule(id: Int!, until: String): AlertRule!
+    """Queues a test alert through the rule's channels; the event id, or 0 with none enabled."""
+    testAlertRule(id: Int!): Int!
+    createAlertDigest(input: AlertDigestInput!): AlertDigest!
+    updateAlertDigest(id: Int!, input: AlertDigestInput!): AlertDigest!
+    deleteAlertDigest(id: Int!): Boolean!
+    """Sends the digest now, outside its timing, and answers once it has gone."""
+    sendAlertDigestNow(id: Int!): AlertDigestRun
+    createAuditSink(input: AuditSinkInput!): AuditSink!
+    updateAuditSink(id: Int!, input: AuditSinkInput!): AuditSink!
+    deleteAuditSink(id: Int!): Boolean!
+    """One test record, straight to the sink: a saved one by id, or the input as typed."""
+    testAuditSink(id: Int, input: AuditSinkInput): AuditSinkTestResult!
 
     """
     What this agent currently has applied. Requires a signed agent, not a user token.

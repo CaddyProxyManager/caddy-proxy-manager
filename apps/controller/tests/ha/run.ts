@@ -352,6 +352,306 @@ async function failover(): Promise<void> {
   await addHost(held, 'after-return.test');
 }
 
+async function graphql(replica: Replica, query: string, variables: Record<string, unknown> = {}) {
+  const res = await fetch(`${REPLICAS[replica].url}/api/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ query, variables }),
+  });
+  const body = (await res.json()) as { data?: Record<string, unknown>; errors?: unknown[] };
+  if (body.errors) throw new Error(`GraphQL: ${JSON.stringify(body.errors)}`);
+  return body.data ?? {};
+}
+
+/** Only since the container last started: a restarted replica's log still holds its old lead. */
+function currentLog(replica: Replica): string {
+  const { container } = REPLICAS[replica];
+  const started = sh(['docker', 'inspect', '-f', '{{.State.StartedAt}}', container], {
+    allowFail: true,
+  }).output;
+  return sh(['docker', 'logs', '--since', started, container], { allowFail: true }).output;
+}
+
+function leads(replica: Replica): boolean {
+  const text = currentLog(replica);
+  return text.lastIndexOf('now runs the background jobs') > text.lastIndexOf('no longer runs');
+}
+
+/** Whichever replica's log last says it took the background jobs. */
+function leader(): Replica | null {
+  const held = (['web-a', 'web-b'] as const).filter(leads);
+  return held.length === 1 ? held[0] : null;
+}
+
+async function backupSlotSurvivesLeaderLoss(): Promise<void> {
+  console.log('\nThe leader dies just before a backup is due');
+  const writer = leader();
+  check(writer !== null, 'one replica leads', String(writer));
+  if (!writer) return;
+  const survivor = other(writer);
+  const created = (await graphql(
+    survivor,
+    `mutation ($d: BackupDestinationInput!) { createBackupDestination(input: $d) { id } }`,
+    { d: { name: 'ha-local', kind: 'local', path: 'ha' } },
+  )) as { createBackupDestination: { id: number } };
+  const schedule = (await graphql(
+    survivor,
+    `mutation ($s: BackupScheduleInput!) { createBackupSchedule(input: $s) { id } }`,
+    {
+      s: {
+        name: 'ha-every-minute',
+        destinationId: created.createBackupDestination.id,
+        cron: '* * * * *',
+        timeZone: 'UTC',
+        passphrase: 'ha scheduled passphrase',
+      },
+    },
+  )) as { createBackupSchedule: { id: number } };
+  const id = schedule.createBackupSchedule.id;
+
+  // Two seconds before a minute turns: the leader dies holding the cron job for that slot.
+  const untilEdge = 60_000 - (Date.now() % 60_000);
+  await Bun.sleep(untilEdge < 8_000 ? untilEdge + 58_000 : untilEdge - 2_000);
+  const slot = Math.ceil(Date.now() / 60_000) * 60_000;
+  sh(['docker', 'kill', REPLICAS[writer].container]);
+  check(
+    // The dead one's log still ends in its own takeover, so only the survivor's is read.
+    await until(`${survivor} to lead`, () => (leads(survivor) ? true : null), 90_000).catch(
+      () => false,
+    ),
+    `${survivor} takes the background jobs over`,
+  );
+  const runs = await until(
+    'the slot to be run',
+    () => {
+      const rows = sql(
+        `select status from backup_runs where "scheduleId" = ${id} and slot = ${slot}`,
+      );
+      return rows && rows !== 'running' ? rows : null;
+    },
+    120_000,
+  ).catch(() => '');
+  check(runs === 'succeeded', 'the slot the dead leader owned is run exactly once', runs);
+  const ranOn = sql(
+    `select r.hostname from backup_runs b join controller_replicas r on r.id = b.replica where b."scheduleId" = ${id} and b.slot = ${slot}`,
+  );
+  check(ranOn === survivor, `and ${survivor} ran it`, ranOn);
+  // A leader starting late catches up a slot; one starting early fires it: never both.
+  const doubles = sql(
+    `select count(*) from (select slot from backup_runs where "scheduleId" = ${id} group by slot having count(*) > 1) d`,
+  );
+  check(doubles === '0', 'no slot has two runs', doubles);
+
+  await graphql(survivor, 'mutation ($id: Int!) { deleteBackupSchedule(id: $id) }', { id });
+  sh(['docker', 'start', REPLICAS[writer].container]);
+  await until(
+    `${writer} to be healthy`,
+    async () => (await fetch(`${REPLICAS[writer].url}/api/health`)).ok,
+    180_000,
+  );
+}
+
+/** POSTs the origin logged at a path, by webhook-id; read through Caddy, which shares its network. */
+function received(path: string): string[] {
+  const out = sh(['docker', 'exec', CADDY, 'wget', '-qO-', `http://${ORIGIN}:8080/__requests`], {
+    allowFail: true,
+  }).output;
+  try {
+    const rows = JSON.parse(out) as {
+      method: string;
+      raw_path: string;
+      headers: Record<string, string>;
+    }[];
+    return rows
+      .filter((row) => row.method === 'POST' && row.raw_path === path)
+      .map((row) => row.headers['webhook-id'] ?? '');
+  } catch {
+    return [];
+  }
+}
+
+async function alertsSurviveLeaderLoss(): Promise<void> {
+  console.log('\nThe leader dies with an alert queued and a digest due');
+  // The replica the last scenario restarted may still be joining.
+  const writer = await until('one replica to lead', () => leader(), 60_000).catch(() => null);
+  check(writer !== null, 'one replica leads', String(writer));
+  if (!writer) return;
+  const survivor = other(writer);
+  // Far enough from a minute's turn to set everything up before it.
+  const untilStart = 60_000 - (Date.now() % 60_000);
+  if (untilStart < 50_000) await Bun.sleep(untilStart + 1_000);
+  const slot = Math.ceil(Date.now() / 60_000) * 60_000;
+  const hhmm = new Date(slot).toISOString().slice(11, 16);
+  const channel = async (name: string, path: string) =>
+    (
+      (await graphql(
+        survivor,
+        `mutation ($c: AlertChannelInput!) { createAlertChannel(input: $c) { id } }`,
+        { c: { name, kind: 'webhook', url: `http://${ORIGIN}:8080${path}` } },
+      )) as { createAlertChannel: { id: number } }
+    ).createAlertChannel.id;
+  const alertChannel = await channel('ha-alerts', '/ha-alert');
+  const digestChannel = await channel('ha-digest', '/ha-digest');
+  const rule = (
+    (await graphql(
+      survivor,
+      `mutation ($r: AlertRuleInput!) { createAlertRule(input: $r) { id } }`,
+      {
+        r: {
+          name: 'ha-rule',
+          source: 'event',
+          kinds: ['agentOffline'],
+          channelIds: [alertChannel],
+        },
+      },
+    )) as { createAlertRule: { id: number } }
+  ).createAlertRule.id;
+  const digest = (
+    (await graphql(
+      survivor,
+      `mutation ($d: AlertDigestInput!) { createAlertDigest(input: $d) { id } }`,
+      { d: { name: 'ha-digest', time: hhmm, timeZone: 'UTC', channelIds: [digestChannel] } },
+    )) as { createAlertDigest: { id: number } }
+  ).createAlertDigest.id;
+  // Queued now, due a minute later: after the leader is gone.
+  const eventId = (
+    (await graphql(survivor, 'mutation ($id: Int!) { testAlertRule(id: $id) }', { id: rule })) as {
+      testAlertRule: number;
+    }
+  ).testAlertRule;
+  check(eventId > 0, 'a test alert is queued through the rule', String(eventId));
+
+  await Bun.sleep(Math.max(0, slot - 2_000 - Date.now()));
+  sh(['docker', 'kill', REPLICAS[writer].container]);
+  check(
+    await until(`${survivor} to lead`, () => (leads(survivor) ? true : null), 90_000).catch(
+      () => false,
+    ),
+    `${survivor} takes the alerts over`,
+  );
+
+  const sent = await until(
+    'the alert to be sent',
+    () => {
+      const status = sql(`select status from alert_deliveries where "eventId" = ${eventId}`);
+      return status === 'sent' ? status : null;
+    },
+    180_000,
+  ).catch(() => '');
+  check(sent === 'sent', 'the queued alert is sent', sent);
+  await Bun.sleep(5_000);
+  const alertPosts = received('/ha-alert');
+  check(alertPosts.length === 1, 'and the receiver got it exactly once', alertPosts.join(','));
+
+  const run = await until(
+    'the digest slot to be sent',
+    () => {
+      const status = sql(
+        `select status from alert_digest_runs where "digestId" = ${digest} and slot = ${slot}`,
+      );
+      return status && status !== 'running' ? status : null;
+    },
+    180_000,
+  ).catch(() => '');
+  check(run === 'sent', 'the digest the dead leader owed is sent', run);
+  const runs = sql(`select count(*) from alert_digest_runs where "digestId" = ${digest}`);
+  check(runs === '1', 'one run for the slot', runs);
+  await Bun.sleep(5_000);
+  const digestPosts = received('/ha-digest');
+  check(digestPosts.length === 1, 'and one digest reached the receiver', digestPosts.join(','));
+
+  await graphql(survivor, 'mutation ($id: Int!) { deleteAlertDigest(id: $id) }', { id: digest });
+  await graphql(survivor, 'mutation ($id: Int!) { deleteAlertRule(id: $id) }', { id: rule });
+  sh(['docker', 'start', REPLICAS[writer].container]);
+  await until(
+    `${writer} to be healthy`,
+    async () => (await fetch(`${REPLICAS[writer].url}/api/health`)).ok,
+    180_000,
+  );
+}
+
+/**
+ * Every audit record the file sink received, in the order written. Read through a replica, since
+ * both share the data volume; the origin's request log keeps no bodies.
+ */
+function streamed(through: Replica): { seq: number; prevHash: string; hash: string }[] {
+  const out = sh(
+    ['docker', 'exec', REPLICAS[through].container, 'cat', '/app/data/audit-stream/ha.jsonl'],
+    { allowFail: true },
+  ).output;
+  return out
+    .split('\n')
+    .filter((line) => line.startsWith('{'))
+    .map((line) => JSON.parse(line))
+    .filter((record) => record.kind === 'audit');
+}
+
+async function auditStreamSurvivesLeaderLoss(): Promise<void> {
+  console.log('\nThe leader dies while streaming the audit log');
+  const writer = await until('one replica to lead', () => leader(), 60_000).catch(() => null);
+  check(writer !== null, 'one replica leads', String(writer));
+  if (!writer) return;
+  const survivor = other(writer);
+  const sink = (
+    (await graphql(
+      survivor,
+      `mutation ($s: AuditSinkInput!) { createAuditSink(input: $s) { id } }`,
+      { s: { name: 'ha-sink', kind: 'file', fileName: 'ha.jsonl' } },
+    )) as { createAuditSink: { id: number } }
+  ).createAuditSink.id;
+  // Each Verify is an audit event, written through either replica.
+  const verify = async (replica: Replica, times: number) => {
+    for (let i = 0; i < times; i++) await graphql(replica, 'mutation { verifyAuditChain { ok } }');
+  };
+  await verify(survivor, 10);
+  await until(
+    'the first records to arrive',
+    () => (streamed(survivor).length > 0 ? true : null),
+    60_000,
+  );
+  await verify(survivor, 10);
+  sh(['docker', 'kill', REPLICAS[writer].container]);
+  check(
+    await until(`${survivor} to lead`, () => (leads(survivor) ? true : null), 90_000).catch(
+      () => false,
+    ),
+    `${survivor} takes the streaming over`,
+  );
+  await verify(survivor, 10);
+  const head = Number(sql('select max(seq) from audit_events'));
+  const arrived = await until(
+    'the receiver to reach the head of the log',
+    () => {
+      const records = streamed(survivor);
+      return records.some((record) => record.seq === head) ? records : null;
+    },
+    120_000,
+  ).catch(() => streamed(survivor));
+  const unique = new Map(arrived.map((record) => [record.seq, record]));
+  const seqs = [...unique.keys()].sort((a, b) => a - b);
+  const contiguous = seqs.every((seq, i) => i === 0 || seq === seqs[i - 1] + 1);
+  check(
+    seqs.at(-1) === head && contiguous,
+    'no record is skipped',
+    `${seqs.length} up to ${seqs.at(-1)} of ${head}`,
+  );
+  const linked = seqs.every(
+    (seq, i) => i === 0 || unique.get(seq)?.prevHash === unique.get(seqs[i - 1])?.hash,
+  );
+  check(linked, 'every record links to the one before it');
+  // At least once allows the batch in flight to come again, never the stream over.
+  const repeats = arrived.length - unique.size;
+  check(repeats <= 200, 'a flip repeats at most one batch', `${repeats} repeated`);
+
+  await graphql(survivor, 'mutation ($id: Int!) { deleteAuditSink(id: $id) }', { id: sink });
+  sh(['docker', 'start', REPLICAS[writer].container]);
+  await until(
+    `${writer} to be healthy`,
+    async () => (await fetch(`${REPLICAS[writer].url}/api/health`)).ok,
+    180_000,
+  );
+}
+
 async function withoutAgent(): Promise<void> {
   console.log('\nNo agent connected');
   sh(['docker', 'stop', 'caddy-proxy-manager-agent']);
@@ -383,6 +683,9 @@ async function main(): Promise<void> {
     await routing();
     await settingsPropagate();
     await failover();
+    await backupSlotSurvivesLeaderLoss();
+    await alertsSurviveLeaderLoss();
+    await auditStreamSurvivesLeaderLoss();
     await withoutAgent();
   } catch (error) {
     failures.push(String(error));

@@ -93,16 +93,26 @@ function undoing(document: unknown, undo: (handle: Row[]) => Row[]): unknown {
  * Rows the startup passes rewrite on their own schedule, so neither the boot comparison nor the
  * restore comparison can expect them to hold still.
  */
-const VOLATILE_ROWS: Array<{ table: string; key: string; why: string }> = [
+const VOLATILE_ROWS: Array<{ table: string; matches: (row: Row) => boolean; why: string }> = [
   {
     table: 'settings',
-    key: 'crs_plugin_registry_state',
+    matches: (row) => row.key === 'crs_plugin_registry_state',
     why: 'the CRS registry updater refreshes it from GitHub once started',
+  },
+  {
+    table: 'notification_channels',
+    matches: (row) => row.builtin !== null,
+    why: 'the built-in email and push channels are created on first use, with that time',
+  },
+  {
+    table: 'alert_rules',
+    matches: (row) => row.builtin !== null,
+    why: "each notification category's built-in rule is created on first use, with that time",
   },
 ];
 
 const isVolatile = (table: string, row: Row) =>
-  VOLATILE_ROWS.some((entry) => entry.table === table && row.key === entry.key);
+  VOLATILE_ROWS.some((entry) => entry.table === table && entry.matches(row));
 
 type Failure = string;
 

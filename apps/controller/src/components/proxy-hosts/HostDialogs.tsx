@@ -1,5 +1,6 @@
 "use client";
 
+import { type EditorRollback, RollbackNotice } from "@/components/host-history/RollbackNotice";
 import { useActionState, useEffect, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -284,10 +285,13 @@ export function EditHostDialog({
   tailscaleDefaults,
   canEditRawConfig = false,
   initialSection = null,
+  rollback = null,
 }: {
   open: boolean;
   host: ProxyHost;
   onClose: () => void;
+  /** The editor holds this revision rather than the stored host. */
+  rollback?: EditorRollback | null;
   /** Scrolled to on open, from a section link on the host's page. */
   initialSection?: EditorSection | null;
   /** Admins only. Omitted rather than disabled, so the save leaves an admin's snippet untouched. */
@@ -352,6 +356,7 @@ export function EditHostDialog({
         {/* Grouped by the sections the host's page links to (lib/proxy-hosts/editor-sections). */}
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
+          {rollback && <RollbackNotice rollback={rollback} />}
           <VStack gap={5} id={editorSectionAnchor("general")}>
             <SettingsToggles part="enabled" enabled={host.enabled} />
             <TextInput

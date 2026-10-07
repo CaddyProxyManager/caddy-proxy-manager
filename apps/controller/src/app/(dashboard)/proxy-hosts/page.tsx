@@ -1,9 +1,12 @@
 import ProxyHostsClient from "./ProxyHostsClient";
+import { revisionForEditor } from "@/src/lib/host-history";
+import { strictId } from "@/src/lib/http/strict-id";
 import { HostTagSuggestions } from "@/components/proxy-hosts/HostTagsField";
 import {
   listProxyHostsPaginated,
   countProxyHostsByState,
   getProxyHost,
+  proxyHostFromRow,
   getProxyHostsByIds,
   listProxyHostDomainRefs,
   listProxyHostTags,
@@ -41,6 +44,8 @@ interface PageProps {
     tag?: string;
     /** A host to open the editor on, from its page's section links. */
     edit?: string;
+    /** With `edit`: a revision of that host to load instead, for a rollback. */
+    revision?: string;
   }>;
 }
 
@@ -62,6 +67,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     state: stateParam,
     tag: tagParam,
     edit: editParam,
+    revision: revisionParam,
   } = await searchParams;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   // Filtered in the query: client-side, "Disabled 2" shows nothing when both sit on a later page.
@@ -119,6 +125,12 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       (canView(access, "proxyHost", editId) ? await getProxyHost(editId) : null))
     : null;
   const dialogHosts = editHost && !hosts.includes(editHost) ? [...hosts, editHost] : hosts;
+  const managed = editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null;
+  const revisionId = strictId(revisionParam);
+  const rollback =
+    managed && revisionId !== undefined
+      ? await revisionForEditor("http", managed.id, revisionId)
+      : null;
 
   // Assignments for this page's hosts only, not the fleet. Insights are best-effort: unavailable
   // analytics drops the columns instead of failing the list.
@@ -132,6 +144,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     ),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
+  if (managed && rollback) agentAssignments[managed.id] = rollback.snapshot.agentIds;
 
   return (
     <HostTagSuggestions tags={tags}>
@@ -151,7 +164,14 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         agentAssignments={agentAssignments}
         counts={counts}
         insights={insights}
-        editTarget={editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null}
+        editTarget={
+          managed && rollback
+            ? { ...proxyHostFromRow(rollback.snapshot.row), id: managed.id }
+            : managed
+        }
+        rollback={
+          rollback && revisionId !== undefined ? { revisionId, missing: rollback.missing } : null
+        }
         canCreate={canCreate(access)}
         manageableIds={dialogHosts
           .filter((h) => canManage(access, "proxyHost", h.id))

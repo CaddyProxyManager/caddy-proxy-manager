@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { VStack } from "@astryxdesign/core/Stack";
-import { ArrowLeft, DatabaseBackup, History, LayoutGrid } from "lucide-react";
+import { ArrowLeft, DatabaseBackup, History, LayoutGrid, RadioTower } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import {
@@ -71,6 +71,13 @@ export default function SettingsSideNav({
           label={t("backup.navLabel")}
           icon={<DatabaseBackup className={ACCENTS.green.text} />}
           isSelected={pathname === "/settings/backup"}
+        />
+        <SideNavItem
+          as={Link}
+          href="/settings/audit-streaming"
+          label={t("auditStreaming.navLabel")}
+          icon={<RadioTower className={ACCENTS.purple.text} />}
+          isSelected={pathname === "/settings/audit-streaming"}
         />
       </SideNavSection>
 

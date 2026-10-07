@@ -41,7 +41,8 @@ import { StatTiles } from "@/components/ui/StatTiles";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { formatBytes, formatShare } from "@/src/app/(dashboard)/analytics/explore/format";
-import { editorSectionHref } from "@/lib/proxy-hosts/editor-sections";
+import { editorSectionHref, proxyHostDetailHref } from "@/lib/proxy-hosts/editor-sections";
+import { HostPageTabs } from "@/components/host-history/HostPageTabs";
 import type { ProxyHostDetail } from "@/lib/proxy-hosts/detail-types";
 import type { HostPathRow, HostStatusRow } from "@/lib/clickhouse/host-traffic";
 import type { SectionFact } from "@/lib/proxy-hosts/section-summary";
@@ -93,6 +94,7 @@ export function ProxyHostDetailView({
   canManage,
   analyticsHref,
   logsHref,
+  historyHref = null,
 }: {
   detail: Omit<ProxyHostDetail, "audit">;
   auditRows: HostAuditRow[] | null;
@@ -101,6 +103,8 @@ export function ProxyHostDetailView({
   analyticsHref: string | null;
   /** Administrators only: access logs carry every client's address. */
   logsHref: string | null;
+  /** Those who may manage the host; its revisions name who changed it. */
+  historyHref?: string | null;
 }) {
   const t = useTranslations("proxyHosts.detail");
   const tOverview = useTranslations("overview");
@@ -243,6 +247,13 @@ export function ProxyHostDetailView({
             )}
           </HStack>
         </HStack>
+        {historyHref && (
+          <HostPageTabs
+            active="overview"
+            overviewHref={proxyHostDetailHref(host.id)}
+            historyHref={historyHref}
+          />
+        )}
       </VStack>
 
       <SectionCard icon={TriangleAlert} title={tAttention("title")}>

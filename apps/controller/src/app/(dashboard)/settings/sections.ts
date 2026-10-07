@@ -88,6 +88,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "User avatars",
             envSearch: ["AVATAR_GRAVATAR"],
           },
+          {
+            id: "host-history",
+            name: "Host history",
+            envSearch: ["HOST_HISTORY_KEEP_REVISIONS", "HOST_HISTORY_KEEP_DAYS"],
+          },
         ],
       },
       {
@@ -193,6 +198,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "NOTIFY_GEOIP_FAILED",
               "NOTIFY_CRS_PLUGIN_DISABLED",
               "NOTIFY_UPDATE_AVAILABLE",
+              "NOTIFY_BACKUP_FAILED",
+              "NOTIFY_AUDIT_SINK_FAILED",
+              "NOTIFY_CHANNEL_FAILING",
               "NOTIFY_DISABLED_ACCOUNT_OWNER",
             ],
           },

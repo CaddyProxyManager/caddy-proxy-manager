@@ -8,6 +8,7 @@ import { auditSummaryText } from "@/src/lib/audit/summary";
 import { DEFAULT_EXPLORE_STATE, serializeExploreState } from "@/src/lib/analytics/explore-state";
 import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 import { getProxyHostDetail } from "@/src/lib/proxy-hosts/detail";
+import { proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { hostTrafficNames } from "@/src/lib/proxy-hosts/traffic-status";
 import { canManage, canView, requireAccess } from "@/src/lib/users/permissions";
 import { ProxyHostDetailView } from "@/src/components/proxy-hosts/detail/ProxyHostDetailView";
@@ -70,6 +71,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
     <ProxyHostDetailView
       detail={detail}
       canManage={canManage(access, "proxyHost", host.id)}
+      historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.id) : null}
       analyticsHref={analyticsHref}
       logsHref={
         access.isAdmin && primaryName

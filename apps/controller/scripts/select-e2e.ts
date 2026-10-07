@@ -50,6 +50,7 @@ const CERTIFICATES: Specs = [
   "proxy-hosts/wildcard-dns-guard",
 ];
 const L4: Specs = ["l4-proxy-hosts", "functional/l4-"];
+const HOST_HISTORY: Specs = ["proxy-hosts/host-history", ...L4, "audit-log"];
 const ACCESS_LISTS: Specs = [
   "access-lists",
   "functional/access-control",
@@ -70,7 +71,7 @@ const GEOIP: Specs = [
 const USERS: Specs = ["users/", "auth/sessions", "auth/disabled-user", "auth/account-security"];
 const GROUPS: Specs = ["users/", "functional/oidc-group-sync", "functional/oauth-role-injection"];
 const NAV: Specs = ["command-palette", "mobile/", "dashboard"];
-const NOTIFICATIONS: Specs = ["notifications", "auth/email-password-reset", "settings/"];
+const NOTIFICATIONS: Specs = ["notifications", "alerts", "auth/email-password-reset", "settings/"];
 const API: Specs = ["api/"];
 const SETTINGS_PAGE: Specs = ["settings/", "auth/", "notifications"];
 
@@ -229,6 +230,11 @@ export const RULES: readonly Rule[] = [
     match: [`${LIB}host-review/`, `${SRC}components/host-review/`],
     specs: [...PROXY_HOSTS, ...L4],
   },
+  // Host revisions: recorded by both host models, rolled back through both editors.
+  {
+    match: [`${LIB}host-history/`, `${SRC}components/host-history/`],
+    specs: HOST_HISTORY,
+  },
   {
     match: [
       `${LIB}access-lists/`,
@@ -302,7 +308,12 @@ export const RULES: readonly Rule[] = [
   { match: [`${LIB}secrets/`], specs: ["functional/secret-rotation", "settings/backup"] },
   {
     match: [`${LIB}backup/`, `${APP}api/backup/`, `${V1}backup/`, `${DASH}settings/backup/`],
-    specs: ["settings/backup", "settings/config-transfer", "setup/setup-migrate"],
+    specs: [
+      "settings/backup",
+      "settings/scheduled-backups",
+      "settings/config-transfer",
+      "setup/setup-migrate",
+    ],
   },
   {
     match: [`${LIB}config-transfer/`, `${APP}api/config/`],
@@ -312,10 +323,16 @@ export const RULES: readonly Rule[] = [
     match: [`${LIB}branding/`, `${APP}api/branding/`, `${DASH}settings/AccentColorPicker.tsx`],
     specs: ["settings/branding"],
   },
+  { match: [`${DASH}alerts/`], specs: ["alerts"] },
+  {
+    match: [`${LIB}audit-stream/`, `${DASH}settings/audit-streaming/`],
+    specs: ["settings/audit-streaming"],
+  },
   {
     match: [
       `${LIB}email/`,
       `${LIB}notifications/`,
+      `${LIB}alerts/`,
       `${MODELS}notification-preferences.ts`,
       `${MODELS}push-subscriptions.ts`,
       `${DASH}settings/EmailSection.tsx`,
@@ -419,6 +436,7 @@ export const MESSAGES = "apps/controller/messages/en.json";
 export const NAMESPACES: Readonly<Record<string, Specs>> = {
   accessLists: ACCESS_LISTS,
   agents: ["agents", "functional/agent"],
+  alerts: ["alerts"],
   analytics: ANALYTICS,
   attention: ["dashboard", "proxy-hosts/host-detail"],
   apiDocs: ["api/api-docs"],
@@ -431,6 +449,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   email: NOTIFICATIONS,
   groups: GROUPS,
   hostReview: [...PROXY_HOSTS, ...L4],
+  hostHistory: HOST_HISTORY,
   l4ProxyHosts: L4,
   logs: LOGS,
   mtlsRoles: CERTIFICATES,

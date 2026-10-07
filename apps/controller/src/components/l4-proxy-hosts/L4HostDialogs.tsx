@@ -1,5 +1,6 @@
 "use client";
 
+import { type EditorRollback, RollbackNotice } from "@/components/host-history/RollbackNotice";
 import { type ReactNode, useActionState, useEffect, useState } from "react";
 import {
   createL4ProxyHostAction,
@@ -845,10 +846,13 @@ export function EditL4HostDialog({
   accessLists = [],
   assignedAgentIds = [],
   initialSection = null,
+  rollback = null,
 }: {
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
+  /** The editor holds this revision rather than the stored host. */
+  rollback?: EditorRollback | null;
   /** Scrolled to on open, from the hash of an `?edit=` link. */
   initialSection?: L4EditorSection | null;
   agents?: AgentOption[];
@@ -889,6 +893,7 @@ export function EditL4HostDialog({
       sections={l4SectionLinks("")}
       onSectionLink={(section) => linkEditorSection(host.id, section)}
     >
+      {rollback && <RollbackNotice rollback={rollback} formId="edit-l4-host-form" />}
       <L4HostForm
         formId="edit-l4-host-form"
         formAction={formAction}

@@ -85,6 +85,14 @@
         "title": "GeoIP databases are not updating",
         "detail": "{error}"
       },
+      "backupFailed": {
+        "title": "Scheduled backup {name} failed",
+        "detail": "Its last run failed: {error}"
+      },
+      "backupOverdue": {
+        "title": "Scheduled backup {name} has stopped running",
+        "detail": "Its last two runs did not happen. Check that a controller is running and the schedule is valid."
+      },
       "wafDetectionOnly": {
         "title": "The WAF only detects",
         "detail": "The global WAF logs what its rules match but blocks nothing. Switch it to Blocking once the events look right."
@@ -597,6 +605,8 @@
       "l4ProxyHostCreated": "Created L4 proxy host {name}",
       "l4ProxyHostDeleted": "Deleted L4 proxy host {name}",
       "l4ProxyHostUpdated": "Updated L4 proxy host {name}",
+      "l4ProxyHostRolledBack": "Rolled back L4 proxy host {name} to revision {revision}",
+      "l4ProxyHostRestored": "Restored L4 proxy host {name}",
       "loginSuccess": "User signed in",
       "mtlsAccessRuleCreated": "Created mTLS access rule for path {path} on proxy host {hostId}",
       "mtlsAccessRuleDeleted": "Deleted mTLS access rule for path {path}",
@@ -637,6 +647,25 @@
       "certificateFileNamesChanged": "Read a new version of certificate {name} with different names",
       "backupCreated": "Downloaded a configuration backup",
       "backupRestored": "Restored the configuration from a backup",
+      "backupRunNow": "Ran backup schedule {name} now",
+      "backupDestinationCreated": "Created backup destination {name}",
+      "backupDestinationUpdated": "Updated backup destination {name}",
+      "backupDestinationDeleted": "Deleted backup destination {name}",
+      "backupScheduleCreated": "Created backup schedule {name}",
+      "backupScheduleUpdated": "Updated backup schedule {name}",
+      "backupScheduleDeleted": "Deleted backup schedule {name}",
+      "alertChannelCreated": "Created alert channel {name}",
+      "alertChannelUpdated": "Updated alert channel {name}",
+      "alertChannelDeleted": "Deleted alert channel {name}",
+      "alertRuleCreated": "Created alert rule {name}",
+      "alertRuleUpdated": "Updated alert rule {name}",
+      "alertRuleDeleted": "Deleted alert rule {name}",
+      "alertDigestCreated": "Created alert digest {name}",
+      "alertDigestUpdated": "Updated alert digest {name}",
+      "alertDigestDeleted": "Deleted alert digest {name}",
+      "auditSinkCreated": "Created audit sink {name}",
+      "auditSinkUpdated": "Updated audit sink {name}",
+      "auditSinkDeleted": "Deleted audit sink {name}",
       "settingsApplied": "Applied settings revision {revision}",
       "auditChainVerified": "Verified the audit log's hash chain",
       "auditChainRekeyed": "Re-keyed the audit log's hash chain",
@@ -660,6 +689,8 @@
       "proxyHostUpdated": "Updated proxy host {name}",
       "proxyHostMaintenanceOn": "Turned on maintenance mode for proxy host {name}",
       "proxyHostMaintenanceOff": "Turned off maintenance mode for proxy host {name}",
+      "proxyHostRolledBack": "Rolled back proxy host {name} to revision {revision}",
+      "proxyHostRestored": "Restored proxy host {name}",
       "setupFirstAdmin": "User {id} became the first administrator by signing in during setup",
       "userCreated": "Created user {id} ({email}) with role {role}",
       "userDeleted": "Deleted user {id}",
@@ -1424,6 +1455,76 @@
     "configImportFailed": "The configuration could not be imported",
     "backupFailed": "The backup could not be made or read",
     "backupTooLarge": "That file is too large to be a backup",
+    "backupPayloadTooLarge": "That backup unpacks to more than a restore can hold",
+    "backupObjectInvalid": "That is not a backup this destination holds",
+    "backupDestinationNotFound": "That backup destination does not exist",
+    "backupDestinationNameRequired": "Give the destination a name",
+    "backupDestinationNameTaken": "A destination named {name} already exists",
+    "backupDestinationKindInvalid": "A destination is an S3-compatible bucket or a local folder",
+    "backupDestinationInUse": "A schedule still writes to this destination. Delete or move that schedule first",
+    "backupPrefixInvalid": "A prefix is folder names separated by /, using letters, digits and . _ - only",
+    "backupFolderInvalid": "Name a folder, using letters, digits and . _ - only, with / between folders",
+    "backupEndpointInvalid": "The endpoint must be an http or https URL without credentials, a query or a fragment, and not a cloud metadata address",
+    "backupEndpointNeedsHttps": "Use https for an endpoint outside your own network",
+    "backupBucketRequired": "Enter the bucket name",
+    "backupCredentialsRequired": "Enter both the access key ID and the secret access key",
+    "backupSecretReentry": "The endpoint, bucket or access key changed. Enter the secret access key again",
+    "backupProbeMismatch": "The test file read back differently from what was written",
+    "alertChannelNotFound": "That alert channel does not exist",
+    "alertChannelNameRequired": "Give the channel a name of up to 100 characters",
+    "alertChannelNameTaken": "A channel named {name} already exists",
+    "alertChannelKindInvalid": "A channel is a webhook, Discord, Slack, Teams or ntfy, and its kind cannot change",
+    "alertChannelUrlInvalid": "Enter the full http or https address to post to, without a user name or #fragment",
+    "alertChannelUrlHttps": "Use https. Plain http is allowed only to an address on this network",
+    "alertChannelUrlMetadata": "That address belongs to a cloud metadata service and cannot be posted to",
+    "alertChannelSecretInvalid": "A signing secret is whsec_ followed by at least 24 bytes of base64, and a token has no spaces",
+    "alertChannelTopicInvalid": "An ntfy topic is 1 to 64 letters, digits, hyphens or underscores",
+    "alertChannelHeaderInvalid": "Each header needs a valid name that is not a signature or content header, a one-line value, and there can be at most {max}",
+    "alertChannelBuiltin": "The built-in email and push channels are set up under Settings and Profile, not here",
+    "alertChannelTestFailed": "The test did not get through: {error}",
+    "alertChannelPushNone": "No administrator's browser is subscribed to push, or none accepted the test",
+    "alertRuleNotFound": "That alert rule does not exist",
+    "alertRuleNameRequired": "Give the rule a name of up to 100 characters",
+    "alertRuleSourceInvalid": "Choose what the rule watches: events, a Needs attention item, a traffic signal or a metric",
+    "alertRuleThresholdInvalid": "A metric rule needs a threshold of 0 or more and a window of 1 to 1440 minutes",
+    "alertRuleScopeInvalid": "Pick at least one host or tag to scope the rule to",
+    "alertRuleChannelsInvalid": "Pick at least one channel that exists",
+    "alertRuleQuietInvalid": "The quiet period is 0 to 10080 minutes",
+    "alertRuleBuiltin": "A built-in rule always watches its own events; change its channels, severity, quiet period or silence instead",
+    "alertDigestNotFound": "That digest does not exist",
+    "alertDigestNameRequired": "Give the digest a name of up to 100 characters",
+    "alertDigestNameTaken": "A digest named {name} already exists",
+    "alertDigestTimeInvalid": "Enter the time as HH:MM, from 00:00 to 23:59",
+    "auditSinkNotFound": "That audit sink does not exist",
+    "auditSinkNameRequired": "Give the sink a name of up to 100 characters",
+    "auditSinkNameTaken": "A sink named {name} already exists",
+    "auditSinkKindInvalid": "A sink is syslog over UDP, TCP or TLS, an HTTP receiver, or a file",
+    "auditSinkHostInvalid": "Enter the receiver's host name or IP address",
+    "auditSinkPortInvalid": "The port is a whole number from 1 to 65535",
+    "auditSinkMaxBytesInvalid": "The largest datagram is {min} to {max} bytes",
+    "auditSinkCaInvalid": "The CA certificate must be one PEM certificate",
+    "auditSinkUrlInvalid": "Enter the receiver's full http or https address, without a user name or #fragment",
+    "auditSinkUrlHttps": "Use https. Plain http is allowed only to an address on this network, since the audit log travels in the body",
+    "auditSinkMetadata": "That address belongs to a cloud metadata service or the link-local range, and is never contacted",
+    "auditSinkEncodingInvalid": "The encoding is none, gzip or zstd",
+    "auditSinkHeaderInvalid": "The auth header needs a valid name that is not a content or host header, and a one-line value",
+    "auditSinkSecretReentry": "The address points somewhere else now. Enter the auth header's value again, or clear it",
+    "auditSinkFileInvalid": "A file name is up to 100 letters, digits, dots, hyphens or underscores, starting with a letter or digit",
+    "auditSinkUnreachable": "Could not deliver to {target}: {reason}",
+    "auditSinkTls": "{target} did not present a certificate this controller trusts for its name: {reason}",
+    "auditSinkTimeout": "{target} did not answer in time",
+    "auditSinkHttpStatus": "The receiver answered HTTP {status}",
+    "auditSinkFileFailed": "Could not append to the file: {reason}",
+    "auditSinkGapAudit": "Audit events {from} to {to} were pruned before this sink received them",
+    "auditSinkGapSecurity": "Security records {from} to {to} were pruned before this sink received them",
+    "backupScheduleNotFound": "That backup schedule does not exist",
+    "backupScheduleNameRequired": "Give the schedule a name",
+    "backupScheduleNameTaken": "A schedule named {name} already exists",
+    "backupCronInvalid": "That is not a valid cron expression. Use five fields: minute, hour, day of month, month and day of week",
+    "backupTimeZoneInvalid": "That time zone is not known. Use an IANA name such as Europe/Berlin",
+    "backupCronNeverFires": "That expression never runs, for example because the date does not exist",
+    "backupRetentionInvalid": "Keep a whole number between 1 and {max}, or leave it empty",
+    "backupRunInterrupted": "The run was interrupted before it finished",
     "backupRestoreNeedsFreshSignIn": "Restoring replaces every account. Sign out and in again, then restore within {minutes} minutes",
     "hostDescriptionTooLong": "Notes can be at most {max} characters",
     "hostTagsInvalid": "Tags must be a list of text values",
@@ -1436,6 +1537,21 @@
     "restoreRevisionFailed": "Failed to restore the revision",
     "revisionNotFound": "Revision #{revision} does not exist",
     "revisionNotRecorded": "Revision #{revision} cannot be restored: a later revision was applied before values were recorded",
+    "hostRevisionNotFound": "Host revision #{revision} does not exist",
+    "hostKindInvalid": "The host kind must be \"http\" or \"l4\"",
+    "hostReferencesMissing": "This revision names what no longer exists: {references}. Choose replacements before saving",
+    "hostReferenceCertificate": "certificate #{id}",
+    "hostReferenceAccessList": "access list #{id}",
+    "hostReferenceAgent": "agent #{id}",
+    "hostReferenceCaCertificate": "CA certificate #{id}",
+    "hostReferenceClientCertificate": "client certificate #{id}",
+    "hostReferenceMtlsRole": "mTLS role #{id}",
+    "hostRestoreDomainConflict": "{domain} is now served by the host {host}, so this host cannot be restored as it was",
+    "hostRestoreExists": "This host has not been deleted, so there is nothing to restore",
+    "hostRollbackDeleted": "A deletion cannot be rolled back to. Restore the host instead",
+    "hostRollbackGone": "This host has been deleted. Restore it instead of rolling it back",
+    "restoreHostFailed": "Failed to restore the host",
+    "rollbackRevisionInvalid": "That revision does not belong to this host",
     "renameAgentFailed": "Failed to rename the agent",
     "setupAlreadyCompleted": "Setup has already been completed.",
     "toggleL4HostFailed": "Failed to toggle L4 proxy host.",
@@ -1810,6 +1926,61 @@
     "noUsersMatch": "No users match \"{query}\"",
     "usersToAdd": "Users to add"
   },
+  "hostHistory": {
+    "pageTitle": "History of {name}",
+    "overviewTab": "Overview",
+    "subtitle": "A revision is kept after every save, maintenance switch, bulk change, import and deletion, newest first. Compare any two, or load one into the editor and roll back to it.",
+    "deletedTitle": "This host was deleted",
+    "deletedDescription": "Its history is kept. Restoring brings it back under its old id, as the selected revision had it.",
+    "deletedBadge": "Deleted",
+    "empty": "No revision has been kept for this host yet. One is taken at its next change.",
+    "operations": {
+      "create": "Host created",
+      "update": "Edited",
+      "maintenance": "Maintenance switched",
+      "delete": "Deleted the host",
+      "bulk": "Bulk change: {action}",
+      "import": "Imported from a file",
+      "rollback": "Rolled back to #{revision}",
+      "restore": "Restored from #{revision}"
+    },
+    "bulkActions": {
+      "enable": "switched on",
+      "disable": "switched off",
+      "delete": "removed",
+      "maintenanceOn": "maintenance on",
+      "maintenanceOff": "maintenance off",
+      "setCertificate": "certificate set",
+      "setAccessList": "access list set",
+      "addTag": "tag {tag} added"
+    },
+    "initial": "Before the host existed",
+    "comparisonSubtitleInitial": "What the host was given by #{to}.",
+    "noChanges": "These revisions hold the same host.",
+    "showConfig": "Show the Caddy config",
+    "showConfigHelp": "Renders the whole config twice, with only this host swapped, so it shows what the host adds and nothing else.",
+    "rollbackHelp": "Loads revision #{id} into the editor. Its review shows what saving changes before anything is stored, and the save becomes a new revision.",
+    "rollbackLatest": "This is the host as it is now.",
+    "restoreHelp": "Brings the host back as revision #{id} had it.",
+    "restoreTitle": "Restore {name}",
+    "restoreMissing": "Revision #{id} names things deleted since. Restoring leaves them out:",
+    "restoreMissingAgents": "With no agent left, the host is served by every agent.",
+    "restored": "Host restored.",
+    "rollbackBannerTitle": "Rolling back to revision #{id}",
+    "rollbackBannerDescription": "The editor holds this revision. Saving goes through the review and becomes a new revision; nothing is stored until then.",
+    "rollbackMissing": "Left out because they were deleted since - choose replacements or leave them unset:",
+    "references": {
+      "certificate": "Certificate #{id}",
+      "accessList": "Access list #{id}",
+      "agent": "Agent #{id}",
+      "caCertificate": "CA certificate #{id}",
+      "clientCertificate": "Client certificate #{id}",
+      "mtlsRole": "mTLS role #{id}"
+    },
+    "revert": "Revert",
+    "auditRollback": "Roll back to before this change",
+    "auditRestore": "Open the deleted host's history"
+  },
   "hostReview": {
     "reviewUnsaved": "Review ({count, plural, one {# unsaved change} other {# unsaved changes}})",
     "reviewTitle": "Review changes",
@@ -2090,6 +2261,7 @@
     "viewAsRoles": { "operator": "an operator", "user": "a user", "viewer": "a viewer" },
     "accessLists": "Access lists",
     "agents": "Agents",
+    "alerts": "Alerts",
     "analytics": "Analytics",
     "apiDocs": "API docs",
     "auditLog": "Audit log",
@@ -3132,6 +3304,71 @@
     "wafLegacyExclusions": "Still excluded from an older version, until the next restart moves them to the WAF page:"
   },
   "settings": {
+    "auditStreaming": {
+      "navLabel": "Audit streaming",
+      "sinksTitle": "Sinks",
+      "help": "Every audit event goes to each enabled sink in order, at least once, with its seq, hash and prevHash so the receiver can check that nothing is missing or out of order. A new sink starts from the oldest event the log still holds.",
+      "emptyTitle": "No sinks yet",
+      "emptyDescription": "Add a sink to send the audit log to a syslog server, an HTTP receiver or a file.",
+      "addTitle": "Add sink",
+      "editTitle": "Edit sink",
+      "saveFailed": "The sink could not be saved.",
+      "deleteFailed": "The sink could not be deleted.",
+      "deleteTitle": "Delete sink?",
+      "deleteConfirm": "{name} stops receiving the audit log. What it already received stays with the receiver.",
+      "kind": "Transport",
+      "kinds": {
+        "syslogUdp": "Syslog over UDP",
+        "syslogTcp": "Syslog over TCP",
+        "syslogTls": "Syslog over TLS",
+        "http": "HTTP (NDJSON)",
+        "file": "JSON lines file"
+      },
+      "kindHelp": {
+        "syslogUdp": "RFC 5424 messages, one per datagram. Nothing confirms delivery, so prefer TCP or TLS where the server offers it.",
+        "syslogTcp": "RFC 5424 messages with octet-counting framing. Unencrypted: use it only on a network you trust.",
+        "syslogTls": "RFC 5424 messages with octet-counting framing over TLS. Nothing is sent until the server's certificate checks out for the host name.",
+        "http": "Batches of records POSTed as newline-delimited JSON.",
+        "file": "Appended to a file on the data volume, one JSON record per line, for a local shipper to pick up."
+      },
+      "lag": "Not yet sent",
+      "lagAudit": "{count, plural, one {# audit event} other {# audit events}}",
+      "lagSecurity": "{count, plural, one {# security record} other {# security records}}",
+      "withSecurity": "With security events",
+      "state": {
+        "current": "Up to date",
+        "behind": "Catching up"
+      },
+      "lastDelivered": "Last delivered",
+      "host": "Syslog server",
+      "maxBytes": "Largest datagram (bytes)",
+      "maxBytesHelp": "{min} to {max}. A longer record keeps its header and its seq, hash and prevHash whole; the JSON after them is cut and the message marked truncated.",
+      "ca": "Trusted CA",
+      "caHelp": "A PEM certificate to trust for this sink, besides the system's authorities. For a receiver with a certificate from a private CA.",
+      "urlHelp": "Plain http is allowed only to an address on this network.",
+      "encoding": "Request compression",
+      "encodingHelp": "A request body has no negotiation, so pick what the receiver accepts. If it answers 415, batches go uncompressed and this page says so.",
+      "encodings": {
+        "identity": "No compression",
+        "gzip": "gzip",
+        "zstd": "zstd"
+      },
+      "headerName": "Auth header",
+      "headerValueHelp": "Sent with every batch, for example Bearer and a token. Stored encrypted and never shown again.",
+      "clearHeaderValue": "Remove the stored header value",
+      "fileName": "File name",
+      "fileNameHelp": "Created under audit-stream/ on the data volume.",
+      "includeSecurity": "Include security events",
+      "includeSecurityHelp": "WAF events and other mitigated requests, as records of kind security with a seq of their own, redacted as stored. They are not part of the hash chain and say so. Needs analytics.",
+      "testDelivered": "Test record delivered",
+      "testEncodingRefused": "The receiver refused the configured compression, so it went uncompressed. Saved sinks fall back the same way.",
+      "testFailed": "The test record did not get through",
+      "gapTitle": "{name} missed records",
+      "gapAudit": "Audit events {from} to {to} were pruned before it received them. {missed, plural, one {# record} other {# records}} missed in all; the receiver was sent a gap record in their place.",
+      "gapSecurity": "Security records {from} to {to} were dropped before it received them. {missed, plural, one {# record} other {# records}} missed in all; the receiver was sent a gap record in their place.",
+      "encodingFallbackTitle": "{name} sends uncompressed",
+      "encodingFallback": "The receiver answered 415 to {encoding}, so batches go uncompressed until the sink is saved again."
+    },
     "backup": {
       "navLabel": "Backup",
       "title": "Backup and restore",
@@ -3142,7 +3379,7 @@
       "passphraseConfirm": "Confirm the passphrase",
       "passphraseMismatch": "The passphrases don't match",
       "includeAuditLog": "Include the audit log",
-      "includeSettingsHistory": "Include the settings history",
+      "includeSettingsHistory": "Include the settings and host history",
       "notIncluded": "Not included: who is signed in, the certificates Caddy has issued (they are issued again), analytics, and the GeoIP databases (they are downloaded again).",
       "downloadFailed": "The backup could not be made",
       "restoreTitle": "Restore from a backup",
@@ -3165,7 +3402,106 @@
       "restore": "Restore",
       "restoreFailed": "The restore did not happen",
       "confirmTitle": "Replace this configuration?",
+      "restoreFrom": "Restore from",
+      "fromFile": "A file",
+      "fromDestination": "A destination",
+      "chooseDestination": "Choose a destination",
+      "remoteBackup": "Stored backup",
+      "chooseRemoteBackup": "Choose a backup",
+      "remoteEmpty": "This destination holds no backups yet.",
+      "listFailed": "Could not list the destination's backups",
       "confirmHelp": "Every host, user and setting here is replaced by the backup's. Caddy's certificates will be issued again, which can hit your certificate authority's rate limits if there are many hosts."
+    },
+    "backupSchedules": {
+      "destinationsTitle": "Backup destinations",
+      "destinationsHelp": "Where scheduled backups are written: a bucket on any S3-compatible service, or a folder on the controller's data volume.",
+      "destinationsEmptyTitle": "No destinations yet",
+      "destinationsEmptyDescription": "Add a bucket or a local folder for scheduled backups to go to.",
+      "addDestination": "Add a destination",
+      "editDestination": "Edit destination",
+      "kind": "Kind",
+      "kinds": {
+        "s3": "S3-compatible",
+        "local": "Local folder"
+      },
+      "where": "Location",
+      "endpoint": "Endpoint",
+      "endpointHelp": "The service's S3 URL. Leave empty for Amazon S3 itself, where the region picks the address.",
+      "bucket": "Bucket",
+      "region": "Region",
+      "accessKeyId": "Access key ID",
+      "secretAccessKey": "Secret access key",
+      "secretStored": "A secret is stored. Leave empty to keep it, unless the endpoint, bucket or key ID changes.",
+      "virtualHostedStyle": "Bucket in the host name",
+      "virtualHostedStyleHelp": "Address the bucket as bucket.endpoint rather than endpoint/bucket. Some providers require one or the other.",
+      "folder": "Folder",
+      "folderHelp": "Under backups/ on the controller's data volume. Copy it somewhere else as well: a backup on the same disk does not survive losing that disk.",
+      "prefix": "Prefix",
+      "prefixHelp": "Prepended to every file name, for sharing a bucket with other data.",
+      "testPassed": "The destination works: a test file was written, read back and deleted",
+      "testFailed": "The destination test failed",
+      "saveFailed": "The change was not saved",
+      "deleteFailed": "Could not delete",
+      "actionFailed": "That did not work",
+      "deleteDestinationTitle": "Delete this destination?",
+      "deleteDestinationConfirm": "{name} is removed from this list. Backups already written there stay where they are.",
+      "schedulesTitle": "Backup schedules",
+      "schedulesHelp": "Each schedule makes a sealed backup on its own timing and writes it to a destination. One controller runs them; if it was down when one was due, the next controller to take over runs the latest it missed.",
+      "schedulesEmptyTitle": "No schedules yet",
+      "schedulesEmptyDescription": "Add a schedule to back up this instance automatically.",
+      "schedulesNeedDestination": "Add a destination first: a schedule needs somewhere to write.",
+      "addSchedule": "Add a schedule",
+      "editSchedule": "Edit schedule",
+      "destination": "Destination",
+      "frequency": "Runs",
+      "frequencies": {
+        "hourly": "Every hour",
+        "daily": "Every day",
+        "weekly": "Every week",
+        "custom": "Cron expression"
+      },
+      "hour": "Hour",
+      "minute": "Minute",
+      "weekday": "Day",
+      "expression": "Expression",
+      "expressionHelp": "Five fields: minute, hour, day of month, month, day of week. For example 0 */6 * * * runs every six hours.",
+      "timeZone": "Schedule time zone",
+      "timeZoneHelp": "An IANA name such as Europe/Berlin. The schedule follows its daylight-saving changes.",
+      "nextRunPreview": "{cron} runs next on",
+      "timingInvalid": "This timing cannot be saved",
+      "schedulePrefixHelp": "Added after the destination's prefix. Old backups are pruned only from directly under this prefix, and only files this schedule names.",
+      "keepLast": "Keep the last",
+      "keepDays": "Keep for days",
+      "retentionHelp": "A backup is deleted once neither rule keeps it. Leave both empty to keep every backup.",
+      "passphraseKeep": "Leave empty to keep the stored passphrase. Backups already made keep the passphrase they were made with.",
+      "passphraseStoredTitle": "The passphrase is stored on this instance",
+      "passphraseStored": "Scheduled runs need nobody present, so the passphrase is kept, encrypted with SESSION_SECRET. Anyone who has that secret can already read this database, so this exposes nothing new, but keep a copy of the passphrase elsewhere: without it no backup can be restored.",
+      "enabled": "Enabled",
+      "enabledFor": "Run {name} on its schedule",
+      "timing": "Timing",
+      "nextRun": "Next run",
+      "lastRun": "Last run",
+      "runNow": "Run now",
+      "running": "Making a backup",
+      "runningHelp": "This takes a few seconds, longer with the audit log included.",
+      "runFailed": "The backup did not complete",
+      "deleteScheduleTitle": "Delete this schedule?",
+      "deleteScheduleConfirm": "{name} stops running. Backups it already wrote stay at the destination.",
+      "runsTitle": "Recent runs",
+      "started": "Started",
+      "schedule": "Schedule",
+      "size": "File size",
+      "detail": "File or error",
+      "status": {
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed"
+      },
+      "triggers": {
+        "schedule": "On schedule",
+        "catchUp": "Caught up after a restart",
+        "manual": "Run by hand"
+      }
     },
     "configTransfer": {
       "heading": "Portable configuration",
@@ -3568,6 +3904,15 @@
         "description": "Required for analytics: the ClickHouse container refuses to start without one, and with it empty there is nothing to authenticate as.",
         "label": "ClickHouse password"
       },
+      "host_history_keep_revisions": {
+        "description": "Each host keeps at least this many of its latest revisions, however old. Older ones go once they are also past the age below.",
+        "label": "Host revisions kept"
+      },
+      "host_history_keep_days": {
+        "description": "Revisions younger than this are kept, however many a host has. A deleted host keeps its history too, so it can be restored.",
+        "fieldLabel": "Host history kept",
+        "label": "Host history kept (days)"
+      },
       "clickhouse_retention_days": {
         "description": "How long traffic and WAF events are kept. Lowering it uses less disk, and migrates the existing tables' TTL on the next start.",
         "fieldLabel": "Analytics retention",
@@ -3723,6 +4068,18 @@
       "notify_update_available": {
         "description": "Once per release, while the update check under General is on.",
         "label": "New release"
+      },
+      "notify_backup_failed": {
+        "description": "When a scheduled backup fails, and when the schedule's next run works again.",
+        "label": "Scheduled backup failing"
+      },
+      "notify_audit_sink_failed": {
+        "description": "When an audit sink keeps failing or falls behind, and when it catches up again.",
+        "label": "Audit streaming failing"
+      },
+      "notify_channel_failing": {
+        "description": "When sends to an alert channel keep failing, told on the other channels, and when it works again.",
+        "label": "Alert channel failing"
       },
       "notify_disabled_account_owner": {
         "description": "Email one message to an account's own address when it is disabled, by an administrator or after failed sign-ins. A disabled account gets nothing else.",
@@ -3980,6 +4337,9 @@
       },
       "instance": {
         "name": "Instance"
+      },
+      "hostHistory": {
+        "name": "Host history"
       },
       "avatars": {
         "name": "User avatars"
@@ -4422,6 +4782,9 @@
       },
       "avatars": {
         "valueGravatar": "Gravatar on"
+      },
+      "hostHistory": {
+        "value": "Latest {count} per host, or {days} days"
       },
       "errorPages": {
         "valueRules": "{count, plural, one {# custom page} other {# custom pages}}",
@@ -5025,6 +5388,7 @@
         "branding": "logo, accent, colour, color, favicon, theme",
         "instance": "app name, public url, base url, address",
         "avatars": "gravatar, profile picture, photo",
+        "hostHistory": "revisions, rollback, undo, restore deleted host, retention",
         "defaultResponse": "fallback, unknown host, catch-all, 404",
         "errorPages": "custom error page, 502, 503, maintenance page",
         "caddyBuild": "plugins, modules, image, build",
@@ -5057,6 +5421,7 @@
         "metrics": "prometheus, monitoring, metrics endpoint, scrape",
         "logging": "access log, logs, log format",
         "backup": "restore, export, snapshot, download",
+        "auditStreaming": "siem, syslog, log shipping, forward audit log, splunk, ndjson",
         "portableConfig": "export, import, migrate, json, config transfer",
         "settingsHistory": "revisions, changes, undo, rollback",
         "wafTuning": "paranoia level, anomaly threshold, crs, detection only, blocking",
@@ -5068,6 +5433,10 @@
       "pages": {
         "backup": {
           "title": "Backup and restore",
+          "context": "Settings"
+        },
+        "auditStreaming": {
+          "title": "Audit streaming",
           "context": "Settings"
         },
         "portableConfig": {
@@ -5850,6 +6219,45 @@
       "action": "Open certificates",
       "once": "Each certificate is reported once as it nears expiry and once more if it expires."
     },
+    "chat": {
+      "resolved": "Resolved"
+    },
+    "digest": {
+      "subject": "{appName}: daily digest for {date}",
+      "intro": "What happened on {appName} from {from} to {to}.",
+      "unavailable": "This could not be read in time.",
+      "none": "Nothing to report.",
+      "count": "{name}: {count, number}",
+      "traffic": {
+        "title": "Traffic and mitigations",
+        "off": "Analytics are off, so there is no traffic to report.",
+        "totals": "{requests, plural, one {# request} other {# requests}}, {mitigated, number} mitigated"
+      },
+      "hosts": "Most attacked hosts",
+      "paths": "Most attacked paths",
+      "rules": "Most triggered WAF rules",
+      "newCountries": "Countries new against the previous 30 days",
+      "newAsns": "Networks new against the previous 30 days",
+      "certificates": {
+        "title": "Certificates expiring within {days} days",
+        "none": "No certificate expires within {days} days.",
+        "line": "{name}: {expired, select, yes {expired} other {{days, plural, one {# day} other {# days}} left}}"
+      },
+      "changes": {
+        "title": "Configuration changes",
+        "count": "{count, plural, =0 {No changes.} one {# change.} other {# changes.}}",
+        "line": "{time}: {summary}"
+      },
+      "backups": {
+        "title": "Scheduled backups",
+        "none": "No backup schedule is enabled.",
+        "line": "{name}: {status, select, succeeded {succeeded} failed {failed} running {running} other {no run}} at {time}",
+        "never": "{name}: not run yet"
+      },
+      "attention": {
+        "count": "{count, plural, =0 {Nothing needs attention.} one {# item needs attention.} other {# items need attention.}}"
+      }
+    },
     "notifications": {
       "subjectOne": "{appName}: {title}",
       "subjectMany": "{appName}: {count} notifications",
@@ -5923,6 +6331,54 @@
         "updateAvailable": {
           "title": "Version {version} is available",
           "item": "Release {version} is available. This instance runs {current}."
+        },
+        "backupFailed": {
+          "title": "Scheduled backup {schedule} failed",
+          "item": "The scheduled backup {schedule} failed: {error}. Earlier backups are untouched."
+        },
+        "backupRecovered": {
+          "title": "Scheduled backup {schedule} works again",
+          "item": "The scheduled backup {schedule} ran successfully again."
+        },
+        "auditSinkFailed": {
+          "title": "Audit sink {sink} is failing",
+          "item": "The audit sink {sink} is not receiving the audit log: {error}"
+        },
+        "auditSinkRecovered": {
+          "title": "Audit sink {sink} has caught up",
+          "item": "The audit sink {sink} is receiving the audit log again."
+        },
+        "channelFailing": {
+          "title": "Alert channel {channel} is failing",
+          "item": "Alerts to {channel} failed {failures, plural, one {# time} other {# times}} in a row: {error}. They are retried with growing waits."
+        },
+        "channelRecovered": {
+          "title": "Alert channel {channel} works again",
+          "item": "Alerts reach {channel} again."
+        },
+        "channelTest": {
+          "title": "Test alert",
+          "item": "This is a test alert: alerts reach {channel}."
+        },
+        "ruleTest": {
+          "title": "Test alert for {rule}",
+          "item": "This is a test alert queued through the rule {rule}: its channels receive what it raises."
+        },
+        "attention": {
+          "title": "{title}",
+          "item": "{title}. {detail}"
+        },
+        "attentionResolved": {
+          "title": "Resolved: {title}",
+          "item": "No longer needs attention: {title}."
+        },
+        "metricThreshold": {
+          "title": "{metric, select, serverErrorShare {5xx share} requests {Requests} serverErrors {5xx responses} other {Mitigated requests}} on {host} {comparison, select, below {below} other {above}} {threshold}",
+          "item": "{host}: {metric, select, serverErrorShare {the 5xx share was {value}%} requests {{value} requests were served} serverErrors {{value} requests were answered with 5xx} other {{value} requests were mitigated}} in the last {minutes, plural, one {# minute} other {# minutes}}, {comparison, select, below {below} other {above}} the rule's {threshold}."
+        },
+        "metricRecovered": {
+          "title": "{host} is back within its {metric, select, serverErrorShare {5xx share} requests {request} serverErrors {5xx} other {mitigation}} threshold",
+          "item": "{host} is back within the rule's {metric, select, serverErrorShare {5xx share} requests {request} serverErrors {5xx} other {mitigation}} threshold."
         },
         "test": {
           "title": "test notification",
@@ -6087,5 +6543,255 @@
       "viewer": "Viewer"
     },
     "accountCount": "{count, plural, one {# account} other {# accounts}}"
+  },
+  "alerts": {
+    "settingsNote": "Alert rules, webhook and chat channels, daily digests and the history of what was sent are on the <link>Alerts</link> page.",
+    "tabs": {
+      "rules": "Rules",
+      "channels": "Channels",
+      "history": "History",
+      "digests": "Digests"
+    },
+    "codes": {
+      "certificateExpired": "Certificate expired",
+      "certificateExpiring": "Certificate close to expiry",
+      "certificateFileError": "Certificate file unreadable",
+      "caddyApplyFailed": "Caddy refused a configuration",
+      "agentOffline": "Agent not connected",
+      "agentProblem": "Agent reports a failure",
+      "serverErrorBurst": "Burst of 5xx errors",
+      "serverErrorShare": "High share of 5xx errors",
+      "mitigationSpike": "Blocked requests rising on a host",
+      "mitigationSpikeFleet": "Blocked requests rising everywhere",
+      "blockedConcentration": "Blocks concentrated on one path",
+      "ldapUnreachable": "Directory unreachable",
+      "accountLocked": "Account made to wait after failed sign-ins",
+      "accountDisabled": "Account disabled by failed sign-ins",
+      "l4PortsPending": "L4 ports waiting to be applied",
+      "l4PortsFailed": "L4 ports failed to apply",
+      "crsPluginDisabled": "CRS plugin turned off",
+      "geoipFailing": "GeoIP updates failing",
+      "wafDetectionOnly": "WAF only detecting, not blocking",
+      "blockedSourcesUnenforced": "Blocked sources not enforced",
+      "accessListGeoUnenforced": "Access list geo rules not enforced",
+      "backupFailed": "Scheduled backup failed",
+      "backupOverdue": "Scheduled backup overdue"
+    },
+    "rules": {
+      "title": "Alert rules",
+      "help": "Each rule watches for something and tells the channels it names. The built-in rules follow the notification switches under Settings; their channels, severity and quiet period are changed here.",
+      "emptyTitle": "No rules yet",
+      "emptyDescription": "Add a rule to be told about events, Needs attention items, traffic signals or a metric crossing a threshold.",
+      "editTitle": "Edit rule",
+      "saveFailed": "The rule could not be saved.",
+      "deleteFailed": "The rule could not be deleted.",
+      "testFailed": "The test could not be queued.",
+      "testQueued": "A test alert is queued on its channels. It shows under History once it goes out.",
+      "testNoChannel": "None of its channels is enabled, so no test was queued.",
+      "deleteTitle": "Delete rule?",
+      "deleteConfirm": "Rule {name} stops alerting. Its past alerts stay in History.",
+      "builtinHelp": "A built-in rule always watches its own events and is switched on or off with its notification switch in Settings.",
+      "watches": "Watches",
+      "source": "Watch",
+      "sources": {
+        "event": "Events",
+        "attention": "Needs attention",
+        "signal": "Traffic signals",
+        "metric": "Metric"
+      },
+      "sourceHelp": {
+        "event": "Events CPM raises itself, grouped as the notification switches in Settings group them. Recoveries come with them.",
+        "attention": "Items on the Needs attention list, told when they appear and again when they clear.",
+        "signal": "Unusual traffic the analytics notice on their own, such as a burst of errors.",
+        "metric": "A per-host number from analytics checked over a sliding window. Needs analytics to be on."
+      },
+      "events": "Event groups",
+      "codes": "Items",
+      "signalsLabel": "Signals",
+      "signals": {
+        "serverErrorBurst": "Bursts of 5xx errors",
+        "mitigationSpike": "Spikes in blocked requests",
+        "blockedConcentration": "Blocked requests piling up on one path"
+      },
+      "metric": "Measure",
+      "metrics": {
+        "serverErrorShare": "Share of 5xx responses",
+        "requests": "Request count",
+        "serverErrors": "5xx response count",
+        "mitigated": "Blocked request count"
+      },
+      "comparison": "When it is",
+      "comparisons": {
+        "above": "Above",
+        "below": "Below"
+      },
+      "threshold": "Threshold",
+      "thresholdPercent": "Threshold (%)",
+      "window": "Window (minutes)",
+      "metricSummary": "{metric} {comparison, select, below {below} other {above}} {threshold, number} over {minutes, plural, one {# minute} other {# minutes}}",
+      "scope": "Scope",
+      "scopes": {
+        "all": "All hosts",
+        "hosts": "Chosen hosts",
+        "tags": "Hosts with tags"
+      },
+      "scopeHelp": "Only alerts about a proxy host can match a scoped rule; the rest never do.",
+      "hosts": "Proxy hosts to watch",
+      "tags": "Host tags to watch",
+      "severity": "Severity",
+      "quiet": "Quiet",
+      "quietMinutes": "Quiet period (minutes)",
+      "quietHelp": "After an alert, the same alert is not repeated for this long. 0 tells every time.",
+      "quietValue": "{minutes, plural, =0 {None} other {# min}}",
+      "enabled": "Rule on",
+      "state": {
+        "on": "On",
+        "off": "Off",
+        "silenced": "Silenced"
+      },
+      "silencedUntil": "until",
+      "silence": "Silence",
+      "unsilence": "Unsilence",
+      "silenceTitle": "Silence {name}",
+      "silenceHelp": "While silenced the rule neither sends its alerts nor records them in History.",
+      "silenceFor": "For",
+      "silencePresets": {
+        "hour": "1 hour",
+        "day": "24 hours",
+        "week": "7 days",
+        "custom": "Until a date and time"
+      },
+      "silenceUntil": "Silenced until"
+    },
+    "channels": {
+      "title": "Alert channels",
+      "help": "Where alerts are sent. Email and browser push are built in and set up under Settings and Profile; add a webhook, Discord, Slack, Teams or ntfy channel here.",
+      "emptyTitle": "No channels yet",
+      "emptyDescription": "Add a channel for alerts to reach.",
+      "addTitle": "Add channel",
+      "editTitle": "Edit channel",
+      "saveFailed": "The channel could not be saved.",
+      "deleteFailed": "The channel could not be deleted.",
+      "deleteTitle": "Delete channel?",
+      "deleteConfirm": "Channel {name} is taken out of every rule and digest that uses it.",
+      "kind": "Service",
+      "kinds": {
+        "webhook": "Webhook",
+        "discord": "Discord",
+        "slack": "Slack",
+        "teams": "Microsoft Teams",
+        "ntfy": "ntfy",
+        "email": "Email to administrators",
+        "push": "Browser push"
+      },
+      "builtinTarget": {
+        "email": "The alert recipients, or every administrator who chose email under Profile",
+        "push": "Every administrator's browser subscribed under Profile"
+      },
+      "target": "Sends to",
+      "state": {
+        "off": "Off",
+        "failing": "Failing",
+        "working": "Working",
+        "unused": "Not used yet"
+      },
+      "failures": "{count, plural, one {# failed send} other {# failed sends in a row}}",
+      "lastSent": "Last sent",
+      "url": "URL",
+      "urlKept": "Leave empty to keep the stored address, which is never shown again.",
+      "urlHelp": {
+        "webhook": "Receives a signed JSON POST. Plain http is allowed only to an address on this network.",
+        "discord": "A Discord channel's webhook URL, from its Integrations settings.",
+        "slack": "A Slack incoming webhook URL.",
+        "teams": "The URL of a Teams workflow started by the \"When a Teams webhook request is received\" trigger. The retired Office 365 connector URLs no longer work."
+      },
+      "signingSecret": "Signing secret",
+      "signingSecretHelp": "Leave empty to have one made. The receiver checks each request's signature with it.",
+      "secretKept": "Leave empty to keep the stored one, which is never shown again.",
+      "signingSecretTitle": "Webhook signing secret",
+      "signingSecretOnce": "Copy it now: it is not shown again",
+      "signingSecretOnceHelp": "Give this secret to the receiver so it can verify the signature on each request. A new one can be set by editing the channel.",
+      "headers": "Extra headers",
+      "headersHelp": "Sent with every request, for a receiver that wants a token of its own.",
+      "headersKept": "A header left with an empty value keeps its stored value.",
+      "headerName": "Header name",
+      "headerValue": "Header value",
+      "addHeader": "Add header",
+      "server": "ntfy server",
+      "topic": "Topic",
+      "topicHelp": "Letters, digits, hyphens and underscores. Anyone who knows a topic on a public server can read it.",
+      "token": "Access token",
+      "tokenHelp": "For a server or topic that needs one.",
+      "clearToken": "Remove the stored token",
+      "enabled": "Channel on",
+      "testDelivered": "The test was delivered.",
+      "testAccepted": "The test was accepted.",
+      "testAcceptedHelp": "The service took the message but does not say whether it was delivered. Check that it arrived.",
+      "testRecipients": "Sent to {recipients}.",
+      "testFailed": "Test failed"
+    },
+    "history": {
+      "title": "Alert history",
+      "help": "Every alert raised in the last 90 days, newest first, with how each channel's delivery went.",
+      "emptyTitle": "No alerts",
+      "emptyDescription": "Nothing matches these filters yet.",
+      "loadFailed": "The history could not be loaded.",
+      "refresh": "Refresh",
+      "older": "Older",
+      "any": "Any",
+      "alert": "Alert",
+      "rule": "Rule",
+      "channel": "Channel",
+      "type": "Type",
+      "types": {
+        "notice": "Notice",
+        "problem": "Problem",
+        "recovery": "Recovery"
+      },
+      "deliveries": "Deliveries",
+      "noDeliveries": "Not sent to any channel",
+      "delivery": "{channel}: {status}",
+      "statuses": {
+        "pending": "Pending",
+        "sent": "Sent",
+        "failed": "Failed",
+        "dropped": "Dropped",
+        "withdrawn": "Withdrawn"
+      }
+    },
+    "digests": {
+      "title": "Daily digests",
+      "help": "A summary of the last day's alerts, traffic and anything needing attention, sent at a set time. Browser push cannot carry one.",
+      "emptyTitle": "No digests yet",
+      "emptyDescription": "Add a digest to get a daily summary on a channel.",
+      "addTitle": "Add digest",
+      "editTitle": "Edit digest",
+      "saveFailed": "The digest could not be saved.",
+      "deleteFailed": "The digest could not be deleted.",
+      "deleteTitle": "Delete digest?",
+      "deleteConfirm": "Digest {name} is no longer sent.",
+      "time": "Send at",
+      "channelsHelp": "Browser push is left out: it carries a line, not a report.",
+      "enabled": "Digest on",
+      "nextRun": "Next",
+      "lastRun": "Last",
+      "preview": "Preview",
+      "send": "Send now",
+      "sending": "Sending the digest…",
+      "sendFailed": "The digest could not be sent.",
+      "previewTitle": "Preview of {name}",
+      "previewLoading": "Putting the preview together…",
+      "previewFailed": "The preview could not be made.",
+      "runStatus": {
+        "running": "Running",
+        "sent": "Sent",
+        "partial": "Partly sent",
+        "failed": "Failed"
+      },
+      "channelSent": "{channel}: sent",
+      "channelFailed": "{channel}: {error}"
+    },
+    "builtin": "Built-in",
+    "actionFailed": "That did not work."
   }
 }

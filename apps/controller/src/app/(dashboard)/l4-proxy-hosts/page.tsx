@@ -6,7 +6,10 @@ import {
   countL4ProxyHostsByProtocol,
   listL4ProxyHostTags,
   getL4ProxyHost,
+  l4ProxyHostFromRow,
 } from "@/src/lib/models/l4-proxy-hosts";
+import { revisionForEditor } from "@/src/lib/host-history";
+import { strictId } from "@/src/lib/http/strict-id";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
@@ -27,6 +30,8 @@ interface PageProps {
     tag?: string;
     /** A host to open the editor on. */
     edit?: string;
+    /** With `edit`: a revision of that host to load instead, for a rollback. */
+    revision?: string;
   }>;
 }
 
@@ -47,6 +52,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     protocol: protocolParam,
     tag: tagParam,
     edit: editParam,
+    revision: revisionParam,
   } = await searchParams;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
@@ -80,6 +86,12 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     ...hosts.map((host) => host.id),
     ...(editHost && !hosts.includes(editHost) ? [editHost.id] : []),
   ]).catch(() => new Map<number, number[]>());
+  const revisionId = strictId(revisionParam);
+  const rollback =
+    editHost && revisionId !== undefined
+      ? await revisionForEditor("l4", editHost.id, revisionId)
+      : null;
+  if (editHost && rollback) assignments.set(editHost.id, rollback.snapshot.agentIds);
 
   return (
     <HostTagSuggestions tags={tags}>
@@ -97,7 +109,14 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
         agentAssignments={Object.fromEntries(assignments)}
         canCreate={canCreate(access)}
         manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
-        editTarget={editHost}
+        editTarget={
+          editHost && rollback
+            ? { ...l4ProxyHostFromRow(rollback.snapshot.row), id: editHost.id }
+            : editHost
+        }
+        rollback={
+          rollback && revisionId !== undefined ? { revisionId, missing: rollback.missing } : null
+        }
       />
     </HostTagSuggestions>
   );

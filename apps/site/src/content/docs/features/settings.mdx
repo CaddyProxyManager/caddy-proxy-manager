@@ -14,7 +14,7 @@ The search field at the top of the Settings overview finds a setting by what it 
 words someone might use for it: `smtp` finds **Email**, `prometheus` finds **Metrics & monitoring**,
 `redis` finds the **HTTP cache** storage, `mfa` finds **Two-factor sign-in**. It also reaches the
 pages that configure the instance outside the settings sections - **Backup and restore** and its
-portable configuration, settings history, the WAF's tuning, per-host modes and exclusions, blocked
+portable configuration, [audit streaming](../audit-streaming/), settings history, the WAF's tuning, per-host modes and exclusions, blocked
 sources and the sign-in overview - and the environment variables each section reads. The same
 index answers the command palette (Ctrl/Cmd+K) from any page.
 
@@ -68,7 +68,8 @@ Revisions applied before values were recorded are listed but cannot be compared 
 
 **Settings → Backup** downloads the whole configuration as one file: hosts, certificates and their
 keys, access lists, users and their two-factor secrets, groups, API tokens, agents and every
-setting. The audit log and the settings history can be included too.
+setting. The audit log and the settings history can be included too; the settings history brings
+the [host history](../host-history/) with it.
 
 - **The passphrase is the only protection.** Everything the database keeps encrypted is decrypted
   into the file, and the file is sealed with the passphrase - at least 12 characters - using scrypt
@@ -86,9 +87,10 @@ setting. The audit log and the settings history can be included too.
 - **A backup from a newer version is refused.** An older one restores onto a newer version, with
   anything added since taking its default.
 
-For a scheduled backup, `POST /api/v1/backup` with an admin API token and `{"passphrase": "..."}`
-returns the same file; add `"auditLog": true` or `"settingsHistory": true` to include those.
-Restoring is only in the dashboard.
+Backups can also run on a schedule, to an S3-compatible bucket or a local folder, and be restored
+from there: see [Backups](/features/backups/). For a script of your own, `POST /api/v1/backup`
+with an admin API token and `{"passphrase": "..."}` returns the same file; add `"auditLog": true`
+or `"settingsHistory": true` to include those. Restoring is only in the dashboard.
 
 ## Portable configuration
 

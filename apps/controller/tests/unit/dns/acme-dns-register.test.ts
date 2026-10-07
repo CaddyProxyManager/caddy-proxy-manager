@@ -6,6 +6,7 @@ import { describe, expect, it } from 'bun:test';
 import { parseAcmeDnsServerUrl, registerAcmeDnsAccount } from '@/src/lib/dns/acme-dns';
 import { isLocalHost } from '@/src/lib/http/outbound-url';
 import { DomainError } from '@/src/lib/errors/domain-error';
+import { OutboundError } from '@/src/lib/http/outbound';
 
 const ACCOUNT = {
   username: 'c36f50e8-4632-44f0-83fe-e070fef28a10',
@@ -135,6 +136,19 @@ describe('registerAcmeDnsAccount', () => {
     expect(await codeOf(registerAcmeDnsAccount('https://auth.example.org', unreachable))).toBe(
       'acmeDnsRegisterUnreachable',
     );
+  });
+
+  it('maps what the client refuses at connect time', async () => {
+    const refusing = (code: 'metadata' | 'too-large') =>
+      (async () => {
+        throw new OutboundError(code, code);
+      }) as unknown as typeof fetch;
+    expect(
+      await codeOf(registerAcmeDnsAccount('https://auth.example.org', refusing('metadata'))),
+    ).toBe('outboundUrlMetadata');
+    expect(
+      await codeOf(registerAcmeDnsAccount('https://auth.example.org', refusing('too-large'))),
+    ).toBe('acmeDnsRegisterTooLarge');
   });
 });
 

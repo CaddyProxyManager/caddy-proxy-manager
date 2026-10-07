@@ -13,12 +13,17 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Selector } from "@astryxdesign/core/Selector";
 import { CheckboxInput } from "@/components/ui/FormBooleanControls";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { StagedView } from "@/src/lib/settings/staged-view";
+import type { RemoteBackup } from "@/src/lib/backup/manage";
 import SettingsFrame from "../SettingsFrame";
+import { type BackupOverview, listRemoteBackupsAction } from "./actions";
 import { ConfigTransfer } from "./ConfigTransfer";
+import { ScheduledBackups } from "./ScheduledBackups";
 
 type Preview = {
   createdAt: string;
@@ -132,9 +137,28 @@ function DownloadCard() {
   );
 }
 
-function RestoreCard() {
+/** Where the backup to restore comes from: an uploaded file, or one a destination holds. */
+type Source = { kind: "file"; file: File } | { kind: "remote"; destinationId: number; key: string };
+
+function sourceForm(source: Source): FormData {
+  const form = new FormData();
+  if (source.kind === "file") form.set("file", source.file);
+  else {
+    form.set("destinationId", String(source.destinationId));
+    form.set("key", source.key);
+  }
+  return form;
+}
+
+function RestoreCard({ destinations }: { destinations: BackupOverview["destinations"] }) {
   const t = useTranslations("settings.backup");
+  const tSchedules = useTranslations("settings.backupSchedules");
+  const [from, setFrom] = useState<"file" | "destination">("file");
+  const [destinationId, setDestinationId] = useState<string>("");
+  const [remote, setRemote] = useState<RemoteBackup[] | null>(null);
+  const [remoteKey, setRemoteKey] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
+  const [source, setSource] = useState<Source | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [passphrase, setPassphrase] = useState("");
   const [keepAgents, setKeepAgents] = useState(true);
@@ -142,13 +166,12 @@ function RestoreCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const choose = async (chosen: File | null) => {
-    setFile(chosen);
+  const describe = async (chosen: Source | null) => {
+    setSource(chosen);
     setPreview(null);
     setError(null);
     if (!chosen) return;
-    const form = new FormData();
-    form.set("file", chosen);
+    const form = sourceForm(chosen);
     form.set("preview", "1");
     try {
       const response = await fetch("/api/backup/restore", { method: "POST", body: form });
@@ -160,13 +183,34 @@ function RestoreCard() {
     }
   };
 
+  const choose = (chosen: File | null) => {
+    setFile(chosen);
+    void describe(chosen ? { kind: "file", file: chosen } : null);
+  };
+
+  const pickDestination = async (id: string) => {
+    setDestinationId(id);
+    setRemote(null);
+    setRemoteKey("");
+    void describe(null);
+    try {
+      setRemote(await listRemoteBackupsAction(Number(id)));
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : t("listFailed"));
+    }
+  };
+
+  const pickRemote = (key: string) => {
+    setRemoteKey(key);
+    void describe({ kind: "remote", destinationId: Number(destinationId), key });
+  };
+
   const restore = async () => {
-    if (!file) return;
+    if (!source) return;
     setBusy(true);
     setError(null);
     try {
-      const form = new FormData();
-      form.set("file", file);
+      const form = sourceForm(source);
       form.set("passphrase", passphrase);
       form.set("keepAgents", keepAgents ? "1" : "0");
       const response = await fetch("/api/backup/restore", { method: "POST", body: form });
@@ -201,12 +245,59 @@ function RestoreCard() {
           {t("restoreHelp")}
         </Text>
         {error && <Banner status="error" title={t("restoreFailed")} description={error} />}
-        <FileInput
-          label={t("chooseFile")}
-          accept=".cpmbak"
-          value={file}
-          onChange={(chosen) => choose(Array.isArray(chosen) ? (chosen[0] ?? null) : chosen)}
-        />
+        {destinations.length > 0 && (
+          <SegmentedControl
+            label={t("restoreFrom")}
+            size="sm"
+            value={from}
+            onChange={(value) => {
+              setFrom(value === "destination" ? "destination" : "file");
+              void describe(null);
+            }}
+          >
+            <SegmentedControlItem value="file" label={t("fromFile")} />
+            <SegmentedControlItem value="destination" label={t("fromDestination")} />
+          </SegmentedControl>
+        )}
+        {from === "file" ? (
+          <FileInput
+            label={t("chooseFile")}
+            accept=".cpmbak"
+            value={file}
+            onChange={(chosen) => choose(Array.isArray(chosen) ? (chosen[0] ?? null) : chosen)}
+          />
+        ) : (
+          <VStack gap={3}>
+            <Selector
+              label={tSchedules("destination")}
+              size="sm"
+              width={320}
+              placeholder={t("chooseDestination")}
+              options={destinations.map((destination) => ({
+                value: String(destination.id),
+                label: destination.name,
+              }))}
+              value={destinationId || undefined}
+              onChange={(value) => void pickDestination(value)}
+            />
+            {remote && remote.length === 0 && (
+              <Text type="body" size="sm" color="secondary">
+                {t("remoteEmpty")}
+              </Text>
+            )}
+            {remote && remote.length > 0 && (
+              <Selector
+                label={t("remoteBackup")}
+                size="sm"
+                width="100%"
+                placeholder={t("chooseRemoteBackup")}
+                options={remote.map((object) => ({ value: object.key, label: object.key }))}
+                value={remoteKey || undefined}
+                onChange={pickRemote}
+              />
+            )}
+          </VStack>
+        )}
 
         {preview && (
           <VStack gap={3}>
@@ -263,13 +354,20 @@ function RestoreCard() {
   );
 }
 
-export default function BackupClient({ staged }: { staged: StagedView }) {
+export default function BackupClient({
+  staged,
+  overview,
+}: {
+  staged: StagedView;
+  overview: BackupOverview;
+}) {
   const t = useTranslations("settings");
   return (
     <SettingsFrame sectionId={null} title={t("backup.title")} staged={staged} aside={false}>
       <VStack gap={6}>
         <DownloadCard />
-        <RestoreCard />
+        <ScheduledBackups initial={overview} />
+        <RestoreCard destinations={overview.destinations} />
         <ConfigTransfer />
       </VStack>
     </SettingsFrame>
