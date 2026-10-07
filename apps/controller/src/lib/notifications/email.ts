@@ -100,6 +100,13 @@ export function values(
       return { sink: event.sink, error: storedErrorMessage(tRoot, event.error, event.errorCode) };
     case "auditSinkRecovered":
       return { sink: event.sink };
+    case "accessReviewDue":
+    case "accessReviewOverdue":
+      return { campaign: event.campaign, pending: event.pending, dueOn: event.dueOn };
+    case "accessReviewConfirm":
+      return { campaign: event.campaign, revocations: event.revocations };
+    case "changeApprovalBypassed":
+      return { id: event.requestId, change: event.change, by: event.by, reason: event.reason };
     case "channelFailing":
       return { channel: event.channel, failures: event.failures, error: event.error };
     case "channelRecovered":

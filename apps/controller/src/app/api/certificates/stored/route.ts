@@ -1,6 +1,7 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { getCurrentSessionInfo, isFreshSession, requireAdmin } from "@/src/lib/auth";
+import { getCurrentSessionInfo, isFreshSession } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { readAgentCertificate } from "@/src/lib/agent/client";
 
@@ -9,7 +10,7 @@ import { readAgentCertificate } from "@/src/lib/agent/client";
  * sign-in, and every key handed out is in the audit log.
  */
 export async function GET(request: NextRequest) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const t = await getTranslations("certificates");
   const params = request.nextUrl.searchParams;
   const includeKey = params.get("key") === "1";

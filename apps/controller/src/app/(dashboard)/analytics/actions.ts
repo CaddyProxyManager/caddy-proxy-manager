@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { type ActionState, extractErrorMessage } from "@/src/lib/errors/action-error";
 import {
   type AnalyticsView,
@@ -27,7 +27,7 @@ export async function listAnalyticsViewsAction(): Promise<
   { status: "success"; views: AnalyticsView[] } | ActionState
 > {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("analytics:read");
     return { status: "success", views: await listAnalyticsViews(Number(session.user.id)) };
   } catch (error) {
     return failure(error, "viewsLoadFailed");
@@ -42,7 +42,7 @@ export async function saveAnalyticsViewAction(input: {
   shared?: boolean;
 }): Promise<AnalyticsViewResult> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("analytics:write");
     const userId = Number(session.user.id);
     const view =
       input.id === undefined
@@ -57,7 +57,7 @@ export async function saveAnalyticsViewAction(input: {
 
 export async function deleteAnalyticsViewAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("analytics:write");
     await deleteAnalyticsView(Number(session.user.id), id);
     const t = await getTranslations("analytics");
     return { status: "success", message: t("viewDeleted") };

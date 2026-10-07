@@ -3,6 +3,7 @@
  * Settings UI's rules: refuse a selection disabling a module in use, regenerate the config on save.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/settings', () => ({
@@ -39,7 +40,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {

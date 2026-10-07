@@ -6,38 +6,29 @@ import {
   deleteBlockedSource,
   listBlockedSources,
 } from "../models/blocked-sources";
-import {
-  type WafExclusionInput,
-  createWafExclusion,
-  deleteWafExclusion,
-  listWafExclusions,
-  updateWafExclusion,
-} from "../models/waf-exclusions";
+import { type WafExclusionInput, listWafExclusions } from "../models/waf-exclusions";
+import { apiSubmitter, submitOrApply } from "../approvals";
 import { getSecurityReport } from "../security/report";
 import { type WafEventVerdict, getWafEventDetail, reviewWafEvent } from "../security/waf-event";
 import { type AnalyticsQueryInput, exploreStateFromInput } from "./analytics";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 export const securityQueryResolvers = {
-  wafExclusions: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    await requireAdmin(context);
+  wafExclusions: async (_: unknown, __: unknown, _context: GraphQLContext) => {
     return listWafExclusions();
   },
-  wafEvent: async (_: unknown, args: { key: string }, context: GraphQLContext) => {
-    await requireAdmin(context);
+  wafEvent: async (_: unknown, args: { key: string }, _context: GraphQLContext) => {
     const detail = await getWafEventDetail(args.key);
     return { ...detail, rawRecord: detail.event.rawData };
   },
   securityReport: async (
     _: unknown,
     args: { query?: AnalyticsQueryInput | null; page?: number | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     return getSecurityReport(exploreStateFromInput(args.query), args.page ?? 1);
   },
-  blockedSources: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    await requireAdmin(context);
+  blockedSources: async (_: unknown, __: unknown, _context: GraphQLContext) => {
     return listBlockedSources();
   },
 };
@@ -48,20 +39,26 @@ export const securityMutationResolvers = {
     args: { input: WafExclusionInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
-    return createWafExclusion(args.input, userId);
+    return submitOrApply(apiSubmitter(await context.viewer()), {
+      kind: "wafExclusionCreate",
+      payload: { input: args.input },
+    });
   },
   updateWafExclusion: async (
     _: unknown,
     args: { id: number; input: WafExclusionInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
-    return updateWafExclusion(args.id, args.input, userId);
+    return submitOrApply(apiSubmitter(await context.viewer()), {
+      kind: "wafExclusionUpdate",
+      payload: { id: args.id, input: args.input },
+    });
   },
   deleteWafExclusion: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
-    await deleteWafExclusion(args.id, userId);
+    await submitOrApply(apiSubmitter(await context.viewer()), {
+      kind: "wafExclusionDelete",
+      payload: { id: args.id },
+    });
     return true;
   },
   reviewWafEvent: async (
@@ -69,7 +66,7 @@ export const securityMutationResolvers = {
     args: { key: string; verdict?: string | null },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return reviewWafEvent(args.key, (args.verdict ?? null) as WafEventVerdict | null, userId);
   },
   createBlockedSource: async (
@@ -77,11 +74,11 @@ export const securityMutationResolvers = {
     args: { input: BlockedSourceInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return createBlockedSource(args.input, userId);
   },
   deleteBlockedSource: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await deleteBlockedSource(args.id, userId);
     return true;
   },

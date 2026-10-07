@@ -68,7 +68,14 @@ export async function sessionSignInMethod(
 ): Promise<SignInMethod | null> {
   if (!path) return null;
   if (isPasskeySignInPath(path)) return "passkey";
-  if (path.startsWith("/oauth2/callback/") || path.startsWith("/callback/")) return "oidc";
+  // "oidc" is what the users list calls single sign-on, whichever protocol it came by.
+  if (
+    path.startsWith("/oauth2/callback/") ||
+    path.startsWith("/callback/") ||
+    path.startsWith("/sso/saml2/sp/acs/")
+  ) {
+    return "oidc";
+  }
   if (path === "/sign-up/email") return "password";
   if (isTwoFactorVerifyPath(path)) {
     // The second step after a password: whose password is the account's to say.

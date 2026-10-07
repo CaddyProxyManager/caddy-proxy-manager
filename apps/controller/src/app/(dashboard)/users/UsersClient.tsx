@@ -4,15 +4,18 @@
  * Users as a list-detail page. Creating and editing happen in dialogs, so the list never reflows
  * under a form.
  */
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { ViewAsDialog } from "@/components/users/ViewAsDialog";
 import {
   Ban,
   CheckCircle2,
+  ClipboardCheck,
   Eye,
   LogIn,
   Pencil,
   Plus,
+  ShieldCheck,
+  Cable,
   Trash2,
   User,
   UserCog,
@@ -64,7 +67,13 @@ import { isSignInMethod } from "@/src/lib/auth/sign-in-methods";
 import { Token } from "@astryxdesign/core/Token";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 
-type Role = "admin" | "operator" | "user" | "viewer";
+/** A role key: built-in, or one an administrator made. */
+type Role = string;
+
+/** The roles an administrator made, by key; built-in ones are named from the catalog. */
+export type CustomRole = { key: string; name: string };
+
+const CustomRolesContext = createContext<readonly CustomRole[]>([]);
 
 type UserEntry = {
   id: number;
@@ -116,25 +125,49 @@ type Props = {
   /** Email is set up, so accounts can be invited and sent password links. */
   emailEnabled?: boolean;
   mfaPolicyMode?: MfaPolicyMode;
+  customRoles?: readonly CustomRole[];
+  /** Links to the Roles page. */
+  canSeeRoles?: boolean;
 };
 
 type StatusFilter = "all" | "active" | "disabled";
 
-const ROLE_OPTIONS = [
-  { value: "admin", labelKey: "roles.admin" },
-  { value: "operator", labelKey: "roles.operator" },
-  { value: "user", labelKey: "roles.user" },
-  { value: "viewer", labelKey: "roles.viewer" },
-] as const;
+const BUILT_IN_ROLES = ["admin", "operator", "user", "viewer"] as const;
 
-/** Role tint. Admin reads as elevated privilege, the rest are informational. */
-const ROLE_VARIANTS: Record<Role, "red" | "blue" | "neutral"> = {
+function isBuiltIn(role: string): role is (typeof BUILT_IN_ROLES)[number] {
+  return (BUILT_IN_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Role tint. Admin reads as elevated privilege, the rest are informational; a made role is
+ * whatever it holds, so it takes the operator's middle tint.
+ */
+const ROLE_VARIANTS: Record<(typeof BUILT_IN_ROLES)[number], "red" | "blue" | "neutral"> = {
   admin: "red",
   // Elevated, but only over what their groups were granted - not the whole instance.
   operator: "blue",
   user: "blue",
   viewer: "neutral",
 };
+
+function roleVariant(role: string): "red" | "blue" | "neutral" {
+  return isBuiltIn(role) ? ROLE_VARIANTS[role] : "blue";
+}
+
+/** Every role by its name in the reader's language, built-in first, and a name for any key. */
+function useRoles() {
+  const t = useTranslations("users");
+  const custom = useContext(CustomRolesContext);
+  const label = (role: string) =>
+    isBuiltIn(role)
+      ? t(`roles.${role}`)
+      : (custom.find((entry) => entry.key === role)?.name ?? role);
+  const options = [
+    ...BUILT_IN_ROLES.map((role) => ({ value: role as string, label: t(`roles.${role}`) })),
+    ...custom.map((role) => ({ value: role.key, label: role.name })),
+  ];
+  return { label, options };
+}
 
 function userLabel(user: Pick<UserEntry, "name" | "email">) {
   return user.name ?? user.email.split("@")[0];
@@ -156,7 +189,36 @@ export default function UsersClient({
   localUsersEnabled = true,
   emailEnabled = false,
   mfaPolicyMode = "off",
+  customRoles = [],
+  canSeeRoles = false,
 }: Props) {
+  return (
+    <CustomRolesContext.Provider value={customRoles}>
+      <UsersPage
+        users={users}
+        groups={groups}
+        localUsersEnabled={localUsersEnabled}
+        emailEnabled={emailEnabled}
+        mfaPolicyMode={mfaPolicyMode}
+        canSeeRoles={canSeeRoles}
+      />
+    </CustomRolesContext.Provider>
+  );
+}
+
+function UsersPage({
+  users,
+  groups = [],
+  localUsersEnabled = true,
+  emailEnabled = false,
+  mfaPolicyMode = "off",
+  canSeeRoles = false,
+}: Props) {
+  const tRoles = useTranslations("roles");
+  const tScim = useTranslations("scim");
+  const tReviews = useTranslations("accessReviews");
+  const madeRoles = useContext(CustomRolesContext);
+  const roles = useRoles();
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const [noMfaOnly, setNoMfaOnly] = useState(false);
   const t = useTranslations("users");
@@ -297,7 +359,7 @@ export default function UsersClient({
                     />
                   )}
                   {user.status !== "active" && <Badge variant="error" label={t("disabledBadge")} />}
-                  <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
+                  <Badge variant={roleVariant(user.role)} label={roles.label(user.role)} />
                 </HStack>
               }
               onClick={() => {
@@ -309,13 +371,36 @@ export default function UsersClient({
         </List>
       )}
 
-      <HStack>
+      <HStack gap={1} wrap="wrap">
         <Button
           variant="ghost"
           size="sm"
           icon={<LogIn />}
           label={tSignInOverview("title")}
           href="/users/sign-in"
+        />
+        {canSeeRoles && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<ShieldCheck />}
+            label={tRoles("title")}
+            href="/users/roles"
+          />
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Cable />}
+          label={tScim("title")}
+          href="/users/provisioning"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<ClipboardCheck />}
+          label={tReviews("title")}
+          href="/users/access-reviews"
         />
       </HStack>
 
@@ -360,6 +445,7 @@ export default function UsersClient({
             open={viewAsOpen}
             onClose={() => setViewAsOpen(false)}
             groups={groups.map(({ id, name }) => ({ id, name }))}
+            madeRoles={madeRoles}
           />
           {selected ? (
             <UserDetail
@@ -413,6 +499,7 @@ function UserDetail({
   onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
+  const roles = useRoles();
   const tProfile = useTranslations("profile");
   const tCommon = useTranslations("common");
   const isDisabled = user.status !== "active";
@@ -431,7 +518,7 @@ function UserDetail({
           <VStack gap={1}>
             <HStack gap={2} vAlign="center" wrap="wrap">
               <Heading level={2}>{name}</Heading>
-              <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
+              <Badge variant={roleVariant(user.role)} label={roles.label(user.role)} />
               {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
             </HStack>
             <Text type="body" size="sm" color="secondary">
@@ -504,7 +591,7 @@ function UserDetail({
             <MetadataListItem label={t("signInUsername")}>
               {isUsableSignInUsername(user.username) ? user.username : t("signInUsernameNone")}
             </MetadataListItem>
-            <MetadataListItem label={tCommon("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
+            <MetadataListItem label={tCommon("role")}>{roles.label(user.role)}</MetadataListItem>
             <MetadataListItem label={t("accountSource.label")}>
               {t(`accountSource.${user.accountSource}`)}
             </MetadataListItem>
@@ -825,7 +912,7 @@ function CreateUserDialog({
 }) {
   const t = useTranslations("users");
   const tCommon = useTranslations("common");
-  const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
+  const roleOptions = useRoles().options;
   const [role, setRole] = useState<Role>("user");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -978,10 +1065,7 @@ function EditUserDialog({
 }) {
   const t = useTranslations("users");
   const tCommon = useTranslations("common");
-  const roleOptions = ROLE_OPTIONS.map((option) => ({
-    value: option.value,
-    label: t(option.labelKey),
-  }));
+  const roleOptions = useRoles().options;
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);

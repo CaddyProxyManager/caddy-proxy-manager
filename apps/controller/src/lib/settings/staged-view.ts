@@ -24,6 +24,8 @@ export type StagedView = {
   currentRevision: number | null;
   /** Every apply fails in the demo, which has no Caddy; the rail says so instead of "failed". */
   demoMode: boolean;
+  /** The approval policy holds this set: applying it submits a change request instead. */
+  approvalRequired: boolean;
 };
 
 function changedFields(storedValue: string | null, stagedValue: string): string[] {
@@ -81,12 +83,26 @@ export async function stagedView(userId: number): Promise<StagedView> {
     }
   }
 
+  let approvalRequired = false;
+  if (staged.length > 0) {
+    // Lazily: the approvals module reaches back into settings for what it applies.
+    const { needsApproval } = await import("../approvals");
+    approvalRequired = await needsApproval(
+      { userId },
+      {
+        kind: "settingsApply",
+        payload: { entries: staged.map(({ key, value }) => ({ key, value })) },
+      },
+    );
+  }
+
   return {
     changes,
     diff,
     revisions,
     currentRevision: revisions[0]?.id ?? null,
     demoMode: isDemoMode(),
+    approvalRequired,
   };
 }
 

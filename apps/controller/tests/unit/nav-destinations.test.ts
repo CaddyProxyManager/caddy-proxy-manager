@@ -12,54 +12,74 @@ import {
   resolveDrawer,
   visibleDestinations,
 } from '@/src/lib/nav/destinations';
+import { capabilitiesOf } from '@/tests/helpers/access';
 
 const ids = (list: { id: string }[]) => list.map((d) => d.id);
 
 describe('visibleDestinations', () => {
   it('shows an admin every page', () => {
-    expect(visibleDestinations('admin')).toHaveLength(DESTINATIONS.length);
+    expect(visibleDestinations(capabilitiesOf('admin'))).toHaveLength(DESTINATIONS.length);
   });
 
   it('shows an operator the pages scoped to their grants, plus Overview and Profile', () => {
-    expect(ids(visibleDestinations('operator'))).toEqual([
+    expect(ids(visibleDestinations(capabilitiesOf('operator')))).toEqual([
       'overview',
       'proxy-hosts',
       'l4-proxy-hosts',
       'agents',
+      'approvals',
       'profile',
     ]);
   });
 
-  it('shows anyone else only Overview and Profile', () => {
-    expect(ids(visibleDestinations('user'))).toEqual(['overview', 'profile']);
-    expect(ids(visibleDestinations(undefined))).toEqual(['overview', 'profile']);
+  it('shows a role a page for each area it holds, held outright or not', () => {
+    expect(ids(visibleDestinations({ 'audit:read': 'all', 'hosts:read': 'granted' }))).toEqual([
+      'overview',
+      'proxy-hosts',
+      'l4-proxy-hosts',
+      'audit-log',
+      'approvals',
+      'profile',
+    ]);
+  });
+
+  it('shows anyone else only Overview, Approvals and Profile', () => {
+    // Approvals is anyone's: a policy can name an approver by group, whatever their role.
+    expect(ids(visibleDestinations(capabilitiesOf('user')))).toEqual([
+      'overview',
+      'approvals',
+      'profile',
+    ]);
+    expect(ids(visibleDestinations({}))).toEqual(['overview', 'approvals', 'profile']);
   });
 });
 
 describe('moreDestinations', () => {
-  it('holds the twelve pages the tab bar cannot name, for an admin', () => {
-    const more = ids(moreDestinations('admin'));
-    expect(more).toHaveLength(12);
+  it('holds the thirteen pages the tab bar cannot name, for an admin', () => {
+    const more = ids(moreDestinations(capabilitiesOf('admin')));
+    expect(more).toHaveLength(13);
     expect(more).toContain('security');
     for (const tab of ['overview', 'proxy-hosts', 'l4-proxy-hosts', 'agents', 'analytics']) {
       expect(more).not.toContain(tab);
     }
   });
 
-  it('leaves an operator only Profile', () => {
-    expect(ids(moreDestinations('operator'))).toEqual(['profile']);
+  it('leaves an operator only Approvals and Profile', () => {
+    expect(ids(moreDestinations(capabilitiesOf('operator')))).toEqual(['approvals', 'profile']);
   });
 });
 
 describe('resolveDrawer', () => {
   it('defaults to the first eight in canonical order until a choice is saved', () => {
-    const drawer = resolveDrawer(null, 'admin');
+    const drawer = resolveDrawer(null, capabilitiesOf('admin'));
     expect(drawer).toHaveLength(MORE_DRAWER_SLOTS);
-    expect(ids(drawer)).toEqual(ids(moreDestinations('admin')).slice(0, MORE_DRAWER_SLOTS));
+    expect(ids(drawer)).toEqual(
+      ids(moreDestinations(capabilitiesOf('admin'))).slice(0, MORE_DRAWER_SLOTS),
+    );
   });
 
   it('keeps a saved choice in the order it was chosen', () => {
-    expect(ids(resolveDrawer(['waf', 'users', 'settings'], 'admin'))).toEqual([
+    expect(ids(resolveDrawer(['waf', 'users', 'settings'], capabilitiesOf('admin')))).toEqual([
       'waf',
       'users',
       'settings',
@@ -68,21 +88,27 @@ describe('resolveDrawer', () => {
 
   it('drops pages the role can no longer open', () => {
     // A demoted admin's saved drawer still names Settings.
-    expect(ids(resolveDrawer(['settings', 'profile', 'waf'], 'operator'))).toEqual(['profile']);
+    expect(ids(resolveDrawer(['settings', 'profile', 'waf'], capabilitiesOf('operator')))).toEqual([
+      'profile',
+    ]);
   });
 
   it('ignores pages that are not behind More', () => {
-    expect(ids(resolveDrawer(['overview', 'waf', 'analytics'], 'admin'))).toEqual(['waf']);
+    expect(ids(resolveDrawer(['overview', 'waf', 'analytics'], capabilitiesOf('admin')))).toEqual([
+      'waf',
+    ]);
   });
 
   it('never holds more than the slot count', () => {
-    const everything = ids(moreDestinations('admin')) as Parameters<typeof resolveDrawer>[0];
-    expect(resolveDrawer(everything, 'admin')).toHaveLength(MORE_DRAWER_SLOTS);
+    const everything = ids(moreDestinations(capabilitiesOf('admin'))) as Parameters<
+      typeof resolveDrawer
+    >[0];
+    expect(resolveDrawer(everything, capabilitiesOf('admin'))).toHaveLength(MORE_DRAWER_SLOTS);
   });
 
   it('treats an empty saved choice as a real, empty drawer rather than the defaults', () => {
     // Null means "never chose"; an empty list means "chose nothing", and only All pages remains.
-    expect(resolveDrawer([], 'admin')).toEqual([]);
+    expect(resolveDrawer([], capabilitiesOf('admin'))).toEqual([]);
   });
 });
 

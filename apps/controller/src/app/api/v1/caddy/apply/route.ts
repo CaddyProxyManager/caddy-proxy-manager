@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     await applyCaddyConfig();
     return NextResponse.json({ ok: true });
   } catch (error) {

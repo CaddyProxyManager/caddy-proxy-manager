@@ -7,7 +7,15 @@ import { and, eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, oauthProviders, passkeys, users } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secrets";
-import { isAppRole } from "../auth/oidc/groups";
+import { isKnownRole } from "../roles/store";
+import {
+  type LegacyRoleColumns,
+  type RoleGroups,
+  legacyColumns,
+  requestedRoleGroups,
+  setRoleGroups,
+  withRoleGroups,
+} from "../roles/mappings";
 import { domainError } from "../errors/domain-error";
 import { revokeSessionsAfterPasswordChange } from "./sessions";
 import type { OAuthGroupMapping } from "./oauth-providers";
@@ -49,7 +57,7 @@ export type LdapDirectoryInput = Partial<OAuthGroupMapping> & {
   enabled?: boolean;
 };
 
-type Row = typeof oauthProviders.$inferSelect;
+type Row = typeof oauthProviders.$inferSelect & LegacyRoleColumns & { roleGroups: RoleGroups };
 
 function parseRow(row: Row): LdapDirectory {
   return {
@@ -68,7 +76,8 @@ function parseRow(row: Row): LdapDirectory {
     operatorGroup: row.operatorGroup,
     userGroup: row.userGroup,
     viewerGroup: row.viewerGroup,
-    defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
+    roleGroups: row.roleGroups,
+    defaultRole: row.defaultRole,
     syncGroups: row.syncGroups,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -84,7 +93,7 @@ const isLdap = eq(oauthProviders.type, LDAP_PROVIDER_TYPE);
 
 export async function listLdapDirectories(): Promise<LdapDirectoryView[]> {
   const rows = await db.select().from(oauthProviders).where(isLdap).orderBy(oauthProviders.name);
-  return rows.map((row) => toLdapDirectoryView(parseRow(row)));
+  return (await withRoleGroups(rows)).map((row) => toLdapDirectoryView(parseRow(row)));
 }
 
 /** With credentials, for signing in. */
@@ -94,7 +103,7 @@ export async function listEnabledLdapDirectories(): Promise<LdapDirectory[]> {
     .from(oauthProviders)
     .where(and(isLdap, eq(oauthProviders.enabled, true)))
     .orderBy(oauthProviders.name);
-  return rows.map(parseRow);
+  return (await withRoleGroups(rows)).map(parseRow);
 }
 
 /** For the sign-in forms: names only. */
@@ -108,7 +117,7 @@ export async function getLdapDirectory(id: string): Promise<LdapDirectory | null
     .from(oauthProviders)
     .where(and(isLdap, eq(oauthProviders.id, id)))
     .limit(1);
-  return row ? parseRow(row) : null;
+  return row ? parseRow((await withRoleGroups([row]))[0]) : null;
 }
 
 /** The ids of every directory, enabled or not, for telling their `accounts` rows apart. */
@@ -143,20 +152,14 @@ async function assertNameFree(name: string, exceptId: string | null): Promise<vo
   }
 }
 
-function groupMappingColumns(input: Partial<OAuthGroupMapping>) {
+async function groupMappingColumns(input: Partial<OAuthGroupMapping>) {
   return {
     ...(input.groupPrefix !== undefined && { groupPrefix: input.groupPrefix?.trim() || null }),
     ...(input.roleMappingEnabled !== undefined && {
       roleMappingEnabled: input.roleMappingEnabled,
     }),
-    ...(input.adminGroup !== undefined && { adminGroup: input.adminGroup?.trim() || null }),
-    ...(input.operatorGroup !== undefined && {
-      operatorGroup: input.operatorGroup?.trim() || null,
-    }),
-    ...(input.userGroup !== undefined && { userGroup: input.userGroup?.trim() || null }),
-    ...(input.viewerGroup !== undefined && { viewerGroup: input.viewerGroup?.trim() || null }),
     ...(input.defaultRole !== undefined && {
-      defaultRole: isAppRole(input.defaultRole) ? input.defaultRole : "user",
+      defaultRole: (await isKnownRole(input.defaultRole)) ? input.defaultRole : "user",
     }),
     ...(input.syncGroups !== undefined && { syncGroups: input.syncGroups }),
   };
@@ -215,11 +218,10 @@ export async function previewLdapDirectory(
     groupsClaim: "memberOf",
     groupPrefix: input.groupPrefix?.trim() || null,
     roleMappingEnabled: input.roleMappingEnabled ?? false,
-    adminGroup: input.adminGroup?.trim() || null,
-    operatorGroup: input.operatorGroup?.trim() || null,
-    userGroup: input.userGroup?.trim() || null,
-    viewerGroup: input.viewerGroup?.trim() || null,
-    defaultRole: isAppRole(input.defaultRole) ? input.defaultRole : "user",
+    ...legacyColumns(requestedRoleGroups(input)),
+    roleGroups: requestedRoleGroups(input),
+    defaultRole:
+      input.defaultRole && (await isKnownRole(input.defaultRole)) ? input.defaultRole : "user",
     syncGroups: input.syncGroups ?? false,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -245,13 +247,14 @@ export async function createLdapDirectory(input: LdapDirectoryInput): Promise<Ld
       enabled: input.enabled ?? true,
       source: "ui",
       groupsClaim: "memberOf",
-      ...groupMappingColumns(input),
+      ...(await groupMappingColumns(input)),
       ldapConfig: JSON.stringify(prepared.config),
       createdAt: now,
       updatedAt: now,
     })
     .returning();
-  return parseRow(row);
+  await setRoleGroups(row.id, requestedRoleGroups(input));
+  return parseRow((await withRoleGroups([row]))[0]);
 }
 
 export async function updateLdapDirectory(
@@ -271,13 +274,14 @@ export async function updateLdapDirectory(
       issuer: prepared.url,
       ...(input.autoLink !== undefined && { autoLink: input.autoLink }),
       ...(input.enabled !== undefined && { enabled: input.enabled }),
-      ...groupMappingColumns(input),
+      ...(await groupMappingColumns(input)),
       ldapConfig: JSON.stringify(prepared.config),
       updatedAt: nowIso(),
     })
     .where(and(isLdap, eq(oauthProviders.id, id)))
     .returning();
-  return parseRow(row);
+  await setRoleGroups(row.id, requestedRoleGroups(input));
+  return parseRow((await withRoleGroups([row]))[0]);
 }
 
 export async function setLdapDirectoryEnabled(
@@ -290,7 +294,7 @@ export async function setLdapDirectoryEnabled(
     .where(and(isLdap, eq(oauthProviders.id, id)))
     .returning();
   if (!row) throw domainError("ldapDirectoryNotFound", {}, { status: 404 });
-  return parseRow(row);
+  return parseRow((await withRoleGroups([row]))[0]);
 }
 
 /**

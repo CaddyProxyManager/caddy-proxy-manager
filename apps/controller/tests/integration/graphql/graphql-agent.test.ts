@@ -3,6 +3,7 @@
  * and operator fields would break silently, so both directions are asserted, not assumed.
  */
 import { describe, it, expect, afterEach } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -89,8 +90,7 @@ function userContext(role: string): GraphQLContext {
     access: async () => ({
       userId: 1,
       role,
-      isAdmin: role === 'admin',
-      isOperator: false,
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '{}',

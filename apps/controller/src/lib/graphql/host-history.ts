@@ -13,11 +13,10 @@ import {
   listDeletedHosts,
   listHostRevisions,
   missingReferences,
-  restoreHost,
-  rollbackHost,
 } from "../host-history";
+import { apiSubmitter, submitOrApply } from "../approvals";
 import type { HostKind } from "../host-history/types";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 const MAX_PAGE = 200;
 
@@ -47,9 +46,8 @@ export const hostHistoryQueryResolvers = {
   hostRevisions: async (
     _: unknown,
     args: { kind: string; hostId: number; limit?: number | null; offset?: number | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     const kind = kindOf(args.kind);
     const limit = Math.min(Math.max(args.limit ?? 20, 1), MAX_PAGE);
     const summaries = await listHostRevisions(
@@ -63,31 +61,30 @@ export const hostHistoryQueryResolvers = {
       revisions.filter((revision): revision is HostRevision => !!revision).map(revisionForApi),
     );
   },
-  hostRevision: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    await requireAdmin(context);
+  hostRevision: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
     const revision = await getHostRevision(args.id);
     return revision ? revisionForApi(revision) : null;
   },
   compareHostRevisions: async (
     _: unknown,
     args: { kind: string; hostId: number; from: number; to: number; config?: boolean | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     return compareHostRevisions(kindOf(args.kind), args.hostId, args.from, args.to, {
       config: args.config === true,
     });
   },
-  deletedHosts: async (_: unknown, args: { kind: string }, context: GraphQLContext) => {
-    await requireAdmin(context);
+  deletedHosts: async (_: unknown, args: { kind: string }, _context: GraphQLContext) => {
     return listDeletedHosts(kindOf(args.kind));
   },
 };
 
 export const hostHistoryMutationResolvers = {
   rollbackHost: async (_: unknown, args: { revisionId: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
-    const { revisionId } = await rollbackHost(args.revisionId, userId);
+    const { revisionId } = await submitOrApply(apiSubmitter(await context.viewer()), {
+      kind: "hostRollback",
+      payload: { revisionId: args.revisionId },
+    });
     return revisionOrThrow(revisionId);
   },
   restoreHost: async (
@@ -95,9 +92,12 @@ export const hostHistoryMutationResolvers = {
     args: { revisionId: number; dropMissingReferences?: boolean | null },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
-    const { revisionId } = await restoreHost(args.revisionId, userId, {
-      dropMissingReferences: args.dropMissingReferences === true,
+    const { revisionId } = await submitOrApply(apiSubmitter(await context.viewer()), {
+      kind: "hostRestore",
+      payload: {
+        revisionId: args.revisionId,
+        dropMissingReferences: args.dropMissingReferences === true,
+      },
     });
     return revisionOrThrow(revisionId);
   },

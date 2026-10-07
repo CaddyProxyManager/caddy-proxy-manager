@@ -7,8 +7,12 @@ import { defineConfig } from "vite";
 const { version: pkgVersion } = createRequire(import.meta.url)("./package.json");
 const appVersion = String(process.env.APP_VERSION || pkgVersion || "unknown").replace(/^v/, "");
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), vinext()],
+
+  // Dev rewrites a dependency's require() calls into hoisted imports, which turns node-rsa's lazy,
+  // circular require("./schemes") eager and 500s every page. The build bundles it correctly.
+  ...(command === "serve" ? { ssr: { external: ["samlify"] } } : {}),
 
   // Inlined, so the rest of package.json stays out of the client bundle.
   define: {
@@ -27,4 +31,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

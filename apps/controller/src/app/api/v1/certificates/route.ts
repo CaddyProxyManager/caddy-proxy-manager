@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { listCertificates, createCertificate } from "@/src/lib/models/certificates";
 import { toCertificateApiResponse } from "@/src/lib/certificates/api";
 import { createCertificateFromAgentFiles } from "@/src/lib/models/certificate-files";
@@ -8,7 +8,7 @@ const PRIVATE_RESPONSE_INIT = { headers: { "Cache-Control": "no-store" } };
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const certs = await listCertificates();
     return NextResponse.json(certs.map(toCertificateApiResponse), PRIVATE_RESPONSE_INIT);
   } catch (error) {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const body = await request.json();
     // Read from the agent before anything is stored; see models/certificate-files.ts.
     const cert =

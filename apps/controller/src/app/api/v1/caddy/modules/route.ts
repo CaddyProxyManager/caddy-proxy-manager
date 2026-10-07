@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { getCaddyBuildDiff, sanitizeCaddyBuildSettings } from "@/src/lib/caddy/image-build";
 import { describeModuleConflicts } from "@/src/lib/caddy/image-build/conflicts";
 import { applyCaddyConfig } from "@/src/lib/caddy";
@@ -20,7 +20,7 @@ const AVAILABLE = CADDY_MODULES.map((m) => ({
 /** GET /api/v1/caddy/modules - with the catalog, since module ids are what PUT expects. */
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const [settings, diff] = await Promise.all([getCaddyBuildSettings(), getCaddyBuildDiff()]);
     return NextResponse.json({
       available: AVAILABLE,
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const body = await request.json();
     const settings = sanitizeCaddyBuildSettings({
       modules: body?.modules,

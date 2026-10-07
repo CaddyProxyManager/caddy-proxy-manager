@@ -37,6 +37,7 @@ import {
   SQLITE_NOTICE_DISMISS_SECONDS,
 } from "@/src/lib/db/sqlite-notice-cookie";
 import type { ResolvedAvatar } from "@/src/lib/users/avatar";
+import type { CapabilitySet } from "@/src/lib/roles/capabilities";
 import {
   type Destination,
   type DestinationId,
@@ -140,8 +141,11 @@ export default function DashboardLayoutClient({
   updateAvailable,
   stagedKeys,
   morePins,
+  capabilities,
   viewAs = null,
   mfaDeadline = null,
+  pendingReviews = null,
+  awaitingApprovals = 0,
   children,
 }: {
   user: User;
@@ -155,13 +159,21 @@ export default function DashboardLayoutClient({
   stagedKeys: readonly string[];
   /** Null if the user never customized the More drawer. */
   morePins: readonly DestinationId[] | null;
+  /** What the viewer may do, which decides the pages the nav offers. */
+  capabilities: CapabilitySet;
   /** See lib/users/view-as.ts. */
-  viewAs?: { role: string; groupNames: string[] } | null;
+  /** `roleName` for a made role; a built-in one is named from the catalog. */
+  viewAs?: { role: string; roleName?: string | null; groupNames: string[] } | null;
   /** Inside a two-factor policy's grace period: when setup becomes compulsory. */
   mfaDeadline?: string | null;
+  /** Access review items waiting on this person, and the soonest due date among them. */
+  pendingReviews?: { count: number; dueOn: string | null } | null;
+  /** Change requests this person could approve and has not decided. */
+  awaitingApprovals?: number;
   children: ReactNode;
 }) {
   const t = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
   const pathname = usePathname();
   const isNarrow = useMediaQuery(NARROW);
@@ -171,8 +183,8 @@ export default function DashboardLayoutClient({
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // The rail's footer reaches Profile on a desktop.
-  const railItems = visibleDestinations(user.role).filter((d) => d.id !== "profile");
-  const drawerItems = resolveDrawer(morePins, user.role);
+  const railItems = visibleDestinations(capabilities).filter((d) => d.id !== "profile");
+  const drawerItems = resolveDrawer(morePins, capabilities);
 
   // An element, as the Settings rail passes: SideNavItem draws a component smaller.
   const renderRailItem = ({ id, href, labelKey }: Destination) => {
@@ -206,12 +218,12 @@ export default function DashboardLayoutClient({
         isOpen={isMoreOpen}
         onClose={closeMore}
         items={drawerItems}
-        totalPages={moreDestinations(user.role).length}
+        totalPages={moreDestinations(capabilities).length}
         offerCustomize={morePins === null}
         returnFocusRef={moreButtonRef}
       />
       <MobileTabBar
-        role={user.role}
+        capabilities={capabilities}
         isMoreOpen={isMoreOpen}
         onToggleMore={toggleMore}
         onCloseMore={closeMore}
@@ -222,6 +234,9 @@ export default function DashboardLayoutClient({
   const content = <div className="cpm-mobile-content">{children}</div>;
   // View-as first: the way back must be on every page. The demo banner is not dismissable; the
   // SQLite one is, for a while (src/lib/db/sqlite-notice.ts).
+  const viewAsRole = viewAs
+    ? (viewAs.roleName ?? t(`viewAsRoles.${viewAs.role as "operator" | "user" | "viewer"}`))
+    : "";
   const banner = viewAs ? (
     <Banner
       status="warning"
@@ -229,12 +244,10 @@ export default function DashboardLayoutClient({
       title={
         viewAs.groupNames.length > 0
           ? t("viewAsBannerTitleGroups", {
-              role: t(`viewAsRoles.${viewAs.role as "operator" | "user" | "viewer"}`),
+              role: viewAsRole,
               groups: viewAs.groupNames.join(", "),
             })
-          : t("viewAsBannerTitle", {
-              role: t(`viewAsRoles.${viewAs.role as "operator" | "user" | "viewer"}`),
-            })
+          : t("viewAsBannerTitle", { role: viewAsRole })
       }
       description={t("viewAsBannerDescription")}
       endContent={
@@ -274,6 +287,39 @@ export default function DashboardLayoutClient({
         />
       }
     />
+  ) : pendingReviews && !pathname.startsWith("/users/access-reviews") ? (
+    <Banner
+      status="info"
+      container="section"
+      title={t("pendingReviewsTitle", { count: pendingReviews.count })}
+      description={
+        pendingReviews.dueOn
+          ? t("pendingReviewsDue", {
+              date: format.dateTime(new Date(`${pendingReviews.dueOn}T00:00:00Z`), {
+                dateStyle: "medium",
+                timeZone: "UTC",
+              }),
+            })
+          : undefined
+      }
+      endContent={
+        <Button
+          variant="secondary"
+          size="sm"
+          label={tCommon("review")}
+          href="/users/access-reviews"
+        />
+      }
+    />
+  ) : awaitingApprovals > 0 && !pathname.startsWith("/approvals") ? (
+    <Banner
+      status="info"
+      container="section"
+      title={t("awaitingApprovalsTitle", { count: awaitingApprovals })}
+      endContent={
+        <Button variant="secondary" size="sm" label={tCommon("review")} href="/approvals" />
+      }
+    />
   ) : sqliteNotice ? (
     <Banner
       status="warning"
@@ -291,7 +337,7 @@ export default function DashboardLayoutClient({
   // Settings takes the rail over; its first row is the way back (./settings/SettingsSideNav.tsx).
   if (inSettings) {
     return (
-      <GlobalCommandPaletteProvider role={user.role}>
+      <GlobalCommandPaletteProvider capabilities={capabilities}>
         <AppShell
           banner={banner}
           contentPadding={0}
@@ -311,7 +357,7 @@ export default function DashboardLayoutClient({
   }
 
   return (
-    <GlobalCommandPaletteProvider role={user.role}>
+    <GlobalCommandPaletteProvider capabilities={capabilities}>
       <AppShell
         banner={banner}
         contentPadding={isFullBleed ? 0 : 6}

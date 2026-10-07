@@ -10,7 +10,7 @@ import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 import { getProxyHostDetail } from "@/src/lib/proxy-hosts/detail";
 import { proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { hostTrafficNames } from "@/src/lib/proxy-hosts/traffic-status";
-import { canManage, canView, requireAccess } from "@/src/lib/users/permissions";
+import { canManage, canView, requireReach, can } from "@/src/lib/users/permissions";
 import { ProxyHostDetailView } from "@/src/components/proxy-hosts/detail/ProxyHostDetailView";
 import { requestMemo } from "@/src/lib/request-memo";
 
@@ -26,7 +26,7 @@ async function viewableHost(raw: string) {
   const id = parseId(raw);
   if (id === null) return null;
   return requestMemo(`proxy-host-view:${id}`, async () => {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:read");
     if (!canView(access, "proxyHost", id)) return null;
     const host = await getProxyHost(id);
     return host ? { access, host } : null;
@@ -60,7 +60,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
 
   const primaryName = hostTrafficNames(host.domains)[0];
   const analyticsHref =
-    access.isAdmin && detail.traffic && primaryName
+    can(access, "analytics:read") && detail.traffic && primaryName
       ? `/analytics?${serializeExploreState({
           ...DEFAULT_EXPLORE_STATE,
           filters: [{ field: "host", op: "is", value: primaryName }],
@@ -74,12 +74,12 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
       historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.id) : null}
       analyticsHref={analyticsHref}
       logsHref={
-        access.isAdmin && primaryName
+        can(access, "logs:read") && primaryName
           ? `/logs?source=access&host=${encodeURIComponent(primaryName)}`
           : null
       }
       auditRows={
-        access.isAdmin
+        can(access, "audit:read")
           ? audit.map((event) => ({
               id: event.id,
               action: event.action,

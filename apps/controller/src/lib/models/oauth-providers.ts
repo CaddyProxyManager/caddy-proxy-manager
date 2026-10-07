@@ -1,35 +1,54 @@
 import { randomUUID } from "node:crypto";
 import db, { nowIso } from "../db";
 import { oauthProviders, settings } from "../db/schema";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne, notInArray } from "drizzle-orm";
 import { encryptSecret, decryptSecret } from "../secrets";
-import type { AppRole } from "../auth/oidc/groups";
-import { isAppRole } from "../auth/oidc/groups";
+import { isKnownRole } from "../roles/store";
+import {
+  type LegacyRoleColumns,
+  type RoleGroups,
+  requestedRoleGroups,
+  setRoleGroups,
+  withRoleGroups,
+} from "../roles/mappings";
 import { toOAuthProviderView, type OAuthProviderView } from "../auth/oidc/provider-view";
 import { domainError } from "../errors/domain-error";
 import { LDAP_PROVIDER_TYPE } from "../ldap/defaults";
+import { SAML_PROVIDER_TYPE } from "../auth/saml/urls";
 
-/** LDAP directories share the table (models/ldap-directories.ts); no reader here may see one. */
-const isOidc = ne(oauthProviders.type, LDAP_PROVIDER_TYPE);
+/**
+ * LDAP directories and SAML providers share the table (models/ldap-directories.ts,
+ * models/saml-providers.ts); no reader here may see one.
+ */
+const NOT_OIDC = [LDAP_PROVIDER_TYPE, SAML_PROVIDER_TYPE];
+const isOidc = notInArray(oauthProviders.type, NOT_OIDC);
 
-/** A directory is made through its own model, never turned into one here. */
+/** A directory or SAML provider is made through its own model, never turned into one here. */
 function assertOidcType(type: string | undefined): void {
-  if (type === LDAP_PROVIDER_TYPE)
+  if (type !== undefined && NOT_OIDC.includes(type))
     throw domainError("oauthProviderTypeInvalid", {}, { status: 400 });
 }
 
-/** Per-provider OIDC group mapping, shared by the type, create and update paths. */
-export type OAuthGroupMapping = {
+/**
+ * Per-provider OIDC group mapping, shared by the type, create and update paths. Which groups give
+ * a role are `role_mappings` rows: `roleGroups` for every role, and the built-in roles' comma
+ * lists beside it, the shape forms and `/api/v1/oauth-providers` have always used.
+ */
+export type OAuthGroupMapping = LegacyRoleColumns & {
   groupsClaim: string;
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
-  adminGroup: string | null;
-  operatorGroup: string | null;
-  userGroup: string | null;
-  viewerGroup: string | null;
-  defaultRole: AppRole;
+  /** Absent on an object built without the table, where the comma lists say it all. */
+  roleGroups?: RoleGroups;
+  /** A role key, built-in or made. */
+  defaultRole: string;
   syncGroups: boolean;
 };
+
+/** An unknown role, as an input or left behind, reads as `user`, as an unknown built-in did. */
+async function knownRoleOr(value: unknown, fallback: string): Promise<string> {
+  return typeof value === "string" && (await isKnownRole(value)) ? value : fallback;
+}
 
 export type OAuthProvider = OAuthGroupMapping & {
   id: string;
@@ -49,7 +68,8 @@ export type OAuthProvider = OAuthGroupMapping & {
   updatedAt: string;
 };
 
-type DbProvider = typeof oauthProviders.$inferSelect;
+type DbProvider = typeof oauthProviders.$inferSelect &
+  LegacyRoleColumns & { roleGroups: RoleGroups };
 
 function parseDbProvider(row: DbProvider): OAuthProvider {
   return {
@@ -73,7 +93,8 @@ function parseDbProvider(row: DbProvider): OAuthProvider {
     operatorGroup: row.operatorGroup,
     userGroup: row.userGroup,
     viewerGroup: row.viewerGroup,
-    defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
+    roleGroups: row.roleGroups,
+    defaultRole: row.defaultRole,
     syncGroups: row.syncGroups,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -119,18 +140,15 @@ export async function createOAuthProvider(
       groupsClaim: data.groupsClaim?.trim() || "groups",
       groupPrefix: data.groupPrefix?.trim() || null,
       roleMappingEnabled: data.roleMappingEnabled ?? false,
-      adminGroup: data.adminGroup?.trim() || null,
-      operatorGroup: data.operatorGroup?.trim() || null,
-      userGroup: data.userGroup?.trim() || null,
-      viewerGroup: data.viewerGroup?.trim() || null,
-      defaultRole: isAppRole(data.defaultRole) ? data.defaultRole : "user",
+      defaultRole: await knownRoleOr(data.defaultRole, "user"),
       syncGroups: data.syncGroups ?? false,
       createdAt: now,
       updatedAt: now,
     })
     .returning();
 
-  return parseDbProvider(row);
+  await setRoleGroups(row.id, requestedRoleGroups(data));
+  return parseDbProvider((await withRoleGroups([row]))[0]);
 }
 
 export async function listOAuthProviders(): Promise<OAuthProviderView[]> {
@@ -139,7 +157,7 @@ export async function listOAuthProviders(): Promise<OAuthProviderView[]> {
     .from(oauthProviders)
     .where(isOidc)
     .orderBy(asc(oauthProviders.name));
-  return rows.map((row) => toOAuthProviderView(parseDbProvider(row)));
+  return (await withRoleGroups(rows)).map((row) => toOAuthProviderView(parseDbProvider(row)));
 }
 
 export async function listEnabledOAuthProviders(): Promise<OAuthProvider[]> {
@@ -148,7 +166,7 @@ export async function listEnabledOAuthProviders(): Promise<OAuthProvider[]> {
     .from(oauthProviders)
     .where(and(isOidc, eq(oauthProviders.enabled, true)))
     .orderBy(asc(oauthProviders.name));
-  return rows.map(parseDbProvider);
+  return (await withRoleGroups(rows)).map(parseDbProvider);
 }
 
 export async function getOAuthProvider(id: string): Promise<OAuthProvider | null> {
@@ -157,7 +175,7 @@ export async function getOAuthProvider(id: string): Promise<OAuthProvider | null
     .from(oauthProviders)
     .where(and(isOidc, eq(oauthProviders.id, id)))
     .limit(1);
-  return row ? parseDbProvider(row) : null;
+  return row ? parseDbProvider((await withRoleGroups([row]))[0]) : null;
 }
 
 /** Unfiltered: the env sync must see a directory holding the name, or its insert would clash. */
@@ -165,7 +183,7 @@ export async function getOAuthProviderByName(name: string): Promise<OAuthProvide
   const row = await db.query.oauthProviders.findFirst({
     where: (table, { eq }) => eq(table.name, name),
   });
-  return row ? parseDbProvider(row) : null;
+  return row ? parseDbProvider((await withRoleGroups([row]))[0]) : null;
 }
 
 export async function updateOAuthProvider(
@@ -208,12 +226,8 @@ export async function updateOAuthProvider(
   if (data.groupsClaim !== undefined) updates.groupsClaim = data.groupsClaim.trim() || "groups";
   if (data.groupPrefix !== undefined) updates.groupPrefix = data.groupPrefix?.trim() || null;
   if (data.roleMappingEnabled !== undefined) updates.roleMappingEnabled = data.roleMappingEnabled;
-  if (data.adminGroup !== undefined) updates.adminGroup = data.adminGroup?.trim() || null;
-  if (data.operatorGroup !== undefined) updates.operatorGroup = data.operatorGroup?.trim() || null;
-  if (data.userGroup !== undefined) updates.userGroup = data.userGroup?.trim() || null;
-  if (data.viewerGroup !== undefined) updates.viewerGroup = data.viewerGroup?.trim() || null;
   if (data.defaultRole !== undefined)
-    updates.defaultRole = isAppRole(data.defaultRole) ? data.defaultRole : "user";
+    updates.defaultRole = await knownRoleOr(data.defaultRole, "user");
   if (data.syncGroups !== undefined) updates.syncGroups = data.syncGroups;
 
   const [row] = await db
@@ -222,7 +236,9 @@ export async function updateOAuthProvider(
     .where(and(isOidc, eq(oauthProviders.id, id)))
     .returning();
 
-  return row ? parseDbProvider(row) : null;
+  if (!row) return null;
+  await setRoleGroups(row.id, requestedRoleGroups(data));
+  return parseDbProvider((await withRoleGroups([row]))[0]);
 }
 
 export async function deleteOAuthProvider(id: string): Promise<void> {
@@ -268,23 +284,32 @@ export async function setPrimaryProviderId(id: string | null): Promise<void> {
     .onConflictDoUpdate({ target: settings.key, set: { value: id, updatedAt: now } });
 }
 
+/** The sign-in buttons: OIDC and SAML providers in one list, each saying how it signs in. */
 export async function getProviderDisplayList(): Promise<
-  Array<{ id: string; name: string; autoLink: boolean; isPrimary: boolean }>
+  Array<{
+    id: string;
+    name: string;
+    autoLink: boolean;
+    isPrimary: boolean;
+    protocol: "oidc" | "saml";
+  }>
 > {
   const rows = await db
     .select({
       id: oauthProviders.id,
       name: oauthProviders.name,
       autoLink: oauthProviders.autoLink,
+      type: oauthProviders.type,
     })
     .from(oauthProviders)
-    .where(and(isOidc, eq(oauthProviders.enabled, true)))
+    .where(and(ne(oauthProviders.type, LDAP_PROVIDER_TYPE), eq(oauthProviders.enabled, true)))
     .orderBy(asc(oauthProviders.name));
   const primaryId = await getPrimaryProviderId();
   const list = rows.map((r) => ({
     id: r.id,
     name: r.name,
     autoLink: r.autoLink,
+    protocol: r.type === SAML_PROVIDER_TYPE ? ("saml" as const) : ("oidc" as const),
     // Resolved against this list, so a stale id from a deleted or disabled provider simply
     // means no primary rather than a marker nothing matches.
     isPrimary: r.id === primaryId,

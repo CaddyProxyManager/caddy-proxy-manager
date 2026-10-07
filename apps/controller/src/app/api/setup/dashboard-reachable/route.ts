@@ -1,3 +1,4 @@
+import { sessionCan } from "@/src/lib/users/permissions";
 import type { NextRequest } from "next/server";
 import { auth } from "@/src/lib/auth";
 import { dashboardHostAnswers } from "@/src/lib/dashboard-host";
@@ -8,7 +9,7 @@ import { getDashboardSettings } from "@/src/lib/settings";
  * a URL, and only the stored, validated domain - nothing the caller sends.
  */
 export async function GET(request: NextRequest): Promise<Response> {
-  if ((await auth(request))?.user.role !== "admin") {
+  if (!(await sessionCan(await auth(request), "settings:read"))) {
     return Response.json({ ok: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
 

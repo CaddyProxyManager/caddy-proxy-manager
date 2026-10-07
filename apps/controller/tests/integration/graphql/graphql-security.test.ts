@@ -3,6 +3,7 @@
  * Writes are read back from the database, and every field refuses a non-admin.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -30,8 +31,7 @@ function contextFor(role: string): GraphQLContext {
     access: async () => ({
       userId: 1,
       role,
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '',
@@ -142,7 +142,7 @@ describe('a non-administrator', () => {
       'mutation { reviewWafEvent(key: "1.0123456789abcdef0123", verdict: "intended") { verdict } }',
     ]) {
       const result = await run(document, 'user');
-      expect(result.errors?.[0]?.message).toContain('Administrator');
+      expect(result.errors?.[0]?.message).toContain('role does not allow');
     }
     expect(await ctx.db.select().from(db.blockedSources)).toEqual([]);
     expect(await ctx.db.select().from(db.wafExclusions)).toEqual([]);

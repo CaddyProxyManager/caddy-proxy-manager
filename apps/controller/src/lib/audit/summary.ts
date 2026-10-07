@@ -41,9 +41,13 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("mtls_role", "mTLS role", "mtlsRole"),
   ...lifecycle("access_list", "access list", "accessList"),
   ...lifecycle("group", "group", "group"),
+  // roles/store.ts
+  ...lifecycle("role", "role", "role"),
   ...lifecycle("waf_preset", "WAF preset", "wafPreset"),
   // settings/ldap-actions.ts
   ...lifecycle("ldap_directory", "directory", "ldapDirectory"),
+  // settings/saml-actions.ts
+  ...lifecycle("saml_provider", "SAML provider", "samlProvider"),
   // models/analytics-views.ts
   ...lifecycle("analytics_view", "analytics view", "analyticsView"),
   // backup/manage.ts
@@ -55,6 +59,84 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("alert_digest", "alert digest", "alertDigest"),
   // audit-stream/sinks.ts
   ...lifecycle("audit_sink", "audit sink", "auditSink"),
+  // scim/connections.ts
+  ...lifecycle("scim_connection", "SCIM connection", "scimConnection"),
+  {
+    entityType: "scim_connection",
+    action: "update",
+    message: "scimConnectionRotated",
+    pattern: /^Rotated the token of SCIM connection (?<name>.+)$/s,
+  },
+  // access-reviews/
+  ...lifecycle("access_review", "access review", "accessReview"),
+  {
+    entityType: "access_review",
+    action: "access_review_decision",
+    message: "accessReviewDecided",
+    pattern: /^Decided (?<decision>.+?) for item (?<item>.+?) of access review (?<name>.+)$/s,
+  },
+  {
+    entityType: "access_review",
+    action: "access_review_closed",
+    message: "accessReviewClosed",
+    pattern: /^Closed access review (?<name>.+)$/s,
+  },
+  {
+    entityType: "access_review",
+    action: "access_review_applied",
+    message: "accessReviewApplied",
+    pattern: /^Applied the revocations of access review (?<name>.+)$/s,
+  },
+  {
+    entityType: "access_review",
+    action: "access_review_reassigned",
+    message: "accessReviewReassigned",
+    pattern: /^Reassigned (?<count>.+?) items of access review (?<name>.+)$/s,
+  },
+  {
+    entityType: "access_review",
+    action: "access_review_exported",
+    message: "accessReviewExported",
+    pattern: /^Exported access review (?<name>.+)$/s,
+  },
+  // approvals/
+  ...(
+    [
+      ["change_request_submitted", "changeRequestSubmitted", "Submitted change request"],
+      ["change_request_approved", "changeRequestApproved", "Approved change request"],
+      ["change_request_rejected", "changeRequestRejected", "Rejected change request"],
+      ["change_request_withdrawn", "changeRequestWithdrawn", "Withdrew change request"],
+      ["change_request_invalidated", "changeRequestInvalidated", "Invalidated change request"],
+      ["change_request_applied", "changeRequestApplied", "Applied change request"],
+      ["change_request_bypassed", "changeRequestBypassed", "Bypassed approval for change request"],
+    ] as const
+  ).map(([action, message, prefix]) => ({
+    entityType: "change_request",
+    action,
+    message,
+    pattern: new RegExp(`^${prefix} #(?<id>.+)$`, "s"),
+  })),
+  {
+    entityType: "change_request",
+    action: "change_request_failed",
+    message: "changeRequestFailed",
+    pattern: /^Change request #(?<id>.+) failed to apply$/s,
+  },
+  {
+    entityType: "approval_policy",
+    action: "update",
+    message: "approvalPolicyUpdated",
+    pattern: /^Updated the change approval policy$/,
+  },
+  // scim/mirror.ts: what an identity provider changed through a connection
+  ...(["user", "group"] as const).flatMap((kind) =>
+    (["created", "updated", "removed"] as const).map((verb) => ({
+      entityType: `scim_${kind}`,
+      action: `scim_${verb}`,
+      message: `scim${kind === "user" ? "User" : "Group"}${verb[0].toUpperCase()}${verb.slice(1)}`,
+      pattern: new RegExp(`^SCIM connection (?<connection>.+?) ${verb} ${kind} (?<name>.+)$`, "s"),
+    })),
+  ),
   // models/api-tokens.ts; a token is never updated.
   ...lifecycle("api_token", "API token", "apiToken").filter(
     (pattern) => pattern.action !== "update",
@@ -650,6 +732,13 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "mfa_policy_lifted",
     message: "mfaPolicyLiftedConsole",
     pattern: /^Lifted the two-factor policy from the server console$/,
+  },
+  // `cpm-server --lift-sso-enforcement`
+  {
+    entityType: "settings",
+    action: "sso_enforcement_lifted",
+    message: "ssoEnforcementLiftedConsole",
+    pattern: /^Lifted single sign-on enforcement from the server console$/,
   },
   // lib/auth/account-failures.ts, and `cpm-server --enable-user`
   {

@@ -612,3 +612,255 @@ describe('audit streaming across a restore', () => {
     expect(JSON.parse(decryptSecret(restored.secret))).toEqual(secret);
   });
 });
+
+describe('roles across a restore', () => {
+  async function seedRoles() {
+    await ctx.db.delete(schema.roleMappings);
+    await ctx.db.delete(schema.oauthProviders);
+    await ctx.db.delete(schema.roles);
+    await ctx.db.insert(schema.roles).values({
+      key: 'role-0123456789ab',
+      name: 'Auditors',
+      capabilities: '["audit:read"]',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await ctx.db.insert(schema.oauthProviders).values({
+      id: 'idp',
+      name: 'IdP',
+      clientId: encryptSecret('c'),
+      clientSecret: encryptSecret('s'),
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await ctx.db.insert(schema.roleMappings).values([
+      { providerId: 'idp', role: 'admin', externalName: 'admins', createdAt: NOW },
+      { providerId: 'idp', role: 'role-0123456789ab', externalName: 'audit', createdAt: NOW },
+    ]);
+  }
+
+  const mappings = async () =>
+    (await ctx.db.select().from(schema.roleMappings)).map((row) => [row.role, row.externalName]);
+
+  it('keeps made roles and every role mapping', async () => {
+    await seedRoles();
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.roleMappings);
+    await ctx.db.delete(schema.roles);
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    expect((await ctx.db.select().from(schema.roles)).map((row) => row.name)).toEqual(['Auditors']);
+    expect(await mappings()).toEqual([
+      ['admin', 'admins'],
+      ['role-0123456789ab', 'audit'],
+    ]);
+  });
+
+  it('turns the role columns of a backup from before role mappings into rows', async () => {
+    await seedRoles();
+    const { openBackup, sealBackup } = await import('../../src/lib/backup/format');
+    const opened = await openBackup(await createBackup(PASSPHRASE), PASSPHRASE);
+    // What a backup made before the move carries: the lists on the provider, no mapping table.
+    const tables = { ...opened.tables };
+    delete tables.role_mappings;
+    tables.oauth_providers = (tables.oauth_providers as Record<string, unknown>[]).map((row) => ({
+      ...row,
+      adminGroup: 'owners, admins',
+      operatorGroup: null,
+      userGroup: 'staff',
+      viewerGroup: '',
+    }));
+    const legacy = await sealBackup({ ...opened, tables }, PASSPHRASE, {
+      appVersion: opened.header.appVersion,
+    });
+    await restoreBackup(legacy, PASSPHRASE, { keepAgents: true });
+    expect(await mappings()).toEqual([
+      ['admin', 'owners'],
+      ['admin', 'admins'],
+      ['user', 'staff'],
+    ]);
+  });
+});
+
+describe('SAML providers across a restore', () => {
+  it('keeps both halves of a provider, its metadata as saved', async () => {
+    await ctx.db.delete(schema.ssoProviders);
+    await ctx.db.delete(schema.oauthProviders);
+    await ctx.db.insert(schema.oauthProviders).values({
+      id: 'saml-idp',
+      name: 'SAML IdP',
+      type: 'saml',
+      clientId: encryptSecret(''),
+      clientSecret: encryptSecret(''),
+      issuer: 'https://idp.example.com/metadata',
+      scopes: '',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const samlConfig = JSON.stringify({
+      issuer: 'https://cpm.example.com/sp',
+      idpMetadata: { metadata: '<md:EntityDescriptor/>' },
+      wantAssertionsSigned: true,
+    });
+    await ctx.db.insert(schema.ssoProviders).values({
+      issuer: 'https://cpm.example.com/sp',
+      samlConfig,
+      providerId: 'saml-idp',
+      domain: 'example.com',
+    });
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.oauthProviders);
+    expect(await ctx.db.select().from(schema.ssoProviders)).toHaveLength(0);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.ssoProviders);
+    expect(restored).toMatchObject({
+      providerId: 'saml-idp',
+      issuer: 'https://cpm.example.com/sp',
+      samlConfig,
+      domain: 'example.com',
+      domainVerified: true,
+    });
+    const [provider] = await ctx.db
+      .select()
+      .from(schema.oauthProviders)
+      .where(eq(schema.oauthProviders.id, 'saml-idp'));
+    expect(provider.type).toBe('saml');
+    // Re-sealed under this deployment's key, like any provider's.
+    expect(decryptSecret(provider.clientSecret)).toBe('');
+  });
+});
+
+describe('SCIM connections across a restore', () => {
+  it('keeps a connection, its mapping and what it provisioned', async () => {
+    await ctx.db.delete(schema.scimConnections);
+    const [connection] = await ctx.db
+      .insert(schema.scimConnections)
+      .values({
+        name: 'Backed up IdP',
+        tokenHash: 'a'.repeat(64),
+        tokenHint: 'abcd',
+        linkExisting: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    await ctx.db.insert(schema.scimRoleMappings).values({
+      connectionId: connection.id,
+      role: 'viewer',
+      externalName: 'Readers',
+      createdAt: NOW,
+    });
+    await ctx.db.insert(schema.scimGroups).values({
+      connectionId: String(connection.id),
+      provisioningDomainId: 'cpm',
+      displayName: 'Readers',
+      displayNameKey: 'cpm:readers',
+      orderKey: 'order-1',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.scimGroups);
+    await ctx.db.delete(schema.scimConnections);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.scimConnections);
+    expect(restored).toMatchObject({
+      name: 'Backed up IdP',
+      tokenHash: 'a'.repeat(64),
+      linkExisting: false,
+    });
+    expect(await ctx.db.select().from(schema.scimRoleMappings)).toHaveLength(1);
+    const [group] = await ctx.db.select().from(schema.scimGroups);
+    expect(group).toMatchObject({ displayName: 'Readers', connectionId: String(connection.id) });
+  });
+});
+
+describe('access reviews across a restore', () => {
+  it('keeps a campaign and its decisions, the record of who reviewed what', async () => {
+    await ctx.db.delete(schema.accessReviewCampaigns);
+    const [campaign] = await ctx.db
+      .insert(schema.accessReviewCampaigns)
+      .values({
+        name: 'Backed up review',
+        scope: 'tokens',
+        dueOn: '2026-12-31',
+        status: 'closed',
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    await ctx.db.insert(schema.accessReviewItems).values({
+      campaignId: campaign.id,
+      kind: 'token',
+      subjectLabel: 'ci',
+      targetLabel: 'owner@example.com',
+      hints: '["tokenUnused"]',
+      decision: 'revoke',
+      note: 'unused',
+      outcome: 'applied',
+    });
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.accessReviewCampaigns);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.accessReviewCampaigns);
+    expect(restored).toMatchObject({ name: 'Backed up review', status: 'closed' });
+    const [item] = await ctx.db.select().from(schema.accessReviewItems);
+    expect(item).toMatchObject({
+      campaignId: restored.id,
+      subjectLabel: 'ci',
+      decision: 'revoke',
+      note: 'unused',
+      outcome: 'applied',
+    });
+  });
+});
+
+describe('change requests across a restore', () => {
+  it('keeps a request, its sealed write and its decisions, the record of who approved what', async () => {
+    await ctx.db.delete(schema.changeRequests);
+    const [request] = await ctx.db
+      .insert(schema.changeRequests)
+      .values({
+        kind: 'proxyHostUpdate',
+        area: 'hosts',
+        targetType: 'proxyHost',
+        targetId: 7,
+        targetName: 'shop',
+        payload: encryptSecret(JSON.stringify({ id: 7, input: { name: 'store' } })),
+        preview: '{"type":"fields","changes":[]}',
+        baseState: 'abc',
+        status: 'applied',
+        createdAt: NOW,
+      })
+      .returning();
+    await ctx.db.insert(schema.changeRequestDecisions).values({
+      requestId: request.id,
+      userName: 'Bob',
+      decision: 'approve',
+      note: 'fine',
+      createdAt: NOW,
+    });
+    const file = await createBackup(PASSPHRASE);
+    await ctx.db.delete(schema.changeRequests);
+
+    await restoreBackup(file, PASSPHRASE, { keepAgents: true });
+    const [restored] = await ctx.db.select().from(schema.changeRequests);
+    expect(restored).toMatchObject({
+      kind: 'proxyHostUpdate',
+      targetName: 'shop',
+      status: 'applied',
+    });
+    expect(JSON.parse(decryptSecret(restored.payload))).toEqual({
+      id: 7,
+      input: { name: 'store' },
+    });
+    const [decision] = await ctx.db.select().from(schema.changeRequestDecisions);
+    expect(decision).toMatchObject({
+      requestId: restored.id,
+      userName: 'Bob',
+      decision: 'approve',
+    });
+  });
+});

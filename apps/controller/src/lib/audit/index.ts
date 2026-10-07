@@ -1,6 +1,7 @@
 import { runInTransaction, nowIso } from "../db";
 import { type AuditRow, chainedAuditInsert } from "./chain";
 import type { AuditChange } from "./changes";
+import { currentApprovalStamp } from "./context";
 
 export type AuditEventParams = {
   userId?: number | null;
@@ -15,14 +16,19 @@ export type AuditEventParams = {
 
 function eventData(params: AuditEventParams): string | null {
   const changes = params.changes && params.changes.length > 0 ? params.changes : null;
-  if (!changes) return params.data ? JSON.stringify(params.data) : null;
+  const approval = currentApprovalStamp();
+  if (!changes && !approval) return params.data ? JSON.stringify(params.data) : null;
   const base =
     params.data && typeof params.data === "object" && !Array.isArray(params.data)
       ? params.data
       : params.data
         ? { value: params.data }
         : {};
-  return JSON.stringify({ ...base, changes });
+  return JSON.stringify({
+    ...base,
+    ...(changes ? { changes } : {}),
+    ...(approval ? { approval } : {}),
+  });
 }
 
 /** The row itself, for a caller inserting it inside its own transaction with chainedAuditInsert. */

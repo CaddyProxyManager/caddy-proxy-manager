@@ -3,6 +3,7 @@
  * from its foreign keys, 0/1 to booleans, serial resync (PostgreSQL ignores explicit ids), and
  * references into unselected tables nulled, or the row dropped when it cannot exist without them.
  */
+import { legacyRoleMappings } from "../roles/mappings";
 import { Database } from "bun:sqlite";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -158,7 +159,16 @@ export async function importLegacyDatabase(
       }
 
       if (!present.has(table.name)) {
-        results.push({ table: table.name, copied: 0, skipped: 0 });
+        const moved =
+          table.name === "role_mappings" &&
+          present.has("oauth_providers") &&
+          sqliteColumns(source, "oauth_providers").has("adminGroup")
+            ? legacyRoleMappings(
+                source.query<Record<string, unknown>, []>('SELECT * FROM "oauth_providers"').all(),
+              )
+            : undefined;
+        if (moved) prepared.push({ table, rows: moved });
+        else results.push({ table: table.name, copied: 0, skipped: 0 });
         continue;
       }
 

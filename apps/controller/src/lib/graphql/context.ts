@@ -21,12 +21,15 @@ export type GraphQLContext = {
   request: NextRequest;
   /** Once per request, not once per agent in a list. Absent on a context a test builds. */
   applyFailures?: () => Promise<ApplyFailures>;
+  /** A covered write was submitted for approval: the route answers 202. */
+  markAccepted?: () => void;
 };
 
 /** Lazy, memoised auth: a malformed request pays nothing, and twenty fields authenticate once. */
 export function createContext(
   request: NextRequest,
   rawBody: () => Promise<string>,
+  accepted?: { value: boolean },
 ): GraphQLContext {
   let viewerPromise: Promise<ApiAuthResult> | null = null;
   let accessPromise: Promise<Access> | null = null;
@@ -56,18 +59,13 @@ export function createContext(
     return failuresPromise;
   };
 
-  return { viewer, access, rawBody, request, applyFailures };
+  const markAccepted = () => {
+    if (accepted) accepted.value = true;
+  };
+
+  return { viewer, access, rawBody, request, applyFailures, markAccepted };
 }
 
 export async function requireUser(context: GraphQLContext): Promise<ApiAuthResult> {
   return await context.viewer();
-}
-
-/** As `/api/v1/`: grants delegate the dashboard, not the API; an operator's token is a user's. */
-export async function requireAdmin(context: GraphQLContext): Promise<ApiAuthResult> {
-  const result = await context.viewer();
-  if (result.role !== "admin") {
-    throw new ApiAuthError("Administrator privileges required", 403);
-  }
-  return result;
 }

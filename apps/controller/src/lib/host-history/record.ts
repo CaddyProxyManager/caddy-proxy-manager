@@ -6,6 +6,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { type AuditEventParams, auditEventRow } from "../audit";
 import { chainedAuditSteps } from "../audit/chain";
+import { currentApprovalStamp } from "../audit/context";
 import { nowIso, runInTransaction } from "../db";
 import { type Step, readingStep } from "../db/reading-step";
 import {
@@ -92,6 +93,14 @@ export function* readSnapshot(
   return { row, agentIds: pins.map((pin) => pin.agentId) };
 }
 
+/** With the change request that approved it, when a write runs as one. */
+function revisionDetail(detail: HostRevisionDetail | null): string | null {
+  const stamp = currentApprovalStamp();
+  const changeRequest = stamp && "changeRequest" in stamp ? stamp.changeRequest : undefined;
+  if (changeRequest === undefined) return detail ? JSON.stringify(detail) : null;
+  return JSON.stringify({ ...detail, changeRequest });
+}
+
 /** Yields its statements inside the caller's reading step; returns the new revision's id. */
 export function* recordHostRevision(
   tx: Tx,
@@ -116,7 +125,7 @@ export function* recordHostRevision(
         hostKind: write.kind,
         hostId: write.hostId,
         operation: write.operation,
-        detail: write.detail ? JSON.stringify(write.detail) : null,
+        detail: revisionDetail(write.detail ?? null),
         snapshot: JSON.stringify(snapshot),
         userId: write.userId,
         userName,

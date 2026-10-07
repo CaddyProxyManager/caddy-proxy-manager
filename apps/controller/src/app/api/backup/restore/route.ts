@@ -1,3 +1,4 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import {
@@ -5,7 +6,6 @@ import {
   checkSameOrigin,
   getCurrentSessionInfo,
   isFreshSession,
-  requireAdmin,
 } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { invalidateProviderCache } from "@/src/lib/auth/server";
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   if (forbidden) return forbidden;
   const t = await getTranslations("errors");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("backups:write");
     const form = await request.formData();
     const preview = form.get("preview") === "1";
     // From a destination: read server-side, then the same checks and steps as an upload.

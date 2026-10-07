@@ -5,7 +5,7 @@ import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScre
 import { loadHostHistory } from "@/src/lib/host-history/page";
 import { getL4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import { l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
-import { canManage, requireAccess } from "@/src/lib/users/permissions";
+import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreL4ProxyHostAction } from "../../actions";
 
 type PageProps = {
@@ -26,9 +26,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function L4ProxyHostHistoryPage({ params, searchParams }: PageProps) {
   const id = parseId((await params).id);
   if (id === null) notFound();
-  const access = await requireAccess();
+  const access = await requireReach("hosts:read");
   const host = await getL4ProxyHost(id);
-  if (host ? !canManage(access, "l4ProxyHost", id) : !access.isAdmin) notFound();
+  if (host ? !canManage(access, "l4ProxyHost", id) : !can(access, "hosts:write")) notFound();
   const data = await loadHostHistory("l4", id, await searchParams);
   if (!host && data.latest === 0) notFound();
   const tNav = await getTranslations("nav");
@@ -53,7 +53,7 @@ export default async function L4ProxyHostHistoryPage({ params, searchParams }: P
         showConfig: data.showConfig,
         rollbackHref: host ? `/l4-proxy-hosts?edit=${id}&revision=` : null,
         restore:
-          !host && access.isAdmin
+          !host && can(access, "hosts:write")
             ? {
                 missing: data.missing,
                 name: data.name ?? `#${id}`,

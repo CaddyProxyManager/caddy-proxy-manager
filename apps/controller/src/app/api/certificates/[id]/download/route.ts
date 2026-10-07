@@ -1,12 +1,13 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { getCurrentSessionInfo, isFreshSession, requireAdmin } from "@/src/lib/auth";
+import { getCurrentSessionInfo, isFreshSession } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { getCertificate } from "@/src/lib/models/certificates";
 
 /** An imported certificate's PEM, and its key under the same rules as a stored one's. */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const t = await getTranslations("certificates");
   const { id } = await params;
   const includeKey = request.nextUrl.searchParams.get("key") === "1";

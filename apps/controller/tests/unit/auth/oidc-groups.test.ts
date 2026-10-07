@@ -29,24 +29,22 @@ describe('toGroupMappingConfig', () => {
       groupsClaim: 'groups',
       groupPrefix: null,
       roleMappingEnabled: false,
-      adminGroup: null,
-      operatorGroup: null,
-      userGroup: null,
-      viewerGroup: null,
+      roleGroups: {},
       defaultRole: 'user',
       syncGroups: false,
     });
   });
 
-  it('falls back to "user" for an unrecognised defaultRole', () => {
-    expect(toGroupMappingConfig({ defaultRole: 'superadmin' }).defaultRole).toBe('user');
+  it('keeps any role key as the default: the models check it exists when it is saved', () => {
+    expect(toGroupMappingConfig({ defaultRole: 'role-0a1b2c' }).defaultRole).toBe('role-0a1b2c');
+    expect(toGroupMappingConfig({ defaultRole: ' ' }).defaultRole).toBe('user');
   });
 
   it('treats blank strings as unset', () => {
     const cfg = toGroupMappingConfig({ groupsClaim: '   ', groupPrefix: '  ', adminGroup: '' });
     expect(cfg.groupsClaim).toBe('groups');
     expect(cfg.groupPrefix).toBeNull();
-    expect(cfg.adminGroup).toBeNull();
+    expect(cfg.roleGroups).toEqual({});
   });
 });
 

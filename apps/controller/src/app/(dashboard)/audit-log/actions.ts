@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { verifyAuditChain } from "@/src/lib/audit/chain";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
@@ -10,7 +10,7 @@ import type { VerifyChainResult } from "./AuditLogClient";
 export async function verifyAuditChainAction(): Promise<VerifyChainResult> {
   const t = await getTranslations();
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("audit:write");
     const verification = await verifyAuditChain();
     // After the check, so this event is the next one the following check covers.
     await logAuditEvent({

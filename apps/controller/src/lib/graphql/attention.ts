@@ -12,7 +12,7 @@ import { type AttentionItem, attentionMessageValues } from "../attention/types";
 import { getProxyHost } from "../models/proxy-hosts";
 import { getHostTrafficReport } from "../proxy-hosts/detail";
 import { getSetupChecklist, setSetupChecklistHidden, setSetupStepDone } from "../setup-checklist";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 type DynamicTranslate = (key: string, values?: Record<string, string | number | Date>) => string;
 
@@ -39,18 +39,15 @@ export function attentionItemForApi(item: AttentionItem) {
 
 export const attentionQueryResolvers = {
   attention: async (_: unknown, args: { proxyHostId?: number | null }, context: GraphQLContext) => {
-    await requireAdmin(context);
     const list = await collectAttention(await context.access(), {
       proxyHostId: args.proxyHostId ?? undefined,
     });
     return { ...list, items: list.items.map(attentionItemForApi) };
   },
-  setupChecklist: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    await requireAdmin(context);
+  setupChecklist: async (_: unknown, __: unknown, _context: GraphQLContext) => {
     return getSetupChecklist();
   },
-  proxyHostTraffic: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    await requireAdmin(context);
+  proxyHostTraffic: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
     const host = await getProxyHost(args.id);
     if (!host) throw new NotFoundError("Proxy host not found");
     return getHostTrafficReport(host);
@@ -63,7 +60,7 @@ export const attentionMutationResolvers = {
     args: { step: string; done: boolean },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return setSetupStepDone(args.step, args.done, userId);
   },
   setSetupChecklistHidden: async (
@@ -71,7 +68,7 @@ export const attentionMutationResolvers = {
     args: { hidden: boolean },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return setSetupChecklistHidden(args.hidden, userId);
   },
 };

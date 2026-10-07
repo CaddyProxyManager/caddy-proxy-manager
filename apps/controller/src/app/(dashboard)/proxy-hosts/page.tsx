@@ -25,8 +25,9 @@ import {
   canCreate,
   canManage,
   canView,
-  requireAccess,
+  requireReach,
   visibleIdFilter,
+  can,
 } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificates/api";
@@ -56,7 +57,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // Operators see hosts per grant. Null from visibleIdFilter means admin, hence not `?? []`.
-  const access = await requireAccess();
+  const access = await requireReach("hosts:read");
   const visible = visibleIdFilter(access, "proxyHost");
   const visibleIds = visible === null ? null : [...visible];
   const {
@@ -172,11 +173,11 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         rollback={
           rollback && revisionId !== undefined ? { revisionId, missing: rollback.missing } : null
         }
-        canCreate={canCreate(access)}
+        canCreate={canCreate(access, "proxyHost")}
         manageableIds={dialogHosts
           .filter((h) => canManage(access, "proxyHost", h.id))
           .map((h) => h.id)}
-        canEditRawConfig={access.isAdmin}
+        canEditRawConfig={can(access, "settings:write")}
       />
     </HostTagSuggestions>
   );

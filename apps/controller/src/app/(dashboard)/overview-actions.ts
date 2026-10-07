@@ -7,7 +7,6 @@
 
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin, requireUser } from "@/src/lib/auth";
 import { collectAttention } from "@/src/lib/attention";
 import type { AttentionList } from "@/src/lib/attention/types";
 import { actionError, actionSuccess, type ActionState } from "@/src/lib/errors/action-error";
@@ -17,12 +16,12 @@ import {
   setSetupStepDone,
   type SetupChecklist,
 } from "@/src/lib/setup-checklist";
-import { resolveAccess } from "@/src/lib/users/permissions";
+import { can, currentAccess, requireCan } from "@/src/lib/users/permissions";
 
 export async function loadAttentionAction(): Promise<AttentionList | null> {
-  const session = await requireUser();
+  const { access } = await currentAccess();
   try {
-    return await collectAttention(await resolveAccess(session));
+    return await collectAttention(access);
   } catch (error) {
     console.error("Failed to collect Needs attention:", error);
     return null;
@@ -30,8 +29,8 @@ export async function loadAttentionAction(): Promise<AttentionList | null> {
 }
 
 export async function loadSetupChecklistAction(): Promise<SetupChecklist | null> {
-  const session = await requireUser();
-  if (session.user.role !== "admin") return null;
+  const { access } = await currentAccess();
+  if (!can(access, "overview:read")) return null;
   try {
     return await getSetupChecklist();
   } catch (error) {
@@ -42,7 +41,7 @@ export async function loadSetupChecklistAction(): Promise<SetupChecklist | null>
 
 export async function setSetupStepDoneAction(step: string, done: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("overview:write");
     await setSetupStepDone(step, done, Number(session.user.id));
     revalidatePath("/");
     return actionSuccess();
@@ -54,7 +53,7 @@ export async function setSetupStepDoneAction(step: string, done: boolean): Promi
 
 export async function setSetupChecklistHiddenAction(hidden: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("overview:write");
     await setSetupChecklistHidden(hidden, Number(session.user.id));
     revalidatePath("/");
     return actionSuccess();

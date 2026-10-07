@@ -1,6 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { getAppName } from "@/src/lib/branding/app-name";
 import { getSignInOverview } from "@/src/lib/users/sign-in-overview";
 import { SignInOverviewClient } from "./SignInOverviewClient";
@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SignInOverviewPage() {
-  await requireAdmin();
+  await requireCan("users:read");
   const [overview, appName] = await Promise.all([getSignInOverview(), getAppName()]);
   return <SignInOverviewClient overview={overview} appName={appName} />;
 }

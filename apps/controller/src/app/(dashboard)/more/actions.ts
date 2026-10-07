@@ -2,18 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { requireUser } from "@/src/lib/auth";
+import { currentAccess } from "@/src/lib/users/permissions";
 import { setMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 import { MORE_DRAWER_SLOTS, moreDestinations } from "@/src/lib/nav/destinations";
 
 export type SaveDrawerResult = { ok: true } | { ok: false; error: string };
 
 export async function saveMoreDrawerPinsAction(ids: string[]): Promise<SaveDrawerResult> {
-  const session = await requireUser();
+  const { session, access } = await currentAccess();
   const t = await getTranslations("nav.more");
 
   // What this user may open, not just what exists: a posted "settings" must not pin a refused page.
-  const allowed = new Set(moreDestinations(session.user.role).map((d) => d.id));
+  const allowed = new Set(moreDestinations(access.capabilities).map((d) => d.id));
   const chosen = [...new Set(ids)].filter((id) => allowed.has(id as never));
 
   if (chosen.length !== new Set(ids).size) {

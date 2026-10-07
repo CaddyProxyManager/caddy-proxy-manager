@@ -1,15 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import { removeAccessListEntry } from "@/src/lib/models/access-lists";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; entryId: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id, entryId } = await params;
-    const list = await removeAccessListEntry(Number(id), Number(entryId), userId);
+    const list = await submitOrApply(apiSubmitter(caller), {
+      kind: "accessListEntryRemove",
+      payload: { id: Number(id), entryIds: [Number(entryId)] },
+    });
     return NextResponse.json(list);
   } catch (error) {
     return apiErrorResponse(error);

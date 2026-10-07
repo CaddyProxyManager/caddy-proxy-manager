@@ -18,7 +18,7 @@ import {
   listAnalyticsViews,
   updateAnalyticsView,
 } from "../models/analytics-views";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 export type AnalyticsQueryInput = {
   range?: string | null;
@@ -55,9 +55,8 @@ export const analyticsQueryResolvers = {
   analyticsReport: async (
     _: unknown,
     args: { query?: AnalyticsQueryInput | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     const report = await getAnalyticsReport(exploreStateFromInput(args.query));
     return {
       ...report,
@@ -67,9 +66,8 @@ export const analyticsQueryResolvers = {
   analyticsTopList: async (
     _: unknown,
     args: { query?: AnalyticsQueryInput | null; dimension: TopDimension; limit?: number | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     return getAnalyticsTopList(
       exploreStateFromInput(args.query),
       args.dimension,
@@ -79,9 +77,8 @@ export const analyticsQueryResolvers = {
   trafficSignals: async (
     _: unknown,
     args: { from?: number | null; to?: number | null; budgetMs?: number | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     const window =
       args.from != null && args.to != null && args.from < args.to
         ? { from: args.from, to: args.to }
@@ -93,7 +90,7 @@ export const analyticsQueryResolvers = {
     return detectTrafficSignals({ window, budgetMs });
   },
   analyticsViews: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return listAnalyticsViews(userId);
   },
 };
@@ -104,7 +101,7 @@ export const analyticsMutationResolvers = {
     args: { name: string; query: string; shared?: boolean | null },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return createAnalyticsView(userId, {
       name: args.name,
       query: args.query,
@@ -116,7 +113,7 @@ export const analyticsMutationResolvers = {
     args: { id: number; name?: string | null; query?: string | null; shared?: boolean | null },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return updateAnalyticsView(userId, args.id, {
       name: args.name ?? undefined,
       query: args.query ?? undefined,
@@ -124,7 +121,7 @@ export const analyticsMutationResolvers = {
     });
   },
   deleteAnalyticsView: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await deleteAnalyticsView(userId, args.id);
     return true;
   },

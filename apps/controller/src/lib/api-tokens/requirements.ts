@@ -1,24 +1,43 @@
 /**
- * Which area each API surface belongs to, so a scoped token is checked in one place rather than
- * per route. Anything not listed is refused to a narrowed token: a new route or field stays closed
- * until it is named here, and `tests/unit/api-tokens/token-requirements.test.ts` says which.
+ * The capability each API surface needs, checked in one place for REST (`requireApiUser`) and
+ * GraphQL (`withRequirements`) rather than per route: the caller's role must hold it, and a
+ * scoped token must cover its area too, so a token never does more than its owner may. Anything
+ * not named here is refused to everyone - a new route or field stays closed until it is, and
+ * `tests/unit/api-tokens/token-requirements.test.ts` says which.
  */
+import { type Capability, type CapabilityResource, capabilityArea } from "../roles/capabilities";
 import { type TokenAccess, type TokenArea, type TokenScope, scopeAllows } from "./scope";
 
 export type TokenRequirement = {
+  capability: Capability;
   area: TokenArea;
   access: TokenAccess;
   /** Only a full-scope token: no area grant covers it. */
   fullOnly?: true;
+  /** Any token scope: it describes the API, nothing behind it. */
+  anyToken?: true;
+  /** The caller's own things, which any account may reach: the handler narrows to them. */
+  signedIn?: true;
 };
 
-const read = (area: TokenArea): TokenRequirement => ({ area, access: "read" });
-const write = (area: TokenArea): TokenRequirement => ({ area, access: "write" });
+const need = (capability: Capability): TokenRequirement => ({
+  capability,
+  ...capabilityArea(capability),
+});
+const read = (resource: CapabilityResource) => need(`${resource}:read`);
+const write = (resource: CapabilityResource) => need(`${resource}:write`);
 /** Every private key, and writes to groups and grants: more than any one area. */
-const full = (area: TokenArea): TokenRequirement => ({ area, access: "write", fullOnly: true });
+const full = (resource: CapabilityResource): TokenRequirement => ({
+  ...write(resource),
+  fullOnly: true,
+});
+const signedIn = (resource: CapabilityResource, access: TokenAccess): TokenRequirement => ({
+  ...need(`${resource}:${access}`),
+  signedIn: true,
+});
 
-/** Longest prefix first is not needed: no prefix here is a prefix of another's area boundary. */
-const REST_AREAS: ReadonlyArray<readonly [string, TokenArea]> = [
+/** Longest prefix first is not needed: no prefix here is a prefix of another's boundary. */
+const REST_RESOURCES: ReadonlyArray<readonly [string, CapabilityResource]> = [
   ["/api/v1/proxy-hosts", "hosts"],
   ["/api/v1/l4-proxy-hosts", "hosts"],
   ["/api/l4-ports", "hosts"],
@@ -32,37 +51,44 @@ const REST_AREAS: ReadonlyArray<readonly [string, TokenArea]> = [
   ["/api/waf-events", "security"],
   ["/api/analytics", "analytics"],
   ["/api/v1/users", "users"],
-  ["/api/v1/groups", "users"],
+  ["/api/v1/groups", "groups"],
   ["/api/v1/forward-auth-sessions", "users"],
   ["/api/v1/sessions", "users"],
   ["/api/v1/settings", "settings"],
   ["/api/v1/oauth-providers", "settings"],
   ["/api/v1/dns-providers", "settings"],
   ["/api/v1/caddy", "settings"],
-  ["/api/v1/backup", "settings"],
+  ["/api/v1/backup", "backups"],
   ["/api/caddy-build", "settings"],
   ["/api/geoip-status", "settings"],
   ["/api/v1/audit-log", "audit"],
   ["/api/v1/tokens", "tokens"],
+  ["/api/v1/openapi.json", "settings"],
 ];
 
-/** Describes the API, nothing behind it. */
-const ANY_TOKEN_PATHS = new Set(["/api/v1/openapi.json"]);
+/** The caller's own sessions and tokens, a credential-free catalog, and one's own account. */
+function isSignedInOnly(pathname: string, verb: string): boolean {
+  if (/^\/api\/v1\/(sessions|tokens)(\/|$)/.test(pathname)) return true;
+  if (verb !== "GET" && verb !== "HEAD") return false;
+  return pathname === "/api/v1/dns-providers" || /^\/api\/v1\/users\/[^/]+$/.test(pathname);
+}
 
 /**
  * GET and HEAD read. A backup, download or restore, needs a full token: it carries every secret
  * and restores users and grants, which no area covers.
  */
-export function restRequirement(pathname: string, method: string): TokenRequirement | "any" | null {
-  if (ANY_TOKEN_PATHS.has(pathname)) return "any";
-  const match = REST_AREAS.find(
+export function restRequirement(pathname: string, method: string): TokenRequirement | null {
+  const match = REST_RESOURCES.find(
     ([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
   if (!match) return null;
-  const area = match[1];
-  if (pathname === "/api/v1/backup" || pathname.startsWith("/api/v1/backup/")) return full(area);
+  const resource = match[1];
   const verb = method.toUpperCase();
-  return verb === "GET" || verb === "HEAD" ? read(area) : write(area);
+  if (resource === "backups") return full(resource);
+  if (pathname === "/api/v1/openapi.json") return { ...read(resource), anyToken: true };
+  const access: TokenAccess = verb === "GET" || verb === "HEAD" ? "read" : "write";
+  if (isSignedInOnly(pathname, verb)) return signedIn(resource, access);
+  return access === "read" ? read(resource) : write(resource);
 }
 
 /** `Type.field`. Agent mutations and the subscription authenticate as agents and are not here. */
@@ -87,16 +113,27 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Query.accessListStats": read("accessLists"),
   "Query.users": read("users"),
   "Query.user": read("users"),
-  "Query.groups": read("users"),
+  "Query.groups": read("groups"),
   "Query.signInOverview": read("users"),
-  "Query.group": read("users"),
-  "Query.apiTokens": read("tokens"),
+  "Query.group": read("groups"),
+  "Query.roles": read("roles"),
+  "Query.role": read("roles"),
+  "Query.capabilities": read("roles"),
+  "Query.apiTokens": signedIn("tokens", "read"),
   "Query.agents": read("agents"),
   "Query.oauthProviders": read("settings"),
   "Query.dnsProviders": read("settings"),
   "Query.settings": read("settings"),
   "Query.caddyModules": read("settings"),
   "Query.auditLog": read("audit"),
+  "Query.scimConnections": read("users"),
+  // A reviewer needs no capability: the resolver answers only what the caller reviews.
+  "Query.accessReviews": signedIn("users", "read"),
+  "Query.accessReview": signedIn("users", "read"),
+  // Narrowed to what the caller may see; a token that submitted a change can read its outcome.
+  "Query.changeRequests": { ...signedIn("settings", "read"), anyToken: true },
+  "Query.changeRequest": { ...signedIn("settings", "read"), anyToken: true },
+  "Query.approvalPolicy": read("settings"),
   "Query.analyticsReport": read("analytics"),
   "Query.analyticsTopList": read("analytics"),
   "Query.trafficSignals": read("analytics"),
@@ -107,15 +144,15 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Query.wafEvent": read("security"),
   "Query.securityReport": read("security"),
   "Query.blockedSources": read("security"),
-  "Query.backupDestinations": read("settings"),
-  "Query.backupSchedules": read("settings"),
-  "Query.backupRuns": read("settings"),
-  "Query.alertChannels": read("settings"),
-  "Query.alertRules": read("settings"),
-  "Query.alertHistory": read("settings"),
-  "Query.alertDigests": read("settings"),
-  "Query.alertDigestRuns": read("settings"),
-  "Query.previewAlertDigest": read("settings"),
+  "Query.backupDestinations": read("backups"),
+  "Query.backupSchedules": read("backups"),
+  "Query.backupRuns": read("backups"),
+  "Query.alertChannels": read("alerts"),
+  "Query.alertRules": read("alerts"),
+  "Query.alertHistory": read("alerts"),
+  "Query.alertDigests": read("alerts"),
+  "Query.alertDigestRuns": read("alerts"),
+  "Query.previewAlertDigest": read("alerts"),
   "Query.auditSinks": read("audit"),
 
   "Mutation.createProxyHost": write("hosts"),
@@ -135,21 +172,25 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Mutation.updateAccessList": write("accessLists"),
   "Mutation.deleteAccessList": write("accessLists"),
   "Mutation.setAccessListRules": write("accessLists"),
-  "Mutation.createGroup": write("users"),
-  "Mutation.updateGroup": write("users"),
-  "Mutation.deleteGroup": write("users"),
-  "Mutation.addGroupMember": write("users"),
-  "Mutation.removeGroupMember": write("users"),
+  "Mutation.createGroup": write("groups"),
+  "Mutation.updateGroup": write("groups"),
+  "Mutation.deleteGroup": write("groups"),
+  "Mutation.addGroupMember": write("groups"),
+  "Mutation.removeGroupMember": write("groups"),
+  "Mutation.setGroupRole": write("groups"),
+  "Mutation.createRole": write("roles"),
+  "Mutation.updateRole": write("roles"),
+  "Mutation.deleteRole": write("roles"),
   "Mutation.updateUser": write("users"),
   "Mutation.deleteUser": write("users"),
-  "Mutation.createApiToken": write("tokens"),
-  "Mutation.deleteApiToken": write("tokens"),
+  "Mutation.createApiToken": signedIn("tokens", "write"),
+  "Mutation.deleteApiToken": signedIn("tokens", "write"),
   "Mutation.saveSettings": write("settings"),
   "Mutation.applyCaddyConfig": write("settings"),
   // Every private key out, and groups and grants in.
-  "Mutation.exportConfig": full("settings"),
-  "Mutation.previewConfigImport": full("settings"),
-  "Mutation.applyConfigImport": full("settings"),
+  "Mutation.exportConfig": full("backups"),
+  "Mutation.previewConfigImport": full("backups"),
+  "Mutation.applyConfigImport": full("backups"),
   // Writes an audit event.
   "Mutation.verifyAuditChain": write("audit"),
   "Mutation.createAnalyticsView": write("analytics"),
@@ -164,40 +205,71 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Mutation.createBlockedSource": write("security"),
   "Mutation.deleteBlockedSource": write("security"),
   // A backup carries every secret: whoever picks where it goes, or runs it, could take them all.
-  "Mutation.createBackupDestination": full("settings"),
-  "Mutation.updateBackupDestination": full("settings"),
-  "Mutation.deleteBackupDestination": full("settings"),
-  "Mutation.testBackupDestination": full("settings"),
-  "Mutation.createBackupSchedule": full("settings"),
-  "Mutation.updateBackupSchedule": full("settings"),
-  "Mutation.deleteBackupSchedule": full("settings"),
-  "Mutation.runBackupNow": full("settings"),
-  "Mutation.createAlertChannel": write("settings"),
-  "Mutation.updateAlertChannel": write("settings"),
-  "Mutation.deleteAlertChannel": write("settings"),
-  "Mutation.testAlertChannel": write("settings"),
-  "Mutation.createAlertRule": write("settings"),
-  "Mutation.updateAlertRule": write("settings"),
-  "Mutation.deleteAlertRule": write("settings"),
-  "Mutation.silenceAlertRule": write("settings"),
-  "Mutation.testAlertRule": write("settings"),
-  "Mutation.createAlertDigest": write("settings"),
-  "Mutation.updateAlertDigest": write("settings"),
-  "Mutation.deleteAlertDigest": write("settings"),
-  "Mutation.sendAlertDigestNow": write("settings"),
+  "Mutation.createBackupDestination": full("backups"),
+  "Mutation.updateBackupDestination": full("backups"),
+  "Mutation.deleteBackupDestination": full("backups"),
+  "Mutation.testBackupDestination": full("backups"),
+  "Mutation.createBackupSchedule": full("backups"),
+  "Mutation.updateBackupSchedule": full("backups"),
+  "Mutation.deleteBackupSchedule": full("backups"),
+  "Mutation.runBackupNow": full("backups"),
+  "Mutation.createAlertChannel": write("alerts"),
+  "Mutation.updateAlertChannel": write("alerts"),
+  "Mutation.deleteAlertChannel": write("alerts"),
+  "Mutation.testAlertChannel": write("alerts"),
+  "Mutation.createAlertRule": write("alerts"),
+  "Mutation.updateAlertRule": write("alerts"),
+  "Mutation.deleteAlertRule": write("alerts"),
+  "Mutation.silenceAlertRule": write("alerts"),
+  "Mutation.testAlertRule": write("alerts"),
+  "Mutation.createAlertDigest": write("alerts"),
+  "Mutation.updateAlertDigest": write("alerts"),
+  "Mutation.deleteAlertDigest": write("alerts"),
+  "Mutation.sendAlertDigestNow": write("alerts"),
   // A sink receives the whole audit log, and security events with it: as much as reading both.
   "Mutation.createAuditSink": full("audit"),
   "Mutation.updateAuditSink": full("audit"),
   "Mutation.deleteAuditSink": full("audit"),
   "Mutation.testAuditSink": full("audit"),
+  // A SCIM token makes accounts and fills groups: no area grant should mint one.
+  "Mutation.createScimConnection": full("users"),
+  "Mutation.updateScimConnection": full("users"),
+  "Mutation.rotateScimConnectionToken": full("users"),
+  "Mutation.deleteScimConnection": full("users"),
+  "Mutation.createAccessReview": write("users"),
+  "Mutation.updateAccessReview": write("users"),
+  "Mutation.reassignAccessReviewItems": write("users"),
+  "Mutation.deleteAccessReview": write("users"),
+  "Mutation.decideAccessReviewItem": signedIn("users", "write"),
+  // Revokes memberships, grants, tokens and connections as well as roles: more than one area.
+  "Mutation.closeAccessReview": full("users"),
+  "Mutation.confirmAccessReview": full("users"),
+  // An approver is named by the policy, not a capability; deciding applies a change in any area.
+  "Mutation.approveChangeRequest": { ...signedIn("settings", "write"), fullOnly: true },
+  "Mutation.rejectChangeRequest": { ...signedIn("settings", "write"), fullOnly: true },
+  "Mutation.bypassChangeRequest": { ...signedIn("settings", "write"), fullOnly: true },
+  "Mutation.withdrawChangeRequest": signedIn("settings", "write"),
+  "Mutation.setApprovalPolicy": write("settings"),
 };
 
 /** A session (no scope) or a full-scope token passes; a narrowed one needs the area. */
 export function tokenAllows(
   scope: TokenScope | undefined,
-  requirement: TokenRequirement | "any" | null,
+  requirement: TokenRequirement | null,
 ): boolean {
-  if (!scope || scope.kind === "full" || requirement === "any") return true;
+  if (!scope || scope.kind === "full" || requirement?.anyToken) return true;
   if (requirement?.fullOnly) return false;
   return requirement !== null && scopeAllows(scope, requirement.area, requirement.access);
+}
+
+/**
+ * Whether the role may: nothing unnamed, and the rest held outright. A scoped role holds hosts and
+ * agents only per object, which the API does not filter by, so its grants reach the dashboard alone.
+ */
+export function roleAllows(
+  can: (capability: Capability) => boolean,
+  requirement: TokenRequirement | null,
+): boolean {
+  if (requirement === null) return false;
+  return requirement.signedIn === true || can(requirement.capability);
 }

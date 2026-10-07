@@ -112,9 +112,9 @@ if create_resource users "$(jq -nc --arg e "$viewer_email" --arg p "$viewer_pass
     "$CPM_API/api/auth/sign-in/email"
   viewer_token=$(cpm_mint_token "$CPM_API" "$jar" gql-viewer)
   with_token "$viewer_token" gql '{ proxyHosts { id } }'
-  t_eq "a viewer's token cannot read hosts" "Administrator privileges required" "$(gqr '.errors[0].message')"
+  t_eq "a viewer's token cannot read hosts" "This account's role does not allow this request" "$(gqr '.errors[0].message')"
   with_token "$viewer_token" gql 'mutation { applyCaddyConfig }'
-  t_eq "nor apply the config" "Administrator privileges required" "$(gqr '.errors[0].message')"
+  t_eq "nor apply the config" "This account's role does not allow this request" "$(gqr '.errors[0].message')"
   with_token "$viewer_token" gql '{ apiTokens { name } }'
   t_eq "but can list its own tokens" "gql-viewer" "$(gqr '.data.apiTokens[0].name')"
 else

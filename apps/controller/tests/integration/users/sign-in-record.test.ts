@@ -88,6 +88,7 @@ describe('the sign-in method', () => {
   it('names a passkey, single sign-on, and the password behind a second factor', async () => {
     expect(await sessionSignInMethod(local, '/passkey/verify-authentication')).toBe('passkey');
     expect(await sessionSignInMethod(sso, '/oauth2/callback/:providerId')).toBe('oidc');
+    expect(await sessionSignInMethod(sso, '/sso/saml2/sp/acs/:providerId')).toBe('oidc');
     expect(await sessionSignInMethod(local, '/two-factor/verify-totp')).toBe('password');
     expect(await sessionSignInMethod(directory, '/two-factor/verify-totp')).toBe('ldap');
     // Recorded by the auth route instead, once the second step is known not to follow.

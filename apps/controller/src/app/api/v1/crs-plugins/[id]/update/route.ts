@@ -1,12 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import { updateCrsPlugin } from "@/src/lib/models/crs-plugins";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id } = await params;
-    return NextResponse.json(await updateCrsPlugin(Number(id), userId));
+    const plugin = await submitOrApply(apiSubmitter(caller), {
+      kind: "crsPluginUpdate",
+      payload: { id: Number(id) },
+    });
+    return NextResponse.json(plugin);
   } catch (error) {
     return apiErrorResponse(error);
   }

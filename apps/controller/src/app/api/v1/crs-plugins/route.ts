@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import { installCrsPlugin, listCrsPlugins, listCrsRegistry } from "@/src/lib/models/crs-plugins";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
+import { listCrsPlugins, listCrsRegistry } from "@/src/lib/models/crs-plugins";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     return NextResponse.json(await listCrsPlugins());
   } catch (error) {
     return apiErrorResponse(error);
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const body = await request.json();
     if (typeof body?.name !== "string" || !body.name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -34,7 +35,10 @@ export async function POST(request: NextRequest) {
       }
       registry = listed[0]?.registryId ?? "";
     }
-    const plugin = await installCrsPlugin(registry, name, userId);
+    const plugin = await submitOrApply(apiSubmitter(caller), {
+      kind: "crsPluginInstall",
+      payload: { registryId: registry, name },
+    });
     return NextResponse.json(plugin, { status: 201 });
   } catch (error) {
     return apiErrorResponse(error);

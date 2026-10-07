@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/errors/domain-error";
 import { internalCaSubject } from "@/src/lib/certificates/ca-subject";
 import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
@@ -63,7 +63,7 @@ function validatePem(pem: string): void {
 }
 
 async function createCaCertificateActionUntranslated(formData: FormData) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
   const certificatePem = String(formData.get("certificate_pem") ?? "").trim();
@@ -77,7 +77,7 @@ async function createCaCertificateActionUntranslated(formData: FormData) {
 }
 
 export async function updateCaCertificateAction(id: number, formData: FormData) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
   const certificatePem = formData.get("certificate_pem")
@@ -102,10 +102,10 @@ export async function updateCaCertificateAction(id: number, formData: FormData) 
 export async function deleteCaCertificateAction(
   id: number,
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   try {
-    // Translates a DomainError before the catch hands it to the dialog. `requireAdmin` stays
+    // Translates a DomainError before the catch hands it to the dialog. `requireCan` stays
     // outside: its redirect throws.
     await withTranslatedErrors(() => deleteCaCertificate(id, userId));
     revalidatePath("/certificates");
@@ -122,7 +122,7 @@ export async function deleteCaCertificateAction(
 async function generateCaCertificateActionUntranslated(
   formData: FormData,
 ): Promise<{ id: number }> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
   const commonName = String(formData.get("common_name") ?? name).trim() || name;
@@ -172,7 +172,7 @@ async function issueClientCertificateActionUntranslated(
   caCertId: number,
   formData: FormData,
 ): Promise<IssuedClientCert> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const commonName = String(formData.get("common_name") ?? "").trim();
   const validityDays = Math.min(
@@ -267,7 +267,7 @@ async function issueClientCertificateActionUntranslated(
 export async function revokeIssuedClientCertificateAction(
   id: number,
 ): Promise<{ revokedAt: string }> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const record = await revokeIssuedClientCertificate(id, userId);
   revalidatePath("/certificates");

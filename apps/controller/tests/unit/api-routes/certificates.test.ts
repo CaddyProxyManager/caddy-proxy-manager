@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/models/certificates', () => ({
@@ -19,8 +20,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {
@@ -44,14 +49,14 @@ import {
   updateCertificate,
   deleteCertificate,
 } from '@/src/lib/models/certificates';
-import { requireApiAdmin } from '@/src/lib/api/auth';
+import { requireApiUser } from '@/src/lib/api/auth';
 
 const mockList = vi.mocked(listCertificates);
 const mockCreate = vi.mocked(createCertificate);
 const mockGet = vi.mocked(getCertificate);
 const mockUpdate = vi.mocked(updateCertificate);
 const mockDelete = vi.mocked(deleteCertificate);
-const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
+const mockRequireApiUser = vi.mocked(requireApiUser);
 
 function createMockRequest(options: { method?: string; body?: unknown } = {}): any {
   return {
@@ -80,7 +85,12 @@ const sampleCert = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+  mockRequireApiUser.mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'bearer',
+    access: accessOf('admin'),
+  });
 });
 
 describe('GET /api/v1/certificates', () => {
@@ -119,7 +129,7 @@ describe('GET /api/v1/certificates', () => {
 
   it('returns 401 on auth failure', async () => {
     const { ApiAuthError } = await import('@/src/lib/api/auth');
-    mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
+    mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await listGET(createMockRequest());
     expect(response.status).toBe(401);

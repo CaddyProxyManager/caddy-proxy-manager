@@ -1,12 +1,12 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { listAgentCertificates } from "@/src/lib/agent/client";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { renewalsPending, settleRenewals } from "@/src/lib/certificates/renewals";
 
 /** Also completes a pending "Renew now": a newer certificate returns the name to its policy. */
 export async function GET() {
-  await requireAdmin();
+  await requireCan("certificates:read");
   const agents = await listAgentCertificates();
   let settled = false;
   for (const agent of agents) {

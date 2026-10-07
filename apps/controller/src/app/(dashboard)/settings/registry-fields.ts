@@ -5,6 +5,8 @@
 
 import type { getTranslations } from "next-intl/server";
 import {
+  accessReviewConfirmRevocations,
+  accessReviewReminderDays,
   accentColor,
   accountLockBaseDelayMs,
   accountLockDisableAfter,
@@ -39,6 +41,8 @@ import {
   notifyCrsPluginDisabled,
   notifyBackupFailed,
   notifyAuditSinkFailed,
+  notifyAccessReviews,
+  notifyChangeApprovals,
   notifyChannelFailing,
   notifyDisabledAccountOwner,
   notifyGeoipFailed,
@@ -67,6 +71,7 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
   branding: [accentColor] as AnySetting[],
   "host-history": [hostHistoryKeepRevisions, hostHistoryKeepDays] as AnySetting[],
+  "access-reviews": [accessReviewConfirmRevocations, accessReviewReminderDays] as AnySetting[],
   agent: [caddyMonitorEnabled] as AnySetting[],
   "forward-auth": [forwardAuthAllowedPorts, forwardAuthSequentialUserIds] as AnySetting[],
   "sign-in": [
@@ -105,6 +110,8 @@ const BLOCKS: Record<string, readonly AnySetting[]> = {
     notifyUpdateAvailable,
     notifyBackupFailed,
     notifyAuditSinkFailed,
+    notifyAccessReviews,
+    notifyChangeApprovals,
     notifyChannelFailing,
     notifyDisabledAccountOwner,
   ] as AnySetting[],

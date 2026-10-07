@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   getIssuedClientCertificate,
   revokeIssuedClientCertificate,
@@ -7,7 +7,7 @@ import {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     const cert = await getIssuedClientCertificate(Number(id));
     if (!cert) {
@@ -24,7 +24,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const { id } = await params;
     const cert = await revokeIssuedClientCertificate(Number(id), userId);
     return NextResponse.json(cert);

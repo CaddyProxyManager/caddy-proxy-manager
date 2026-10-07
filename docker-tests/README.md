@@ -286,7 +286,7 @@ a change to either is deliberate:
 - `/api/waf-events`, `/api/geoip-status` and `/api/l4-ports` sit outside the
   session middleware's allowlist in `proxy.ts`, so a bearer token gets a 307 to
   the login page. They are UI-support endpoints, absent from the OpenAPI
-  document, and each still enforces `requireApiAdmin` on its own.
+  document, and each still checks its role through `requireApiUser` on its own.
 - The Caddy admin API's `origins` list rejects a foreign `Origin` header but not
   a foreign `Host`: binding to an open interface makes Caddy skip Host checking
   entirely. What actually bounds reach is that port 2019 is never published.

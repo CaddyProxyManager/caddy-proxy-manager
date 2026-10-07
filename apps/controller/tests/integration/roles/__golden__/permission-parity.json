@@ -1,0 +1,3186 @@
+{
+  "destinations": [
+    "overview",
+    "proxy-hosts",
+    "l4-proxy-hosts",
+    "agents",
+    "access-lists",
+    "groups",
+    "users",
+    "certificates",
+    "waf",
+    "security",
+    "analytics",
+    "audit-log",
+    "logs",
+    "alerts",
+    "approvals",
+    "api-docs",
+    "settings",
+    "profile"
+  ],
+  "capabilities": {
+    "admin/none": {
+      "overview:read": {
+        "-": true,
+        "*": true
+      },
+      "overview:write": {
+        "-": true,
+        "*": true
+      },
+      "hosts:read": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "agents:read": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "accessLists:read": {
+        "-": true,
+        "*": true
+      },
+      "accessLists:write": {
+        "-": true,
+        "*": true
+      },
+      "certificates:read": {
+        "-": true,
+        "*": true
+      },
+      "certificates:write": {
+        "-": true,
+        "*": true
+      },
+      "security:read": {
+        "-": true,
+        "*": true
+      },
+      "security:write": {
+        "-": true,
+        "*": true
+      },
+      "analytics:read": {
+        "-": true,
+        "*": true
+      },
+      "analytics:write": {
+        "-": true,
+        "*": true
+      },
+      "logs:read": {
+        "-": true,
+        "*": true
+      },
+      "logs:write": {
+        "-": true,
+        "*": true
+      },
+      "users:read": {
+        "-": true,
+        "*": true
+      },
+      "users:write": {
+        "-": true,
+        "*": true
+      },
+      "groups:read": {
+        "-": true,
+        "*": true
+      },
+      "groups:write": {
+        "-": true,
+        "*": true
+      },
+      "roles:read": {
+        "-": true,
+        "*": true
+      },
+      "roles:write": {
+        "-": true,
+        "*": true
+      },
+      "settings:read": {
+        "-": true,
+        "*": true
+      },
+      "settings:write": {
+        "-": true,
+        "*": true
+      },
+      "backups:read": {
+        "-": true,
+        "*": true
+      },
+      "backups:write": {
+        "-": true,
+        "*": true
+      },
+      "alerts:read": {
+        "-": true,
+        "*": true
+      },
+      "alerts:write": {
+        "-": true,
+        "*": true
+      },
+      "audit:read": {
+        "-": true,
+        "*": true
+      },
+      "audit:write": {
+        "-": true,
+        "*": true
+      },
+      "tokens:read": {
+        "-": true,
+        "*": true
+      },
+      "tokens:write": {
+        "-": true,
+        "*": true
+      }
+    },
+    "operator/none": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": true,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": true,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "user/none": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "viewer/none": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "admin/view": {
+      "overview:read": {
+        "-": true,
+        "*": true
+      },
+      "overview:write": {
+        "-": true,
+        "*": true
+      },
+      "hosts:read": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "agents:read": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "accessLists:read": {
+        "-": true,
+        "*": true
+      },
+      "accessLists:write": {
+        "-": true,
+        "*": true
+      },
+      "certificates:read": {
+        "-": true,
+        "*": true
+      },
+      "certificates:write": {
+        "-": true,
+        "*": true
+      },
+      "security:read": {
+        "-": true,
+        "*": true
+      },
+      "security:write": {
+        "-": true,
+        "*": true
+      },
+      "analytics:read": {
+        "-": true,
+        "*": true
+      },
+      "analytics:write": {
+        "-": true,
+        "*": true
+      },
+      "logs:read": {
+        "-": true,
+        "*": true
+      },
+      "logs:write": {
+        "-": true,
+        "*": true
+      },
+      "users:read": {
+        "-": true,
+        "*": true
+      },
+      "users:write": {
+        "-": true,
+        "*": true
+      },
+      "groups:read": {
+        "-": true,
+        "*": true
+      },
+      "groups:write": {
+        "-": true,
+        "*": true
+      },
+      "roles:read": {
+        "-": true,
+        "*": true
+      },
+      "roles:write": {
+        "-": true,
+        "*": true
+      },
+      "settings:read": {
+        "-": true,
+        "*": true
+      },
+      "settings:write": {
+        "-": true,
+        "*": true
+      },
+      "backups:read": {
+        "-": true,
+        "*": true
+      },
+      "backups:write": {
+        "-": true,
+        "*": true
+      },
+      "alerts:read": {
+        "-": true,
+        "*": true
+      },
+      "alerts:write": {
+        "-": true,
+        "*": true
+      },
+      "audit:read": {
+        "-": true,
+        "*": true
+      },
+      "audit:write": {
+        "-": true,
+        "*": true
+      },
+      "tokens:read": {
+        "-": true,
+        "*": true
+      },
+      "tokens:write": {
+        "-": true,
+        "*": true
+      }
+    },
+    "operator/view": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": false,
+        "*": true,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "user/view": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "viewer/view": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "admin/manage": {
+      "overview:read": {
+        "-": true,
+        "*": true
+      },
+      "overview:write": {
+        "-": true,
+        "*": true
+      },
+      "hosts:read": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": true,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "agents:read": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": true,
+        "*": true,
+        "agent:1": true
+      },
+      "accessLists:read": {
+        "-": true,
+        "*": true
+      },
+      "accessLists:write": {
+        "-": true,
+        "*": true
+      },
+      "certificates:read": {
+        "-": true,
+        "*": true
+      },
+      "certificates:write": {
+        "-": true,
+        "*": true
+      },
+      "security:read": {
+        "-": true,
+        "*": true
+      },
+      "security:write": {
+        "-": true,
+        "*": true
+      },
+      "analytics:read": {
+        "-": true,
+        "*": true
+      },
+      "analytics:write": {
+        "-": true,
+        "*": true
+      },
+      "logs:read": {
+        "-": true,
+        "*": true
+      },
+      "logs:write": {
+        "-": true,
+        "*": true
+      },
+      "users:read": {
+        "-": true,
+        "*": true
+      },
+      "users:write": {
+        "-": true,
+        "*": true
+      },
+      "groups:read": {
+        "-": true,
+        "*": true
+      },
+      "groups:write": {
+        "-": true,
+        "*": true
+      },
+      "roles:read": {
+        "-": true,
+        "*": true
+      },
+      "roles:write": {
+        "-": true,
+        "*": true
+      },
+      "settings:read": {
+        "-": true,
+        "*": true
+      },
+      "settings:write": {
+        "-": true,
+        "*": true
+      },
+      "backups:read": {
+        "-": true,
+        "*": true
+      },
+      "backups:write": {
+        "-": true,
+        "*": true
+      },
+      "alerts:read": {
+        "-": true,
+        "*": true
+      },
+      "alerts:write": {
+        "-": true,
+        "*": true
+      },
+      "audit:read": {
+        "-": true,
+        "*": true
+      },
+      "audit:write": {
+        "-": true,
+        "*": true
+      },
+      "tokens:read": {
+        "-": true,
+        "*": true
+      },
+      "tokens:write": {
+        "-": true,
+        "*": true
+      }
+    },
+    "operator/manage": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "agents:read": {
+        "-": false,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": false,
+        "*": true,
+        "agent:1": true
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "user/manage": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    },
+    "viewer/manage": {
+      "overview:read": {
+        "-": false,
+        "*": false
+      },
+      "overview:write": {
+        "-": false,
+        "*": false
+      },
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "accessLists:read": {
+        "-": false,
+        "*": false
+      },
+      "accessLists:write": {
+        "-": false,
+        "*": false
+      },
+      "certificates:read": {
+        "-": false,
+        "*": false
+      },
+      "certificates:write": {
+        "-": false,
+        "*": false
+      },
+      "security:read": {
+        "-": false,
+        "*": false
+      },
+      "security:write": {
+        "-": false,
+        "*": false
+      },
+      "analytics:read": {
+        "-": false,
+        "*": false
+      },
+      "analytics:write": {
+        "-": false,
+        "*": false
+      },
+      "logs:read": {
+        "-": false,
+        "*": false
+      },
+      "logs:write": {
+        "-": false,
+        "*": false
+      },
+      "users:read": {
+        "-": false,
+        "*": false
+      },
+      "users:write": {
+        "-": false,
+        "*": false
+      },
+      "groups:read": {
+        "-": false,
+        "*": false
+      },
+      "groups:write": {
+        "-": false,
+        "*": false
+      },
+      "roles:read": {
+        "-": false,
+        "*": false
+      },
+      "roles:write": {
+        "-": false,
+        "*": false
+      },
+      "settings:read": {
+        "-": false,
+        "*": false
+      },
+      "settings:write": {
+        "-": false,
+        "*": false
+      },
+      "backups:read": {
+        "-": false,
+        "*": false
+      },
+      "backups:write": {
+        "-": false,
+        "*": false
+      },
+      "alerts:read": {
+        "-": false,
+        "*": false
+      },
+      "alerts:write": {
+        "-": false,
+        "*": false
+      },
+      "audit:read": {
+        "-": false,
+        "*": false
+      },
+      "audit:write": {
+        "-": false,
+        "*": false
+      },
+      "tokens:read": {
+        "-": false,
+        "*": false
+      },
+      "tokens:write": {
+        "-": false,
+        "*": false
+      }
+    }
+  },
+  "visible": {
+    "admin/none": {
+      "proxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "l4ProxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "agent": {
+        "ids": [1, 2],
+        "filter": null
+      }
+    },
+    "operator/none": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "user/none": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "viewer/none": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "admin/view": {
+      "proxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "l4ProxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "agent": {
+        "ids": [1, 2],
+        "filter": null
+      }
+    },
+    "operator/view": {
+      "proxyHost": {
+        "ids": [1],
+        "filter": [1]
+      },
+      "l4ProxyHost": {
+        "ids": [1],
+        "filter": [1]
+      },
+      "agent": {
+        "ids": [1],
+        "filter": [1]
+      }
+    },
+    "user/view": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "viewer/view": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "admin/manage": {
+      "proxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "l4ProxyHost": {
+        "ids": [1, 2],
+        "filter": null
+      },
+      "agent": {
+        "ids": [1, 2],
+        "filter": null
+      }
+    },
+    "operator/manage": {
+      "proxyHost": {
+        "ids": [1],
+        "filter": [1]
+      },
+      "l4ProxyHost": {
+        "ids": [1],
+        "filter": [1]
+      },
+      "agent": {
+        "ids": [1],
+        "filter": [1]
+      }
+    },
+    "user/manage": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    },
+    "viewer/manage": {
+      "proxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "l4ProxyHost": {
+        "ids": [],
+        "filter": []
+      },
+      "agent": {
+        "ids": [],
+        "filter": []
+      }
+    }
+  },
+  "attention": {
+    "admin/none": ["admin-only:1", "agent:1", "host:1", "host:2", "instance"],
+    "operator/none": [],
+    "user/none": [],
+    "viewer/none": [],
+    "admin/view": ["admin-only:1", "agent:1", "host:1", "host:2", "instance"],
+    "operator/view": ["agent:1", "host:1"],
+    "user/view": [],
+    "viewer/view": [],
+    "admin/manage": ["admin-only:1", "agent:1", "host:1", "host:2", "instance"],
+    "operator/manage": ["agent:1", "host:1"],
+    "user/manage": [],
+    "viewer/manage": []
+  },
+  "viewAs": {
+    "admin->operator": "operator",
+    "admin->user": "user",
+    "admin->viewer": "viewer",
+    "admin->admin": null,
+    "operator->operator": null,
+    "operator->user": null,
+    "operator->viewer": null,
+    "operator->admin": null,
+    "user->operator": null,
+    "user->user": null,
+    "user->viewer": null,
+    "user->admin": null,
+    "viewer->operator": null,
+    "viewer->user": null,
+    "viewer->viewer": null,
+    "viewer->admin": null,
+    "access:operator/none": {
+      "hosts:read": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": true,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": true,
+        "agent:1": false
+      }
+    },
+    "access:operator/group": {
+      "hosts:read": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "hosts:write": {
+        "-": false,
+        "*": true,
+        "proxyHost:1": true,
+        "l4ProxyHost:1": true
+      },
+      "agents:read": {
+        "-": false,
+        "*": true,
+        "agent:1": true
+      },
+      "agents:write": {
+        "-": false,
+        "*": true,
+        "agent:1": true
+      }
+    },
+    "access:user/none": {
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      }
+    },
+    "access:user/group": {
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      }
+    },
+    "access:viewer/none": {
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      }
+    },
+    "access:viewer/group": {
+      "hosts:read": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "hosts:write": {
+        "-": false,
+        "*": false,
+        "proxyHost:1": false,
+        "l4ProxyHost:1": false
+      },
+      "agents:read": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      },
+      "agents:write": {
+        "-": false,
+        "*": false,
+        "agent:1": false
+      }
+    }
+  },
+  "nav": {
+    "admin": [
+      "overview",
+      "proxy-hosts",
+      "l4-proxy-hosts",
+      "agents",
+      "access-lists",
+      "groups",
+      "users",
+      "certificates",
+      "waf",
+      "security",
+      "analytics",
+      "audit-log",
+      "logs",
+      "alerts",
+      "approvals",
+      "api-docs",
+      "settings",
+      "profile"
+    ],
+    "operator": ["overview", "proxy-hosts", "l4-proxy-hosts", "agents", "approvals", "profile"],
+    "user": ["overview", "approvals", "profile"],
+    "viewer": ["overview", "approvals", "profile"]
+  },
+  "graphql": {
+    "roles": {
+      "admin": [
+        "Query.accessList",
+        "Query.accessListStats",
+        "Query.accessLists",
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.agents",
+        "Query.alertChannels",
+        "Query.alertDigestRuns",
+        "Query.alertDigests",
+        "Query.alertHistory",
+        "Query.alertRules",
+        "Query.analyticsReport",
+        "Query.analyticsTopList",
+        "Query.analyticsViews",
+        "Query.apiTokens",
+        "Query.approvalPolicy",
+        "Query.attention",
+        "Query.auditLog",
+        "Query.auditSinks",
+        "Query.backupDestinations",
+        "Query.backupRuns",
+        "Query.backupSchedules",
+        "Query.blockedSources",
+        "Query.caCertificates",
+        "Query.caddyModules",
+        "Query.capabilities",
+        "Query.certificate",
+        "Query.certificates",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.clientCertificates",
+        "Query.compareHostRevisions",
+        "Query.deletedHosts",
+        "Query.dnsProviders",
+        "Query.group",
+        "Query.groups",
+        "Query.hostRevision",
+        "Query.hostRevisions",
+        "Query.l4ProxyHost",
+        "Query.l4ProxyHosts",
+        "Query.mtlsRoles",
+        "Query.oauthProviders",
+        "Query.previewAlertDigest",
+        "Query.proxyHost",
+        "Query.proxyHostTraffic",
+        "Query.proxyHostUpstreamHealth",
+        "Query.proxyHosts",
+        "Query.role",
+        "Query.roles",
+        "Query.scimConnections",
+        "Query.securityReport",
+        "Query.settings",
+        "Query.setupChecklist",
+        "Query.signInOverview",
+        "Query.trafficSignals",
+        "Query.user",
+        "Query.users",
+        "Query.wafEvent",
+        "Query.wafExclusions",
+        "Mutation.addGroupMember",
+        "Mutation.applyCaddyConfig",
+        "Mutation.approveChangeRequest",
+        "Mutation.bulkL4ProxyHosts",
+        "Mutation.bulkProxyHosts",
+        "Mutation.bypassChangeRequest",
+        "Mutation.closeAccessReview",
+        "Mutation.confirmAccessReview",
+        "Mutation.createAccessList",
+        "Mutation.createAccessReview",
+        "Mutation.createAlertChannel",
+        "Mutation.createAlertDigest",
+        "Mutation.createAlertRule",
+        "Mutation.createAnalyticsView",
+        "Mutation.createApiToken",
+        "Mutation.createAuditSink",
+        "Mutation.createBackupDestination",
+        "Mutation.createBackupSchedule",
+        "Mutation.createBlockedSource",
+        "Mutation.createGroup",
+        "Mutation.createL4ProxyHost",
+        "Mutation.createProxyHost",
+        "Mutation.createRole",
+        "Mutation.createScimConnection",
+        "Mutation.createWafExclusion",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteAccessList",
+        "Mutation.deleteAccessReview",
+        "Mutation.deleteAlertChannel",
+        "Mutation.deleteAlertDigest",
+        "Mutation.deleteAlertRule",
+        "Mutation.deleteAnalyticsView",
+        "Mutation.deleteApiToken",
+        "Mutation.deleteAuditSink",
+        "Mutation.deleteBackupDestination",
+        "Mutation.deleteBackupSchedule",
+        "Mutation.deleteBlockedSource",
+        "Mutation.deleteGroup",
+        "Mutation.deleteL4ProxyHost",
+        "Mutation.deleteProxyHost",
+        "Mutation.deleteRole",
+        "Mutation.deleteScimConnection",
+        "Mutation.deleteUser",
+        "Mutation.deleteWafExclusion",
+        "Mutation.previewConfigImport",
+        "Mutation.previewL4ProxyHost",
+        "Mutation.previewProxyHost",
+        "Mutation.reassignAccessReviewItems",
+        "Mutation.rejectChangeRequest",
+        "Mutation.removeGroupMember",
+        "Mutation.restoreHost",
+        "Mutation.reviewWafEvent",
+        "Mutation.rollbackHost",
+        "Mutation.rotateScimConnectionToken",
+        "Mutation.runBackupNow",
+        "Mutation.saveSettings",
+        "Mutation.sendAlertDigestNow",
+        "Mutation.setAccessListRules",
+        "Mutation.setApprovalPolicy",
+        "Mutation.setGroupRole",
+        "Mutation.setSetupChecklistHidden",
+        "Mutation.setSetupStepDone",
+        "Mutation.silenceAlertRule",
+        "Mutation.testAlertChannel",
+        "Mutation.testAlertRule",
+        "Mutation.testAuditSink",
+        "Mutation.testBackupDestination",
+        "Mutation.updateAccessList",
+        "Mutation.updateAccessReview",
+        "Mutation.updateAlertChannel",
+        "Mutation.updateAlertDigest",
+        "Mutation.updateAlertRule",
+        "Mutation.updateAnalyticsView",
+        "Mutation.updateAuditSink",
+        "Mutation.updateBackupDestination",
+        "Mutation.updateBackupSchedule",
+        "Mutation.updateGroup",
+        "Mutation.updateL4ProxyHost",
+        "Mutation.updateProxyHost",
+        "Mutation.updateRole",
+        "Mutation.updateScimConnection",
+        "Mutation.updateUser",
+        "Mutation.updateWafExclusion",
+        "Mutation.verifyAuditChain",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "operator": [
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.apiTokens",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Mutation.approveChangeRequest",
+        "Mutation.bypassChangeRequest",
+        "Mutation.createApiToken",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteApiToken",
+        "Mutation.rejectChangeRequest",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "user": [
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.apiTokens",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Mutation.approveChangeRequest",
+        "Mutation.bypassChangeRequest",
+        "Mutation.createApiToken",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteApiToken",
+        "Mutation.rejectChangeRequest",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "viewer": [
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.apiTokens",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Mutation.approveChangeRequest",
+        "Mutation.bypassChangeRequest",
+        "Mutation.createApiToken",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteApiToken",
+        "Mutation.rejectChangeRequest",
+        "Mutation.withdrawChangeRequest"
+      ]
+    },
+    "adminTokens": {
+      "session": [
+        "Query.accessList",
+        "Query.accessListStats",
+        "Query.accessLists",
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.agents",
+        "Query.alertChannels",
+        "Query.alertDigestRuns",
+        "Query.alertDigests",
+        "Query.alertHistory",
+        "Query.alertRules",
+        "Query.analyticsReport",
+        "Query.analyticsTopList",
+        "Query.analyticsViews",
+        "Query.apiTokens",
+        "Query.approvalPolicy",
+        "Query.attention",
+        "Query.auditLog",
+        "Query.auditSinks",
+        "Query.backupDestinations",
+        "Query.backupRuns",
+        "Query.backupSchedules",
+        "Query.blockedSources",
+        "Query.caCertificates",
+        "Query.caddyModules",
+        "Query.capabilities",
+        "Query.certificate",
+        "Query.certificates",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.clientCertificates",
+        "Query.compareHostRevisions",
+        "Query.deletedHosts",
+        "Query.dnsProviders",
+        "Query.group",
+        "Query.groups",
+        "Query.hostRevision",
+        "Query.hostRevisions",
+        "Query.l4ProxyHost",
+        "Query.l4ProxyHosts",
+        "Query.mtlsRoles",
+        "Query.oauthProviders",
+        "Query.previewAlertDigest",
+        "Query.proxyHost",
+        "Query.proxyHostTraffic",
+        "Query.proxyHostUpstreamHealth",
+        "Query.proxyHosts",
+        "Query.role",
+        "Query.roles",
+        "Query.scimConnections",
+        "Query.securityReport",
+        "Query.settings",
+        "Query.setupChecklist",
+        "Query.signInOverview",
+        "Query.trafficSignals",
+        "Query.user",
+        "Query.users",
+        "Query.wafEvent",
+        "Query.wafExclusions",
+        "Mutation.addGroupMember",
+        "Mutation.applyCaddyConfig",
+        "Mutation.approveChangeRequest",
+        "Mutation.bulkL4ProxyHosts",
+        "Mutation.bulkProxyHosts",
+        "Mutation.bypassChangeRequest",
+        "Mutation.closeAccessReview",
+        "Mutation.confirmAccessReview",
+        "Mutation.createAccessList",
+        "Mutation.createAccessReview",
+        "Mutation.createAlertChannel",
+        "Mutation.createAlertDigest",
+        "Mutation.createAlertRule",
+        "Mutation.createAnalyticsView",
+        "Mutation.createApiToken",
+        "Mutation.createAuditSink",
+        "Mutation.createBackupDestination",
+        "Mutation.createBackupSchedule",
+        "Mutation.createBlockedSource",
+        "Mutation.createGroup",
+        "Mutation.createL4ProxyHost",
+        "Mutation.createProxyHost",
+        "Mutation.createRole",
+        "Mutation.createScimConnection",
+        "Mutation.createWafExclusion",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteAccessList",
+        "Mutation.deleteAccessReview",
+        "Mutation.deleteAlertChannel",
+        "Mutation.deleteAlertDigest",
+        "Mutation.deleteAlertRule",
+        "Mutation.deleteAnalyticsView",
+        "Mutation.deleteApiToken",
+        "Mutation.deleteAuditSink",
+        "Mutation.deleteBackupDestination",
+        "Mutation.deleteBackupSchedule",
+        "Mutation.deleteBlockedSource",
+        "Mutation.deleteGroup",
+        "Mutation.deleteL4ProxyHost",
+        "Mutation.deleteProxyHost",
+        "Mutation.deleteRole",
+        "Mutation.deleteScimConnection",
+        "Mutation.deleteUser",
+        "Mutation.deleteWafExclusion",
+        "Mutation.previewConfigImport",
+        "Mutation.previewL4ProxyHost",
+        "Mutation.previewProxyHost",
+        "Mutation.reassignAccessReviewItems",
+        "Mutation.rejectChangeRequest",
+        "Mutation.removeGroupMember",
+        "Mutation.restoreHost",
+        "Mutation.reviewWafEvent",
+        "Mutation.rollbackHost",
+        "Mutation.rotateScimConnectionToken",
+        "Mutation.runBackupNow",
+        "Mutation.saveSettings",
+        "Mutation.sendAlertDigestNow",
+        "Mutation.setAccessListRules",
+        "Mutation.setApprovalPolicy",
+        "Mutation.setGroupRole",
+        "Mutation.setSetupChecklistHidden",
+        "Mutation.setSetupStepDone",
+        "Mutation.silenceAlertRule",
+        "Mutation.testAlertChannel",
+        "Mutation.testAlertRule",
+        "Mutation.testAuditSink",
+        "Mutation.testBackupDestination",
+        "Mutation.updateAccessList",
+        "Mutation.updateAccessReview",
+        "Mutation.updateAlertChannel",
+        "Mutation.updateAlertDigest",
+        "Mutation.updateAlertRule",
+        "Mutation.updateAnalyticsView",
+        "Mutation.updateAuditSink",
+        "Mutation.updateBackupDestination",
+        "Mutation.updateBackupSchedule",
+        "Mutation.updateGroup",
+        "Mutation.updateL4ProxyHost",
+        "Mutation.updateProxyHost",
+        "Mutation.updateRole",
+        "Mutation.updateScimConnection",
+        "Mutation.updateUser",
+        "Mutation.updateWafExclusion",
+        "Mutation.verifyAuditChain",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "full": [
+        "Query.accessList",
+        "Query.accessListStats",
+        "Query.accessLists",
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.agents",
+        "Query.alertChannels",
+        "Query.alertDigestRuns",
+        "Query.alertDigests",
+        "Query.alertHistory",
+        "Query.alertRules",
+        "Query.analyticsReport",
+        "Query.analyticsTopList",
+        "Query.analyticsViews",
+        "Query.apiTokens",
+        "Query.approvalPolicy",
+        "Query.attention",
+        "Query.auditLog",
+        "Query.auditSinks",
+        "Query.backupDestinations",
+        "Query.backupRuns",
+        "Query.backupSchedules",
+        "Query.blockedSources",
+        "Query.caCertificates",
+        "Query.caddyModules",
+        "Query.capabilities",
+        "Query.certificate",
+        "Query.certificates",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.clientCertificates",
+        "Query.compareHostRevisions",
+        "Query.deletedHosts",
+        "Query.dnsProviders",
+        "Query.group",
+        "Query.groups",
+        "Query.hostRevision",
+        "Query.hostRevisions",
+        "Query.l4ProxyHost",
+        "Query.l4ProxyHosts",
+        "Query.mtlsRoles",
+        "Query.oauthProviders",
+        "Query.previewAlertDigest",
+        "Query.proxyHost",
+        "Query.proxyHostTraffic",
+        "Query.proxyHostUpstreamHealth",
+        "Query.proxyHosts",
+        "Query.role",
+        "Query.roles",
+        "Query.scimConnections",
+        "Query.securityReport",
+        "Query.settings",
+        "Query.setupChecklist",
+        "Query.signInOverview",
+        "Query.trafficSignals",
+        "Query.user",
+        "Query.users",
+        "Query.wafEvent",
+        "Query.wafExclusions",
+        "Mutation.addGroupMember",
+        "Mutation.applyCaddyConfig",
+        "Mutation.applyConfigImport",
+        "Mutation.approveChangeRequest",
+        "Mutation.bulkL4ProxyHosts",
+        "Mutation.bulkProxyHosts",
+        "Mutation.bypassChangeRequest",
+        "Mutation.closeAccessReview",
+        "Mutation.confirmAccessReview",
+        "Mutation.createAccessList",
+        "Mutation.createAccessReview",
+        "Mutation.createAlertChannel",
+        "Mutation.createAlertDigest",
+        "Mutation.createAlertRule",
+        "Mutation.createAnalyticsView",
+        "Mutation.createAuditSink",
+        "Mutation.createBackupDestination",
+        "Mutation.createBackupSchedule",
+        "Mutation.createBlockedSource",
+        "Mutation.createGroup",
+        "Mutation.createL4ProxyHost",
+        "Mutation.createProxyHost",
+        "Mutation.createRole",
+        "Mutation.createScimConnection",
+        "Mutation.createWafExclusion",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteAccessList",
+        "Mutation.deleteAccessReview",
+        "Mutation.deleteAlertChannel",
+        "Mutation.deleteAlertDigest",
+        "Mutation.deleteAlertRule",
+        "Mutation.deleteAnalyticsView",
+        "Mutation.deleteApiToken",
+        "Mutation.deleteAuditSink",
+        "Mutation.deleteBackupDestination",
+        "Mutation.deleteBackupSchedule",
+        "Mutation.deleteBlockedSource",
+        "Mutation.deleteGroup",
+        "Mutation.deleteL4ProxyHost",
+        "Mutation.deleteProxyHost",
+        "Mutation.deleteRole",
+        "Mutation.deleteScimConnection",
+        "Mutation.deleteUser",
+        "Mutation.deleteWafExclusion",
+        "Mutation.exportConfig",
+        "Mutation.previewConfigImport",
+        "Mutation.previewL4ProxyHost",
+        "Mutation.previewProxyHost",
+        "Mutation.reassignAccessReviewItems",
+        "Mutation.rejectChangeRequest",
+        "Mutation.removeGroupMember",
+        "Mutation.restoreHost",
+        "Mutation.reviewWafEvent",
+        "Mutation.rollbackHost",
+        "Mutation.rotateScimConnectionToken",
+        "Mutation.runBackupNow",
+        "Mutation.saveSettings",
+        "Mutation.sendAlertDigestNow",
+        "Mutation.setAccessListRules",
+        "Mutation.setApprovalPolicy",
+        "Mutation.setGroupRole",
+        "Mutation.setSetupChecklistHidden",
+        "Mutation.setSetupStepDone",
+        "Mutation.silenceAlertRule",
+        "Mutation.testAlertChannel",
+        "Mutation.testAlertRule",
+        "Mutation.testAuditSink",
+        "Mutation.testBackupDestination",
+        "Mutation.updateAccessList",
+        "Mutation.updateAccessReview",
+        "Mutation.updateAlertChannel",
+        "Mutation.updateAlertDigest",
+        "Mutation.updateAlertRule",
+        "Mutation.updateAnalyticsView",
+        "Mutation.updateAuditSink",
+        "Mutation.updateBackupDestination",
+        "Mutation.updateBackupSchedule",
+        "Mutation.updateGroup",
+        "Mutation.updateL4ProxyHost",
+        "Mutation.updateProxyHost",
+        "Mutation.updateRole",
+        "Mutation.updateScimConnection",
+        "Mutation.updateUser",
+        "Mutation.updateWafExclusion",
+        "Mutation.verifyAuditChain",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "read": [
+        "Query.accessList",
+        "Query.accessListStats",
+        "Query.accessLists",
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.agents",
+        "Query.alertChannels",
+        "Query.alertDigestRuns",
+        "Query.alertDigests",
+        "Query.alertHistory",
+        "Query.alertRules",
+        "Query.analyticsReport",
+        "Query.analyticsTopList",
+        "Query.analyticsViews",
+        "Query.apiTokens",
+        "Query.approvalPolicy",
+        "Query.attention",
+        "Query.auditLog",
+        "Query.auditSinks",
+        "Query.backupDestinations",
+        "Query.backupRuns",
+        "Query.backupSchedules",
+        "Query.blockedSources",
+        "Query.caCertificates",
+        "Query.caddyModules",
+        "Query.capabilities",
+        "Query.certificate",
+        "Query.certificates",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.clientCertificates",
+        "Query.compareHostRevisions",
+        "Query.deletedHosts",
+        "Query.dnsProviders",
+        "Query.group",
+        "Query.groups",
+        "Query.hostRevision",
+        "Query.hostRevisions",
+        "Query.l4ProxyHost",
+        "Query.l4ProxyHosts",
+        "Query.mtlsRoles",
+        "Query.oauthProviders",
+        "Query.previewAlertDigest",
+        "Query.proxyHost",
+        "Query.proxyHostTraffic",
+        "Query.proxyHostUpstreamHealth",
+        "Query.proxyHosts",
+        "Query.role",
+        "Query.roles",
+        "Query.scimConnections",
+        "Query.securityReport",
+        "Query.settings",
+        "Query.setupChecklist",
+        "Query.signInOverview",
+        "Query.trafficSignals",
+        "Query.user",
+        "Query.users",
+        "Query.wafEvent",
+        "Query.wafExclusions"
+      ],
+      "hostsRead": [
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.compareHostRevisions",
+        "Query.deletedHosts",
+        "Query.hostRevision",
+        "Query.hostRevisions",
+        "Query.l4ProxyHost",
+        "Query.l4ProxyHosts",
+        "Query.proxyHost",
+        "Query.proxyHostTraffic",
+        "Query.proxyHostUpstreamHealth",
+        "Query.proxyHosts"
+      ],
+      "settingsWrite": [
+        "Query.alertChannels",
+        "Query.alertDigestRuns",
+        "Query.alertDigests",
+        "Query.alertHistory",
+        "Query.alertRules",
+        "Query.approvalPolicy",
+        "Query.backupDestinations",
+        "Query.backupRuns",
+        "Query.backupSchedules",
+        "Query.caddyModules",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.dnsProviders",
+        "Query.oauthProviders",
+        "Query.previewAlertDigest",
+        "Query.settings",
+        "Mutation.applyCaddyConfig",
+        "Mutation.createAlertChannel",
+        "Mutation.createAlertDigest",
+        "Mutation.createAlertRule",
+        "Mutation.deleteAlertChannel",
+        "Mutation.deleteAlertDigest",
+        "Mutation.deleteAlertRule",
+        "Mutation.saveSettings",
+        "Mutation.sendAlertDigestNow",
+        "Mutation.setApprovalPolicy",
+        "Mutation.silenceAlertRule",
+        "Mutation.testAlertChannel",
+        "Mutation.testAlertRule",
+        "Mutation.updateAlertChannel",
+        "Mutation.updateAlertDigest",
+        "Mutation.updateAlertRule",
+        "Mutation.withdrawChangeRequest"
+      ],
+      "usersWrite": [
+        "Query.accessReview",
+        "Query.accessReviews",
+        "Query.capabilities",
+        "Query.changeRequest",
+        "Query.changeRequests",
+        "Query.group",
+        "Query.groups",
+        "Query.role",
+        "Query.roles",
+        "Query.scimConnections",
+        "Query.signInOverview",
+        "Query.user",
+        "Query.users",
+        "Mutation.addGroupMember",
+        "Mutation.createAccessReview",
+        "Mutation.createGroup",
+        "Mutation.createRole",
+        "Mutation.decideAccessReviewItem",
+        "Mutation.deleteAccessReview",
+        "Mutation.deleteGroup",
+        "Mutation.deleteRole",
+        "Mutation.deleteUser",
+        "Mutation.reassignAccessReviewItems",
+        "Mutation.removeGroupMember",
+        "Mutation.setGroupRole",
+        "Mutation.updateAccessReview",
+        "Mutation.updateGroup",
+        "Mutation.updateRole",
+        "Mutation.updateUser"
+      ]
+    }
+  },
+  "rest": {
+    "roles": {
+      "admin": [
+        "DELETE /api/v1/access-lists/[id]",
+        "DELETE /api/v1/access-lists/[id]/entries/[entryId]",
+        "DELETE /api/v1/ca-certificates/[id]",
+        "DELETE /api/v1/certificates/[id]",
+        "DELETE /api/v1/client-certificates/[id]",
+        "DELETE /api/v1/crs-plugins/[id]",
+        "DELETE /api/v1/forward-auth-sessions",
+        "DELETE /api/v1/forward-auth-sessions/[id]",
+        "DELETE /api/v1/groups/[id]",
+        "DELETE /api/v1/groups/[id]/members/[userId]",
+        "DELETE /api/v1/l4-proxy-hosts/[id]",
+        "DELETE /api/v1/mtls-roles/[id]",
+        "DELETE /api/v1/mtls-roles/[id]/certificates/[certId]",
+        "DELETE /api/v1/oauth-providers/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "DELETE /api/v1/users/[id]",
+        "DELETE /api/v1/waf-presets/[id]",
+        "GET /api/analytics/blocked",
+        "GET /api/analytics/countries",
+        "GET /api/analytics/country",
+        "GET /api/analytics/explore",
+        "GET /api/analytics/hosts",
+        "GET /api/analytics/overview",
+        "GET /api/analytics/protocols",
+        "GET /api/analytics/summary",
+        "GET /api/analytics/timeline",
+        "GET /api/analytics/top",
+        "GET /api/analytics/user-agents",
+        "GET /api/analytics/waf-stats",
+        "GET /api/caddy-build",
+        "GET /api/geoip-status",
+        "GET /api/l4-ports",
+        "GET /api/v1/access-lists",
+        "GET /api/v1/access-lists/[id]",
+        "GET /api/v1/access-lists/[id]/ip-rules",
+        "GET /api/v1/audit-log",
+        "GET /api/v1/ca-certificates",
+        "GET /api/v1/ca-certificates/[id]",
+        "GET /api/v1/caddy/modules",
+        "GET /api/v1/certificates",
+        "GET /api/v1/certificates/[id]",
+        "GET /api/v1/client-certificates",
+        "GET /api/v1/client-certificates/[id]",
+        "GET /api/v1/client-certificates/[id]/roles",
+        "GET /api/v1/crs-plugins",
+        "GET /api/v1/crs-plugins/[id]",
+        "GET /api/v1/crs-plugins/registry",
+        "GET /api/v1/crs-plugins/registry/settings",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/forward-auth-sessions",
+        "GET /api/v1/groups",
+        "GET /api/v1/groups/[id]",
+        "GET /api/v1/l4-proxy-hosts",
+        "GET /api/v1/l4-proxy-hosts/[id]",
+        "GET /api/v1/l4-proxy-hosts/[id]/revisions",
+        "GET /api/v1/mtls-roles",
+        "GET /api/v1/mtls-roles/[id]",
+        "GET /api/v1/oauth-providers",
+        "GET /api/v1/oauth-providers/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/proxy-hosts",
+        "GET /api/v1/proxy-hosts/[id]",
+        "GET /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "GET /api/v1/proxy-hosts/[id]/revisions",
+        "GET /api/v1/sessions",
+        "GET /api/v1/settings/[group]",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users",
+        "GET /api/v1/users/[id]",
+        "GET /api/v1/waf-presets",
+        "GET /api/v1/waf-presets/[id]",
+        "GET /api/waf-events",
+        "PATCH /api/v1/groups/[id]",
+        "POST /api/caddy-build",
+        "POST /api/caddy-build/image",
+        "POST /api/l4-ports",
+        "POST /api/v1/access-lists",
+        "POST /api/v1/access-lists/[id]/entries",
+        "POST /api/v1/backup",
+        "POST /api/v1/ca-certificates",
+        "POST /api/v1/caddy/apply",
+        "POST /api/v1/certificates",
+        "POST /api/v1/certificates/[id]/reread",
+        "POST /api/v1/client-certificates",
+        "POST /api/v1/crs-plugins",
+        "POST /api/v1/crs-plugins/[id]/update",
+        "POST /api/v1/crs-plugins/registry/check",
+        "POST /api/v1/groups",
+        "POST /api/v1/groups/[id]/members",
+        "POST /api/v1/l4-proxy-hosts",
+        "POST /api/v1/l4-proxy-hosts/[id]/preview",
+        "POST /api/v1/l4-proxy-hosts/bulk",
+        "POST /api/v1/l4-proxy-hosts/preview",
+        "POST /api/v1/mtls-roles",
+        "POST /api/v1/mtls-roles/[id]/certificates",
+        "POST /api/v1/oauth-providers",
+        "POST /api/v1/proxy-hosts",
+        "POST /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "POST /api/v1/proxy-hosts/[id]/preview",
+        "POST /api/v1/proxy-hosts/bulk",
+        "POST /api/v1/proxy-hosts/preview",
+        "POST /api/v1/tokens",
+        "POST /api/v1/users",
+        "POST /api/v1/waf-presets",
+        "PUT /api/v1/access-lists/[id]",
+        "PUT /api/v1/access-lists/[id]/ip-rules",
+        "PUT /api/v1/ca-certificates/[id]",
+        "PUT /api/v1/caddy/modules",
+        "PUT /api/v1/certificates/[id]",
+        "PUT /api/v1/crs-plugins/[id]",
+        "PUT /api/v1/crs-plugins/registry/settings",
+        "PUT /api/v1/l4-proxy-hosts/[id]",
+        "PUT /api/v1/mtls-roles/[id]",
+        "PUT /api/v1/oauth-providers/[id]",
+        "PUT /api/v1/proxy-hosts/[id]",
+        "PUT /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "PUT /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "PUT /api/v1/settings/[group]",
+        "PUT /api/v1/users/[id]",
+        "PUT /api/v1/waf-presets/[id]"
+      ],
+      "operator": [
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/sessions",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users/[id]",
+        "POST /api/v1/tokens"
+      ],
+      "user": [
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/sessions",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users/[id]",
+        "POST /api/v1/tokens"
+      ],
+      "viewer": [
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/sessions",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users/[id]",
+        "POST /api/v1/tokens"
+      ]
+    },
+    "adminTokens": {
+      "session": [
+        "DELETE /api/v1/access-lists/[id]",
+        "DELETE /api/v1/access-lists/[id]/entries/[entryId]",
+        "DELETE /api/v1/ca-certificates/[id]",
+        "DELETE /api/v1/certificates/[id]",
+        "DELETE /api/v1/client-certificates/[id]",
+        "DELETE /api/v1/crs-plugins/[id]",
+        "DELETE /api/v1/forward-auth-sessions",
+        "DELETE /api/v1/forward-auth-sessions/[id]",
+        "DELETE /api/v1/groups/[id]",
+        "DELETE /api/v1/groups/[id]/members/[userId]",
+        "DELETE /api/v1/l4-proxy-hosts/[id]",
+        "DELETE /api/v1/mtls-roles/[id]",
+        "DELETE /api/v1/mtls-roles/[id]/certificates/[certId]",
+        "DELETE /api/v1/oauth-providers/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "DELETE /api/v1/users/[id]",
+        "DELETE /api/v1/waf-presets/[id]",
+        "GET /api/analytics/blocked",
+        "GET /api/analytics/countries",
+        "GET /api/analytics/country",
+        "GET /api/analytics/explore",
+        "GET /api/analytics/hosts",
+        "GET /api/analytics/overview",
+        "GET /api/analytics/protocols",
+        "GET /api/analytics/summary",
+        "GET /api/analytics/timeline",
+        "GET /api/analytics/top",
+        "GET /api/analytics/user-agents",
+        "GET /api/analytics/waf-stats",
+        "GET /api/caddy-build",
+        "GET /api/geoip-status",
+        "GET /api/l4-ports",
+        "GET /api/v1/access-lists",
+        "GET /api/v1/access-lists/[id]",
+        "GET /api/v1/access-lists/[id]/ip-rules",
+        "GET /api/v1/audit-log",
+        "GET /api/v1/ca-certificates",
+        "GET /api/v1/ca-certificates/[id]",
+        "GET /api/v1/caddy/modules",
+        "GET /api/v1/certificates",
+        "GET /api/v1/certificates/[id]",
+        "GET /api/v1/client-certificates",
+        "GET /api/v1/client-certificates/[id]",
+        "GET /api/v1/client-certificates/[id]/roles",
+        "GET /api/v1/crs-plugins",
+        "GET /api/v1/crs-plugins/[id]",
+        "GET /api/v1/crs-plugins/registry",
+        "GET /api/v1/crs-plugins/registry/settings",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/forward-auth-sessions",
+        "GET /api/v1/groups",
+        "GET /api/v1/groups/[id]",
+        "GET /api/v1/l4-proxy-hosts",
+        "GET /api/v1/l4-proxy-hosts/[id]",
+        "GET /api/v1/l4-proxy-hosts/[id]/revisions",
+        "GET /api/v1/mtls-roles",
+        "GET /api/v1/mtls-roles/[id]",
+        "GET /api/v1/oauth-providers",
+        "GET /api/v1/oauth-providers/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/proxy-hosts",
+        "GET /api/v1/proxy-hosts/[id]",
+        "GET /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "GET /api/v1/proxy-hosts/[id]/revisions",
+        "GET /api/v1/sessions",
+        "GET /api/v1/settings/[group]",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users",
+        "GET /api/v1/users/[id]",
+        "GET /api/v1/waf-presets",
+        "GET /api/v1/waf-presets/[id]",
+        "GET /api/waf-events",
+        "PATCH /api/v1/groups/[id]",
+        "POST /api/caddy-build",
+        "POST /api/caddy-build/image",
+        "POST /api/l4-ports",
+        "POST /api/v1/access-lists",
+        "POST /api/v1/access-lists/[id]/entries",
+        "POST /api/v1/backup",
+        "POST /api/v1/ca-certificates",
+        "POST /api/v1/caddy/apply",
+        "POST /api/v1/certificates",
+        "POST /api/v1/certificates/[id]/reread",
+        "POST /api/v1/client-certificates",
+        "POST /api/v1/crs-plugins",
+        "POST /api/v1/crs-plugins/[id]/update",
+        "POST /api/v1/crs-plugins/registry/check",
+        "POST /api/v1/groups",
+        "POST /api/v1/groups/[id]/members",
+        "POST /api/v1/l4-proxy-hosts",
+        "POST /api/v1/l4-proxy-hosts/[id]/preview",
+        "POST /api/v1/l4-proxy-hosts/bulk",
+        "POST /api/v1/l4-proxy-hosts/preview",
+        "POST /api/v1/mtls-roles",
+        "POST /api/v1/mtls-roles/[id]/certificates",
+        "POST /api/v1/oauth-providers",
+        "POST /api/v1/proxy-hosts",
+        "POST /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "POST /api/v1/proxy-hosts/[id]/preview",
+        "POST /api/v1/proxy-hosts/bulk",
+        "POST /api/v1/proxy-hosts/preview",
+        "POST /api/v1/tokens",
+        "POST /api/v1/users",
+        "POST /api/v1/waf-presets",
+        "PUT /api/v1/access-lists/[id]",
+        "PUT /api/v1/access-lists/[id]/ip-rules",
+        "PUT /api/v1/ca-certificates/[id]",
+        "PUT /api/v1/caddy/modules",
+        "PUT /api/v1/certificates/[id]",
+        "PUT /api/v1/crs-plugins/[id]",
+        "PUT /api/v1/crs-plugins/registry/settings",
+        "PUT /api/v1/l4-proxy-hosts/[id]",
+        "PUT /api/v1/mtls-roles/[id]",
+        "PUT /api/v1/oauth-providers/[id]",
+        "PUT /api/v1/proxy-hosts/[id]",
+        "PUT /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "PUT /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "PUT /api/v1/settings/[group]",
+        "PUT /api/v1/users/[id]",
+        "PUT /api/v1/waf-presets/[id]"
+      ],
+      "full": [
+        "DELETE /api/v1/access-lists/[id]",
+        "DELETE /api/v1/access-lists/[id]/entries/[entryId]",
+        "DELETE /api/v1/ca-certificates/[id]",
+        "DELETE /api/v1/certificates/[id]",
+        "DELETE /api/v1/client-certificates/[id]",
+        "DELETE /api/v1/crs-plugins/[id]",
+        "DELETE /api/v1/forward-auth-sessions",
+        "DELETE /api/v1/forward-auth-sessions/[id]",
+        "DELETE /api/v1/groups/[id]",
+        "DELETE /api/v1/groups/[id]/members/[userId]",
+        "DELETE /api/v1/l4-proxy-hosts/[id]",
+        "DELETE /api/v1/mtls-roles/[id]",
+        "DELETE /api/v1/mtls-roles/[id]/certificates/[certId]",
+        "DELETE /api/v1/oauth-providers/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]",
+        "DELETE /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/tokens/[id]",
+        "DELETE /api/v1/users/[id]",
+        "DELETE /api/v1/waf-presets/[id]",
+        "GET /api/analytics/blocked",
+        "GET /api/analytics/countries",
+        "GET /api/analytics/country",
+        "GET /api/analytics/explore",
+        "GET /api/analytics/hosts",
+        "GET /api/analytics/overview",
+        "GET /api/analytics/protocols",
+        "GET /api/analytics/summary",
+        "GET /api/analytics/timeline",
+        "GET /api/analytics/top",
+        "GET /api/analytics/user-agents",
+        "GET /api/analytics/waf-stats",
+        "GET /api/caddy-build",
+        "GET /api/geoip-status",
+        "GET /api/l4-ports",
+        "GET /api/v1/access-lists",
+        "GET /api/v1/access-lists/[id]",
+        "GET /api/v1/access-lists/[id]/ip-rules",
+        "GET /api/v1/audit-log",
+        "GET /api/v1/ca-certificates",
+        "GET /api/v1/ca-certificates/[id]",
+        "GET /api/v1/caddy/modules",
+        "GET /api/v1/certificates",
+        "GET /api/v1/certificates/[id]",
+        "GET /api/v1/client-certificates",
+        "GET /api/v1/client-certificates/[id]",
+        "GET /api/v1/client-certificates/[id]/roles",
+        "GET /api/v1/crs-plugins",
+        "GET /api/v1/crs-plugins/[id]",
+        "GET /api/v1/crs-plugins/registry",
+        "GET /api/v1/crs-plugins/registry/settings",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/forward-auth-sessions",
+        "GET /api/v1/groups",
+        "GET /api/v1/groups/[id]",
+        "GET /api/v1/l4-proxy-hosts",
+        "GET /api/v1/l4-proxy-hosts/[id]",
+        "GET /api/v1/l4-proxy-hosts/[id]/revisions",
+        "GET /api/v1/mtls-roles",
+        "GET /api/v1/mtls-roles/[id]",
+        "GET /api/v1/oauth-providers",
+        "GET /api/v1/oauth-providers/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/proxy-hosts",
+        "GET /api/v1/proxy-hosts/[id]",
+        "GET /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "GET /api/v1/proxy-hosts/[id]/revisions",
+        "GET /api/v1/sessions",
+        "GET /api/v1/settings/[group]",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users",
+        "GET /api/v1/users/[id]",
+        "GET /api/v1/waf-presets",
+        "GET /api/v1/waf-presets/[id]",
+        "GET /api/waf-events",
+        "PATCH /api/v1/groups/[id]",
+        "POST /api/caddy-build",
+        "POST /api/caddy-build/image",
+        "POST /api/l4-ports",
+        "POST /api/v1/access-lists",
+        "POST /api/v1/access-lists/[id]/entries",
+        "POST /api/v1/backup",
+        "POST /api/v1/ca-certificates",
+        "POST /api/v1/caddy/apply",
+        "POST /api/v1/certificates",
+        "POST /api/v1/certificates/[id]/reread",
+        "POST /api/v1/client-certificates",
+        "POST /api/v1/crs-plugins",
+        "POST /api/v1/crs-plugins/[id]/update",
+        "POST /api/v1/crs-plugins/registry/check",
+        "POST /api/v1/groups",
+        "POST /api/v1/groups/[id]/members",
+        "POST /api/v1/l4-proxy-hosts",
+        "POST /api/v1/l4-proxy-hosts/[id]/preview",
+        "POST /api/v1/l4-proxy-hosts/bulk",
+        "POST /api/v1/l4-proxy-hosts/preview",
+        "POST /api/v1/mtls-roles",
+        "POST /api/v1/mtls-roles/[id]/certificates",
+        "POST /api/v1/oauth-providers",
+        "POST /api/v1/proxy-hosts",
+        "POST /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "POST /api/v1/proxy-hosts/[id]/preview",
+        "POST /api/v1/proxy-hosts/bulk",
+        "POST /api/v1/proxy-hosts/preview",
+        "POST /api/v1/tokens",
+        "POST /api/v1/users",
+        "POST /api/v1/waf-presets",
+        "PUT /api/v1/access-lists/[id]",
+        "PUT /api/v1/access-lists/[id]/ip-rules",
+        "PUT /api/v1/ca-certificates/[id]",
+        "PUT /api/v1/caddy/modules",
+        "PUT /api/v1/certificates/[id]",
+        "PUT /api/v1/crs-plugins/[id]",
+        "PUT /api/v1/crs-plugins/registry/settings",
+        "PUT /api/v1/l4-proxy-hosts/[id]",
+        "PUT /api/v1/mtls-roles/[id]",
+        "PUT /api/v1/oauth-providers/[id]",
+        "PUT /api/v1/proxy-hosts/[id]",
+        "PUT /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "PUT /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "PUT /api/v1/settings/[group]",
+        "PUT /api/v1/users/[id]",
+        "PUT /api/v1/waf-presets/[id]"
+      ],
+      "read": [
+        "GET /api/analytics/blocked",
+        "GET /api/analytics/countries",
+        "GET /api/analytics/country",
+        "GET /api/analytics/explore",
+        "GET /api/analytics/hosts",
+        "GET /api/analytics/overview",
+        "GET /api/analytics/protocols",
+        "GET /api/analytics/summary",
+        "GET /api/analytics/timeline",
+        "GET /api/analytics/top",
+        "GET /api/analytics/user-agents",
+        "GET /api/analytics/waf-stats",
+        "GET /api/caddy-build",
+        "GET /api/geoip-status",
+        "GET /api/l4-ports",
+        "GET /api/v1/access-lists",
+        "GET /api/v1/access-lists/[id]",
+        "GET /api/v1/access-lists/[id]/ip-rules",
+        "GET /api/v1/audit-log",
+        "GET /api/v1/ca-certificates",
+        "GET /api/v1/ca-certificates/[id]",
+        "GET /api/v1/caddy/modules",
+        "GET /api/v1/certificates",
+        "GET /api/v1/certificates/[id]",
+        "GET /api/v1/client-certificates",
+        "GET /api/v1/client-certificates/[id]",
+        "GET /api/v1/client-certificates/[id]/roles",
+        "GET /api/v1/crs-plugins",
+        "GET /api/v1/crs-plugins/[id]",
+        "GET /api/v1/crs-plugins/registry",
+        "GET /api/v1/crs-plugins/registry/settings",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/forward-auth-sessions",
+        "GET /api/v1/groups",
+        "GET /api/v1/groups/[id]",
+        "GET /api/v1/l4-proxy-hosts",
+        "GET /api/v1/l4-proxy-hosts/[id]",
+        "GET /api/v1/l4-proxy-hosts/[id]/revisions",
+        "GET /api/v1/mtls-roles",
+        "GET /api/v1/mtls-roles/[id]",
+        "GET /api/v1/oauth-providers",
+        "GET /api/v1/oauth-providers/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/proxy-hosts",
+        "GET /api/v1/proxy-hosts/[id]",
+        "GET /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "GET /api/v1/proxy-hosts/[id]/revisions",
+        "GET /api/v1/sessions",
+        "GET /api/v1/settings/[group]",
+        "GET /api/v1/tokens",
+        "GET /api/v1/users",
+        "GET /api/v1/users/[id]",
+        "GET /api/v1/waf-presets",
+        "GET /api/v1/waf-presets/[id]",
+        "GET /api/waf-events"
+      ],
+      "hostsRead": [
+        "GET /api/l4-ports",
+        "GET /api/v1/l4-proxy-hosts",
+        "GET /api/v1/l4-proxy-hosts/[id]",
+        "GET /api/v1/l4-proxy-hosts/[id]/revisions",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/proxy-hosts",
+        "GET /api/v1/proxy-hosts/[id]",
+        "GET /api/v1/proxy-hosts/[id]/forward-auth-access",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules",
+        "GET /api/v1/proxy-hosts/[id]/mtls-access-rules/[ruleId]",
+        "GET /api/v1/proxy-hosts/[id]/revisions"
+      ],
+      "settingsWrite": [
+        "DELETE /api/v1/oauth-providers/[id]",
+        "GET /api/caddy-build",
+        "GET /api/geoip-status",
+        "GET /api/v1/caddy/modules",
+        "GET /api/v1/dns-providers",
+        "GET /api/v1/oauth-providers",
+        "GET /api/v1/oauth-providers/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/settings/[group]",
+        "POST /api/caddy-build",
+        "POST /api/caddy-build/image",
+        "POST /api/v1/caddy/apply",
+        "POST /api/v1/oauth-providers",
+        "PUT /api/v1/caddy/modules",
+        "PUT /api/v1/oauth-providers/[id]",
+        "PUT /api/v1/settings/[group]"
+      ],
+      "usersWrite": [
+        "DELETE /api/v1/forward-auth-sessions",
+        "DELETE /api/v1/forward-auth-sessions/[id]",
+        "DELETE /api/v1/groups/[id]",
+        "DELETE /api/v1/groups/[id]/members/[userId]",
+        "DELETE /api/v1/sessions",
+        "DELETE /api/v1/sessions/[id]",
+        "DELETE /api/v1/users/[id]",
+        "GET /api/v1/forward-auth-sessions",
+        "GET /api/v1/groups",
+        "GET /api/v1/groups/[id]",
+        "GET /api/v1/openapi.json",
+        "GET /api/v1/sessions",
+        "GET /api/v1/users",
+        "GET /api/v1/users/[id]",
+        "PATCH /api/v1/groups/[id]",
+        "POST /api/v1/groups",
+        "POST /api/v1/groups/[id]/members",
+        "POST /api/v1/users",
+        "PUT /api/v1/users/[id]"
+      ]
+    }
+  }
+}

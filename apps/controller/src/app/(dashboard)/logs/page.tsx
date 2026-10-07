@@ -1,6 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { logReadableAgents } from "@/src/lib/agent/client";
 import { isLogView } from "@/src/lib/analytics/log-view";
 import { getLoggingSettings } from "@/src/lib/settings";
@@ -17,7 +17,7 @@ export default async function LogsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  await requireCan("logs:read");
   const params = await searchParams;
   const view = isLogView(params.source) ? params.source : "access";
   const host = typeof params.host === "string" ? params.host : null;

@@ -47,7 +47,7 @@ import {
 
 const t = testTranslator('settings.results');
 const tSettings = testTranslator('settings');
-const REFUSED = { success: false, message: domainErrorMessage('adminRequired') };
+const REFUSED = { success: false, message: domainErrorMessage('accessDenied') };
 
 let admin: SessionUser;
 const realFetch = globalThis.fetch;
@@ -416,7 +416,7 @@ describe('a non-administrator', () => {
 
   it('cannot read what an administrator can', async () => {
     await expect(actions.lookupWafRuleMessageAction(942100)).rejects.toThrow(
-      domainErrorMessage('adminRequired'),
+      domainErrorMessage('accessDenied'),
     );
     await expect(
       actions.testCrowdSecConnectionAction({ apiUrl: 'http://x', apiKey: 'k' }),

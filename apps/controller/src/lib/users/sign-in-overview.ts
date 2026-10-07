@@ -3,11 +3,13 @@
  * accounts use it, whether each directory answers, which groups become which role, and what the
  * login page offers as a result. Read-only; every switch it reports lives in Settings.
  */
-import { and, count, eq, isNotNull, ne } from "drizzle-orm";
+import { withRoleGroups } from "../roles/mappings";
+import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import db from "../db";
 import { groups, oauthProviders, passkeys, users } from "../db/schema";
 import { authPolicy } from "../auth/policy";
-import { getTwoFactorPolicySettings } from "../settings";
+import { getSsoEnforcementSettings, getTwoFactorPolicySettings } from "../settings";
+import { SAML_PROVIDER_TYPE } from "../auth/saml/urls";
 import { getPrimaryProviderId } from "../models/oauth-providers";
 import { listLdapDirectories, listEnabledLdapDirectories } from "../models/ldap-directories";
 import { listAllMappings } from "../models/group-idp-mappings";
@@ -48,6 +50,7 @@ export type SignInOverview = {
   providers: Array<{
     id: string;
     name: string;
+    protocol: "oidc" | "saml";
     enabled: boolean;
     primary: boolean;
     autoLink: boolean;
@@ -70,6 +73,12 @@ export type SignInOverview = {
   }>;
   groupMappings: Array<{ group: string; provider: string | null; externalName: string }>;
   mfa: { mode: MfaPolicyMode; graceDays: number; withTotp: number; withPasskey: number };
+  sso: {
+    enforced: boolean;
+    allowLdap: boolean;
+    /** The break-glass accounts' emails, the ones still let in with a password or passkey. */
+    breakGlass: string[];
+  };
 };
 
 function roles(source: {
@@ -123,7 +132,11 @@ export async function getSignInOverview(): Promise<SignInOverview> {
     getTwoFactorPolicySettings(),
     getPrimaryProviderId(),
     // Not the model's list: that decrypts client secrets this page has no use for.
-    db.select().from(oauthProviders).where(ne(oauthProviders.type, LDAP_PROVIDER_TYPE)),
+    db
+      .select()
+      .from(oauthProviders)
+      .where(ne(oauthProviders.type, LDAP_PROVIDER_TYPE))
+      .then(withRoleGroups),
     listLdapDirectories(),
     listEnabledLdapDirectories(),
     linkedAccountCounts(),
@@ -138,6 +151,14 @@ export async function getSignInOverview(): Promise<SignInOverview> {
     db.select({ id: groups.id, name: groups.name }).from(groups),
     getPublicBaseUrl(),
   ]);
+  const sso = await getSsoEnforcementSettings();
+  const breakGlass = sso.breakGlassUserIds.length
+    ? await db
+        .select({ email: users.email })
+        .from(users)
+        .where(inArray(users.id, sso.breakGlassUserIds))
+        .orderBy(users.email)
+    : [];
   const passwordUsers = await db
     .select({ id: users.id })
     .from(users)
@@ -170,6 +191,7 @@ export async function getSignInOverview(): Promise<SignInOverview> {
     providers: providerRows.map((row) => ({
       id: row.id,
       name: row.name,
+      protocol: row.type === SAML_PROVIDER_TYPE ? ("saml" as const) : ("oidc" as const),
       enabled: row.enabled,
       primary: row.id === primaryId,
       autoLink: row.autoLink,
@@ -201,6 +223,11 @@ export async function getSignInOverview(): Promise<SignInOverview> {
       graceDays: mfa.graceDays,
       withTotp: Number(totpUsers?.total ?? 0),
       withPasskey: passkeyUsers.length,
+    },
+    sso: {
+      enforced: sso.enforced,
+      allowLdap: sso.allowLdap,
+      breakGlass: breakGlass.map((row) => row.email),
     },
   };
 }

@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { deleteForwardAuthSession } from "@/src/lib/models/forward-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     await deleteForwardAuthSession(Number(id));
     return new NextResponse(null, { status: 204 });

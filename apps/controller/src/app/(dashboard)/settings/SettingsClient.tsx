@@ -1,5 +1,6 @@
 "use client";
 
+import { type MadeRole, MadeRolesContext } from "./GroupMappingFields";
 import { useState, useActionState, useEffect, useRef, useTransition, type ReactNode } from "react";
 import {
   CalendarDays,
@@ -119,6 +120,7 @@ import {
   updateGlobalCaddyConfigAction,
   updateHttpCacheSettingsAction,
   updateTwoFactorPolicySettingsAction,
+  updateSsoEnforcementSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
   updateDashboardSettingsAction,
@@ -142,6 +144,9 @@ import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
 import { DashboardHostSection } from "./DashboardHostSection";
 import { CaptchaSection } from "./CaptchaSection";
 import { TwoFactorPolicySection } from "./TwoFactorPolicySection";
+import { type BreakGlassCandidate, SsoEnforcementSection } from "./SsoEnforcementSection";
+import type { SsoEnforcement } from "@/src/lib/auth/sso-enforcement";
+import type { SamlProvider } from "@/src/lib/models/saml-providers";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { RateLimitSection } from "./RateLimitSection";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
@@ -176,12 +181,17 @@ type Props = {
   globalCaddyConfig: GlobalCaddyConfigSettings;
   httpCache: HttpCacheSettingsView;
   twoFactorPolicy: TwoFactorPolicySettings;
+  ssoEnforcement: SsoEnforcement;
+  breakGlassCandidates: BreakGlassCandidate[];
+  samlProviders: SamlProvider[];
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalRateLimit?: GlobalRateLimitSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProviderView[];
   ldapDirectories: LdapDirectoryView[];
+  /** Roles made here, which a provider or directory can map groups to. */
+  madeRoles?: MadeRole[];
   /** The provider offered first on the sign-in screen, or null for alphabetical order. */
   primaryProviderId: string | null;
   localUsersDisabled: boolean;
@@ -257,12 +267,16 @@ export default function SettingsClient({
   globalCaddyConfig,
   httpCache,
   twoFactorPolicy,
+  ssoEnforcement,
+  breakGlassCandidates,
+  samlProviders,
   defaultResponse,
   globalGeoBlock,
   globalRateLimit = null,
   globalErrorPages,
   oauthProviders,
   ldapDirectories,
+  madeRoles = [],
   primaryProviderId,
   localUsersDisabled,
   avatars,
@@ -329,6 +343,10 @@ export default function SettingsClient({
     updateRegistrySettingsAction,
     null,
   );
+  const [accessReviewsState, accessReviewsFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
   const [agentRegistryState, agentRegistryFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
@@ -378,6 +396,10 @@ export default function SettingsClient({
   );
   const [twoFactorPolicyState, twoFactorPolicyFormAction] = useActionState(
     updateTwoFactorPolicySettingsAction,
+    null,
+  );
+  const [ssoEnforcementState, ssoEnforcementFormAction] = useActionState(
+    updateSsoEnforcementSettingsAction,
     null,
   );
   const [defaultResponseState, defaultResponseFormAction] = useActionState(
@@ -500,6 +522,14 @@ export default function SettingsClient({
         formAction={hostHistoryFormAction}
       />
     ),
+    "access-reviews": (
+      <RegistrySettingsBlock
+        block="access-reviews"
+        fields={registry["access-reviews"] ?? []}
+        state={accessReviewsState}
+        formAction={accessReviewsFormAction}
+      />
+    ),
     "sign-in": (
       <RegistrySettingsBlock
         block="sign-in"
@@ -560,6 +590,7 @@ export default function SettingsClient({
     oauth: (
       <OAuthSection
         oauthProviders={oauthProviders}
+        samlProviders={samlProviders}
         primaryProviderId={primaryProviderId}
         localUsersDisabled={localUsersDisabled}
         baseUrl={baseUrl}
@@ -591,6 +622,14 @@ export default function SettingsClient({
         policy={twoFactorPolicy}
         state={twoFactorPolicyState}
         formAction={twoFactorPolicyFormAction}
+      />
+    ),
+    "sso-enforcement": (
+      <SsoEnforcementSection
+        policy={ssoEnforcement}
+        candidates={breakGlassCandidates}
+        state={ssoEnforcementState}
+        formAction={ssoEnforcementFormAction}
       />
     ),
     "password-policy": (
@@ -692,32 +731,34 @@ export default function SettingsClient({
   // Saved but not applied, so marked the same as a field typed into just now.
   const stagedFields = staged.changes.flatMap((change) => change.fields);
   return (
-    <SettingsFrame sectionId={active} staged={staged} aside>
-      <FocusField />
-      <HStack gap={5} align="start">
-        <VStack gap={5} maxWidth={768} className="min-w-0 grow">
-          <PageSaveBar stagedFields={stagedFields}>
-            <VStack gap={5}>
-              {page.blocks.map((block) => (
-                <SettingsBlockShell
-                  key={block.id}
-                  block={block}
-                  showHeading={page.blocks.length > 1}
-                >
-                  {blocks[block.id]}
-                </SettingsBlockShell>
-              ))}
-            </VStack>
-          </PageSaveBar>
-        </VStack>
-        <OnThisPage
-          anchors={page.blocks.map((block) => ({
-            id: block.id,
-            label: settingsBlockName(t, block.id),
-          }))}
-        />
-      </HStack>
-    </SettingsFrame>
+    <MadeRolesContext.Provider value={madeRoles}>
+      <SettingsFrame sectionId={active} staged={staged} aside>
+        <FocusField />
+        <HStack gap={5} align="start">
+          <VStack gap={5} maxWidth={768} className="min-w-0 grow">
+            <PageSaveBar stagedFields={stagedFields}>
+              <VStack gap={5}>
+                {page.blocks.map((block) => (
+                  <SettingsBlockShell
+                    key={block.id}
+                    block={block}
+                    showHeading={page.blocks.length > 1}
+                  >
+                    {blocks[block.id]}
+                  </SettingsBlockShell>
+                ))}
+              </VStack>
+            </PageSaveBar>
+          </VStack>
+          <OnThisPage
+            anchors={page.blocks.map((block) => ({
+              id: block.id,
+              label: settingsBlockName(t, block.id),
+            }))}
+          />
+        </HStack>
+      </SettingsFrame>
+    </MadeRolesContext.Provider>
   );
 }
 
@@ -1839,11 +1880,13 @@ function ForwardAuthSection({
 
 function OAuthSection({
   oauthProviders,
+  samlProviders,
   primaryProviderId,
   localUsersDisabled,
   baseUrl,
 }: {
   oauthProviders: OAuthProviderView[];
+  samlProviders: SamlProvider[];
   /** The provider offered first on the sign-in screen, or null for alphabetical order. */
   primaryProviderId: string | null;
   localUsersDisabled: boolean;
@@ -1853,6 +1896,7 @@ function OAuthSection({
     <FormCard>
       <OAuthProvidersSection
         initialProviders={oauthProviders}
+        initialSamlProviders={samlProviders}
         initialPrimaryProviderId={primaryProviderId}
         baseUrl={baseUrl}
         localUsersDisabled={localUsersDisabled}

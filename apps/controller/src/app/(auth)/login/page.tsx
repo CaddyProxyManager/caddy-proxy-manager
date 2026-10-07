@@ -12,6 +12,7 @@ import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { oauthCallbackErrorMessage } from "@/src/lib/auth/oauth-callback-error";
 import { emailReady } from "@/src/lib/email/config";
+import { getSsoEnforcement } from "@/src/lib/auth/sso-break-glass";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.login");
@@ -49,6 +50,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       captcha={captcha}
       passwordResetEnabled={localLoginEnabled && (await emailReady())}
       directories={directories}
+      ssoEnforced={(await getSsoEnforcement()).enforced}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
     />
   );

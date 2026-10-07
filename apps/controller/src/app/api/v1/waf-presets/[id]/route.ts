@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import { getWafPreset, updateWafPreset, deleteWafPreset } from "@/src/lib/models/waf-presets";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
+import { getWafPreset } from "@/src/lib/models/waf-presets";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     const preset = await getWafPreset(Number(id));
     if (!preset) {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
     for (const key of ["name", "description", "directives"] as const) {
@@ -26,7 +27,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ error: `${key} must be a string` }, { status: 400 });
       }
     }
-    const preset = await updateWafPreset(Number(id), body, userId);
+    const preset = await submitOrApply(apiSubmitter(caller), {
+      kind: "wafPresetUpdate",
+      payload: { id: Number(id), input: body },
+    });
     return NextResponse.json(preset);
   } catch (error) {
     return apiErrorResponse(error);
@@ -38,9 +42,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id } = await params;
-    await deleteWafPreset(Number(id), userId);
+    await submitOrApply(apiSubmitter(caller), {
+      kind: "wafPresetDelete",
+      payload: { id: Number(id) },
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiErrorResponse(error);

@@ -21,7 +21,7 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/src/lib/auth', () => ({
-  requireAdmin: vi.fn(async () => ({ user: { id: '1', role: 'admin' } })),
+  requireUser: vi.fn(async () => ({ user: { id: '1', role: 'admin' } })),
 }));
 
 import { eq } from 'drizzle-orm';

@@ -29,6 +29,7 @@ export function toOAuthProviderView(provider: OAuthProvider): OAuthProviderView 
     operatorGroup: provider.operatorGroup,
     userGroup: provider.userGroup,
     viewerGroup: provider.viewerGroup,
+    roleGroups: provider.roleGroups ?? {},
     defaultRole: provider.defaultRole,
     syncGroups: provider.syncGroups,
     id: provider.id,

@@ -4,7 +4,7 @@
  */
 
 import { collectAttention } from "../attention";
-import type { Access } from "../users/permissions";
+import { type Access, can } from "../users/permissions";
 import type { ProxyHost } from "../models/proxy-hosts";
 import type { HostTrafficReport } from "../clickhouse/host-traffic";
 import { HOST_AUDIT_LIMIT, healthChecksOf, type ProxyHostDetail } from "./detail-types";
@@ -64,7 +64,7 @@ export async function getProxyHostDetail(
       agentIdsForHost("http", host.id).catch(() => [] as number[]),
       listAgentOptions().catch(() => []),
       getCrowdSecSettings().catch(() => null),
-      access.isAdmin
+      can(access, "audit:read")
         ? listAuditEvents(HOST_AUDIT_LIMIT, 0, { entityType: "proxy_host", entityId: host.id })
         : Promise.resolve([]),
       expiry.certificateTroubleDays().catch(() => expiry.DEFAULT_TROUBLE_DAYS),

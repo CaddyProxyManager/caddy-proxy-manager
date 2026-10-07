@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import {
@@ -18,7 +18,7 @@ import { DomainError } from "@/src/lib/errors/domain-error";
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     // `?agent=<row id>` narrows both to one agent, which is what the settings panel polls with
     // once an agent is being edited separately. Absent is the fleet-wide answer.
     const agentRowId = parseAgentRowId(request.nextUrl.searchParams.get("agent"));
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 /** POST /api/caddy-build - write the build override and trigger the agent. */
 export async function POST(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const status = await applyCaddyBuild(
       parseAgentRowId(request.nextUrl.searchParams.get("agent")),
     );

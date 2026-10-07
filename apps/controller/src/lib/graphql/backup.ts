@@ -15,19 +15,17 @@ import {
 } from "../backup/manage";
 import type { BackupRun } from "../backup/runs";
 import type { BackupScheduleInput } from "../backup/schedules";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 function runForApi(run: BackupRun | null) {
   return run && { ...run, slot: new Date(run.slot).toISOString() };
 }
 
 export const backupQueryResolvers = {
-  backupDestinations: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    await requireAdmin(context);
+  backupDestinations: async (_: unknown, __: unknown, _context: GraphQLContext) => {
     return listDestinations();
   },
-  backupSchedules: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    await requireAdmin(context);
+  backupSchedules: async (_: unknown, __: unknown, _context: GraphQLContext) => {
     return (await listSchedulesWithRuns()).map((schedule) => ({
       ...schedule,
       lastRun: runForApi(schedule.lastRun),
@@ -36,9 +34,8 @@ export const backupQueryResolvers = {
   backupRuns: async (
     _: unknown,
     args: { scheduleId?: number | null; limit?: number | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     const runs = await listRuns({
       scheduleId: args.scheduleId ?? undefined,
       limit: args.limit ?? undefined,
@@ -53,7 +50,7 @@ export const backupMutationResolvers = {
     args: { input: BackupDestinationInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return createDestinationAudited(args.input, userId);
   },
   updateBackupDestination: async (
@@ -61,20 +58,19 @@ export const backupMutationResolvers = {
     args: { id: number; input: BackupDestinationInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return updateDestinationAudited(args.id, args.input, userId);
   },
   deleteBackupDestination: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await deleteDestinationAudited(args.id, userId);
     return true;
   },
   testBackupDestination: async (
     _: unknown,
     args: { id?: number | null; input?: BackupDestinationInput | null },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     await testDestinationInput(args.id ?? null, args.input ?? null);
     return true;
   },
@@ -83,7 +79,7 @@ export const backupMutationResolvers = {
     args: { input: BackupScheduleInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return createScheduleAudited(args.input, userId);
   },
   updateBackupSchedule: async (
@@ -91,16 +87,16 @@ export const backupMutationResolvers = {
     args: { id: number; input: BackupScheduleInput },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return updateScheduleAudited(args.id, args.input, userId);
   },
   deleteBackupSchedule: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await deleteScheduleAudited(args.id, userId);
     return true;
   },
   runBackupNow: async (_: unknown, args: { scheduleId: number }, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     return runForApi(await runNowAudited(args.scheduleId, userId));
   },
 };

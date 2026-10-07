@@ -1,3 +1,4 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import {
@@ -5,7 +6,6 @@ import {
   checkSameOrigin,
   getCurrentSessionInfo,
   isFreshSession,
-  requireAdmin,
 } from "@/src/lib/auth";
 import {
   MAX_CONFIG_BYTES,
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (forbidden) return forbidden;
   const t = await getTranslations();
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("backups:write");
     const form = await request.formData();
     const upload = form.get("file");
     if (!(upload instanceof Blob) || upload.size === 0) {

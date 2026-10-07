@@ -1,0 +1,128 @@
+---
+title: Change approvals
+description: Hold changes to hosts, access lists, the WAF and settings until another person approves them.
+---
+
+Some changes deserve a second pair of eyes: turning off the WAF on the payment site, widening an
+access list, a new global Caddy snippet. With **change approvals** on, such a change is not applied
+when it is saved. It becomes a **change request**, and it applies only once enough approvers agree,
+as the person who made it.
+
+Requests and the policy live on the **Approvals** page.
+
+## The policy
+
+**Approvals → Approval policy** decides what waits. Anyone who can read settings sees it; only
+someone who manages settings can change it.
+
+| Setting | What it does |
+| --- | --- |
+| Require approval | Off, every change applies when it is saved. Off by default |
+| What needs approval | **Every change the policy can hold**, **changes in chosen areas** (hosts, access lists, the WAF, settings), or **changes to hosts with chosen tags** |
+| Approver roles and groups | Who may approve: anyone holding one of the roles, their own or [through a group](../users-and-groups/), and anyone in one of the groups |
+| Approvals each change needs | One or two |
+| Apply to API tokens | On by default; see [API tokens](#api-tokens) |
+
+A tag policy looks at the host's tags both before and after the change, so tagging a host into the
+policy is held too, and so is removing the tag that put it there. Only host changes match a tag;
+nothing else waits under a tag policy.
+
+The policy is a settings change itself. While settings are covered, changing the policy is held for
+approval like anything else.
+
+### What the policy can hold
+
+| Area | Changes |
+| --- | --- |
+| Hosts | Proxy and L4 hosts: creating, editing, enabling and disabling, maintenance mode, deleting, bulk changes, who may sign in to a host, its mTLS access rules, and [rolling back or restoring](../host-history/) a host |
+| Access lists | Creating, editing and deleting a list, its IP rules, adding members and removing them |
+| WAF | Presets, rule exclusions, and installing, updating, configuring or uninstalling CRS plugins |
+| Settings | Applying staged settings (everything on the Settings pages that goes through **Review**), a settings group saved over the API, and the approval policy itself |
+
+Some writes stay outside it, each for a reason:
+
+- **Regenerating an access list member's password** replaces a credential for someone who already
+  has access; it changes nobody's access, and the new password is shown once, to whoever made it.
+- **Settings that save at once** rather than through **Review** - the Caddy build, analytics,
+  GeoIP, email, CAPTCHA and certificate alerts - and which CRS plugin registries are read.
+- **Restoring a backup** and **importing a configuration** replace configuration wholesale. Only an
+  administrator can do either, and an administrator can bypass approval anyway.
+- **[Access reviews](../access-reviews/)** have reviewers of their own, and change users, groups and
+  tokens, which no approval area covers.
+- **Users, groups, roles, certificates, alerts and backups** are outside the four areas.
+
+## Submitting a change
+
+Nothing new to learn: edit as usual. When the policy covers what you are saving, the host editor's
+review says so and its button reads **Submit** instead of **Save**; the staged settings review does
+the same in place of **Apply**. Other pages save as always and tell you the change was submitted,
+with its request number.
+
+A submitted change runs every check a save would first, so a change that could never apply is
+refused straight away rather than queued.
+
+## Approving
+
+Approvers see a banner on every page while a request waits for them. A request shows the same diff a
+save would: for a host, the editor's own review with its impact - which agents reload, which
+certificates are requested, and warnings such as a protection being removed; for staged settings,
+the changed fields and the Caddy configuration they produce; for anything else, field by field.
+Secrets are masked throughout.
+
+- **Approve** adds your approval, with an optional note. The approval a request still needs applies
+  it, **as the person who submitted it**: the host history and the audit log name them, with the
+  request and its approvers recorded beside the change.
+- **Reject** closes it. One rejection is enough.
+- **Withdraw** is the requester's: it closes a request nobody has applied.
+
+**Nobody approves their own change**, whatever their role, and a request needing two approvals needs
+two people other than its requester.
+
+### When the target changes first
+
+A request remembers what it edits as it stood when submitted. If that changes before the request is
+approved - someone edited the same host, or another request applied first - approving it does not
+overwrite the newer state. The request goes **Out of date** and nothing is applied; make the change
+again on top of what is there now.
+
+Approval also never lends permission: if the requester has since lost the right to make the change,
+or their account is disabled, the request fails rather than applying.
+
+Two approvers pressing **Approve** at the same moment apply the change once.
+
+If the controller stops while a request is applying, it is settled once it has been applying for ten
+minutes, and never by applying it again. A change that was written is marked applied; one that was
+not fails, and the request says whether its target is untouched or whether that cannot be told, in
+which case check the target before submitting it again.
+
+## Emergency bypass
+
+During an outage, waiting for an approver may not be an option. An administrator can **Bypass** a
+pending request, with a reason. It applies at once, still as its requester and still refused if its
+target changed. Every bypass is in the audit log with the reason, and raises the **Change approval
+bypassed** alert, which goes to the administrators' email and push by default and to any
+[alert channel](../alerts/) a rule sends it to.
+
+## API tokens
+
+**Apply to API tokens** decides what a covered write made with an [API token](../api/) does.
+
+- **On** (the default): it waits like any other. REST answers `202 Accepted` with
+  `{ "status": "pending", "changeRequestId": 12 }`; GraphQL answers `202` with an error whose
+  `extensions` carry `code: "PENDING_APPROVAL"` and the `changeRequestId`. The request is the token
+  owner's. Read its outcome with the `changeRequest(id)` query.
+- **Off**: the write applies at once, and its audit event records that approval was skipped.
+
+Without the setting a token would be a way around the policy, which is why it is on by default.
+
+Over GraphQL, `changeRequests`, `changeRequest`, `approveChangeRequest`, `rejectChangeRequest`,
+`withdrawChangeRequest`, `bypassChangeRequest`, `approvalPolicy` and `setApprovalPolicy` do what
+the page does. Deciding a request applies a change in whichever area it is in, so a token needs the
+full scope to approve, reject or bypass one.
+
+## Audit
+
+Every step is in the [audit log](../audit-log/): submitted, approved, rejected, withdrawn, out of
+date, bypassed with its reason, applied, or failed with why. The change itself is audited as the
+requester's, with the request number and approvers in the event's details, and a host revision made
+by a request links back to it from the host's history.

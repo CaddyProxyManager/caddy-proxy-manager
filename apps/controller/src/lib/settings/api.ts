@@ -69,6 +69,7 @@ import {
 } from "./index";
 import { SettingsValidationError, validateSettingsGroup } from "./validation";
 import { withSettingsUpdateLock } from "./update-lock";
+import { withCapturedWrites } from "./staging-context";
 
 type SettingsHandler = {
   get: () => Promise<unknown>;
@@ -315,4 +316,26 @@ export async function saveSettingsGroup(group: string, input: unknown): Promise<
     }
     await handler.afterSave?.();
   });
+}
+
+/**
+ * What saving `input` to `group` would write, by storage key, without writing it: the group's own
+ * saver, validation and encryption, run under a capturing scope. A change request shows this.
+ */
+export async function captureSettingsGroupWrites(
+  group: string,
+  input: unknown,
+): Promise<Map<string, string>> {
+  if (!isSettingsGroup(group)) throw new SettingsValidationError("Unknown settings group");
+  const handler = SETTINGS_HANDLERS[group];
+  const validated = validateSettingsGroup(group, input, {
+    previousWaf: group === "waf" ? await getWafSettings() : null,
+  });
+  const { writes } = await withCapturedWrites(new Map(), () => handler.save(validated as never));
+  return writes;
+}
+
+/** The storage key a group saves to. */
+export function settingsGroupKey(group: string): string | null {
+  return isSettingsGroup(group) ? SETTINGS_HANDLERS[group].storageKey : null;
 }

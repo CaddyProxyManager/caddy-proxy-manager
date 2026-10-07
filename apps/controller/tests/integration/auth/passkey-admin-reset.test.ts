@@ -21,7 +21,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({
   ...actualAuth,
-  requireAdmin: vi.fn(async () => ({ user: { id: String(ctx.actorId), role: 'admin' } })),
+  requireUser: vi.fn(async () => ({ user: { id: String(ctx.actorId), role: 'admin' } })),
 }));
 
 import { eq } from 'drizzle-orm';

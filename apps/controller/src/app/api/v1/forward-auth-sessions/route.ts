@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   listForwardAuthSessions,
   deleteUserForwardAuthSessions,
@@ -7,7 +7,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const sessions = await listForwardAuthSessions();
     return NextResponse.json(sessions);
   } catch (error) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const userId = request.nextUrl.searchParams.get("userId");
     if (!userId) {
       return NextResponse.json({ error: "userId query parameter is required" }, { status: 400 });

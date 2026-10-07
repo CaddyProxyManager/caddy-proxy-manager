@@ -206,6 +206,15 @@ export function clearLdapDirectories(): void {
   `);
 }
 
+/** SAML providers have no REST route; a spec clears its own so a rerun starts clean. */
+export function clearSamlProviders(): void {
+  runSeedScript(`
+    await sql\`DELETE FROM oauth_providers WHERE type = 'saml'\`;
+    await sql\`DELETE FROM settings WHERE key = 'sso_enforcement'\`;
+    await sql.close();
+  `);
+}
+
 /** A directory-provisioned account, so a rerun signs in as a first-time user again. */
 export function deleteUserByEmail(email: string): void {
   runSeedScript(`

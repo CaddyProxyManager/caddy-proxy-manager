@@ -13,23 +13,26 @@ import { startViewAsAction } from "@/src/app/(dashboard)/view-as/actions";
 const ROLES = ["operator", "user", "viewer"] as const;
 
 /**
- * Starts "View as" (lib/users/view-as.ts). Groups are only offered for an operator: grants reach no
- * other role, so a viewer in a group sees exactly what a viewer outside one does.
+ * Starts "View as" (lib/users/view-as.ts): any role but admin, in any groups, since a group's
+ * grants reach a scoped role and the role a group gives reaches everyone in it.
  */
 export function ViewAsDialog({
   open,
   onClose,
   groups,
   initialGroupIds = [],
+  madeRoles = [],
 }: {
   open: boolean;
   onClose: () => void;
   groups: { id: number; name: string }[];
   initialGroupIds?: number[];
+  /** Roles made here, by key and name. */
+  madeRoles?: readonly { key: string; name: string }[];
 }) {
   const t = useTranslations("users.viewAs");
   const tCommon = useTranslations("common");
-  const [role, setRole] = useState<(typeof ROLES)[number]>("operator");
+  const [role, setRole] = useState<string>("operator");
   const [groupIds, setGroupIds] = useState<number[]>(initialGroupIds);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,7 +40,7 @@ export function ViewAsDialog({
   const start = async () => {
     setBusy(true);
     setError(null);
-    const result = await startViewAsAction(role, role === "operator" ? groupIds : []);
+    const result = await startViewAsAction(role, groupIds);
     setBusy(false);
     if (result.status === "error") {
       setError(result.message ?? null);
@@ -64,36 +67,37 @@ export function ViewAsDialog({
         </Text>
         <Selector
           label={tCommon("role")}
-          options={ROLES.map((value) => ({ value, label: t(`roles.${value}`) }))}
+          options={[
+            ...ROLES.map((value) => ({ value: value as string, label: t(`roles.${value}`) })),
+            ...madeRoles.map((made) => ({ value: made.key, label: made.name })),
+          ]}
           value={role}
-          onChange={(next) => setRole(next as (typeof ROLES)[number])}
+          onChange={setRole}
         />
-        {role === "operator" && (
-          <VStack gap={2}>
-            <Text type="body" size="sm" weight="semibold">
-              {t("groups")}
+        <VStack gap={2}>
+          <Text type="body" size="sm" weight="semibold">
+            {t("groups")}
+          </Text>
+          {groups.length === 0 ? (
+            <Text type="body" size="sm" color="secondary">
+              {t("noGroups")}
             </Text>
-            {groups.length === 0 ? (
-              <Text type="body" size="sm" color="secondary">
-                {t("noGroups")}
-              </Text>
-            ) : (
-              groups.map((group) => (
-                <CheckboxInput
-                  key={group.id}
-                  label={group.name}
-                  value={groupIds.includes(group.id)}
-                  onChange={(checked) =>
-                    setGroupIds((current) =>
-                      checked ? [...current, group.id] : current.filter((id) => id !== group.id),
-                    )
-                  }
-                />
-              ))
-            )}
-            <Text type="supporting">{t("groupsHelp")}</Text>
-          </VStack>
-        )}
+          ) : (
+            groups.map((group) => (
+              <CheckboxInput
+                key={group.id}
+                label={group.name}
+                value={groupIds.includes(group.id)}
+                onChange={(checked) =>
+                  setGroupIds((current) =>
+                    checked ? [...current, group.id] : current.filter((id) => id !== group.id),
+                  )
+                }
+              />
+            ))
+          )}
+          <Text type="supporting">{t("groupsHelp")}</Text>
+        </VStack>
       </VStack>
     </AppDialog>
   );

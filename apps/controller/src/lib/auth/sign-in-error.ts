@@ -26,6 +26,9 @@ export const SIGN_IN_ERROR_KEYS: Readonly<
 
 import type { useFormatter } from "next-intl";
 
+/** Raised by auth/server.ts while single sign-on is enforced; its message is already translated. */
+export const SSO_REQUIRED = "SSO_REQUIRED";
+
 /** A per-account lock, told apart from Better Auth's per-address limit, which has no code. */
 export const ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
 

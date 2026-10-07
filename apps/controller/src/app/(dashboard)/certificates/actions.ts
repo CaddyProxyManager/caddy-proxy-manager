@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
 import {
   createCertificate,
   deleteCertificate,
@@ -19,7 +19,7 @@ import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { getTranslations } from "next-intl/server";
 
 export async function createCertificateAction(formData: FormData) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const type = String(formData.get("type") ?? "managed") as "managed" | "imported";
   await createCertificate(
@@ -37,7 +37,7 @@ export async function createCertificateAction(formData: FormData) {
 }
 
 export async function updateCertificateAction(id: number, formData: FormData) {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const type = formData.get("type")
     ? (String(formData.get("type")) as "managed" | "imported")
@@ -68,7 +68,7 @@ export async function updateCertificateAction(id: number, formData: FormData) {
 export async function deleteCertificateAction(
   id: number,
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   try {
     // A refusal names the hosts still using it, which only the server can list-format.
@@ -96,7 +96,7 @@ async function translated<T>(run: () => Promise<T>): Promise<Outcome<T>> {
 export async function listCertificateFilesAction(
   agentRowId: number,
 ): Promise<Outcome<CertificateFileEntry[]>> {
-  await requireAdmin();
+  await requireCan("certificates:read");
   return translated(() => listCertificateFilesOnAgent(agentRowId));
 }
 
@@ -106,7 +106,7 @@ export async function createCertificateFromFilesAction(input: {
   certPath: string;
   keyPath: string;
 }): Promise<Outcome> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const outcome = await translated(async () => {
     await createCertificateFromAgentFiles(
       {
@@ -124,7 +124,7 @@ export async function createCertificateFromFilesAction(input: {
 
 /** A failed read is stored on the row and shown there, so only an unreachable agent errors here. */
 export async function rereadCertificateFileAction(id: number): Promise<Outcome> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const outcome = await translated(async () => {
     await rereadCertificateFile(id, Number(session.user.id));
   });
@@ -136,7 +136,7 @@ export async function rereadCertificateFileAction(id: number): Promise<Outcome> 
 export async function deleteUnusedCertificatesAction(
   ids: number[],
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const userId = Number(session.user.id);
   const t = await getTranslations("certificates");
   try {

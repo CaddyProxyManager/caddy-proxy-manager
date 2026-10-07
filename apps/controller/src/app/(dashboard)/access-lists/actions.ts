@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/errors/domain-error";
 import { normalizeCidr } from "@/src/lib/access-lists/rules";
 import type { AccessRuleKind } from "@/src/lib/access-lists/limits";
@@ -9,32 +9,36 @@ import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { getTranslations } from "next-intl/server";
 import {
   addAccessListEntry,
-  createAccessList,
-  deleteAccessList,
   getAccessList,
   getAccessListStats,
-  removeAccessListEntries,
   removeAccessListEntry,
-  setAccessListIpRules,
-  updateAccessList,
   type AccessListSettingsInput,
   type AccessListStats,
 } from "@/src/lib/models/access-lists";
+import { submitOrApply } from "@/src/lib/approvals";
+import { orSubmitted } from "@/src/lib/approvals/action-result";
 
 export async function createAccessListAction(input: {
   name: string;
   description: string | null;
   users: { username: string; password: string }[];
 }) {
-  const session = await requireAdmin();
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
-  const list = await createAccessList(
-    {
-      name: input.name,
-      description: input.description,
-      users: input.users.filter((u) => u.username.trim() && u.password),
-    },
-    userId,
+  const list = await orSubmitted(() =>
+    submitOrApply(
+      { userId },
+      {
+        kind: "accessListCreate",
+        payload: {
+          input: {
+            name: input.name,
+            description: input.description,
+            users: input.users.filter((u) => u.username.trim() && u.password),
+          },
+        },
+      },
+    ),
   );
   revalidatePath("/access-lists");
   return list;
@@ -42,8 +46,13 @@ export async function createAccessListAction(input: {
 
 export async function updateAccessListAction(id: number, input: AccessListSettingsInput) {
   return withTranslatedErrors(async () => {
-    const session = await requireAdmin();
-    const list = await updateAccessList(id, input, Number(session.user.id));
+    const session = await requireCan("accessLists:write");
+    const list = await orSubmitted(() =>
+      submitOrApply(
+        { userId: Number(session.user.id) },
+        { kind: "accessListUpdate", payload: { id, input } },
+      ),
+    );
     revalidatePath("/access-lists");
     return list;
   });
@@ -64,14 +73,19 @@ export async function setAccessListIpRulesAction(
   }[],
 ) {
   return withTranslatedErrors(async () => {
-    const session = await requireAdmin();
+    const session = await requireCan("accessLists:write");
     const typed = rules.map(({ kind, target, ...rule }) => {
       if (kind === "address") {
         return normalizeCidr(target) ? { ...rule, cidr: target } : { ...rule, hostname: target };
       }
       return { ...rule, [kind]: target };
     });
-    const list = await setAccessListIpRules(id, typed, Number(session.user.id));
+    const list = await orSubmitted(() =>
+      submitOrApply(
+        { userId: Number(session.user.id) },
+        { kind: "accessListRules", payload: { id, rules: typed } },
+      ),
+    );
     revalidatePath("/access-lists");
     return list;
   });
@@ -79,20 +93,24 @@ export async function setAccessListIpRulesAction(
 
 /** Hosts using the list, and what it stopped over the last day when analytics are on. */
 export async function getAccessListStatsAction(id: number): Promise<AccessListStats> {
-  await requireAdmin();
+  await requireCan("accessLists:read");
   return getAccessListStats(id);
 }
 
 export async function deleteAccessListAction(
   id: number,
-): Promise<{ success: boolean; error?: string }> {
-  const session = await requireAdmin();
+): Promise<{ success: boolean; error?: string; submitted?: string }> {
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
   try {
     // A refusal names the hosts still using it, which only the server can list-format.
-    await withTranslatedErrors(() => deleteAccessList(id, userId));
+    const outcome = await withTranslatedErrors(() =>
+      orSubmitted(() => submitOrApply({ userId }, { kind: "accessListDelete", payload: { id } })),
+    );
     revalidatePath("/access-lists");
-    return { success: true };
+    return typeof outcome === "object"
+      ? { success: true, submitted: outcome.message }
+      : { success: true };
   } catch (e) {
     const t = await getTranslations("accessLists");
     return { success: false, error: e instanceof Error ? e.message : t("deleteFailed") };
@@ -103,25 +121,37 @@ export async function addAccessEntryAction(
   accessListId: number,
   entry: { username: string; password: string },
 ) {
-  const session = await requireAdmin();
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
-  const list = await addAccessListEntry(accessListId, entry, userId);
+  const list = await orSubmitted(() =>
+    submitOrApply({ userId }, { kind: "accessListEntryAdd", payload: { id: accessListId, entry } }),
+  );
   revalidatePath("/access-lists");
   return list;
 }
 
 export async function deleteAccessEntryAction(accessListId: number, entryId: number) {
-  const session = await requireAdmin();
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
-  const list = await removeAccessListEntry(accessListId, entryId, userId);
+  const list = await orSubmitted(() =>
+    submitOrApply(
+      { userId },
+      { kind: "accessListEntryRemove", payload: { id: accessListId, entryIds: [entryId] } },
+    ),
+  );
   revalidatePath("/access-lists");
   return list;
 }
 
 export async function bulkDeleteEntriesAction(accessListId: number, entryIds: number[]) {
-  const session = await requireAdmin();
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
-  const list = await removeAccessListEntries(accessListId, entryIds, userId);
+  const list = await orSubmitted(() =>
+    submitOrApply(
+      { userId },
+      { kind: "accessListEntryRemove", payload: { id: accessListId, entryIds } },
+    ),
+  );
   revalidatePath("/access-lists");
   return list;
 }
@@ -131,7 +161,7 @@ async function regeneratePasswordActionUntranslated(
   entryId: number,
   newPassword: string,
 ) {
-  const session = await requireAdmin();
+  const session = await requireCan("accessLists:write");
   const userId = Number(session.user.id);
   // Replaced as remove-and-add under the same username, which has to be read first.
   const listBefore = await getAccessList(accessListId);

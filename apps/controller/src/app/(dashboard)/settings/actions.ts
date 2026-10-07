@@ -1,7 +1,7 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
 import { extractErrorMessage, storedErrorMessage } from "@/src/lib/errors/action-error";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { domainError } from "@/src/lib/errors/domain-error";
@@ -57,6 +57,7 @@ import {
   saveGlobalCaddyConfigSettings,
   saveHttpCacheSettings,
   saveTwoFactorPolicySettings,
+  saveSsoEnforcementSettings,
   saveDefaultResponseSettings,
   type DefaultResponseSettings,
   saveAvatarSettings,
@@ -118,9 +119,11 @@ import { withSettingsUpdateLock } from "@/src/lib/settings/update-lock";
 import {
   discardAllStaged,
   discardStagedKey,
+  listStagedSettings,
   stageWrites,
   stagedOverlay,
 } from "@/src/lib/settings/staging";
+import { submitIfCovered } from "@/src/lib/approvals";
 import { withCapturedWrites } from "@/src/lib/settings/staging-context";
 import { applyStagedSettings } from "@/src/lib/settings/apply";
 import { stageRevisionRestore } from "@/src/lib/settings/revisions";
@@ -140,7 +143,6 @@ import { detach } from "@/src/lib/agent/registry";
 import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/models/agents";
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
-import type { AppRole } from "@/src/lib/auth/oidc/groups";
 
 type ActionResult = {
   success: boolean;
@@ -176,7 +178,7 @@ function stagedSettingsAction<TArgs extends unknown[], TResult extends ActionRes
 ): (...args: TArgs) => Promise<TResult> {
   return async (...args: TArgs) =>
     withSettingsUpdateLock(async () => {
-      const session = await requireAdmin();
+      const session = await requireCan("settings:write");
       const userId = Number(session.user.id);
       const overlay = await stagedOverlay(userId);
 
@@ -207,7 +209,7 @@ async function updateGeneralSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
     // The CA only refuses a malformed contact at the next issuance, long after this save.
     if (acmeEmail !== "" && !isEmailAddress(acmeEmail, "public")) {
@@ -234,7 +236,7 @@ async function updateAcmeSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const caUrl = formData.get("caUrl") ? String(formData.get("caUrl")).trim() : "";
     const caRootPem = formData.get("caRootPem") ? String(formData.get("caRootPem")).trim() : "";
@@ -284,7 +286,7 @@ async function updateCloudflareSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const rawToken = formData.get("apiToken") ? String(formData.get("apiToken")).trim() : "";
     const clearToken = formData.get("clearToken") === "on";
     const current = await getSetting<CloudflareSettings>("cloudflare");
@@ -331,7 +333,7 @@ async function updateDnsProviderSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const action = String(formData.get("action") ?? "save").trim();
     const providerName = String(formData.get("provider") ?? "").trim();
@@ -545,7 +547,7 @@ async function registerAcmeDnsAccountActionUnlocked(
 ): Promise<AcmeDnsRegisterResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const domain = normalizeDnsName(challengeBaseName(String(formData.get("domain") ?? "")));
     if (!domain) return { success: false, message: t("results.dnsDelegationDomainInvalid") };
     const serverUrl = String(formData.get("serverUrl") ?? "").trim();
@@ -580,7 +582,7 @@ async function registerAcmeDnsAccountActionUnlocked(
 
 /** Read-only lookups, so no lock; a warning on the screen, never a refusal. */
 export async function checkDnsDelegationsAction(): Promise<DelegationCheck[]> {
-  await requireAdmin();
+  await requireCan("settings:read");
   const settings = await getDnsProviderSettings();
   return await checkDelegations(settings?.delegations ?? [], settings?.acmeDnsAccounts);
 }
@@ -591,7 +593,7 @@ async function updateAuthentikSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const outpostDomain = String(formData.get("outpostDomain") ?? "").trim();
     const outpostUpstream = String(formData.get("outpostUpstream") ?? "").trim();
     const authEndpoint = formData.get("authEndpoint")
@@ -626,7 +628,7 @@ async function updateForwardAuthSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const providerRaw = String(formData.get("forwardAuthProvider") ?? "").trim();
     const provider = providerRaw === "custom" ? "custom" : "authelia";
     const authUpstream = String(formData.get("forwardAuthUpstream") ?? "").trim();
@@ -663,7 +665,7 @@ async function updateTailscaleSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const existing = (await getTailscaleSettings()) ?? defaultTailscaleSettings();
     const submittedAuthKey = String(formData.get("tailscaleAuthKey") ?? "").trim();
@@ -734,7 +736,7 @@ async function updateCaptchaSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const existing = await getCaptchaSettings();
     const rawProvider = String(formData.get("captchaProvider") ?? "none");
@@ -783,7 +785,7 @@ async function updatePasswordPolicySettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     // The env var pins the behaviour; refuse rather than silently storing an overridden preference.
     if (config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null) {
@@ -818,7 +820,7 @@ async function updateAvatarSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     // AVATAR_GRAVATAR pins the behaviour; refuse rather than store an overridden preference.
     if (config.avatars.gravatarFromEnv !== null) {
@@ -853,7 +855,7 @@ async function updateAnalyticsSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const enabled = formData.get("analyticsEnabled") === "on";
     const password = String(formData.get("clickhousePassword") ?? "");
@@ -896,7 +898,7 @@ async function updateGeoipSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const enabled = formData.get("geoipEnabled") === "on";
     const accountId = String(formData.get("geoipAccountId") ?? "");
@@ -938,7 +940,7 @@ async function updateFaviconActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     if (formData.get("intent") === "remove") {
       await clearFavicon();
@@ -977,7 +979,7 @@ async function updateAccentColorActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const [{ accentColor, SettingValidationError }, { setSetting }, { isEnvOverridden }] =
       await Promise.all([
         import("@/src/lib/settings/registry"),
@@ -1015,7 +1017,7 @@ async function updateRegistrySettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const block = String(formData.get("registryBlock") ?? "");
     const [
@@ -1117,7 +1119,7 @@ async function updateEmailSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const registry = await import("@/src/lib/settings/registry");
     const values: Record<string, unknown> = {
       // Never back to null: the tri-state is for deployments that never saw this page.
@@ -1147,7 +1149,7 @@ async function updateCertificateAlertSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const registry = await import("@/src/lib/settings/registry");
     return await saveEmailRegistryValues(
       {
@@ -1169,7 +1171,7 @@ async function updateUpdateSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const [registry, { saveSettings }] = await Promise.all([
       import("@/src/lib/settings/registry"),
@@ -1218,7 +1220,7 @@ async function updateUpdateSettingsActionUnlocked(
 async function checkForUpdatesActionUnlocked(): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const result = await checkForUpdates();
     revalidatePath("/", "layout");
     return result.error
@@ -1242,7 +1244,7 @@ async function updateMetricsSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const enabled = formData.get("enabled") === "on";
     const portStr = formData.get("port") ? String(formData.get("port")).trim() : "";
     const port = portStr && !Number.isNaN(Number(portStr)) ? Number(portStr) : 9090;
@@ -1280,7 +1282,7 @@ async function updateLoggingSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const enabled = formData.get("enabled") === "on";
     const format = formData.get("format") ? String(formData.get("format")).trim() : "json";
 
@@ -1333,7 +1335,7 @@ async function updateDashboardSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const domain = String(formData.get("domain") ?? "").trim();
     const current = await getDashboardSettings();
@@ -1371,7 +1373,7 @@ async function updateDashboardSettingsActionUnlocked(
  * would make form input the host of a server-side request (SSRF).
  */
 export async function checkDashboardDnsAction(): Promise<DashboardDnsCheck> {
-  await requireAdmin();
+  await requireCan("settings:read");
   const saved = await getDashboardSettings();
   return await checkDashboardDns(saved?.domain ?? "");
 }
@@ -1382,7 +1384,7 @@ async function updateTrustedProxiesSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const ranges = parseResolverList(
       formData.get("ranges") ? String(formData.get("ranges")) : null,
@@ -1428,7 +1430,7 @@ async function updateHttpProtocolsSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     await saveHttpProtocolsSettings({
       http2: formData.get("http2") === "on",
       http3: formData.get("http3") === "on",
@@ -1462,7 +1464,7 @@ async function updateCompressionSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     await saveCompressionSettings({ enabled: formData.get("enabled") === "on" });
     try {
       await applyCaddyConfig();
@@ -1493,7 +1495,7 @@ async function updateCrowdSecSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     // A blank key keeps the stored one while the addresses are unchanged; see saveCrowdSecSettings.
     await saveCrowdSecSettings({
       enabled: parseCheckbox(formData.get("crowdsecEnabled")),
@@ -1525,7 +1527,7 @@ export async function testCrowdSecConnectionAction(input: {
 }): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const typed = normalizeCrowdSecSettings({ apiUrl: input.apiUrl, apiKey: input.apiKey });
     if (!typed.apiUrl) return { success: false, message: t("results.crowdsecTestNoUrl") };
     const stored = await getCrowdSecSettings();
@@ -1567,7 +1569,7 @@ async function updateHttpCacheSettingsActionUnlocked(
   const t = await getTranslations("settings");
   const field = (name: string) => String(formData.get(name) ?? "");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     // A blank secret keeps the stored one; saveHttpCacheSettings fills it in.
     await saveHttpCacheSettings({
       storage: field("storage"),
@@ -1617,7 +1619,7 @@ async function updateGlobalCaddyConfigActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     await saveGlobalCaddyConfigSettings({ caddyfile: String(formData.get("caddyfile") ?? "") });
     try {
       await applyCaddyConfig();
@@ -1648,7 +1650,7 @@ async function updateTwoFactorPolicySettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const graceDays = formData.get("graceDays");
     await saveTwoFactorPolicySettings({
       mode: String(formData.get("mode") ?? "off"),
@@ -1665,13 +1667,40 @@ async function updateTwoFactorPolicySettingsActionUnlocked(
   }
 }
 
+async function updateSsoEnforcementSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireCan("settings:write");
+    const breakGlassUserIds = String(formData.get("breakGlassUserIds") ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+    await saveSsoEnforcementSettings({
+      enforced: formData.get("enforced") === "true",
+      allowLdap: formData.get("allowLdap") !== "false",
+      breakGlassUserIds,
+    });
+    revalidatePath("/settings");
+    return { success: true, message: t("results.ssoEnforcementSaved") };
+  } catch (error) {
+    console.error("Failed to save single sign-on enforcement:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.ssoEnforcementFailed")),
+    };
+  }
+}
+
 async function updateDnsSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const enabled = formData.get("enabled") === "on";
     const resolversRaw = formData.get("resolvers") ? String(formData.get("resolvers")) : "";
     const fallbacksRaw = formData.get("fallbacks") ? String(formData.get("fallbacks")) : "";
@@ -1719,7 +1748,7 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const enabled = formData.get("enabled") === "on";
     const familyRaw = formData.get("family") ? String(formData.get("family")).trim() : "both";
@@ -1808,7 +1837,7 @@ async function updateGeoBlockSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const enabled = parseCheckbox(formData.get("geoblockEnabled"));
 
@@ -1879,7 +1908,7 @@ async function updateRateLimitSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const zonesRaw = formData.get("rateLimitZonesJson");
     let zones: unknown = [];
     try {
@@ -1920,7 +1949,7 @@ async function updateErrorPagesSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const raw = formData.get("errorPagesJson");
     let rules: ReturnType<typeof sanitizeErrorPageRules> = [];
@@ -1962,7 +1991,7 @@ async function updateDefaultResponseSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const responseMode = String(formData.get("mode") ?? "caddy");
     let next: DefaultResponseSettings;
@@ -2017,13 +2046,13 @@ async function updateDefaultResponseSettingsActionUnlocked(
 export async function lookupWafRuleMessageAction(
   ruleId: number,
 ): Promise<{ message: string | null }> {
-  await requireAdmin();
+  await requireCan("settings:read");
   const map = await getWafRuleMessages([ruleId]);
   return { message: map[ruleId] ?? null };
 }
 
 export async function getOAuthProvidersAction() {
-  await requireAdmin();
+  await requireCan("settings:read");
   const { listOAuthProviders } = await import("@/src/lib/models/oauth-providers");
   return listOAuthProviders();
 }
@@ -2046,10 +2075,11 @@ export async function createOAuthProviderAction(data: {
   operatorGroup?: string | null;
   userGroup?: string | null;
   viewerGroup?: string | null;
-  defaultRole?: AppRole;
+  defaultRole?: string;
+  roleGroups?: Record<string, string[]>;
   syncGroups?: boolean;
 }) {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:write");
   const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
   const { invalidateProviderCache } = await import("@/src/lib/auth/server");
   const provider = await createOAuthProvider({ ...data, source: "ui" });
@@ -2072,7 +2102,7 @@ export async function createOAuthProviderAction(data: {
  * "exactly one primary".
  */
 export async function setPrimaryOAuthProviderAction(id: string | null): Promise<void> {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:write");
   const { setPrimaryProviderId } = await import("@/src/lib/models/oauth-providers");
   await setPrimaryProviderId(id);
   const { createAuditEvent } = await import("@/src/lib/models/audit");
@@ -2107,11 +2137,12 @@ export async function updateOAuthProviderAction(
     operatorGroup: string | null;
     userGroup: string | null;
     viewerGroup: string | null;
-    defaultRole: AppRole;
+    defaultRole: string;
+    roleGroups: Record<string, string[]>;
     syncGroups: boolean;
   }>,
 ) {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:write");
   const { updateOAuthProvider } = await import("@/src/lib/models/oauth-providers");
   const { invalidateProviderCache } = await import("@/src/lib/auth/server");
   const updated = await updateOAuthProvider(id, data);
@@ -2130,7 +2161,7 @@ export async function updateOAuthProviderAction(
 }
 
 export async function deleteOAuthProviderAction(id: string) {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:write");
   const { getOAuthProvider, deleteOAuthProvider } = await import(
     "@/src/lib/models/oauth-providers"
   );
@@ -2196,7 +2227,7 @@ async function updateWafSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     // The mode control posts Off, DetectionOnly or On; an older form only the enable switch.
     const rawMode = formData.get("wafEngineMode");
@@ -2321,7 +2352,7 @@ async function updateCaddyBuildSettingsActionUnlocked(
 ): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
 
     const agentRowIdRaw = Number.parseInt(String(formData.get("agentRowId") ?? "0"), 10);
     const agentRowId =
@@ -2418,7 +2449,7 @@ export async function rebuildCaddyAction(
   void _formData;
   const t = await getTranslations();
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const status = await applyCaddyBuild();
     revalidatePath("/settings");
     return {
@@ -2489,6 +2520,9 @@ export const updateHttpCacheSettingsAction = stagedSettingsAction(
 export const updateTwoFactorPolicySettingsAction = stagedSettingsAction(
   updateTwoFactorPolicySettingsActionUnlocked,
 );
+export const updateSsoEnforcementSettingsAction = stagedSettingsAction(
+  updateSsoEnforcementSettingsActionUnlocked,
+);
 export const updateDashboardSettingsAction = stagedSettingsAction(
   updateDashboardSettingsActionUnlocked,
 );
@@ -2552,7 +2586,7 @@ export const updateCertificateAlertSettingsAction = serializedSettingsAction(
 export async function sendTestNotificationAction(): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const { sendTestNotification } = await import("@/src/lib/notifications");
     const recipients = await sendTestNotification();
     if (recipients.length === 0) {
@@ -2575,7 +2609,7 @@ export async function sendTestNotificationAction(): Promise<ActionResult> {
 export async function sendTestEmailAction(recipient: string): Promise<ActionResult> {
   const t = await getTranslations("settings");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("settings:write");
     const to = recipient.trim() || session.user.email;
     if (!isEmailAddress(to)) return { success: false, message: t("email.testInvalidRecipient") };
 
@@ -2597,7 +2631,7 @@ export async function sendTestEmailAction(recipient: string): Promise<ActionResu
 /** Not staged: it writes only the databases, and there is nothing for an operator to review. */
 export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireCan("settings:write");
     const { updateGeoipDatabases } = await import("@/src/lib/geoip/updater");
 
     const result = await updateGeoipDatabases();
@@ -2641,8 +2675,29 @@ export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
 export async function applyStagedSettingsAction(): Promise<ActionResult> {
   const t = await getTranslations();
   try {
-    const session = await requireAdmin();
-    const outcome = await applyStagedSettings(Number(session.user.id), session.user.name);
+    const session = await requireCan("settings:write");
+    const userId = Number(session.user.id);
+    const staged = await listStagedSettings(userId);
+    const requestId =
+      staged.length === 0
+        ? null
+        : await submitIfCovered(
+            { userId },
+            {
+              kind: "settingsApply",
+              payload: { entries: staged.map(({ key, value }) => ({ key, value })) },
+            },
+          );
+    if (requestId !== null) {
+      // The request carries the set now; left staged, it would be applied a second time.
+      await discardAllStaged(userId);
+      revalidatePath("/settings", "layout");
+      return {
+        success: true,
+        message: t("errors.changeSubmittedForApproval", { id: requestId }),
+      };
+    }
+    const outcome = await applyStagedSettings(userId, session.user.name);
     // Root, not /settings: the accent and favicon render in the root layout.
     revalidatePath("/", "layout");
 
@@ -2670,7 +2725,7 @@ export async function applyStagedSettingsAction(): Promise<ActionResult> {
 
 export async function discardStagedSettingsAction(key?: string): Promise<ActionResult> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("settings:write");
     const userId = Number(session.user.id);
     if (key) {
       await discardStagedKey(userId, key);
@@ -2693,7 +2748,7 @@ export async function discardStagedSettingsAction(key?: string): Promise<ActionR
 export async function restoreRevisionAction(revision: number): Promise<ActionResult> {
   const t = await getTranslations();
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("settings:write");
     const { staged } = await stageRevisionRestore(Number(session.user.id), revision);
     revalidatePath("/settings", "layout");
     return {
@@ -2717,14 +2772,14 @@ export async function restoreRevisionAction(revision: number): Promise<ActionRes
  * return value is serialized to the browser.
  */
 export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
-  await requireAdmin();
+  await requireCan("agents:write");
   const { code, expiresAt } = await ensurePairingCode();
   return { code, expiresAt };
 }
 
 /** Throw the live code away, so the next read mints a fresh one. */
 export async function revokePairingCodeAction(): Promise<void> {
-  await requireAdmin();
+  await requireCan("agents:write");
   await revokePairingCode();
   revalidatePath("/settings");
 }
@@ -2734,7 +2789,7 @@ export async function revokePairingCodeAction(): Promise<void> {
  * off, or it would find a fresh bootstrap token and pair straight back.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireCan("agents:write");
   const id = Number(formData.get("agentId"));
   if (Number.isNaN(id)) return;
   const agentId = await deleteAgent(id);
@@ -2756,7 +2811,7 @@ export type RepairAgentResult =
  * its id; any other gets a code that re-pairs it and nothing else.
  */
 export async function repairAgentAction(agentRowId: number): Promise<RepairAgentResult> {
-  await requireAdmin();
+  await requireCan("agents:write");
   const agent = await findAgentById(agentRowId);
   if (!agent) return { kind: "failed" };
   if (await isBundledAgent(agent.agentId)) {
@@ -2768,7 +2823,7 @@ export async function repairAgentAction(agentRowId: number): Promise<RepairAgent
 
 /** Let the bundled agent pair itself again, after unpairing it turned that off. */
 export async function enableAutoPairingAction(): Promise<void> {
-  await requireAdmin();
+  await requireCan("agents:write");
   await enableAutoPairing();
   revalidatePath("/settings");
 }

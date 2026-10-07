@@ -1,10 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import {
-  requireApiUser,
-  requireApiAdmin,
-  apiErrorResponse,
-  ApiAuthError,
-} from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse, ApiAuthError } from "@/src/lib/api/auth";
 import {
   getUserById,
   updateUserAccount,
@@ -13,9 +8,16 @@ import {
   deleteUser,
 } from "@/src/lib/models/user";
 import { logAuditEvent } from "@/src/lib/audit";
+import { can } from "@/src/lib/users/permissions";
 import { domainErrorMessage } from "@/src/lib/errors/domain-error";
 import { isEmailAddress } from "@/src/lib/email/address";
-import { isUserRole, isUserStatus, signInUsernameRulesMessage } from "@/src/lib/users/admin";
+import {
+  assertAssignableRole,
+  assertMayManageUser,
+  isUserStatus,
+  signInUsernameRulesMessage,
+} from "@/src/lib/users/admin";
+import { isKnownRole } from "@/src/lib/roles/store";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const targetId = Number(id);
 
-    if (auth.role !== "admin" && auth.userId !== targetId) {
+    if (!can(auth.access, "users:read") && auth.userId !== targetId) {
       throw new ApiAuthError("Forbidden", 403);
     }
 
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireApiAdmin(request);
+    const auth = await requireApiUser(request);
     const { id } = await params;
     const targetId = Number(id);
     const body = await request.json();
@@ -53,7 +55,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Refused, not skipped: ignoring an unknown value reads as success to a client.
     const hasRole = body.role !== undefined && body.role !== null;
     const hasStatus = body.status !== undefined && body.status !== null;
-    if (hasRole && !isUserRole(body.role)) {
+    if (hasRole && !(await isKnownRole(body.role))) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
     if (hasStatus && !isUserStatus(body.status)) {
@@ -76,6 +78,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (hasStatus && auth.userId === targetId) {
       return NextResponse.json({ error: "Cannot change your own status" }, { status: 400 });
     }
+    // Before any write: an account holding more than the caller, or a role they could not give.
+    await assertMayManageUser(auth.access.capabilities, targetId);
+    if (hasRole) await assertAssignableRole(auth.access.capabilities, body.role);
 
     // First, in one update: a refused username or email (400) leaves every field unchanged.
     const accountFields: Parameters<typeof updateUserAccount>[1] = {};
@@ -128,7 +133,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireApiAdmin(request);
+    const auth = await requireApiUser(request);
     const { id } = await params;
     const targetId = Number(id);
 
@@ -136,7 +141,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
     }
 
-    const user = await getUserById(targetId);
+    const user = await assertMayManageUser(auth.access.capabilities, targetId);
     if (!user) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

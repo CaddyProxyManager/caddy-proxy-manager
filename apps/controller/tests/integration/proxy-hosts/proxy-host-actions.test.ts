@@ -363,7 +363,7 @@ describe('createProxyHostAction', () => {
   it.each(['operator', 'viewer'] as const)('refuses a %s, writing nothing', async (role) => {
     sessionUserId = users[role];
     const result = await createProxyHostAction(undefined, form(BASIC));
-    expect(result).toEqual({ status: 'error', message: t('errors.adminRequired') });
+    expect(result).toEqual({ status: 'error', message: t('errors.accessDenied') });
     expect(await hostRows()).toEqual([]);
     expect(audit).not.toHaveBeenCalled();
     expect(await auditCalls()).toEqual([]);

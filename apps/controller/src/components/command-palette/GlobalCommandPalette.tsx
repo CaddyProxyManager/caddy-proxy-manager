@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Every page the role can open, and for an admin every settings section, searchable by its
+ * Every page the viewer can open, and every settings section to whoever may open Settings, searchable by its
  * description, group and env vars. The provider owns open state so either rail can open it.
  */
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
@@ -18,6 +18,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
 import { ACCENTS, type Hue } from "@/src/components/ui/accent";
 import { visibleDestinations } from "@/src/lib/nav/destinations";
+import { type CapabilitySet, reaches } from "@/src/lib/roles/capabilities";
 import {
   SETTINGS_HUES,
   SETTINGS_ITEMS,
@@ -68,11 +69,11 @@ export function PaletteSearchButton() {
 }
 
 export function GlobalCommandPaletteProvider({
-  role,
+  capabilities,
   children,
 }: {
   /** Decides which pages, and whether settings, are listed. */
-  role: string | undefined;
+  capabilities: CapabilitySet;
   children: ReactNode;
 }) {
   const t = useTranslations("commandPalette");
@@ -118,7 +119,7 @@ export function GlobalCommandPaletteProvider({
 
   // Per language rather than module scope: it matches translated names.
   const searchSource = useMemo(() => {
-    const pages: PaletteItem[] = visibleDestinations(role).map((destination) => ({
+    const pages: PaletteItem[] = visibleDestinations(capabilities).map((destination) => ({
       id: destination.href,
       label: tNav(destination.labelKey),
       auxiliaryData: {
@@ -130,34 +131,34 @@ export function GlobalCommandPaletteProvider({
       },
     }));
 
-    // Admin-only pages; anyone else would only be refused. Synonyms come from the settings
-    // search index, so "smtp" finds Email here as on the Settings page.
-    const searchEntries = role === "admin" ? settingsSearchEntries(tSettings) : [];
+    // Only to whoever may open Settings; anyone else would be refused. Synonyms come from the
+    // settings search index, so "smtp" finds Email here as on the Settings page.
+    const seesSettings = reaches(capabilities, "settings:read");
+    const searchEntries = seesSettings ? settingsSearchEntries(tSettings) : [];
     const keywordsFor = new Map(searchEntries.map((entry) => [entry.id, entry.keywords]));
-    const settings: PaletteItem[] =
-      role === "admin"
-        ? SETTINGS_ITEMS.map((item) => {
-            const group = groupForSection(item.id);
-            return {
-              id: `/settings/${item.id}`,
-              label: settingsSectionName(tSettings, item),
-              auxiliaryData: {
-                group: tNav("settings"),
-                desc: settingsSectionDescription(tSettings, item),
-                keywords: [
-                  group ? settingsGroupLabel(tSettings, group) : "",
-                  // So a page is found by anything it carries, not only its name.
-                  ...item.blocks.flatMap((block) => [
-                    settingsBlockName(tSettings, block.id),
-                    ...(keywordsFor.get(block.id) ?? []),
-                  ]),
-                ],
-                icon: item.icon,
-                hue: SETTINGS_HUES[item.id],
-              },
-            };
-          })
-        : [];
+    const settings: PaletteItem[] = seesSettings
+      ? SETTINGS_ITEMS.map((item) => {
+          const group = groupForSection(item.id);
+          return {
+            id: `/settings/${item.id}`,
+            label: settingsSectionName(tSettings, item),
+            auxiliaryData: {
+              group: tNav("settings"),
+              desc: settingsSectionDescription(tSettings, item),
+              keywords: [
+                group ? settingsGroupLabel(tSettings, group) : "",
+                // So a page is found by anything it carries, not only its name.
+                ...item.blocks.flatMap((block) => [
+                  settingsBlockName(tSettings, block.id),
+                  ...(keywordsFor.get(block.id) ?? []),
+                ]),
+              ],
+              icon: item.icon,
+              hue: SETTINGS_HUES[item.id],
+            },
+          };
+        })
+      : [];
     // The blocks a page holds, and the admin pages outside the sections, each its own row.
     const pageHrefs = new Set(settings.map((item) => item.id));
     const settingsBlocks: PaletteItem[] = searchEntries
@@ -177,7 +178,7 @@ export function GlobalCommandPaletteProvider({
     return createStaticSource(items, {
       keywords: (item) => [item.auxiliaryData.desc, ...item.auxiliaryData.keywords],
     });
-  }, [role, t, tNav, tSettings]);
+  }, [capabilities, t, tNav, tSettings]);
 
   return (
     <PaletteContext value={{ open: () => setIsOpen(true) }}>

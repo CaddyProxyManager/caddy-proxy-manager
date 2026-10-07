@@ -19,7 +19,7 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('../../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { setGroupGrants } from '../../../src/lib/models/group-grants';
-import { canCreate, canView, resolveAccess } from '../../../src/lib/users/permissions';
+import { can, canCreate, canView, resolveAccess } from '../../../src/lib/users/permissions';
 import {
   readViewAs,
   startViewAs,
@@ -116,10 +116,10 @@ describe('access while viewing', () => {
   it("sees what the chosen groups grant, and nothing the admin's own memberships do", async () => {
     await ctx.db.insert(schema.groupMembers).values({ groupId: 20, userId: ADMIN, createdAt: NOW });
     const access = await resolveAccess(viewing([10]));
-    expect(access.isAdmin).toBe(false);
+    expect(can(access, 'settings:read')).toBe(false);
     expect(canView(access, 'proxyHost', 1)).toBe(true);
     expect(canView(access, 'proxyHost', 2)).toBe(false);
-    expect(canCreate(access)).toBe(false);
+    expect(canCreate(access, 'proxyHost')).toBe(false);
   });
 
   it('gives a viewer nothing, groups or not', async () => {

@@ -21,6 +21,60 @@
         "backchannel.logout.revoke.offline.tokens": "false",
         "pkce.code.challenge.method": "S256"
       }
+    },
+    {
+      "clientId": "cpm-saml",
+      "name": "CPM (SAML)",
+      "enabled": true,
+      "protocol": "saml",
+      "redirectUris": ["http://localhost:3000/*"],
+      "frontchannelLogout": false,
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.server.signature": "true",
+        "saml.client.signature": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.authnstatement": "true",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": "username",
+        "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "email",
+            "attribute.name": "email",
+            "attribute.nameformat": "Basic"
+          }
+        },
+        {
+          "name": "displayName",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "firstName",
+            "attribute.name": "displayName",
+            "attribute.nameformat": "Basic"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "saml",
+          "protocolMapper": "saml-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.name": "groups",
+            "full.path": "false",
+            "single": "false",
+            "attribute.nameformat": "Basic"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -31,7 +85,19 @@
       "emailVerified": true,
       "firstName": "Keycloak",
       "lastName": "Alice",
-      "credentials": [{ "type": "password", "value": "KcAlicePassword2026!", "temporary": false }]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "KcAlicePassword2026!",
+          "temporary": false
+        }
+      ],
+      "groups": ["/cpm-saml-operators"]
+    }
+  ],
+  "groups": [
+    {
+      "name": "cpm-saml-operators"
     }
   ]
 }

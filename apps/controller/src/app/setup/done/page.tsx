@@ -1,3 +1,4 @@
+import { sessionCan } from "@/src/lib/users/permissions";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -22,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function SetupDonePage() {
   const session = await auth();
-  if (session?.user?.role !== "admin") redirect("/login");
+  if (!(await sessionCan(session, "settings:write"))) redirect("/login");
   if (!(await isSetupCompleted())) redirect("/setup");
 
   const source = await getMigrationSource();

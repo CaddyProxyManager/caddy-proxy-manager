@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/models/api-tokens', () => ({
@@ -18,8 +19,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {
@@ -71,7 +76,12 @@ function createMockRequest(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiUser.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'session' });
+  mockRequireApiUser.mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'session',
+    access: accessOf('admin'),
+  });
 });
 
 describe('GET /api/v1/tokens', () => {
@@ -106,7 +116,12 @@ describe('GET /api/v1/tokens', () => {
   });
 
   it('returns own tokens for non-admin user', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 5, role: 'user', authMethod: 'bearer' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 5,
+      role: 'user',
+      authMethod: 'bearer',
+      access: accessOf('user'),
+    });
     const tokens = [
       {
         id: 3,
@@ -220,7 +235,12 @@ describe('POST /api/v1/tokens', () => {
   });
 
   it('rejects token creation authenticated by another bearer token', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    });
 
     const response = await POST(
       createMockRequest({
@@ -237,7 +257,12 @@ describe('POST /api/v1/tokens', () => {
   });
 
   it('preserves token self-service for non-admin sessions', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 5, role: 'viewer', authMethod: 'session' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 5,
+      role: 'viewer',
+      authMethod: 'session',
+      access: accessOf('viewer'),
+    });
     mockCreateApiToken.mockResolvedValue({
       token: { id: 12, name: 'Viewer Token' },
       rawToken: 'viewer-token',
@@ -283,7 +308,12 @@ describe('DELETE /api/v1/tokens/[id]', () => {
   });
 
   it('limits non-admin deletion to the authenticated user', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 7, role: 'user', authMethod: 'session' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 7,
+      role: 'user',
+      authMethod: 'session',
+      access: accessOf('user'),
+    });
     mockDeleteApiToken.mockResolvedValue(undefined as any);
 
     const response = await DELETE(createMockRequest({ method: 'DELETE' }), {

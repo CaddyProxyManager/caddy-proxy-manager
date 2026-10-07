@@ -5,16 +5,16 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { announce, onAnnouncement } from "../cluster/announcements";
 import db from "../db";
 import * as schema from "../db/schema";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { config } from "../config";
 import { extraTrustedOrigins } from "./trusted-origins";
 import { getPublicBaseUrl, publicOrigins } from "../http/public-url";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secrets";
 import type { OAuthProvider } from "../models/oauth-providers";
+import { withRoleGroups } from "../roles/mappings";
 import type { GenericOAuthConfig } from "better-auth/plugins";
 import {
   extractGroups,
-  isAppRole,
   mapGroupsToLocalGroups,
   mapGroupsToRole,
   needsGroupClaims,
@@ -45,6 +45,11 @@ import {
 import { FRESH_SESSION_MAX_AGE_MS, isFreshSession } from "./session-age";
 import { LDAP_PROVIDER_TYPE } from "../ldap/defaults";
 import { findTwoFactorAfterHook, ldapSignIn } from "../ldap/plugin";
+import { SSO_DISABLED_PATHS, guardSsoRequest, isSsoPath, samlSignIn } from "./saml/plugin";
+import { SAML_PROVIDER_TYPE } from "./saml/urls";
+import { scimGate } from "../scim/gate";
+import { type SsoEnforcement, isBreakGlassAccount } from "./sso-enforcement";
+import { getSsoEnforcement, isBreakGlassName } from "./sso-break-glass";
 import {
   PASSKEY_NAME_MAX_LENGTH,
   isUserVerified,
@@ -176,11 +181,11 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       .where(
         and(
           eq(schema.oauthProviders.enabled, true),
-          // Directories share the table; they are the ldap plugin's, not generic OAuth's.
-          ne(schema.oauthProviders.type, LDAP_PROVIDER_TYPE),
+          // Directories and SAML providers share the table; each has a plugin of its own.
+          notInArray(schema.oauthProviders.type, [LDAP_PROVIDER_TYPE, SAML_PROVIDER_TYPE]),
         ),
       );
-    const providers: OAuthProvider[] = rows.map((row) => ({
+    const providers: OAuthProvider[] = (await withRoleGroups(rows)).map((row) => ({
       id: row.id,
       name: row.name,
       type: row.type,
@@ -201,7 +206,8 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       operatorGroup: row.operatorGroup,
       userGroup: row.userGroup,
       viewerGroup: row.viewerGroup,
-      defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
+      roleGroups: row.roleGroups,
+      defaultRole: row.defaultRole,
       syncGroups: row.syncGroups,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -291,6 +297,51 @@ export async function guardPasskeyRequest(
       await refusePasskey("BAD_REQUEST", "LAST_SIGN_IN_METHOD", "passkeyLastSignInMethod");
     }
   }
+}
+
+async function refuseWithoutSso(): Promise<never> {
+  const { getTranslations } = await import("next-intl/server");
+  const t = await getTranslations("auth.apiErrors");
+  throw new PluginAPIError("FORBIDDEN", { code: "SSO_REQUIRED", message: t("ssoRequired") });
+}
+
+function bodyField(body: unknown, key: string): string {
+  const value =
+    body && typeof body === "object" ? (body as Record<string, unknown>)[key] : undefined;
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * While single sign-on is enforced: a password typed into CPM is refused before it is checked,
+ * unless the name is a break-glass account's. A passkey names its account only once verified, so
+ * that is refused at session creation instead (`refuseEnforcedPasskey`).
+ */
+export async function guardSsoEnforcement(ctx: AuthHookContext): Promise<void> {
+  const path = ctx.path;
+  const watched =
+    path === "/sign-in/email" ||
+    path === "/sign-in/username" ||
+    path === LDAP_SIGN_IN_PATH ||
+    path === SIGN_UP_EMAIL_PATH ||
+    isPasskeyRegisterPath(path);
+  if (!watched) return;
+  const policy = await getSsoEnforcement();
+  if (!policy.enforced) return;
+  if (path === SIGN_UP_EMAIL_PATH) await refuseWithoutSso();
+  if (isPasskeyRegisterPath(path)) {
+    const session = await getSessionFromCtx(ctx);
+    if (session && !isBreakGlassAccount(policy, Number(session.user.id))) await refuseWithoutSso();
+    return;
+  }
+  // A directory's own sign-in, when allowed; its local-account fallback asks `localSignInAllowed`.
+  if (path === LDAP_SIGN_IN_PATH && policy.allowLdap) return;
+  const name = bodyField(ctx.body, path === "/sign-in/email" ? "email" : "username");
+  if (!(await isBreakGlassName(policy, name))) await refuseWithoutSso();
+}
+
+async function refuseEnforcedPasskey(userId: number): Promise<void> {
+  const policy: SsoEnforcement = await getSsoEnforcement();
+  if (policy.enforced && !isBreakGlassAccount(policy, userId)) await refuseWithoutSso();
 }
 
 /** Called after the signature checks out: the plugin verifies without requiring UV. */
@@ -395,6 +446,11 @@ async function createAuth(baseURL: string): Promise<any> {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (isSsoPath(ctx.path)) {
+          await guardSsoRequest(ctx);
+          return;
+        }
+        await guardSsoEnforcement(ctx);
         if (ctx.path.startsWith("/passkey/")) {
           await guardPasskeyRequest(ctx, policy.disableLocalUsers);
           return;
@@ -529,6 +585,7 @@ async function createAuth(baseURL: string): Promise<any> {
               .limit(1);
             if (user?.status === "active") {
               if (!isPasskeySignInPath(context?.path)) return;
+              await refuseEnforcedPasskey(Number(session.userId));
               // A directory user's passkey: only while a directory still vouches for them.
               const { directoryAccessWithdrawn } = await import("../models/ldap-directories");
               if (!(await directoryAccessWithdrawn(Number(session.userId)))) return;
@@ -589,7 +646,7 @@ async function createAuth(baseURL: string): Promise<any> {
         },
       },
     },
-    disabledPaths: DISABLED_AUTH_PATHS,
+    disabledPaths: [...DISABLED_AUTH_PATHS, ...SSO_DISABLED_PATHS],
     plugins: [
       // Cast via unknown: the plugin's `email: string` vs BetterAuthPlugin's `email?: any`.
       username({
@@ -603,7 +660,14 @@ async function createAuth(baseURL: string): Promise<any> {
         twoFactorAfterHook: findTwoFactorAfterHook(twoFactorPlugin),
         localUsersEnabled: !policy.disableLocalUsers,
         allowRegistration: policy.allowOauthRegistration,
+        localSignInAllowed: async (username) => {
+          const enforcement = await getSsoEnforcement();
+          return !enforcement.enforced || (await isBreakGlassName(enforcement, username));
+        },
       }),
+      samlSignIn({ allowRegistration: policy.allowOauthRegistration }),
+      // Hands /scim/v2 to its own instance (lib/scim/auth.ts), or answers 501 under SQLite.
+      scimGate(),
       passkey({
         // An unparseable Public URL: a hostname no browser will sign for, never "localhost".
         rpID: rpId ?? "invalid.",

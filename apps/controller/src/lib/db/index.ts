@@ -2,12 +2,12 @@
  * The database handle (connection in ./db/connection.ts) plus one-time data migrations,
  * top-level-awaited so no route handler can observe a half-migrated database.
  */
-import { eq, ne, and, isNull, desc } from "drizzle-orm";
+import { eq, ne, and, inArray, isNull, desc } from "drizzle-orm";
 import * as schema from "./schema";
 import { db, isEphemeral, runSchemaMigrations } from "./connection";
 import { acquireStartupLock } from "./startup-lock";
 import { encryptSecret, isEncryptedSecret } from "../secrets";
-import { envGroupMapping } from "../auth/oidc/groups";
+import { envGroupMapping, splitGroupList } from "../auth/oidc/groups";
 
 export { db, client, runInTransaction } from "./connection";
 export type { Db } from "./connection";
@@ -164,7 +164,15 @@ async function runEnvProviderSync() {
     .where(eq(oauthProviders.name, name))
     .limit(1);
 
-  const groupMapping = envGroupMapping(config.oauth);
+  const { adminGroup, operatorGroup, userGroup, viewerGroup, ...groupMapping } = envGroupMapping(
+    config.oauth,
+  );
+  const roleGroups = {
+    admin: splitGroupList(adminGroup),
+    operator: splitGroupList(operatorGroup),
+    user: splitGroupList(userGroup),
+    viewer: splitGroupList(viewerGroup),
+  };
 
   const now = new Date().toISOString();
   if (existing && existing.source === "env") {
@@ -183,6 +191,7 @@ async function runEnvProviderSync() {
         updatedAt: now,
       })
       .where(eq(oauthProviders.id, existing.id));
+    await writeEnvRoleGroups(existing.id, roleGroups, now);
   } else if (!existing) {
     await db.insert(oauthProviders).values({
       id: providerId,
@@ -202,7 +211,45 @@ async function runEnvProviderSync() {
       createdAt: now,
       updatedAt: now,
     });
+    await writeEnvRoleGroups(providerId, roleGroups, now);
     console.log(`Synced OAuth provider from env: ${name}`);
+  }
+}
+
+/** The env provider's built-in role names, replacing whatever it had: the env is its source. */
+async function writeEnvRoleGroups(
+  providerId: string,
+  roleGroups: Record<string, string[]>,
+  now: string,
+): Promise<void> {
+  const { roleMappings } = schema;
+  const wanted = Object.entries(roleGroups).flatMap(([role, names]) =>
+    names.map((externalName) => ({ role, externalName })),
+  );
+  const stored = await db
+    .select({ role: roleMappings.role, externalName: roleMappings.externalName })
+    .from(roleMappings)
+    .where(
+      and(
+        eq(roleMappings.providerId, providerId),
+        inArray(roleMappings.role, Object.keys(roleGroups)),
+      ),
+    )
+    .orderBy(roleMappings.id);
+  // Unchanged is left alone, so a restart writes nothing.
+  if (JSON.stringify(stored) === JSON.stringify(wanted)) return;
+  await db
+    .delete(roleMappings)
+    .where(
+      and(
+        eq(roleMappings.providerId, providerId),
+        inArray(roleMappings.role, Object.keys(roleGroups)),
+      ),
+    );
+  if (wanted.length > 0) {
+    await db
+      .insert(roleMappings)
+      .values(wanted.map((row) => ({ providerId, ...row, createdAt: now })));
   }
 }
 

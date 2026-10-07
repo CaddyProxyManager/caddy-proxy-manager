@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/src/lib/auth";
+import { requireCan } from "@/src/lib/users/permissions";
 import { recentRevisions } from "@/src/lib/settings/apply";
 import {
   compareRevisions,
@@ -34,7 +34,7 @@ export default async function SettingsHistoryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:read");
   const params = await searchParams;
 
   const [staged, total, ids, restorableFrom] = await Promise.all([

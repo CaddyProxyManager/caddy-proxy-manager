@@ -46,7 +46,66 @@ const NEW_COLUMN_DEFAULTS: Record<string, Record<string, unknown>> = {
   l4_proxy_hosts: { accessListId: null },
   access_list_ip_rules: { hostname: null },
   oauth_providers: { ldapConfig: null },
+  groups: { role: null, scimGroupId: null },
 };
+
+/** Commas only, trimmed, a repeat once: how a role column's names were read. */
+const splitNames = (value: unknown) =>
+  typeof value === 'string'
+    ? [
+        ...new Set(
+          value
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean),
+        ),
+      ]
+    : [];
+
+/**
+ * Columns a migration moved into another table, each checked where it went instead of where it
+ * was: a table with rows only because of the move is expected to have them.
+ */
+const MOVED_COLUMNS: Array<{
+  table: string;
+  columns: string[];
+  into: string;
+  why: string;
+  check: (before: Tables, after: Tables) => string[];
+}> = [
+  {
+    table: 'oauth_providers',
+    columns: ['adminGroup', 'operatorGroup', 'userGroup', 'viewerGroup'],
+    into: 'role_mappings',
+    why: 'custom roles: each provider role group became role_mappings rows',
+    check: (before, after) => {
+      const failures: string[] = [];
+      const rows = after.role_mappings ?? [];
+      for (const provider of before.oauth_providers ?? []) {
+        for (const [column, role] of [
+          ['adminGroup', 'admin'],
+          ['operatorGroup', 'operator'],
+          ['userGroup', 'user'],
+          ['viewerGroup', 'viewer'],
+        ]) {
+          const moved = rows
+            .filter((row) => row.providerId === provider.id && row.role === role)
+            .map((row) => row.externalName);
+          const wanted = splitNames(provider[column]);
+          if (JSON.stringify(moved) !== JSON.stringify(wanted)) {
+            failures.push(
+              `${provider.id} ${role}: ${JSON.stringify(wanted)} became ${JSON.stringify(moved)}`,
+            );
+          }
+        }
+      }
+      const known = new Set((before.oauth_providers ?? []).map((provider) => provider.id));
+      const stray = rows.filter((row) => !known.has(row.providerId));
+      if (stray.length > 0) failures.push(`${stray.length} mapping(s) for no provider`);
+      return failures;
+    },
+  },
+];
 
 /**
  * Deliberate differences in this version's document, each undone on a copy before comparing: a
@@ -129,9 +188,13 @@ function compareTables(before: Tables, after: Tables, failures: Failure[]): stri
       continue;
     }
     const added = new Set<string>();
+    const moved = new Set(
+      MOVED_COLUMNS.filter((move) => move.table === table).flatMap((move) => move.columns),
+    );
     rows.forEach((row, index) => {
       const next = upgraded[index];
       for (const [column, value] of Object.entries(row)) {
+        if (moved.has(column) && !(column in next)) continue;
         if (JSON.stringify(next[column]) !== JSON.stringify(value)) {
           failures.push(
             `${table}[${index}].${column}: ${JSON.stringify(value)} -> ${JSON.stringify(next[column])}`,
@@ -158,11 +221,20 @@ function compareTables(before: Tables, after: Tables, failures: Failure[]): stri
       }
     }
   }
+  for (const move of MOVED_COLUMNS) {
+    if (!before[move.table]) continue;
+    const problems = move.check(before, after);
+    for (const problem of problems) failures.push(`${move.into}: ${problem}`);
+    if (problems.length === 0) {
+      notes.push(`${move.table}.{${move.columns.join(',')}} moved into ${move.into}: ${move.why}`);
+    }
+  }
+  const movedInto = new Set(MOVED_COLUMNS.map((move) => move.into));
   for (const [table, rows] of Object.entries(after)) {
     if (before[table]) continue;
-    if (rows.length > 0)
+    if (rows.length > 0 && !movedInto.has(table))
       failures.push(`new table ${table} has ${rows.length} rows after migrating`);
-    else notes.push(`new table ${table} (empty)`);
+    else notes.push(`new table ${table} (${rows.length ? `${rows.length} moved rows` : 'empty'})`);
   }
   return notes;
 }

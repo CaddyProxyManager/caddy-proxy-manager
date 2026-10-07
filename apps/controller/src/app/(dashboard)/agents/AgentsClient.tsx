@@ -84,12 +84,12 @@ const LAST_SEEN_RELATIVE_MS = 48 * 60 * 60 * 1000;
 export default function AgentsClient({
   agents,
   anyPaired,
-  isAdmin,
+  managesFleet,
   fleetApplyFailure = null,
 }: {
   agents: AgentRow[];
   anyPaired: boolean;
-  isAdmin: boolean;
+  managesFleet: boolean;
   /** A refusal no one agent owns: a Caddy reached with no agent attached. */
   fleetApplyFailure?: ApplyFailure | null;
 }) {
@@ -155,10 +155,10 @@ export default function AgentsClient({
 
   return (
     <VStack gap={6}>
-      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way. */}
+      {/* Pairing lives in Settings, behind agents:write over every agent. */}
       <PageHeader
         title={tNav("agents")}
-        action={isAdmin ? { label: t("pair"), href: "/settings/agent" } : undefined}
+        action={managesFleet ? { label: t("pair"), href: "/settings/agent" } : undefined}
       />
 
       {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}
@@ -171,7 +171,9 @@ export default function AgentsClient({
         <EmptyState
           headingLevel={2}
           title={t("noneTitle")}
-          description={anyPaired && !isAdmin ? t("noneGrantedDescription") : t("noneDescription")}
+          description={
+            anyPaired && !managesFleet ? t("noneGrantedDescription") : t("noneDescription")
+          }
         />
       )}
 

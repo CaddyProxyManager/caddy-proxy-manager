@@ -3,6 +3,8 @@
  * No React: the server validates saved drawers with it, so the client attaches icons.
  */
 
+import { type Capability, type CapabilitySet, reaches } from "../roles/capabilities";
+
 export type DestinationId =
   | "overview"
   | "proxy-hosts"
@@ -18,6 +20,7 @@ export type DestinationId =
   | "audit-log"
   | "logs"
   | "alerts"
+  | "approvals"
   | "api-docs"
   | "settings"
   | "profile";
@@ -49,6 +52,7 @@ export type NavLabelKey =
   | "auditLog"
   | "logs"
   | "alerts"
+  | "approvals"
   | "apiDocs"
   | "settings"
   | "profile";
@@ -57,9 +61,11 @@ export type Destination = {
   id: DestinationId;
   href: string;
   labelKey: NavLabelKey;
-  adminOnly: boolean;
-  /** Shown even with no grants: an empty page explains itself, a missing menu item does not. */
-  operator: boolean;
+  /**
+   * Needed to see it, null for everyone. Held over a single object is enough: a page of granted
+   * objects, even with none granted yet, explains itself where a missing menu item does not.
+   */
+  capability: Capability | null;
   /** Behind More on a phone; unset for the tab bar's own. */
   moreGroup?: MoreGroup;
   /** Unset sits above the titled sections, as Overview does. */
@@ -67,38 +73,34 @@ export type Destination = {
 };
 
 export const DESTINATIONS: readonly Destination[] = [
-  { id: "overview", href: "/", labelKey: "overview", adminOnly: false, operator: false },
+  { id: "overview", href: "/", labelKey: "overview", capability: null },
   {
     id: "proxy-hosts",
     href: "/proxy-hosts",
     labelKey: "proxyHosts",
     railGroup: "hosts",
-    adminOnly: true,
-    operator: true,
+    capability: "hosts:read",
   },
   {
     id: "l4-proxy-hosts",
     href: "/l4-proxy-hosts",
     labelKey: "l4ProxyHosts",
     railGroup: "hosts",
-    adminOnly: true,
-    operator: true,
+    capability: "hosts:read",
   },
   {
     id: "agents",
     href: "/agents",
     labelKey: "agents",
     railGroup: "hosts",
-    adminOnly: true,
-    operator: true,
+    capability: "agents:read",
   },
   {
     id: "access-lists",
     href: "/access-lists",
     labelKey: "accessLists",
     railGroup: "access",
-    adminOnly: true,
-    operator: false,
+    capability: "accessLists:read",
     moreGroup: "access",
   },
   {
@@ -106,8 +108,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/groups",
     labelKey: "groups",
     railGroup: "access",
-    adminOnly: true,
-    operator: false,
+    capability: "groups:read",
     moreGroup: "access",
   },
   {
@@ -115,8 +116,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/users",
     labelKey: "users",
     railGroup: "access",
-    adminOnly: true,
-    operator: false,
+    capability: "users:read",
     moreGroup: "access",
   },
   {
@@ -124,8 +124,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/certificates",
     labelKey: "certificates",
     railGroup: "security",
-    adminOnly: true,
-    operator: false,
+    capability: "certificates:read",
     moreGroup: "security",
   },
   {
@@ -133,8 +132,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/waf",
     labelKey: "waf",
     railGroup: "security",
-    adminOnly: true,
-    operator: false,
+    capability: "security:read",
     moreGroup: "security",
   },
   {
@@ -142,8 +140,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/security",
     labelKey: "security",
     railGroup: "security",
-    adminOnly: true,
-    operator: false,
+    capability: "security:read",
     moreGroup: "security",
   },
   {
@@ -151,16 +148,14 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/analytics",
     labelKey: "analytics",
     railGroup: "observability",
-    adminOnly: true,
-    operator: false,
+    capability: "analytics:read",
   },
   {
     id: "audit-log",
     href: "/audit-log",
     labelKey: "auditLog",
     railGroup: "observability",
-    adminOnly: true,
-    operator: false,
+    capability: "audit:read",
     moreGroup: "reference",
   },
   {
@@ -168,8 +163,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/logs",
     labelKey: "logs",
     railGroup: "observability",
-    adminOnly: true,
-    operator: false,
+    capability: "logs:read",
     moreGroup: "reference",
   },
   {
@@ -177,17 +171,25 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/alerts",
     labelKey: "alerts",
     railGroup: "observability",
-    adminOnly: true,
-    operator: false,
+    capability: "alerts:read",
     moreGroup: "reference",
+  },
+  // Anyone's: a requester follows their change here, and the policy, not a capability, names who
+  // approves.
+  {
+    id: "approvals",
+    href: "/approvals",
+    labelKey: "approvals",
+    railGroup: "system",
+    capability: null,
+    moreGroup: "instance",
   },
   {
     id: "api-docs",
     href: "/api-docs",
     labelKey: "apiDocs",
     railGroup: "system",
-    adminOnly: true,
-    operator: false,
+    capability: "settings:read",
     moreGroup: "reference",
   },
   {
@@ -195,8 +197,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/settings",
     labelKey: "settings",
     railGroup: "system",
-    adminOnly: true,
-    operator: false,
+    capability: "settings:read",
     moreGroup: "instance",
   },
   // The desktop rail reaches Profile from its footer; a phone has none.
@@ -204,8 +205,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "profile",
     href: "/profile",
     labelKey: "profile",
-    adminOnly: false,
-    operator: false,
+    capability: null,
     moreGroup: "instance",
   },
 ];
@@ -215,30 +215,28 @@ export const MORE_GROUPS: readonly MoreGroup[] = ["access", "security", "referen
 /** A three-by-three grid whose ninth slot is always All pages, so no pin can push it out. */
 export const MORE_DRAWER_SLOTS = 8;
 
-export function canSee(destination: Destination, role: string | undefined): boolean {
-  if (!destination.adminOnly) return true;
-  if (role === "admin") return true;
-  return role === "operator" && destination.operator;
+export function canSee(destination: Destination, capabilities: CapabilitySet): boolean {
+  return destination.capability === null || reaches(capabilities, destination.capability);
 }
 
-export function visibleDestinations(role: string | undefined): Destination[] {
-  return DESTINATIONS.filter((d) => canSee(d, role));
+export function visibleDestinations(capabilities: CapabilitySet): Destination[] {
+  return DESTINATIONS.filter((d) => canSee(d, capabilities));
 }
 
-export function moreDestinations(role: string | undefined): Destination[] {
-  return visibleDestinations(role).filter((d) => d.moreGroup !== undefined);
+export function moreDestinations(capabilities: CapabilitySet): Destination[] {
+  return visibleDestinations(capabilities).filter((d) => d.moreGroup !== undefined);
 }
 
 export function isDestinationId(value: unknown): value is DestinationId {
   return typeof value === "string" && DESTINATIONS.some((d) => d.id === value);
 }
 
-/** A saved drawer is filtered by role: a demoted admin's may still name Settings. */
+/** A saved drawer is filtered by what the viewer may see: a demoted admin's may still name Settings. */
 export function resolveDrawer(
   saved: readonly DestinationId[] | null,
-  role: string | undefined,
+  capabilities: CapabilitySet,
 ): Destination[] {
-  const available = moreDestinations(role);
+  const available = moreDestinations(capabilities);
   if (saved === null) return available.slice(0, MORE_DRAWER_SLOTS);
   return saved
     .map((id) => available.find((d) => d.id === id))

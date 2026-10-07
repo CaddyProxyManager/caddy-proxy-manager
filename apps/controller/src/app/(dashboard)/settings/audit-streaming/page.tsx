@@ -1,6 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { loadSinksAction } from "./actions";
 import AuditStreamingClient from "./AuditStreamingClient";
@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AuditStreamingPage() {
-  const session = await requireAdmin();
+  const session = await requireCan("audit:read");
   const [staged, sinks] = await Promise.all([
     stagedView(Number(session.user.id)),
     loadSinksAction(),

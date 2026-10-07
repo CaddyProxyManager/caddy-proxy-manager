@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   getOverviewAnalytics,
   type TrafficEventFilter,
@@ -12,7 +12,7 @@ const DEFAULT_INTERVAL = "24h";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireApiAdmin(req);
+    await requireApiUser(req);
     const { searchParams } = req.nextUrl;
     const hostsParam = searchParams.get("hosts") ?? "";
     const hosts = hostsParam ? hostsParam.split(",").filter(Boolean) : [];

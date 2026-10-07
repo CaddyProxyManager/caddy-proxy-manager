@@ -5,7 +5,7 @@
  * and resolved when it is gone. A source that could not be read resolves nothing.
  */
 
-import { emptyGrants } from "../models/group-grants";
+import { systemAccess } from "../users/permissions";
 import type { AlertMetric } from "../notifications/events";
 import {
   type AlertRule,
@@ -57,10 +57,7 @@ async function watchAttention(rules: readonly AlertRule[], now: number): Promise
   const watching = rules.filter((rule) => rule.source === "attention" || rule.source === "signal");
   if (watching.length === 0) return;
   const { collectAttention } = await import("../attention");
-  const list = await collectAttention(
-    { userId: 0, role: "admin", isAdmin: true, isOperator: false, grants: emptyGrants() },
-    { now },
-  );
+  const list = await collectAttention(systemAccess(), { now });
   const { raiseRuleProblem } = await import("../notifications");
   for (const rule of watching) {
     const codes: string[] =

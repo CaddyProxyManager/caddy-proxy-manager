@@ -602,6 +602,9 @@
       "groupMemberAdded": "Added user {id} to group {group}",
       "groupMemberRemoved": "Removed user {id} from group {group}",
       "groupUpdated": "Updated group {name}",
+      "roleCreated": "Created role {name}",
+      "roleUpdated": "Updated role {name}",
+      "roleDeleted": "Deleted role {name}",
       "l4ProxyHostCreated": "Created L4 proxy host {name}",
       "l4ProxyHostDeleted": "Deleted L4 proxy host {name}",
       "l4ProxyHostUpdated": "Updated L4 proxy host {name}",
@@ -666,6 +669,33 @@
       "auditSinkCreated": "Created audit sink {name}",
       "auditSinkUpdated": "Updated audit sink {name}",
       "auditSinkDeleted": "Deleted audit sink {name}",
+      "scimConnectionCreated": "Created SCIM connection {name}",
+      "scimConnectionUpdated": "Updated SCIM connection {name}",
+      "scimConnectionDeleted": "Deleted SCIM connection {name}",
+      "scimConnectionRotated": "Rotated the token of SCIM connection {name}",
+      "accessReviewCreated": "Created access review {name}",
+      "accessReviewUpdated": "Updated access review {name}",
+      "accessReviewDeleted": "Deleted access review {name}",
+      "accessReviewDecided": "Decided {decision} for item {item} of access review {name}",
+      "accessReviewClosed": "Closed access review {name}",
+      "accessReviewApplied": "Applied the revocations of access review {name}",
+      "accessReviewReassigned": "Reassigned {count} items of access review {name}",
+      "accessReviewExported": "Exported access review {name}",
+      "changeRequestSubmitted": "Submitted change request #{id}",
+      "changeRequestApproved": "Approved change request #{id}",
+      "changeRequestRejected": "Rejected change request #{id}",
+      "changeRequestWithdrawn": "Withdrew change request #{id}",
+      "changeRequestInvalidated": "Invalidated change request #{id}",
+      "changeRequestApplied": "Applied change request #{id}",
+      "changeRequestBypassed": "Bypassed approval for change request #{id}",
+      "changeRequestFailed": "Change request #{id} failed to apply",
+      "approvalPolicyUpdated": "Updated the change approval policy",
+      "scimUserCreated": "SCIM connection {connection} created user {name}",
+      "scimUserUpdated": "SCIM connection {connection} updated user {name}",
+      "scimUserRemoved": "SCIM connection {connection} removed user {name}",
+      "scimGroupCreated": "SCIM connection {connection} created group {name}",
+      "scimGroupUpdated": "SCIM connection {connection} updated group {name}",
+      "scimGroupRemoved": "SCIM connection {connection} removed group {name}",
       "settingsApplied": "Applied settings revision {revision}",
       "auditChainVerified": "Verified the audit log's hash chain",
       "auditChainRekeyed": "Re-keyed the audit log's hash chain",
@@ -718,7 +748,11 @@
       "blockedSourceExpired": "The block on {kind} {value} expired",
       "apiTokenCreated": "Created API token {name}",
       "apiTokenDeleted": "Deleted API token {name}",
-      "mfaPolicyLiftedConsole": "Lifted the two-factor policy from the server console"
+      "mfaPolicyLiftedConsole": "Lifted the two-factor policy from the server console",
+      "samlProviderCreated": "Created SAML provider {name}",
+      "samlProviderUpdated": "Updated SAML provider {name}",
+      "samlProviderDeleted": "Deleted SAML provider {name}",
+      "ssoEnforcementLiftedConsole": "Lifted single sign-on enforcement from the server console"
     }
   },
   "auth": {
@@ -755,7 +789,8 @@
       "passkeyNameTooLong": "A passkey name can be at most {max} characters.",
       "passkeyReauthRequired": "To add a passkey, sign out and sign in again, then add it within {minutes} minutes.",
       "passkeyLastSignInMethod": "This is the only way you can sign in. Set a password or link a single sign-on provider before removing it.",
-      "passkeyNotVerified": "Your authenticator did not verify you (PIN, fingerprint or face). Passkeys here need that check."
+      "passkeyNotVerified": "Your authenticator did not verify you (PIN, fingerprint or face). Passkeys here need that check.",
+      "ssoRequired": "This instance requires single sign-on. Use your identity provider's button."
     },
     "passkey": {
       "signIn": "Sign in with a passkey",
@@ -808,7 +843,8 @@
       },
       "forgotPassword": "Forgot your password?",
       "localAccount": "Account on this instance",
-      "signInWith": "Sign in with"
+      "signInWith": "Sign in with",
+      "ssoEnforcedNotice": "This instance requires single sign-on. Passwords work only for break-glass accounts."
     },
     "missingDestinationDescription": "No redirect destination specified.",
     "missingProviderDescription": "Single sign-on is the only way to sign in, but no provider is configured.",
@@ -1187,6 +1223,7 @@
     "cancel": "Cancel",
     "save": "Save",
     "edit": "Edit",
+    "submit": "Submit",
     "delete": "Delete",
     "remove": "Remove",
     "create": "Create",
@@ -1324,6 +1361,23 @@
     "acmeDnsRegisterTooLarge": "The acme-dns server's answer exceeded the {max}-byte limit",
     "acmeDnsRegisterInvalidResponse": "The acme-dns server's answer was not an account",
     "cannotChangeOwnRole": "Cannot change your own role",
+    "roleExceedsYours": "You can only hand out a role whose permissions you hold yourself",
+    "accountExceedsYours": "That account holds permissions you do not, so only someone who holds them can change it",
+    "roleNameInvalid": "A role needs a name of at most {max} characters",
+    "roleDescriptionTooLong": "A role's description can be at most {max} characters",
+    "roleCapabilityInvalid": "These are not permissions: {capabilities}",
+    "roleNameTaken": "Another role already has that name",
+    "cannotEditOwnRole": "You cannot change or delete the role you hold",
+    "roleBuiltIn": "The built-in roles cannot be changed or deleted",
+    "roleNotFound": "Role not found",
+    "roleInUse": "This role is still given to people, groups or sign-in mappings. Take it away from them first",
+    "groupRoleAdmin": "A group cannot give the administrator role: make each administrator one directly",
+    "scimNeedsPostgres": "SCIM provisioning needs CPM to run on PostgreSQL",
+    "scimConnectionNotFound": "SCIM connection not found",
+    "scimConnectionNameRequired": "A SCIM connection needs a name",
+    "scimConnectionNameTooLong": "A SCIM connection's name must be {max} characters or fewer",
+    "scimConnectionNameTaken": "Another SCIM connection already has that name",
+    "scimConnectionNeedsUsersAndGroups": "Issuing a SCIM connection takes permission to change both users and groups",
     "userNotFound": "User not found",
     "cannotResetOwnTwoFactor": "Turn off your own two-factor sign-in from your Profile page instead",
     "resetTwoFactorFailed": "Failed to reset two-factor sign-in",
@@ -1865,9 +1919,64 @@
     "caddyRejectedOnWafBodyLimitZero": "Caddy rejected configuration on {agent}: a WAF body limit is zero",
     "caddyUnreachable": "Unable to reach Caddy API",
     "caddyUnreachableOn": "Unable to reach Caddy API on {agents}",
-    "caddyNeedsAgent": "No agent is connected. With more than one controller running, Caddy is reached only through an agent."
+    "caddyNeedsAgent": "No agent is connected. With more than one controller running, Caddy is reached only through an agent.",
+    "samlMetadataRequired": "Enter the identity provider's metadata URL, or paste its metadata.",
+    "samlMetadataInvalid": "That is not SAML metadata CPM can read.",
+    "samlMetadataTooLarge": "The metadata is larger than {kib} KiB.",
+    "samlMetadataManyEntities": "The metadata describes several entities. Use the URL or file for this one identity provider.",
+    "samlMetadataNotIdp": "The metadata has no identity provider descriptor.",
+    "samlMetadataNoRedirectBinding": "The identity provider offers no sign-on URL with the HTTP-Redirect binding.",
+    "samlMetadataNoSigningCertificate": "The metadata carries no signing certificate, so no assertion could be verified.",
+    "samlMetadataUrlInvalid": "The metadata URL must start with https:// or http://.",
+    "samlMetadataFetchFailed": "Could not fetch the metadata ({reason}).",
+    "samlAttributeInvalid": "An attribute name is too long or holds control characters.",
+    "samlLinkDomainInvalid": "\"{domain}\" is not a domain name.",
+    "samlSpEntityIdInvalid": "The service provider entity ID cannot be empty or contain spaces.",
+    "samlNameRequired": "Enter a name for the provider.",
+    "samlProviderNotFound": "That SAML provider does not exist.",
+    "breakGlassAccountUnknown": "A break-glass account no longer exists. Pick the accounts again.",
+    "ssoEnforcementNeedsProvider": "Single sign-on cannot be enforced until a provider is enabled.",
+    "accessReviewNotFound": "That access review does not exist",
+    "accessReviewNameInvalid": "Give the access review a name of up to {max} characters",
+    "accessReviewScopeInvalid": "Choose what to review, and the role or group it names",
+    "accessReviewDueInvalid": "The due date must be today or later",
+    "accessReviewReviewersInvalid": "Choose 1 to {max} reviewers, each an active account",
+    "accessReviewEmpty": "There is nothing in that scope to review",
+    "accessReviewNotOpen": "This access review is no longer open",
+    "accessReviewNotConfirming": "This access review has no revocations waiting for confirmation",
+    "accessReviewItemNotFound": "That item is not one of yours to review",
+    "accessReviewOwnItem": "Nobody reviews their own access",
+    "accessReviewDecisionInvalid": "A decision is keep, revoke or change",
+    "accessReviewChangeUnavailable": "Only a role or a grant can be changed; keep or revoke this one",
+    "accessReviewChangeInvalid": "Choose access different from what it has now",
+    "accessReviewScimManaged": "This access comes from SCIM provisioning, which would restore it. Remove it in the identity provider",
+    "accessReviewNoteTooLong": "A note must be {max} characters or fewer",
+    "accessReviewApplyFailed": "It could not be applied; the server log says why",
+    "changeSubmittedForApproval": "Submitted for approval as change request #{id}",
+    "changeRequestNotFound": "That change request does not exist",
+    "changeRequestNotPending": "This change request has already been decided",
+    "changeRequestAlreadyDecided": "You have already decided this change request",
+    "changeRequestSelfApproval": "Nobody approves their own change",
+    "changeRequestNotApprover": "The approval policy does not name you as an approver",
+    "changeRequestNotYours": "Only whoever submitted a change request can withdraw it",
+    "changeRequestTargetChanged": "What this change request edits has changed since it was submitted. Submit the change again",
+    "changeRequestRequesterGone": "The account that submitted this change is gone or disabled",
+    "changeRequestRequesterLacks": "The account that submitted this change may no longer make it",
+    "changeRequestUnknownKind": "This kind of change can no longer be applied",
+    "changeRequestInterrupted": "Applying this change was interrupted before it took effect. Submit it again",
+    "changeRequestInterruptedUnknown": "Applying this change was interrupted, and whether it took effect cannot be told. Check what it edits before submitting it again",
+    "changeRequestNoteTooLong": "Keep it to {max} characters",
+    "changeRequestBypassAdmin": "Only an administrator can bypass approval",
+    "changeRequestBypassReason": "Give a reason for bypassing approval",
+    "approvalPolicyNoApprovers": "Name at least one role or group whose members may approve",
+    "approvalPolicyNoAreas": "Choose at least one area that needs approval",
+    "approvalPolicyNoTags": "Enter at least one host tag that needs approval",
+    "approvalPolicyTagInvalid": "A tag is letters, digits and . _ : / - only, up to 40 characters"
   },
   "groups": {
+    "roleHelp": "Every member holds this role besides their own, for as long as they are in the group. A group cannot give the administrator role.",
+    "noRole": "No role of its own",
+    "roleFailed": "Could not change the group's role",
     "viewAsGroup": "View as an operator in this group",
     "viewAsGroupNamed": "View as an operator in {name}",
     "access": "Access",
@@ -1928,6 +2037,7 @@
   },
   "hostHistory": {
     "pageTitle": "History of {name}",
+    "approvedIn": "Change request #{id}",
     "overviewTab": "Overview",
     "subtitle": "A revision is kept after every save, maintenance switch, bulk change, import and deletion, newest first. Compare any two, or load one into the editor and roll back to it.",
     "deletedTitle": "This host was deleted",
@@ -2254,6 +2364,7 @@
   },
   "nav": {
     "logs": "Logs",
+    "approvals": "Approvals",
     "viewAsBannerTitle": "Viewing as {role}",
     "viewAsBannerTitleGroups": "Viewing as {role} in {groups}",
     "viewAsBannerDescription": "Pages, menus and actions follow that role's permissions. Anything you change is still recorded as you. This view ends on its own after an hour.",
@@ -2309,7 +2420,10 @@
     "security": "Security",
     "mfaGraceTitle": "Set up a second factor by {date}",
     "mfaGraceDescription": "This instance requires an authenticator app or a passkey for your account. After that date you'll be asked to set one up before anything else.",
-    "mfaGraceAction": "Set it up"
+    "mfaGraceAction": "Set it up",
+    "pendingReviewsTitle": "You have {count, plural, one {# access review item} other {# access review items}} to decide",
+    "pendingReviewsDue": "The first is due {date}.",
+    "awaitingApprovalsTitle": "{count, plural, one {# change waits} other {# changes wait}} for your approval"
   },
   "overview": {
     "checklist": {
@@ -3574,6 +3688,7 @@
     "addProvider": "Add provider",
     "addressFamily": "Address family",
     "adminGroups": "Admin groups",
+    "madeRoleGroups": "{role} groups",
     "agentManagementUnavailableTitle": "No agent is answering, so the container cannot be managed from here",
     "agentsDescription": "An agent recreates, rebuilds and configures the Caddy container on its host. The controller has no Docker access of its own, and no address for any Caddy - everything reaches a proxy through its agent.",
     "agentsUnavailableTitle": "No agent is answering",
@@ -3808,6 +3923,15 @@
       "account_lock_disable_after": {
         "description": "Counted like the lock above: forgotten a day after the last failure, and reset by a successful sign-in.",
         "label": "Failed sign-ins before an account is disabled"
+      },
+      "access_review_confirm_revocations": {
+        "description": "A closed access review holds its revocations until an administrator confirms them, instead of applying them as it closes.",
+        "label": "Revocations wait for confirmation"
+      },
+      "access_review_reminder_days": {
+        "description": "How many days before an access review is due its undecided items are reported, through the access review notifications.",
+        "fieldLabel": "Reminder before due",
+        "label": "Access review reminder (days before due)"
       },
       "account_lock_disable_enabled": {
         "description": "Disable an account once it reaches the number of failed sign-ins below, until an administrator enables it again. Anyone who knows a username can then disable that account by guessing at it. The last active administrator is never disabled, only locked.",
@@ -4076,6 +4200,14 @@
       "notify_audit_sink_failed": {
         "description": "When an audit sink keeps failing or falls behind, and when it catches up again.",
         "label": "Audit streaming failing"
+      },
+      "notify_access_reviews": {
+        "description": "When an access review nears its due date or passes it with items undecided, and when one closes with revocations waiting for confirmation.",
+        "label": "Access reviews"
+      },
+      "notify_change_approvals": {
+        "description": "When an administrator applies a change request without waiting for its approvals.",
+        "label": "Change approval bypassed"
       },
       "notify_channel_failing": {
         "description": "When sends to an alert channel keep failing, told on the other channels, and when it works again.",
@@ -4390,7 +4522,7 @@
         "name": "Tailscale"
       },
       "oauth": {
-        "name": "OAuth providers"
+        "name": "Single sign-on providers"
       },
       "signIn": {
         "name": "Sign-in"
@@ -4436,6 +4568,12 @@
       },
       "ldap": {
         "name": "Directories (LDAP)"
+      },
+      "ssoEnforcement": {
+        "name": "Single sign-on enforcement"
+      },
+      "accessReviews": {
+        "name": "Access reviews"
       }
     },
     "dnsDelegation": {
@@ -4911,6 +5049,13 @@
       "analytics": {
         "valueRetention": "ClickHouse - {days}-day retention",
         "detailEnv": "Set in the environment, so this instance cannot change it here."
+      },
+      "accessReviews": {
+        "valueApply": "Revocations apply on close; reminders {days, plural, one {# day} other {# days}} before",
+        "valueConfirm": "Revocations wait for confirmation; reminders {days, plural, one {# day} other {# days}} before"
+      },
+      "ssoEnforcement": {
+        "valueEnforced": "{count, plural, =0 {Enforced, no break-glass account} one {Enforced, # break-glass account} other {Enforced, # break-glass accounts}}"
       }
     },
     "stagedLabels": {
@@ -4941,7 +5086,8 @@
       "passwordPolicy": "Password policy",
       "metrics": "Metrics",
       "logging": "Logging",
-      "waf": "WAF"
+      "waf": "WAF",
+      "ssoEnforcement": "Single sign-on enforcement"
     },
     "results": {
       "unknownError": "Unknown error",
@@ -5079,7 +5225,9 @@
       "captchaSiteKeyRequired": "Enter the site key the provider issued",
       "captchaSecretKeyRequired": "Enter the secret key the provider issued",
       "captchaCapUrlRequired": "Enter the Cap instance URL, starting with http:// or https://",
-      "captchaFailed": "Failed to save CAPTCHA settings"
+      "captchaFailed": "Failed to save CAPTCHA settings",
+      "ssoEnforcementSaved": "Single sign-on enforcement saved.",
+      "ssoEnforcementFailed": "Could not save single sign-on enforcement."
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
     "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard host first.",
@@ -5411,6 +5559,7 @@
         "captcha": "bot check, challenge, human check",
         "twoFactor": "mfa, 2fa, totp, authenticator, passkey, second factor",
         "passwordPolicy": "password, bcrypt, argon2, hash",
+        "accessReviews": "access review, recertification, attestation, revoke, reviewer",
         "authentik": "forward auth, outpost",
         "forwardAuth": "auth proxy, sso gate",
         "geoip": "maxmind, geolite, country database, city database",
@@ -5468,6 +5617,33 @@
           "context": "Users"
         }
       }
+    },
+    "saml": {
+      "metadataUrl": "Metadata URL",
+      "metadataUrlHelp": "Where the identity provider publishes its SAML metadata. Fetched again each time the provider is saved; sign-in uses the saved copy.",
+      "metadataXml": "Metadata XML",
+      "metadataXmlHelp": "Paste the identity provider's metadata when it has no URL CPM can reach.",
+      "spEntityId": "Service provider entity ID",
+      "spEntityIdHelp": "What the identity provider knows CPM as, and the audience every assertion must name. Left blank, it is the metadata URL below.",
+      "emailAttribute": "Email attribute",
+      "nameAttribute": "Display name attribute",
+      "linkDomains": "Domains to link",
+      "linkDomainsHelp": "Comma-separated. A first sign-in whose email is in one of these domains joins the CPM account with the same email; any other needs an account of its own.",
+      "groupsAttribute": "Groups attribute",
+      "groupsAttributeHelp": "The assertion attribute listing the user's groups, one value a group.",
+      "idpSummary": "Identity provider {entityId}, {certificates, plural, one {# signing certificate} other {# signing certificates}}.",
+      "acsUrl": "Assertion consumer service URL",
+      "spMetadataUrl": "Service provider metadata URL",
+      "urlsAfterSave": "Once saved, the provider shows the URLs to register with the identity provider. CPM requires signed assertions."
+    },
+    "ssoEnforcement": {
+      "enforce": "Require single sign-on",
+      "enforceHelp": "Passwords and passkeys stop working, except for the break-glass accounts below. People sign in through an enabled provider, so its own second factor applies.",
+      "breakGlass": "Break-glass accounts",
+      "breakGlassHelp": "Up to {max} accounts that keep signing in with their own password or passkey, for when the identity provider is down.",
+      "allowLdap": "Allow LDAP while single sign-on is enforced",
+      "allowLdapHelp": "Directory accounts are created and removed in the directory, but their password is typed into CPM and the identity provider's second factor never runs. Turn this off to send them through a provider too.",
+      "liftHelp": "Locked out? Run cpm-server --lift-sso-enforcement inside the web container to turn enforcement off."
     }
   },
   "setup": {
@@ -5803,8 +5979,8 @@
       "description": "See the pages, menus and actions a role gets, without signing in as anyone. Your own account doesn't change, and anything you do is still recorded as you. It ends after an hour, or when you return to your own view.",
       "roles": { "operator": "Operator", "user": "User", "viewer": "Viewer" },
       "groups": "In these groups",
-      "groupsHelp": "An operator can only reach what their groups were granted. Pick none to see an operator with no grants.",
-      "noGroups": "There are no groups yet, so an operator here would have no grants.",
+      "groupsHelp": "A scoped role such as operator reaches only what its groups were granted, and a group can give a role of its own. Pick none to see the role on its own.",
+      "noGroups": "There are no groups yet, so the role is seen on its own, with no grants.",
       "errorTitle": "Could not switch views"
     },
     "twoFactorOn": "On",
@@ -6348,6 +6524,22 @@
           "title": "Audit sink {sink} has caught up",
           "item": "The audit sink {sink} is receiving the audit log again."
         },
+        "accessReviewDue": {
+          "title": "Access review {campaign} is due {dueOn}",
+          "item": "The access review {campaign} is due {dueOn} and has {pending, plural, one {# item} other {# items}} nobody has decided."
+        },
+        "accessReviewOverdue": {
+          "title": "Access review {campaign} is overdue",
+          "item": "The access review {campaign} was due {dueOn} and still has {pending, plural, one {# item} other {# items}} nobody has decided."
+        },
+        "accessReviewConfirm": {
+          "title": "Access review {campaign} waits for confirmation",
+          "item": "The access review {campaign} is closed. {revocations, plural, one {# revocation or change waits} other {# revocations and changes wait}} for someone who manages users to confirm them."
+        },
+        "changeApprovalBypassed": {
+          "title": "Approval bypassed for change request #{id}",
+          "item": "{by} applied change request #{id} ({change}) without its approvals. Reason given: {reason}"
+        },
         "channelFailing": {
           "title": "Alert channel {channel} is failing",
           "item": "Alerts to {channel} failed {failures, plural, one {# time} other {# times}} in a row: {error}. They are retried with growing waits."
@@ -6496,7 +6688,8 @@
       "password": "Local accounts",
       "passkey": "Local accounts",
       "oidc": "Single sign-on (OIDC)",
-      "ldap": "Directory (LDAP)"
+      "ldap": "Directory (LDAP)",
+      "saml": "Single sign-on (SAML)"
     },
     "methods": {
       "password": "Username and password",
@@ -6517,7 +6710,9 @@
       "syncGroups": "Syncs groups",
       "reachable": "Answering",
       "unreachable": "Failed at {stage}",
-      "unchecked": "Not checked yet"
+      "unchecked": "Not checked yet",
+      "breakGlassOnly": "Break-glass accounts only",
+      "ldapOffWhileEnforced": "Off while single sign-on is enforced"
     },
     "mfaTitle": "Second factor",
     "mfaModes": {
@@ -6542,7 +6737,15 @@
       "user": "User",
       "viewer": "Viewer"
     },
-    "accountCount": "{count, plural, one {# account} other {# accounts}}"
+    "accountCount": "{count, plural, one {# account} other {# accounts}}",
+    "ssoTitle": "Enforced single sign-on",
+    "ssoEnforced": "Enforced",
+    "ssoNotEnforced": "Not enforced",
+    "ssoBreakGlass": "Break-glass accounts: {accounts}.",
+    "ssoNoBreakGlass": "No break-glass account: if every provider is down, only the server console gets anyone back in.",
+    "ssoLdapAllowed": "Directory accounts still sign in with their LDAP password.",
+    "ssoLdapRefused": "Directory accounts sign in through a provider too.",
+    "previewSsoEnforced": "Passwords and passkeys work only for break-glass accounts."
   },
   "alerts": {
     "settingsNote": "Alert rules, webhook and chat channels, daily digests and the history of what was sent are on the <link>Alerts</link> page.",
@@ -6793,5 +6996,391 @@
     },
     "builtin": "Built-in",
     "actionFailed": "That did not work."
+  },
+  "roles": {
+    "title": "Roles",
+    "description": "What each role may see and change. The four built-in roles are fixed; any other is made here from the same permissions, and a group can give one to all its members.",
+    "kind": "Kind of role",
+    "builtIn": "Built-in",
+    "scopedShort": "Granted objects only",
+    "permissions": "Permissions",
+    "signsInOnly": "Signs in only",
+    "builtInHelp": {
+      "admin": "Everything, over every host and agent.",
+      "operator": "Manages the hosts and agents its groups are granted, and nothing else.",
+      "user": "Signs in, and reaches the apps forward auth lets it.",
+      "viewer": "Signs in, and reaches the apps forward auth lets it, under its own name."
+    },
+    "builtInLocked": "A built-in role cannot be changed. Make a role of your own to give a different set.",
+    "newTitle": "New role",
+    "saveFailed": "Could not save the role",
+    "deleteFailed": "Could not delete the role",
+    "deleteTitle": "Delete this role?",
+    "deleteConfirm": "{name} is deleted. Anyone, any group and any sign-in mapping still giving it must be moved to another role first.",
+    "scoped": "Scoped to granted objects",
+    "scopedHelp": "Hosts and agents only as far as the holder's groups are granted them, as an operator; creating one needs the role to hold it outright.",
+    "area": "Area",
+    "access": "Access",
+    "holdsOnly": "You can only give permissions you hold yourself.",
+    "resources": {
+      "overview": {
+        "label": "Overview",
+        "help": "The full overview, Needs attention for everything, and the setup checklist."
+      },
+      "hosts": {
+        "label": "Proxy and L4 hosts",
+        "help": "Hosts, their history, previews and bulk changes."
+      },
+      "agents": {
+        "label": "Agents",
+        "help": "Agents and their Caddy, pairing included."
+      },
+      "accessLists": {
+        "label": "Access lists",
+        "help": "Access lists and their IP rules."
+      },
+      "certificates": {
+        "label": "Certificates",
+        "help": "Certificates, CAs, client certificates and mTLS roles."
+      },
+      "security": {
+        "label": "WAF and security",
+        "help": "WAF presets, exclusions and events, CRS plugins and blocked sources."
+      },
+      "analytics": {
+        "label": "Analytics",
+        "help": "Traffic analytics and saved views."
+      },
+      "logs": {
+        "label": "Logs",
+        "help": "The access, WAF and Caddy logs."
+      },
+      "users": {
+        "label": "Users",
+        "help": "Accounts, their roles, sessions and second factors."
+      },
+      "groups": {
+        "label": "Groups",
+        "help": "Groups, members, grants and the role a group gives."
+      },
+      "roles": {
+        "label": "Roles",
+        "help": "This page."
+      },
+      "settings": {
+        "label": "Settings",
+        "help": "Every setting, sign-in providers and directories, and applying Caddy's configuration."
+      },
+      "backups": {
+        "label": "Backups",
+        "help": "Backups, their destinations and schedules, and configuration export and import."
+      },
+      "alerts": {
+        "label": "Alerts",
+        "help": "Alert channels, rules and digests."
+      },
+      "audit": {
+        "label": "Audit log",
+        "help": "The audit log, its verification and audit streaming."
+      },
+      "tokens": {
+        "label": "Everyone's API tokens",
+        "help": "Every account's API tokens. Your own are always yours to manage."
+      }
+    }
+  },
+  "scim": {
+    "title": "Provisioning",
+    "description": "SCIM connections let an identity provider create, update and disable accounts and groups here. Each identity provider gets its own connection and token, separate from API tokens.",
+    "postgresOnlyTitle": "Needs PostgreSQL",
+    "postgresOnly": "SCIM provisioning is available only when CPM runs on PostgreSQL. SQLite is meant for trying CPM out, not for an identity provider writing to it all day.",
+    "endpoint": "SCIM base URL",
+    "endpointHelp": "Give this to the identity provider with the connection's token, as a bearer token.",
+    "tokenOnce": "Copy this token now. It is shown once and cannot be read back.",
+    "tokenEnding": "Token ending {hint}",
+    "turnedOff": "Turned off",
+    "provisioned": "Provisioned",
+    "provisionedCounts": "{users, plural, one {# user} other {# users}}, {groups, plural, one {# group} other {# groups}}",
+    "lastUsed": "Last used",
+    "rotateTitle": "Rotate token?",
+    "rotateConfirm": "{name} gets a new token and its current one stops working at once. Update the identity provider straight after.",
+    "deleteTitle": "Delete connection?",
+    "deleteConfirm": "{name}'s token stops working. Its accounts are signed out but kept, and its groups move to the Groups page, members and all.",
+    "emptyTitle": "No connections yet",
+    "emptyDescription": "Make one for each identity provider that should provision accounts here.",
+    "newTitle": "New SCIM connection",
+    "enabledHelp": "Off, the token is refused until it is turned back on.",
+    "linkExisting": "Link existing accounts",
+    "linkExistingHelp": "An account that already has the provisioned email is taken over by this connection, keeping its name and role. Off, provisioning that email is refused.",
+    "roleMappingHelp": "A provisioned group whose name is listed under a role gives its members that role. Groups cannot give the administrator role.",
+    "groupNamesPlaceholder": "Group names, separated by commas",
+    "saveFailed": "Could not save the connection",
+    "actionFailed": "Could not change the connection"
+  },
+  "accessReviews": {
+    "title": "Access reviews",
+    "description": "Ask reviewers whether each account, group membership, grant and token still needs its access. Nothing changes until a review is closed.",
+    "reviewerDescription": "The access handed to you for review. Decide whether each piece should stay.",
+    "start": "Start",
+    "newTitle": "New access review",
+    "emptyTitle": "No access reviews",
+    "emptyDescription": "Start one to have reviewers confirm or revoke who holds what.",
+    "emptyReviewerDescription": "Nothing is waiting for your review.",
+    "noItemsTitle": "No items for you",
+    "notFound": "That access review does not exist.",
+    "saveFailed": "The access review could not be saved.",
+    "actionFailed": "The access review could not be updated.",
+    "scope": "What to review",
+    "scopes": {
+      "allUsers": "Every account",
+      "role": "Holders of a role",
+      "group": "One group",
+      "grants": "Host and agent grants",
+      "tokens": "Every API token",
+      "scim": "Every SCIM connection"
+    },
+    "scopeHelp": {
+      "allUsers": "Each active account's role, and each of its group memberships.",
+      "role": "Each active account with the role, and each member of a group that carries it.",
+      "group": "The group's members, and what its grants reach.",
+      "grants": "Every group's grant on a proxy host, L4 host or agent.",
+      "tokens": "Every API token that still works, with its owner.",
+      "scim": "Every identity provider allowed to provision accounts."
+    },
+    "scopeRoleNamed": "Holders of {role}",
+    "scopeGroupNamed": "Members and grants of {group}",
+    "group": "Group",
+    "due": "Due",
+    "dueHelp": "Reminders go out as it nears, through the access review notifications. It is due at the end of the day, UTC.",
+    "dueOverdue": "{date}, overdue",
+    "overdue": "Overdue",
+    "reviewers": "Reviewers",
+    "reviewersHelp": "Each person's access goes to one reviewer, and nobody is asked about their own.",
+    "statuses": {
+      "open": "In review",
+      "applying": "Applying",
+      "confirming": "Awaiting confirmation",
+      "closed": "Closed"
+    },
+    "progressHeader": "Progress",
+    "progress": "{decided} of {total} decided",
+    "kinds": {
+      "role": "Role assignment",
+      "membership": "Group membership",
+      "grant": "Grant",
+      "token": "API token of an account",
+      "scimConnection": "SCIM connection"
+    },
+    "hints": {
+      "noRecentSignIn": "No sign-in in 90 days",
+      "tokenUnused": "Token unused in 90 days",
+      "connectionUnused": "No provisioning in 90 days",
+      "groupEmpty": "Group has no members"
+    },
+    "subject": "Who or what",
+    "access": "Holds",
+    "reviewer": "Reviewer",
+    "you": "You",
+    "unassigned": "Nobody yet",
+    "decision": "Decision",
+    "undecided": "Not decided",
+    "decisions": {
+      "keep": "Keep it",
+      "revoke": "Revoke it",
+      "change": "Change it"
+    },
+    "changedTo": "Change to {to}",
+    "changeTo": "New access",
+    "levels": {
+      "view": "Can view",
+      "manage": "Can manage"
+    },
+    "grantOn": "{object}: {level, select, manage {manage} other {view}}",
+    "ownedBy": "Owned by {owner}",
+    "connectionOn": "Provisioning accounts",
+    "connectionOff": "Not provisioning",
+    "scimManaged": "Provisioned by SCIM",
+    "scimManagedHelp": "The identity provider manages this access and would put it back. Remove it there; here it can be kept or changed.",
+    "revokeHelp": {
+      "role": "Revoking disables the account, which signs it out and stops its API tokens. To keep the account with less access, change its role.",
+      "membership": "Revoking takes the account out of the group.",
+      "grant": "Revoking removes the grant from the group.",
+      "token": "Revoking deletes the token.",
+      "scimConnection": "Revoking switches the connection off. The accounts it provisioned stay as they are."
+    },
+    "note": "Note",
+    "decide": "Decide",
+    "decideTitle": "Decide on {subject}",
+    "reassign": "Reassign",
+    "reassignTitle": "Reassign {subject}",
+    "outcomes": {
+      "applied": "Applied",
+      "failed": "Not applied",
+      "gone": "Already gone"
+    },
+    "export": "Export",
+    "confirm": "Confirm",
+    "closeTitle": "Close {name}?",
+    "closeDescription": "Reviewing ends{undecided, plural, =0 {} one { with # item undecided, which stays as it is} other { with # items undecided, which stay as they are}}. {count, plural, =0 {Nothing was revoked or changed.} one {# revocation or change applies as you, unless Settings holds it for confirmation.} other {# revocations and changes apply as you, unless Settings holds them for confirmation.}}",
+    "confirmTitle": "Apply the revocations of {name}?",
+    "confirmDescription": "{count, plural, one {# revocation or change applies} other {# revocations and changes apply}} now, as you. Each is checked against what you may do yourself.",
+    "confirmingTitle": "Waiting for confirmation",
+    "confirmingDescription": "This review is closed. Its revocations and changes apply once someone who manages users confirms them.",
+    "failedTitle": "{count, plural, one {# revocation was not applied} other {# revocations were not applied}}",
+    "failedDescription": "Each says why. Confirm tries them again, as you.",
+    "deleteTitle": "Delete {name}?",
+    "deleteConfirm": "The review and its decisions are deleted. What it already revoked stays revoked.",
+    "csv": {
+      "item": "Item",
+      "kind": "Item kind",
+      "subject": "Subject",
+      "target": "Target",
+      "current": "Current access",
+      "hints": "Hints",
+      "reviewer": "Reviewed by",
+      "decision": "Decided",
+      "changeTo": "Changed to",
+      "note": "Reviewer's note",
+      "decidedAt": "Decided at",
+      "outcome": "Result",
+      "outcomeReason": "Why not applied"
+    }
+  },
+  "changeApprovals": {
+    "tabs": {
+      "requests": "Change requests",
+      "policy": "Approval policy"
+    },
+    "filters": {
+      "pending": "Waiting",
+      "decided": "Decided",
+      "all": "All"
+    },
+    "columns": {
+      "requester": "Submitted by",
+      "submitted": "Submitted"
+    },
+    "requestNumber": "Request #{id}",
+    "approvalCount": "{approvals} of {required}",
+    "unknownUser": "A deleted account",
+    "viaToken": "With an API token",
+    "requestedWithToken": "{name}, with an API token",
+    "policyOff": "Approval is off. Every change applies as it is saved; the approval policy turns it on.",
+    "empty": "No change requests",
+    "emptyPending": "Nothing is waiting for approval",
+    "emptyDescription": "A change the approval policy holds back waits here until enough approvers agree to it.",
+    "editorNotice": "The approval policy holds this change. Submitting sends it to the approvers, and it applies once they approve it.",
+    "stagedNotice": "The approval policy holds settings changes. Submitting sends this set to the approvers, and it applies once they approve it.",
+    "waitingOnOthers": "This change is waiting for approvers. Nothing has been applied yet.",
+    "previewTitle": "What it changes",
+    "previewNote": "As it was when submitted. If what it edits changes before it is approved, the request is invalidated rather than applied over the newer state.",
+    "noFieldChanges": "No field changes",
+    "decisionsTitle": "Decisions",
+    "noDecisions": "Nobody has decided yet",
+    "approvedBy": "Approved by {name}",
+    "rejectedBy": "Rejected by {name}",
+    "bypassedLabel": "Approval bypassed",
+    "bypassedBy": "By {name}: {reason}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "withdraw": "Withdraw",
+    "bypass": "Bypass",
+    "approveTitle": "Approve change request #{id}",
+    "rejectTitle": "Reject change request #{id}",
+    "withdrawTitle": "Withdraw change request #{id}",
+    "bypassTitle": "Bypass approval for change request #{id}",
+    "approveApplies": "Yours is the last approval it needs: it applies now, as whoever submitted it.",
+    "approveWaits": "It still needs another approval after yours before it applies.",
+    "rejectHelp": "A rejected request is closed. Whoever submitted it can make the change again.",
+    "withdrawHelp": "Nothing is applied. You can make the change again whenever you like.",
+    "bypassHelp": "This applies the change now, without its approvals, as whoever submitted it. The audit log keeps your reason, and the alert channels are told.",
+    "noteLabel": "Note for the requester",
+    "actionFailed": "That could not be done",
+    "bypassApplied": "Applied without its approvals.",
+    "results": {
+      "pending": "Approved. It is waiting for another approval.",
+      "applying": "Approved. Another approval is applying it.",
+      "applied": "Approved and applied.",
+      "failed": "Approved, but it failed to apply.",
+      "rejected": "Rejected.",
+      "withdrawn": "Withdrawn.",
+      "invalidated": "What it edits has changed since it was submitted, so it was not applied."
+    },
+    "statuses": {
+      "pending": "Waiting",
+      "applying": "Applying",
+      "applied": "Applied",
+      "failed": "Failed",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn",
+      "invalidated": "Out of date"
+    },
+    "kinds": {
+      "proxyHostCreate": "Create proxy host {name}",
+      "proxyHostUpdate": "Edit proxy host {name}",
+      "proxyHostDelete": "Delete proxy host {name}",
+      "proxyHostMaintenance": "Switch maintenance mode on {name}",
+      "proxyHostBulk": "Change {name} proxy hosts at once",
+      "forwardAuthAccess": "Change who may sign in to {name}",
+      "mtlsRuleCreate": "Add an mTLS access rule to {name}",
+      "mtlsRuleUpdate": "Edit an mTLS access rule on {name}",
+      "mtlsRuleDelete": "Remove an mTLS access rule from {name}",
+      "l4HostCreate": "Create L4 proxy host {name}",
+      "l4HostUpdate": "Edit L4 proxy host {name}",
+      "l4HostDelete": "Delete L4 proxy host {name}",
+      "l4HostBulk": "Change {name} L4 proxy hosts at once",
+      "hostRollback": "Roll {name} back to an earlier revision",
+      "hostRestore": "Restore the deleted host {name}",
+      "accessListCreate": "Create access list {name}",
+      "accessListUpdate": "Edit access list {name}",
+      "accessListDelete": "Delete access list {name}",
+      "accessListRules": "Change the IP rules of {name}",
+      "accessListEntryAdd": "Add a member to {name}",
+      "accessListEntryRemove": "Remove members from {name}",
+      "wafPresetCreate": "Create WAF preset {name}",
+      "wafPresetUpdate": "Edit WAF preset {name}",
+      "wafPresetDelete": "Delete WAF preset {name}",
+      "wafExclusionCreate": "Exclude WAF rule {name}",
+      "wafExclusionUpdate": "Edit the exclusion of WAF rule {name}",
+      "wafExclusionDelete": "Remove the exclusion of WAF rule {name}",
+      "crsPluginInstall": "Install CRS plugin {name}",
+      "crsPluginUpdate": "Update CRS plugin {name}",
+      "crsPluginConfig": "Change the configuration of CRS plugin {name}",
+      "crsPluginUninstall": "Uninstall CRS plugin {name}",
+      "settingsApply": "Apply staged settings",
+      "settingsGroup": "Save the {name} settings",
+      "approvalPolicy": "Change the approval policy"
+    },
+    "policy": {
+      "title": "Which changes wait for approval",
+      "description": "A covered change is saved as a request instead of applied. Approvers see what it changes and what it sets off, and the approval it still needs applies it, as whoever submitted it. Nobody approves their own change.",
+      "readOnly": "Only someone who manages settings can change the policy.",
+      "enabled": "Require approval",
+      "enabledHelp": "Off, every change applies as it is saved.",
+      "scope": "What needs approval",
+      "scopes": {
+        "everything": "Every change the policy can hold",
+        "areas": "Changes in chosen areas",
+        "tags": "Changes to hosts with chosen tags"
+      },
+      "scopeHelp": {
+        "everything": "Proxy and L4 hosts, access lists, the WAF, and applying settings.",
+        "areas": "Only the areas chosen below.",
+        "tags": "A host change needs approval when the host carries one of these tags, before or after the change. Nothing else does."
+      },
+      "areas": "Areas",
+      "tags": "Host tags",
+      "tagsHelp": "Comma-separated, as hosts are tagged.",
+      "approverRoles": "Approver roles",
+      "approversHelp": "Anyone holding one of these roles, their own or through a group, may approve; so may members of the groups below.",
+      "approverGroups": "Approver groups",
+      "requiredApprovals": "Approvals each change needs",
+      "one": "One",
+      "two": "Two",
+      "applyToTokens": "Apply to API tokens",
+      "applyToTokensHelp": "On, a covered write over the API answers 202 with a request id and waits, as the token's owner. Off, it applies at once and its audit event says approval was skipped.",
+      "saved": "Approval policy saved",
+      "saveFailed": "The approval policy could not be saved"
+    }
   }
 }

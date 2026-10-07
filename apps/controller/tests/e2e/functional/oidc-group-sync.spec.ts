@@ -106,7 +106,7 @@ test.describe('OIDC group sync', () => {
     deleteUserByEmail(email);
     const name = `Groups IdP ${Date.now()}`;
 
-    await goToSetting(page, 'OAuth providers');
+    await goToSetting(page, 'Single sign-on providers');
     await page.getByRole('button', { name: /add provider/i }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/^name/i).fill(name);

@@ -10,6 +10,7 @@ export interface SignInProvider {
   name: string;
   /** At most one, enforced by the settings key behind it. */
   isPrimary?: boolean;
+  protocol?: "oidc" | "saml";
 }
 
 /** The primary is `tonal`, not badged: a fill is seen, a badge read. Solid stays with submit. */
@@ -22,7 +23,7 @@ export function SignInProviders({
   providers: SignInProvider[];
   pendingId: string | null;
   isDisabled: boolean;
-  onSelect: (providerId: string) => void;
+  onSelect: (provider: SignInProvider) => void;
 }) {
   const t = useTranslations("auth.login");
 
@@ -44,7 +45,7 @@ export function SignInProviders({
             }
             isLoading={isPending}
             isDisabled={isDisabled}
-            onClick={() => onSelect(provider.id)}
+            onClick={() => onSelect(provider)}
           />
         );
       })}

@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { countHostRevisions, listHostRevisions } from "@/src/lib/host-history";
 
 /** Newest first, without the stored rows; GraphQL's hostRevision answers one in full. */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     const search = request.nextUrl.searchParams;
     const limit = Math.min(Math.max(Number(search.get("limit") ?? 20) || 20, 1), 200);

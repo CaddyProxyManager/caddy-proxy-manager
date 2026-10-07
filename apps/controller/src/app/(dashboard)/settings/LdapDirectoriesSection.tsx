@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Filter, KeyRound, Link, Pencil, Plug, Plus, Trash2, User } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
@@ -32,7 +32,14 @@ import {
   type LdapGroupSource,
 } from "@/src/lib/ldap/defaults";
 import type { LdapDirectoryInput, LdapDirectoryView } from "@/src/lib/models/ldap-directories";
-import { type GroupMappingForm, GroupMappingFields } from "./GroupMappingFields";
+import {
+  type GroupMappingForm,
+  GroupMappingFields,
+  type MadeRole,
+  MadeRolesContext,
+  madeRoleGroupsOf,
+  roleGroupsInput,
+} from "./GroupMappingFields";
 import {
   type LdapTestView,
   createLdapDirectoryAction,
@@ -66,6 +73,7 @@ const emptyForm: Form = {
   userGroup: "",
   viewerGroup: "",
   defaultRole: "user",
+  madeRoleGroups: {},
   syncGroups: false,
 };
 
@@ -85,11 +93,12 @@ function toForm(directory: LdapDirectoryView): Form {
     userGroup: directory.userGroup ?? "",
     viewerGroup: directory.viewerGroup ?? "",
     defaultRole: directory.defaultRole,
+    madeRoleGroups: madeRoleGroupsOf(directory.roleGroups),
     syncGroups: directory.syncGroups,
   };
 }
 
-function toInput(form: Form): LdapDirectoryInput {
+function toInput(form: Form, made: readonly MadeRole[]): LdapDirectoryInput {
   return {
     name: form.name,
     url: form.url,
@@ -103,6 +112,7 @@ function toInput(form: Form): LdapDirectoryInput {
     operatorGroup: form.operatorGroup,
     userGroup: form.userGroup,
     viewerGroup: form.viewerGroup,
+    roleGroups: roleGroupsInput(form, made),
     defaultRole: form.defaultRole,
     syncGroups: form.syncGroups,
   };
@@ -114,6 +124,7 @@ export default function LdapDirectoriesSection({
   initialDirectories: LdapDirectoryView[];
 }) {
   const t = useTranslations("settings.ldap");
+  const made = useContext(MadeRolesContext);
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
   const tSettings = useTranslations("settings");
@@ -196,8 +207,8 @@ export default function LdapDirectoriesSection({
     setError(null);
     try {
       const saved = editing
-        ? await updateLdapDirectoryAction(editing.id, toInput(form))
-        : await createLdapDirectoryAction(toInput(form));
+        ? await updateLdapDirectoryAction(editing.id, toInput(form, made))
+        : await createLdapDirectoryAction(toInput(form, made));
       setDirectories((prev) =>
         editing ? prev.map((d) => (d.id === saved.id ? saved : d)) : [...prev, saved],
       );
@@ -215,7 +226,7 @@ export default function LdapDirectoriesSection({
     try {
       setTestResult(
         await testLdapDirectoryAction(
-          toInput(form),
+          toInput(form, made),
           editing?.id ?? null,
           probe.username.trim() ? probe : null,
         ),
@@ -644,9 +655,10 @@ export default function LdapDirectoriesSection({
                   </MetadataListItem>
                   {testResult.identity.role && (
                     <MetadataListItem label={tCommon("role")}>
-                      {tUsers(
-                        `roles.${isAppRole(testResult.identity.role) ? testResult.identity.role : "user"}`,
-                      )}
+                      {isAppRole(testResult.identity.role)
+                        ? tUsers(`roles.${testResult.identity.role}`)
+                        : (made.find((role) => role.key === testResult.identity?.role)?.name ??
+                          testResult.identity.role)}
                     </MetadataListItem>
                   )}
                 </MetadataList>

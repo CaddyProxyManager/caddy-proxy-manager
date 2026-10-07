@@ -1,5 +1,6 @@
 /** The audited layer the dashboard and GraphQL share: one event per change, no secret in a view. */
 import { graphql } from 'graphql';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -187,8 +188,7 @@ describe('over GraphQL', () => {
       access: async () => ({
         userId: null,
         role,
-        isAdmin: role === 'admin',
-        isOperator: false,
+        capabilities: capabilitiesOf(role),
         grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
       }),
       rawBody: async () => '',
@@ -269,6 +269,6 @@ describe('over GraphQL', () => {
 
   it('refuses anyone but an administrator', async () => {
     const answer = await as('user')('{ backupDestinations { id } }');
-    expect(answer.errors?.[0]?.message).toBe('Administrator privileges required');
+    expect(answer.errors?.[0]?.message).toBe("This account's role does not allow this request");
   });
 });

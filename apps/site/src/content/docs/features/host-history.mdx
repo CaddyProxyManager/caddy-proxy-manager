@@ -53,6 +53,12 @@ A restore is refused when one of the host's domains is now served by another pro
 an L4 host, when its port is now taken on an agent it shares. If the revision names anything
 deleted since, the dialog lists it and the host comes back without it.
 
+## Under change approval
+
+While [change approvals](../change-approvals/) cover a host, a rollback and a restore wait for
+approval like any edit: **Submit** sends the rollback, and it applies once approved. The revision it
+makes names the change request, and the history links to it.
+
 ## How long history is kept
 
 Each host keeps at least its latest **100** revisions, however old, and every revision younger than

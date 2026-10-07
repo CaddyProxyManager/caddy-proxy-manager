@@ -1,5 +1,6 @@
 "use client";
 
+import { createContext, useContext } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@astryxdesign/core/Card";
 import { Grid } from "@astryxdesign/core/Grid";
@@ -9,7 +10,10 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 
-export type AppRole = "admin" | "operator" | "user" | "viewer";
+/** The roles an administrator made, which a provider can map groups to beside the built-in ones. */
+export type MadeRole = { key: string; name: string };
+
+export const MadeRolesContext = createContext<readonly MadeRole[]>([]);
 
 export type GroupMappingForm = {
   groupsClaim: string;
@@ -19,9 +23,33 @@ export type GroupMappingForm = {
   operatorGroup: string;
   userGroup: string;
   viewerGroup: string;
-  defaultRole: AppRole;
+  defaultRole: string;
+  /** A made role's key to its comma-separated group names. */
+  madeRoleGroups: Record<string, string>;
   syncGroups: boolean;
 };
+
+/** A provider's made roles as the form edits them. */
+export function madeRoleGroupsOf(roleGroups: Record<string, string[]> | undefined) {
+  return Object.fromEntries(
+    Object.entries(roleGroups ?? {})
+      .filter(([role]) => !(ROLE_OPTIONS as readonly string[]).includes(role))
+      .map(([role, names]) => [role, names.join(", ")]),
+  );
+}
+
+/** What a save sends for the made roles: every one the form shows, so a cleared field clears. */
+export function roleGroupsInput(form: GroupMappingForm, made: readonly MadeRole[]) {
+  return Object.fromEntries(
+    made.map((role) => [
+      role.key,
+      (form.madeRoleGroups[role.key] ?? "")
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean),
+    ]),
+  );
+}
 
 const ROLE_OPTIONS = ["admin", "operator", "user", "viewer"] as const;
 
@@ -42,6 +70,7 @@ export function GroupMappingFields({
 }) {
   const t = useTranslations("settings");
   const tUsers = useTranslations("users");
+  const made = useContext(MadeRolesContext);
   return (
     <Card variant="muted" padding={3}>
       <VStack gap={3}>
@@ -113,18 +142,32 @@ export function GroupMappingFields({
                 onChange={(v) => onChange({ viewerGroup: v })}
                 placeholder={value.groupPrefix ? `${value.groupPrefix}Viewer` : "auditors"}
               />
+              {made.map((role) => (
+                <TextInput
+                  key={role.key}
+                  label={t("madeRoleGroups", { role: role.name })}
+                  size="sm"
+                  value={value.madeRoleGroups[role.key] ?? ""}
+                  onChange={(v) =>
+                    onChange({ madeRoleGroups: { ...value.madeRoleGroups, [role.key]: v } })
+                  }
+                />
+              ))}
             </Grid>
             <Text type="supporting">{t("roleGroupNamesHelp")}</Text>
 
             <Selector
               label={t("defaultRoleLabel")}
               size="sm"
-              options={ROLE_OPTIONS.map((role) => ({
-                value: role,
-                label: tUsers(`roles.${role}`),
-              }))}
+              options={[
+                ...ROLE_OPTIONS.map((role) => ({
+                  value: role as string,
+                  label: tUsers(`roles.${role}`),
+                })),
+                ...made.map((role) => ({ value: role.key, label: role.name })),
+              ]}
               value={value.defaultRole}
-              onChange={(v) => onChange({ defaultRole: v as AppRole })}
+              onChange={(v) => onChange({ defaultRole: v })}
             />
           </>
         )}

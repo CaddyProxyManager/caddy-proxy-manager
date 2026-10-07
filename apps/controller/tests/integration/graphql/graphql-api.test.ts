@@ -4,6 +4,7 @@
  * and that one line per resolver is easy to forget, so it is asserted per operation.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -41,8 +42,7 @@ function contextFor(
     access: async () => ({
       userId: 1,
       role: role ?? '',
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     // Nothing here signs a request; the agent fields are covered by their own tests.
@@ -274,7 +274,7 @@ describe('the admin gate', () => {
       for (const role of ['user', 'viewer', 'operator']) {
         const result = await run(document, role);
         expect(result.errors?.[0]?.message, `${name} as ${role}`).toContain(
-          'Administrator privileges required',
+          "This account's role does not allow this request",
         );
       }
     });

@@ -37,13 +37,14 @@ await reloadConfig();
 
 import { getAuth } from '../../../src/lib/auth/server';
 import { DISABLED_AUTH_PATHS } from '../../../src/lib/auth/disabled-paths';
+import { SSO_DISABLED_PATHS } from '../../../src/lib/auth/saml/plugin';
 import { ensureAdminUser } from '../../../src/lib/db/init';
 import { users } from '../../../src/lib/db/schema';
 
 describe('the Better Auth instance', () => {
   it('is built with the endpoints the app replaces turned off', async () => {
     const auth = (await getAuth()) as any;
-    expect(auth.options.disabledPaths).toEqual(DISABLED_AUTH_PATHS);
+    expect(auth.options.disabledPaths).toEqual([...DISABLED_AUTH_PATHS, ...SSO_DISABLED_PATHS]);
   });
 });
 

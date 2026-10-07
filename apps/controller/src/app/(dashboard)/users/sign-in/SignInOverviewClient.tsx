@@ -24,7 +24,7 @@ import type { RoleMapping, SignInOverview } from "@/src/lib/users/sign-in-overvi
 type MethodRow = {
   id: string;
   name: string;
-  kind: "password" | "passkey" | "oidc" | "ldap";
+  kind: "password" | "passkey" | "oidc" | "saml" | "ldap";
   status: "on" | "off" | "unreachable";
   accounts: number;
   notes: string[];
@@ -51,6 +51,8 @@ export function SignInOverviewClient({
   const tNav = useTranslations("nav");
   const tGroups = useTranslations("groups");
 
+  const sso = overview.sso;
+  const breakGlassOnly = sso.enforced ? [t("notes.breakGlassOnly")] : [];
   const methods: MethodRow[] = [
     {
       id: "password",
@@ -58,7 +60,12 @@ export function SignInOverviewClient({
       kind: "password",
       status: overview.password.enabled ? "on" : "off",
       accounts: overview.password.accounts,
-      notes: overview.password.selfRegistration ? [t("notes.selfRegistration")] : [],
+      notes: [
+        ...breakGlassOnly,
+        ...(overview.password.selfRegistration && !sso.enforced
+          ? [t("notes.selfRegistration")]
+          : []),
+      ],
       href: "/settings/authentication#sign-in",
     },
     {
@@ -72,14 +79,15 @@ export function SignInOverviewClient({
           ? t("notes.passkeyHost", { host: overview.passkeys.rpId })
           : t("notes.passkeyNoHost"),
         t("notes.passkeysRegistered", { count: overview.passkeys.registered }),
+        ...breakGlassOnly,
       ],
       href: "/settings/general#instance",
     },
     ...overview.providers.map(
       (provider): MethodRow => ({
-        id: `oidc:${provider.id}`,
+        id: `${provider.protocol}:${provider.id}`,
         name: provider.name,
-        kind: "oidc",
+        kind: provider.protocol,
         status: provider.enabled ? "on" : "off",
         accounts: provider.linked,
         notes: [
@@ -95,11 +103,12 @@ export function SignInOverviewClient({
         id: `ldap:${directory.id}`,
         name: directory.name,
         kind: "ldap",
-        status: !directory.enabled
-          ? "off"
-          : directory.health === "unreachable"
-            ? "unreachable"
-            : "on",
+        status:
+          !directory.enabled || (sso.enforced && !sso.allowLdap)
+            ? "off"
+            : directory.health === "unreachable"
+              ? "unreachable"
+              : "on",
         accounts: directory.linked,
         notes: [
           directory.health === "unreachable"
@@ -108,6 +117,7 @@ export function SignInOverviewClient({
               ? t("notes.reachable")
               : t("notes.unchecked"),
           ...(directory.syncGroups ? [t("notes.syncGroups")] : []),
+          ...(sso.enforced && !sso.allowLdap ? [t("notes.ldapOffWhileEnforced")] : []),
         ],
         href: "/settings/authentication#ldap",
       }),
@@ -239,6 +249,41 @@ export function SignInOverviewClient({
 
         <Card padding={4}>
           <VStack gap={3}>
+            <Heading level={2}>{t("ssoTitle")}</Heading>
+            <HStack gap={2} vAlign="center">
+              <StatusDot
+                variant={sso.enforced ? "success" : "neutral"}
+                label={sso.enforced ? t("ssoEnforced") : t("ssoNotEnforced")}
+              />
+              <Text type="body" size="sm" weight="medium">
+                {sso.enforced ? t("ssoEnforced") : t("ssoNotEnforced")}
+              </Text>
+            </HStack>
+            {sso.enforced && (
+              <Text type="body" size="sm" color="secondary">
+                {sso.breakGlass.length > 0
+                  ? t("ssoBreakGlass", { accounts: sso.breakGlass.join(", ") })
+                  : t("ssoNoBreakGlass")}
+              </Text>
+            )}
+            {sso.enforced && (
+              <Text type="body" size="sm" color="secondary">
+                {sso.allowLdap ? t("ssoLdapAllowed") : t("ssoLdapRefused")}
+              </Text>
+            )}
+            <HStack>
+              <Button
+                variant="secondary"
+                size="sm"
+                label={tCommon("configure")}
+                href="/settings/authentication#sso-enforcement"
+              />
+            </HStack>
+          </VStack>
+        </Card>
+
+        <Card padding={4}>
+          <VStack gap={3}>
             <Heading level={2}>{t("previewTitle")}</Heading>
             <Text type="body" size="sm" color="secondary">
               {t("previewDescription")}
@@ -248,6 +293,7 @@ export function SignInOverviewClient({
               passwordForm={overview.password.enabled || enabledDirectories.length > 0}
               directories={enabledDirectories.map((directory) => directory.name)}
               passkey={overview.passkeys.enabled}
+              ssoEnforced={sso.enforced}
               providers={enabledProviders.map((provider) => ({
                 id: provider.id,
                 name: provider.name,
@@ -303,12 +349,14 @@ function LoginPreview({
   passwordForm,
   directories,
   passkey,
+  ssoEnforced,
   providers,
 }: {
   appName: string;
   passwordForm: boolean;
   directories: string[];
   passkey: boolean;
+  ssoEnforced: boolean;
   providers: { id: string; name: string; isPrimary: boolean }[];
 }) {
   const t = useTranslations("signInOverview");
@@ -318,6 +366,11 @@ function LoginPreview({
     <Card padding={4}>
       <VStack gap={3}>
         <Heading level={3}>{appName}</Heading>
+        {ssoEnforced && (
+          <Text type="supporting" color="secondary">
+            {t("previewSsoEnforced")}
+          </Text>
+        )}
         {passwordForm && (
           <VStack gap={2}>
             <TextInput

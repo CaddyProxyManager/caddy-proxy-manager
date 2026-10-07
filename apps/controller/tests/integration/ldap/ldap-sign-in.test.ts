@@ -308,3 +308,37 @@ describe('/sign-in/ldap', () => {
     expect(await env.directories.getLdapDirectory(env.directory.id)).not.toBeNull();
   });
 });
+
+describe('/sign-in/ldap while single sign-on is enforced', () => {
+  /** Written as stored: saving through Settings would want an SSO provider this file has none of. */
+  async function withEnforcement(allowLdap: boolean, run: () => Promise<void>) {
+    const { setSetting } = await import('@/src/lib/settings');
+    await setSetting('sso_enforcement', { enforced: true, breakGlassUserIds: [], allowLdap });
+    try {
+      await run();
+    } finally {
+      await setSetting('sso_enforcement', {
+        enforced: false,
+        breakGlassUserIds: [],
+        allowLdap: true,
+      });
+    }
+  }
+
+  live('signs a directory user in while "Allow LDAP" is on', async () => {
+    await withEnforcement(true, async () => {
+      const response = await signIn({ username: 'alice', password: LDAP_PASSWORDS.alice });
+      expect(response.status).toBe(200);
+      expect(response.cookies).toContain('session_token');
+    });
+  });
+
+  live('refuses a directory user while "Allow LDAP" is off', async () => {
+    await withEnforcement(false, async () => {
+      const response = await signIn({ username: 'alice', password: LDAP_PASSWORDS.alice });
+      expect(response.status).toBe(403);
+      expect(response.json.code).toBe('SSO_REQUIRED');
+      expect(response.cookies).not.toContain('session_token');
+    });
+  });
+});

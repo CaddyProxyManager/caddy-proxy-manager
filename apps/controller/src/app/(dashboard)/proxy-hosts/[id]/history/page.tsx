@@ -5,7 +5,7 @@ import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScre
 import { loadHostHistory } from "@/src/lib/host-history/page";
 import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 import { proxyHostDetailHref, proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
-import { canManage, requireAccess } from "@/src/lib/users/permissions";
+import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreProxyHostAction } from "../../actions";
 
 type PageProps = {
@@ -22,13 +22,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("history.navLabel") };
 }
 
-/** Managers of a live host, and administrators of a deleted one: its grants went with it. */
+/** Managers of a live host, and of every host for a deleted one: its grants went with it. */
 export default async function ProxyHostHistoryPage({ params, searchParams }: PageProps) {
   const id = parseId((await params).id);
   if (id === null) notFound();
-  const access = await requireAccess();
+  const access = await requireReach("hosts:read");
   const host = await getProxyHost(id);
-  if (host ? !canManage(access, "proxyHost", id) : !access.isAdmin) notFound();
+  if (host ? !canManage(access, "proxyHost", id) : !can(access, "hosts:write")) notFound();
   const data = await loadHostHistory("http", id, await searchParams);
   if (!host && data.latest === 0) notFound();
   const tNav = await getTranslations("nav");
@@ -53,7 +53,7 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
         showConfig: data.showConfig,
         rollbackHref: host ? `/proxy-hosts?edit=${id}&revision=` : null,
         restore:
-          !host && access.isAdmin
+          !host && can(access, "hosts:write")
             ? {
                 missing: data.missing,
                 name: data.name ?? `#${id}`,

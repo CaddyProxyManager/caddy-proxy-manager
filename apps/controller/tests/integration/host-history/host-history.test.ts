@@ -5,6 +5,7 @@
  * their revision.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { asc, eq } from 'drizzle-orm';
 import { graphql } from 'graphql';
 import { vi } from '@/tests/helpers/vi';
@@ -296,8 +297,7 @@ describe('secrets', () => {
       access: async () => ({
         userId,
         role: 'admin',
-        isAdmin: true,
-        isOperator: false,
+        capabilities: capabilitiesOf('admin'),
         grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
       }),
       rawBody: async () => '',
@@ -539,8 +539,7 @@ describe('the editor and the API', () => {
       access: async () => ({
         userId,
         role: 'admin',
-        isAdmin: true,
-        isOperator: false,
+        capabilities: capabilitiesOf('admin'),
         grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
       }),
       rawBody: async () => '',

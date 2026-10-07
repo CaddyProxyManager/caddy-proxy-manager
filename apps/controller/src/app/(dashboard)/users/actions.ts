@@ -1,8 +1,8 @@
 "use server";
 
+import { requireCanAccess } from "@/src/lib/users/permissions";
 import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/errors/domain-error";
 import {
   createUser,
@@ -30,14 +30,15 @@ import {
 import {
   assertAcceptablePassword,
   assertEmailAddress,
+  assertAssignableRole,
+  assertMayManageUser,
   assertNotSelf,
-  assertUserRole,
   assertUserStatus,
 } from "@/src/lib/users/admin";
 
 /** Returns why an invitation was not sent: the account exists regardless, and can be re-sent. */
 async function createUserActionUntranslated(formData: FormData): Promise<unknown> {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
 
   if (await localUsersDisabled()) {
@@ -46,7 +47,10 @@ async function createUserActionUntranslated(formData: FormData): Promise<unknown
 
   const email = String(formData.get("email") ?? "").trim();
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;
-  const role = assertUserRole(String(formData.get("role") ?? "user"));
+  const role = await assertAssignableRole(
+    access.capabilities,
+    String(formData.get("role") ?? "user"),
+  );
   const password = String(formData.get("password") ?? "");
   // Empty: their own email when it can be a username (createUser).
   const username = String(formData.get("username") ?? "").trim() || null;
@@ -91,14 +95,13 @@ async function createUserActionUntranslated(formData: FormData): Promise<unknown
 }
 
 async function updateUserRoleActionUntranslated(userId: number, requestedRole: User["role"]) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
 
   assertNotSelf(actorId, userId, "cannotChangeOwnRole");
+  const before = await assertMayManageUser(access.capabilities, userId);
   // A server action is a public endpoint: the type annotation is not a check on what arrives.
-  const role = assertUserRole(requestedRole);
-
-  const before = await getUserById(userId);
+  const role = await assertAssignableRole(access.capabilities, requestedRole);
   await updateUserRole(userId, role);
 
   await logAuditEvent({
@@ -114,13 +117,13 @@ async function updateUserRoleActionUntranslated(userId: number, requestedRole: U
 }
 
 async function updateUserStatusActionUntranslated(userId: number, requestedStatus: string) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
 
   assertNotSelf(actorId, userId, "cannotChangeOwnStatus");
   const status = assertUserStatus(requestedStatus);
 
-  const before = await getUserById(userId);
+  const before = await assertMayManageUser(access.capabilities, userId);
   await updateUserStatus(userId, status);
 
   await logAuditEvent({
@@ -136,7 +139,7 @@ async function updateUserStatusActionUntranslated(userId: number, requestedStatu
 }
 
 async function updateUserInfoActionUntranslated(userId: number, formData: FormData) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
 
   const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
@@ -145,7 +148,7 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
   // A form without the field leaves the username alone.
   const username = formData.has("username") ? String(formData.get("username")) : undefined;
 
-  const before = await getUserById(userId);
+  const before = await assertMayManageUser(access.capabilities, userId);
   // All or nothing: a refused username or email leaves the name unchanged too.
   const changed = await updateUserAccount(userId, { name, email, username });
   if (!changed) throw domainError("userNotFound");
@@ -175,10 +178,11 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
 }
 
 async function deleteUserActionUntranslated(userId: number) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
 
   assertNotSelf(actorId, userId, "cannotDeleteOwnAccount");
+  await assertMayManageUser(access.capabilities, userId);
 
   await deleteUser(userId);
 
@@ -265,11 +269,11 @@ export async function deleteUserAction(userId: number): Promise<ActionState> {
 
 /** Sessions go too: the reset often follows a lost or stolen device. */
 async function resetUserTwoFactorActionUntranslated(userId: number) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
   // Your own is turned off from the Profile page, with your password.
   assertNotSelf(actorId, userId, "cannotResetOwnTwoFactor");
-  const target = await getUserById(userId);
+  const target = await assertMayManageUser(access.capabilities, userId);
   if (!target) throw domainError("userNotFound");
 
   await resetTwoFactor(userId);
@@ -298,11 +302,11 @@ export async function resetUserTwoFactorAction(userId: number): Promise<ActionSt
 
 /** As the 2FA reset: sessions go too, since a lost device may have signed in with its passkey. */
 async function removeUserPasskeysActionUntranslated(userId: number) {
-  const session = await requireAdmin();
+  const { session, access } = await requireCanAccess("users:write");
   const actorId = Number(session.user.id);
   // Your own are removed one at a time from the Profile page, behind its lock-out check.
   assertNotSelf(actorId, userId, "cannotRemoveOwnPasskeys");
-  const target = await getUserById(userId);
+  const target = await assertMayManageUser(access.capabilities, userId);
   if (!target) throw domainError("userNotFound");
 
   await deleteUserPasskeys(userId);
@@ -332,7 +336,9 @@ export async function removeUserPasskeysAction(userId: number): Promise<ActionSt
 /** An invitation to an account with no password yet, a reset link to one with. */
 export async function sendEmailedLinkAction(userId: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const { session, access } = await requireCanAccess("users:write");
+    // A password link is a way into the account, so only for one the caller may manage.
+    await assertMayManageUser(access.capabilities, userId);
     const purpose = await sendEmailedLink(
       userId,
       session.user.name || session.user.email,

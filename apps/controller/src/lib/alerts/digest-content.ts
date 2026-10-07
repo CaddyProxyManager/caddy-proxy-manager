@@ -7,7 +7,7 @@
 import { and, desc, gte, lt, sql } from "drizzle-orm";
 import db from "../db";
 import { auditEvents } from "../db/schema";
-import { emptyGrants } from "../models/group-grants";
+import { systemAccess } from "../users/permissions";
 
 export const DIGEST_WINDOW_MS = 24 * 60 * 60_000;
 /** Countries and networks count as new against this much history before the window. */
@@ -184,12 +184,7 @@ export async function collectDigest(now: number): Promise<DigestData> {
   const { collectAttention } = await import("../attention");
   const [trafficData, attention, changed, backed] = await Promise.all([
     analyticsOn ? within("traffic", () => traffic(from, now)) : Promise.resolve(null),
-    within("Needs attention", () =>
-      collectAttention(
-        { userId: 0, role: "admin", isAdmin: true, isOperator: false, grants: emptyGrants() },
-        { now },
-      ),
-    ),
+    within("Needs attention", () => collectAttention(systemAccess(), { now })),
     within("changes", () => changes(from, now)),
     within("backups", backups),
   ]);

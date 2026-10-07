@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { APP_VERSION } from "@/src/lib/runtime/app-version";
 import { TOKEN_AREAS, TOKEN_SCOPE_KINDS } from "@/src/lib/api-tokens/scope";
 import { APP_ROLES } from "@/src/lib/auth/oidc/groups";
@@ -2551,6 +2551,25 @@ const spec = {
           },
         },
       },
+      PendingApproval: {
+        description:
+          "Held for approval: the change approval policy covers this write, so it was stored as a " +
+          "change request instead of applied. Approvers decide it on the Approvals page or over " +
+          "GraphQL; the request is the token owner's.",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                status: { type: "string", enum: ["pending"] },
+                changeRequestId: { type: "integer" },
+                message: { type: "string" },
+              },
+              required: ["status", "changeRequestId", "message"],
+            },
+          },
+        },
+      },
       Unauthorized: {
         description: "Unauthorized",
         content: {
@@ -4915,12 +4934,30 @@ const spec = {
   },
 };
 
+/** The writes a change approval policy can hold, each of which may answer 202 instead. */
+const APPROVAL_COVERED = [
+  /^\/api\/v1\/proxy-hosts(\/\{id\}(\/(forward-auth-access|mtls-access-rules(\/\{ruleId\})?))?|\/bulk)?$/,
+  /^\/api\/v1\/l4-proxy-hosts(\/\{id\}|\/bulk)?$/,
+  /^\/api\/v1\/access-lists(\/\{id\}(\/(ip-rules|entries(\/\{entryId\})?))?)?$/,
+  /^\/api\/v1\/waf-presets(\/\{id\})?$/,
+  /^\/api\/v1\/crs-plugins(\/\{id\}(\/update)?)?$/,
+  /^\/api\/v1\/settings\/\{group\}$/,
+];
+for (const [path, operations] of Object.entries(spec.paths)) {
+  if (!APPROVAL_COVERED.some((pattern) => pattern.test(path))) continue;
+  for (const [method, operation] of Object.entries(operations as Record<string, unknown>)) {
+    if (method === "get") continue;
+    const responses = (operation as { responses: Record<string, unknown> }).responses;
+    responses["202"] = { $ref: "#/components/responses/PendingApproval" };
+  }
+}
+
 // Serialized once: the document never changes, and stringifying it was the whole cost of a GET.
 const SPEC_JSON = JSON.stringify(spec);
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
   } catch (error) {
     return apiErrorResponse(error);
   }

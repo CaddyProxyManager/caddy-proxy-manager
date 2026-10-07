@@ -3,7 +3,9 @@ import { logAuditEvent } from "../audit";
 import { diffAuditRecords } from "../audit/changes";
 import { groups, groupMembers, users } from "../db/schema";
 import { asc, eq, inArray, count } from "drizzle-orm";
-import { domainError } from "../errors/domain-error";
+import { DomainError, domainError } from "../errors/domain-error";
+import type { CapabilitySet } from "../roles/capabilities";
+import { assertMayAssignRole } from "../roles/store";
 
 export type Group = {
   id: number;
@@ -11,6 +13,8 @@ export type Group = {
   description: string | null;
   /** "ui" for operator-managed groups, "oidc" for groups an IdP sync created. */
   source: string;
+  /** A role every member holds besides their own; never the built-in admin. */
+  role: string | null;
   members: GroupMember[];
   createdAt: string;
   updatedAt: string;
@@ -36,6 +40,7 @@ function toGroup(row: GroupRow, members: GroupMember[]): Group {
     name: row.name,
     description: row.description,
     source: row.source,
+    role: row.role,
     members,
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!,
@@ -255,4 +260,52 @@ export async function getGroupsForUser(userId: number): Promise<{ id: number; na
     .where(eq(groupMembers.userId, userId));
 
   return rows;
+}
+
+/**
+ * The role a group gives its members, or none. Never the built-in admin: an administrator is a
+ * person the second-factor policy and the last-administrator guard can name, which a group is not.
+ */
+export async function setGroupRole(
+  id: number,
+  role: string | null,
+  actor: { userId: number; capabilities: CapabilitySet },
+): Promise<Group> {
+  const existing = await db.query.groups.findFirst({
+    where: (table, operators) => operators.eq(table.id, id),
+  });
+  if (!existing) throw domainError("groupNotFound");
+  if (role === "admin") throw domainError("groupRoleAdmin");
+  if (role !== null) await assertMayAssignRole(actor.capabilities, role);
+  // Taking a role away hands nothing out, but changing one the actor could not give is acting
+  // above themselves.
+  if (existing.role !== null)
+    await assertMayAssignRole(actor.capabilities, existing.role).catch((error) => {
+      if (error instanceof DomainError && error.code === "invalidUserRole") return;
+      throw error;
+    });
+  if (existing.role === role) return (await getGroup(id))!;
+
+  await db.update(groups).set({ role, updatedAt: nowIso() }).where(eq(groups.id, id));
+  await logAuditEvent({
+    userId: actor.userId,
+    action: "update",
+    entityType: "group",
+    entityId: id,
+    summary: `Updated group ${existing.name}`,
+    changes: diffAuditRecords({ role: existing.role }, { role }),
+  });
+  return (await getGroup(id))!;
+}
+
+/**
+ * Joining a group gives its role, so adding someone is handing it out: only for whoever could
+ * give that role directly.
+ */
+export async function assertMayAddToGroup(holding: CapabilitySet, groupId: number): Promise<void> {
+  const group = await db.query.groups.findFirst({
+    where: (table, operators) => operators.eq(table.id, groupId),
+    columns: { role: true },
+  });
+  if (group?.role) await assertMayAssignRole(holding, group.role);
 }

@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { getGroup, updateGroup, deleteGroup } from "@/src/lib/models/groups";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     const group = await getGroup(Number(id));
     if (!group) {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
     const group = await updateGroup(Number(id), body, userId);
@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const { id } = await params;
     await deleteGroup(Number(id), userId);
     return new NextResponse(null, { status: 204 });

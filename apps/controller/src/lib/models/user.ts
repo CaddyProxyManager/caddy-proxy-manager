@@ -1,5 +1,4 @@
 import db, { nowIso, runInTransaction, toIso } from "../db";
-import type { AppRole } from "../auth/oidc/groups";
 import { users, accounts, sessions } from "../db/schema";
 import { and, count, desc, eq, isNotNull, isNull, max, ne } from "drizzle-orm";
 import { uuidv7 } from "../db/uuidv7";
@@ -36,7 +35,8 @@ export type User = {
   passwordHash: string | null;
   /** When the login password was last set; null without one, or when it predates the record. */
   passwordChangedAt: string | null;
-  role: AppRole;
+  /** A role key: built-in, or one an administrator made. */
+  role: string;
   provider: string | null;
   subject: string | null;
   avatarUrl: string | null;
@@ -62,7 +62,7 @@ function parseDbUser(user: DbUser): User {
     username: user.username,
     passwordHash: user.passwordHash,
     passwordChangedAt: toIso(user.passwordChangedAt),
-    role: user.role as AppRole,
+    role: user.role,
     provider: user.provider,
     subject: user.subject,
     avatarUrl: user.avatarUrl,

@@ -556,6 +556,32 @@ export const accountLockDisableAfter = numberSetting({
   max: 1000,
 });
 
+/** Off: closing a review applies what it revokes at once, as the person closing it. */
+export const accessReviewConfirmRevocations = booleanSetting({
+  name: "access_review_confirm_revocations",
+  env: "ACCESS_REVIEW_CONFIRM_REVOCATIONS",
+  group: "authentication",
+  label: "Revocations wait for confirmation",
+  description:
+    "A closed access review holds its revocations until an administrator confirms them, " +
+    "instead of applying them as it closes.",
+  default: false,
+});
+
+export const accessReviewReminderDays = numberSetting({
+  name: "access_review_reminder_days",
+  unit: "days",
+  env: "ACCESS_REVIEW_REMINDER_DAYS",
+  group: "authentication",
+  label: "Access review reminder (days before due)",
+  description:
+    "How many days before an access review is due its undecided items are reported, " +
+    "through the access review notifications.",
+  default: 3,
+  min: 1,
+  max: 60,
+});
+
 export const forwardAuthAllowedPorts = stringSetting({
   name: "forward_auth_allowed_ports",
   env: "FORWARD_AUTH_ALLOWED_PORTS",
@@ -828,6 +854,21 @@ export const notifyAuditSinkFailed = notifySetting(
   "When an audit sink keeps failing or falls behind, and when it catches up again.",
 );
 
+export const notifyAccessReviews = notifySetting(
+  "notify_access_reviews",
+  "NOTIFY_ACCESS_REVIEWS",
+  "Access reviews",
+  "When an access review nears its due date or passes it with items undecided, and when one " +
+    "closes with revocations waiting for confirmation.",
+);
+
+export const notifyChangeApprovals = notifySetting(
+  "notify_change_approvals",
+  "NOTIFY_CHANGE_APPROVALS",
+  "Change approval bypassed",
+  "When an administrator applies a change request without waiting for its approvals.",
+);
+
 export const notifyChannelFailing = notifySetting(
   "notify_channel_failing",
   "NOTIFY_CHANNEL_FAILING",
@@ -1044,6 +1085,8 @@ export const SETTING_DEFINITIONS = [
   accountLockMaxDelayMs,
   accountLockDisableEnabled,
   accountLockDisableAfter,
+  accessReviewConfirmRevocations,
+  accessReviewReminderDays,
   forwardAuthAllowedPorts,
   forwardAuthSequentialUserIds,
   smtpEnabled,
@@ -1070,6 +1113,8 @@ export const SETTING_DEFINITIONS = [
   notifyUpdateAvailable,
   notifyBackupFailed,
   notifyAuditSinkFailed,
+  notifyAccessReviews,
+  notifyChangeApprovals,
   notifyChannelFailing,
   notifyDisabledAccountOwner,
   analyticsEnabled,

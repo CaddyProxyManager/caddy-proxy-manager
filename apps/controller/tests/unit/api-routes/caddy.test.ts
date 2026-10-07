@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/caddy', () => ({
@@ -15,8 +16,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {
@@ -33,10 +38,10 @@ vi.mock('@/src/lib/api/auth', () => {
 
 import { POST } from '@/src/app/api/v1/caddy/apply/route';
 import { applyCaddyConfig } from '@/src/lib/caddy';
-import { requireApiAdmin } from '@/src/lib/api/auth';
+import { requireApiUser } from '@/src/lib/api/auth';
 
 const mockApplyCaddyConfig = vi.mocked(applyCaddyConfig);
-const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
+const mockRequireApiUser = vi.mocked(requireApiUser);
 
 function createMockRequest(): any {
   return {
@@ -49,7 +54,12 @@ function createMockRequest(): any {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+  mockRequireApiUser.mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'bearer',
+    access: accessOf('admin'),
+  });
   mockApplyCaddyConfig.mockResolvedValue(undefined);
 });
 
@@ -65,7 +75,7 @@ describe('POST /api/v1/caddy/apply', () => {
 
   it('returns 401 on auth failure', async () => {
     const { ApiAuthError } = await import('@/src/lib/api/auth');
-    mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
+    mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await POST(createMockRequest());
     const data = await response.json();

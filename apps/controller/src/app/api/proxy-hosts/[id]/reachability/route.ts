@@ -1,6 +1,7 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
+import { checkSameOrigin } from "@/src/lib/auth";
 import { checkDomainReachability, isCheckableDomain } from "@/src/lib/reachability/domain";
 import { askLetsDebug } from "@/src/lib/reachability/letsdebug";
 import { getProxyHost } from "@/src/lib/models/proxy-hosts";
@@ -13,7 +14,7 @@ import { getProxyHost } from "@/src/lib/models/proxy-hosts";
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const forbidden = checkSameOrigin(request);
   if (forbidden) return forbidden;
-  await requireAdmin();
+  await requireCan("hosts:read");
   const t = await getTranslations("certificates");
   const { id } = await params;
   const host = await getProxyHost(Number(id));

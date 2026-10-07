@@ -7,16 +7,19 @@ import { eq, inArray } from "drizzle-orm";
 import db from "../db";
 import { groups, sessions } from "../db/schema";
 import { domainError } from "../errors/domain-error";
+import { isMadeRoleKey } from "../roles/built-in";
 
 export const VIEW_AS_ROLES = ["operator", "user", "viewer"] as const;
 export type ViewAsRole = (typeof VIEW_AS_ROLES)[number];
 /** Long enough to click around, short enough that a forgotten one doesn't linger. */
 export const VIEW_AS_DURATION_MS = 60 * 60 * 1000;
 
-export type ViewAs = { role: ViewAsRole; groupIds: number[]; expiresAt: string };
+/** A built-in role short of admin, or a made one's key. */
+export type ViewAs = { role: string; groupIds: number[]; expiresAt: string };
 
-function isViewAsRole(value: unknown): value is ViewAsRole {
-  return (VIEW_AS_ROLES as readonly unknown[]).includes(value);
+/** By shape only: a made role deleted since grants nothing, which is the safe direction. */
+function isViewAsRole(value: unknown): value is string {
+  return (VIEW_AS_ROLES as readonly unknown[]).includes(value) || isMadeRoleKey(value);
 }
 
 /** Checked against the real role too, so a view left on a since-demoted admin grants nothing. */
@@ -48,6 +51,9 @@ export async function startViewAs(
   now = Date.now(),
 ): Promise<ViewAs> {
   if (!isViewAsRole(role)) throw domainError("viewAsRoleInvalid");
+  // Lazily: auth reads view-as on every request and need not load the role store for it.
+  const { getRole } = await import("../roles/store");
+  if (!(await getRole(role))) throw domainError("viewAsRoleInvalid");
   const requested = Array.isArray(groupIds)
     ? [...new Set(groupIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
     : [];

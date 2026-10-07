@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { requireUser } from "@/src/lib/auth";
+import { currentAccess } from "@/src/lib/users/permissions";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 import { moreDestinations, resolveDrawer } from "@/src/lib/nav/destinations";
 import CustomizeDrawerClient from "./CustomizeDrawerClient";
@@ -11,12 +11,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function CustomizeDrawerPage() {
-  const session = await requireUser();
+  const { session, access } = await currentAccess();
   const pins = await getMoreDrawerPins(Number(session.user.id));
   return (
     <CustomizeDrawerClient
-      destinations={moreDestinations(session.user.role)}
-      initial={resolveDrawer(pins, session.user.role).map((d) => d.id)}
+      destinations={moreDestinations(access.capabilities)}
+      initial={resolveDrawer(pins, access.capabilities).map((d) => d.id)}
     />
   );
 }

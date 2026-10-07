@@ -1,8 +1,8 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import {
   type ActionState,
   actionSuccess,
@@ -25,7 +25,7 @@ async function failure(error: unknown, fallbackKey: "blockFailed" | "unblockFail
 /** Re-applies the config, so the block holds once this returns. */
 export async function blockSourceAction(input: BlockedSourceInput): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     const source = await createBlockedSource(input, Number(session.user.id));
     revalidatePath("/security");
     revalidatePath("/security/blocked-sources");
@@ -38,7 +38,7 @@ export async function blockSourceAction(input: BlockedSourceInput): Promise<Acti
 
 export async function unblockSourceAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     await deleteBlockedSource(id, Number(session.user.id));
     revalidatePath("/security");
     revalidatePath("/security/blocked-sources");

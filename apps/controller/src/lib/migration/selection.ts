@@ -43,6 +43,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "api_tokens",
       "push_subscriptions",
       "analytics_views",
+      "roles",
       "groups",
       "group_members",
       // With the group, not the hosts: without hosts the resource column is cleared (clearedColumns
@@ -55,6 +56,22 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       // Sign-in limits and spent nonces; each row expires within a day, so nothing hangs on them.
       "rate_limit_counters",
       "spent_nonces",
+      // Claimed only for coverage: a legacy source provisions nothing.
+      "scim_connections",
+      "scim_role_mappings",
+      "scim_connection_bindings",
+      "scim_identity_tombstones",
+      "scim_subjects",
+      "scim_users",
+      "scim_projection_grants",
+      "scim_groups",
+      "scim_group_members",
+      // Claimed only for coverage: a legacy source has no reviews.
+      "access_review_campaigns",
+      "access_review_items",
+      // Claimed only for coverage: a legacy source has no change requests.
+      "change_requests",
+      "change_request_decisions",
     ],
     requires: [],
   },
@@ -113,7 +130,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     description:
       "Configured identity providers, including their client secrets. Bringing an enabled " +
       "provider across is a way in on its own, even without the old user accounts.",
-    tables: ["oauth_providers", "oauth_states"],
+    tables: ["oauth_providers", "oauth_states", "role_mappings", "sso_providers"],
     requires: [],
   },
   {

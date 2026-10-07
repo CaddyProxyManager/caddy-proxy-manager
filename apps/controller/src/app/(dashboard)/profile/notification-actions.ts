@@ -1,9 +1,10 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
-import { getCurrentSessionId, requireAdmin } from "@/src/lib/auth";
+import { getCurrentSessionId } from "@/src/lib/auth";
 import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
 import { setNotificationPreferences } from "@/src/lib/models/notification-preferences";
 import {
@@ -43,7 +44,7 @@ export async function saveNotificationPreferencesAction(input: {
 }): Promise<NotificationActionResult> {
   const t = await getTranslations("profile.notifications");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     // A server action is a public endpoint: the parameter's type is not a check on what arrives.
     await setNotificationPreferences(Number(session.user.id), {
       email: input?.email === true,
@@ -63,7 +64,7 @@ export async function subscribePushAction(
 ): Promise<NotificationActionResult> {
   const t = await getTranslations("profile.notifications");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     await savePushSubscription(
       Number(session.user.id),
       parsePushSubscription(subscription),
@@ -82,7 +83,7 @@ export async function subscribePushAction(
 export async function unsubscribePushAction(endpoint: string): Promise<NotificationActionResult> {
   const t = await getTranslations("profile.notifications");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     await deletePushSubscription(Number(session.user.id), String(endpoint));
     await refreshFleetConfig();
     return { success: true, message: t("pushDisabled") };
@@ -96,7 +97,7 @@ export async function unsubscribePushAction(endpoint: string): Promise<Notificat
 export async function removePushBrowserAction(id: number): Promise<NotificationActionResult> {
   const t = await getTranslations("profile.notifications");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     await deletePushSubscriptionById(Number(session.user.id), Number(id));
     await refreshFleetConfig();
     const { revalidatePath } = await import("next/cache");
@@ -111,7 +112,7 @@ export async function removePushBrowserAction(id: number): Promise<NotificationA
 /** Whether this server still sends to it: one a push service gave up on is dropped here. */
 export async function pushSubscriptionKnownAction(endpoint: string): Promise<boolean> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     return await hasPushSubscription(Number(session.user.id), String(endpoint));
   } catch {
     return false;
@@ -122,7 +123,7 @@ export async function pushSubscriptionKnownAction(endpoint: string): Promise<boo
 export async function sendTestPushAction(endpoint: string): Promise<NotificationActionResult> {
   const t = await getTranslations("profile.notifications");
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("alerts:read");
     const [{ adminPushTargets }, { sendPush }] = await Promise.all([
       import("@/src/lib/models/push-subscriptions"),
       import("@/src/lib/notifications/push"),

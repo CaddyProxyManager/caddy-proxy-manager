@@ -1,5 +1,5 @@
 import db, { toIso } from "@/src/lib/db";
-import { requireUser } from "@/src/lib/auth";
+import { can, canReach, currentAccess } from "@/src/lib/users/permissions";
 import OverviewClient from "./OverviewClient";
 import { accessLists, auditEvents, certificates, proxyHosts, users } from "@/src/lib/db/schema";
 import { count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
@@ -110,12 +110,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function OverviewPage() {
-  const session = await requireUser();
-  const isAdmin = session.user.role === "admin";
+  const { session, access } = await currentAccess();
+  const isAdmin = can(access, "overview:read");
   const t = await getTranslations("overview");
   const tAuditLog = await getTranslations("auditLog");
 
-  // Non-admin users see a minimal welcome page
+  // Without the overview: a welcome, and Needs attention for whatever hosts or agents they see
   if (!isAdmin) {
     return (
       <OverviewClient
@@ -124,7 +124,7 @@ export default async function OverviewPage() {
         trafficSummary={null}
         recentEvents={[]}
         isAdmin={false}
-        showAttention={session.user.role === "operator"}
+        showAttention={canReach(access, "hosts:read") || canReach(access, "agents:read")}
       />
     );
   }

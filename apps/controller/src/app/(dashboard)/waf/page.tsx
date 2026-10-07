@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import WafEventsClient from "./WafEventsClient";
 import {
   listWafEvents,
@@ -21,7 +22,6 @@ import {
   storedCrsPluginUpdates,
   toCrsPluginOption,
 } from "@/src/lib/models/crs-plugins";
-import { requireAdmin } from "@/src/lib/auth";
 import { listDroppedWafDirectives } from "@/src/lib/waf/caddy";
 import { listWafExclusions } from "@/src/lib/models/waf-exclusions";
 import { getWafHostModes } from "@/src/lib/security/report";
@@ -82,7 +82,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function WafPage({ searchParams }: PageProps) {
-  const session = await requireAdmin();
+  const session = await requireCan("security:read");
   const resolvedSearchParams = await searchParams;
   const { page: pageParam, ...params } = resolvedSearchParams;
   const { range, from, to } = parseRange(resolvedSearchParams);

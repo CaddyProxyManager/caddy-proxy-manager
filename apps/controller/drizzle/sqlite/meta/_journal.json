@@ -232,6 +232,41 @@
       "when": 1791310718659,
       "tag": "0032_audit_sinks",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1791330724653,
+      "tag": "0033_custom_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1791337180329,
+      "tag": "0034_sso_providers",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1791342524880,
+      "tag": "0035_scim_provisioning",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1791353349759,
+      "tag": "0036_access_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1791360930044,
+      "tag": "0037_change_approvals",
+      "breakpoints": true
     }
   ]
 }

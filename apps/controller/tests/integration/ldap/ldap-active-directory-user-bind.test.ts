@@ -93,7 +93,7 @@ beforeAll(async () => {
   const actualAuth = await import('@/src/lib/auth');
   vi.mock('@/src/lib/auth', () => ({
     ...actualAuth,
-    requireAdmin: async () => ({ user: { id: '1', role: 'admin' } }),
+    requireUser: async () => ({ user: { id: '1', role: 'admin' } }),
   }));
 
   const directories = (await import(

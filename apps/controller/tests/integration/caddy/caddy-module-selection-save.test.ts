@@ -4,6 +4,7 @@
  * resumes its autosave and must not find a module it lost. A failed apply sends nothing.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -21,13 +22,18 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/src/lib/auth', () => ({
-  requireAdmin: vi.fn(async () => ({ user: { id: '1', role: 'admin' } })),
+  requireUser: vi.fn(async () => ({ user: { id: '1', role: 'admin' } })),
 }));
 
 const actualApiAuth = await import('../../../src/lib/api/auth');
 vi.mock('../../../src/lib/api/auth', () => ({
   ...actualApiAuth,
-  requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+  requireApiUser: vi.fn().mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'bearer',
+    access: accessOf('admin'),
+  }),
 }));
 
 import messages from '../../../messages/en.json';

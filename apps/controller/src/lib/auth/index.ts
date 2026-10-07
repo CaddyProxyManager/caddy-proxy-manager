@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuth } from "./server";
-import { domainError } from "../errors/domain-error";
 import { getUserById } from "../models/user";
 import { type ViewAs, readViewAs } from "../users/view-as";
 import { requestMemo } from "../request-memo";
@@ -133,27 +132,6 @@ export async function requireUser(): Promise<Session> {
     const { redirect } = await import("next/navigation");
     redirect("/login");
     throw new Error("Redirecting to login"); // TypeScript doesn't know redirect() never returns
-  }
-  return session;
-}
-
-export async function requireAdmin(): Promise<Session> {
-  const session = await requireUser();
-  if (session.user.role !== "admin") {
-    throw domainError("adminRequired");
-  }
-  return session;
-}
-
-/**
- * Admin or operator: gates a page an operator may open, whose contents `lib/users/permissions.ts`
- * filters per resource. Everything global stays on `requireAdmin`.
- */
-export async function requireManager(): Promise<Session> {
-  const session = await requireUser();
-  if (session.user.role !== "admin" && session.user.role !== "operator") {
-    // Role-neutral: requireAdmin's wording would send a refused operator to find an admin.
-    throw domainError("accessDenied");
   }
   return session;
 }

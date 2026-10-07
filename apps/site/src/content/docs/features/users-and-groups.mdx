@@ -1,6 +1,6 @@
 ---
 title: Users, roles & groups
-description: Four roles, group-based delegation, and OAuth/OIDC single sign-on.
+description: Built-in and custom roles, group-based delegation, and OIDC or SAML single sign-on.
 ---
 
 import Demo from "../../../components/Demo.astro";
@@ -8,7 +8,7 @@ import GroupAccessDemo from "../../../demos/samples/GroupAccessDemo";
 import SignInDemo from "../../../demos/samples/SignInDemo";
 import TwoFactorDemo from "../../../demos/samples/TwoFactorDemo";
 
-## The four roles
+## The built-in roles
 
 | Capability | Viewer | User | Operator | Admin |
 | ---------- | ------ | ---- | -------- | ----- |
@@ -32,8 +32,41 @@ Its baseline is nothing, and it reaches exactly what its groups were granted. St
 is what makes grants safe to add: viewer and user gain nothing from a grant, so creating one can
 never widen an existing account. Someone has to be made an operator deliberately.
 
-Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only - an
-operator's [API token](../api/) gets the same user-scoped endpoints a user's does.
+Grants apply to the dashboard. Over the [API](../api/) a role reaches hosts and agents only if it
+holds them outright, so an operator's token gets the same user-scoped endpoints a user's does.
+
+## Custom roles
+
+**Users → Roles** lists the four built-in roles, which can't be changed, and lets you make your
+own. A role is a set of permissions, one choice per area - none, read, or read and change - and
+read and change always brings read with it.
+
+- **Areas** follow the dashboard: the overview, hosts, agents, access lists, certificates, WAF and
+  security, analytics, logs, users, groups, roles, settings, backups, alerts, the audit log, and
+  everyone's API tokens. Your own tokens are always yours to manage, whatever your role.
+- **Scoped to granted objects** makes the role work like operator for hosts and agents: it reaches
+  only those its groups were [granted](#groups), and can't create one. Every other area it holds
+  outright.
+- **Nobody hands out more than they hold.** Making, changing, deleting or giving a role needs every
+  permission in it, held outright, so a role is never a way to more than its giver has. The same
+  goes for acting on an account: someone who manages users can't disable, demote or reset anyone
+  holding more than they do, an administrator included. Granting hosts or agents to a group needs
+  managing every host or agent.
+- **You can't change or delete the role you hold**, and the built-in roles can't be changed at all.
+- **A role in use can't be deleted** while a user, a group, a sign-in mapping or a provider's
+  default role still gives it.
+- **API tokens never exceed their owner's role**, custom or built-in: a token's scope narrows the
+  role, and a request needs both.
+
+Administrators stay the people the [two-factor policy](#the-two-factor-policy), notifications and
+the last-administrator guard name, so those follow the built-in admin role, not a custom role that
+happens to hold a lot.
+
+### A role carried by a group
+
+A group can give a role to all its members, on top of their own, from **Groups → Access → Role**.
+It can't give the admin role, and adding someone to a group that gives a role needs the same
+permissions as giving that role directly. View-as with a group brings the group's role too.
 
 ## Groups
 
@@ -52,7 +85,7 @@ Groups are lists of users doing two jobs:
 
 To check what a delegated operator can actually reach, an administrator can view the dashboard as
 one: **Users → View as a role** (the eye beside the heading), or **View as an operator in this
-group** on a group. Pick operator, user or viewer, and for an operator, the groups to be in.
+group** on a group. Pick any role but admin, custom ones included, and the groups to be in.
 
 - **Nobody is impersonated.** CPM grants to roles and groups, not to people, so that is what it
   previews. The view lives on the administrator's own session, and anything done while viewing is
@@ -222,10 +255,12 @@ no policy on, leads to [requiring a second factor](#the-two-factor-policy).
 **Users → Sign-in overview** (the arrow icon beside the heading) puts every way in on one page:
 
 - **Each method and whether it is on**: username and password, passkeys (with the hostname they
-  are bound to), every OAuth provider and every directory, each with the number of accounts using
+  are bound to), every OIDC and SAML provider and every directory, each with the number of accounts using
   it and a link to where it is configured. Directories are checked as Needs attention checks them,
   and one not answering is marked.
 - **The second-factor policy** and how many accounts have an authenticator app or a passkey.
+- **[Single sign-on enforcement](#enforcing-single-sign-on)**: whether it is on, the break-glass
+  accounts, and whether directory accounts still sign in with their LDAP password.
 - **The login page as it stands**: what someone signing in sees first, drawn from the same
   settings. Nothing in it signs anyone in.
 - **Group and role mappings**: which provider or directory group becomes which role, the role for
@@ -254,11 +289,85 @@ password, after confirming the current one, so the account signs in through the 
 
 Two options worth knowing:
 
-- **Group-based role mapping.** Members of a claimed group become admins, operators, users or
-  viewers automatically, so role changes happen in your IdP rather than here. **Role when no
-  group matches**, per provider, sets the role for anyone in none of them; it defaults to user.
+- **Group-based role mapping.** Members of a claimed group become admins, operators, users,
+  viewers or holders of a custom role automatically, so role changes happen in your IdP rather
+  than here. When several match, admin wins, then operator, then custom roles in the order they
+  were made, then user and viewer. **Role when no group matches**, per provider, sets the role
+  for anyone in none of them; it defaults to user.
 - **OIDC-only mode.** Disables local accounts entirely. There is no bootstrap admin and no
   credential sign-in: every identity comes from the provider.
+
+## SAML 2.0
+
+**Settings → Authentication → Single sign-on providers** lists OIDC and SAML providers together;
+**Add provider** with the type **SAML 2.0** adds one. To someone signing in it is one more
+**Continue with** button, and its users, linked accounts and group mappings work as an OIDC
+provider's do.
+
+1. Give CPM the identity provider's metadata: its URL, fetched each time the provider is saved, or
+   the XML pasted in. The metadata must describe one identity provider with a sign-on URL for the
+   HTTP-Redirect binding and a signing certificate, or saving says which is missing. Sign-in uses
+   the copy saved, never a fresh fetch.
+2. Save. The provider then shows two URLs to register with the identity provider: the **assertion
+   consumer service URL** and the **service provider metadata URL**, which most identity providers
+   can import directly.
+3. The **service provider entity ID** is what the identity provider knows CPM as. Left blank it is
+   the metadata URL; set it to whatever the identity provider's client is called.
+
+CPM refuses a response unless:
+
+- **The assertion itself is signed** with a certificate from the saved metadata, using SHA-256 or
+  stronger. A signed response around an unsigned assertion is not enough, so turn on assertion
+  signing in the identity provider (Keycloak: **Sign assertions**).
+- **It answers a sign-in CPM started.** Sign-ins the identity provider starts on its own are
+  refused, and each assertion is accepted once, on every controller.
+- **It names CPM** as its audience and recipient.
+- **It carries timestamps** and is valid within two minutes of the controller's clock.
+
+**Attributes.** The email and display name come from the attributes named on the provider
+(`email` and `displayName` by default). The **groups attribute** feeds the same group-to-role
+mapping and group sync as an OIDC groups claim, on every sign-in, so a group change at the identity
+provider lands at the next one.
+
+**Existing accounts.** A first SAML sign-in whose email already belongs to a CPM account is
+refused, unless the email's domain is one of the provider's **Domains to link**: then it joins that
+account. List only domains the identity provider is the authority for. Whether a first sign-in may
+create an account at all follows the same setting as OIDC providers.
+
+## Enforcing single sign-on
+
+**Settings → Authentication → Single sign-on enforcement → Require single sign-on** stops
+passwords and passkeys typed into CPM, so everyone signs in through an enabled OIDC or SAML
+provider, and its own second factor applies. It is refused while no provider is enabled.
+
+- **Break-glass accounts** keep their password and passkeys, for when the identity provider is
+  down. Pick up to 20 accounts that have a local password.
+- **Allow LDAP while single sign-on is enforced**, on by default, keeps the directory sign-in.
+  Directory accounts are created and removed in the directory, which is usually what enforcing
+  single sign-on is for, but the password is still typed into CPM and the identity provider's
+  second factor never runs. Turn it off to send directory users through a provider too.
+- **The forward-auth portal follows the same rules**, and self-registration is refused.
+- **[The sign-in overview](#sign-in-overview)** shows whether it is on, the break-glass accounts,
+  and which methods it leaves working.
+
+If the identity provider is down and no break-glass account was named, turn enforcement off from
+inside the server's container. It is signed and answered like the two-factor policy's lift, and
+recorded in the audit log:
+
+```bash
+docker compose exec web /app/cpm-server --lift-sso-enforcement
+```
+
+## SCIM provisioning
+
+An identity provider can also create, update and disable accounts and groups ahead of any sign-in,
+through SCIM 2.0 on PostgreSQL. See [SCIM provisioning](../scim-provisioning/).
+
+## Access reviews
+
+**Users → Access reviews** asks reviewers, item by item, whether each role, group membership,
+grant, API token or SCIM connection should stay, and applies what they revoke when the review
+closes. See [Access reviews](../access-reviews/).
 
 ## LDAP and Active Directory
 

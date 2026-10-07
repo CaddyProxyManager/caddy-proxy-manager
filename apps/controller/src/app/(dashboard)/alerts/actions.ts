@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getLocale, getTimeZone } from "next-intl/server";
 import {
@@ -35,7 +36,6 @@ import {
   testRule,
   updateRule,
 } from "@/src/lib/alerts/rule-store";
-import { requireAdmin } from "@/src/lib/auth";
 import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
 import { listProxyHosts, listProxyHostTags } from "@/src/lib/models/proxy-hosts";
@@ -83,11 +83,11 @@ export type HistoryRow = {
 const PAGE = "/alerts";
 
 async function adminId(): Promise<number> {
-  return Number((await requireAdmin()).user.id);
+  return Number((await requireCan("alerts:write")).user.id);
 }
 
 export async function loadAlertsOverviewAction(): Promise<AlertsOverview> {
-  await requireAdmin();
+  await requireCan("alerts:read");
   const [rules, channels, digests, hosts, tags, states] = await Promise.all([
     listRules(),
     listChannels(),
@@ -150,7 +150,7 @@ export async function testRuleAction(
   id: number,
   displayName: string,
 ): Promise<{ queued: boolean }> {
-  await requireAdmin();
+  await requireCan("alerts:write");
   const eventId = await withTranslatedErrors(() => testRule(id, displayName.slice(0, 200)));
   return { queued: eventId > 0 };
 }
@@ -187,7 +187,7 @@ export async function testChannelAction(
   id: number | null,
   input: ChannelInput | null,
 ): Promise<ChannelTestOutcome> {
-  await requireAdmin();
+  await requireCan("alerts:write");
   try {
     const result = await withTranslatedErrors(() => testChannel(id, input));
     return { ok: true, outcome: result.outcome, recipients: result.recipients ?? [] };
@@ -201,7 +201,7 @@ export async function testChannelAction(
 export async function loadHistoryAction(
   filter: HistoryFilter,
 ): Promise<{ rows: HistoryRow[]; hasMore: boolean }> {
-  await requireAdmin();
+  await requireCan("alerts:read");
   const limit = HISTORY_PAGE;
   const [events, locale] = await Promise.all([listHistory({ ...filter, limit }), getLocale()]);
   if (events.length === 0) return { rows: [], hasMore: false };
@@ -265,7 +265,7 @@ export async function deleteDigestAction(id: number): Promise<void> {
 
 /** What it would say now, in the reader's language and time zone. */
 export async function previewDigestAction(id: number): Promise<{ subject: string; text: string }> {
-  await requireAdmin();
+  await requireCan("alerts:read");
   const [locale, timeZone] = await Promise.all([getLocale(), getTimeZone()]);
   return withTranslatedErrors(() =>
     previewDigest(id, { locale: parseLocale(locale) ?? DEFAULT_LOCALE, timeZone }),
@@ -273,6 +273,6 @@ export async function previewDigestAction(id: number): Promise<{ subject: string
 }
 
 export async function sendDigestNowAction(id: number): Promise<DigestRun | null> {
-  await requireAdmin();
+  await requireCan("alerts:write");
   return withTranslatedErrors(() => sendDigestNow(id));
 }

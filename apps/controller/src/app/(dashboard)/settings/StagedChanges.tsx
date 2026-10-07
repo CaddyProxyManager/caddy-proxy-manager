@@ -17,6 +17,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import type { DiffLine } from "@/src/lib/settings/config-diff";
 import type { RevisionRow } from "@/src/lib/settings/apply";
 import { settingsHref } from "./sections";
@@ -139,6 +140,7 @@ function ReviewSheet({
 }) {
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
+  const tApprovals = useTranslations("changeApprovals");
   const format = useFormatter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +155,8 @@ function ReviewSheet({
         return;
       }
       onClose();
+      // The set left as a change request; say which, since the bar it sat in is gone.
+      if (view.approvalRequired && result.message) toast.success(result.message);
       // The accent is an attribute on <html>, which vinext's cached root layout keeps after a refresh.
       if (view.changes.some((change) => change.key === "config:accent_color")) {
         window.location.reload();
@@ -180,6 +184,7 @@ function ReviewSheet({
         </Text>
 
         {error && <Banner status="error" title={error} />}
+        {view.approvalRequired && <Banner status="info" title={tApprovals("stagedNotice")} />}
 
         <HStack gap={4} vAlign="start">
           <VStack gap={3} width="100%" maxWidth={360}>
@@ -294,7 +299,13 @@ function ReviewSheet({
             isDisabled={pending}
           />
           <Button
-            label={pending ? t("reviewApplying") : tCommon("apply")}
+            label={
+              pending
+                ? t("reviewApplying")
+                : view.approvalRequired
+                  ? tCommon("submit")
+                  : tCommon("apply")
+            }
             onClick={apply}
             isDisabled={pending}
           />

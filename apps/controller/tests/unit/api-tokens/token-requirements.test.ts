@@ -10,6 +10,7 @@ import { typeDefs } from '../../../src/lib/graphql/typedefs';
 import {
   GRAPHQL_REQUIREMENTS,
   restRequirement,
+  roleAllows,
   tokenAllows,
 } from '../../../src/lib/api-tokens/requirements';
 
@@ -111,16 +112,69 @@ describe('REST requirements', () => {
 
   it('read on GET and write otherwise, a backup download included', () => {
     expect(restRequirement('/api/v1/proxy-hosts/3', 'GET')).toEqual({
+      capability: 'hosts:read',
       area: 'hosts',
       access: 'read',
     });
     expect(restRequirement('/api/v1/proxy-hosts/preview', 'POST')).toEqual({
+      capability: 'hosts:write',
       area: 'hosts',
       access: 'write',
     });
-    expect(restRequirement('/api/v1/backup', 'GET')).toMatchObject({ access: 'write' });
+    expect(restRequirement('/api/v1/backup', 'GET')).toMatchObject({
+      capability: 'backups:write',
+      area: 'settings',
+      fullOnly: true,
+    });
     expect(restRequirement('/api/v1/proxy-hostsx', 'GET')).toBeNull();
-    expect(restRequirement('/api/v1/openapi.json', 'GET')).toBe('any');
+    expect(restRequirement('/api/v1/openapi.json', 'GET')).toMatchObject({ anyToken: true });
+  });
+
+  it('split an area where people need finer capabilities than tokens', () => {
+    expect(restRequirement('/api/v1/groups/1', 'PUT')).toMatchObject({
+      capability: 'groups:write',
+      area: 'users',
+    });
+    expect(GRAPHQL_REQUIREMENTS['Mutation.createAlertRule']).toMatchObject({
+      capability: 'alerts:write',
+      area: 'settings',
+    });
+  });
+
+  it("name the caller's own things as open to any account", () => {
+    for (const [path, method] of [
+      ['/api/v1/tokens', 'GET'],
+      ['/api/v1/tokens/4', 'DELETE'],
+      ['/api/v1/sessions', 'DELETE'],
+      ['/api/v1/users/4', 'GET'],
+      ['/api/v1/dns-providers', 'GET'],
+    ]) {
+      expect(restRequirement(path, method)?.signedIn).toBe(true);
+    }
+    expect(restRequirement('/api/v1/users/4', 'PUT')?.signedIn).toBeUndefined();
+    expect(GRAPHQL_REQUIREMENTS['Query.apiTokens']?.signedIn).toBe(true);
+  });
+
+  it('let a reviewer reach their own access review items, and keep closing a review to full tokens', () => {
+    const reviewer = (capability: string) => capability === 'nothing';
+    for (const field of [
+      'Query.accessReviews',
+      'Query.accessReview',
+      'Mutation.decideAccessReviewItem',
+    ]) {
+      expect(roleAllows(reviewer, GRAPHQL_REQUIREMENTS[field] ?? null)).toBe(true);
+    }
+    expect(roleAllows(reviewer, GRAPHQL_REQUIREMENTS['Mutation.createAccessReview'] ?? null)).toBe(
+      false,
+    );
+    const usersWrite = { kind: 'custom' as const, permissions: ['users:write' as const] };
+    expect(
+      tokenAllows(usersWrite, GRAPHQL_REQUIREMENTS['Mutation.createAccessReview'] ?? null),
+    ).toBe(true);
+    for (const field of ['Mutation.closeAccessReview', 'Mutation.confirmAccessReview']) {
+      expect(tokenAllows(usersWrite, GRAPHQL_REQUIREMENTS[field] ?? null)).toBe(false);
+      expect(tokenAllows({ kind: 'full' }, GRAPHQL_REQUIREMENTS[field] ?? null)).toBe(true);
+    }
   });
 
   it('keep the backup and config transfer from any token short of full', () => {
@@ -140,6 +194,14 @@ describe('REST requirements', () => {
       expect(tokenAllows(undefined, requirement ?? null)).toBe(true);
     }
     expect(tokenAllows(settingsWrite, restRequirement('/api/v1/settings', 'PUT'))).toBe(true);
+  });
+
+  it('refuse an unnamed path to every role, and a named one to a role without it', () => {
+    const all = () => true;
+    expect(roleAllows(all, null)).toBe(false);
+    expect(roleAllows(() => false, restRequirement('/api/v1/settings', 'GET'))).toBe(false);
+    expect(roleAllows(() => false, restRequirement('/api/v1/tokens', 'GET'))).toBe(true);
+    expect(roleAllows(all, restRequirement('/api/v1/settings', 'GET'))).toBe(true);
   });
 
   it('let a session and a full token through, and refuse an unnamed path to a narrowed one', () => {

@@ -5,6 +5,7 @@
  * it, and a refused username or email leaves every other field of the request unchanged.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -26,10 +27,14 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({
   ...actualAuth,
-  requireAdmin: vi.fn(async () => {
-    if (ctx.caller.role !== 'admin') throw new Error('adminRequired');
-    return { user: { id: String(ctx.caller.userId), role: ctx.caller.role } };
-  }),
+  auth: vi.fn(async () => ({
+    user: {
+      id: String(ctx.caller.userId),
+      email: 'caller@example.com',
+      name: null,
+      role: ctx.caller.role,
+    },
+  })),
 }));
 const actualApiAuth = await import('@/src/lib/api/auth');
 vi.mock('@/src/lib/api/auth', () => {
@@ -37,13 +42,14 @@ vi.mock('@/src/lib/api/auth', () => {
     userId: ctx.caller.userId,
     role: ctx.caller.role,
     authMethod: 'bearer' as const,
+    access: accessOf(ctx.caller.role, {}, ctx.caller.userId),
   });
   return {
     ...actualApiAuth,
-    requireApiUser: vi.fn(async () => result()),
-    requireApiAdmin: vi.fn(async () => {
+    // Every route here needs users:write, which only the administrator holds.
+    requireApiUser: vi.fn(async () => {
       if (ctx.caller.role !== 'admin') {
-        throw new actualApiAuth.ApiAuthError('Administrator privileges required', 403);
+        throw new actualApiAuth.ApiAuthError(actualApiAuth.ROLE_REFUSED, 403);
       }
       return result();
     }),

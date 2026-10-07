@@ -143,7 +143,7 @@ describe('grants reach only the operator role', () => {
     const access = await resolveAccess(await session('admin', 1));
     expect(canManage(access, 'proxyHost', HOST_B)).toBe(true);
     expect(canManage(access, 'agent', AGENT_A)).toBe(true);
-    expect(canCreate(access)).toBe(true);
+    expect(canCreate(access, 'proxyHost')).toBe(true);
     // No restriction at all, which is what null means to the list queries.
     expect(visibleIdFilter(access, 'proxyHost')).toBeNull();
   });
@@ -153,7 +153,7 @@ describe('grants reach only the operator role', () => {
     const access = await resolveAccess(await session('user', 2));
     expect(canView(access, 'proxyHost', HOST_A)).toBe(false);
     expect(canManage(access, 'proxyHost', HOST_A)).toBe(false);
-    expect(canCreate(access)).toBe(false);
+    expect(canCreate(access, 'proxyHost')).toBe(false);
     expect([...(visibleIdFilter(access, 'proxyHost') ?? [])]).toEqual([]);
   });
 
@@ -168,7 +168,7 @@ describe('grants reach only the operator role', () => {
     expect(canView(access, 'proxyHost', HOST_B)).toBe(false);
     expect(canManage(access, 'agent', AGENT_A)).toBe(false);
     // A grant names an existing host, so it says nothing about creating.
-    expect(canCreate(access)).toBe(false);
+    expect(canCreate(access, 'proxyHost')).toBe(false);
     expect([...(visibleIdFilter(access, 'proxyHost') ?? [])]).toEqual([HOST_A]);
   });
 });

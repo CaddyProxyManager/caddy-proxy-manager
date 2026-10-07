@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { listOAuthProviders, createOAuthProvider } from "@/src/lib/models/oauth-providers";
 import {
   oauthCallbackUrl,
@@ -24,7 +24,7 @@ function redactClientId(provider: OAuthProviderView, baseUrl: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const [providers, baseUrl] = await Promise.all([listOAuthProviders(), getPublicBaseUrl()]);
     return NextResponse.json(
       providers.map((provider) => redactClientId(provider, baseUrl)),
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const body = await request.json();
 
     if (!body.name || typeof body.name !== "string") {

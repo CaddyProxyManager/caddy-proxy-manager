@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import { Text } from "@astryxdesign/core/Text";
 import { canSee, DESTINATIONS, type DestinationId } from "@/src/lib/nav/destinations";
+import type { CapabilitySet } from "@/src/lib/roles/capabilities";
 import { ACCENTS } from "@/src/components/ui/accent";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "./nav-icons";
 
@@ -57,13 +58,13 @@ function owns(pathname: string, path: string): boolean {
 
 /** Replaces the hamburger drawer rather than adding a second persistent nav bar. */
 export function MobileTabBar({
-  role,
+  capabilities,
   isMoreOpen,
   onToggleMore,
   onCloseMore,
   moreButtonRef,
 }: {
-  role: string | undefined;
+  capabilities: CapabilitySet;
   isMoreOpen: boolean;
   onToggleMore: () => void;
   onCloseMore: () => void;
@@ -76,7 +77,7 @@ export function MobileTabBar({
 
   const tabs = TABS.filter((tab) => {
     const destination = DESTINATIONS.find((d) => d.id === tab.destination);
-    return destination !== undefined && canSee(destination, role);
+    return destination !== undefined && canSee(destination, capabilities);
   });
   const tabOwnsPath = tabs.some((tab) => tab.owns.some((path) => owns(pathname, path)));
   // More is active whenever no named tab owns the path.

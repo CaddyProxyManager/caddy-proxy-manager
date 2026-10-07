@@ -1,15 +1,16 @@
 import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
 import { hashPassword } from "@/src/lib/auth/password";
 import { DomainError, domainErrorMessage } from "@/src/lib/errors/domain-error";
 import { isEmailAddress } from "@/src/lib/email/address";
 import {
   assertAcceptablePassword,
-  isUserRole,
+  assertAssignableRole,
   signInUsernameRulesMessage,
 } from "@/src/lib/users/admin";
+import { isKnownRole } from "@/src/lib/roles/store";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -19,7 +20,7 @@ function stripPasswordHash(user: Record<string, unknown>) {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const users = await listUsers();
     return NextResponse.json(
       users.map((u) => stripPasswordHash(u as unknown as Record<string, unknown>)),
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    const { access } = await requireApiUser(request);
 
     if (await localUsersDisabled()) {
       return NextResponse.json(
@@ -45,10 +46,11 @@ export async function POST(request: NextRequest) {
     const email = String(body.email ?? "").trim();
     const password = String(body.password ?? "");
     const name = body.name ? String(body.name).trim() : null;
-    if (body.role !== undefined && body.role !== null && !isUserRole(body.role)) {
+    const requested = body.role === undefined || body.role === null ? "user" : body.role;
+    if (!(await isKnownRole(requested))) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
-    const role = isUserRole(body.role) ? body.role : "user";
+    const role = await assertAssignableRole(access.capabilities, requested);
     // Optional: without one, createUser gives their own email when it can be a username.
     const username: unknown = body.username ?? null;
     if (username !== null && typeof username !== "string") {

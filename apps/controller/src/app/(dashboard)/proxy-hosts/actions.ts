@@ -1,8 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
-import { assertCanManage, assertCanView, requireAccess } from "@/src/lib/users/permissions";
+import {
+  assertCanManage,
+  assertCanView,
+  requireReach,
+  requireCan,
+} from "@/src/lib/users/permissions";
 import {
   type HostUpstreamHealth,
   getProxyHostUpstreamHealth,
@@ -14,24 +18,15 @@ import {
   INITIAL_ACTION_STATE,
   type ActionState,
 } from "@/src/lib/errors/action-error";
-import {
-  createProxyHost,
-  deleteProxyHost,
-  setProxyHostMaintenance,
-  updateProxyHost,
-} from "@/src/lib/models/proxy-hosts";
-import {
-  type ProxyHostBulkRequest,
-  bulkUpdateProxyHosts,
-  parseProxyHostBulkRequest,
-} from "@/src/lib/models/bulk-hosts";
-import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
+import { type ProxyHostBulkRequest, parseProxyHostBulkRequest } from "@/src/lib/models/bulk-hosts";
+import { needsApproval, submitOrApply } from "@/src/lib/approvals";
+import { logWriteFailure } from "@/src/lib/approvals/submitted";
 import { getTranslations } from "next-intl/server";
 import { parseProxyHostCreateForm, parseProxyHostUpdateForm } from "@/src/lib/proxy-hosts/form";
 import { revertedFields } from "@/src/lib/host-review/diff";
 import { previewProxyHostChange, revertProxyHostInput } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
-import { restoreHost, rollbackRevisionFrom } from "@/src/lib/host-history";
+import { rollbackRevisionFrom } from "@/src/lib/host-history";
 import {
   type HostEditorOptions,
   loadForwardAuthAccess,
@@ -44,7 +39,7 @@ export async function createProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("hosts:write");
     const userId = Number(session.user.id);
     const {
       input,
@@ -55,10 +50,10 @@ export async function createProxyHostAction(
       revertedFields(formData),
       true,
     );
-    const host = await createProxyHost(input, userId);
-    if (forwardAuthAccess && host.cpmForwardAuth?.enabled) {
-      await setForwardAuthAccess(host.id, forwardAuthAccess, userId);
-    }
+    await submitOrApply(
+      { userId },
+      { kind: "proxyHostCreate", payload: { input, forwardAuthAccess } },
+    );
 
     revalidatePath("/proxy-hosts");
 
@@ -74,7 +69,7 @@ export async function createProxyHostAction(
     return actionSuccess(t("hostCreated"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to create proxy host:", error);
+    logWriteFailure(error, "Failed to create proxy host:");
     return actionError(t, error, t("errors.createProxyHostFailed"));
   }
 }
@@ -88,7 +83,7 @@ export async function updateProxyHostAction(
   try {
     // Operators may edit granted hosts but not create them: a grant names an existing host.
     // updateProxyHost keeps the raw Caddy config fields admin-only.
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "proxyHost", id);
     const userId = access.userId;
     const {
@@ -101,10 +96,10 @@ export async function updateProxyHostAction(
       false,
     );
     const rollbackFrom = await rollbackRevisionFrom(formData, "http", id);
-    await updateProxyHost(id, input, userId, { rollbackFrom });
-    if (forwardAuthAccess) {
-      await setForwardAuthAccess(id, forwardAuthAccess, userId);
-    }
+    await submitOrApply(
+      { userId },
+      { kind: "proxyHostUpdate", payload: { id, input, forwardAuthAccess, rollbackFrom } },
+    );
 
     revalidatePath("/proxy-hosts");
 
@@ -120,7 +115,7 @@ export async function updateProxyHostAction(
     return actionSuccess(t("hostUpdated"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to update proxy host:", id, error);
+    logWriteFailure(error, "Failed to update proxy host:", id);
     return actionError(t, error, t("errors.updateProxyHostFailed"));
   }
 }
@@ -131,30 +126,33 @@ export async function deleteProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "proxyHost", id);
-    await deleteProxyHost(id, access.userId);
+    await submitOrApply({ userId: access.userId }, { kind: "proxyHostDelete", payload: { id } });
     revalidatePath("/proxy-hosts");
     const t = await getTranslations("proxyHosts");
     return actionSuccess(t("hostDeleted"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to delete proxy host:", id, error);
+    logWriteFailure(error, "Failed to delete proxy host:", id);
     return actionError(t, error, t("errors.deleteProxyHostFailed"));
   }
 }
 
 export async function toggleProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "proxyHost", id);
-    await updateProxyHost(id, { enabled }, access.userId);
+    await submitOrApply(
+      { userId: access.userId },
+      { kind: "proxyHostUpdate", payload: { id, input: { enabled } } },
+    );
     revalidatePath("/proxy-hosts");
     const t = await getTranslations("proxyHosts");
     return actionSuccess(enabled ? t("hostEnabledResult") : t("hostDisabledResult"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to toggle proxy host:", id, error);
+    logWriteFailure(error, "Failed to toggle proxy host:", id);
     return actionError(t, error, t("errors.toggleProxyHostFailed"));
   }
 }
@@ -164,15 +162,18 @@ export async function setProxyHostMaintenanceAction(
   enabled: boolean,
 ): Promise<ActionState> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "proxyHost", id);
-    await setProxyHostMaintenance(id, enabled, access.userId);
+    await submitOrApply(
+      { userId: access.userId },
+      { kind: "proxyHostMaintenance", payload: { id, enabled } },
+    );
     revalidatePath("/proxy-hosts");
     const t = await getTranslations("proxyHosts");
     return actionSuccess(enabled ? t("maintenanceOnResult") : t("maintenanceOffResult"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to switch maintenance mode:", id, error);
+    logWriteFailure(error, "Failed to switch maintenance mode:", id);
     return actionError(t, error, t("errors.toggleMaintenanceFailed"));
   }
 }
@@ -180,10 +181,13 @@ export async function setProxyHostMaintenanceAction(
 /** All or nothing: one host the operator may not manage refuses the whole batch. */
 export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promise<ActionState> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     const parsed = parseProxyHostBulkRequest(request);
     for (const id of parsed.ids) assertCanManage(access, "proxyHost", id);
-    const { count } = await bulkUpdateProxyHosts(parsed, access.userId);
+    const count = await submitOrApply(
+      { userId: access.userId },
+      { kind: "proxyHostBulk", payload: parsed },
+    );
     revalidatePath("/proxy-hosts");
     const t = await getTranslations("ui");
     return actionSuccess(
@@ -193,7 +197,7 @@ export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promi
     );
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to change proxy hosts in bulk:", error);
+    logWriteFailure(error, "Failed to change proxy hosts in bulk:");
     return actionError(t, error, t("errors.bulkHostsFailed"));
   }
 }
@@ -203,7 +207,7 @@ export async function hostEditorOptionsAction(): Promise<
   { ok: true; options: HostEditorOptions } | { ok: false; message: string }
 > {
   try {
-    await requireAccess();
+    await requireReach("hosts:write");
     return { ok: true, options: await loadHostEditorOptions() };
   } catch (error) {
     const t = await getTranslations();
@@ -222,7 +226,7 @@ export async function hostForwardAuthAccessAction(
   { ok: true; access: { userIds: number[]; groupIds: number[] } } | { ok: false; message: string }
 > {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:read");
     assertCanView(access, "proxyHost", id);
     return { ok: true, access: await loadForwardAuthAccess(id) };
   } catch (error) {
@@ -240,7 +244,7 @@ export async function proxyHostUpstreamHealthAction(
   id: number,
 ): Promise<{ ok: true; health: HostUpstreamHealth } | { ok: false; message: string }> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:read");
     assertCanView(access, "proxyHost", id);
     return { ok: true, health: await getProxyHostUpstreamHealth(id) };
   } catch (error) {
@@ -261,9 +265,9 @@ export async function previewProxyHostAction(
   try {
     let userId: number;
     if (id === null) {
-      userId = Number((await requireAdmin()).user.id);
+      userId = Number((await requireCan("hosts:write")).user.id);
     } else {
-      const access = await requireAccess();
+      const access = await requireReach("hosts:write");
       assertCanManage(access, "proxyHost", id);
       userId = access.userId;
     }
@@ -280,7 +284,13 @@ export async function previewProxyHostAction(
       },
       userId,
     );
-    return { ok: true, preview };
+    const approval = await needsApproval(
+      { userId },
+      id === null
+        ? { kind: "proxyHostCreate", payload: { input: parsed.input } }
+        : { kind: "proxyHostUpdate", payload: { id, input: parsed.input } },
+    );
+    return { ok: true, preview, approval };
   } catch (error) {
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
@@ -293,17 +303,17 @@ export async function restoreProxyHostAction(
   dropMissingReferences: boolean,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    await restoreHost(revisionId, Number(session.user.id), {
-      dropMissingReferences,
-      kind: "http",
-    });
+    const session = await requireCan("hosts:write");
+    await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "hostRestore", payload: { revisionId, dropMissingReferences, kind: "http" } },
+    );
     revalidatePath("/proxy-hosts");
     const t = await getTranslations("hostHistory");
     return actionSuccess(t("restored"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to restore proxy host:", revisionId, error);
+    logWriteFailure(error, "Failed to restore proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));
   }
 }

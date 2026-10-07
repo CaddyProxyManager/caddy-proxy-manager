@@ -10,6 +10,7 @@ export const TRANSLATED_PASSKEY_CODES = new Set([
   "SESSION_NOT_FRESH",
   "LAST_SIGN_IN_METHOD",
   "USER_NOT_VERIFIED",
+  "SSO_REQUIRED",
 ]);
 
 /** The browser's prompt was dismissed or timed out, or another ceremony replaced this one. */

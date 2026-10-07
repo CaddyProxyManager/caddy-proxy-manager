@@ -158,6 +158,7 @@ export function HostEditorShell({
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [result, setResult] = useState<HostChangePreview | null>(null);
+  const [approval, setApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [reverted, setReverted] = useState<string[]>([]);
@@ -180,8 +181,10 @@ export function HostEditorShell({
     try {
       const answer = await preview(data);
       if (id !== request.current) return;
-      if (answer.ok) setResult(answer.preview);
-      else {
+      if (answer.ok) {
+        setResult(answer.preview);
+        setApproval(answer.approval === true);
+      } else {
         setResult(null);
         setError(answer.message);
       }
@@ -357,6 +360,7 @@ export function HostEditorShell({
         error={error}
         reverted={reverted}
         isSaving={isPending}
+        approval={approval}
         onUndo={(field) => changeReverted([...reverted, field])}
         onRestore={(field) => changeReverted(reverted.filter((f) => f !== field))}
         onEditSection={(id) => {

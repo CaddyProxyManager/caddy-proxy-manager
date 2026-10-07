@@ -12,8 +12,10 @@ import { installPeerAddressStamp } from "../src/lib/http/peer-address";
 import {
   CONSOLE_ENABLE_USER_PATH,
   CONSOLE_LIFT_MFA_POLICY_PATH,
+  CONSOLE_LIFT_SSO_ENFORCEMENT_PATH,
   CONSOLE_POLICY_SUBJECT,
   CONSOLE_RESET_TWO_FACTOR_PATH,
+  CONSOLE_SSO_SUBJECT,
   type ConsoleCommandPurpose,
   signConsoleCommand,
 } from "../src/lib/users/console-command";
@@ -107,6 +109,35 @@ function runLiftMfaPolicy(port: number): void {
     });
 }
 
+function runLiftSsoEnforcement(port: number): void {
+  postConsoleCommand(
+    port,
+    CONSOLE_LIFT_SSO_ENFORCEMENT_PATH,
+    "lift-sso-enforcement",
+    CONSOLE_SSO_SUBJECT,
+  )
+    .then(async (response) => {
+      const body = (await response.json().catch(() => ({}))) as {
+        wasEnforced?: boolean;
+        error?: string;
+      };
+      if (!response.ok) {
+        console.error(`[cpm] Lifting it was refused: ${body.error ?? response.status}`);
+        process.exit(1);
+      }
+      console.log(
+        body.wasEnforced
+          ? "[cpm] Single sign-on is no longer enforced: passwords and passkeys work again. Turn it back on under Settings > Authentication once you are in."
+          : "[cpm] Single sign-on was not enforced.",
+      );
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("[cpm] Could not reach the running server:", error);
+      process.exit(1);
+    });
+}
+
 function runResetTwoFactor(port: number, username: string): void {
   postConsoleCommand(port, CONSOLE_RESET_TWO_FACTOR_PATH, "reset-2fa", username)
     .then(async (response) => {
@@ -184,6 +215,12 @@ const argv = yargs(hideBin(process.argv))
     describe:
       "Turn off the policy requiring a second factor on the running server, then exit (break glass)",
   })
+  .option("lift-sso-enforcement", {
+    type: "boolean",
+    default: false,
+    describe:
+      "Stop requiring single sign-on on the running server, so passwords work again, then exit (break glass)",
+  })
   .option("enable-user", {
     type: "string",
     describe:
@@ -206,6 +243,8 @@ if (argv["reset-2fa"] !== undefined) {
   runEnableUser(argv.port, argv["enable-user"]);
 } else if (argv["lift-mfa-policy"]) {
   runLiftMfaPolicy(argv.port);
+} else if (argv["lift-sso-enforcement"]) {
+  runLiftSsoEnforcement(argv.port);
 } else if (argv.healthcheck) {
   // The resolved port, so probing a server started with --port still reaches it.
   runHealthCheck(argv.port);

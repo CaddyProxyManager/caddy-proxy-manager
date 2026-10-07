@@ -1,0 +1,138 @@
+---
+title: Access reviews
+description: Have reviewers confirm or revoke who holds what - roles, group memberships, grants, API tokens and SCIM connections.
+---
+
+Access piles up. Someone changes teams and keeps the Operator role, a token made for a migration
+is still valid a year later, a group still manages a host nobody in it looks after. An **access
+review** asks the people who know, item by item, whether each piece of access should stay, and then
+does what they decided.
+
+Reviews live under **Users → Access reviews**.
+
+## Starting a review
+
+**Start** asks for a name, what to review, a due date and the reviewers. What to review is one of:
+
+| Scope | What it asks about |
+| --- | --- |
+| Every account | Each active account's role, and each of its group memberships |
+| Holders of a role | Each active account with that role, and each member of a group that [carries it](../users-and-groups/) |
+| One group | The group's members, and each of its grants on a host or agent |
+| Host and agent grants | Every group's grant on a proxy host, L4 host or agent |
+| Every API token | Every [API token](../api/) that still works, with its owner |
+| Every SCIM connection | Every identity provider allowed to [provision accounts](../scim-provisioning/) |
+
+Starting a review takes a snapshot: each item keeps the names it had then, so a review still reads
+after an account, group or token is gone. Disabled accounts and expired tokens open nothing and are
+left out.
+
+The items are shared among the reviewers. Everything about one person goes to one reviewer, and
+**nobody is asked about their own access**: an item whose only reviewer is its subject goes to
+whoever started the review, and is left unassigned if that is the same person. Anyone who manages
+users can **Reassign** an item to someone else while the review is open.
+
+### Hints
+
+Some items carry a hint, worked out when the review starts:
+
+- **No sign-in in 90 days** - the account has not completed a sign-in for 90 days, or never has and
+  is older than that.
+- **Token unused in 90 days** - the API token has not been used for 90 days, or never has.
+- **No provisioning in 90 days** - the SCIM connection has not been used for 90 days.
+- **Group has no members** - a grant on a group nobody is in.
+
+## Deciding
+
+A reviewer needs no permission of their own. Anyone with items waiting sees a banner on every page,
+with the earliest due date, and **Review** takes them to the list. A reviewer sees only the reviews
+they have items in, and only their own items within them.
+
+Each item gets one of:
+
+- **Keep it** - nothing changes.
+- **Revoke it** - for a role, the account is **disabled**, which signs it out and stops its API
+  tokens; a membership is removed; a grant is removed; a token is deleted; a SCIM connection is
+  switched off (the accounts it provisioned stay as they are).
+- **Change it** - a role becomes another role, or a grant moves between view and manage. To keep an
+  account with less access, change its role rather than revoking it.
+
+A note can go with any decision. Decisions can be changed until the review closes, and every one is
+recorded in the [audit log](../audit-log/) with its item, the decision and the note.
+
+### Accounts and groups provisioned by SCIM
+
+An identity provider that [provisions accounts over SCIM](../scim-provisioning/) owns them: it
+would re-enable an account disabled here on its next update, and put back a membership of a group
+it provisioned. So **revoking is refused** for an account a SCIM connection provisioned and for a
+membership of a SCIM group - the item says **Provisioned by SCIM**. Remove that access in the
+identity provider instead. Keeping it, or changing the account's role (which is CPM's own), still
+works.
+
+## Closing
+
+Someone who manages users **Closes** the review when it is done; it can be closed before its due
+date. Reviewing ends, and items nobody decided stay as they are.
+
+The revocations and changes are then **applied as the person closing it**, through exactly the
+checks they would meet doing each by hand:
+
+- disabling an account or changing its role needs permission to change users, and only for an
+  account holding no more than they do; the new role must be one they could hand out;
+- removing a membership or grant needs permission to change groups, and changing a grant means
+  managing every host or agent the group's grants name;
+- deleting someone else's token needs permission to change API tokens;
+- switching off a SCIM connection needs permission to change both users and groups;
+- nobody disables their own account, and the last active administrator is never disabled.
+
+So a review can never do what its closer could not. An item that fails is marked **Not applied**
+with the reason, the review waits as **Awaiting confirmation**, and **Confirm** tries the failures
+again - as whoever presses it, so an administrator can finish what a narrower role could not.
+Something already gone (a token deleted meanwhile) is marked **Already gone**.
+
+### Waiting for confirmation
+
+With **Settings → Authentication → Access reviews → Revocations wait for confirmation** on
+(`ACCESS_REVIEW_CONFIRM_REVOCATIONS`, off by default), closing applies nothing: the review waits as
+**Awaiting confirmation** until someone who manages users presses **Confirm**. Use it when the
+person closing reviews should not be the one carrying out revocations.
+
+## Reminders
+
+Reminders go through [alerting](../alerts/) as the **Access reviews** notification
+(`NOTIFY_ACCESS_REVIEWS`, on by default), to the administrators by email and browser notification
+and to any alert rule's channels that name them:
+
+| Event | When |
+| --- | --- |
+| Access review due | A number of days before the due date (**Access review reminder**, `ACCESS_REVIEW_REMINDER_DAYS`, 3 by default), while items are undecided |
+| Access review overdue | The due date passed with items still undecided |
+| Access review waits for confirmation | A review closed with revocations held for confirmation |
+
+Each is told once per review. A review is due at the end of its due date, in UTC.
+
+## Exporting
+
+**Export** downloads a review as CSV, one row per item: what it was, who reviewed it, the decision
+and note, when it was decided, and whether it was applied (or why not). Kinds, decisions and
+outcomes are written as codes - `role`, `revoke`, `applied` - so a spreadsheet filter works whatever
+language the file was exported in. An export is recorded in the audit log, since it lists who holds
+what.
+
+## Permissions
+
+| Who | May |
+| --- | --- |
+| Users at **Read** or more | See every review and every item, and export them |
+| Users at **Read and change** | Start, rename, reassign, close, confirm and delete reviews |
+| A reviewer | See and decide their own items, whatever their role |
+
+Deleting a review deletes its decisions; what it already revoked stays revoked.
+
+## GraphQL
+
+`accessReviews` and `accessReview(id)` list what the caller may see, as above.
+`createAccessReview`, `updateAccessReview`, `reassignAccessReviewItems` and `deleteAccessReview`
+need permission to change users; `decideAccessReviewItem` takes only the caller's own items; and
+`closeAccessReview` and `confirmAccessReview`, which revoke more than any one token area covers,
+need a full-scope token.

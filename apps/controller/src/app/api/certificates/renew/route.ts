@@ -1,7 +1,8 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import type { CaddyCertificate } from "@cpm/shared";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
+import { checkSameOrigin } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { listAgentCertificates } from "@/src/lib/agent/client";
 import { connectedAgents } from "@/src/lib/agent/registry";
@@ -27,7 +28,7 @@ function datesFrom(body: { notBefore?: unknown; notAfter?: unknown }) {
 export async function POST(request: NextRequest) {
   const forbidden = checkSameOrigin(request);
   if (forbidden) return forbidden;
-  const session = await requireAdmin();
+  const session = await requireCan("certificates:write");
   const t = await getTranslations("certificates");
   const body = await request.json().catch(() => ({}));
   const requested: unknown[] = Array.isArray(body.names) ? body.names : [body.name];

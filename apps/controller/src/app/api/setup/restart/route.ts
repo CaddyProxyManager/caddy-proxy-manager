@@ -1,3 +1,4 @@
+import { sessionCan } from "@/src/lib/users/permissions";
 import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     // importing browser's token or an admin may ask.
     if (await hasAnySignIn()) {
       const permitted =
-        (await consumeRestartToken(token)) || (await auth(request))?.user.role === "admin";
+        (await consumeRestartToken(token)) ||
+        (await sessionCan(await auth(request), "settings:write"));
       if (!permitted) {
         return Response.json(
           { ok: false, error: (await getTranslations("setup"))("restartNotPermitted") },

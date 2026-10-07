@@ -200,6 +200,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "NOTIFY_UPDATE_AVAILABLE",
               "NOTIFY_BACKUP_FAILED",
               "NOTIFY_AUDIT_SINK_FAILED",
+              "NOTIFY_ACCESS_REVIEWS",
+              "NOTIFY_CHANGE_APPROVALS",
               "NOTIFY_CHANNEL_FAILING",
               "NOTIFY_DISABLED_ACCOUNT_OWNER",
             ],
@@ -271,7 +273,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           {
             id: "oauth",
-            name: "OAuth providers",
+            name: "Single sign-on providers",
             // Nineteen tokens would drown the heading, so only the prefix is shown.
             env: ["OAUTH_*"],
             envSearch: [
@@ -332,9 +334,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "Two-factor sign-in",
           },
           {
+            id: "sso-enforcement",
+            name: "Single sign-on enforcement",
+          },
+          {
             id: "password-policy",
             name: "Password policy",
             envSearch: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
+          },
+          {
+            id: "access-reviews",
+            name: "Access reviews",
+            envSearch: ["ACCESS_REVIEW_CONFIRM_REVOCATIONS", "ACCESS_REVIEW_REMINDER_DAYS"],
           },
         ],
       },

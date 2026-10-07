@@ -1,9 +1,10 @@
+import { can, requireCanAccess } from "@/src/lib/users/permissions";
 import { localUsersDisabled } from "@/src/lib/auth/policy";
 import UsersClient from "./UsersClient";
 import { isDemoAdmin } from "@/src/lib/demo/mode";
 import { lastSessionByUser, listUsers, usersWithPassword } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
-import { requireAdmin } from "@/src/lib/auth";
+import { listRoles } from "@/src/lib/roles/store";
 import { resolveAvatar } from "@/src/lib/users/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
@@ -20,8 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function UsersPage() {
-  const session = await requireAdmin();
-  const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword, sources, policy] =
+  const { session, access } = await requireCanAccess("users:read");
+  const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword, sources, policy, roles] =
     await Promise.all([
       listUsers(),
       isGravatarEnabled(),
@@ -31,6 +32,7 @@ export default async function UsersPage() {
       usersWithPassword().catch(() => new Set<number>()),
       accountSourcesByUser().catch(() => new Map<number, AccountSource>()),
       getTwoFactorPolicySettings(),
+      listRoles(),
     ]);
   const passkeyCounts = await passkeyCountsByUser(allUsers.map((user) => user.id)).catch(
     () => new Map<number, number>(),
@@ -63,6 +65,8 @@ export default async function UsersPage() {
       localUsersEnabled={!(await localUsersDisabled())}
       emailEnabled={await emailReady()}
       mfaPolicyMode={policy.mode}
+      customRoles={roles.flatMap((role) => (role.name ? [{ key: role.key, name: role.name }] : []))}
+      canSeeRoles={can(access, "roles:read")}
     />
   );
 }

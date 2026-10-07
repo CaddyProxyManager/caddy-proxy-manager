@@ -1,6 +1,8 @@
 /**
- * Grants reach only `operator`, whose baseline is nothing. `admin` ignores them, so no arrangement
- * of groups leaves an instance nobody can administer; `user` and `viewer` manage nothing.
+ * Every permission check goes through `can()`. A role holds capabilities (`lib/roles`); a scoped
+ * role holds its object-bound ones only over what its groups are granted, which is how `operator`
+ * works. Grants mean nothing to a capability held outright, so no arrangement of groups narrows
+ * an administrator.
  */
 
 import type { Session } from "../auth";
@@ -11,18 +13,33 @@ import {
   type GrantCapability,
   emptyGrants,
   grantsForGroups,
-  grantsForUser,
+  groupIdsOf,
+  rolesOfGroups,
 } from "../models/group-grants";
+import {
+  CAPABILITIES,
+  type Capability,
+  type CapabilitySet,
+  type ObjectKind,
+  capabilitySetOf,
+  holds,
+  reaches,
+  resourceOfKind,
+  splitCapability,
+} from "../roles/capabilities";
+import { BUILT_IN_ROLES } from "../roles/built-in";
+import { roleDefinitions } from "../roles";
 
-export type ResourceKind = "proxyHost" | "l4ProxyHost" | "agent";
+export type ResourceKind = ObjectKind;
+
+export type ObjectRef = { kind: ObjectKind; id: number };
 
 /** What the current viewer may do, resolved once per request. */
 export type Access = {
   userId: number;
   role: string;
-  isAdmin: boolean;
-  /** The only role grants apply to. */
-  isOperator: boolean;
+  capabilities: CapabilitySet;
+  /** Read only for capabilities a scoped role holds. */
   grants: EffectiveGrants;
 };
 
@@ -34,10 +51,32 @@ export class ForbiddenError extends DomainError {
   }
 }
 
-function bucket(access: Access, kind: ResourceKind): Map<number, GrantCapability> {
+function bucket(access: Access, kind: ObjectKind): Map<number, GrantCapability> {
   if (kind === "proxyHost") return access.grants.proxyHosts;
   if (kind === "l4ProxyHost") return access.grants.l4ProxyHosts;
   return access.grants.agents;
+}
+
+/**
+ * Without an object: held outright, which creating and every page not about one object need.
+ * With one: held outright, or through a grant on it (a manage grant for write, any for read).
+ */
+export function can(access: Access, capability: Capability, object?: ObjectRef): boolean {
+  if (holds(access.capabilities, capability)) return true;
+  if (!object || !reaches(access.capabilities, capability)) return false;
+  const [resource, level] = splitCapability(capability);
+  if (resourceOfKind(object.kind) !== resource) return false;
+  const grant = bucket(access, object.kind).get(object.id);
+  return level === "read" ? grant !== undefined : grant === "manage";
+}
+
+/** Held over at least one object: opens a list page, whose rows `visibleIds` then filters. */
+export function canReach(access: Access, capability: Capability): boolean {
+  return reaches(access.capabilities, capability);
+}
+
+export function assertCan(access: Access, capability: Capability, object?: ObjectRef): void {
+  if (!can(access, capability, object)) throw new ForbiddenError();
 }
 
 export async function resolveAccess(session: Session): Promise<Access> {
@@ -48,72 +87,115 @@ export async function resolveAccess(session: Session): Promise<Access> {
 export async function accessFor(
   userId: number,
   role: string,
-  /** An admin viewing as these groups: their grants, not the ones the admin's memberships carry. */
+  /** An admin viewing as these groups: theirs, not what the admin's memberships carry. */
   viewAsGroupIds?: number[],
 ): Promise<Access> {
-  const isOperator = role === "operator";
-  const grants = !isOperator
-    ? emptyGrants()
-    : viewAsGroupIds
-      ? await grantsForGroups(viewAsGroupIds)
-      : await grantsForUser(userId);
+  const own = capabilitySetOf(await roleDefinitions([role]));
+  // Holding everything outright, nothing a group adds or grants could change an answer.
+  if (CAPABILITIES.every((capability) => holds(own, capability))) {
+    return { userId, role, capabilities: own, grants: emptyGrants() };
+  }
+  const groupIds = viewAsGroupIds ?? (await groupIdsOf(userId));
+  const groupRoles = await rolesOfGroups(groupIds);
+  const capabilities =
+    groupRoles.length === 0 ? own : capabilitySetOf(await roleDefinitions([role, ...groupRoles]));
+  const scoped = Object.values(capabilities).includes("granted");
+  const grants = scoped ? await grantsForGroups(groupIds) : emptyGrants();
+  return { userId, role, capabilities, grants };
+}
 
-  return { userId, role, isAdmin: role === "admin", isOperator, grants };
+/** Background work done for nobody in particular, which sees everything. */
+export function systemAccess(): Access {
+  return {
+    userId: 0,
+    role: "admin",
+    capabilities: capabilitySetOf([BUILT_IN_ROLES.admin]),
+    grants: emptyGrants(),
+  };
 }
 
 /** A manage grant implies view. */
-export function canView(access: Access, kind: ResourceKind, id: number): boolean {
-  if (access.isAdmin) return true;
-  if (!access.isOperator) return false;
-  return bucket(access, kind).has(id);
+export function canView(access: Access, kind: ObjectKind, id: number): boolean {
+  return can(access, `${resourceOfKind(kind)}:read`, { kind, id });
 }
 
-export function canManage(access: Access, kind: ResourceKind, id: number): boolean {
-  if (access.isAdmin) return true;
-  if (!access.isOperator) return false;
-  return bucket(access, kind).get(id) === "manage";
+export function canManage(access: Access, kind: ObjectKind, id: number): boolean {
+  return can(access, `${resourceOfKind(kind)}:write`, { kind, id });
 }
 
-/**
- * Creating, or anything not tied to a resource. Admins only: a grant names a resource that
- * already exists, so it has nothing to say about one that does not.
- */
-export function canCreate(access: Access): boolean {
-  return access.isAdmin;
+/** A grant names an object that already exists, so it has nothing to say about a new one. */
+export function canCreate(access: Access, kind: ObjectKind): boolean {
+  return can(access, `${resourceOfKind(kind)}:write`);
 }
 
-export function visibleIds(access: Access, kind: ResourceKind, ids: number[]): number[] {
-  if (access.isAdmin) return ids;
-  if (!access.isOperator) return [];
-  const granted = bucket(access, kind);
-  return ids.filter((id) => granted.has(id));
+export function visibleIds(access: Access, kind: ObjectKind, ids: number[]): number[] {
+  const filter = visibleIdFilter(access, kind);
+  return filter === null ? ids : ids.filter((id) => filter.has(id));
 }
 
-/** Null means no restriction (an admin). */
-export function visibleIdFilter(access: Access, kind: ResourceKind): Set<number> | null {
-  if (access.isAdmin) return null;
-  if (!access.isOperator) return new Set();
+/** Null means no restriction. */
+export function visibleIdFilter(access: Access, kind: ObjectKind): Set<number> | null {
+  const capability: Capability = `${resourceOfKind(kind)}:read`;
+  if (holds(access.capabilities, capability)) return null;
+  if (!reaches(access.capabilities, capability)) return new Set();
   return new Set(bucket(access, kind).keys());
 }
 
-export function assertCanManage(access: Access, kind: ResourceKind, id: number): void {
+export function assertCanManage(access: Access, kind: ObjectKind, id: number): void {
   if (canManage(access, kind, id)) return;
   throw new ForbiddenError();
 }
 
-export function assertCanView(access: Access, kind: ResourceKind, id: number): void {
+export function assertCanView(access: Access, kind: ObjectKind, id: number): void {
   if (canView(access, kind, id)) return;
   throw new ForbiddenError();
 }
 
 /** Once per page render, like the session it is resolved from. */
-export async function requireAccess(): Promise<Access> {
-  const { requireManager } = await import("../auth");
-  const session = await requireManager();
-  return requestMemo("auth:access", () => resolveAccess(session));
+export async function currentAccess(): Promise<{ session: Session; access: Access }> {
+  const { requireUser } = await import("../auth");
+  const session = await requireUser();
+  const access = await requestMemo("auth:access", () => resolveAccess(session));
+  return { session, access };
 }
 
-/** Gates navigation. An operator with no grants still gets the pages, empty, not a redirect. */
-export function hasManagementSurface(role: string | undefined): boolean {
-  return role === "admin" || role === "operator";
+/** The signed-in caller, if they hold `capability` outright. */
+export async function requireCan(capability: Capability): Promise<Session> {
+  return (await requireCanAccess(capability)).session;
+}
+
+/** As `requireCan`, with the caller's access for the checks that follow. */
+export async function requireCanAccess(
+  capability: Capability,
+): Promise<{ session: Session; access: Access }> {
+  const current = await currentAccess();
+  assertCan(current.access, capability);
+  return current;
+}
+
+/**
+ * For a page listing objects: the caller holds `capability` over at least one. The page filters
+ * its rows, and an empty page explains itself where a refusal would not.
+ */
+export async function requireReach(capability: Capability): Promise<Access> {
+  const { access } = await currentAccess();
+  if (!canReach(access, capability)) throw new ForbiddenError();
+  return access;
+}
+
+/** For a model given only the acting user's id, e.g. a host write that may need more than hosts. */
+export async function actorCan(actorUserId: number, capability: Capability): Promise<boolean> {
+  const { getUserById } = await import("../models/user");
+  const actor = await getUserById(actorUserId);
+  if (!actor) return false;
+  return can(await accessFor(actor.id, actor.role), capability);
+}
+
+/** For a route that reads the session itself, where a missing one is an answer, not a redirect. */
+export async function sessionCan(
+  session: Session | null,
+  capability: Capability,
+): Promise<boolean> {
+  if (!session?.user) return false;
+  return can(await resolveAccess(session), capability);
 }

@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { geoipDatabasePath, geoipEnabled } from "@/src/lib/agent/geoip";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     // Absent while GeoIP is off, or a stale file would offer country matching it stops emitting.
     const enabled = await geoipEnabled();
     return NextResponse.json({

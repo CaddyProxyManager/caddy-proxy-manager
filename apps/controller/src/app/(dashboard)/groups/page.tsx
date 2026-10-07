@@ -1,4 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import GroupsClient from "./GroupsClient";
+import { listRoles } from "@/src/lib/roles/store";
 import { listGroups } from "@/src/lib/models/groups";
 import { listUsers } from "@/src/lib/models/user";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
@@ -9,7 +11,6 @@ import { listLdapDirectories } from "@/src/lib/models/ldap-directories";
 import { listAllGrants } from "@/src/lib/models/group-grants";
 import { listAllMappings } from "@/src/lib/models/group-idp-mappings";
 import type { GroupAccess } from "@/components/groups/GroupAccessDialog";
-import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -19,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GroupsPage() {
-  await requireAdmin();
+  await requireCan("groups:read");
   const [
     allGroups,
     allUsers,
@@ -30,6 +31,7 @@ export default async function GroupsPage() {
     directories,
     grants,
     mappings,
+    roles,
   ] = await Promise.all([
     listGroups(),
     listUsers(),
@@ -41,6 +43,7 @@ export default async function GroupsPage() {
     listLdapDirectories(),
     listAllGrants(),
     listAllMappings(),
+    listRoles(),
   ]);
 
   const userList = allUsers.map((u) => ({
@@ -82,6 +85,9 @@ export default async function GroupsPage() {
       l4ProxyHosts={l4Hosts.map((h) => ({ id: h.id, name: h.name }))}
       agents={agents.map((a) => ({ id: a.id, name: a.name }))}
       access={access}
+      roles={roles
+        .filter((role) => role.key !== "admin")
+        .map((role) => ({ key: role.key, name: role.name }))}
     />
   );
 }

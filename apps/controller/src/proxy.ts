@@ -4,6 +4,7 @@ import { TWO_FACTOR_SETUP_PATH, mustEnrollTwoFactor } from "@/src/lib/auth/two-f
 import {
   CONSOLE_ENABLE_USER_PATH,
   CONSOLE_LIFT_MFA_POLICY_PATH,
+  CONSOLE_LIFT_SSO_ENFORCEMENT_PATH,
   CONSOLE_RESET_TWO_FACTOR_PATH,
 } from "@/src/lib/users/console-command";
 import type { NextRequest } from "next/server";
@@ -102,11 +103,12 @@ export default async function proxy(req: NextRequest) {
     pathname === "/api/sign-in/captcha" ||
     // For someone who cannot sign in; each route is rate-limited and answers nothing about accounts.
     pathname.startsWith("/api/password-reset/") ||
-    // Signed by `cpm-server --reset-2fa`, `--enable-user` and `--lift-mfa-policy`, answered only to
-    // loopback; see the routes.
+    // Signed by `cpm-server --reset-2fa`, `--enable-user`, `--lift-mfa-policy` and
+    // `--lift-sso-enforcement`, answered only to loopback; see the routes.
     pathname === CONSOLE_RESET_TWO_FACTOR_PATH ||
     pathname === CONSOLE_ENABLE_USER_PATH ||
-    pathname === CONSOLE_LIFT_MFA_POLICY_PATH
+    pathname === CONSOLE_LIFT_MFA_POLICY_PATH ||
+    pathname === CONSOLE_LIFT_SSO_ENFORCEMENT_PATH
   ) {
     return publicResponse();
   }

@@ -158,6 +158,24 @@ describe('forward-auth login', () => {
     );
   });
 
+  it('takes a local password only from a break-glass account while single sign-on is enforced', async () => {
+    const { user } = await setup();
+    const { setSetting } = await import('../../../src/lib/settings');
+    await setSetting('sso_enforcement', { enforced: true, breakGlassUserIds: [], allowLdap: true });
+    try {
+      const refused = await attempt(PASSWORD, await createRedirectIntent(TARGET));
+      expect(refused.status).toBe(401);
+      await setSetting('sso_enforcement', {
+        enforced: true,
+        breakGlassUserIds: [user.id],
+        allowLdap: true,
+      });
+      expect((await attempt(PASSWORD, await createRedirectIntent(TARGET))).status).toBe(200);
+    } finally {
+      await ctx.db.delete(schema.settings).where(eq(schema.settings.key, 'sso_enforcement'));
+    }
+  });
+
   it('accepts the portal served from the stored Public URL, and still refuses anywhere else', async () => {
     await setup();
     const { baseUrl } = await import('../../../src/lib/settings/registry');

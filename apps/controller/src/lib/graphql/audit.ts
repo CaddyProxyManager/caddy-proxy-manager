@@ -12,7 +12,7 @@ import {
 import { ApiAuthError } from "../api/auth";
 import { FRESH_SESSION_MAX_AGE_MS, getCurrentSessionInfo, isFreshSession } from "../auth";
 import { domainError, domainErrorMessage } from "../errors/domain-error";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 
 /** As the dashboard's routes: a session must be recent. A token is checked by its scope instead. */
 async function requireFreshSession(context: GraphQLContext): Promise<void> {
@@ -36,7 +36,7 @@ function decodeFile(file: string): Buffer {
 
 export const auditMutationResolvers = {
   verifyAuditChain: async (_: unknown, __: unknown, context: GraphQLContext) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     const verification = await verifyAuditChain();
     await logAuditEvent({
       userId,
@@ -56,7 +56,7 @@ export const auditMutationResolvers = {
     args: { passphrase: string; sections?: string[] | null },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await requireFreshSession(context);
     const sections = args.sections
       ? args.sections.filter((s): s is ConfigSection =>
@@ -69,9 +69,8 @@ export const auditMutationResolvers = {
   previewConfigImport: async (
     _: unknown,
     args: { file: string; passphrase: string },
-    context: GraphQLContext,
+    _context: GraphQLContext,
   ) => {
-    await requireAdmin(context);
     return await previewConfigImport(decodeFile(args.file), args.passphrase);
   },
   applyConfigImport: async (
@@ -79,7 +78,7 @@ export const auditMutationResolvers = {
     args: { file: string; passphrase: string },
     context: GraphQLContext,
   ) => {
-    const { userId } = await requireAdmin(context);
+    const { userId } = await context.viewer();
     await requireFreshSession(context);
     return await applyConfigImport(decodeFile(args.file), args.passphrase, userId);
   },

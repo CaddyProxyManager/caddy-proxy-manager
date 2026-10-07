@@ -14,6 +14,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
+import { Link } from "@astryxdesign/core/Link";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Pagination } from "@astryxdesign/core/Pagination";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -189,6 +190,14 @@ function RevisionRow({
             · <Timestamp value={revision.createdAt} style="dateTimeShort" />
           </Text>
         </VStack>
+        {revision.detail?.changeRequest !== undefined && (
+          <Link href={`/approvals?id=${revision.detail.changeRequest}`}>
+            <Badge
+              variant="neutral"
+              label={t("approvedIn", { id: revision.detail.changeRequest })}
+            />
+          </Link>
+        )}
         {isCurrent && <Badge variant="success" label={tSettings("history.current")} />}
         {revision.operation === "delete" && <Badge variant="error" label={t("deletedBadge")} />}
         <Button

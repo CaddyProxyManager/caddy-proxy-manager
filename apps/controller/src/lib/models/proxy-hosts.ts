@@ -21,7 +21,7 @@ import {
 } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-hosts/domains";
 import { isPlainObject, stripCaddyPlaceholders } from "../caddy/utils";
-import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
+import { assertNoNewAdminDialTargets, mayReachInstance } from "./admin-dial-targets";
 import {
   CORAZA_MAX_BODY_LIMIT,
   CORAZA_MIN_BODY_LIMIT,
@@ -3573,7 +3573,7 @@ async function assertRawConfigChangeAllowed(
       normalizeMetaValue(input[field]) !== normalizeMetaValue(existing?.[field]),
   );
   if (!changed) return;
-  if (!(await isAdminActor(actorUserId))) {
+  if (!(await mayReachInstance(actorUserId))) {
     throw domainError("rawCaddyConfigAdminOnly");
   }
 }

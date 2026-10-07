@@ -110,6 +110,8 @@ administrator or after failed sign-ins, and nothing more while it stays disabled
 | New release | A newer release, once per version, while the update check is on | - |
 | Scheduled backup failing | A [scheduled backup](../backups/) failing | The schedule's next run works |
 | Audit streaming failing | An audit sink that keeps failing or falls behind | It catches up |
+| Access reviews | An [access review](../access-reviews/#reminders) nearing or past its due date with items undecided, or closed with revocations waiting for confirmation | - |
+| Change approval bypassed | An administrator [applying a change request](../change-approvals/#emergency-bypass) without its approvals | - |
 | Alert channel failing | An [alert channel](../alerts/#batching-retries-and-failing-channels) failing three sends in a row, told on the others | It works again |
 
 Each of these is a built-in [alert rule](../alerts/): on the Alerts page it can also go to Discord,

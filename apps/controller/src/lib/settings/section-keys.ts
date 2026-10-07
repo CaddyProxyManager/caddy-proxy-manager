@@ -35,6 +35,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   "forward-auth": { label: "Forward auth", keys: ["forward_auth"] },
   "password-policy": { label: "Password policy", keys: ["password_policy"] },
   "two-factor": { label: "Two-factor sign-in", keys: ["two_factor_policy"] },
+  "sso-enforcement": { label: "Single sign-on enforcement", keys: ["sso_enforcement"] },
   metrics: { label: "Metrics", keys: ["metrics"] },
   logging: { label: "Logging", keys: ["logging"] },
   waf: { label: "WAF", keys: ["waf"] },

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/models/oauth-providers', () => ({
@@ -10,10 +11,11 @@ vi.mock('@/src/lib/models/oauth-providers', () => ({
 }));
 
 vi.mock('@/src/lib/api/auth', () => ({
-  requireApiAdmin: vi.fn().mockResolvedValue({
+  requireApiUser: vi.fn().mockResolvedValue({
     userId: 1,
     role: 'admin',
     authMethod: 'bearer',
+    access: accessOf('admin'),
   }),
   apiErrorResponse: vi.fn((error: unknown) => {
     const { NextResponse } = require('next/server');

@@ -22,7 +22,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({
   ...actualAuth,
-  requireAdmin: vi.fn(async () => ({
+  requireUser: vi.fn(async () => ({
     user: { id: String(ctx.callerId), role: 'admin', name: 'Admin', email: 'admin@example.com' },
   })),
 }));

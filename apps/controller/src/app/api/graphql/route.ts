@@ -9,7 +9,11 @@ import { createContext } from "@/src/lib/graphql/context";
 import { authenticatedIntrospectionPlugin, maskGraphQLError } from "@/src/lib/graphql/errors";
 import { schema } from "@/src/lib/graphql/schema";
 
-type ServerContext = { request: NextRequest; rawBody: () => Promise<string> };
+type ServerContext = {
+  request: NextRequest;
+  rawBody: () => Promise<string>;
+  accepted?: { value: boolean };
+};
 
 const yoga = createYoga<ServerContext>({
   schema,
@@ -20,7 +24,8 @@ const yoga = createYoga<ServerContext>({
   // Yoga's default reflects any Origin with credentials allowed.
   cors: false,
   plugins: [authenticatedIntrospectionPlugin()],
-  context: ({ request, rawBody }) => createContext(request as NextRequest, rawBody),
+  context: ({ request, rawBody, accepted }) =>
+    createContext(request as NextRequest, rawBody, accepted),
   // Deliberate refusals go out as written, so "domain already in use" survives; anything else is
   // logged and replaced, as REST's apiErrorResponse does.
   maskedErrors: {
@@ -42,7 +47,15 @@ function bodyReader(request: NextRequest): () => Promise<string> {
 }
 
 async function handle(request: NextRequest) {
-  return await yoga.handleRequest(request, { request, rawBody: bodyReader(request) });
+  const accepted = { value: false };
+  const response = await yoga.handleRequest(request, {
+    request,
+    rawBody: bodyReader(request),
+    accepted,
+  });
+  if (!accepted.value || response.status !== 200) return response;
+  // A covered mutation waits for approval: accepted, not done, as REST answers it.
+  return new Response(response.body, { status: 202, headers: response.headers });
 }
 
 export async function GET(request: NextRequest) {

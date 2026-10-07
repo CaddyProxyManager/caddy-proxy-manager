@@ -1,0 +1,87 @@
+---
+title: SCIM provisioning
+description: Let an identity provider create, update and disable accounts and groups through SCIM 2.0.
+---
+
+An identity provider that speaks SCIM 2.0 can keep CPM's accounts and groups in step with its own
+directory: people it assigns to CPM get an account, people it removes are disabled straight away,
+and its groups arrive as CPM groups with the role you map them to.
+
+:::caution[PostgreSQL only]
+SCIM provisioning needs CPM to run on PostgreSQL. Under SQLite the SCIM endpoint answers
+`501 Not Implemented` and the **Provisioning** page says so: SQLite is meant for trying CPM out, not
+for an identity provider writing to it all day.
+:::
+
+## Connections
+
+Each identity provider gets its own **connection**, made under **Users → Provisioning**. A
+connection is a bearer token for SCIM and nothing else:
+
+- A SCIM token is refused by the REST and GraphQL APIs, and an [API token](../api/) is refused by
+  the SCIM endpoint.
+- The token is shown once, when the connection is made or its token rotated. CPM keeps only a hash
+  of it and shows its last four characters to tell connections apart.
+- **Rotate** replaces the token at once; the old one stops working, so paste the new one into the
+  identity provider straight after.
+- Turning a connection **off** refuses its token until it is turned back on.
+- Making, changing, rotating or deleting a connection needs permission to change both users and
+  groups, since its token creates the first and fills the second. Over GraphQL these mutations need
+  a full-scope token.
+
+Give the identity provider the **SCIM base URL** the page shows, which ends in `/api/auth/scim/v2`,
+and the token as a bearer token ("OAuth bearer token" in most identity providers).
+
+## Accounts
+
+- A provisioned person gets an account with the **User** role. What they may do comes from the
+  groups they are in (below) or from an administrator.
+- **Link existing accounts** (on by default): when someone is provisioned with the email of an
+  account that already exists, that account is taken over by the connection instead of a second one
+  being refused. It keeps its name, role and sign-in methods; from then on the identity provider
+  decides whether it is active. Turn this off to have such a request refused instead.
+- **`active: false`**, which is how most identity providers deprovision, disables the account and,
+  in the same transaction, ends its sessions and forward-auth sessions and deletes its API tokens.
+  `"False"` as a string and a capitalised `"Replace"` operation are accepted too.
+- **Deleting** a user through SCIM disables the account in the same way. It is not erased, so its
+  history stays readable and an administrator decides whether it goes.
+- The last active administrator cannot be disabled through SCIM; the request is refused and nothing
+  changes.
+
+People sign in the way they already do, usually through [single sign-on](../users-and-groups/#oauth--sso).
+A provisioned account has no password; turn on **Auto-link accounts** on the OIDC provider (or list
+the email domains on a SAML provider) so the first sign-in joins the provisioned account.
+
+## Groups and roles
+
+Each group the identity provider pushes becomes a CPM group with the source **SCIM**, and its
+members follow the identity provider's membership. Anyone added to it on the Groups page stays.
+
+Under **Group roles** a connection maps group names to roles, the same way an OIDC provider's group
+claims do: a provisioned group whose name is listed under a role [gives that role](../users-and-groups/#a-role-carried-by-a-group)
+to its members. Changing the mapping reaches existing groups at once. Groups cannot give the
+administrator role, and you can only map roles you could hand out yourself.
+
+A group name that already belongs to a group made on the Groups page is refused with a `409`, and
+nothing from that request is kept.
+
+## Deleting a connection
+
+The token stops working, its groups move to the Groups page (source **UI**, members and all), and
+its accounts are signed out but stay enabled, for an administrator to keep or remove.
+
+## What CPM supports
+
+| | |
+| --- | --- |
+| Resources | `Users` and `Groups`: create, replace, `PATCH` (add, replace, remove, with value filters such as `emails[type eq "work"].value`) and delete |
+| Filters | `eq`, joined by `and`, on `userName`, `externalId` and the other attributes the Schemas endpoint lists; any other operator answers `400` `invalidFilter` |
+| Paging | `startIndex` and `count` |
+| Attribute selection | `attributes` and `excludedAttributes` |
+| Discovery | `ServiceProviderConfig`, `Schemas` and `ResourceTypes` |
+| Not supported | Bulk, `/Me` (both answer `501`), sorting, ETags, password changes and nested groups, each advertised as such |
+
+Errors use SCIM's error schema with a `scimType` where one applies (`invalidFilter`,
+`invalidPath`, `invalidValue`, `mutability`, `noTarget`, `uniqueness`), and responses are
+`application/scim+json`. Every change a connection makes is in the [audit log](../audit-log/),
+named with its connection.

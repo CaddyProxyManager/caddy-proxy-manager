@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isSubmittedForApproval } from "@/lib/approvals/submitted";
 import { ArrowDown, ArrowUp, Network, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useFormatter, useTranslations } from "next-intl";
@@ -145,8 +146,11 @@ export function NetworkTab({
             expiresAt,
           })),
       );
-      onListUpdated(updated);
-      toast.success(t("saved"));
+      if (isSubmittedForApproval(updated)) toast.success(updated.message);
+      else {
+        onListUpdated(updated);
+        toast.success(t("saved"));
+      }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
     } finally {
@@ -156,8 +160,12 @@ export function NetworkTab({
 
   const saveSetting = async (input: Parameters<typeof updateAccessListAction>[1]) => {
     try {
-      onListUpdated(await updateAccessListAction(list.id, input));
-      toast.success(t("saved"));
+      const updated = await updateAccessListAction(list.id, input);
+      if (isSubmittedForApproval(updated)) toast.success(updated.message);
+      else {
+        onListUpdated(updated);
+        toast.success(t("saved"));
+      }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
     }

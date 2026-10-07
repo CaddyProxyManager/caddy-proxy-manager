@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { getAnalyticsTopList } from "@/src/lib/analytics/explore";
 import {
   TOP_DIMENSIONS,
@@ -10,7 +10,7 @@ import {
 /** One top list at "view all" length, under the same filters as the page. */
 export async function GET(req: NextRequest) {
   try {
-    await requireApiAdmin(req);
+    await requireApiUser(req);
     const { searchParams } = req.nextUrl;
     const dimension = searchParams.get("dimension");
     if (!(TOP_DIMENSIONS as readonly (string | null)[]).includes(dimension)) {

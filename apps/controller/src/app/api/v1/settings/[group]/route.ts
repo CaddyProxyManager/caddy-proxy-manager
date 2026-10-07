@@ -1,12 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 import { DefaultResponseValidationError } from "@/src/lib/caddy/default-response";
-import {
-  isSettingsGroup,
-  readSettingsGroup,
-  saveSettingsGroup,
-  SettingsApplyError,
-} from "@/src/lib/settings/api";
+import { isSettingsGroup, readSettingsGroup, SettingsApplyError } from "@/src/lib/settings/api";
 import { assertSettingsPayloadSize, SettingsValidationError } from "@/src/lib/settings/validation";
 
 export async function GET(
@@ -14,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ group: string }> },
 ) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { group } = await params;
 
     const settings = await readSettingsGroup(group);
@@ -36,7 +32,7 @@ export async function PUT(
   { params }: { params: Promise<{ group: string }> },
 ) {
   try {
-    await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { group } = await params;
     let body: unknown;
     try {
@@ -63,7 +59,10 @@ export async function PUT(
     }
 
     try {
-      await saveSettingsGroup(group, input);
+      await submitOrApply(apiSubmitter(caller), {
+        kind: "settingsGroup",
+        payload: { group, input },
+      });
     } catch (error) {
       if (
         error instanceof SettingsValidationError ||

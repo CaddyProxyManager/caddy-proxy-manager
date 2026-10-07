@@ -8,15 +8,7 @@ import { applyCaddyConfig as applyCaddy } from "../caddy";
 import { getApplyFailures } from "../caddy/apply-status";
 import { DNS_PROVIDERS } from "../dns/providers";
 import { getCaddyModuleAvailability } from "../caddy/image-build";
-import {
-  listAccessLists,
-  getAccessList,
-  createAccessList,
-  updateAccessList,
-  deleteAccessList,
-  getAccessListStats,
-  setAccessListIpRules,
-} from "../models/access-lists";
+import { listAccessLists, getAccessList, getAccessListStats } from "../models/access-lists";
 import { isConnected } from "../agent/registry";
 import { type PairedAgent, listAgents } from "../models/agents";
 import { createApiToken, deleteApiToken, listApiTokens } from "../models/api-tokens";
@@ -26,6 +18,7 @@ import { listCaCertificates } from "../models/ca-certificates";
 import { listCertificates, getCertificate } from "../models/certificates";
 import {
   addGroupMember,
+  assertMayAddToGroup,
   createGroup,
   deleteGroup,
   getGroup,
@@ -34,44 +27,32 @@ import {
   updateGroup,
 } from "../models/groups";
 import { listIssuedClientCertificates } from "../models/issued-client-certificates";
-import {
-  createL4ProxyHost,
-  deleteL4ProxyHost,
-  getL4ProxyHost,
-  listL4ProxyHosts,
-  updateL4ProxyHost,
-} from "../models/l4-proxy-hosts";
+import { getL4ProxyHost, listL4ProxyHosts } from "../models/l4-proxy-hosts";
 import { listMtlsRoles } from "../models/mtls-roles";
 import { listOAuthProviders } from "../models/oauth-providers";
-import {
-  createProxyHost,
-  deleteProxyHost,
-  getProxyHost,
-  listProxyHosts,
-  updateProxyHost,
-} from "../models/proxy-hosts";
-import {
-  bulkUpdateL4ProxyHosts,
-  bulkUpdateProxyHosts,
-  parseL4HostBulkRequest,
-  parseProxyHostBulkRequest,
-} from "../models/bulk-hosts";
+import { getProxyHost, listProxyHosts } from "../models/proxy-hosts";
+import { parseL4HostBulkRequest, parseProxyHostBulkRequest } from "../models/bulk-hosts";
 import { getProxyHostUpstreamHealth } from "../proxy-hosts/upstream-health";
 import { previewL4HostChange, previewProxyHostChange } from "../host-review";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
 import { ApiAuthError, NotFoundError } from "../api/auth";
 import { domainErrorMessage } from "../errors/domain-error";
-import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings/api";
-import { assertNotSelf, assertUserRole } from "../users/admin";
+import { isSettingsGroup, readSettingsGroup } from "../settings/api";
+import { assertAssignableRole, assertMayManageUser, assertNotSelf } from "../users/admin";
+import { apiSubmitter, submitOrApply } from "../approvals";
 import { analyticsMutationResolvers, analyticsQueryResolvers } from "./analytics";
 import { attentionMutationResolvers, attentionQueryResolvers } from "./attention";
 import { securityMutationResolvers, securityQueryResolvers } from "./security";
 import { auditMutationResolvers } from "./audit";
 import { alertMutationResolvers, alertQueryResolvers } from "./alerts";
+import { roleMutationResolvers, roleQueryResolvers } from "./roles";
 import { auditStreamMutationResolvers, auditStreamQueryResolvers } from "./audit-stream";
+import { scimMutationResolvers, scimQueryResolvers } from "./scim";
+import { accessReviewMutationResolvers, accessReviewQueryResolvers } from "./access-reviews";
 import { backupMutationResolvers, backupQueryResolvers } from "./backup";
+import { approvalMutationResolvers, approvalQueryResolvers } from "./approvals";
 import { hostHistoryMutationResolvers, hostHistoryQueryResolvers } from "./host-history";
-import { type GraphQLContext, requireAdmin } from "./context";
+import type { GraphQLContext } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
 /** The rest becomes `config`. */
@@ -184,57 +165,44 @@ export const resolvers = {
   },
 
   Query: {
-    proxyHosts: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    proxyHosts: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listProxyHosts();
     },
-    proxyHost: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    proxyHost: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getProxyHost(args.id);
     },
-    proxyHostUpstreamHealth: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    proxyHostUpstreamHealth: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getProxyHostUpstreamHealth(args.id);
     },
-    l4ProxyHosts: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    l4ProxyHosts: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listL4ProxyHosts();
     },
-    l4ProxyHost: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    l4ProxyHost: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getL4ProxyHost(args.id);
     },
-    certificates: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    certificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return (await listCertificates()).map(projectCertificate);
     },
-    certificate: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    certificate: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       const row = await getCertificate(args.id);
       return row ? projectCertificate(row) : null;
     },
-    caCertificates: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    caCertificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listCaCertificates();
     },
-    clientCertificates: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    clientCertificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listIssuedClientCertificates();
     },
-    mtlsRoles: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    mtlsRoles: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listMtlsRoles();
     },
-    accessLists: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    accessLists: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listAccessLists();
     },
-    accessList: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    accessList: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getAccessList(args.id);
     },
-    accessListStats: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    accessListStats: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       if (!(await getAccessList(args.id))) throw new NotFoundError("Access list not found");
       const stats = await getAccessListStats(args.id);
       return {
@@ -243,21 +211,17 @@ export const resolvers = {
         failedSignIns: stats.traffic?.failedSignIns ?? null,
       };
     },
-    users: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    users: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return (await listUsers()).map(projectUser);
     },
-    user: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    user: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       const row = await getUserById(args.id);
       return row ? projectUser(row) : null;
     },
-    groups: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    groups: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listGroups();
     },
-    group: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    group: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getGroup(args.id);
     },
     apiTokens: async (_: unknown, __: unknown, context: GraphQLContext) => {
@@ -265,16 +229,13 @@ export const resolvers = {
       const viewer = await context.viewer();
       return await listApiTokens(viewer.userId);
     },
-    agents: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    agents: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listAgents();
     },
-    oauthProviders: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    oauthProviders: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listOAuthProviders();
     },
-    dnsProviders: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    dnsProviders: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       // No `configured`: that is a settings read per provider, and REST does not answer it either.
       return DNS_PROVIDERS.map((provider) => ({
         id: provider.name,
@@ -285,9 +246,8 @@ export const resolvers = {
     auditLog: async (
       _: unknown,
       args: { limit?: number; offset?: number; search?: string },
-      context: GraphQLContext,
+      _context: GraphQLContext,
     ) => {
-      await requireAdmin(context);
       const limit = Math.min(Math.max(args.limit ?? 100, 1), MAX_AUDIT_LOG_LIMIT);
       const offset = Math.max(args.offset ?? 0, 0);
       const [items, total] = await Promise.all([
@@ -296,19 +256,16 @@ export const resolvers = {
       ]);
       return { items, total };
     },
-    settings: async (_: unknown, args: { group: string }, context: GraphQLContext) => {
-      await requireAdmin(context);
+    settings: async (_: unknown, args: { group: string }, _context: GraphQLContext) => {
       // The REST groups and redaction: a raw storage key would read any row, secrets included.
       const settings = await readSettingsGroup(args.group);
       if (!settings) throw new NotFoundError("Unknown settings group");
       return settings.value;
     },
-    caddyModules: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    caddyModules: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await getCaddyModuleAvailability();
     },
-    signInOverview: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    signInOverview: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       const { getSignInOverview } = await import("../users/sign-in-overview");
       return await getSignInOverview();
     },
@@ -317,26 +274,36 @@ export const resolvers = {
     ...securityQueryResolvers,
     ...backupQueryResolvers,
     ...alertQueryResolvers,
+    ...roleQueryResolvers,
     ...auditStreamQueryResolvers,
+    ...scimQueryResolvers,
+    ...accessReviewQueryResolvers,
     ...hostHistoryQueryResolvers,
+    ...approvalQueryResolvers,
   },
 
   Mutation: {
     createProxyHost: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      return await createProxyHost(args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "proxyHostCreate",
+        payload: { input: args.input as never },
+      });
     },
     updateProxyHost: async (
       _: unknown,
       args: { id: number; input: unknown },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
-      return await updateProxyHost(args.id, args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "proxyHostUpdate",
+        payload: { id: args.id, input: args.input as never },
+      });
     },
     deleteProxyHost: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      await deleteProxyHost(args.id, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      await submitOrApply(submitter, { kind: "proxyHostDelete", payload: { id: args.id } });
       return true;
     },
     previewProxyHost: async (
@@ -344,32 +311,41 @@ export const resolvers = {
       args: { id?: number | null; input: unknown; revert?: string[] | null },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       return await previewProxyHostChange(
         { id: args.id ?? null, input: args.input as never, reverted: args.revert ?? [] },
         userId,
       );
     },
     bulkProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      return (await bulkUpdateProxyHosts(parseProxyHostBulkRequest(args.input), userId)).count;
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "proxyHostBulk",
+        payload: parseProxyHostBulkRequest(args.input),
+      });
     },
 
     createL4ProxyHost: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      return await createL4ProxyHost(args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "l4HostCreate",
+        payload: { input: args.input as never },
+      });
     },
     updateL4ProxyHost: async (
       _: unknown,
       args: { id: number; input: unknown },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
-      return await updateL4ProxyHost(args.id, args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "l4HostUpdate",
+        payload: { id: args.id, input: args.input as never },
+      });
     },
     deleteL4ProxyHost: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      await deleteL4ProxyHost(args.id, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      await submitOrApply(submitter, { kind: "l4HostDelete", payload: { id: args.id } });
       return true;
     },
     previewL4ProxyHost: async (
@@ -377,32 +353,41 @@ export const resolvers = {
       args: { id?: number | null; input: unknown; revert?: string[] | null },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       return await previewL4HostChange(
         { id: args.id ?? null, input: args.input as never, reverted: args.revert ?? [] },
         userId,
       );
     },
     bulkL4ProxyHosts: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      return (await bulkUpdateL4ProxyHosts(parseL4HostBulkRequest(args.input), userId)).count;
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "l4HostBulk",
+        payload: parseL4HostBulkRequest(args.input),
+      });
     },
 
     createAccessList: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      return await createAccessList(args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "accessListCreate",
+        payload: { input: args.input as never },
+      });
     },
     updateAccessList: async (
       _: unknown,
       args: { id: number; input: unknown },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
-      return await updateAccessList(args.id, args.input as never, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "accessListUpdate",
+        payload: { id: args.id, input: args.input as never },
+      });
     },
     deleteAccessList: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
-      await deleteAccessList(args.id, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      await submitOrApply(submitter, { kind: "accessListDelete", payload: { id: args.id } });
       return true;
     },
     setAccessListRules: async (
@@ -410,12 +395,15 @@ export const resolvers = {
       args: { id: number; rules: unknown },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
-      return await setAccessListIpRules(args.id, args.rules, userId);
+      const submitter = apiSubmitter(await context.viewer());
+      return await submitOrApply(submitter, {
+        kind: "accessListRules",
+        payload: { id: args.id, rules: args.rules },
+      });
     },
 
     createGroup: async (_: unknown, args: { input: unknown }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       return await createGroup(args.input as never, userId);
     },
     updateGroup: async (
@@ -423,11 +411,11 @@ export const resolvers = {
       args: { id: number; input: unknown },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       return await updateGroup(args.id, args.input as never, userId);
     },
     deleteGroup: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       await deleteGroup(args.id, userId);
       return true;
     },
@@ -436,7 +424,8 @@ export const resolvers = {
       args: { groupId: number; userId: number },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
+      await assertMayAddToGroup((await context.access()).capabilities, args.groupId);
       await addGroupMember(args.groupId, args.userId, userId);
       return true;
     },
@@ -445,7 +434,7 @@ export const resolvers = {
       args: { groupId: number; userId: number },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       await removeGroupMember(args.groupId, args.userId, userId);
       return true;
     },
@@ -455,11 +444,14 @@ export const resolvers = {
       args: { id: number; input: { role?: unknown } },
       context: GraphQLContext,
     ) => {
-      const { userId } = await requireAdmin(context);
-      if (!(await getUserById(args.id))) throw new NotFoundError("User not found");
+      const { userId } = await context.viewer();
+      const { capabilities } = await context.access();
+      if (!(await assertMayManageUser(capabilities, args.id))) {
+        throw new NotFoundError("User not found");
+      }
       if (args.input.role !== undefined && args.input.role !== null) {
-        const role = assertUserRole(args.input.role);
         assertNotSelf(userId, args.id, "cannotChangeOwnRole");
+        const role = await assertAssignableRole(capabilities, args.input.role);
         await updateUserRole(args.id, role);
       }
       const row = await getUserById(args.id);
@@ -467,9 +459,12 @@ export const resolvers = {
       return projectUser(row);
     },
     deleteUser: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      const { userId } = await requireAdmin(context);
+      const { userId } = await context.viewer();
       assertNotSelf(userId, args.id, "cannotDeleteOwnAccount");
-      if (!(await getUserById(args.id))) throw new NotFoundError("User not found");
+      const { capabilities } = await context.access();
+      if (!(await assertMayManageUser(capabilities, args.id))) {
+        throw new NotFoundError("User not found");
+      }
       await deleteUser(args.id);
       return true;
     },
@@ -515,16 +510,17 @@ export const resolvers = {
       args: { group: string; input: unknown },
       context: GraphQLContext,
     ) => {
-      await requireAdmin(context);
       if (!isSettingsGroup(args.group)) throw new NotFoundError("Unknown settings group");
       // As REST: the group's saver and encryption, the Caddy apply, and rollback on refusal.
-      await saveSettingsGroup(args.group, args.input);
+      await submitOrApply(apiSubmitter(await context.viewer()), {
+        kind: "settingsGroup",
+        payload: { group: args.group, input: args.input },
+      });
       // Redacted - never the credentials the caller just sent.
       return (await readSettingsGroup(args.group))?.value ?? {};
     },
 
-    applyCaddyConfig: async (_: unknown, __: unknown, context: GraphQLContext) => {
-      await requireAdmin(context);
+    applyCaddyConfig: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       await applyCaddy();
       return true;
     },
@@ -535,7 +531,11 @@ export const resolvers = {
     ...auditMutationResolvers,
     ...backupMutationResolvers,
     ...alertMutationResolvers,
+    ...roleMutationResolvers,
     ...auditStreamMutationResolvers,
+    ...scimMutationResolvers,
+    ...accessReviewMutationResolvers,
     ...hostHistoryMutationResolvers,
+    ...approvalMutationResolvers,
   },
 };

@@ -94,6 +94,8 @@ async function categorySwitches() {
     updateAvailable: registry.notifyUpdateAvailable,
     backups: registry.notifyBackupFailed,
     auditSinks: registry.notifyAuditSinkFailed,
+    accessReviews: registry.notifyAccessReviews,
+    changeApprovals: registry.notifyChangeApprovals,
     channels: registry.notifyChannelFailing,
   } satisfies Record<NotificationCategory, typeof registry.notifyAccountDisabled>;
 }
@@ -415,6 +417,7 @@ export function startNotifications(): void {
     import("./upstream-errors"),
     import("../alerts/watch"),
     import("../alerts/history"),
+    import("../access-reviews/reminders"),
   ])
     .then(
       ([
@@ -423,12 +426,14 @@ export function startNotifications(): void {
         { watchUpstreamErrors },
         { watchRuleSources },
         { pruneHistoryHourly },
+        { watchAccessReviews },
       ]) => {
         addNotificationWatcher(watchAgents);
         addNotificationWatcher(watchReleases);
         addNotificationWatcher(watchUpstreamErrors);
         addNotificationWatcher(watchRuleSources);
         addNotificationWatcher(pruneHistoryHourly);
+        addNotificationWatcher(watchAccessReviews);
       },
     )
     .catch((error: unknown) => {

@@ -216,9 +216,12 @@ cannot extend its own life. An account holds at most ten, and each expires in 30
 default), a year, on a date you pick, or never. A token stops working while its owner is overdue
 for [two-factor setup](../users-and-groups/#the-two-factor-policy).
 
-A token carries its owner's role. The management fields are **admin-only**, including for an
-operator - a [group grant](../users-and-groups/) delegates the dashboard, not the API. Managing your
-own tokens is the exception, and open to every signed-in role.
+A token carries its owner's role, [custom](../users-and-groups/#custom-roles) or built-in: each
+field and endpoint needs a permission the role holds outright. Hosts and agents a role reaches only
+through a [group grant](../users-and-groups/) don't count, so an operator's token gets nothing a
+user's doesn't - grants delegate the dashboard, not the API. Managing your own tokens is the
+exception, and open to every signed-in role. A refusal answers 403 with
+`This account's role does not allow this request`.
 
 ### Scopes
 

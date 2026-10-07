@@ -86,7 +86,12 @@ interface ProfileClientProps {
   user: UserData;
   /** From the authoritative accounts table (#261). */
   linkedProviders: Array<{ providerId: string; accountId: string }>;
-  enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
+  enabledProviders: Array<{
+    id: string;
+    name: string;
+    autoLink: boolean;
+    protocol?: "oidc" | "saml";
+  }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
   /** False in OIDC-only mode: local passwords do not exist. */
@@ -710,16 +715,19 @@ export default function ProfileClient({
                   {t("oauthLinkDescription")}
                 </Text>
                 <VStack gap={2}>
-                  {enabledProviders.map((provider) => (
-                    <Button
-                      key={provider.id}
-                      variant="secondary"
-                      width="100%"
-                      icon={<LogIn />}
-                      label={t("linkProvider", { provider: provider.name })}
-                      onClick={() => handleLinkOAuth(provider.id)}
-                    />
-                  ))}
+                  {/* SAML has no link-from-a-session step; its account links by email domain. */}
+                  {enabledProviders
+                    .filter((provider) => provider.protocol !== "saml")
+                    .map((provider) => (
+                      <Button
+                        key={provider.id}
+                        variant="secondary"
+                        width="100%"
+                        icon={<LogIn />}
+                        label={t("linkProvider", { provider: provider.name })}
+                        onClick={() => handleLinkOAuth(provider.id)}
+                      />
+                    ))}
                 </VStack>
               </VStack>
             )}

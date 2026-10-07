@@ -1,3 +1,4 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import {
@@ -5,7 +6,6 @@ import {
   checkSameOrigin,
   getCurrentSessionInfo,
   isFreshSession,
-  requireAdmin,
 } from "@/src/lib/auth";
 import {
   CONFIG_SECTIONS,
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const forbidden = checkSameOrigin(request);
   if (forbidden) return forbidden;
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("backups:write");
     // Every private key leaves in the file, so a borrowed old session is not enough.
     if (!isFreshSession(await getCurrentSessionInfo(request))) {
       const t = await getTranslations();

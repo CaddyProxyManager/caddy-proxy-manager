@@ -56,7 +56,7 @@ import { type FakeAgent, startFakeAgent } from '../../helpers/fake-agent';
 import { type SessionUser, form, seedUser } from '../../helpers/settings-actions';
 
 const results = messages.settings.results;
-const ADMIN_REQUIRED = domainErrorMessage('adminRequired');
+const ADMIN_REQUIRED = domainErrorMessage('accessDenied');
 const L4 = 'github.com/mholt/caddy-l4';
 
 let admin: SessionUser;

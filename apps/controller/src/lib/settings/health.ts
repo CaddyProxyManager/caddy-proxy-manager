@@ -64,6 +64,8 @@ export type HealthInput = {
   gravatarEnabled: boolean;
   /** Optional for callers that predate it; the defaults stand in. */
   hostHistory?: { keepRevisions: number; keepDays: number };
+  /** As hostHistory: absent, the defaults stand in. */
+  accessReviews?: { confirmRevocations: boolean; reminderDays: number };
   errorPageRules: number;
   globalCaddyfileLines: number;
   httpCacheStorage: string;
@@ -79,6 +81,8 @@ export type HealthInput = {
   signIn: { localUsersDisabled: boolean; accountLockEnabled: boolean };
   captchaProvider: string | null;
   twoFactorMode: "off" | "admins" | "all";
+  /** Optional for callers that predate it: not enforced. */
+  ssoEnforcement?: { enforced: boolean; breakGlass: number };
   requireChangeOnLegacyHash: boolean;
   authentikOutpost: string;
   forwardAuth: { provider: "authelia" | "custom"; upstream: string } | null;
@@ -519,6 +523,24 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
       : input.twoFactorMode === "admins"
         ? t("health.twoFactor.valueRequired")
         : t("health.twoFactor.valueOptional"),
+  );
+
+  push(
+    "sso-enforcement",
+    "ssoEnforcement",
+    input.ssoEnforcement?.enforced ? "ok" : "unset",
+    input.ssoEnforcement?.enforced
+      ? t("health.ssoEnforcement.valueEnforced", { count: input.ssoEnforcement.breakGlass })
+      : t("health.off"),
+  );
+
+  push(
+    "access-reviews",
+    "accessReviews",
+    "ok",
+    input.accessReviews?.confirmRevocations
+      ? t("health.accessReviews.valueConfirm", { days: input.accessReviews.reminderDays })
+      : t("health.accessReviews.valueApply", { days: input.accessReviews?.reminderDays ?? 3 }),
   );
 
   push(

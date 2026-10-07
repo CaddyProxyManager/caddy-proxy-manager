@@ -2,8 +2,10 @@ import type { WafExclusionRule } from "../waf/exclusions";
 import type { WafTuning } from "../waf/tuning";
 import type { DashboardHostSettings } from "../dashboard-host";
 import db, { nowIso } from "../db";
-import { settings } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { oauthProviders, settings, users } from "../db/schema";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import { domainError } from "../errors/domain-error";
+import { LDAP_PROVIDER_TYPE } from "../ldap/defaults";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "../models/proxy-hosts";
 import type { CaddyCustomModule } from "../caddy/image-build/modules";
 import {
@@ -24,6 +26,7 @@ import {
   nextMfaPolicy,
   readMfaPolicy,
 } from "../auth/two-factor/mfa-policy";
+import { type SsoEnforcement, readSsoEnforcement } from "../auth/sso-enforcement";
 import {
   DEFAULT_HTTP_CACHE_SETTINGS,
   encryptHttpCacheSecrets,
@@ -494,6 +497,43 @@ export async function saveTwoFactorPolicySettings(settings: unknown): Promise<vo
       : previous.mode;
   const graceDays = "graceDays" in raw ? Number(raw.graceDays) : previous.graceDays;
   await setSetting("two_factor_policy", nextMfaPolicy(previous, { mode, graceDays }));
+}
+
+export type { SsoEnforcement } from "../auth/sso-enforcement";
+
+export async function getSsoEnforcementSettings(): Promise<SsoEnforcement> {
+  return readSsoEnforcement(await getSetting<unknown>("sso_enforcement"));
+}
+
+/**
+ * Refused while it would lock everyone out: enforcing needs a provider to send people to, and a
+ * break-glass account must be one that exists. Fields left out keep their stored values.
+ */
+export async function saveSsoEnforcementSettings(settings: unknown): Promise<SsoEnforcement> {
+  const raw = settings && typeof settings === "object" ? (settings as Record<string, unknown>) : {};
+  const next = readSsoEnforcement({ ...(await getSsoEnforcementSettings()), ...raw });
+  if (next.breakGlassUserIds.length > 0) {
+    const found = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.id, next.breakGlassUserIds));
+    const existing = new Set(found.map((row) => row.id));
+    // A stored account deleted since is dropped quietly; one just picked must exist.
+    if ("breakGlassUserIds" in raw && found.length !== next.breakGlassUserIds.length) {
+      throw domainError("breakGlassAccountUnknown", {}, { status: 400 });
+    }
+    next.breakGlassUserIds = next.breakGlassUserIds.filter((id) => existing.has(id));
+  }
+  if (next.enforced) {
+    const [provider] = await db
+      .select({ id: oauthProviders.id })
+      .from(oauthProviders)
+      .where(and(eq(oauthProviders.enabled, true), ne(oauthProviders.type, LDAP_PROVIDER_TYPE)))
+      .limit(1);
+    if (!provider) throw domainError("ssoEnforcementNeedsProvider", {}, { status: 400 });
+  }
+  await setSetting("sso_enforcement", next);
+  return next;
 }
 
 export async function getDnsSettings(): Promise<DnsSettings | null> {

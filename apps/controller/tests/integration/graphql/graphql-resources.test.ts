@@ -4,6 +4,7 @@
  * back from the database, so a resolver that reports success without writing fails here.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -39,8 +40,7 @@ function contextFor(role: string | null): GraphQLContext {
     access: async () => ({
       userId: 1,
       role: role ?? '',
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '',
@@ -148,7 +148,9 @@ describe('the admin gate on the remaining resources', () => {
   it('refuses every one to an operator, and writes nothing', async () => {
     for (const document of documents) {
       const result = await run(document, 'operator');
-      expect(result.errors?.[0]?.message, document).toContain('Administrator privileges required');
+      expect(result.errors?.[0]?.message, document).toContain(
+        "This account's role does not allow this request",
+      );
     }
     expect(await ctx.db.select().from(db.groups)).toEqual([]);
     expect(await ctx.db.select().from(db.accessLists)).toEqual([]);

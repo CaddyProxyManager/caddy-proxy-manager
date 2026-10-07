@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/models/user', () => ({
@@ -21,8 +22,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {
@@ -47,12 +52,11 @@ import {
   updateUserStatus,
   createUser,
 } from '@/src/lib/models/user';
-import { requireApiAdmin, requireApiUser } from '@/src/lib/api/auth';
+import { requireApiUser } from '@/src/lib/api/auth';
 
 const mockListUsers = vi.mocked(listUsers);
 const mockGetUserById = vi.mocked(getUserById);
 const mockUpdateUserAccount = vi.mocked(updateUserAccount);
-const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
 const mockRequireApiUser = vi.mocked(requireApiUser);
 
 function createMockRequest(options: { method?: string; body?: unknown } = {}): any {
@@ -75,8 +79,12 @@ const sampleUser = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
-  mockRequireApiUser.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+  mockRequireApiUser.mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'bearer',
+    access: accessOf('admin'),
+  });
 });
 
 describe('GET /api/v1/users', () => {
@@ -95,7 +103,7 @@ describe('GET /api/v1/users', () => {
 
   it('returns 401 on auth failure', async () => {
     const { ApiAuthError } = await import('@/src/lib/api/auth');
-    mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
+    mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await listGET(createMockRequest());
     expect(response.status).toBe(401);
@@ -125,7 +133,12 @@ describe('GET /api/v1/users/[id]', () => {
   });
 
   it('returns 403 when non-admin tries to view another user', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 5, role: 'user', authMethod: 'bearer' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 5,
+      role: 'user',
+      authMethod: 'bearer',
+      access: accessOf('user'),
+    });
 
     const response = await getGET(createMockRequest(), { params: Promise.resolve({ id: '1' }) });
     const data = await response.json();
@@ -135,7 +148,12 @@ describe('GET /api/v1/users/[id]', () => {
   });
 
   it('allows non-admin to view themselves', async () => {
-    mockRequireApiUser.mockResolvedValue({ userId: 5, role: 'user', authMethod: 'bearer' });
+    mockRequireApiUser.mockResolvedValue({
+      userId: 5,
+      role: 'user',
+      authMethod: 'bearer',
+      access: accessOf('user'),
+    });
     const user = { ...sampleUser, id: 5, role: 'user' };
     mockGetUserById.mockResolvedValue(user as any);
 

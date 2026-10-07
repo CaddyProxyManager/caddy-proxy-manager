@@ -1,4 +1,5 @@
 import type { useFormatter, useTranslations } from "next-intl";
+import { ChangeSubmitted } from "../approvals/submitted";
 import {
   DomainError,
   domainErrorOf,
@@ -28,11 +29,12 @@ type DynamicTranslate = (key: string, values?: Record<string, string | number>) 
 
 /**
  * Only a `DomainError`, or one an error carries, is translated; another Error keeps its English
- * and a non-Error gets the fallback. Pass `t` from `await getTranslations()`.
+ * and a non-Error gets the fallback. Pass `t` from `await getTranslations()`. A write held for
+ * approval arrives here too, and is reported as done: it was, as far as the person can go.
  */
 export function actionError(t: Translator, error: unknown, fallbackMessage: string): ActionState {
   return {
-    status: "error",
+    status: error instanceof ChangeSubmitted ? "success" : "error",
     message: extractErrorMessage(t, error, fallbackMessage),
   };
 }

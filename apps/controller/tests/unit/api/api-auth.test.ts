@@ -10,10 +10,17 @@ vi.mock('@/src/lib/auth', () => ({
   checkSameOrigin: vi.fn(() => null),
 }));
 
+// No groups, so a role's own capabilities decide; this file has no database.
+const actualGrants = await import('@/src/lib/models/group-grants');
+vi.mock('@/src/lib/models/group-grants', () => ({
+  ...actualGrants,
+  groupIdsOf: async () => [],
+  rolesOfGroups: async () => [],
+}));
+
 import {
   authenticateApiRequest,
   requireApiUser,
-  requireApiAdmin,
   ApiAuthError,
   NotFoundError,
   apiErrorResponse,
@@ -39,7 +46,7 @@ function createMockRequest(
       },
     },
     method: options.method ?? 'GET',
-    nextUrl: { pathname: options.pathname ?? '/api/v1/test' },
+    nextUrl: { pathname: options.pathname ?? '/api/v1/proxy-hosts' },
   };
 }
 
@@ -107,7 +114,7 @@ describe('authenticateApiRequest', () => {
   });
 });
 
-describe('requireApiAdmin', () => {
+describe('requireApiUser', () => {
   it('allows admin users', async () => {
     mockValidateToken.mockResolvedValue({
       token: {
@@ -123,7 +130,7 @@ describe('requireApiAdmin', () => {
       user: { id: 1, role: 'admin', hasPassword: false, twoFactorEnabled: false },
     });
 
-    const result = await requireApiAdmin(createMockRequest({ authorization: 'Bearer token' }));
+    const result = await requireApiUser(createMockRequest({ authorization: 'Bearer token' }));
     expect(result.role).toBe('admin');
   });
 
@@ -143,7 +150,7 @@ describe('requireApiAdmin', () => {
     });
 
     try {
-      await requireApiAdmin(createMockRequest({ authorization: 'Bearer token' }));
+      await requireApiUser(createMockRequest({ authorization: 'Bearer token' }));
       expect.unreachable('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ApiAuthError);
@@ -159,9 +166,22 @@ describe('requireApiUser', () => {
       expires: '',
     } as any);
 
-    const result = await requireApiUser(createMockRequest());
+    // Their own sessions: what any account may reach.
+    const result = await requireApiUser(createMockRequest({ pathname: '/api/v1/sessions' }));
     expect(result.userId).toBe(5);
     expect(result.role).toBe('viewer');
+  });
+
+  it("refuses a role a path's capability it does not hold", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: '5', role: 'viewer', name: 'V', email: 'v@test.com' },
+      expires: '',
+    } as any);
+
+    await expect(requireApiUser(createMockRequest())).rejects.toMatchObject({ status: 403 });
+    await expect(
+      requireApiUser(createMockRequest({ pathname: '/api/v1/nothing-here' })),
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   it('CSRF check blocks session-authenticated POST without same origin', async () => {
@@ -277,7 +297,7 @@ describe('requireApiUser - a scoped token', () => {
       user: { id: 7, role: 'user', hasPassword: false, twoFactorEnabled: false },
     });
     const request = createMockRequest({ authorization: 'Bearer t', pathname: '/api/v1/users' });
-    await expect(requireApiAdmin(request)).rejects.toMatchObject({ status: 403 });
+    await expect(requireApiUser(request)).rejects.toMatchObject({ status: 403 });
   });
 });
 

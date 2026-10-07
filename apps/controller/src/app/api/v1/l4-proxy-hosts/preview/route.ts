@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { previewL4HostChange } from "@/src/lib/host-review";
 
 /** What POST /api/v1/l4-proxy-hosts would create, checked and diffed but not stored. */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const { userId } = await requireApiUser(request);
     const body = await request.json();
     const reverted = request.nextUrl.searchParams.getAll("revert");
     return NextResponse.json(

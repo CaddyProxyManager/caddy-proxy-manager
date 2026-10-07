@@ -4,10 +4,12 @@ import { auth, checkSameOrigin } from "../auth";
 import { validateToken } from "../models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./errors";
+import { ChangeSubmitted } from "../approvals/submitted";
 import { CaddyApplyError } from "../caddy/apply-error";
 import { DomainError, domainErrorMessage } from "../errors/domain-error";
 import { type TokenScope, unflattenScope } from "../api-tokens/scope";
-import { restRequirement, tokenAllows } from "../api-tokens/requirements";
+import { restRequirement, roleAllows, tokenAllows } from "../api-tokens/requirements";
+import { type Access, accessFor, can } from "../users/permissions";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -20,6 +22,7 @@ export class ApiAuthError extends Error {
 
 /** English: what an API client reads. */
 export const TOKEN_SCOPE_REFUSED = "This API token's scope does not allow this request";
+export const ROLE_REFUSED = "This account's role does not allow this request";
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -87,16 +90,24 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
   };
 }
 
-export async function requireApiUser(request: NextRequest): Promise<ApiAuthResult> {
+/**
+ * Every REST route comes through here, so the role and a token's scope are both checked once, by
+ * path (`lib/api-tokens/requirements.ts`). A path named nowhere is refused to everyone.
+ */
+export async function requireApiUser(
+  request: NextRequest,
+): Promise<ApiAuthResult & { access: Access }> {
   const result = await authenticateApiRequest(request);
+  const requirement = restRequirement(request.nextUrl.pathname, request.method);
 
-  // Every REST route comes through here, so a scoped token is checked once, by path.
   const scope = result.tokenScope;
-  if (scope && scope.kind !== "full") {
-    const pathname = request.nextUrl.pathname;
-    if (!tokenAllows(scope, restRequirement(pathname, request.method))) {
-      throw new ApiAuthError(TOKEN_SCOPE_REFUSED, 403);
-    }
+  if (scope && scope.kind !== "full" && !tokenAllows(scope, requirement)) {
+    throw new ApiAuthError(TOKEN_SCOPE_REFUSED, 403);
+  }
+
+  const access = await accessFor(result.userId, result.role, result.viewAsGroupIds);
+  if (!roleAllows((capability) => can(access, capability), requirement)) {
+    throw new ApiAuthError(ROLE_REFUSED, 403);
   }
 
   // A bearer token cannot be ridden cross-site; a session cookie can.
@@ -110,18 +121,17 @@ export async function requireApiUser(request: NextRequest): Promise<ApiAuthResul
     }
   }
 
-  return result;
-}
-
-export async function requireApiAdmin(request: NextRequest): Promise<ApiAuthResult> {
-  const result = await requireApiUser(request);
-  if (result.role !== "admin") {
-    throw new ApiAuthError("Administrator privileges required", 403);
-  }
-  return result;
+  return { ...result, access };
 }
 
 export function apiErrorResponse(error: unknown): NextResponse {
+  // Not a failure: the write waits for approval, under this id.
+  if (error instanceof ChangeSubmitted) {
+    return NextResponse.json(
+      { status: "pending", changeRequestId: error.requestId, message: error.message },
+      { status: 202 },
+    );
+  }
   if (error instanceof ApiAuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }

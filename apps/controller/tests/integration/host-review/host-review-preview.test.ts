@@ -4,6 +4,7 @@
  * save carrying the review's undo leaves those fields as stored. GraphQL and REST answer the same.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf, capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -492,8 +493,7 @@ describe('the API previews', () => {
       access: async () => ({
         userId: users.admin,
         role,
-        isAdmin: role === 'admin',
-        isOperator: role === 'operator',
+        capabilities: capabilitiesOf(role),
         grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
       }),
       rawBody: async () => '',
@@ -535,10 +535,11 @@ describe('the API previews', () => {
 
   it('POST /api/v1/proxy-hosts/{id}/preview takes ?revert like the editor', async () => {
     const row = await seedHost();
-    vi.spyOn(await import('../../../src/lib/api/auth'), 'requireApiAdmin').mockResolvedValue({
+    vi.spyOn(await import('../../../src/lib/api/auth'), 'requireApiUser').mockResolvedValue({
       userId: users.admin,
       role: 'admin',
       authMethod: 'bearer',
+      access: accessOf('admin'),
     } as never);
     const { POST } = await import('../../../src/app/api/v1/proxy-hosts/[id]/preview/route');
     const response = await POST(

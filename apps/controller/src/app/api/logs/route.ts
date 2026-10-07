@@ -1,6 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { readAgentLog } from "@/src/lib/agent/client";
 import type { LogSource } from "@/src/lib/analytics/log-view";
 
@@ -12,7 +12,7 @@ const SOURCES: readonly LogSource[] = ["access", "waf", "caddy"];
  */
 export async function GET(request: NextRequest) {
   const t = await getTranslations("logs");
-  await requireAdmin();
+  await requireCan("logs:read");
   const params = request.nextUrl.searchParams;
   const agentId = params.get("agent") ?? "";
   const source = params.get("source") as LogSource;

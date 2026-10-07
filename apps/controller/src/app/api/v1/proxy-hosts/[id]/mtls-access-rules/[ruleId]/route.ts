@@ -1,17 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import {
-  getMtlsAccessRule,
-  updateMtlsAccessRule,
-  deleteMtlsAccessRule,
-} from "@/src/lib/models/mtls-access-rules";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
+import { getMtlsAccessRule } from "@/src/lib/models/mtls-access-rules";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { ruleId } = await params;
     const rule = await getMtlsAccessRule(Number(ruleId));
     if (!rule) {
@@ -28,10 +25,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { ruleId } = await params;
     const body = await request.json();
-    const rule = await updateMtlsAccessRule(Number(ruleId), body, userId);
+    const rule = await submitOrApply(apiSubmitter(caller), {
+      kind: "mtlsRuleUpdate",
+      payload: { id: Number(ruleId), input: body },
+    });
     return NextResponse.json(rule);
   } catch (error) {
     return apiErrorResponse(error);
@@ -43,9 +43,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { ruleId } = await params;
-    await deleteMtlsAccessRule(Number(ruleId), userId);
+    await submitOrApply(apiSubmitter(caller), {
+      kind: "mtlsRuleDelete",
+      payload: { id: Number(ruleId) },
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiErrorResponse(error);

@@ -9,7 +9,7 @@ import { logAccessFixes } from "@/src/lib/agent/log-access";
 import { connectedAgents } from "@/src/lib/agent/registry";
 import { listAgents } from "@/src/lib/models/agents";
 import { listHostAssignments } from "@/src/lib/models/host-agents";
-import { canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
+import { canManage, requireReach, visibleIdFilter, can } from "@/src/lib/users/permissions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -26,7 +26,7 @@ function countAssigned(assignments: Map<number, number[]>, agentRowId: number): 
 }
 
 export default async function AgentsPage() {
-  const access = await requireAccess();
+  const access = await requireReach("agents:read");
   // For a status failure this side worded, such as an agent that has not reported yet.
   const tRoot = await getTranslations();
 
@@ -85,15 +85,16 @@ export default async function AgentsPage() {
   // different problems with different fixes, and an operator cannot tell them apart otherwise.
   const anyPaired = agentOptions.length > 0;
 
-  // Not tied to one agent, and may name any of them: an admin's to see, as in Needs attention.
+  // Not tied to one agent, and may name any of them: only for whoever manages every agent.
   const fleet = applyFailures.all;
-  const fleetApplyFailure = access.isAdmin && fleet ? { at: fleet.at, error: fleet.error } : null;
+  const managesFleet = can(access, "agents:write");
+  const fleetApplyFailure = managesFleet && fleet ? { at: fleet.at, error: fleet.error } : null;
 
   return (
     <AgentsClient
       agents={rows}
       anyPaired={anyPaired}
-      isAdmin={access.isAdmin}
+      managesFleet={managesFleet}
       fleetApplyFailure={fleetApplyFailure}
     />
   );

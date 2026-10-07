@@ -325,9 +325,9 @@ describe('checking delegations', () => {
   it('is for administrators only', async () => {
     ctx.session = { user: await seedUser(ctx.db, 'op@example.com', 'operator') };
 
-    await expect(checkDnsDelegationsAction()).rejects.toThrow(domainErrorMessage('adminRequired'));
+    await expect(checkDnsDelegationsAction()).rejects.toThrow(domainErrorMessage('accessDenied'));
     await expect(save({ provider: 'cloudflare', credential_api_token: 'x' })).rejects.toThrow(
-      domainErrorMessage('adminRequired'),
+      domainErrorMessage('accessDenied'),
     );
   });
 });

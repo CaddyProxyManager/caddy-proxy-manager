@@ -4,12 +4,6 @@ export type AppRole = "admin" | "operator" | "user" | "viewer";
 
 export const APP_ROLES: readonly AppRole[] = ["admin", "operator", "user", "viewer"] as const;
 
-/**
- * First match wins. `operator` outranks `user` and `viewer`, which manage nothing at all (they are
- * forward-auth identities), though the axes are not otherwise comparable.
- */
-const ROLE_PRECEDENCE: readonly AppRole[] = ["admin", "operator", "user", "viewer"] as const;
-
 const ROLE_SUFFIX: Record<AppRole, string> = {
   admin: "Admin",
   operator: "Operator",
@@ -25,39 +19,55 @@ export type GroupMappingConfig = {
   groupsClaim: string;
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
-  adminGroup: string | null;
-  operatorGroup: string | null;
-  userGroup: string | null;
-  viewerGroup: string | null;
-  defaultRole: AppRole;
+  /**
+   * Role key to the group names that give it. A built-in role with none falls back to
+   * `<groupPrefix><Role>`; any other role needs names of its own.
+   */
+  roleGroups: Readonly<Record<string, readonly string[]>>;
+  /** A role key: built-in, or one an administrator made. */
+  defaultRole: string;
   syncGroups: boolean;
 };
 
-export function toGroupMappingConfig(provider: {
-  groupsClaim?: string | null;
-  groupPrefix?: string | null;
-  roleMappingEnabled?: boolean | null;
+/** The built-in roles' comma lists, the shape providers stored before `role_mappings`. */
+type LegacyRoleLists = {
   adminGroup?: string | null;
   operatorGroup?: string | null;
   userGroup?: string | null;
   viewerGroup?: string | null;
-  defaultRole?: string | null;
-  syncGroups?: boolean | null;
-}): GroupMappingConfig {
+};
+
+export function toGroupMappingConfig(
+  provider: LegacyRoleLists & {
+    groupsClaim?: string | null;
+    groupPrefix?: string | null;
+    roleMappingEnabled?: boolean | null;
+    roleGroups?: Readonly<Record<string, readonly string[]>> | null;
+    defaultRole?: string | null;
+    syncGroups?: boolean | null;
+  },
+): GroupMappingConfig {
+  const lists: Record<string, string[]> = {};
+  for (const [column, role] of [
+    ["adminGroup", "admin"],
+    ["operatorGroup", "operator"],
+    ["userGroup", "user"],
+    ["viewerGroup", "viewer"],
+  ] as const) {
+    const names = splitGroupList(provider[column]);
+    if (names.length > 0) lists[role] = names;
+  }
   return {
     groupsClaim: provider.groupsClaim?.trim() || "groups",
     groupPrefix: provider.groupPrefix?.trim() || null,
     roleMappingEnabled: provider.roleMappingEnabled === true,
-    adminGroup: provider.adminGroup?.trim() || null,
-    operatorGroup: provider.operatorGroup?.trim() || null,
-    userGroup: provider.userGroup?.trim() || null,
-    viewerGroup: provider.viewerGroup?.trim() || null,
-    defaultRole: isAppRole(provider.defaultRole) ? provider.defaultRole : "user",
+    roleGroups: { ...lists, ...(provider.roleGroups ?? {}) },
+    defaultRole: provider.defaultRole?.trim() || "user",
     syncGroups: provider.syncGroups === true,
   };
 }
 
-/** The env-configured provider's mapping columns, as its startup sync stores them. */
+/** The env-configured provider's mapping, as its startup sync stores it. */
 export function envGroupMapping(oauth: {
   groupsClaim: string | null;
   groupPrefix: string | null;
@@ -177,30 +187,51 @@ export function parseGroupNames(value: string | null): string[] {
   return names;
 }
 
-/** Per role: its configured names, else `<groupPrefix><Role>`. */
-export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, string[]> {
-  const configured: Record<AppRole, string | null> = {
-    admin: cfg.adminGroup,
-    operator: cfg.operatorGroup,
-    user: cfg.userGroup,
-    viewer: cfg.viewerGroup,
-  };
-  const result = {} as Record<AppRole, string[]>;
-  for (const role of APP_ROLES) {
-    const names = parseGroupNames(configured[role]);
+/** Commas only, trimmed, a repeat once: names as typed, for storing. */
+export function splitGroupList(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/**
+ * First match wins: `admin`, then `operator`, then the roles an administrator made in the order
+ * `roleGroups` lists them, then `user` and `viewer`, which manage nothing (they are forward-auth
+ * identities).
+ */
+export function roleOrder(cfg: GroupMappingConfig): string[] {
+  const made = Object.keys(cfg.roleGroups).filter((role) => !isAppRole(role));
+  return ["admin", "operator", ...made, "user", "viewer"];
+}
+
+/** Per role: its configured names, else `<groupPrefix><Role>` for a built-in one. */
+export function resolveRoleGroups(cfg: GroupMappingConfig): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const role of roleOrder(cfg)) {
+    const names = parseGroupNames((cfg.roleGroups[role] ?? []).join(","));
     result[role] =
-      names.length > 0 ? names : cfg.groupPrefix ? [`${cfg.groupPrefix}${ROLE_SUFFIX[role]}`] : [];
+      names.length > 0
+        ? names
+        : isAppRole(role) && cfg.groupPrefix
+          ? [`${cfg.groupPrefix}${ROLE_SUFFIX[role]}`]
+          : [];
   }
   return result;
 }
 
 /** `null` when off, else authoritative: no match gives `defaultRole`, so losing admin demotes. */
-export function mapGroupsToRole(groups: string[], cfg: GroupMappingConfig): AppRole | null {
+export function mapGroupsToRole(groups: string[], cfg: GroupMappingConfig): string | null {
   if (!cfg.roleMappingEnabled) return null;
 
   const claimed = new Set(groups.map(comparableGroupName));
   const roleGroups = resolveRoleGroups(cfg);
-  for (const role of ROLE_PRECEDENCE) {
+  for (const role of roleOrder(cfg)) {
     if (roleGroups[role].some((name) => claimed.has(comparableGroupName(name)))) return role;
   }
   return cfg.defaultRole;

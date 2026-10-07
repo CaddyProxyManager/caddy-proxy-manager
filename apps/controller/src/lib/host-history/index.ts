@@ -305,7 +305,7 @@ async function existingUser(id: unknown): Promise<number | null> {
   return row ? row.id : null;
 }
 
-async function auditChangesFor(
+export async function auditChangesFor(
   kind: HostKind,
   before: { host: Record<string, unknown>; agentIds: number[] } | null,
   snapshot: HostSnapshot,

@@ -1,4 +1,5 @@
 import { localUsersDisabled } from "@/src/lib/auth/policy";
+import { getSsoEnforcement, isBreakGlassName } from "@/src/lib/auth/sso-break-glass";
 import { randomBytes } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
@@ -152,9 +153,12 @@ export async function POST(request: NextRequest) {
 
     let user: Awaited<ReturnType<typeof db.query.users.findFirst>>;
     let isValid = false;
+    // As on /login: while single sign-on is enforced, a local password only for break-glass.
+    const enforcement = await getSsoEnforcement();
+    const localAllowed = !enforcement.enforced || (await isBreakGlassName(enforcement, username));
     try {
       // Picking a directory skips the local account, as on /login.
-      if (!directoryId && !localDisabled) {
+      if (!directoryId && !localDisabled && localAllowed) {
         const email = `${username}@localhost`;
         user = await db.query.users.findFirst({
           where: (table, operators) => operators.eq(table.email, email),
@@ -167,7 +171,7 @@ export async function POST(request: NextRequest) {
         );
         isValid = Boolean(passwordHash) && matches;
       }
-      if (!isValid) {
+      if (!isValid && (!enforcement.enforced || enforcement.allowLdap)) {
         const directory = await resolveSignInDirectory(directoryId);
         if (directory) {
           const [{ internalAdapter }, { allowOauthRegistration }] = await Promise.all([

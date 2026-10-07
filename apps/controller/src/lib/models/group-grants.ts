@@ -1,12 +1,14 @@
 /**
- * Grants only widen what an `operator` reaches; other roles ignore them, so rows are inert until
- * someone is made operator. One nullable column per resource, not a polymorphic (type, id), so
- * each is a real foreign key and deleting a host takes its grants with it.
+ * Grants only widen what a scoped role such as `operator` reaches; other roles ignore them, so
+ * rows are inert until a member holds one. One nullable column per resource, not a polymorphic
+ * (type, id), so each is a real foreign key and deleting a host takes its grants with it.
  */
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import db, { nowIso } from "../db";
-import { groupGrants, groupMembers } from "../db/schema";
+import { groupGrants, groupMembers, groups } from "../db/schema";
+import { domainError } from "../errors/domain-error";
+import { type CapabilitySet, holds } from "../roles/capabilities";
 
 /** A manage grant implies view; there is no third level. */
 export type GrantCapability = "view" | "manage";
@@ -112,11 +114,25 @@ function merge(into: Map<number, GrantCapability>, id: number, capability: Grant
 
 /** Ignores role, so `lib/users/permissions.ts` alone decides what a role does with grants. */
 export async function grantsForUser(userId: number): Promise<EffectiveGrants> {
+  return await grantsForGroups(await groupIdsOf(userId));
+}
+
+export async function groupIdsOf(userId: number): Promise<number[]> {
   const memberships = await db
     .select({ groupId: groupMembers.groupId })
     .from(groupMembers)
     .where(eq(groupMembers.userId, userId));
-  return await grantsForGroups(memberships.map((row) => row.groupId));
+  return memberships.map((row) => row.groupId);
+}
+
+/** The roles these groups carry, each once. */
+export async function rolesOfGroups(groupIds: number[]): Promise<string[]> {
+  if (groupIds.length === 0) return [];
+  const rows = await db
+    .select({ role: groups.role })
+    .from(groups)
+    .where(and(inArray(groups.id, groupIds), isNotNull(groups.role)));
+  return [...new Set(rows.flatMap((row) => (row.role ? [row.role] : [])))];
 }
 
 export async function grantsForGroups(groupIds: number[]): Promise<EffectiveGrants> {
@@ -137,4 +153,18 @@ export async function grantsForGroups(groupIds: number[]): Promise<EffectiveGran
     }
   }
   return effective;
+}
+
+/**
+ * A grant hands its group's scoped members part of what the giver manages, so only someone who
+ * manages every host (or agent) may give one.
+ */
+export function assertMayGrant(
+  holding: CapabilitySet,
+  grants: readonly { resource: GrantResource }[],
+): void {
+  for (const { resource } of grants) {
+    const capability = resource.kind === "agent" ? "agents:write" : "hosts:write";
+    if (!holds(holding, capability)) throw domainError("roleExceedsYours", {}, { status: 403 });
+  }
 }

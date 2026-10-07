@@ -639,13 +639,15 @@ test.describe('Settings - Authentik Defaults', () => {
 
 test.describe('Settings - OAuth Providers', () => {
   test('section renders with Add Provider button', async ({ page }) => {
-    await goToSection(page, 'OAuth providers');
-    await expect(page.getByRole('heading', { level: 2, name: 'OAuth providers' })).toBeVisible();
+    await goToSection(page, 'Single sign-on providers');
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Single sign-on providers' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /add provider/i })).toBeVisible();
   });
 
   test('clicking Add Provider opens dialog', async ({ page }) => {
-    await goToSection(page, 'OAuth providers');
+    await goToSection(page, 'Single sign-on providers');
     await page.getByRole('button', { name: /add provider/i }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -655,7 +657,7 @@ test.describe('Settings - OAuth Providers', () => {
   });
 
   test('create and delete an OAuth provider', async ({ page }) => {
-    await goToSection(page, 'OAuth providers');
+    await goToSection(page, 'Single sign-on providers');
     await page.getByRole('button', { name: /add provider/i }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/^name/i).fill('E2E Test Provider');
@@ -714,7 +716,7 @@ test.describe('Settings - OAuth Providers', () => {
       expect(itemBody).not.toContain(secret);
       expect(itemBody).not.toContain('clientSecret');
 
-      await goToSection(page, 'OAuth providers');
+      await goToSection(page, 'Single sign-on providers');
       // The accessible name carries the timestamped provider name, so no card scoping.
       await page.getByRole('button', { name: `Edit ${providerName}` }).click();
 
@@ -846,7 +848,9 @@ test.describe('Settings - cross-section navigation', () => {
     ).toBeVisible();
 
     await sidebar.getByRole('link', { name: 'Authentication', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 2, name: 'OAuth providers' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Single sign-on providers' }),
+    ).toBeVisible();
 
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();

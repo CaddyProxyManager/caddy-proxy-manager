@@ -4,7 +4,7 @@
  * agent or directory. Items are filtered to what the viewer may see, worst first, capped.
  */
 
-import type { Access } from "../users/permissions";
+import { type Access, can, canReach, canView } from "../users/permissions";
 import {
   ATTENTION_PROVIDER_LIST,
   type AttentionProvider,
@@ -50,13 +50,24 @@ async function withinBudget(
   }
 }
 
-/** Admins see everything; an operator what touches a host or agent granted to them. */
+/**
+ * Whoever holds the overview sees everything; anyone else what touches a host or agent they may
+ * view. An item naming neither is about the instance, so it needs the overview.
+ */
 export function visibleTo(access: Access, item: AttentionItem): boolean {
-  if (access.isAdmin) return true;
-  if (!access.isOperator) return false;
+  if (can(access, "overview:read")) return true;
   const hosts = item.scope.proxyHosts ?? [];
-  if (hosts.some((id) => access.grants.proxyHosts.has(id))) return true;
-  return item.scope.agent !== undefined && access.grants.agents.has(item.scope.agent);
+  if (hosts.some((id) => canView(access, "proxyHost", id))) return true;
+  return item.scope.agent !== undefined && canView(access, "agent", item.scope.agent);
+}
+
+/** Nothing to show without the overview or some host or agent to see. */
+function seesAny(access: Access): boolean {
+  return (
+    can(access, "overview:read") ||
+    canReach(access, "hosts:read") ||
+    canReach(access, "agents:read")
+  );
 }
 
 async function loadHostRefs(): Promise<HostRef[]> {
@@ -98,7 +109,7 @@ export async function collectAttention(
   access: Access,
   options: AttentionOptions = {},
 ): Promise<AttentionList> {
-  if (!access.isAdmin && !access.isOperator) return { items: [], skipped: [], truncated: 0 };
+  if (!seesAny(access)) return { items: [], skipped: [], truncated: 0 };
   const now = options.now ?? Date.now();
   let hosts: Promise<HostRef[]> | null = null;
   const context = {
@@ -110,7 +121,7 @@ export async function collectAttention(
   };
   const providers = (options.providers ?? ATTENTION_PROVIDER_LIST).filter(
     (provider) =>
-      (access.isAdmin || !provider.adminOnly) &&
+      (!provider.adminOnly || can(access, "overview:read")) &&
       (options.proxyHostId === undefined || HOST_PROVIDERS.includes(provider.id)),
   );
 

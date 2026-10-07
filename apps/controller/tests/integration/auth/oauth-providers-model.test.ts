@@ -236,7 +236,7 @@ describe('the primary provider', () => {
     await setPrimaryProviderId(zeta.id);
 
     expect(await getProviderDisplayList()).toEqual([
-      { id: zeta.id, name: 'Zeta', autoLink: false, isPrimary: true },
+      { id: zeta.id, name: 'Zeta', autoLink: false, isPrimary: true, protocol: 'oidc' },
       expect.objectContaining({ name: 'Alpha', autoLink: true, isPrimary: false }),
     ]);
   });

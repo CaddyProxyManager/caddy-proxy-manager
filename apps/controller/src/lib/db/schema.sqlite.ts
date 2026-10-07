@@ -177,12 +177,7 @@ export const oauthProviders = sqliteTable(
     // Convention prefix: with "CPM_", membership of "CPM_Admin" grants admin.
     groupPrefix: text("groupPrefix"),
     roleMappingEnabled: integer("roleMappingEnabled", { mode: "boolean" }).notNull().default(false),
-    // Explicit overrides; when unset they are derived from groupPrefix.
-    adminGroup: text("adminGroup"),
-    operatorGroup: text("operatorGroup"),
-    userGroup: text("userGroup"),
-    viewerGroup: text("viewerGroup"),
-    // Role assigned when no role group matched.
+    // Which groups give which role are `role_mappings` rows. Role assigned when none matched.
     defaultRole: text("defaultRole").notNull().default("user"),
     // Mirror the remaining prefixed IdP groups into CPM groups.
     syncGroups: integer("syncGroups", { mode: "boolean" }).notNull().default(false),
@@ -193,6 +188,32 @@ export const oauthProviders = sqliteTable(
   },
   (table) => ({
     nameUnique: uniqueIndex("oauth_providers_name_unique").on(table.name),
+  }),
+);
+
+// Better Auth's `ssoProvider` model (@better-auth/sso), SAML only. CPM's half of each provider -
+// name, switch, group mapping - is its `oauth_providers` row (type 'saml'), which `providerId`
+// names. `samlConfig` is the plugin's JSON: IdP metadata and certificates, nothing secret.
+export const ssoProviders = sqliteTable(
+  "sso_providers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** The service provider's entity ID, which assertions must name as their audience. */
+    issuer: text("issuer").notNull(),
+    oidcConfig: text("oidcConfig"),
+    samlConfig: text("samlConfig"),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    providerId: text("providerId")
+      .references(() => oauthProviders.id, { onDelete: "cascade" })
+      .notNull(),
+    organizationId: text("organizationId"),
+    /** Email domains whose first sign-in may join an existing account with the same email. */
+    domain: text("domain").notNull().default(""),
+    // Domain verification is how the plugin trusts `domain`; CPM's administrators vouch instead.
+    domainVerified: integer("domainVerified", { mode: "boolean" }).notNull().default(true),
+  },
+  (table) => ({
+    providerUnique: uniqueIndex("sso_providers_provider_unique").on(table.providerId),
   }),
 );
 
@@ -709,14 +730,19 @@ export const groups = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
-    // "ui" for operator-managed groups, "oidc" for groups created by an IdP group sync. Only
-    // "oidc" group membership is reconciled on sign-in.
+    // "ui" for operator-managed groups, "oidc" for groups created by an IdP group sync, "scim" for
+    // groups a SCIM connection owns. Only "oidc" group membership is reconciled on sign-in.
     source: text("source").notNull().default("ui"),
+    /** A role key every member holds besides their own; never the built-in admin. */
+    role: text("role"),
+    /** For source "scim": the SCIM group (scim_groups.id) this one mirrors. */
+    scimGroupId: text("scimGroupId"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
     nameUnique: uniqueIndex("groups_name_unique").on(table.name),
+    scimGroupUnique: uniqueIndex("groups_scim_group_unique").on(table.scimGroupId),
   }),
 );
 
@@ -917,8 +943,307 @@ export const groupIdpMappings = sqliteTable(
 );
 
 /**
- * What a group may manage. Additive, and only for `operator`s. One nullable column per resource
- * kind, not a polymorphic pair, so real foreign keys delete grants with their host.
+ * Roles an administrator defines. The four built-in roles live in code (`lib/roles/built-in.ts`)
+ * and are never stored, so what they mean cannot drift from the code that checks them. `key` is
+ * what users, groups and mappings point at, and survives a rename.
+ */
+export const roles = sqliteTable(
+  "roles",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** A JSON array of capabilities, as `lib/roles/capabilities.ts` names them. */
+    capabilities: text("capabilities").notNull().default("[]"),
+    /** Hosts and agents only as far as the holder's groups are granted, as the built-in operator. */
+    scoped: integer("scoped", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    keyUnique: uniqueIndex("roles_key_unique").on(table.key),
+  }),
+);
+
+/**
+ * Which identity-provider groups give which role, per OIDC provider or LDAP directory: one row a
+ * name, matched as `lib/auth/oidc/groups.ts` compares them. `role` is a role key.
+ */
+export const roleMappings = sqliteTable(
+  "role_mappings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    providerId: text("providerId")
+      .references(() => oauthProviders.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role").notNull(),
+    externalName: text("externalName").notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    providerIdx: index("role_mappings_provider_idx").on(table.providerId),
+    nameUnique: uniqueIndex("role_mappings_unique").on(
+      table.providerId,
+      table.role,
+      table.externalName,
+    ),
+  }),
+);
+
+/**
+ * An identity provider's SCIM provisioning credential (lib/scim). Separate from API tokens: it
+ * reaches /api/scim/v2 only, and nothing else takes it.
+ */
+export const scimConnections = sqliteTable(
+  "scim_connections",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    /** SHA-256 of the bearer token, which is shown once. */
+    tokenHash: text("tokenHash").notNull(),
+    /** The token's last characters, to tell two apart. */
+    tokenHint: text("tokenHint").notNull(),
+    /** An account that already has the email is taken over rather than refused. */
+    linkExisting: integer("linkExisting", { mode: "boolean" }).notNull().default(true),
+    createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    lastUsedAt: text("lastUsedAt"),
+    tokenRotatedAt: text("tokenRotatedAt"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("scim_connections_name_unique").on(table.name),
+    tokenHashUnique: uniqueIndex("scim_connections_token_hash_unique").on(table.tokenHash),
+  }),
+);
+
+/** Which provisioned group names give a group which role, per connection, as role_mappings. */
+export const scimRoleMappings = sqliteTable(
+  "scim_role_mappings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: integer("connectionId")
+      .references(() => scimConnections.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role").notNull(),
+    externalName: text("externalName").notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    connectionIdx: index("scim_role_mappings_connection_idx").on(table.connectionId),
+    nameUnique: uniqueIndex("scim_role_mappings_unique").on(
+      table.connectionId,
+      table.role,
+      table.externalName,
+    ),
+  }),
+);
+
+// The SCIM plugin's own tables (@better-auth/scim), field for field as its schema names them; the
+// adapter reaches them under its model names (auth/server.ts). Used under PostgreSQL only.
+
+export const scimConnectionBindings = sqliteTable(
+  "scim_connection_bindings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    connectionKey: text("connectionKey").notNull(),
+    provisioningDomainId: text("provisioningDomainId").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+    decommissionedAt: isoTimestamp("decommissionedAt"),
+    decommissionStatus: text("decommissionStatus").default("active").notNull(),
+    decommissionCursorUserId: text("decommissionCursorUserId"),
+    decommissionReconciledUserCount: integer("decommissionReconciledUserCount")
+      .default(0)
+      .notNull(),
+    decommissionBatchCount: integer("decommissionBatchCount").default(0).notNull(),
+    decommissionRevision: integer("decommissionRevision").default(0).notNull(),
+    decommissionCompletedAt: isoTimestamp("decommissionCompletedAt"),
+    decommissionLeaseId: text("decommissionLeaseId"),
+    decommissionLeaseExpiresAt: isoTimestamp("decommissionLeaseExpiresAt"),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_connection_bindings_connectionId_idx").on(table.connectionId),
+    connectionKeyUnique: uniqueIndex("scim_connection_bindings_connectionKey_unique").on(
+      table.connectionKey,
+    ),
+  }),
+);
+
+export const scimIdentityTombstones = sqliteTable(
+  "scim_identity_tombstones",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    provisioningDomainId: text("provisioningDomainId").notNull(),
+    externalId: text("externalId").notNull(),
+    externalIdKey: text("externalIdKey").notNull(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    profile: text("profile").notNull(),
+    deletedAt: isoTimestamp("deletedAt").notNull(),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_identity_tombstones_connectionId_idx").on(table.connectionId),
+    provisioningDomainIdIdx: index("scim_identity_tombstones_provisioningDomainId_idx").on(
+      table.provisioningDomainId,
+    ),
+    externalIdKeyUnique: uniqueIndex("scim_identity_tombstones_externalIdKey_unique").on(
+      table.externalIdKey,
+    ),
+    userIdIdx: index("scim_identity_tombstones_userId_idx").on(table.userId),
+  }),
+);
+
+export const scimSubjects = sqliteTable(
+  "scim_subjects",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    profileSourceId: text("profileSourceId"),
+    revision: integer("revision").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+    updatedAt: isoTimestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    userIdUnique: uniqueIndex("scim_subjects_userId_unique").on(table.userId),
+    profileSourceIdIdx: index("scim_subjects_profileSourceId_idx").on(table.profileSourceId),
+  }),
+);
+
+export const scimUsers = sqliteTable(
+  "scim_users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    provisioningDomainId: text("provisioningDomainId").notNull(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    connectionUserKey: text("connectionUserKey").notNull(),
+    userName: text("userName").notNull(),
+    userNameKey: text("userNameKey").notNull(),
+    primaryEmail: text("primaryEmail").notNull(),
+    workEmailValueIndex: text("workEmailValueIndex").notNull(),
+    emailValueIndex: text("emailValueIndex").notNull(),
+    displayName: text("displayName").notNull(),
+    formattedName: text("formattedName").notNull(),
+    givenName: text("givenName"),
+    familyName: text("familyName"),
+    serializedEmails: text("serializedEmails").notNull(),
+    serializedAttributes: text("serializedAttributes"),
+    externalId: text("externalId"),
+    externalIdKey: text("externalIdKey"),
+    active: integer("active", { mode: "boolean" }).notNull(),
+    orderKey: text("orderKey").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+    updatedAt: isoTimestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_users_connectionId_idx").on(table.connectionId),
+    provisioningDomainIdIdx: index("scim_users_provisioningDomainId_idx").on(
+      table.provisioningDomainId,
+    ),
+    userIdIdx: index("scim_users_userId_idx").on(table.userId),
+    connectionUserKeyUnique: uniqueIndex("scim_users_connectionUserKey_unique").on(
+      table.connectionUserKey,
+    ),
+    userNameKeyUnique: uniqueIndex("scim_users_userNameKey_unique").on(table.userNameKey),
+    externalIdKeyUnique: uniqueIndex("scim_users_externalIdKey_unique").on(table.externalIdKey),
+    orderKeyUnique: uniqueIndex("scim_users_orderKey_unique").on(table.orderKey),
+  }),
+);
+
+export const scimProjectionGrants = sqliteTable(
+  "scim_projection_grants",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    provisioningDomainId: text("provisioningDomainId").notNull(),
+    scimUserId: integer("scimUserId")
+      .references(() => scimUsers.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    sourceKind: text("sourceKind").notNull(),
+    sourceId: text("sourceId").notNull(),
+    sourceValue: text("sourceValue"),
+    role: text("role").notNull(),
+    grantKey: text("grantKey").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+    updatedAt: isoTimestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_projection_grants_connectionId_idx").on(table.connectionId),
+    provisioningDomainIdIdx: index("scim_projection_grants_provisioningDomainId_idx").on(
+      table.provisioningDomainId,
+    ),
+    scimUserIdIdx: index("scim_projection_grants_scimUserId_idx").on(table.scimUserId),
+    userIdIdx: index("scim_projection_grants_userId_idx").on(table.userId),
+    grantKeyUnique: uniqueIndex("scim_projection_grants_grantKey_unique").on(table.grantKey),
+  }),
+);
+
+export const scimGroups = sqliteTable(
+  "scim_groups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    provisioningDomainId: text("provisioningDomainId").notNull(),
+    revision: integer("revision").default(0).notNull(),
+    displayName: text("displayName").notNull(),
+    displayNameKey: text("displayNameKey").notNull(),
+    externalId: text("externalId"),
+    externalIdKey: text("externalIdKey"),
+    orderKey: text("orderKey").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+    updatedAt: isoTimestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_groups_connectionId_idx").on(table.connectionId),
+    provisioningDomainIdIdx: index("scim_groups_provisioningDomainId_idx").on(
+      table.provisioningDomainId,
+    ),
+    displayNameKeyUnique: uniqueIndex("scim_groups_displayNameKey_unique").on(table.displayNameKey),
+    externalIdKeyUnique: uniqueIndex("scim_groups_externalIdKey_unique").on(table.externalIdKey),
+    orderKeyUnique: uniqueIndex("scim_groups_orderKey_unique").on(table.orderKey),
+  }),
+);
+
+export const scimGroupMembers = sqliteTable(
+  "scim_group_members",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    connectionId: text("connectionId").notNull(),
+    groupId: integer("groupId")
+      .references(() => scimGroups.id, { onDelete: "cascade" })
+      .notNull(),
+    scimUserId: integer("scimUserId")
+      .references(() => scimUsers.id, { onDelete: "cascade" })
+      .notNull(),
+    membershipKey: text("membershipKey").notNull(),
+    createdAt: isoTimestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    connectionIdIdx: index("scim_group_members_connectionId_idx").on(table.connectionId),
+    groupIdIdx: index("scim_group_members_groupId_idx").on(table.groupId),
+    scimUserIdIdx: index("scim_group_members_scimUserId_idx").on(table.scimUserId),
+    membershipKeyUnique: uniqueIndex("scim_group_members_membershipKey_unique").on(
+      table.membershipKey,
+    ),
+  }),
+);
+
+/**
+ * What a group may manage. Additive, and only for scoped roles such as `operator`. One nullable
+ * column per resource kind, not a polymorphic pair, so real foreign keys delete grants with their
+ * host.
  */
 export const groupGrants = sqliteTable(
   "group_grants",
@@ -1519,3 +1844,142 @@ export const auditSecurityHead = sqliteTable("audit_security_head", {
   prunedSeq: integer("prunedSeq").notNull().default(0),
   updatedAt: text("updatedAt").notNull(),
 });
+
+// ── Access reviews (lib/access-reviews) ──────────────────────────────
+
+/** A campaign asking reviewers whether each piece of access in its scope should stay. */
+export const accessReviewCampaigns = sqliteTable("access_review_campaigns", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  /** allUsers, role, group, grants, tokens or scim. */
+  scope: text("scope").notNull(),
+  /** The role key or group id a role or group scope names. */
+  scopeRef: text("scopeRef"),
+  /** YYYY-MM-DD; due at the end of that day, UTC. */
+  dueOn: text("dueOn").notNull(),
+  /** open, confirming (revocations wait for an administrator) or closed. */
+  status: text("status").notNull().default("open"),
+  createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+  closedBy: integer("closedBy").references(() => users.id, { onDelete: "set null" }),
+  closedAt: text("closedAt"),
+  appliedBy: integer("appliedBy").references(() => users.id, { onDelete: "set null" }),
+  appliedAt: text("appliedAt"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+/**
+ * One piece of access under review, with the names it had when the campaign opened, so the export
+ * still reads after the account, group or token is gone.
+ */
+export const accessReviewItems = sqliteTable(
+  "access_review_items",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    campaignId: integer("campaignId")
+      .references(() => accessReviewCampaigns.id, { onDelete: "cascade" })
+      .notNull(),
+    /** role, membership, grant, token or scimConnection. */
+    kind: text("kind").notNull(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    groupId: integer("groupId").references(() => groups.id, { onDelete: "set null" }),
+    tokenId: integer("tokenId").references(() => apiTokens.id, { onDelete: "set null" }),
+    connectionId: integer("connectionId").references(() => scimConnections.id, {
+      onDelete: "set null",
+    }),
+    /** A grant's object: proxyHost, l4ProxyHost or agent, and its id. */
+    objectKind: text("objectKind"),
+    objectId: integer("objectId"),
+    subjectLabel: text("subjectLabel").notNull(),
+    targetLabel: text("targetLabel"),
+    /** The role key, or a grant's view or manage. */
+    current: text("current"),
+    /** JSON array of hint codes, as found when the campaign opened. */
+    hints: text("hints").notNull().default("[]"),
+    /** The account or group belongs to a SCIM connection, which would undo a revocation. */
+    scimManaged: integer("scimManaged", { mode: "boolean" }).notNull().default(false),
+    reviewerId: integer("reviewerId").references(() => users.id, { onDelete: "set null" }),
+    /** keep, revoke or change; null until decided. */
+    decision: text("decision"),
+    changeTo: text("changeTo"),
+    note: text("note"),
+    decidedBy: integer("decidedBy").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: text("decidedAt"),
+    /** applied, failed or gone (nothing left to revoke); null until applied. */
+    outcome: text("outcome"),
+    outcomeCode: text("outcomeCode"),
+    appliedAt: text("appliedAt"),
+  },
+  (table) => ({
+    campaignIdx: index("access_review_items_campaign_idx").on(table.campaignId),
+    reviewerIdx: index("access_review_items_reviewer_idx").on(table.reviewerId),
+  }),
+);
+
+// ── Change approvals (lib/approvals) ─────────────────────────────────
+
+/**
+ * A write held for approval: what the save would have sent, sealed, and the diff its approvers
+ * read. Applied as the requester once enough approvers agree, unless its target moved since.
+ */
+export const changeRequests = sqliteTable(
+  "change_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** proxyHostUpdate, accessListRules, settingsApply... (lib/approvals/kinds.ts). */
+    kind: text("kind").notNull(),
+    /** hosts, accessLists, waf or settings. */
+    area: text("area").notNull(),
+    targetType: text("targetType"),
+    targetId: integer("targetId"),
+    /** The target's name when submitted, so the list still reads after it is gone. */
+    targetName: text("targetName"),
+    /** `enc:v1` JSON of the write: a host's input can carry credentials. */
+    payload: text("payload").notNull(),
+    /** JSON: the diff and impact approvers are shown, secrets masked. */
+    preview: text("preview").notNull(),
+    /** Hash of the target as it stood when submitted; a different one at apply invalidates it. */
+    baseState: text("baseState").notNull(),
+    /** JSON array: the host tags the request touched, which a tag policy matched on. */
+    tags: text("tags").notNull().default("[]"),
+    requiredApprovals: integer("requiredApprovals").notNull().default(1),
+    /** pending, applying, applied, failed, rejected, withdrawn or invalidated. */
+    status: text("status").notNull().default("pending"),
+    requestedBy: integer("requestedBy").references(() => users.id, { onDelete: "set null" }),
+    requestedByName: text("requestedByName"),
+    /** Submitted with an API token, which is why it waits rather than applied. */
+    viaToken: integer("viaToken", { mode: "boolean" }).notNull().default(false),
+    bypassedBy: integer("bypassedBy").references(() => users.id, { onDelete: "set null" }),
+    bypassedByName: text("bypassedByName"),
+    bypassReason: text("bypassReason"),
+    /** Why it failed or was invalidated: an error code, and the English message. */
+    resultCode: text("resultCode"),
+    error: text("error"),
+    createdAt: text("createdAt").notNull(),
+    decidedAt: text("decidedAt"),
+    appliedAt: text("appliedAt"),
+  },
+  (table) => ({
+    statusIdx: index("change_requests_status_idx").on(table.status, table.id),
+  }),
+);
+
+/** One approver's say on a request; one each, so a second click cannot count twice. */
+export const changeRequestDecisions = sqliteTable(
+  "change_request_decisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    requestId: integer("requestId")
+      .references(() => changeRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+    userName: text("userName"),
+    /** approve or reject. */
+    decision: text("decision").notNull(),
+    note: text("note"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    oneEach: uniqueIndex("change_request_decisions_once").on(table.requestId, table.userId),
+  }),
+);

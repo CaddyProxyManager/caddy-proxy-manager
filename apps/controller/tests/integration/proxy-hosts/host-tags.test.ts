@@ -4,6 +4,7 @@
  * health read through the Caddy admin seam per agent.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { createTestDb, type TestDb } from '../../helpers/db';
@@ -232,7 +233,7 @@ describe('bulk add tag', () => {
 describe('GraphQL', () => {
   const context = {
     viewer: async () => ({ userId, role: 'admin', authMethod: 'bearer' as const }),
-    access: async () => ({}) as never,
+    access: async () => accessOf('admin', {}, userId),
     rawBody: async () => '',
     request: {} as never,
   };
@@ -365,12 +366,12 @@ describe('live upstream health', () => {
       source: '{ proxyHostUpstreamHealth(id: 1) { hostId } }',
       contextValue: {
         viewer: async () => ({ userId, role: 'user', authMethod: 'bearer' as const }),
-        access: async () => ({}) as never,
+        access: async () => accessOf('user', {}, userId),
         rawBody: async () => '',
         request: {} as never,
       },
     });
-    expect(result.errors?.[0]?.message).toMatch(/Administrator/);
+    expect(result.errors?.[0]?.message).toMatch(/role does not allow/);
   });
 
   it('answers the GraphQL query from the same model function', async () => {
@@ -383,7 +384,7 @@ describe('live upstream health', () => {
       } }`,
       contextValue: {
         viewer: async () => ({ userId, role: 'admin', authMethod: 'bearer' as const }),
-        access: async () => ({}) as never,
+        access: async () => accessOf('admin', {}, userId),
         rawBody: async () => '',
         request: {} as never,
       },

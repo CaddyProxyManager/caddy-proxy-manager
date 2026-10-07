@@ -233,9 +233,26 @@ export const typeDefs = /* GraphQL */ `
     description: String
     """"ui" for a group someone made here, "oidc" for one an IdP sync created."""
     source: String!
+    """A role key every member holds besides their own; never admin."""
+    role: String
     members: [GroupMember!]!
     createdAt: DateTime!
     updatedAt: DateTime!
+  }
+
+  """
+  What its holders may do. The four built-in roles have no name (a client names them) and cannot
+  change; the rest an administrator made.
+  """
+  type Role {
+    key: String!
+    name: String
+    description: String
+    builtIn: Boolean!
+    """As resource:read and resource:write; a write always brings its read."""
+    capabilities: [String!]!
+    """Hosts and agents only as far as the holder's groups are granted them, as an operator."""
+    scoped: Boolean!
   }
 
   type GroupMember {
@@ -1072,6 +1089,174 @@ export const typeDefs = /* GraphQL */ `
   }
 
   """
+  An identity provider's SCIM provisioning connection (PostgreSQL only). Its bearer token is
+  answered once, when the connection is made or its token rotated; it is no API token.
+  """
+  type ScimConnection {
+    id: Int!
+    name: String!
+    enabled: Boolean!
+    """The token's last four characters."""
+    tokenHint: String!
+    """Whether an account that already has the provisioned email is linked rather than refused."""
+    linkExisting: Boolean!
+    """Role key to the provisioned group names that give a group that role."""
+    roleGroups: JSON!
+    users: Int!
+    groups: Int!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    lastUsedAt: DateTime
+    tokenRotatedAt: DateTime
+  }
+
+  """
+  A campaign asking reviewers whether each piece of access in its scope should stay. scope is
+  allUsers, role, group, grants, tokens or scim; scopeRef names the role key or group id. status
+  is open, applying, confirming (revocations wait for an administrator) or closed.
+  """
+  type AccessReview {
+    id: Int!
+    name: String!
+    scope: String!
+    scopeRef: String
+    """YYYY-MM-DD; due at the end of that day, UTC."""
+    dueOn: String!
+    status: String!
+    createdBy: Int
+    createdAt: DateTime!
+    closedAt: DateTime
+    appliedAt: DateTime
+    reviewers: [AccessReviewReviewer!]!
+    counts: AccessReviewCounts!
+  }
+
+  type AccessReviewReviewer {
+    id: Int!
+    label: String!
+  }
+
+  type AccessReviewCounts {
+    total: Int!
+    decided: Int!
+    keep: Int!
+    revoke: Int!
+    change: Int!
+    applied: Int!
+    failed: Int!
+  }
+
+  """
+  One piece of access under review, with the names it had when the campaign opened. kind is role,
+  membership, grant, token or scimConnection; hints are noRecentSignIn, tokenUnused,
+  connectionUnused and groupEmpty.
+  """
+  type AccessReviewItem {
+    id: Int!
+    campaignId: Int!
+    kind: String!
+    userId: Int
+    groupId: Int
+    tokenId: Int
+    connectionId: Int
+    objectKind: String
+    objectId: Int
+    subjectLabel: String!
+    targetLabel: String
+    """The role key, a grant's view or manage, or a connection's enabled or disabled."""
+    current: String
+    hints: [String!]!
+    """Provisioned by SCIM, which would undo a revocation: revoke is refused."""
+    scimManaged: Boolean!
+    reviewerId: Int
+    reviewerLabel: String
+    """keep, revoke or change; null until decided."""
+    decision: String
+    changeTo: String
+    note: String
+    decidedAt: DateTime
+    """applied, failed or gone; null until applied."""
+    outcome: String
+    outcomeCode: String
+  }
+
+  type AccessReviewDetail {
+    campaign: AccessReview!
+    """Every item for whoever may read users; otherwise only the caller's own."""
+    items: [AccessReviewItem!]!
+  }
+
+  """
+  A write held for approval. kind names it (proxyHostUpdate, accessListRules, settingsApply...);
+  area is hosts, accessLists, waf or settings. status is pending, applying, applied, failed,
+  rejected, withdrawn or invalidated (what it edits changed after it was submitted). preview is
+  what approvers are shown, secrets masked: { type: "host", host } for a host editor's own
+  review, { type: "fields", changes } otherwise, and { type: "settings", keys, changes, config }
+  for settings.
+  """
+  type ChangeRequest {
+    id: Int!
+    kind: String!
+    area: String!
+    targetType: String
+    targetId: Int
+    targetName: String
+    tags: [String!]!
+    status: String!
+    requiredApprovals: Int!
+    approvals: Int!
+    requestedBy: Int
+    requestedByName: String
+    """Submitted with an API token."""
+    viaToken: Boolean!
+    bypassedByName: String
+    bypassReason: String
+    """Why it failed or was invalidated: an error code, and the English message."""
+    resultCode: String
+    error: String
+    createdAt: DateTime!
+    decidedAt: DateTime
+    appliedAt: DateTime
+    decisions: [ChangeDecision!]!
+    preview: JSON!
+    """For the caller: may approve or reject it, withdraw it, or bypass its approvals."""
+    mayDecide: Boolean!
+    mayWithdraw: Boolean!
+    mayBypass: Boolean!
+  }
+
+  type ChangeDecision {
+    userId: Int
+    userName: String
+    """approve or reject."""
+    decision: String!
+    note: String
+    createdAt: DateTime!
+  }
+
+  """
+  Which writes wait for approval. scope is everything, areas (hosts, accessLists, waf, settings)
+  or tags (host changes where the host carries one of tags, before or after). applyToTokens off
+  lets API token writes apply at once, audited as having skipped approval.
+  """
+  type ApprovalPolicy {
+    enabled: Boolean!
+    scope: String!
+    areas: [String!]!
+    tags: [String!]!
+    approverRoles: [String!]!
+    approverGroupIds: [Int!]!
+    requiredApprovals: Int!
+    applyToTokens: Boolean!
+  }
+
+  type ScimConnectionWithToken {
+    connection: ScimConnection!
+    """Shown this once; CPM keeps only its hash."""
+    token: String!
+  }
+
+  """
   Where the audit log is streamed: syslog over UDP, TCP or TLS, an HTTP receiver, or a JSON lines
   file on the data volume. An HTTP sink's URL and auth header value are never answered.
   """
@@ -1275,6 +1460,11 @@ export const typeDefs = /* GraphQL */ `
     user(id: Int!): User
     groups: [Group!]!
     group(id: Int!): Group
+    """Built-in first, then the ones made here, oldest first."""
+    roles: [Role!]!
+    role(key: String!): Role
+    """Every capability a role can hold."""
+    capabilities: [String!]!
     apiTokens: [ApiToken!]!
     agents: [Agent!]!
     oauthProviders: [OAuthProvider!]!
@@ -1337,6 +1527,17 @@ export const typeDefs = /* GraphQL */ `
     previewAlertDigest(id: Int!, timeZone: String): AlertDigestPreview!
     alertRules: [AlertRule!]!
     auditSinks: [AuditSink!]!
+    scimConnections: [ScimConnection!]!
+    """Every campaign for whoever may read users; otherwise the ones the caller reviews."""
+    accessReviews: [AccessReview!]!
+    accessReview(id: Int!): AccessReviewDetail
+    """
+    Pending first, then newest. An approver, or anyone who reads the audit log, sees every request;
+    anyone else their own. status is pending or decided; both when omitted.
+    """
+    changeRequests(status: String, limit: Int): [ChangeRequest!]!
+    changeRequest(id: Int!): ChangeRequest
+    approvalPolicy: ApprovalPolicy!
     """Newest first; page with before (the last id seen). limit defaults to 50, at most 200."""
     alertHistory(
       ruleId: Int
@@ -1421,6 +1622,14 @@ export const typeDefs = /* GraphQL */ `
     deleteGroup(id: Int!): Boolean!
     addGroupMember(groupId: Int!, userId: Int!): Boolean!
     removeGroupMember(groupId: Int!, userId: Int!): Boolean!
+    """Null takes the role away. Only a role the caller holds all of, and never admin."""
+    setGroupRole(groupId: Int!, role: String): Group!
+
+    """input: { name, description, capabilities, scoped }. Only what the caller holds."""
+    createRole(input: JSON!): Role!
+    updateRole(key: String!, input: JSON!): Role!
+    """Refused while a user, group, mapping or provider default still names it."""
+    deleteRole(key: String!): Boolean!
 
     updateUser(id: Int!, input: JSON!): User!
     deleteUser(id: Int!): Boolean!
@@ -1497,6 +1706,55 @@ export const typeDefs = /* GraphQL */ `
     createAuditSink(input: AuditSinkInput!): AuditSink!
     updateAuditSink(id: Int!, input: AuditSinkInput!): AuditSink!
     deleteAuditSink(id: Int!): Boolean!
+
+    """
+    input: { name, enabled, linkExisting, roleGroups }. Needs users and groups write, and every
+    mapped role is one the caller could give. Refused under SQLite.
+    """
+    createScimConnection(input: JSON!): ScimConnectionWithToken!
+    """roleGroups left out keeps the mapping as it is."""
+    updateScimConnection(id: Int!, input: JSON!): ScimConnection!
+    """The old token stops working at once."""
+    rotateScimConnectionToken(id: Int!): ScimConnectionWithToken!
+    """Its groups move to the Groups page; its accounts are signed out and otherwise kept."""
+    deleteScimConnection(id: Int!): Boolean!
+    """
+    input: { name, scope, scopeRef, dueOn, reviewerIds }. Takes a snapshot of the scope; items are
+    shared among the reviewers, never one about the reviewer's own access.
+    """
+    createAccessReview(input: JSON!): AccessReview!
+    """input: { name, dueOn }, while open."""
+    updateAccessReview(id: Int!, input: JSON!): AccessReview!
+    reassignAccessReviewItems(id: Int!, itemIds: [Int!]!, reviewerId: Int!): AccessReview!
+    """
+    The caller's own item only. decision is keep, revoke or change; changeTo is a role key or a
+    grant's view or manage.
+    """
+    decideAccessReviewItem(itemId: Int!, decision: String!, changeTo: String, note: String): AccessReviewItem!
+    """Applies the revocations as the caller, or leaves them for confirmation when Settings says so."""
+    closeAccessReview(id: Int!): AccessReview!
+    """Applies what a closed campaign revoked, or tries the failures again."""
+    confirmAccessReview(id: Int!): AccessReview!
+    deleteAccessReview(id: Int!): Boolean!
+    """
+    An approver's yes. The approval the request still needs applies it, as its requester; nobody
+    approves their own. Answers the request as it stands after.
+    """
+    approveChangeRequest(id: Int!, note: String): ChangeRequest!
+    """One rejection ends a request."""
+    rejectChangeRequest(id: Int!, note: String): ChangeRequest!
+    """Whoever submitted a pending request may take it back."""
+    withdrawChangeRequest(id: Int!): ChangeRequest!
+    """
+    Administrators only: applies a pending request without its approvals. Audited and alerted;
+    reason is required.
+    """
+    bypassChangeRequest(id: Int!, reason: String!): ChangeRequest!
+    """
+    input as ApprovalPolicy. A settings change, so it waits for approval itself while the policy
+    covers settings.
+    """
+    setApprovalPolicy(input: JSON!): ApprovalPolicy!
     """One test record, straight to the sink: a saved one by id, or the input as typed."""
     testAuditSink(id: Int, input: AuditSinkInput): AuditSinkTestResult!
 

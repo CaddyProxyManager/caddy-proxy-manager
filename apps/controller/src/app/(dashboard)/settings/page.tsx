@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/src/lib/auth";
+import { requireCan } from "@/src/lib/users/permissions";
 import {
   getAcmeSettings,
   getCaddyBuildSettings,
@@ -159,6 +159,14 @@ async function remainingBlocks() {
     signIn: { localUsersDisabled, accountLockEnabled },
     captchaProvider: captcha?.provider ?? null,
     twoFactorMode: twoFactor.mode,
+    ssoEnforcement: await stored.getSsoEnforcementSettings().then((policy) => ({
+      enforced: policy.enforced,
+      breakGlass: policy.breakGlassUserIds.length,
+    })),
+    accessReviews: {
+      confirmRevocations: await getSetting(registry.accessReviewConfirmRevocations),
+      reminderDays: await getSetting(registry.accessReviewReminderDays),
+    },
     requireChangeOnLegacyHash: passwordPolicy?.requireChangeOnLegacyHash ?? false,
     authentikOutpost: authentik?.outpostDomain ?? "",
     forwardAuth: forwardAuth?.authUpstream
@@ -181,7 +189,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Reads less than a section page: each value feeds one tile line, not a whole form. */
 export default async function SettingsPage() {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:read");
   const userId = Number(session.user.id);
   // The root translator, for the stored GeoIP failures the health tiles repeat.
   const tRoot = await getTranslations();

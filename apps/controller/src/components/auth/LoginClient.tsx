@@ -22,6 +22,7 @@ import {
   useDirectoryChoice,
 } from "@/src/components/auth/DirectorySelector";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
+import { startProviderSignIn } from "@/src/components/auth/provider-sign-in";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
 import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
@@ -33,7 +34,12 @@ import {
 import { authClient } from "@/src/lib/auth/client";
 import { formatAppVersion } from "@/src/lib/runtime/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
-import { accountLockSeconds, lockLiftsIn, signInErrorMessage } from "@/src/lib/auth/sign-in-error";
+import {
+  SSO_REQUIRED,
+  accountLockSeconds,
+  lockLiftsIn,
+  signInErrorMessage,
+} from "@/src/lib/auth/sign-in-error";
 import { twoFactorError } from "@/src/lib/auth/two-factor/error";
 import { usePageFrame } from "@/src/components/ui/standalone-page";
 
@@ -52,6 +58,8 @@ interface LoginClientProps {
   passwordResetEnabled?: boolean;
   /** Enabled LDAP directories: one is a silent fallback, several get a selector. */
   directories?: DirectoryChoice[];
+  /** Passwords and passkeys then work only for break-glass accounts. */
+  ssoEnforced?: boolean;
 }
 
 export default function LoginClient({
@@ -63,6 +71,7 @@ export default function LoginClient({
   cspNonce,
   passwordResetEnabled = false,
   directories = [],
+  ssoEnforced = false,
 }: LoginClientProps) {
   const frame = usePageFrame();
   const t = useTranslations("auth.login");
@@ -140,9 +149,12 @@ export default function LoginClient({
       // By code: Better Auth's `message` is always English.
       const lockSeconds = accountLockSeconds(error);
       setLoginError(
-        lockSeconds === null
-          ? signInErrorMessage(error, (key) => tErrors(key))
-          : tErrors("accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
+        // Worded by the server, in the reader's language (auth/server.ts).
+        error.code === SSO_REQUIRED && error.message
+          ? error.message
+          : lockSeconds === null
+            ? signInErrorMessage(error, (key) => tErrors(key))
+            : tErrors("accountLocked", { retry: lockLiftsIn(format, lockSeconds) }),
       );
       setLoginPending(false);
       // Keep the name on screen so a typo in it can be told from a wrong password.
@@ -217,16 +229,12 @@ export default function LoginClient({
     await signIn(trimmedUsername);
   };
 
-  const handleOAuthSignIn = async (providerId: string) => {
+  const handleOAuthSignIn = async (provider: SignInProvider) => {
     setLoginError(null);
-    setOauthPending(providerId);
+    setOauthPending(provider.id);
     try {
       // Otherwise a refused sign-in lands on Better Auth's bare error page.
-      await authClient.signIn.social({
-        provider: providerId,
-        callbackURL: "/",
-        errorCallbackURL: "/login",
-      });
+      await startProviderSignIn(provider, { callbackURL: "/", errorCallbackURL: "/login" });
     } catch {
       setLoginError(t("oauthFailed"));
       setOauthPending(null);
@@ -274,6 +282,12 @@ export default function LoginClient({
               title={tAuth("signInUnavailableTitle")}
               description={t("noMethodDescription")}
             />
+          )}
+
+          {ssoEnforced && passwordFormEnabled && (
+            <Text type="supporting" color="secondary">
+              {t("ssoEnforcedNotice")}
+            </Text>
           )}
 
           {/* SSO only: the providers are the whole form. */}

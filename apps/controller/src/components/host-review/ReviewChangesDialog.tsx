@@ -12,6 +12,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import {
   type DiffValue,
   type FieldChange,
+  type HostChangeImpact,
   type HostChangePreview,
   type HostKind,
   MASKED_VALUE,
@@ -76,6 +77,8 @@ export type ReviewChangesDialogProps = {
   error: string | null;
   reverted: readonly string[];
   isSaving: boolean;
+  /** The policy holds this change for approval: saving submits it instead. */
+  approval?: boolean;
   onUndo: (field: string) => void;
   onRestore: (field: string) => void;
   onEditSection: (section: string) => void;
@@ -92,6 +95,7 @@ export function ReviewChangesDialog({
   error,
   reverted,
   isSaving,
+  approval = false,
   onUndo,
   onRestore,
   onEditSection,
@@ -99,13 +103,11 @@ export function ReviewChangesDialog({
   onSave,
 }: ReviewChangesDialogProps) {
   const t = useTranslations("hostReview");
-  const tAgents = useTranslations("agents");
   const tCommon = useTranslations("common");
-  const sectionLabel = (section: string) => t(key(`sections.${kind}.${section}`));
+  const tApprovals = useTranslations("changeApprovals");
   const fieldLabel = (field: string) => t(key(`fields.${field}`));
 
   const changes = preview?.changes ?? [];
-  const sections = [...new Set(changes.map((change) => change.section))];
   const impact = preview?.impact;
   const nothingToSave = !isCreate && preview !== null && changes.length === 0;
 
@@ -120,7 +122,7 @@ export function ReviewChangesDialog({
           <Button variant="secondary" label={tCommon("back")} onClick={onBack} />
           <Button
             variant="primary"
-            label={isCreate ? tCommon("create") : tCommon("save")}
+            label={approval ? tCommon("submit") : isCreate ? tCommon("create") : tCommon("save")}
             onClick={onSave}
             isLoading={isSaving}
             isDisabled={isSaving || isLoading || preview === null || nothingToSave}
@@ -130,6 +132,7 @@ export function ReviewChangesDialog({
     >
       <VStack gap={4}>
         {error && <Banner status="error" title={error} />}
+        {approval && !isLoading && <Banner status="info" title={tApprovals("editorNotice")} />}
         {isLoading && <Spinner size="lg" label={t("loading")} />}
         {!isLoading && nothingToSave && <Text color="secondary">{t("noChanges")}</Text>}
 
@@ -143,46 +146,13 @@ export function ReviewChangesDialog({
                 {t("maskedNote")}
               </Text>
             )}
-            {sections.map((section) => (
-              <List
-                key={section}
-                density="compact"
-                hasDividers
-                header={
-                  <HStack gap={2} justify="between" vAlign="center">
-                    <Text type="label">{sectionLabel(section)}</Text>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      label={t("editSection", { section: sectionLabel(section) })}
-                      onClick={() => onEditSection(section)}
-                    />
-                  </HStack>
-                }
-              >
-                {changes
-                  .filter((change) => change.section === section)
-                  .map((change) => (
-                    <ListItem
-                      key={change.field}
-                      label={fieldLabel(change.field)}
-                      description={<ChangeDescription change={change} t={t} />}
-                      endContent={
-                        change.revertible ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            label={tCommon("undo")}
-                            tooltip={t("undoLabel", { field: fieldLabel(change.field) })}
-                            onClick={() => onUndo(change.field)}
-                            isDisabled={isSaving}
-                          />
-                        ) : undefined
-                      }
-                    />
-                  ))}
-              </List>
-            ))}
+            <HostChangeList
+              kind={kind}
+              changes={changes}
+              isSaving={isSaving}
+              onUndo={onUndo}
+              onEditSection={onEditSection}
+            />
           </VStack>
         )}
 
@@ -216,58 +186,7 @@ export function ReviewChangesDialog({
         {!isLoading && impact && (changes.length > 0 || isCreate) && (
           <VStack gap={3}>
             <Divider />
-            <Text type="label" size="lg">
-              {t("impactHeading")}
-            </Text>
-            <List density="compact">
-              <ListItem
-                label={
-                  !impact.reload
-                    ? t("reloadNone")
-                    : impact.everyAgent
-                      ? t("reloadEveryAgent", { count: impact.agents.length })
-                      : t("reloadAgents", { count: impact.agents.length })
-                }
-                description={
-                  impact.reload && impact.agents.length > 0
-                    ? impact.agents
-                        .map((agent) =>
-                          agent.connected ? agent.name : t("agentOffline", { name: agent.name }),
-                        )
-                        .join(", ")
-                    : undefined
-                }
-              />
-              <ListItem
-                label={impact.pinned ? t("pinned") : tAgents("assignedToAll")}
-                description={impact.pinChanged ? t("pinnedChanged") : undefined}
-              />
-              {kind === "http" && (
-                <ListItem
-                  label={
-                    impact.certificates.length > 0 ? t("certificatesHeading") : t("noCertificates")
-                  }
-                  description={
-                    impact.certificates.length > 0
-                      ? impact.certificates
-                          .map((cert) =>
-                            cert.wildcard
-                              ? t("certificateWildcard", { domain: cert.domain })
-                              : t("certificateRequest", { domain: cert.domain }),
-                          )
-                          .join(", ")
-                      : undefined
-                  }
-                />
-              )}
-            </List>
-            {impact.warnings.map((warning) => (
-              <Banner
-                key={`${warning.code}:${JSON.stringify(warning.values)}`}
-                status={warning.severity === "warning" ? "warning" : "info"}
-                title={t(key(`warnings.${warning.code}`), translateValues(warning.values, t))}
-              />
-            ))}
+            <HostImpactSummary kind={kind} impact={impact} />
           </VStack>
         )}
       </VStack>
@@ -291,4 +210,131 @@ function translateValues(values: Record<string, string | number>, t: T) {
     }
   }
   return out;
+}
+
+/** The diff by editor section. Without callbacks it only reads, as an approver sees it. */
+export function HostChangeList({
+  kind,
+  changes,
+  isSaving = false,
+  onUndo,
+  onEditSection,
+}: {
+  kind: HostKind;
+  changes: FieldChange[];
+  isSaving?: boolean;
+  onUndo?: (field: string) => void;
+  onEditSection?: (section: string) => void;
+}) {
+  const t = useTranslations("hostReview");
+  const tCommon = useTranslations("common");
+  const sectionLabel = (section: string) => t(key(`sections.${kind}.${section}`));
+  const fieldLabel = (field: string) => t(key(`fields.${field}`));
+  const sections = [...new Set(changes.map((change) => change.section))];
+  return (
+    <>
+      {sections.map((section) => (
+        <List
+          key={section}
+          density="compact"
+          hasDividers
+          header={
+            <HStack gap={2} justify="between" vAlign="center">
+              <Text type="label">{sectionLabel(section)}</Text>
+              {onEditSection && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={t("editSection", { section: sectionLabel(section) })}
+                  onClick={() => onEditSection(section)}
+                />
+              )}
+            </HStack>
+          }
+        >
+          {changes
+            .filter((change) => change.section === section)
+            .map((change) => (
+              <ListItem
+                key={change.field}
+                label={fieldLabel(change.field)}
+                description={<ChangeDescription change={change} t={t} />}
+                endContent={
+                  onUndo && change.revertible ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={tCommon("undo")}
+                      tooltip={t("undoLabel", { field: fieldLabel(change.field) })}
+                      onClick={() => onUndo(change.field)}
+                      isDisabled={isSaving}
+                    />
+                  ) : undefined
+                }
+              />
+            ))}
+        </List>
+      ))}
+    </>
+  );
+}
+
+/** What a save sets off: which agents reload, placement, certificates, and the warnings. */
+export function HostImpactSummary({ kind, impact }: { kind: HostKind; impact: HostChangeImpact }) {
+  const t = useTranslations("hostReview");
+  const tAgents = useTranslations("agents");
+  return (
+    <VStack gap={3}>
+      <Text type="label" size="lg">
+        {t("impactHeading")}
+      </Text>
+      <List density="compact">
+        <ListItem
+          label={
+            !impact.reload
+              ? t("reloadNone")
+              : impact.everyAgent
+                ? t("reloadEveryAgent", { count: impact.agents.length })
+                : t("reloadAgents", { count: impact.agents.length })
+          }
+          description={
+            impact.reload && impact.agents.length > 0
+              ? impact.agents
+                  .map((agent) =>
+                    agent.connected ? agent.name : t("agentOffline", { name: agent.name }),
+                  )
+                  .join(", ")
+              : undefined
+          }
+        />
+        <ListItem
+          label={impact.pinned ? t("pinned") : tAgents("assignedToAll")}
+          description={impact.pinChanged ? t("pinnedChanged") : undefined}
+        />
+        {kind === "http" && (
+          <ListItem
+            label={impact.certificates.length > 0 ? t("certificatesHeading") : t("noCertificates")}
+            description={
+              impact.certificates.length > 0
+                ? impact.certificates
+                    .map((cert) =>
+                      cert.wildcard
+                        ? t("certificateWildcard", { domain: cert.domain })
+                        : t("certificateRequest", { domain: cert.domain }),
+                    )
+                    .join(", ")
+                : undefined
+            }
+          />
+        )}
+      </List>
+      {impact.warnings.map((warning) => (
+        <Banner
+          key={`${warning.code}:${JSON.stringify(warning.values)}`}
+          status={warning.severity === "warning" ? "warning" : "info"}
+          title={t(key(`warnings.${warning.code}`), translateValues(warning.values, t))}
+        />
+      ))}
+    </VStack>
+  );
 }

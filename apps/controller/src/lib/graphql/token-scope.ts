@@ -1,15 +1,18 @@
 /**
- * Wraps each Query and Mutation resolver in the token-scope check, so a resolver added later is
- * closed to a narrowed token until `lib/api-tokens/requirements.ts` names it.
+ * Wraps each Query and Mutation resolver in the role and token-scope checks, so a resolver added
+ * later is closed to everyone until `lib/api-tokens/requirements.ts` names what it needs.
  */
-import { ApiAuthError, TOKEN_SCOPE_REFUSED } from "../api/auth";
-import { GRAPHQL_REQUIREMENTS, tokenAllows } from "../api-tokens/requirements";
+import { GraphQLError } from "graphql";
+import { ApiAuthError, ROLE_REFUSED, TOKEN_SCOPE_REFUSED } from "../api/auth";
+import { ChangeSubmitted } from "../approvals/submitted";
+import { GRAPHQL_REQUIREMENTS, roleAllows, tokenAllows } from "../api-tokens/requirements";
+import { can } from "../users/permissions";
 import type { GraphQLContext } from "./context";
 
 // biome-ignore lint/suspicious/noExplicitAny: resolvers differ in parent and argument types
 type Resolver = (parent: any, args: any, context: GraphQLContext, info: any) => unknown;
 
-export function withTokenScopes<T extends Record<string, Resolver>>(
+export function withRequirements<T extends Record<string, Resolver>>(
   typeName: "Query" | "Mutation",
   fields: T,
 ): T {
@@ -22,7 +25,20 @@ export function withTokenScopes<T extends Record<string, Resolver>>(
         if (!tokenAllows(viewer.tokenScope, requirement)) {
           throw new ApiAuthError(TOKEN_SCOPE_REFUSED, 403);
         }
-        return await resolve(parent, args, context, info);
+        const access = await context.access();
+        if (!roleAllows((capability) => can(access, capability), requirement)) {
+          throw new ApiAuthError(ROLE_REFUSED, 403);
+        }
+        try {
+          return await resolve(parent, args, context, info);
+        } catch (error) {
+          if (!(error instanceof ChangeSubmitted)) throw error;
+          // The route answers 202, as REST does; the id travels in the error's extensions.
+          context.markAccepted?.();
+          throw new GraphQLError(error.message, {
+            extensions: { code: "PENDING_APPROVAL", changeRequestId: error.requestId },
+          });
+        }
       },
     ]),
   ) as T;

@@ -1,8 +1,8 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { X509Certificate } from "node:crypto";
 import db from "@/src/lib/db";
 import { proxyHosts, certificates } from "@/src/lib/db/schema";
 import { isNull, isNotNull } from "drizzle-orm";
-import { requireAdmin } from "@/src/lib/auth";
 import CertificatesClient from "./CertificatesClient";
 import { listCaCertificates, type CaCertificate } from "@/src/lib/models/ca-certificates";
 import {
@@ -109,7 +109,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function CertificatesPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  await requireCan("certificates:read");
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PER_PAGE;

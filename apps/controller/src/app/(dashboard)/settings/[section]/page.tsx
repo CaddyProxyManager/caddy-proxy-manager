@@ -1,3 +1,4 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { redactHttpCacheSettings } from "@/src/lib/proxy-hosts/http-cache";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
@@ -23,6 +24,7 @@ import {
   getGlobalCaddyConfigSettings,
   getHttpCacheSettings,
   getTwoFactorPolicySettings,
+  getSsoEnforcementSettings,
   getDefaultResponseSettings,
   getAvatarSettings,
   getPasswordPolicySettings,
@@ -35,6 +37,9 @@ import {
 import { redactCrowdSecSettings } from "@/src/lib/caddy/crowdsec";
 import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listLdapDirectories } from "@/src/lib/models/ldap-directories";
+import { listSamlProviders } from "@/src/lib/models/saml-providers";
+import { listBreakGlassCandidates } from "@/src/lib/auth/sso-break-glass";
+import { listRoles } from "@/src/lib/roles/store";
 import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { autoPairingDisabled } from "@/src/lib/agent/bootstrap";
@@ -47,7 +52,6 @@ import { redactTailscaleSettingsForApi } from "@/src/lib/caddy/tailscale";
 import { config } from "@/src/lib/config";
 import { getPublicBaseUrl } from "@/src/lib/http/public-url";
 import { anyPasskeysExist } from "@/src/lib/auth/passkeys";
-import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { registryFields } from "../registry-fields";
 import { forwardAuthSequentialUserIds } from "@/src/lib/settings/registry";
@@ -100,7 +104,7 @@ export default async function SettingsSectionPage({
 }: {
   params: Promise<{ section: string }>;
 }) {
-  const session = await requireAdmin();
+  const session = await requireCan("settings:read");
   const { section } = await params;
 
   // Formerly separate pages, still linked and bookmarked, so they land on the block itself.
@@ -215,6 +219,12 @@ export default async function SettingsSectionPage({
     // Nor these: a directory is a row, saved by its own actions.
     listLdapDirectories(),
   ]);
+  // Provider rows are saved by their own actions; only the enforcement block is staged.
+  const [ssoEnforcement, breakGlassCandidates, samlProviders] = await Promise.all([
+    withStagedReads(overlay, () => getSsoEnforcementSettings()),
+    listBreakGlassCandidates(),
+    listSamlProviders(),
+  ]);
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
   const crowdsecManaged =
     section === "crowdsec" ? await managedServiceView("crowdsec", tRoot) : null;
@@ -281,12 +291,18 @@ export default async function SettingsSectionPage({
       globalCaddyConfig={globalCaddyConfig}
       httpCache={redactHttpCacheSettings(httpCache)}
       twoFactorPolicy={twoFactorPolicy}
+      ssoEnforcement={ssoEnforcement}
+      breakGlassCandidates={breakGlassCandidates}
+      samlProviders={samlProviders}
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalRateLimit={globalRateLimit}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       ldapDirectories={ldapDirectories}
+      madeRoles={(await listRoles()).flatMap((role) =>
+        role.name ? [{ key: role.key, name: role.name }] : [],
+      )}
       primaryProviderId={primaryProviderId}
       localUsersDisabled={await localUsersDisabled()}
       avatars={{

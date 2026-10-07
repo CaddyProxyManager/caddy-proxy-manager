@@ -35,7 +35,7 @@ import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME_WEBAUTHN,
 } from "@/components/ui/native-input-attrs";
-import { authClient } from "@/src/lib/auth/client";
+import { startProviderSignIn } from "@/src/components/auth/provider-sign-in";
 import { useFormatter, useTranslations } from "next-intl";
 import { usePageFrame } from "@/src/components/ui/standalone-page";
 
@@ -285,16 +285,18 @@ export default function PortalLoginForm({
     await submitCredentials(trimmedUsername);
   };
 
-  const handleOAuthSignIn = (providerId: string) => {
+  const handleOAuthSignIn = (provider: SignInProvider) => {
     setError(null);
-    setOauthPending(providerId);
+    setOauthPending(provider.id);
     // rid is an opaque server-side id; the real redirect URI is never in the URL.
     const callbackUrl = `/portal?rid=${encodeURIComponent(rid)}`;
     // A refused sign-in comes back to the same portal page, rid intact, so it can say why.
-    authClient.signIn.social({
-      provider: providerId,
+    startProviderSignIn(provider, {
       callbackURL: callbackUrl,
       errorCallbackURL: callbackUrl,
+    }).catch(() => {
+      setError(tl("oauthFailed"));
+      setOauthPending(null);
     });
   };
 

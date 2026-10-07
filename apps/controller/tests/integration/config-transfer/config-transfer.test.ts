@@ -4,6 +4,7 @@
  * a domain another host already serves is reported, never overwritten.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { eq } from 'drizzle-orm';
 import { graphql } from 'graphql';
 import { vi } from '@/tests/helpers/vi';
@@ -320,8 +321,7 @@ describe('over GraphQL', () => {
     access: async () => ({
       userId: 1,
       role,
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '',

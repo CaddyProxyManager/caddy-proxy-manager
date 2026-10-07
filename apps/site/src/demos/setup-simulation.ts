@@ -614,6 +614,20 @@ export const SETTING_FIELDS: Array<{
     value: 10,
   },
   {
+    key: "config:access_review_confirm_revocations",
+    env: "ACCESS_REVIEW_CONFIRM_REVOCATIONS",
+    group: "authentication",
+    kind: "boolean",
+    value: false,
+  },
+  {
+    key: "config:access_review_reminder_days",
+    env: "ACCESS_REVIEW_REMINDER_DAYS",
+    group: "authentication",
+    kind: "number",
+    value: 3,
+  },
+  {
     key: "config:forward_auth_allowed_ports",
     env: "FORWARD_AUTH_ALLOWED_PORTS",
     group: "authentication",
@@ -793,6 +807,20 @@ export const SETTING_FIELDS: Array<{
   {
     key: "config:notify_audit_sink_failed",
     env: "NOTIFY_AUDIT_SINK_FAILED",
+    group: "email",
+    kind: "boolean",
+    value: true,
+  },
+  {
+    key: "config:notify_access_reviews",
+    env: "NOTIFY_ACCESS_REVIEWS",
+    group: "email",
+    kind: "boolean",
+    value: true,
+  },
+  {
+    key: "config:notify_change_approvals",
+    env: "NOTIFY_CHANGE_APPROVALS",
     group: "email",
     kind: "boolean",
     value: true,

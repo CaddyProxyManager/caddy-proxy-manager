@@ -2,6 +2,7 @@
  * Rows keep their ids, in the legacy importer's FK order. An older backup restores (missing columns
  * default, gone ones drop); a newer one is refused, since this build would drop columns it needs.
  */
+import { legacyRoleMappings } from "../roles/mappings";
 import { mkdir, writeFile } from "node:fs/promises";
 import { isNewer } from "../runtime/updates";
 import { join } from "node:path";
@@ -168,7 +169,11 @@ export async function restoreBackup(
   const prepared: { table: Described; rows: Record<string, unknown>[] }[] = [];
   for (const table of all) {
     if (skip.has(table.name)) continue;
-    const rows = payload.tables[table.name];
+    const rows =
+      payload.tables[table.name] ??
+      (table.name === "role_mappings"
+        ? legacyRoleMappings(payload.tables.oauth_providers)
+        : undefined);
     // A table the backup doesn't have (newer schema, or optional history left out) is left alone.
     if (!rows) continue;
     const fieldOf = fieldsByColumn(table);

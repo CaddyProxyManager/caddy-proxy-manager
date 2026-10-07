@@ -1,5 +1,6 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import { type NextRequest, NextResponse } from "next/server";
-import { checkSameOrigin, requireAdmin } from "@/src/lib/auth";
+import { checkSameOrigin } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { createBackup } from "@/src/lib/backup/service";
 import { backupDownload } from "@/src/lib/backup/respond";
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
   const forbidden = checkSameOrigin(request);
   if (forbidden) return forbidden;
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("backups:write");
     const body = await request.json();
     const file = await createBackup(String(body.passphrase ?? ""), {
       auditLog: body.auditLog === true,

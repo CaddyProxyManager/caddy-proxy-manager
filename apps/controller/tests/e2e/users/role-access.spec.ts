@@ -11,7 +11,7 @@ import { signInWithCredentials } from '../../helpers/sign-in';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-// Via requireAdmin in their own page.tsx.
+// Via requireCan in their own page.tsx.
 const ADMIN_ONLY_PAGES = [
   '/proxy-hosts',
   '/l4-proxy-hosts',
@@ -190,7 +190,7 @@ test.describe('Role-based access control', () => {
       const page = await userContext.newPage();
       try {
         const response = await page.goto(path);
-        // requireAdmin() throws, so the error boundary renders or it 500s.
+        // requireCan() throws, so the error boundary renders or it 500s.
         const status = response?.status() ?? 0;
         const url = page.url();
 
@@ -198,7 +198,7 @@ test.describe('Role-based access control', () => {
           status >= 400 ||
           url.includes('/login') ||
           (await page
-            .getByText(/administrator privileges|error|forbidden|not authorized/i)
+            .getByText(/do not have access|error|forbidden|not authorized/i)
             .isVisible({ timeout: 3_000 })
             .catch(() => false));
 
@@ -223,7 +223,7 @@ test.describe('Role-based access control', () => {
           status >= 400 ||
           url.includes('/login') ||
           (await page
-            .getByText(/administrator privileges|error|forbidden|not authorized/i)
+            .getByText(/do not have access|error|forbidden|not authorized/i)
             .isVisible({ timeout: 3_000 })
             .catch(() => false));
 

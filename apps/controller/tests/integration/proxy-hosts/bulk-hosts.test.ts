@@ -3,6 +3,8 @@
  * exactly one apply - and the dashboard actions' per-id permission check.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { nextIntlServerMock } from '@/tests/helpers/next-intl';
@@ -17,11 +19,11 @@ vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 const actualPermissions = await import('../../../src/lib/users/permissions');
-type Access = Awaited<ReturnType<typeof actualPermissions.requireAccess>>;
+type Access = Awaited<ReturnType<typeof actualPermissions.requireReach>>;
 let access: Access;
 vi.mock('../../../src/lib/users/permissions', () => ({
   ...actualPermissions,
-  requireAccess: async () => access,
+  requireReach: async () => access,
 }));
 
 import { eq } from 'drizzle-orm';
@@ -37,6 +39,7 @@ const { bulkL4ProxyHostsAction } = await import(
   '../../../src/app/(dashboard)/l4-proxy-hosts/actions'
 );
 const { resolvers } = await import('../../../src/lib/graphql/resolvers');
+const { withRequirements } = await import('../../../src/lib/graphql/token-scope');
 const { deleteUnusedCertificates } = await import('../../../src/lib/models/certificates');
 const { removeAccessListEntries } = await import('../../../src/lib/models/access-lists');
 
@@ -60,7 +63,7 @@ beforeEach(async () => {
     })
     .returning();
   userId = user.id;
-  access = { userId, role: 'admin', isAdmin: true, isOperator: false, grants: emptyGrants() };
+  access = { userId, role: 'admin', capabilities: capabilitiesOf('admin'), grants: emptyGrants() };
 });
 
 async function insertHost(
@@ -322,7 +325,7 @@ describe('bulkProxyHostsAction', () => {
     const grants = emptyGrants();
     grants.proxyHosts.set(managed.id, 'manage');
     grants.proxyHosts.set(viewOnly.id, 'view');
-    access = { userId, role: 'operator', isAdmin: false, isOperator: true, grants };
+    access = { userId, role: 'operator', capabilities: capabilitiesOf('operator'), grants };
 
     const result = await bulkProxyHostsAction({
       action: 'disable',
@@ -344,7 +347,7 @@ describe('operators with mixed grants', () => {
     const grants = emptyGrants();
     for (const [id, level] of proxy) grants.proxyHosts.set(id, level);
     for (const [id, level] of l4) grants.l4ProxyHosts.set(id, level);
-    access = { userId, role: 'operator', isAdmin: false, isOperator: true, grants };
+    access = { userId, role: 'operator', capabilities: capabilitiesOf('operator'), grants };
   }
 
   it('refuses a delete, a certificate or maintenance when one host is not theirs at all', async () => {
@@ -398,21 +401,16 @@ describe('operators with mixed grants', () => {
     const l4 = await insertL4Host('pg');
     const context = {
       viewer: async () => ({ userId, role: 'operator' }),
+      access: async () => accessOf('operator', { proxyHosts: new Map([[host.id, 'manage']]) }),
     } as never;
+    // As served: the role check is the wrapper's, not each resolver's.
+    const served = withRequirements('Mutation', resolvers.Mutation);
 
     await expect(
-      resolvers.Mutation.bulkProxyHosts(
-        null,
-        { input: { action: 'disable', ids: [host.id] } },
-        context,
-      ),
+      served.bulkProxyHosts(null, { input: { action: 'disable', ids: [host.id] } }, context),
     ).rejects.toThrow();
     await expect(
-      resolvers.Mutation.bulkL4ProxyHosts(
-        null,
-        { input: { action: 'disable', ids: [l4.id] } },
-        context,
-      ),
+      served.bulkL4ProxyHosts(null, { input: { action: 'disable', ids: [l4.id] } }, context),
     ).rejects.toThrow();
     expect((await hostRows())[0].enabled).toBe(true);
     expect((await db.select().from(schema.l4ProxyHosts))[0].enabled).toBe(true);

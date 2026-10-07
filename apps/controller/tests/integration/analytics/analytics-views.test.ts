@@ -1,5 +1,6 @@
 /** Saved analytics views: per user, optionally shared, owner-only changes, capped and audited. */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -21,7 +22,13 @@ const {
   normalizeViewQuery,
   updateAnalyticsView,
 } = await import('../../../src/lib/models/analytics-views');
-const { resolvers } = await import('../../../src/lib/graphql/resolvers');
+const { resolvers: raw } = await import('../../../src/lib/graphql/resolvers');
+const { withRequirements } = await import('../../../src/lib/graphql/token-scope');
+// As served: the role check is the wrapper's, not each resolver's.
+const resolvers = {
+  Query: withRequirements('Query', raw.Query),
+  Mutation: withRequirements('Mutation', raw.Mutation),
+};
 type GraphQLContext = import('../../../src/lib/graphql/context').GraphQLContext;
 
 const NOW = new Date().toISOString();
@@ -31,6 +38,7 @@ const BOB = 2;
 function contextFor(userId: number, role = 'admin'): GraphQLContext {
   return {
     viewer: async () => ({ userId, role, authMethod: 'session' }),
+    access: async () => accessOf(role, {}, userId),
   } as unknown as GraphQLContext;
 }
 
@@ -166,11 +174,11 @@ describe('over GraphQL', () => {
 
   it('is for administrators only', async () => {
     await expect(resolvers.Query.analyticsViews(null, {}, contextFor(ANN, 'user'))).rejects.toThrow(
-      'Administrator privileges required',
+      "This account's role does not allow this request",
     );
     await expect(
       resolvers.Query.trafficSignals(null, {}, contextFor(ANN, 'operator')),
-    ).rejects.toThrow('Administrator privileges required');
+    ).rejects.toThrow("This account's role does not allow this request");
   });
 
   it('reports signals as unavailable with analytics off, not as all clear', async () => {

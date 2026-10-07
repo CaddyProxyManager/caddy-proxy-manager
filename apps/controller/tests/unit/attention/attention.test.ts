@@ -3,6 +3,7 @@
  * providers here are stand-ins; the real ones are covered through their pure helpers.
  */
 import { describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { createTranslator } from 'next-intl';
 import messages from '../../../messages/en.json';
 import { collectAttention, visibleTo } from '@/src/lib/attention';
@@ -20,8 +21,7 @@ function access(role: string, grants: { hosts?: number[]; agents?: number[] } = 
   return {
     userId: 1,
     role,
-    isAdmin: role === 'admin',
-    isOperator: role === 'operator',
+    capabilities: capabilitiesOf(role),
     grants: {
       proxyHosts: new Map((grants.hosts ?? []).map((id) => [id, 'view' as const])),
       l4ProxyHosts: new Map(),

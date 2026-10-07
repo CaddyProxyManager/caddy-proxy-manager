@@ -1,21 +1,17 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import {
   actionSuccess,
   extractErrorMessage,
   storedErrorMessage,
   type ActionState,
 } from "@/src/lib/errors/action-error";
-import { createWafPreset, deleteWafPreset, updateWafPreset } from "@/src/lib/models/waf-presets";
-import {
-  type WafExclusionInput,
-  createWafExclusion,
-  deleteWafExclusion,
-  updateWafExclusion,
-} from "@/src/lib/models/waf-exclusions";
+import type { WafExclusionInput } from "@/src/lib/models/waf-exclusions";
+import { submitOrApply } from "@/src/lib/approvals";
+import { ChangeSubmitted } from "@/src/lib/approvals/submitted";
 import {
   type WafEventDetail,
   type WafEventVerdict,
@@ -25,13 +21,9 @@ import {
 import {
   type CrsRegistryListing as CrsRegistryRow,
   checkCrsPluginUpdates,
-  installCrsPlugin,
   installedCrsPluginRepositories,
   listCrsRegistry,
   retryCrsPlugin,
-  setCrsPluginConfig,
-  uninstallCrsPlugin,
-  updateCrsPlugin,
 } from "@/src/lib/models/crs-plugins";
 import {
   type CrsRegistrySettings,
@@ -64,7 +56,8 @@ type FallbackKey =
 async function failure(error: unknown, fallbackKey: FallbackKey) {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
   return {
-    status: "error",
+    // Held for approval is not a failure; the message says which request it became.
+    status: error instanceof ChangeSubmitted ? "success" : "error",
     message: extractErrorMessage(t, error, t(`waf.${fallbackKey}`), format),
   } satisfies ActionState;
 }
@@ -75,7 +68,7 @@ export async function saveWafPresetAction(
   formData: FormData,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     const userId = Number(session.user.id);
     const input = {
       name: String(formData.get("name") ?? ""),
@@ -85,11 +78,11 @@ export async function saveWafPresetAction(
     const id = Number(formData.get("id"));
     const t = await getTranslations("waf");
     if (Number.isInteger(id) && id > 0) {
-      await updateWafPreset(id, input, userId);
+      await submitOrApply({ userId }, { kind: "wafPresetUpdate", payload: { id, input } });
       revalidatePath("/waf");
       return actionSuccess(t("presetUpdated", { name: input.name.trim() }));
     }
-    await createWafPreset(input, userId);
+    await submitOrApply({ userId }, { kind: "wafPresetCreate", payload: { input } });
     revalidatePath("/waf");
     return actionSuccess(t("presetCreated", { name: input.name.trim() }));
   } catch (error) {
@@ -99,8 +92,11 @@ export async function saveWafPresetAction(
 
 export async function deleteWafPresetAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    await deleteWafPreset(id, Number(session.user.id));
+    const session = await requireCan("security:write");
+    await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "wafPresetDelete", payload: { id } },
+    );
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("presetDeleted"));
@@ -149,7 +145,7 @@ async function overview(state?: CrsRegistryState): Promise<CrsRegistryOverview> 
 /** From what the last check stored; only a registry not read yet is fetched, with no API calls. */
 export async function listCrsRegistryAction(): Promise<CrsRegistryListing> {
   try {
-    await requireAdmin();
+    await requireCan("security:read");
     return { status: "success", ...(await overview()) };
   } catch (error) {
     const result = await failure(error, "pluginRegistryFailed");
@@ -160,7 +156,7 @@ export async function listCrsRegistryAction(): Promise<CrsRegistryListing> {
 /** Re-reads every registry and checks each plugin now, waiting for the pass to finish. */
 export async function checkCrsRegistryNowAction(): Promise<CrsRegistryListing> {
   try {
-    await requireAdmin();
+    await requireCan("security:read");
     const state = await runCrsRegistrySync({
       extraRepositories: await installedCrsPluginRepositories(),
     });
@@ -176,7 +172,7 @@ export async function saveCrsRegistrySettingsAction(
   input: CrsRegistrySettingsInput,
 ): Promise<ActionState> {
   try {
-    await requireAdmin();
+    await requireCan("security:write");
     const changed = await saveCrsRegistrySettings(input);
     // Checked in the background: a first check of a new registry takes a while, and the table
     // shows its plugins as soon as the list alone is read.
@@ -198,8 +194,11 @@ export async function installCrsPluginAction(
   name: string,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const plugin = await installCrsPlugin(registryId, name, Number(session.user.id));
+    const session = await requireCan("security:write");
+    const plugin = await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "crsPluginInstall", payload: { registryId, name } },
+    );
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginInstalled", { name: plugin.name, version: plugin.version }));
@@ -214,7 +213,7 @@ export type CrsPluginUpdateCheck =
 
 export async function checkCrsPluginUpdatesAction(): Promise<CrsPluginUpdateCheck> {
   try {
-    await requireAdmin();
+    await requireCan("security:read");
     return { status: "success", updates: Object.fromEntries(await checkCrsPluginUpdates()) };
   } catch (error) {
     const result = await failure(error, "pluginUpdateFailed");
@@ -224,8 +223,11 @@ export async function checkCrsPluginUpdatesAction(): Promise<CrsPluginUpdateChec
 
 export async function updateCrsPluginAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const plugin = await updateCrsPlugin(id, Number(session.user.id));
+    const session = await requireCan("security:write");
+    const plugin = await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "crsPluginUpdate", payload: { id } },
+    );
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginUpdated", { name: plugin.name, version: plugin.version }));
@@ -239,8 +241,11 @@ export async function saveCrsPluginConfigAction(
   config: string | null,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const plugin = await setCrsPluginConfig(id, config, Number(session.user.id));
+    const session = await requireCan("security:write");
+    const plugin = await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "crsPluginConfig", payload: { id, config } },
+    );
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginConfigSaved", { name: plugin.name }));
@@ -251,8 +256,11 @@ export async function saveCrsPluginConfigAction(
 
 export async function uninstallCrsPluginAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    await uninstallCrsPlugin(id, Number(session.user.id));
+    const session = await requireCan("security:write");
+    await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "crsPluginUninstall", payload: { id } },
+    );
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginUninstalled"));
@@ -264,7 +272,7 @@ export async function uninstallCrsPluginAction(id: number): Promise<ActionState>
 /** Switches a plugin Caddy refused back on; the result says whether Caddy took it this time. */
 export async function retryCrsPluginAction(id: number, name: string): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     const loaded = await retryCrsPlugin(id, Number(session.user.id));
     revalidatePath("/waf");
     const t = await getTranslations("waf");
@@ -283,10 +291,13 @@ export async function saveWafExclusionAction(
   input: WafExclusionInput,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     const userId = Number(session.user.id);
-    if (id === null) await createWafExclusion(input, userId);
-    else await updateWafExclusion(id, input, userId);
+    if (id === null) {
+      await submitOrApply({ userId }, { kind: "wafExclusionCreate", payload: { input } });
+    } else {
+      await submitOrApply({ userId }, { kind: "wafExclusionUpdate", payload: { id, input } });
+    }
     revalidatePath("/waf");
     revalidatePath("/security");
     const t = await getTranslations("waf");
@@ -298,8 +309,11 @@ export async function saveWafExclusionAction(
 
 export async function deleteWafExclusionAction(id: number): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    await deleteWafExclusion(id, Number(session.user.id));
+    const session = await requireCan("security:write");
+    await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "wafExclusionDelete", payload: { id } },
+    );
     revalidatePath("/waf");
     revalidatePath("/security");
     const t = await getTranslations("waf");
@@ -315,7 +329,7 @@ export type WafEventDetailResult =
 
 export async function getWafEventDetailAction(key: string): Promise<WafEventDetailResult> {
   try {
-    await requireAdmin();
+    await requireCan("security:read");
     return { status: "success", detail: await getWafEventDetail(key) };
   } catch (error) {
     const result = await failure(error, "eventDetailFailed");
@@ -328,7 +342,7 @@ export async function reviewWafEventAction(
   verdict: WafEventVerdict | null,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("security:write");
     await reviewWafEvent(key, verdict, Number(session.user.id));
     revalidatePath("/security");
     const t = await getTranslations("waf");

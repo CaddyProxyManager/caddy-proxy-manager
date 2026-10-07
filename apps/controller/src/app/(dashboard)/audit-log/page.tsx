@@ -1,3 +1,4 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import AuditLogClient from "./AuditLogClient";
 import { verifyAuditChainAction } from "./actions";
 import {
@@ -9,7 +10,6 @@ import {
   type AuditEventFilter,
 } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
-import { requireAdmin } from "@/src/lib/auth";
 import { strictId } from "@/src/lib/http/strict-id";
 import { auditSummaryText } from "@/src/lib/audit/summary";
 import { auditRevisionLinks } from "@/src/lib/host-history";
@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AuditLogPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  await requireCan("audit:read");
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const filter: AuditEventFilter = {

@@ -1,8 +1,8 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import {
   createSink,
   deleteSink,
@@ -18,12 +18,12 @@ import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
 const PAGE = "/settings/audit-streaming";
 
 async function adminId(): Promise<number> {
-  return Number((await requireAdmin()).user.id);
+  return Number((await requireCan("audit:write")).user.id);
 }
 
 /** The last error rendered here, in the reader's language: the catalog stays on the server. */
 export async function loadSinksAction(): Promise<SinkView[]> {
-  await requireAdmin();
+  await requireCan("audit:read");
   const [sinks, t] = await Promise.all([listSinks(), getTranslations()]);
   return sinks.map((sink) => ({
     ...sink,
@@ -57,7 +57,7 @@ export async function testSinkAction(
   id: number | null,
   input: SinkInput | null,
 ): Promise<SinkTestOutcome> {
-  await requireAdmin();
+  await requireCan("audit:write");
   try {
     const result = await withTranslatedErrors(() => testSink(id, input));
     return { ok: true, encodingRefused: result.encodingRefused };

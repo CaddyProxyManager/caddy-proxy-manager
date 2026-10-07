@@ -4,6 +4,7 @@
  * expected camelCase, so the spread silently dropped `geoblock_mode`, `ssl_forced` and others.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -27,8 +28,12 @@ const actualApiAuth = await import('../../../src/lib/api/auth');
 vi.mock('../../../src/lib/api/auth', () => {
   return {
     ...actualApiAuth,
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
   };
 });
 

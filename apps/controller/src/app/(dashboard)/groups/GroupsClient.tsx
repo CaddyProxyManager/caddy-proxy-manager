@@ -32,6 +32,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Selector } from "@astryxdesign/core/Selector";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -51,6 +52,7 @@ import {
   removeGroupMemberAction,
   setGroupGrantsAction,
   setGroupMappingsAction,
+  setGroupRoleAction,
 } from "./actions";
 import {
   GroupAccessDialog,
@@ -71,6 +73,8 @@ type Group = {
   name: string;
   description: string | null;
   source: string;
+  /** A role every member holds besides their own. */
+  role: string | null;
   members: GroupMember[];
   createdAt: string;
   updatedAt: string;
@@ -92,6 +96,8 @@ type Props = {
   agents?: NamedResource[];
   /** Group id → what that group is mapped from and what it may manage. */
   access?: Record<number, GroupAccess>;
+  /** The roles a group may give: every one but admin, made ones by name. */
+  roles?: { key: string; name: string | null }[];
 };
 
 type DetailTab = "members" | "access";
@@ -126,6 +132,7 @@ export default function GroupsClient({
   l4ProxyHosts = [],
   agents = [],
   access = {},
+  roles = [],
 }: Props) {
   const t = useTranslations("groups");
   const tCommon = useTranslations("common");
@@ -277,6 +284,7 @@ export default function GroupsClient({
             l4ProxyHosts={l4ProxyHosts}
             agents={agents}
             access={access[selected.id] ?? emptyAccess()}
+            roles={roles}
             onChanged={() => router.refresh()}
           />
         ) : (
@@ -314,6 +322,7 @@ function GroupDetail({
   l4ProxyHosts,
   agents,
   access,
+  roles,
   onChanged,
 }: {
   group: Group;
@@ -323,6 +332,7 @@ function GroupDetail({
   l4ProxyHosts: NamedResource[];
   agents: NamedResource[];
   access: GroupAccess;
+  roles: { key: string; name: string | null }[];
   onChanged: () => void;
 }) {
   const t = useTranslations("groups");
@@ -449,6 +459,9 @@ function GroupDetail({
       )}
       {tab === "access" && (
         <AccessTab
+          group={group}
+          roles={roles}
+          onChanged={onChanged}
           access={access}
           providers={providers}
           proxyHosts={proxyHosts}
@@ -621,6 +634,9 @@ function MembersTab({
 }
 
 function AccessTab({
+  group,
+  roles,
+  onChanged,
   access,
   providers,
   proxyHosts,
@@ -628,6 +644,9 @@ function AccessTab({
   agents,
   onEdit,
 }: {
+  group: Group;
+  roles: { key: string; name: string | null }[];
+  onChanged: () => void;
   access: GroupAccess;
   providers: ProviderOption[];
   proxyHosts: NamedResource[];
@@ -662,6 +681,8 @@ function AccessTab({
 
   return (
     <VStack gap={4}>
+      <GroupRoleCard group={group} roles={roles} onChanged={onChanged} />
+
       {counts.total === 0 && (
         <Banner status="info" title={t("noGrants")} description={t("noGrantsHelp")} />
       )}
@@ -728,6 +749,66 @@ function AccessTab({
         </VStack>
       </Card>
     </VStack>
+  );
+}
+
+const NO_ROLE = "";
+
+/** The role a group gives its members, changed in place: one choice, saved as it is made. */
+function GroupRoleCard({
+  group,
+  roles,
+  onChanged,
+}: {
+  group: Group;
+  roles: { key: string; name: string | null }[];
+  onChanged: () => void;
+}) {
+  const t = useTranslations("groups");
+  const tCommon = useTranslations("common");
+  const tUsers = useTranslations("users");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = (role: { key: string; name: string | null }) =>
+    role.name ??
+    (["operator", "user", "viewer"].includes(role.key)
+      ? tUsers(`roles.${role.key as "operator" | "user" | "viewer"}`)
+      : role.key);
+
+  async function change(value: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      await setGroupRoleAction(group.id, value === NO_ROLE ? null : value);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : t("roleFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <VStack gap={3}>
+        <Heading level={3}>{tCommon("role")}</Heading>
+        <Text type="body" size="sm" color="secondary">
+          {t("roleHelp")}
+        </Text>
+        {error && <Banner status="error" title={t("roleFailed")} description={error} />}
+        <Selector
+          label={tCommon("role")}
+          size="sm"
+          isDisabled={saving}
+          options={[
+            { value: NO_ROLE, label: t("noRole") },
+            ...roles.map((role) => ({ value: role.key, label: label(role) })),
+          ]}
+          value={group.role ?? NO_ROLE}
+          onChange={(value) => void change(value)}
+        />
+      </VStack>
+    </Card>
   );
 }
 

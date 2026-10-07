@@ -14,7 +14,7 @@ import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { canCreate, canManage, requireAccess, visibleIdFilter } from "@/src/lib/users/permissions";
+import { canCreate, canManage, requireReach, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
-  const access = await requireAccess();
+  const access = await requireReach("hosts:read");
   const visible = visibleIdFilter(access, "l4ProxyHost");
   const visibleIds = visible === null ? null : [...visible];
   const {
@@ -107,7 +107,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
         agents={agents}
         accessLists={accessLists}
         agentAssignments={Object.fromEntries(assignments)}
-        canCreate={canCreate(access)}
+        canCreate={canCreate(access, "l4ProxyHost")}
         manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
         editTarget={
           editHost && rollback

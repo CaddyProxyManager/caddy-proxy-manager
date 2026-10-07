@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import {
   type CrsRegistrySettingsInput,
   getCrsRegistrySettings,
@@ -10,7 +10,7 @@ import { installedCrsPluginRepositories } from "@/src/lib/models/crs-plugins";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     return NextResponse.json(await getCrsRegistrySettings());
   } catch (error) {
     return apiErrorResponse(error);
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 /** Fields left out keep their value; the token is write-only. */
 export async function PUT(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const body = await request.json();
     const input: CrsRegistrySettingsInput = {};
     if (body?.registries !== undefined) {

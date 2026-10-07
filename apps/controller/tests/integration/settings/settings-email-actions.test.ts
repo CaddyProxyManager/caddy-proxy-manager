@@ -239,7 +239,7 @@ describe('a non-administrator', () => {
   it('can neither change the mail settings nor send through them', async () => {
     await updateEmailSettingsAction(null, form(SMTP));
     ctx.session = { user: await seedUser(ctx.db, 'user@example.com', 'user') };
-    const refused = { success: false, message: domainErrorMessage('adminRequired') };
+    const refused = { success: false, message: domainErrorMessage('accessDenied') };
 
     expect(await updateEmailSettingsAction(null, form({ ...SMTP, smtpHost: 'evil.test' }))).toEqual(
       refused,

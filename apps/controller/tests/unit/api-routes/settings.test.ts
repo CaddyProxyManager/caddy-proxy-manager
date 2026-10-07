@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb } from '@/tests/helpers/db';
 import { dbModuleMock } from '@/tests/helpers/db-module';
@@ -48,7 +49,7 @@ vi.mock('@/src/lib/settings', () => ({
 }));
 
 vi.mock('@/src/lib/auth', () => ({
-  requireAdmin: vi.fn().mockResolvedValue({ user: { id: '1' } }),
+  requireUser: vi.fn().mockResolvedValue({ user: { id: '1', role: 'admin' } }),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
@@ -73,8 +74,12 @@ vi.mock('@/src/lib/api/auth', () => {
     }
   };
   return {
-    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
-    requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    requireApiUser: vi.fn().mockResolvedValue({
+      userId: 1,
+      role: 'admin',
+      authMethod: 'bearer',
+      access: accessOf('admin'),
+    }),
     apiErrorResponse: vi.fn((error: unknown) => {
       const { NextResponse: NR } = require('next/server');
       if (error instanceof ApiAuthError) {
@@ -124,7 +129,7 @@ import {
   clearSetting,
 } from '@/src/lib/settings';
 import { applyCaddyConfig } from '@/src/lib/caddy';
-import { requireApiAdmin } from '@/src/lib/api/auth';
+import { requireApiUser } from '@/src/lib/api/auth';
 import { DefaultResponseValidationError } from '@/src/lib/caddy/default-response';
 import { updateGeneralSettingsAction } from '@/src/app/(dashboard)/settings/actions';
 
@@ -159,7 +164,7 @@ const mockGetSetting = vi.mocked(getSetting);
 const mockSetSetting = vi.mocked(setSetting);
 const mockClearSetting = vi.mocked(clearSetting);
 const mockApplyCaddyConfig = vi.mocked(applyCaddyConfig);
-const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
+const mockRequireApiUser = vi.mocked(requireApiUser);
 
 function createMockRequest(options: { method?: string; body?: unknown } = {}): any {
   return {
@@ -172,7 +177,12 @@ function createMockRequest(options: { method?: string; body?: unknown } = {}): a
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+  mockRequireApiUser.mockResolvedValue({
+    userId: 1,
+    role: 'admin',
+    authMethod: 'bearer',
+    access: accessOf('admin'),
+  });
   mockGetSetting.mockResolvedValue(null);
   mockApplyCaddyConfig.mockResolvedValue({ ok: true } as any);
   // clearAllMocks keeps implementations, so an unconsumed `...Once` would leak into the next test.
@@ -319,7 +329,7 @@ describe('GET /api/v1/settings/[group]', () => {
 
   it('returns 401 on auth failure', async () => {
     const { ApiAuthError } = await import('@/src/lib/api/auth');
-    mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
+    mockRequireApiUser.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
     const response = await GET(createMockRequest(), {
       params: Promise.resolve({ group: 'general' }),

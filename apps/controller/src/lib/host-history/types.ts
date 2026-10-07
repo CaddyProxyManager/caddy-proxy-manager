@@ -29,11 +29,15 @@ export type HostReferenceKind = (typeof HOST_REFERENCE_KINDS)[number];
 
 export type MissingReference = { kind: HostReferenceKind; id: number };
 
-/** `bulk` names its action, `rollback` and `restore` the revision they came from. */
+/**
+ * `bulk` names its action, `rollback` and `restore` the revision they came from, and any write a
+ * change request applied names that request.
+ */
 export type HostRevisionDetail = {
   action?: string;
   tag?: string;
   revision?: number;
+  changeRequest?: number;
 };
 
 export type HostRevisionSummary = {

@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
-import { getAccessList, updateAccessList, deleteAccessList } from "@/src/lib/models/access-lists";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
+import { getAccessList } from "@/src/lib/models/access-lists";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const { id } = await params;
     const list = await getAccessList(Number(id));
     if (!list) {
@@ -18,10 +19,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
-    const list = await updateAccessList(Number(id), body, userId);
+    const list = await submitOrApply(apiSubmitter(caller), {
+      kind: "accessListUpdate",
+      payload: { id: Number(id), input: body },
+    });
     return NextResponse.json(list);
   } catch (error) {
     return apiErrorResponse(error);
@@ -33,9 +37,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { userId } = await requireApiAdmin(request);
+    const caller = await requireApiUser(request);
     const { id } = await params;
-    await deleteAccessList(Number(id), userId);
+    await submitOrApply(apiSubmitter(caller), {
+      kind: "accessListDelete",
+      payload: { id: Number(id) },
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiErrorResponse(error);

@@ -1,3 +1,4 @@
+import { sessionCan } from "@/src/lib/users/permissions";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import type { NextRequest } from "next/server";
@@ -11,7 +12,7 @@ import { getMigrationSource } from "@/src/lib/setup";
  */
 export async function GET(request: NextRequest) {
   const session = await auth(request);
-  if (session?.user?.role !== "admin") {
+  if (!(await sessionCan(session, "backups:write"))) {
     return new Response("Not found", { status: 404 });
   }
 

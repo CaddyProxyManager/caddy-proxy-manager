@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
-import { type AppRole, normalizeGroupName } from "../auth/oidc/groups";
+import { normalizeGroupName } from "../auth/oidc/groups";
 import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
 import { isLastActiveAdmin, reportNewAdmin, withAdminLock } from "../models/user";
 
@@ -16,7 +16,7 @@ export type PendingOidcSync = {
   subject: string;
   providerName: string;
   /** Null when role mapping is off. */
-  role: AppRole | null;
+  role: string | null;
   /** Empty when group sync is off. */
   localGroups: string[];
   /** Verbatim: the explicit mappings are in the database, out of sync `mapProfileToUser`'s reach. */

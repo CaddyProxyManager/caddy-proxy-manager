@@ -3,11 +3,14 @@ import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { domainErrorMessage } from "@/src/lib/errors/domain-error";
 import { createApiToken, listApiTokens, listAllApiTokens } from "@/src/lib/models/api-tokens";
 import { parseTokenScope } from "@/src/lib/api-tokens/scope";
+import { can } from "@/src/lib/users/permissions";
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId, role } = await requireApiUser(request);
-    const tokens = role === "admin" ? await listAllApiTokens() : await listApiTokens(userId);
+    const { userId, access } = await requireApiUser(request);
+    const tokens = can(access, "tokens:read")
+      ? await listAllApiTokens()
+      : await listApiTokens(userId);
     return NextResponse.json(tokens);
   } catch (error) {
     return apiErrorResponse(error);

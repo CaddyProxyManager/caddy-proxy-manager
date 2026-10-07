@@ -1,10 +1,10 @@
+import { requireCan } from "@/src/lib/users/permissions";
 import AccessListsClient from "./AccessListsClient";
 import {
   listAccessLists,
   getAccessListUsageMap,
   type AccessListUsage,
 } from "@/src/lib/models/access-lists";
-import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AccessListsPage() {
-  await requireAdmin();
+  await requireCan("accessLists:read");
 
   const [lists, usageMap] = await Promise.all([listAccessLists(), getAccessListUsageMap()]);
 

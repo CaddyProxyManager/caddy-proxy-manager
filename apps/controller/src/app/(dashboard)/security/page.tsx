@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { parseExploreState } from "@/src/lib/analytics/explore-state";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getSecurityReport } from "@/src/lib/security/report";
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function SecurityPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  await requireCan("security:read");
   const raw = await searchParams;
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(raw)) {

@@ -3,6 +3,7 @@
  * the stats. Admin only, like the REST routes.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -29,8 +30,7 @@ function contextFor(role: string): GraphQLContext {
     access: async () => ({
       userId: 1,
       role,
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '',

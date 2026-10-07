@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { runCrsRegistrySync } from "@/src/lib/waf/crs-plugins/sync";
 import { installedCrsPluginRepositories, listCrsRegistry } from "@/src/lib/models/crs-plugins";
 
 /** Re-reads every registry and checks each plugin, answering once the pass is done. */
 export async function POST(request: NextRequest) {
   try {
-    await requireApiAdmin(request);
+    await requireApiUser(request);
     const state = await runCrsRegistrySync({
       extraRepositories: await installedCrsPluginRepositories(),
     });

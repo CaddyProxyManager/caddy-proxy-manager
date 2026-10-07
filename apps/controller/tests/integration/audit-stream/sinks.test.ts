@@ -3,6 +3,8 @@
  * auth header value stay encrypted and are never shown back.
  */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { accessOf } from '@/tests/helpers/access';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -171,8 +173,7 @@ describe('audit sinks over GraphQL', () => {
       access: async () => ({
         userId: null,
         role,
-        isAdmin: role === 'admin',
-        isOperator: false,
+        capabilities: capabilitiesOf(role),
         grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
       }),
       rawBody: async () => '',
@@ -216,8 +217,9 @@ describe('audit sinks over GraphQL', () => {
       source: '{ auditSinks { id } }',
       contextValue: {
         viewer: async () => ({ userId: 2, role: 'user', authMethod: 'bearer' as const }),
+        access: async () => accessOf('user', {}, 2),
       },
     });
-    expect(answer.errors?.[0]?.message).toBe('Administrator privileges required');
+    expect(answer.errors?.[0]?.message).toBe("This account's role does not allow this request");
   });
 });

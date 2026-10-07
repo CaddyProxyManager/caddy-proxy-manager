@@ -1,6 +1,6 @@
 import { getAppName } from "@/src/lib/branding/app-name";
 import type { ReactNode } from "react";
-import { requireUser } from "@/src/lib/auth";
+import { can, currentAccess } from "@/src/lib/users/permissions";
 import { isDemoMode } from "@/src/lib/demo/mode";
 import { SQLITE_NOTICE_COOKIE, sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 import { cookies } from "next/headers";
@@ -19,9 +19,12 @@ import db from "@/src/lib/db";
 import { groups } from "@/src/lib/db/schema";
 import { stagedKeys } from "@/src/lib/settings/staged-view";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
+import { getRole } from "@/src/lib/roles/store";
 import { getTableDensity } from "@/src/lib/models/table-density";
 import { TableDensityProvider } from "@/components/ui/TableDensity";
 import { mfaStandingFor } from "@/src/lib/auth/two-factor/policy";
+import { pendingReviewsFor } from "@/src/lib/access-reviews";
+import { countAwaiting } from "@/src/lib/approvals";
 
 /** Names for the banner, in the order the ids were chosen. */
 async function groupNames(ids: number[]): Promise<string[]> {
@@ -35,7 +38,7 @@ async function groupNames(ids: number[]): Promise<string[]> {
 }
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const session = await requireUser();
+  const { session, access } = await currentAccess();
   const userId = Number(session.user.id);
   // For the module names in the gate's tooltip.
   const t = await getTranslations();
@@ -50,6 +53,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     morePins,
     tableDensity,
     mfaStanding,
+    pendingReviews,
+    awaitingApprovals,
   ] = await Promise.all([
     requiresLegacyPasswordChange(userId),
     isGravatarEnabled(),
@@ -58,13 +63,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getModuleGateState((module) => caddyModuleName(t, module)),
     // A cache read that refreshes in the background, never a network call on render.
     getUpdateStatus(),
-    // Only admins reach Settings, so nobody else pays for this read.
-    session.user.role === "admin" ? stagedKeys(userId) : null,
+    // Only whoever reaches Settings pays for this read.
+    can(access, "settings:read") ? stagedKeys(userId) : null,
     // Null means never chosen, which keeps the phone's More drawer offering to be customized.
     getMoreDrawerPins(userId),
     getTableDensity(userId),
     // Overdue is the proxy's to enforce; only the grace period's banner is decided here.
     mfaStandingFor(session).catch(() => ({ status: "exempt" }) as const),
+    // A reviewer may hold no capability at all, so this banner is how they find their items.
+    pendingReviewsFor(userId).catch(() => ({ count: 0, dueOn: null })),
+    // An approver is named by the policy and may hold no capability; this is how they hear.
+    countAwaiting({ access }).catch(() => 0),
   ]);
 
   // Here, not per page: a bcrypt-hash user must reach the reset screen from any URL. The reset
@@ -92,10 +101,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           updateAvailable={updates.updateAvailable}
           stagedKeys={staged}
           morePins={morePins}
+          capabilities={access.capabilities}
           mfaDeadline={mfaStanding.status === "grace" ? mfaStanding.deadline : null}
+          pendingReviews={pendingReviews.count > 0 ? pendingReviews : null}
+          awaitingApprovals={awaitingApprovals}
           viewAs={
             session.viewAs
-              ? { role: session.viewAs.role, groupNames: await groupNames(session.viewAs.groupIds) }
+              ? {
+                  role: session.viewAs.role,
+                  roleName: (await getRole(session.viewAs.role))?.name ?? null,
+                  groupNames: await groupNames(session.viewAs.groupIds),
+                }
               : null
           }
         >

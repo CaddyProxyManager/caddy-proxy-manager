@@ -9,7 +9,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 
 vi.mock('@/src/lib/auth', () => ({
-  requireAdmin: vi.fn().mockResolvedValue({ user: { id: '1' } }),
+  requireUser: vi.fn().mockResolvedValue({ user: { id: '1', role: 'admin' } }),
 }));
 
 vi.mock('@/src/lib/models/ca-certificates', () => ({

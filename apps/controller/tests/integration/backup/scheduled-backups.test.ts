@@ -1,5 +1,6 @@
 /** Schedules, slot claims, runs, catch-up and their signals, on both dialects, to a local folder. */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,8 +31,7 @@ process.env.L4_PORTS_DIR = dataDir;
 afterAll(() => rmSync(dataDir, { recursive: true, force: true }));
 
 const adminAccess = {
-  isAdmin: true,
-  isOperator: true,
+  capabilities: capabilitiesOf('admin'),
   grants: { proxyHosts: new Set<number>(), agents: new Set<number>() },
 } as never;
 

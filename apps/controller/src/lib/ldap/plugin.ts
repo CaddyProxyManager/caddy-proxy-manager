@@ -25,6 +25,8 @@ export type LdapPluginOptions = {
   twoFactorAfterHook: AfterHook["handler"] | null;
   localUsersEnabled: boolean;
   allowRegistration: boolean;
+  /** Whether the local-account fallback may try this name; enforced SSO keeps it to break-glass. */
+  localSignInAllowed?: (username: string) => Promise<boolean>;
 };
 
 function refuse(): never {
@@ -66,7 +68,12 @@ export function ldapSignIn(options: LdapPluginOptions): BetterAuthPlugin {
         const adapter = ctx.context.internalAdapter;
 
         // Local first, as /sign-in/username would, so the fallback never shadows a local account.
-        if (!directoryId && options.localUsersEnabled && isValidLoginUsername(username)) {
+        if (
+          !directoryId &&
+          options.localUsersEnabled &&
+          isValidLoginUsername(username) &&
+          (await (options.localSignInAllowed?.(username) ?? true))
+        ) {
           const local = await ctx.context.adapter.findOne<{ id: string }>({
             model: "user",
             where: [{ field: "username", value: username.toLowerCase() }],

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { resolveAnalyticsRange } from "@/src/lib/analytics/db";
 import {
   countWafEventsInRange,
@@ -9,7 +9,7 @@ import {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireApiAdmin(req);
+    await requireApiUser(req);
     const { from, to } = resolveAnalyticsRange(req.nextUrl.searchParams);
     const [total, topRules, byCountry] = await Promise.all([
       countWafEventsInRange(from, to),

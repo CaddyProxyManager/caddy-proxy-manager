@@ -50,7 +50,7 @@ import { auditEvents, oauthProviders } from '@/src/lib/db/schema';
 import { testTranslator } from '../../helpers/next-intl';
 import { type SessionUser, seedUser } from '../../helpers/settings-actions';
 
-const ADMIN_REQUIRED = domainErrorMessage('adminRequired');
+const ADMIN_REQUIRED = domainErrorMessage('accessDenied');
 
 let admin: SessionUser;
 

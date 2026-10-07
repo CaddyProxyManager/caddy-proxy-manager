@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessList, AccessListStats, AccessListUsage } from "@/lib/models/access-lists";
+import { isSubmittedForApproval } from "@/lib/approvals/submitted";
 import { withRowId, type WithRowId } from "@/lib/forms/row-id";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -157,14 +158,21 @@ function MembersTab({
   const removeSelected = async () => {
     const ids = Array.from(selected);
     const updated = await bulkDeleteEntriesAction(list.id, ids);
-    if (updated) onListUpdated(updated);
-    toast.success(t("removedMembersToast", { count: ids.length }));
+    if (isSubmittedForApproval(updated)) toast.success(updated.message);
+    else {
+      if (updated) onListUpdated(updated);
+      toast.success(t("removedMembersToast", { count: ids.length }));
+    }
     setSelected(new Set());
   };
 
   const removeOne = async (id: number) => {
     const entry = list.entries.find((e) => e.id === id);
     const updated = await deleteAccessEntryAction(list.id, id);
+    if (isSubmittedForApproval(updated)) {
+      toast.success(updated.message);
+      return;
+    }
     if (updated) onListUpdated(updated);
     toast.success(
       entry ? t("removedNamedToast", { username: entry.username }) : t("removedMemberToast"),
@@ -195,9 +203,13 @@ function MembersTab({
         username: draft.username.trim(),
         password: draft.password,
       });
-      onListUpdated(updated);
       setDraft({ username: "", password: "" });
       setAdding(false);
+      if (isSubmittedForApproval(updated)) {
+        toast.success(updated.message);
+        return;
+      }
+      onListUpdated(updated);
       toast.success(t("addedToast", { username: draft.username.trim() }));
     } finally {
       setSubmitting(false);
@@ -458,8 +470,12 @@ function SettingsTab({
   // Applied as soon as they're changed, like the IP default: each is one choice, not a draft.
   const saveOption = async (input: { satisfy?: string; passAuth?: boolean }) => {
     try {
-      onListUpdated(await updateAccessListAction(list.id, input));
-      toast.success(t("saved"));
+      const updated = await updateAccessListAction(list.id, input);
+      if (isSubmittedForApproval(updated)) toast.success(updated.message);
+      else {
+        onListUpdated(updated);
+        toast.success(t("saved"));
+      }
     } catch (failure) {
       toast.error(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
     }
@@ -472,8 +488,11 @@ function SettingsTab({
         name: name.trim() || list.name,
         description: desc.trim() || null,
       });
-      onListUpdated(updated);
-      toast.success(t("saved"));
+      if (isSubmittedForApproval(updated)) toast.success(updated.message);
+      else {
+        onListUpdated(updated);
+        toast.success(t("saved"));
+      }
     } finally {
       setSaving(false);
     }
@@ -485,6 +504,10 @@ function SettingsTab({
       const result = await deleteAccessListAction(list.id);
       if (!result.success) {
         toast.error(result.error ?? t("deleteFailed"));
+        return;
+      }
+      if (result.submitted) {
+        toast.success(result.submitted);
         return;
       }
       toast.success(t("deletedToast", { name: list.name }));
@@ -853,8 +876,12 @@ function NewListDialog({
           .filter((s) => s.username.trim() && s.password)
           .map(({ username, password }) => ({ username, password })),
       });
-      onCreate(list);
       onClose();
+      if (isSubmittedForApproval(list)) {
+        toast.success(list.message);
+        return;
+      }
+      onCreate(list);
       toast.success(t("createdToast", { name: list.name }));
     } finally {
       setSubmitting(false);

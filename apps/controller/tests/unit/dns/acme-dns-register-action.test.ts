@@ -11,7 +11,7 @@ import type { DnsProviderSettings } from '@/src/lib/settings';
 vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/src/lib/auth', () => ({
-  requireAdmin: vi.fn(async () => ({ user: { id: '1' } })),
+  requireUser: vi.fn(async () => ({ user: { id: '1', role: 'admin' } })),
 }));
 
 const { getDnsMock, saveDnsMock } = vi.hoisted(() => ({

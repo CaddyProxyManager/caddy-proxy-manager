@@ -3,6 +3,7 @@
  * the owner's role and the scope together: neither alone opens anything.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import type { TestDb } from '../../helpers/db';
@@ -35,8 +36,7 @@ function contextFor(role: string, tokenScope?: TokenScope): GraphQLContext {
     access: async () => ({
       userId: 1,
       role,
-      isAdmin: role === 'admin',
-      isOperator: role === 'operator',
+      capabilities: capabilitiesOf(role),
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
     rawBody: async () => '',
@@ -95,7 +95,7 @@ describe('a custom token', () => {
 
   it('still needs the role: a user is refused what the scope names', async () => {
     const result = await run(CREATE_LIST, 'user', scope);
-    expect(result.errors).toEqual(['Administrator privileges required']);
+    expect(result.errors).toEqual(["This account's role does not allow this request"]);
   });
 });
 

@@ -25,7 +25,7 @@ const actualAuth = await import('@/src/lib/auth');
 vi.mock('@/src/lib/auth', () => ({
   ...actualAuth,
   checkSameOrigin: () => null,
-  requireAdmin: async () => ({ user: { id: '1', email: 'a@example.com', role: 'admin' } }),
+  requireUser: async () => ({ user: { id: '1', email: 'a@example.com', role: 'admin' } }),
   getCurrentSessionInfo: async () => ctx.session,
 }));
 

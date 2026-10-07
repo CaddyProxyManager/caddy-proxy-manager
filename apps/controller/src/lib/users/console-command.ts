@@ -9,12 +9,18 @@ import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 export const CONSOLE_RESET_TWO_FACTOR_PATH = "/api/internal/reset-2fa";
 export const CONSOLE_ENABLE_USER_PATH = "/api/internal/enable-user";
 export const CONSOLE_LIFT_MFA_POLICY_PATH = "/api/internal/lift-mfa-policy";
+export const CONSOLE_LIFT_SSO_ENFORCEMENT_PATH = "/api/internal/lift-sso-enforcement";
 
 /** Names no user: the signed field must be non-empty, and the policy is instance-wide. */
 export const CONSOLE_POLICY_SUBJECT = "two-factor-policy";
+export const CONSOLE_SSO_SUBJECT = "sso-enforcement";
 
 /** Signed in, so one command's signature is refused by another's route. */
-export type ConsoleCommandPurpose = "reset-2fa" | "enable-user" | "lift-mfa-policy";
+export type ConsoleCommandPurpose =
+  | "reset-2fa"
+  | "enable-user"
+  | "lift-mfa-policy"
+  | "lift-sso-enforcement";
 
 /** Short: the command and the server share one machine. */
 export const CONSOLE_COMMAND_MAX_AGE_MS = 60_000;

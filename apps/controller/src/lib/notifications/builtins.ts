@@ -28,6 +28,8 @@ export const CATEGORY_SEVERITY: Record<NotificationCategory, AlertSeverity> = {
   updateAvailable: "info",
   backups: "critical",
   auditSinks: "critical",
+  accessReviews: "warning",
+  changeApprovals: "warning",
   channels: "warning",
 };
 

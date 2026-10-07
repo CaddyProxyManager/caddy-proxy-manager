@@ -80,5 +80,5 @@ export type HostChangePreview = {
 };
 
 export type HostPreviewResult =
-  | { ok: true; preview: HostChangePreview }
+  | { ok: true; preview: HostChangePreview; approval?: boolean }
   | { ok: false; message: string };

@@ -257,6 +257,10 @@ starts their count over - the way back in when that user is the only administrat
 in when it locks out everyone who could change it:
 `docker compose exec web /app/cpm-server --lift-mfa-policy`.
 
+`cpm-server --lift-sso-enforcement` stops requiring single sign-on on the running server, so
+passwords and passkeys work again - the way back in when the identity provider is down and no
+break-glass account was named: `docker compose exec web /app/cpm-server --lift-sso-enforcement`.
+
 `cpm-server --copy-to-postgres` copies a SQLite database into an empty PostgreSQL one and exits; see
 [Moving from SQLite to PostgreSQL](#moving-from-sqlite-to-postgresql).
 
@@ -282,7 +286,7 @@ in when it locks out everyone who could change it:
 - **Certificates** - Automatic HTTPS for every proxy host via Caddy ACME (Let's Encrypt / ZeroSSL) with expiry read from each agent's storage, on-demand renewal, a reachability test (with an opt-in Let's Debug check) and certificate and key downloads, manual SSL/TLS import with expiry monitoring (a certificate a host uses cannot be deleted; unused imports go in one click), certificates read from files an agent's host keeps renewing (`CERT_FILES_HOST_DIR`), and a built-in CA for issuing and revoking internal client certificates (mTLS)
 - **mTLS** - Mutual TLS per proxy host using built-in CA certificates. Issue, track, and revoke client certificates. Fail-closed revocation (all certs revoked = all connections rejected)
 - **mTLS RBAC** - Role-based access control for mTLS client certificates. Define roles, assign certs to roles, and create path-based access rules per proxy host (e.g. `/admin/*` requires the "ops" role)
-- **User Roles** - Four roles (Viewer, User, Operator, Admin) controlling dashboard access, API permissions, and feature visibility
+- **User Roles** - Four built-in roles (Viewer, User, Operator, Admin) and custom roles made from per-area permissions, controlling dashboard access, API permissions and feature visibility. A group can give a role to its members, and identity-provider groups can map to any role
 - **User Management** - Admin page for managing users: edit roles, status, profiles; invite by email or email a reset link; disable or delete accounts; reset two-factor sign-in; search and filter. The last active admin cannot be demoted, disabled or deleted
 - **View as** - Preview the dashboard as an operator, user or viewer, or as an operator in chosen groups, from Users or a group. It only narrows your own session, ends after an hour, and is audited under your name
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
@@ -294,7 +298,8 @@ in when it locks out everyone who could change it:
 - **REST API (deprecated)** - `/api/v1/` still works exactly as it did, with Bearer token authentication and interactive OpenAPI 3.1.0 docs at `/api-docs`. It is no longer the documented path and will be removed in a later release; new integrations should use GraphQL
 - **API tokens** - Up to ten per account, from Profile, each expiring in 30 days, 90 days, a year, on a chosen date or never, and scoped to the owner's role, read only, or chosen read or write permissions per area; a token never does more than its owner's role allows
 - **Default response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
-- **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
+- **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.), and SAML 2.0 with signed assertions required. Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins), OIDC-only mode, which disables local accounts entirely, and enforced single sign-on with named break-glass accounts
+- **SCIM provisioning** - an identity provider creates, updates and disables accounts and groups through SCIM 2.0, each on its own connection token; deprovisioning ends sessions and revokes API tokens, and provisioned groups carry mapped roles (PostgreSQL only)
 - **DNS providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, INWX, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults). Challenge delegation: CNAME `_acme-challenge` to a zone a provider can write, per domain, with a live CNAME check; acme-dns accounts per domain, registered from the UI
 - **Caddy build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored. A search finds any setting by name or by what it is for, such as `smtp`, `prometheus` or `redis`
@@ -305,6 +310,7 @@ in when it locks out everyone who could change it:
 - **Passkeys** - Passwordless sign-in with a fingerprint, face or device PIN on the dashboard and the forward-auth portal, including browser autofill. User verification is required, so a passkey stands in for both factors. Bound to the Public URL's hostname and needs HTTPS (or `localhost`)
 - **LDAP / Active Directory** - Directory users sign in on the normal form and the forward-auth portal with their directory password, over LDAPS or StartTLS with the certificate verified. Accounts are created on first sign-in, and directory groups map to roles and CPM groups as OAuth claims do. Configured and tested from Settings
 - **Host History** - A revision after every change to a proxy or L4 host, whatever made it. Compare any two, with the rendered Caddy config if wanted; roll back through the editor's review, or restore a deleted host. The audit log links each host change to its revision
+- **Change approvals** - Hold changes to hosts, access lists, the WAF and settings - all of them, chosen areas, or hosts with chosen tags - until one or two approvers named by role or group agree. Approvers see the change's diff and impact; the last approval applies it as its requester, nobody approves their own, and a change whose target moved since it was submitted goes out of date instead of overwriting. API tokens wait too (202 with a request id) unless the policy says otherwise. An administrator can bypass approval with a reason, audited and alerted
 - **Backup & Restore** - The whole configuration in one passphrase-encrypted file, from Settings → Backup or `POST /api/v1/backup`, or on a cron schedule to an S3-compatible bucket or a local folder with retention. Restores onto a new machine with a different `SESSION_SECRET`, from a file or a destination, and saves what it replaces first
 - **Portable Configuration** - Export hosts, access lists, certificates, groups, WAF rules and settings to a readable JSON file with each secret sealed under a passphrase, and import it into another instance after a dry run that lists what it would create, update or skip. Rows match by name, users by email; a domain another host already serves is reported, never overwritten
 - **Global Caddyfile** - Raw Caddyfile, global options and site blocks on their own ports, added to every agent's config. Adapted by each agent's Caddy and checked with `caddy validate` on save; anything that would replace CPM's own config (admin API, storage, certificate automation, ports 80/443) is refused by name
@@ -428,6 +434,8 @@ it win even then.
 | Longest account lock, in ms | `ACCOUNT_LOCK_MAX_DELAY_MS` | `900000` |
 | Disable an account after repeated failed sign-ins, until an administrator enables it. Anyone who knows a username can then disable that account | `ACCOUNT_LOCK_DISABLE_ENABLED` | `false` |
 | Failed sign-ins before an account is disabled | `ACCOUNT_LOCK_DISABLE_AFTER` | `10` |
+| A closed access review holds its revocations until an administrator confirms them | `ACCESS_REVIEW_CONFIRM_REVOCATIONS` | `false` |
+| Days before an access review is due that its undecided items are reported | `ACCESS_REVIEW_REMINDER_DAYS` | `3` |
 | Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
 | Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
@@ -468,6 +476,8 @@ it win even then.
 | Notify: A new release, once each, while the update check is on | `NOTIFY_UPDATE_AVAILABLE` | `true` |
 | Notify: A scheduled backup failing, and its recovery | `NOTIFY_BACKUP_FAILED` | `true` |
 | Notify: Audit streaming failing or falling behind, and its recovery | `NOTIFY_AUDIT_SINK_FAILED` | `true` |
+| Notify: An access review nearing or past its due date with items undecided, or waiting for confirmation | `NOTIFY_ACCESS_REVIEWS` | `true` |
+| Notify: An administrator applying a change request without its approvals | `NOTIFY_CHANGE_APPROVALS` | `true` |
 | Notify: An alert channel failing, told on the others, and its recovery | `NOTIFY_CHANNEL_FAILING` | `true` |
 | Email the owner of an account, once, when it is disabled. A disabled account gets nothing else | `NOTIFY_DISABLED_ACCOUNT_OWNER` | `false` |
 
@@ -600,9 +610,10 @@ setup checklist.
 
 ### Roles
 
-A token carries its owner's role, and the management fields are **admin-only** - including for an
-operator, because a [group grant](#groups-and-delegated-management) delegates the dashboard rather
-than the API. `apiTokens` is the exception: every signed-in role manages its own.
+A token carries its owner's role, built-in or custom: each field needs a permission the role holds
+outright, so an operator's grants, which delegate the dashboard rather than the API, give its
+token nothing. `apiTokens` is the exception: every signed-in role manages its own. `roles`,
+`createRole`, `updateRole`, `deleteRole` and `setGroupRole` manage custom roles.
 
 ### REST is still there
 
@@ -966,7 +977,7 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 
 ## User roles
 
-CPM has four roles:
+CPM has four built-in roles, and **Users → Roles** makes more (see below):
 
 | Capability | Viewer | User | Operator | Admin |
 | ---------- | ------ | ---- | -------- | ----- |
@@ -988,8 +999,14 @@ New users default to the **user** role. The first administrator is created in [F
 nothing from a grant, so adding one never widens an existing account - someone has to be given the
 operator role deliberately.
 
-The management endpoints under `/api/v1/` remain **admin-only**. Grants apply to the dashboard;
-an operator's API token gets the same user-scoped endpoints a user's does.
+The management endpoints under `/api/v1/` need a permission the role holds outright. Grants apply
+to the dashboard; an operator's API token gets the same user-scoped endpoints a user's does.
+
+**Custom roles** are sets of permissions, one choice per area (none, read, or read and change),
+optionally **scoped to granted objects** like operator. Nobody makes, gives or changes a role
+holding more than they do; nobody edits the role they hold; a role still given to a user, a group,
+a sign-in mapping or a provider default can't be deleted. A group can give a role to its members
+(never admin), and OIDC and LDAP group mapping can give any role.
 
 API tokens can only be created from an authenticated dashboard session; an
 existing bearer token cannot mint replacement credentials. Viewer and user
@@ -1936,11 +1953,11 @@ refusal reads "Invalid username or password". **Test** reports which step failed
 
 ## OAuth authentication
 
-Supports any OIDC-compliant provider (Authentik, Keycloak, Auth0, etc.). Providers can be configured via environment variables or the **Settings → Authentication → OAuth providers** UI.
+Supports any OIDC-compliant provider (Authentik, Keycloak, Auth0, etc.). Providers can be configured via environment variables or the **Settings → Authentication → Single sign-on providers** UI.
 
 ### Option A: Configure via UI (recommended)
 
-1. Log in as admin and navigate to **Settings → Authentication → OAuth providers**
+1. Log in as admin and navigate to **Settings → Authentication → Single sign-on providers**
 2. Click **Add provider** and fill in the details
 3. Copy the displayed **Callback URL** and add it to your OAuth provider's allowed redirect URIs
 
@@ -1965,7 +1982,7 @@ The callback URL format is:
 {BASE_URL}/api/auth/callback/{provider-id}
 ```
 
-For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → Authentication → OAuth providers** after the provider is synced.
+For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → Authentication → Single sign-on providers** after the provider is synced.
 
 Examples:
 
@@ -1974,7 +1991,7 @@ Examples:
 
 The `BASE_URL` environment variable must match exactly where users access your dashboard.
 
-> **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → Authentication → OAuth providers**.
+> **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → Authentication → Single sign-on providers**.
 
 > **Upgrading to better-auth 1.7:** The callback URL changed again, from
 > `/api/auth/oauth2/callback/{provider-id}` to `/api/auth/callback/{provider-id}`.
@@ -1982,7 +1999,7 @@ The `BASE_URL` environment variable must match exactly where users access your d
 > are served by the core callback endpoint, so the old plugin-specific path no
 > longer exists. Update the redirect URI at your identity provider, or OAuth
 > sign-in will fail with a redirect-URI mismatch. The current value is always
-> shown in **Settings → Authentication → OAuth providers**.
+> shown in **Settings → Authentication → Single sign-on providers**.
 
 OAuth login appears on the login page alongside credentials.
 
@@ -1996,7 +2013,7 @@ Register this as the provider's **back-channel logout URL**:
 {BASE_URL}/api/auth/oidc/backchannel-logout
 ```
 
-It is also shown in **Settings → Authentication → OAuth providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
+It is also shown in **Settings → Authentication → Single sign-on providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
 
 The endpoint is optional - nothing else changes if you do not configure it - and unauthenticated by design, because the caller is the provider's server rather than a browser. The signed token is the whole of the authentication, so it is rejected unless it verifies against the issuer's published JWKS, carries that provider's client ID as its audience, names a back-channel logout in its `events` claim, carries no `nonce`, was issued within the last five minutes, and has a `jti` that has not been seen before.
 
@@ -2012,7 +2029,7 @@ Failures answer `400` with an `error_description` naming the check that failed. 
 
 A signed-in user can always attach an OAuth identity to their own account from **Profile → OAuth connections**, whatever the provider's settings. Their session proves who owns the CPM account and the provider login proves the identity, so the provider's email does not have to match - which is what lets the administrator setup creates (`name@localhost`) link one at all.
 
-**Auto-link accounts** (**Settings → Authentication → OAuth providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
+**Auto-link accounts** (**Settings → Authentication → Single sign-on providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
 
 - **On:** the sign-in links the identity to that existing user. The switch marks the provider as trusted to prove its identity owns the CPM account carrying that email, so leave it off for any IdP where users can register an arbitrary email themselves.
 - **Off:** the sign-in is refused, and the user links the provider from their profile instead.

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { ApiValidationError } from "@/src/lib/api/errors";
 import { getAnalyticsCountryBreakdown, resolveAnalyticsRange } from "@/src/lib/analytics/db";
 
@@ -9,7 +9,7 @@ import { getAnalyticsCountryBreakdown, resolveAnalyticsRange } from "@/src/lib/a
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireApiAdmin(req);
+    await requireApiUser(req);
     const { searchParams } = req.nextUrl;
     const code = (searchParams.get("code") ?? "").toUpperCase();
     if (!/^[A-Z]{2}$/.test(code)) {

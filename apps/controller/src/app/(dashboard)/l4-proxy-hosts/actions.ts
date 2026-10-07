@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/src/lib/auth";
-import { assertCanManage, requireAccess } from "@/src/lib/users/permissions";
+import { assertCanManage, requireReach, requireCan } from "@/src/lib/users/permissions";
 import { getTranslations } from "next-intl/server";
 import {
   actionError,
@@ -11,21 +10,14 @@ import {
   INITIAL_ACTION_STATE,
   type ActionState,
 } from "@/src/lib/errors/action-error";
-import {
-  createL4ProxyHost,
-  deleteL4ProxyHost,
-  updateL4ProxyHost,
-} from "@/src/lib/models/l4-proxy-hosts";
-import {
-  type L4HostBulkRequest,
-  bulkUpdateL4ProxyHosts,
-  parseL4HostBulkRequest,
-} from "@/src/lib/models/bulk-hosts";
+import { type L4HostBulkRequest, parseL4HostBulkRequest } from "@/src/lib/models/bulk-hosts";
+import { needsApproval, submitOrApply } from "@/src/lib/approvals";
+import { logWriteFailure } from "@/src/lib/approvals/submitted";
 import { parseL4CreateForm, parseL4UpdateForm } from "@/src/lib/l4/form";
 import { revertedFields, withoutReverted } from "@/src/lib/host-review/diff";
 import { previewL4HostChange } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
-import { restoreHost, rollbackRevisionFrom } from "@/src/lib/host-history";
+import { rollbackRevisionFrom } from "@/src/lib/host-history";
 
 export async function createL4ProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
@@ -33,7 +25,7 @@ export async function createL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
+    const session = await requireCan("hosts:write");
     const userId = Number(session.user.id);
 
     const input = withoutReverted(
@@ -43,13 +35,13 @@ export async function createL4ProxyHostAction(
       true,
     );
 
-    await createL4ProxyHost(input, userId);
+    await submitOrApply({ userId }, { kind: "l4HostCreate", payload: { input } });
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostCreated"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to create L4 proxy host:", error);
+    logWriteFailure(error, "Failed to create L4 proxy host:");
     return actionError(t, error, t("errors.createL4HostFailed"));
   }
 }
@@ -63,7 +55,7 @@ export async function updateL4ProxyHostAction(
   try {
     // An operator may edit a host their groups were granted; creating one stays with admins,
     // because a grant names a host that already exists.
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "l4ProxyHost", id);
     const userId = access.userId;
 
@@ -75,13 +67,13 @@ export async function updateL4ProxyHostAction(
     );
 
     const rollbackFrom = await rollbackRevisionFrom(formData, "l4", id);
-    await updateL4ProxyHost(id, input, userId, { rollbackFrom });
+    await submitOrApply({ userId }, { kind: "l4HostUpdate", payload: { id, input, rollbackFrom } });
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostUpdated"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to update L4 proxy host:", id, error);
+    logWriteFailure(error, "Failed to update L4 proxy host:", id);
     return actionError(t, error, t("errors.updateL4HostFailed"));
   }
 }
@@ -92,30 +84,33 @@ export async function deleteL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "l4ProxyHost", id);
-    await deleteL4ProxyHost(id, access.userId);
+    await submitOrApply({ userId: access.userId }, { kind: "l4HostDelete", payload: { id } });
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostDeleted"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to delete L4 proxy host:", id, error);
+    logWriteFailure(error, "Failed to delete L4 proxy host:", id);
     return actionError(t, error, t("errors.deleteL4HostFailed"));
   }
 }
 
 export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     assertCanManage(access, "l4ProxyHost", id);
-    await updateL4ProxyHost(id, { enabled }, access.userId);
+    await submitOrApply(
+      { userId: access.userId },
+      { kind: "l4HostUpdate", payload: { id, input: { enabled } } },
+    );
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(enabled ? t("hostEnabledMessage") : t("hostDisabledMessage"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to toggle L4 proxy host:", id, error);
+    logWriteFailure(error, "Failed to toggle L4 proxy host:", id);
     return actionError(t, error, t("errors.toggleL4HostFailed"));
   }
 }
@@ -123,10 +118,13 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
 /** All or nothing, as for proxy hosts. */
 export async function bulkL4ProxyHostsAction(request: L4HostBulkRequest): Promise<ActionState> {
   try {
-    const access = await requireAccess();
+    const access = await requireReach("hosts:write");
     const parsed = parseL4HostBulkRequest(request);
     for (const id of parsed.ids) assertCanManage(access, "l4ProxyHost", id);
-    const { count } = await bulkUpdateL4ProxyHosts(parsed, access.userId);
+    const count = await submitOrApply(
+      { userId: access.userId },
+      { kind: "l4HostBulk", payload: parsed },
+    );
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("ui");
     return actionSuccess(
@@ -136,7 +134,7 @@ export async function bulkL4ProxyHostsAction(request: L4HostBulkRequest): Promis
     );
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to change L4 proxy hosts in bulk:", error);
+    logWriteFailure(error, "Failed to change L4 proxy hosts in bulk:");
     return actionError(t, error, t("errors.bulkHostsFailed"));
   }
 }
@@ -152,9 +150,9 @@ export async function previewL4ProxyHostAction(
   try {
     let userId: number;
     if (id === null) {
-      userId = Number((await requireAdmin()).user.id);
+      userId = Number((await requireCan("hosts:write")).user.id);
     } else {
-      const access = await requireAccess();
+      const access = await requireReach("hosts:write");
       assertCanManage(access, "l4ProxyHost", id);
       userId = access.userId;
     }
@@ -163,7 +161,13 @@ export async function previewL4ProxyHostAction(
       { id, input, reverted: revertedFields(formData) },
       userId,
     );
-    return { ok: true, preview };
+    const approval = await needsApproval(
+      { userId },
+      id === null
+        ? { kind: "l4HostCreate", payload: { input } }
+        : { kind: "l4HostUpdate", payload: { id, input } },
+    );
+    return { ok: true, preview, approval };
   } catch (error) {
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
@@ -176,17 +180,17 @@ export async function restoreL4ProxyHostAction(
   dropMissingReferences: boolean,
 ): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    await restoreHost(revisionId, Number(session.user.id), {
-      dropMissingReferences,
-      kind: "l4",
-    });
+    const session = await requireCan("hosts:write");
+    await submitOrApply(
+      { userId: Number(session.user.id) },
+      { kind: "hostRestore", payload: { revisionId, dropMissingReferences, kind: "l4" } },
+    );
     revalidatePath("/l4-proxy-hosts");
     const t = await getTranslations("hostHistory");
     return actionSuccess(t("restored"));
   } catch (error) {
     const t = await getTranslations();
-    console.error("Failed to restore L4 proxy host:", revisionId, error);
+    logWriteFailure(error, "Failed to restore L4 proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));
   }
 }

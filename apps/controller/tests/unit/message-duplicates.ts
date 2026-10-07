@@ -48,7 +48,10 @@ export const SEPARATE_DUPLICATES: readonly {
     reason: 'casing',
     keys: ['errors.hostReferenceMtlsRole', 'hostHistory.references.mtlsRole'],
   },
-  { reason: 'sense', keys: ['hostHistory.overviewTab', 'nav.overview'] },
+  {
+    reason: 'sense',
+    keys: ['hostHistory.overviewTab', 'nav.overview', 'roles.resources.overview.label'],
+  },
   {
     reason: 'composed',
     keys: [
@@ -420,6 +423,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'nav.agents',
       'profile.apiTokenAreas.agents',
       'setup.migrationGroups.agents.label',
+      'roles.resources.agents.label',
     ],
   },
   { reason: 'composed', keys: ['hostReview.fields.maintenance', 'proxyHosts.maintenance'] },
@@ -452,6 +456,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'profile.apiTokenAreas.accessLists',
       'settings.backup.tables.accessLists',
       'setup.migrationGroups.accessLists.label',
+      'roles.resources.accessLists.label',
     ],
   },
   {
@@ -461,11 +466,17 @@ export const SEPARATE_DUPLICATES: readonly {
       'profile.apiTokenAreas.analytics',
       'settings.groups.analytics',
       'settings.blocks.analytics.name',
+      'roles.resources.analytics.label',
     ],
   },
   {
     reason: 'composed',
-    keys: ['nav.auditLog', 'profile.apiTokenAreas.audit', 'setup.migrationGroups.auditLog.label'],
+    keys: [
+      'nav.auditLog',
+      'profile.apiTokenAreas.audit',
+      'setup.migrationGroups.auditLog.label',
+      'roles.resources.audit.label',
+    ],
   },
   {
     reason: 'composed',
@@ -475,6 +486,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.backup.tables.certificates',
       'setup.migrationGroups.certificates.label',
       'logs.sources.acme',
+      'roles.resources.certificates.label',
     ],
   },
   { reason: 'composed', keys: ['nav.l4ProxyHosts', 'settings.backup.tables.l4ProxyHosts'] },
@@ -503,6 +515,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.search.pages.settingsHistory.context',
       'setup.steps.settings',
       'setup.migrationGroups.settings.label',
+      'roles.resources.settings.label',
     ],
   },
   {
@@ -512,6 +525,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'overview.checklist.steps.secondUser.action',
       'settings.backup.tables.users',
       'settings.search.pages.signInOverview.context',
+      'roles.resources.users.label',
     ],
   },
   {
@@ -591,10 +605,6 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   {
     reason: 'composed',
-    keys: ['settings.blocks.oauth.name', 'setup.migrationGroups.oauthProviders.label'],
-  },
-  {
-    reason: 'composed',
     keys: [
       'settings.dnsProviders.cloudflare.fields.apiToken.label',
       'settings.dnsProviders.digitalocean.fields.apiToken.label',
@@ -638,6 +648,12 @@ export const SEPARATE_DUPLICATES: readonly {
     keys: ['settings.health.twoFactor.valueAll', 'signInOverview.mfaModes.all'],
   },
   { reason: 'composed', keys: ['settings.health.geoblock.name', 'settings.stagedLabels.geoblock'] },
+  {
+    reason: 'composed',
+    keys: ['settings.blocks.ssoEnforcement.name', 'settings.stagedLabels.ssoEnforcement'],
+  },
+  { reason: 'sense', keys: ['settings.ldap.emailAttribute', 'settings.saml.emailAttribute'] },
+  { reason: 'sense', keys: ['settings.ldap.nameAttribute', 'settings.saml.nameAttribute'] },
   { reason: 'composed', keys: ['settings.health.metrics.name', 'settings.stagedLabels.metrics'] },
   {
     reason: 'composed',
@@ -847,9 +863,18 @@ export const SEPARATE_DUPLICATES: readonly {
       'settings.history.failed',
       'alerts.history.statuses.failed',
       'alerts.digests.runStatus.failed',
+      'changeApprovals.statuses.failed',
     ],
   },
-  { reason: 'agrees', keys: ['l4ProxyHosts.filterAll', 'proxyHosts.filterAll', 'users.filterAll'] },
+  {
+    reason: 'agrees',
+    keys: [
+      'l4ProxyHosts.filterAll',
+      'proxyHosts.filterAll',
+      'users.filterAll',
+      'changeApprovals.filters.all',
+    ],
+  },
   { reason: 'agrees', keys: ['mtlsRoles.optional', 'settings.health.twoFactor.valueOptional'] },
   {
     reason: 'agrees',
@@ -1042,6 +1067,7 @@ export const SEPARATE_DUPLICATES: readonly {
       'nav.railGroupAccess',
       'proxyHosts.detail.sections.access',
       'logs.sources.access',
+      'roles.access',
     ],
   },
   { reason: 'sense', keys: ['common.restore', 'settings.backup.restore'] },
@@ -1050,7 +1076,10 @@ export const SEPARATE_DUPLICATES: readonly {
     keys: ['hostReview.fields.tags', 'settings.tags', 'ui.hostTags.label', 'waf.tags'],
   },
   { reason: 'sense', keys: ['l4ProxyHosts.mode', 'waf.hostMode', 'waf.globalMode'] },
-  { reason: 'sense', keys: ['nav.groups', 'settings.ldap.groupSource'] },
+  {
+    reason: 'sense',
+    keys: ['nav.groups', 'settings.ldap.groupSource', 'roles.resources.groups.label'],
+  },
   { reason: 'sense', keys: ['nav.more.groupReference', 'waf.reference'] },
   {
     reason: 'sense',
@@ -1125,4 +1154,50 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'sense', keys: ['settings.history.navLabel', 'alerts.tabs.history'] },
   { reason: 'sense', keys: ['waf.severity', 'alerts.rules.severity'] },
   { reason: 'sense', keys: ['waf.thresholdMark', 'alerts.rules.threshold'] },
+  {
+    reason: 'sense',
+    keys: ['certificates.roles', 'roles.title', 'roles.resources.roles.label'],
+  },
+  {
+    reason: 'composed',
+    keys: ['nav.logs', 'roles.resources.logs.label'],
+  },
+  {
+    reason: 'composed',
+    keys: ['nav.alerts', 'roles.resources.alerts.label'],
+  },
+  {
+    reason: 'composed',
+    keys: ['profile.apiTokenAreas.hosts', 'roles.resources.hosts.label'],
+  },
+  {
+    reason: 'agrees',
+    keys: ['alerts.builtin', 'roles.builtIn'],
+  },
+  { reason: 'sense', keys: ['accessLists.ipNote', 'accessReviews.note'] },
+  { reason: 'sense', keys: ['settings.configTransfer.export', 'accessReviews.export'] },
+  { reason: 'sense', keys: ['setup.migrate.confirmStart', 'accessReviews.start'] },
+  {
+    reason: 'role',
+    keys: [
+      'settings.registry.notify_access_reviews.label',
+      'settings.blocks.accessReviews.name',
+      'accessReviews.title',
+    ],
+  },
+  { reason: 'sense', keys: ['proxyHosts.reject', 'changeApprovals.reject'] },
+  {
+    reason: 'agrees',
+    keys: ['alerts.history.statuses.withdrawn', 'changeApprovals.statuses.withdrawn'],
+  },
+  {
+    reason: 'agrees',
+    keys: ['accessReviews.statuses.applying', 'changeApprovals.statuses.applying'],
+  },
+  {
+    reason: 'agrees',
+    keys: ['accessReviews.outcomes.applied', 'changeApprovals.statuses.applied'],
+  },
+  { reason: 'sense', keys: ['accessReviews.csv.decision', 'changeApprovals.filters.decided'] },
+  { reason: 'role', keys: ['changeApprovals.filters.pending', 'changeApprovals.statuses.pending'] },
 ];

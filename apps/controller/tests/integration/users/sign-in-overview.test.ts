@@ -41,6 +41,7 @@ import {
   groupIdpMappings,
   groups,
   oauthProviders,
+  roleMappings,
   passkeys,
   settings,
   users,
@@ -55,6 +56,7 @@ beforeEach(async () => {
     passkeys,
     accounts,
     users,
+    roleMappings,
     oauthProviders,
     settings,
   ]) {
@@ -70,11 +72,13 @@ beforeEach(async () => {
     enabled: true,
     source: 'ui',
     roleMappingEnabled: true,
-    adminGroup: 'ops',
     defaultRole: 'user',
     createdAt: NOW,
     updatedAt: NOW,
   });
+  await ctx.db
+    .insert(roleMappings)
+    .values({ providerId: 'idp', role: 'admin', externalName: 'ops', createdAt: NOW });
   const [local] = await ctx.db
     .insert(users)
     .values({

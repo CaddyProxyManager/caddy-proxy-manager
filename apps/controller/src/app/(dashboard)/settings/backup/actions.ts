@@ -1,8 +1,8 @@
 "use server";
 
+import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/src/lib/auth";
 import { cronProblem, nextRun } from "@/src/lib/backup/cron";
 import type { BackupDestinationInput, BackupDestinationView } from "@/src/lib/backup/destinations";
 import {
@@ -35,11 +35,11 @@ export type BackupOverview = {
 const PAGE = "/settings/backup";
 
 async function adminId(): Promise<number> {
-  return Number((await requireAdmin()).user.id);
+  return Number((await requireCan("backups:write")).user.id);
 }
 
 export async function loadBackupOverviewAction(): Promise<BackupOverview> {
-  await requireAdmin();
+  await requireCan("backups:read");
   const [destinations, schedules, runs] = await Promise.all([
     listDestinations(),
     listSchedulesWithRuns(),
@@ -76,7 +76,7 @@ export async function testDestinationAction(
   id: number | null,
   input: BackupDestinationInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  await requireAdmin();
+  await requireCan("backups:write");
   try {
     await withTranslatedErrors(() => testDestinationInput(id, input));
     return { ok: true };
@@ -116,7 +116,7 @@ export async function runScheduleNowAction(id: number): Promise<BackupRun | null
 }
 
 export async function listRemoteBackupsAction(destinationId: number): Promise<RemoteBackup[]> {
-  await requireAdmin();
+  await requireCan("backups:read");
   return withTranslatedErrors(() => listRemoteBackups(destinationId));
 }
 
@@ -125,7 +125,7 @@ export async function previewTimingAction(
   cron: string,
   timeZone: string,
 ): Promise<{ nextRunAt: string } | { message: string }> {
-  await requireAdmin();
+  await requireCan("backups:read");
   const problem = cronProblem(cron.trim(), timeZone.trim() || "UTC");
   if (problem) {
     const t = await getTranslations("errors");

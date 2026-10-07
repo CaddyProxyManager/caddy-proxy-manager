@@ -20,6 +20,8 @@ export const NOTIFICATION_CATEGORIES = [
   "updateAvailable",
   "backups",
   "auditSinks",
+  "accessReviews",
+  "changeApprovals",
   "channels",
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -69,6 +71,31 @@ export type NotificationEvent =
   /** An audit sink that keeps failing, or that fell behind past what pruning keeps. */
   | { kind: "auditSinkFailed"; sink: string; error: string; errorCode?: StoredErrorCode | null }
   | { kind: "auditSinkRecovered"; sink: string }
+  /** An access review nearing its due date, or past it, with items nobody has decided. */
+  | {
+      kind: "accessReviewDue";
+      campaignId: number;
+      campaign: string;
+      pending: number;
+      dueOn: string;
+    }
+  | {
+      kind: "accessReviewOverdue";
+      campaignId: number;
+      campaign: string;
+      pending: number;
+      dueOn: string;
+    }
+  /** Closed with revocations an administrator must confirm before they apply. */
+  | { kind: "accessReviewConfirm"; campaignId: number; campaign: string; revocations: number }
+  /** An administrator applied a change request without its approvals. */
+  | {
+      kind: "changeApprovalBypassed";
+      requestId: number;
+      change: string;
+      by: string;
+      reason: string;
+    }
   /** An alert channel whose sends keep failing, told on the others. */
   | { kind: "channelFailing"; channelId: number; channel: string; failures: number; error: string }
   | { kind: "channelRecovered"; channelId: number; channel: string }
@@ -126,6 +153,10 @@ const CATEGORY: Record<Exclude<NotificationKind, "test" | RuleKind>, Notificatio
   backupRecovered: "backups",
   auditSinkFailed: "auditSinks",
   auditSinkRecovered: "auditSinks",
+  accessReviewDue: "accessReviews",
+  accessReviewOverdue: "accessReviews",
+  accessReviewConfirm: "accessReviews",
+  changeApprovalBypassed: "changeApprovals",
   channelFailing: "channels",
   channelRecovered: "channels",
 };

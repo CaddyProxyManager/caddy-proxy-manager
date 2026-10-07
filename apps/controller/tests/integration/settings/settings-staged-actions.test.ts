@@ -782,7 +782,7 @@ describe('the favicon', () => {
   it('refuses a non-administrator', async () => {
     ctx.session = { user: viewer };
     await expect(actions.updateFaviconAction(null, form({ intent: 'remove' }))).rejects.toThrow(
-      domainErrorMessage('adminRequired'),
+      domainErrorMessage('accessDenied'),
     );
   });
 });
@@ -793,7 +793,7 @@ describe('who may stage', () => {
 
     for (const save of VALID_SAVES) {
       await expect(save.action(null, form(save.fields))).rejects.toThrow(
-        domainErrorMessage('adminRequired'),
+        domainErrorMessage('accessDenied'),
       );
     }
     expect(await stagedKeys()).toEqual([]);
@@ -883,7 +883,7 @@ describe('applying the change set', () => {
   it('turns a non-administrator away from apply, discard and restore', async () => {
     await actions.updateCompressionSettingsAction(null, form({ enabled: 'on' }));
     ctx.session = { user: viewer };
-    const refused = { success: false, message: domainErrorMessage('adminRequired') };
+    const refused = { success: false, message: domainErrorMessage('accessDenied') };
 
     expect(await actions.applyStagedSettingsAction()).toEqual(refused);
     expect(await actions.discardStagedSettingsAction()).toEqual(refused);

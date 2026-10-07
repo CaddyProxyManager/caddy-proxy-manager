@@ -1,3 +1,4 @@
+import { sessionCan } from "@/src/lib/users/permissions";
 import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   // A no-op once an admin exists, so a second ordinary user is still refused below.
   const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
-  if (!promoted && session.user.role !== "admin") {
+  if (!promoted && !(await sessionCan(session, "settings:write"))) {
     return json({ ok: false, error: t("adminToFinish") }, 403);
   }
 

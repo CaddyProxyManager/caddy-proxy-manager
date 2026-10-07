@@ -3,6 +3,7 @@
  * gets of it. Agents, ClickHouse and LDAP are absent here, so their providers answer nothing.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { capabilitiesOf } from '@/tests/helpers/access';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { createSelfSignedServerCertificate } from '@/tests/helpers/certs';
@@ -35,8 +36,7 @@ function access(role: 'admin' | 'operator', hosts: number[] = []): Access {
   return {
     userId: 1,
     role,
-    isAdmin: role === 'admin',
-    isOperator: role === 'operator',
+    capabilities: capabilitiesOf(role),
     grants: {
       proxyHosts: new Map(hosts.map((id) => [id, 'view' as const])),
       l4ProxyHosts: new Map(),
