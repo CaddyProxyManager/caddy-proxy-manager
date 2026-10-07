@@ -38,8 +38,8 @@ holds them outright, so an operator's token gets the same user-scoped endpoints 
 ## Custom roles
 
 **Users → Roles** lists the four built-in roles, which can't be changed, and lets you make your
-own. A role is a set of permissions, one choice per area - none, read, or read and change - and
-read and change always brings read with it.
+own. A role is a set of permissions, one choice per area: none, read, or read and change, which
+includes read.
 
 - **Areas** follow the dashboard: the overview, hosts, agents, access lists, certificates, WAF and
   security, analytics, logs, users, groups, roles, settings, backups, alerts, the audit log, and
@@ -48,9 +48,8 @@ read and change always brings read with it.
   only those its groups were [granted](#groups), and can't create one. Every other area it holds
   outright.
 - **Nobody hands out more than they hold.** Making, changing, deleting or giving a role needs every
-  permission in it, held outright, so a role is never a way to more than its giver has. The same
-  goes for acting on an account: someone who manages users can't disable, demote or reset anyone
-  holding more than they do, an administrator included. Granting hosts or agents to a group needs
+  permission in it, held outright. The same goes for acting on an account: someone who manages
+  users can't disable, demote or reset anyone holding more than they do, an administrator included. Granting hosts or agents to a group needs
   managing every host or agent.
 - **You can't change or delete the role you hold**, and the built-in roles can't be changed at all.
 - **A role in use can't be deleted** while a user, a group, a sign-in mapping or a provider's
@@ -58,9 +57,9 @@ read and change always brings read with it.
 - **API tokens never exceed their owner's role**, custom or built-in: a token's scope narrows the
   role, and a request needs both.
 
-Administrators stay the people the [two-factor policy](#the-two-factor-policy), notifications and
-the last-administrator guard name, so those follow the built-in admin role, not a custom role that
-happens to hold a lot.
+When the [two-factor policy](#the-two-factor-policy), notifications and the last-administrator
+guard say administrators, they mean the built-in admin role, never a custom role however many
+permissions it holds.
 
 ### A role carried by a group
 
@@ -70,11 +69,11 @@ permissions as giving that role directly. View-as with a group brings the group'
 
 ## Groups
 
-Groups are lists of users doing two jobs:
+A group is a list of users, and it does two jobs:
 
 1. Gating access to [forward-auth](../forward-auth/) protected apps.
-2. Deciding what an operator may manage, through **Groups → Access**: choose the capability - manage, or
-   view only - then tick the proxy hosts, L4 hosts and agents the group should reach.
+2. Deciding what an operator may manage, through **Groups → Access**: choose the capability -
+   manage, or view only - then tick the proxy hosts, L4 hosts and agents the group should reach.
 
 <Demo title="Groups → Access" note="Open Access, change the grants and save; the card reads back what an operator in the group gets.">
   <GroupAccessDemo client:visible />
@@ -123,9 +122,8 @@ dashboard and the forward-auth portal: Google reCAPTCHA v2, hCaptcha, Cloudflare
 self-hosted [Cap](https://capjs.js.org) instance. With one configured, **Continue** only moves on
 once it is solved.
 
-- **The server enforces it, not just the form.** A solve earns a pass for that one username,
-  and the password endpoint refuses any sign-in without one - a script posting straight to the
-  API gets nowhere.
+- **The server enforces it.** A solve earns a pass for that one username, and the password
+  endpoint refuses any sign-in without one, so a script posting straight to the API gets nowhere.
 - **One solve, one password attempt.** The pass is spent by the attempt whether the password was
   right or not, and the server remembers it was, so replaying it does nothing. After a wrong
   password the CAPTCHA appears again beside the password field, rather than sending you back to
@@ -255,9 +253,9 @@ no policy on, leads to [requiring a second factor](#the-two-factor-policy).
 **Users → Sign-in overview** (the arrow icon beside the heading) puts every way in on one page:
 
 - **Each method and whether it is on**: username and password, passkeys (with the hostname they
-  are bound to), every OIDC and SAML provider and every directory, each with the number of accounts using
-  it and a link to where it is configured. Directories are checked as Needs attention checks them,
-  and one not answering is marked.
+  are bound to), every OIDC and SAML provider and every directory, each with the number of
+  accounts using it and a link to where it is configured. Directories are checked as Needs
+  attention checks them, and one not answering is marked.
 - **The second-factor policy** and how many accounts have an authenticator app or a passkey.
 - **[Single sign-on enforcement](#enforcing-single-sign-on)**: whether it is on, the break-glass
   accounts, and whether directory accounts still sign in with their LDAP password.
@@ -287,7 +285,7 @@ is an email that already belongs to an account the provider is not linked to: si
 password, then link the provider from Profile. Once one is linked, Profile can also remove the
 password, after confirming the current one, so the account signs in through the provider only.
 
-Two options worth knowing:
+Two provider options change how accounts are handled:
 
 - **Group-based role mapping.** Members of a claimed group become admins, operators, users,
   viewers or holders of a custom role automatically, so role changes happen in your IdP rather
@@ -313,6 +311,8 @@ provider's do.
    can import directly.
 3. The **service provider entity ID** is what the identity provider knows CPM as. Left blank it is
    the metadata URL; set it to whatever the identity provider's client is called.
+4. CPM sends its sign-in requests unsigned, so the identity provider's client must not require
+   signed requests (Keycloak: turn off **Client signature required** under the client's Keys).
 
 CPM refuses a response unless:
 
@@ -397,7 +397,7 @@ Nothing about a directory is set by environment variable.
   saving without either is refused, since every sign-in sends the user's real password.
 - **TLS is verified.** Use `ldaps://`, or `ldap://` with **StartTLS**; a server that refuses the
   upgrade fails the sign-in rather than carrying on unencrypted. A private CA's certificate can be
-  pasted in. Turning verification off works, and says loudly what it gives up.
+  pasted in. Turning verification off works, with a warning about what it gives up.
 - **The first sign-in makes the account**, when **Let a first-time OAuth identity create an
   account** is on (**Settings → Authentication → Sign-in**); otherwise an administrator's account
   has to exist and be linked first. The account is tied to the entry's `objectGUID` or `entryUUID`,
@@ -417,19 +417,20 @@ Nothing about a directory is set by environment variable.
   groups naming the user - Active Directory's preset searches nested groups too. Each group is known
   by its name, the first part of its DN: `CN=Proxy Admins,OU=Groups,...` is `Proxy Admins`. Role
   mapping, the group prefix and explicit group mappings behave exactly as they do for a provider.
-- **The same door as a password.** A directory sign-in goes through the CAPTCHA and the
+- **The same checks as a password.** A directory sign-in goes through the CAPTCHA and the
   per-account lockout, asks for a two-factor code when the account has one, and is audited once
   it completes. Every refusal - a wrong password, an unknown name, a name matching two entries, a
-  filter finding someone other than who bound, a directory that is down - answers "Invalid username or password"; the reason is in the server log.
-- **Test before saving.** **Test** checks the address, the TLS handshake, the bind and
-  the base DN, and with a test username and password signs in as that user and shows the groups
-  and role it would get. Binding as the user has no account to test with, so without a test user
-  it checks only the address and TLS, and says so. A stored bind password is only ever sent to the address and bind DN it
-  was saved with: change either and it has to be typed again.
+  filter finding someone other than who bound, a directory that is down - answers "Invalid
+  username or password"; the reason is in the server log.
+- **Test before saving.** **Test** checks the address, the TLS handshake, the bind and the base
+  DN, and with a test username and password signs in as that user and shows the groups and role it
+  would get. Binding as the user has no account to test with, so without a test user it checks
+  only the address and TLS, and says so. A stored bind password is only ever sent to the address
+  and bind DN it was saved with: change either and it has to be typed again.
 
 Two-factor sign-in can't be set up on a directory account (it protects a local password, and there
-isn't one), so **Require two-factor sign-in for administrators** leaves directory administrators
-to the directory, as it does OAuth ones.
+isn't one), so the two-factor policy's **Administrators** setting leaves directory
+administrators to the directory, as it does single sign-on ones.
 
 ## Password policy
 
@@ -440,16 +441,16 @@ password hash can be forced to reset, which rehashes them on next sign-in.
 An account that keeps failing is locked for a delay that doubles with each failure past the fifth,
 from 1 second up to 15 minutes, whichever address the guesses come from. The number of free
 failures, the first delay and the cap are fields under **Settings → Authentication → Sign-in**,
-next to a switch that turns the lock off. A sign-in to a locked account gets a 429
-with the code `ACCOUNT_LOCKED`, the wait in seconds as `retryAfter` in the body and a `Retry-After`
-header, so the sign-in page and the forward-auth portal can say how long. It replaced
+next to a switch that turns the lock off. A sign-in to a locked account gets a 429 with the code
+`ACCOUNT_LOCKED`, the wait in seconds as `retryAfter` in the body and a `Retry-After` header, so
+the sign-in page and the forward-auth portal can say how long. It replaced
 `TOO_MANY_REQUESTS` for that response. The per-address limit keeps its generic message.
 
 **Disable accounts after repeated failed sign-ins**, off by default in the same place, goes
 further: once an account reaches that many failures (10 by default), it is disabled until an
 administrator enables it again. The count is the lock's own, so it is forgotten a day after the last
 failure and a successful sign-in resets it. Turning it on means **anyone who knows a username can
-disable that account** by guessing at it, which is why it is off.
+disable that account** by guessing at it, which is why it is off by default.
 
 - **The sign-in answers as for any wrong password**, so the guesser is not told.
 - **The last active administrator is never disabled.** It stays on the timed lock, and the

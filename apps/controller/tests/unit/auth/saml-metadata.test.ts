@@ -3,6 +3,7 @@ import {
   MAX_IDP_METADATA_BYTES,
   fetchIdpMetadata,
   readIdpMetadata,
+  withUnsignedRequests,
 } from '@/src/lib/auth/saml/metadata';
 import { OutboundError } from '@/src/lib/http/outbound';
 import { createTestIdp } from '@/tests/helpers/saml-idp';
@@ -66,6 +67,30 @@ describe('readIdpMetadata', () => {
   it('refuses metadata larger than the plugin will read back', () => {
     const padding = `<!--${'x'.repeat(MAX_IDP_METADATA_BYTES)}-->`;
     expect(codeOf(() => readIdpMetadata(idp.metadata() + padding))).toBe('samlMetadataTooLarge');
+  });
+});
+
+describe('withUnsignedRequests', () => {
+  it("drops the IdP's ask for signed requests, and nothing else", () => {
+    const xml = idp.metadata();
+    expect(xml).toContain('WantAuthnRequestsSigned="true"');
+    const stored = withUnsignedRequests(xml);
+    expect(stored).toBe(
+      xml.replace('WantAuthnRequestsSigned="true"', 'WantAuthnRequestsSigned="false"'),
+    );
+    expect(withUnsignedRequests(stored)).toBe(stored);
+    expect(readIdpMetadata(stored)).toEqual(readIdpMetadata(xml));
+  });
+
+  it('reads any prefix and quoting', () => {
+    expect(
+      withUnsignedRequests(
+        "<IDPSSODescriptor protocolSupportEnumeration='x' WantAuthnRequestsSigned='1'>",
+      ),
+    ).toBe("<IDPSSODescriptor protocolSupportEnumeration='x' WantAuthnRequestsSigned='false'>");
+    // An SP descriptor's flag is not the IdP's to drop.
+    const sp = '<md:SPSSODescriptor WantAuthnRequestsSigned="true">';
+    expect(withUnsignedRequests(sp)).toBe(sp);
   });
 });
 

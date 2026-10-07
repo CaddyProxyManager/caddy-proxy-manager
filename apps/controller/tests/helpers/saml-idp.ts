@@ -31,6 +31,7 @@ export type TestIdp = {
   metadata: () => string;
 };
 
+/** Asks for signed requests, as Keycloak's realm descriptor always does; CPM sends them unsigned. */
 export function createTestIdp(entityId = 'https://idp.test/realms/cpm'): TestIdp {
   const key = createTestKey();
   const ssoUrl = `${entityId}/protocol/saml`;
@@ -41,7 +42,7 @@ export function createTestIdp(entityId = 'https://idp.test/realms/cpm'): TestIdp
     metadata: () =>
       `<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="${entityId}">
-  <md:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+  <md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
     <md:KeyDescriptor use="signing">
       <ds:KeyInfo><ds:X509Data><ds:X509Certificate>${key.certificateBase64}</ds:X509Certificate></ds:X509Data></ds:KeyInfo>
     </md:KeyDescriptor>

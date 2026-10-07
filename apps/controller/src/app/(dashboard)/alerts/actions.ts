@@ -36,7 +36,8 @@ import {
   testRule,
   updateRule,
 } from "@/src/lib/alerts/rule-store";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import { DEFAULT_LOCALE, parseLocale } from "@/src/lib/locale";
 import { listProxyHosts, listProxyHostTags } from "@/src/lib/models/proxy-hosts";
 import { notificationCategoryStates } from "@/src/lib/notifications";
@@ -86,41 +87,46 @@ async function adminId(): Promise<number> {
   return Number((await requireCan("alerts:write")).user.id);
 }
 
-export async function loadAlertsOverviewAction(): Promise<AlertsOverview> {
-  await requireCan("alerts:read");
-  const [rules, channels, digests, hosts, tags, states] = await Promise.all([
-    listRules(),
-    listChannels(),
-    listDigests(),
-    listProxyHosts(),
-    listProxyHostTags(),
-    notificationCategoryStates(),
-  ]);
-  const categories = states.map(({ category, settingKey }) => ({
-    category,
-    settingKey,
-    kinds: EVENT_KINDS.filter(
-      (kind) => categoryOf({ kind } as NotificationEvent) === category,
-    ) as string[],
-  }));
-  return {
-    rules,
-    channels,
-    digests,
-    hosts: hosts.map((host) => ({ id: host.id, name: host.name || host.domains[0] || "" })),
-    tags,
-    categories,
-    signals: SIGNAL_KINDS,
-    maxQuietMinutes: MAX_QUIET_MINUTES,
-    maxMetricMinutes: MAX_METRIC_MINUTES,
-  };
+export async function loadAlertsOverviewAction(): Promise<ActionResult<AlertsOverview>> {
+  return runAction(async () => {
+    await requireCan("alerts:read");
+    const [rules, channels, digests, hosts, tags, states] = await Promise.all([
+      listRules(),
+      listChannels(),
+      listDigests(),
+      listProxyHosts(),
+      listProxyHostTags(),
+      notificationCategoryStates(),
+    ]);
+    const categories = states.map(({ category, settingKey }) => ({
+      category,
+      settingKey,
+      kinds: EVENT_KINDS.filter(
+        (kind) => categoryOf({ kind } as NotificationEvent) === category,
+      ) as string[],
+    }));
+    return {
+      rules,
+      channels,
+      digests,
+      hosts: hosts.map((host) => ({ id: host.id, name: host.name || host.domains[0] || "" })),
+      tags,
+      categories,
+      signals: SIGNAL_KINDS,
+      maxQuietMinutes: MAX_QUIET_MINUTES,
+      maxMetricMinutes: MAX_METRIC_MINUTES,
+    };
+  });
 }
 
 // ── Rules ───────────────────────────────────────────────────────────────────
 
-export async function saveRuleAction(id: number | null, input: RuleInput): Promise<RuleView> {
-  const userId = await adminId();
-  return withTranslatedErrors(async () => {
+export async function saveRuleAction(
+  id: number | null,
+  input: RuleInput,
+): Promise<ActionResult<RuleView>> {
+  return runAction(async () => {
+    const userId = await adminId();
     const saved =
       id === null ? await createRule(input, userId) : await updateRule(id, input, userId);
     revalidatePath(PAGE);
@@ -128,18 +134,20 @@ export async function saveRuleAction(id: number | null, input: RuleInput): Promi
   });
 }
 
-export async function deleteRuleAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteRuleAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteRule(id, userId);
     revalidatePath(PAGE);
   });
 }
 
 /** Until an ISO time, or lifted with null. */
-export async function silenceRuleAction(id: number, until: string | null): Promise<RuleView> {
-  const userId = await adminId();
-  return withTranslatedErrors(() => silenceRule(id, until, userId));
+export async function silenceRuleAction(
+  id: number,
+  until: string | null,
+): Promise<ActionResult<RuleView>> {
+  return runAction(async () => silenceRule(id, until, await adminId()));
 }
 
 /**
@@ -149,10 +157,12 @@ export async function silenceRuleAction(id: number, until: string | null): Promi
 export async function testRuleAction(
   id: number,
   displayName: string,
-): Promise<{ queued: boolean }> {
-  await requireCan("alerts:write");
-  const eventId = await withTranslatedErrors(() => testRule(id, displayName.slice(0, 200)));
-  return { queued: eventId > 0 };
+): Promise<ActionResult<{ queued: boolean }>> {
+  return runAction(async () => {
+    await requireCan("alerts:write");
+    const eventId = await testRule(id, displayName.slice(0, 200));
+    return { queued: eventId > 0 };
+  });
 }
 
 // ── Channels ────────────────────────────────────────────────────────────────
@@ -160,9 +170,9 @@ export async function testRuleAction(
 export async function saveChannelAction(
   id: number | null,
   input: ChannelInput,
-): Promise<SavedChannel> {
-  const userId = await adminId();
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<SavedChannel>> {
+  return runAction(async () => {
+    const userId = await adminId();
     const saved =
       id === null ? await createChannel(input, userId) : await updateChannel(id, input, userId);
     revalidatePath(PAGE);
@@ -170,109 +180,117 @@ export async function saveChannelAction(
   });
 }
 
-export async function deleteChannelAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteChannelAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteChannel(id, userId);
     revalidatePath(PAGE);
   });
 }
 
-export type ChannelTestOutcome =
-  | { ok: true; outcome: "delivered" | "accepted"; recipients: string[] }
-  | { ok: false; message: string };
+export type ChannelTestOutcome = ActionResult<{
+  outcome: "delivered" | "accepted";
+  recipients: string[];
+}>;
 
 /** A saved channel as stored, or with `input` the form as typed: its blank secrets are the stored ones. */
 export async function testChannelAction(
   id: number | null,
   input: ChannelInput | null,
 ): Promise<ChannelTestOutcome> {
-  await requireCan("alerts:write");
-  try {
-    const result = await withTranslatedErrors(() => testChannel(id, input));
-    return { ok: true, outcome: result.outcome, recipients: result.recipients ?? [] };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
+  return runAction(async () => {
+    await requireCan("alerts:write");
+    const result = await testChannel(id, input);
+    return { outcome: result.outcome, recipients: result.recipients ?? [] };
+  });
 }
 
 // ── History ─────────────────────────────────────────────────────────────────
 
 export async function loadHistoryAction(
   filter: HistoryFilter,
-): Promise<{ rows: HistoryRow[]; hasMore: boolean }> {
-  await requireCan("alerts:read");
-  const limit = HISTORY_PAGE;
-  const [events, locale] = await Promise.all([listHistory({ ...filter, limit }), getLocale()]);
-  if (events.length === 0) return { rows: [], hasMore: false };
-  const { titles, texts } = await notificationText(
-    events.map((event) => ({
-      id: String(event.id),
-      key: event.key,
-      at: event.at,
-      event: event.event,
-    })),
-    parseLocale(locale) ?? DEFAULT_LOCALE,
-  );
-  const states = await notificationCategoryStates();
-  const settingKeys = new Map(states.map((state) => [state.category, state.settingKey]));
-  return {
-    rows: events.map((event, index) => ({
-      id: event.id,
-      at: event.at,
-      resolvedAt: event.resolvedAt,
-      title: titles[index],
-      text: texts[index],
-      ruleId: event.ruleId,
-      ruleName: event.ruleName,
-      ruleSettingKey: event.ruleBuiltin
-        ? (settingKeys.get(event.ruleBuiltin as never) ?? null)
-        : null,
-      severity: event.severity,
-      type: event.type,
-      deliveries: event.deliveries.map((delivery) => ({
-        id: delivery.id,
-        channelName: delivery.channelName,
-        channelKind: delivery.channelKind,
-        status: delivery.status,
-        attempts: delivery.attempts,
-        lastError: delivery.lastError,
-        sentAt: delivery.sentAt,
+): Promise<ActionResult<{ rows: HistoryRow[]; hasMore: boolean }>> {
+  return runAction(async () => {
+    await requireCan("alerts:read");
+    const limit = HISTORY_PAGE;
+    const [events, locale] = await Promise.all([listHistory({ ...filter, limit }), getLocale()]);
+    if (events.length === 0) return { rows: [], hasMore: false };
+    const { titles, texts } = await notificationText(
+      events.map((event) => ({
+        id: String(event.id),
+        key: event.key,
+        at: event.at,
+        event: event.event,
       })),
-    })),
-    hasMore: events.length === limit,
-  };
+      parseLocale(locale) ?? DEFAULT_LOCALE,
+    );
+    const states = await notificationCategoryStates();
+    const settingKeys = new Map(states.map((state) => [state.category, state.settingKey]));
+    return {
+      rows: events.map((event, index) => ({
+        id: event.id,
+        at: event.at,
+        resolvedAt: event.resolvedAt,
+        title: titles[index],
+        text: texts[index],
+        ruleId: event.ruleId,
+        ruleName: event.ruleName,
+        ruleSettingKey: event.ruleBuiltin
+          ? (settingKeys.get(event.ruleBuiltin as never) ?? null)
+          : null,
+        severity: event.severity,
+        type: event.type,
+        deliveries: event.deliveries.map((delivery) => ({
+          id: delivery.id,
+          channelName: delivery.channelName,
+          channelKind: delivery.channelKind,
+          status: delivery.status,
+          attempts: delivery.attempts,
+          lastError: delivery.lastError,
+          sentAt: delivery.sentAt,
+        })),
+      })),
+      hasMore: events.length === limit,
+    };
+  });
 }
 
 // ── Digests ─────────────────────────────────────────────────────────────────
 
-export async function saveDigestAction(id: number | null, input: DigestInput): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function saveDigestAction(
+  id: number | null,
+  input: DigestInput,
+): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     if (id === null) await createDigest(input, userId);
     else await updateDigest(id, input, userId);
     revalidatePath(PAGE);
   });
 }
 
-export async function deleteDigestAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteDigestAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteDigest(id, userId);
     revalidatePath(PAGE);
   });
 }
 
 /** What it would say now, in the reader's language and time zone. */
-export async function previewDigestAction(id: number): Promise<{ subject: string; text: string }> {
-  await requireCan("alerts:read");
-  const [locale, timeZone] = await Promise.all([getLocale(), getTimeZone()]);
-  return withTranslatedErrors(() =>
-    previewDigest(id, { locale: parseLocale(locale) ?? DEFAULT_LOCALE, timeZone }),
-  );
+export async function previewDigestAction(
+  id: number,
+): Promise<ActionResult<{ subject: string; text: string }>> {
+  return runAction(async () => {
+    await requireCan("alerts:read");
+    const [locale, timeZone] = await Promise.all([getLocale(), getTimeZone()]);
+    return previewDigest(id, { locale: parseLocale(locale) ?? DEFAULT_LOCALE, timeZone });
+  });
 }
 
-export async function sendDigestNowAction(id: number): Promise<DigestRun | null> {
-  await requireCan("alerts:write");
-  return withTranslatedErrors(() => sendDigestNow(id));
+export async function sendDigestNowAction(id: number): Promise<ActionResult<DigestRun | null>> {
+  return runAction(async () => {
+    await requireCan("alerts:write");
+    return sendDigestNow(id);
+  });
 }

@@ -32,10 +32,10 @@ entire continent, then allow the two ASNs or addresses that should still get thr
 ## Fail-closed
 
 If the real client address cannot be determined - behind a trusted proxy that sent no usable
-client-IP header, say - fail-closed mode rejects the request rather than letting it past. Off by
-default, because the safer choice for most deployments is that a misconfigured proxy does not take
-the site down; on when the block list is a security control rather than a nuisance filter. It is
-an HTTP option: an L4 host has no headers to trust.
+client-IP header, say - fail-closed mode rejects the request rather than letting it past. It is
+off by default, since for most deployments a misconfigured proxy should not take the site down.
+Turn it on when the block list is a security control rather than a nuisance filter. It is an HTTP
+option: an L4 host has no headers to trust.
 
 ## Responses
 
@@ -44,11 +44,11 @@ answer with, so the connection is closed.
 
 ## Trusted proxies
 
-If CPM sits behind another proxy, the client address it sees is that proxy's. **Settings → Network → Trusted
-Proxies** tells Caddy which addresses to trust and which header carries the real client IP, so geo
-rules match the visitor rather than your load balancer. The global list can seed the global
-geoblock trusted-proxy list while that is empty, which hosts in merge mode inherit, so the two
-cannot silently disagree.
+If CPM sits behind another proxy, the client address it sees is that proxy's. **Settings → Network
+→ Trusted Proxies** tells Caddy which addresses to trust and which header carries the real client
+IP, so geo rules match the visitor rather than your load balancer. While the global geo-blocking
+trusted-proxy list is empty, this list can seed it. Hosts in merge mode inherit that list, so the
+two cannot silently disagree.
 
 ## Getting the databases
 
@@ -63,6 +63,11 @@ cannot silently disagree.
 </Steps>
 
 That is the whole setup. The controller downloads the databases, checks MaxMind for updates once a
-day by default, and every [agent](../agent/) fetches them from it. With the toggle off the host
-forms still show the geo blocking fields, marked **GeoIP off**, and no country is recorded against
-an event.
+day by default, and every [agent](../agent/) fetches them from it.
+
+If the controller cannot reach MaxMind, upload the `.mmdb` files under **Upload a database** in the
+same block. CPM opens each one and checks its edition before it replaces anything.
+[Offline mode](../../start/offline/#geoip-databases) turns the downloads off; uploads still work.
+
+With **Use GeoIP** off, the host forms still show the geo blocking fields, marked **GeoIP off**,
+and no country is recorded against an event.

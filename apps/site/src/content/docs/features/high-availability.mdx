@@ -18,7 +18,8 @@ Every controller is the same container, pointed at the same PostgreSQL database 
 - **The agents.** An agent holds one connection, to whichever controller it reached. The others
   reach it through that one, so a host saved anywhere is applied to every agent.
 - **The background jobs** - GeoIP downloads, certificate alerts, notifications and alerts, daily
-  digests, expiring blocks, scheduled backups, audit streaming - run on one controller at a time. If it stops, another takes them over within about 20 seconds.
+  digests, expiring blocks, scheduled backups, audit streaming - run on one controller at a time.
+  If it stops, another takes them over within about 20 seconds.
 - **GeoIP databases.** The controller running the jobs downloads them; the others copy them from
   the database, so every one serves agents the same files.
 
@@ -145,4 +146,4 @@ other settings your `web` service sets in `.env`; the override above only shows 
   or failover, such as a managed one, for that.
 - **Caddy.** Each agent runs its own Caddy, and a host down takes its Caddy with it. Running
   [agents](/features/agent/) on more than one host, with DNS or a load balancer in front, keeps
-  traffic flowing through that.
+  traffic moving when one host goes down.

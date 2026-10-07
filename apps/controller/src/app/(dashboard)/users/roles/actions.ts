@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import {
   type Role,
   type RoleInput,
@@ -19,9 +20,12 @@ async function actor() {
 }
 
 /** Null `key` makes a role. */
-export async function saveRoleAction(key: string | null, input: RoleInput): Promise<Role> {
-  const by = await actor();
-  return withTranslatedErrors(async () => {
+export async function saveRoleAction(
+  key: string | null,
+  input: RoleInput,
+): Promise<ActionResult<Role>> {
+  return runAction(async () => {
+    const by = await actor();
     const saved = key === null ? await createRole(input, by) : await updateRole(key, input, by);
     revalidatePath(PAGE);
     revalidatePath("/users");
@@ -29,9 +33,9 @@ export async function saveRoleAction(key: string | null, input: RoleInput): Prom
   });
 }
 
-export async function deleteRoleAction(key: string): Promise<void> {
-  const by = await actor();
-  await withTranslatedErrors(async () => {
+export async function deleteRoleAction(key: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const by = await actor();
     await deleteRole(key, by);
     revalidatePath(PAGE);
   });

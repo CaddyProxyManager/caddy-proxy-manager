@@ -124,6 +124,7 @@ async function syncEdition(
 
   let response: Response;
   try {
+    // outbound: agentController
     response = await fetch(`${controllerUrl.replace(/\/+$/, "")}${path}`, {
       headers,
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),

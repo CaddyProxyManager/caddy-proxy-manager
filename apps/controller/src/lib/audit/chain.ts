@@ -331,8 +331,14 @@ export async function reanchorAuditChain() {
   ]);
 }
 
-/** Retention: drops events older than `beforeIso` and anchors the chain at the newest one dropped. */
-export async function pruneAuditEvents(beforeIso: string): Promise<number> {
+/**
+ * Retention: drops events older than `beforeIso` and anchors the chain at the newest one dropped.
+ * `record` builds an event for what was dropped, which joins the chain in the same transaction.
+ */
+export async function pruneAuditEvents(
+  beforeIso: string,
+  record?: (deleted: number) => AuditRow | null,
+): Promise<number> {
   const key = chainKey();
   let deleted = 0;
   await runInTransaction((tx) => [
@@ -381,6 +387,8 @@ export async function pruneAuditEvents(beforeIso: string): Promise<number> {
           })
           .where(eq(auditChain.id, HEAD_ID)),
       };
+      const event = record?.(deleted);
+      if (event) yield* chainedAuditSteps(tx, [event]);
     }),
   ]);
   return deleted;

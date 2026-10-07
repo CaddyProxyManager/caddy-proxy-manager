@@ -358,6 +358,12 @@ export type FleetConfig = {
   upstreamErrors?: boolean;
 
   /**
+   * Offline mode: the agent acts as if `CADDY_BUILD_MODE=external`, since a build downloads Go
+   * modules. Absent from an older controller; an older agent ignores it and still builds.
+   */
+  offline?: boolean;
+
+  /**
    * Pulled, not pushed: tens of megabytes. Agents prefer their paired address joined to
    * `CONTROLLER_GEOIP_ROUTE`, since one beside the controller would otherwise fetch through the
    * Caddy it has not started; `url` (the public address) remains for older agents.

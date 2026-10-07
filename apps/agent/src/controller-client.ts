@@ -291,6 +291,7 @@ export class ControllerClient {
     }
 
     try {
+      // outbound: agentController
       return await fetch(`${this.url}${path}`, {
         method,
         headers,

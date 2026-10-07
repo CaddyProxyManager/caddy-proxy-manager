@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -32,6 +33,7 @@ export async function blockSourceAction(input: BlockedSourceInput): Promise<Acti
     const t = await getTranslations("security");
     return actionSuccess(t("blocked", { value: source.value }));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "blockFailed");
   }
 }
@@ -45,6 +47,7 @@ export async function unblockSourceAction(id: number): Promise<ActionState> {
     const t = await getTranslations("security");
     return actionSuccess(t("unblocked"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "unblockFailed");
   }
 }

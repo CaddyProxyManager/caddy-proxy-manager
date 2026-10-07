@@ -37,8 +37,8 @@ and the token as a bearer token ("OAuth bearer token" in most identity providers
 - A provisioned person gets an account with the **User** role. What they may do comes from the
   groups they are in (below) or from an administrator.
 - **Link existing accounts** (on by default): when someone is provisioned with the email of an
-  account that already exists, that account is taken over by the connection instead of a second one
-  being refused. It keeps its name, role and sign-in methods; from then on the identity provider
+  account that already exists, the connection takes that account over instead of refusing the
+  request. It keeps its name, role and sign-in methods; from then on the identity provider
   decides whether it is active. Turn this off to have such a request refused instead.
 - **`active: false`**, which is how most identity providers deprovision, disables the account and,
   in the same transaction, ends its sessions and forward-auth sessions and deletes its API tokens.

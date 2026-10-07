@@ -7,7 +7,9 @@ sidebar:
 
 import { Steps } from "@astrojs/starlight/components";
 
-One compose file and two generated secrets. Everything else is entered in the browser.
+One compose file and two generated secrets. Everything else is entered in the browser. A host with
+no route to the internet installs from the release's air-gap bundle instead: see
+[installing without internet access](../offline/).
 
 ## Installation
 
@@ -25,7 +27,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    project, so a different directory is a different, empty installation.
 
    It holds `docker-compose.yml`, `.env.example` and the few files they mount, one commit per
-   release, with the images pinned to that release - what you deploy stays on it until you pull.
+   release, with the images pinned to that release, so what you deploy stays on it until you pull.
    The [managed CrowdSec](/features/crowdsec/#managed) container is included too, but stays off
    until you turn it on.
 
@@ -41,10 +43,9 @@ One compose file and two generated secrets. Everything else is entered in the br
    chmod 600 .env
    ```
 
-   That is the whole file. Compose declares those two `${SESSION_SECRET:?}` and
-   `${POSTGRES_PASSWORD:?}` and refuses to start rather than come up on something guessable, so
-   they are generated rather than chosen and nothing you would have had to think of ends up in the
-   file.
+   That is the whole file. Compose declares the two as `${SESSION_SECRET:?}` and
+   `${POSTGRES_PASSWORD:?}` and refuses to start without them rather than come up on something
+   guessable. Generating them means you never have to think up a value for the file.
 
    `SESSION_SECRET` is also the key every secret in the database is encrypted under: DNS provider
    credentials, imported private keys, agent secrets. It cannot live in the thing it encrypts, so
@@ -63,7 +64,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    That also starts the `postgres` service the app keeps its data in, so there is no database
    server to install or run yourself.
 
-   Caddy itself does not start yet - it sits behind a compose profile, and the agent starts it once
+   Caddy itself does not start yet. It sits behind a compose profile, and the agent starts it once
    the two are paired. An unpaired host answering 80 and 443 with a default page would be worse
    than one not listening at all.
 
@@ -80,11 +81,12 @@ database rather than in a file, encrypted at rest where they are secrets, and th
 anything `.env` says.
 
 Prefer that over writing variables by hand. Setup makes you sign in before the rest of the
-configuration is entered, so a mistyped password is found immediately rather than at the end. It shows the exact OAuth callback URL to register, which is derived and not
-guessable. And a credential saved there is handed to `docker compose` in the environment of the
-command the agent runs, instead of sitting in plaintext on the host for as long as the file exists.
+configuration is entered, so a mistyped password shows up immediately rather than at the end. It
+shows the exact OAuth callback URL to register, which is derived and hard to guess. A credential
+saved there reaches `docker compose` in the environment of the command the agent runs, instead of
+sitting in plaintext on the host for as long as the file exists.
 
-`.env.example` is the reference for everything else - every variable that exists, what it defaults
+`.env.example` is the reference for everything else: every variable that exists, what it defaults
 to, and whether Settings owns it. Read it when you need something setup does not cover: a
 PostgreSQL server other than the bundled one, a larger connection pool, a private CA for the agent,
 a deployment with no agent at all. Append the one line you need; there is no reason to carry the
@@ -119,7 +121,7 @@ check and the GeoIP downloads, each with a switch of its own.
 
 Put them in `docker-compose.override.yml` beside `docker-compose.yml`, never in the tracked files.
 Compose merges it over the base file, the agent applies it when it starts Caddy, and git ignores it
-along with `.env` - so `git pull` never stops on a conflict.
+along with `.env`, so `git pull` never stops on a conflict.
 
 ```yaml
 # docker-compose.override.yml
@@ -155,19 +157,19 @@ docker compose up -d
 ### From ghcr.io/silentspud
 
 Up to 3.6.1 the images were published as `ghcr.io/silentspud/caddy-proxy-manager/{web,caddy,agent}`;
-later releases are `ghcr.io/caddyproxymanager/{web,caddy,agent}`. The old images stay where they are, so
-nothing stops working - but an install older than 3.6.1 is never told about a newer release, since
-it checks the old namespace. Moving to the deploy repository, as above, changes every image name at
+later releases are `ghcr.io/caddyproxymanager/{web,caddy,agent}`. The old images stay where they
+are, so nothing stops working. An install older than 3.6.1 is never told about a newer release,
+though, because it checks the old namespace. Moving to the deploy repository, as above, changes every image name at
 once.
 
 ### From PostgreSQL 17
 
-The bundled database moved from PostgreSQL 17 to 18 during the 3.0 release candidates. PostgreSQL does not read
-another major version's data files, so this one upgrade is a dump and restore rather than a pull.
-It applies if your `docker-compose.yml` still says `image: postgres:17-alpine`.
+The bundled database went from PostgreSQL 17 to 18 during the 3.0 release candidates. PostgreSQL
+does not read another major version's data files, so this one upgrade is a dump and restore rather
+than a pull. It applies if your `docker-compose.yml` still says `image: postgres:17-alpine`.
 
 Nothing is lost by getting the order wrong. The 18 service refuses to start on a volume that still
-holds a 17 cluster - it restarts with an error naming the version, and the data stays where it was.
+holds a 17 cluster: it restarts with an error naming the version, and the data stays where it was.
 If you already updated the compose file, put the two old lines back for the first step:
 `image: postgres:17-alpine`, and the volume mounted at `/var/lib/postgresql/data`.
 
@@ -181,8 +183,8 @@ If you already updated the compose file, put the two old lines back for the firs
    docker compose cp postgres:/tmp/cpm.dump ./cpm.dump
    ```
 
-   The dump is copied out rather than redirected to a file, so it arrives intact from any shell -
-   PowerShell's `>` re-encodes what passes through it. Keep `cpm.dump` until you have signed in
+   The dump is copied out rather than redirected to a file, so it arrives intact from any shell.
+   PowerShell's `>`, for one, re-encodes what passes through it. Keep `cpm.dump` until you have signed in
    afterwards.
 
 2. Unpack the new release's archive over the old files, then remove the containers and the 17
@@ -195,7 +197,7 @@ If you already updated the compose file, put the two old lines back for the firs
 
    `down` without `-v` leaves every other volume alone, certificates included. The database volume
    is named after the Compose project, which is the directory the compose file is in unless
-   `COMPOSE_PROJECT_NAME` says otherwise - `docker volume ls` shows it.
+   `COMPOSE_PROJECT_NAME` says otherwise; `docker volume ls` shows it.
 
 3. Start PostgreSQL 18, restore into it, and bring the rest back:
 
@@ -224,12 +226,11 @@ cp .env.example .env
 ```
 
 It still works. Resolution order is stored value → `.env` → built-in default, so a variable set
-there is honoured and still beats the default - it is only overridden once the same setting is
-saved in the app, at which point the line can be deleted.
+there is honoured and still beats the default. Once the same setting is saved in the app, the
+stored value wins and the line can be deleted.
 
-A new install rarely needs it. Most settings live in the database, so a copied
-`.env.example` is mostly commented-out lines that duplicate what the setup page will ask you for
-anyway, and every secret written into it is a plaintext copy that the Settings path would not have
-made. Use it when you are provisioning unattended and there is no browser to reach the setup page
-in - setting both `ADMIN_USERNAME` and `ADMIN_PASSWORD` seeds an administrator at startup and skips
-the flow entirely.
+A new install rarely needs it. Most settings live in the database, so a copied `.env.example` is
+mostly commented-out lines that duplicate what the setup page asks for anyway, and every secret
+written into it is a plaintext copy the Settings path would not have made. Use it when you
+provision unattended and no browser can reach the setup page: setting both `ADMIN_USERNAME` and
+`ADMIN_PASSWORD` seeds an administrator at startup and skips the flow entirely.

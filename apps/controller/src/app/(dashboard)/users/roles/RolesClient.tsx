@@ -33,6 +33,7 @@ import {
   normalizeCapabilities,
 } from "@/src/lib/roles/capabilities";
 import { deleteRoleAction, saveRoleAction } from "./actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 
 export type RoleView = {
   key: string;
@@ -93,7 +94,7 @@ export default function RolesClient({
   async function remove(role: RoleView) {
     setError(null);
     try {
-      await deleteRoleAction(role.key);
+      unwrap(await deleteRoleAction(role.key));
     } catch (err) {
       setError(message(err, t("deleteFailed")));
     } finally {
@@ -291,7 +292,7 @@ function RoleDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveRoleAction(role?.key ?? null, { name, description, capabilities, scoped });
+      unwrap(await saveRoleAction(role?.key ?? null, { name, description, capabilities, scoped }));
       onSaved();
       onClose();
     } catch (err) {

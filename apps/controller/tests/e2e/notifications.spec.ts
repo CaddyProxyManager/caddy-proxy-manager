@@ -22,7 +22,7 @@ const REMOTE = 'caddy-proxy-manager-agent-remote';
 const DEAD_DOMAIN = 'notify-upstream.test';
 
 const OFFLINE_MINUTES = 'Agent offline after';
-const ERROR_COUNT = 'Upstream errors before telling';
+const ERROR_COUNT = 'Upstream errors before notifying';
 const ERROR_MINUTES = 'Upstream error window';
 const DISABLE_SWITCH = 'Disable accounts after repeated failed sign-ins';
 const DISABLE_AFTER = 'Failed sign-ins before an account is disabled';
@@ -110,6 +110,13 @@ async function saveAndConfirm(page: Page, message: RegExp): Promise<void> {
   });
 }
 
+const LOGGING = `${BASE}/api/v1/settings/logging`;
+
+async function putLogging(page: Page, data: unknown): Promise<void> {
+  const res = await page.request.put(LOGGING, { headers: { Origin: BASE }, data });
+  expect(res.ok(), await res.text()).toBeTruthy();
+}
+
 async function setNotificationFields(page: Page, values: Record<string, string>): Promise<void> {
   await openNotifications(page);
   for (const [label, value] of Object.entries(values)) {
@@ -169,6 +176,7 @@ async function unpairRemote(page: Page, bundledId: number): Promise<void> {
 
 test.describe('Admin notifications', () => {
   let bundledId = 0;
+  let previousLogging: object | null = null;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -176,6 +184,9 @@ test.describe('Admin notifications', () => {
     seed.ensureTestUser(USER.username, USER.password, 'user');
     const page = await (await browser.newContext()).newPage();
     bundledId = (await agents(page)).find((agent) => agent.connected)!.id;
+    // The upstream-error fields stay greyed out while there is no JSON access log to read.
+    previousLogging = await (await page.request.get(LOGGING)).json();
+    await putLogging(page, { enabled: true, format: 'json' });
     await configureSmtp(page);
     await setRecipients(page, RECIPIENT);
     await setNotificationFields(page, {
@@ -203,6 +214,8 @@ test.describe('Admin notifications', () => {
     });
     await setRecipients(page, '');
     await removeSmtp(page);
+    // Never-saved logging reads back without `enabled`, which a PUT requires.
+    await putLogging(page, { enabled: false, ...previousLogging });
     await page.context().close();
     for (const key of [...TOUCHED_KEYS, ...SMTP_SETTING_KEYS]) seed.clearSettingRow(key);
     seed.deleteUserByEmail(USER_EMAIL);
@@ -323,7 +336,6 @@ test.describe('Admin notifications', () => {
 
   test('a host whose upstream is dead is reported from the access log', async ({ page }) => {
     test.setTimeout(300_000);
-    const LOGGING = `${BASE}/api/v1/settings/logging`;
     const previousLogging = await (await page.request.get(LOGGING)).json();
     let hostId: number | undefined;
     try {

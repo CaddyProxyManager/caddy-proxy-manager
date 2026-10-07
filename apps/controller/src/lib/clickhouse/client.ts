@@ -122,6 +122,7 @@ export async function getClient(): Promise<ClickHouseClient> {
 
   if (client) await client.close();
   clientKey = key;
+  // outbound: clickhouse
   client = createClient({
     url,
     username: user,

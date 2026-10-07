@@ -66,6 +66,10 @@ export type HealthInput = {
   hostHistory?: { keepRevisions: number; keepDays: number };
   /** As hostHistory: absent, the defaults stand in. */
   accessReviews?: { confirmRevocations: boolean; reminderDays: number };
+  /** Absent, it reads as off, the default. */
+  offlineMode?: boolean;
+  /** Absent, it reads as 0: kept forever, the default. */
+  auditLogKeepDays?: number;
   errorPageRules: number;
   globalCaddyfileLines: number;
   httpCacheStorage: string;
@@ -376,6 +380,15 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   );
 
   push(
+    "audit-retention",
+    "auditRetention",
+    "ok",
+    input.auditLogKeepDays
+      ? t("health.auditRetention.valueDays", { days: input.auditLogKeepDays })
+      : t("health.auditRetention.valueForever"),
+  );
+
+  push(
     "error-pages",
     "errorPages",
     input.errorPageRules > 0 ? "ok" : "unset",
@@ -532,6 +545,13 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     input.ssoEnforcement?.enforced
       ? t("health.ssoEnforcement.valueEnforced", { count: input.ssoEnforcement.breakGlass })
       : t("health.off"),
+  );
+
+  push(
+    "outbound",
+    "outbound",
+    "ok",
+    input.offlineMode ? t("health.outbound.valueOffline") : t("health.outbound.valueOnline"),
   );
 
   push(

@@ -292,10 +292,12 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
 
 /** The registry first, then the legacy blob for unmigrated deployments, or upgrading resets it. */
 export async function isGravatarEnabled(): Promise<boolean> {
-  const [{ gravatarEnabled }, { resolveSetting }] = await Promise.all([
+  const [{ gravatarEnabled }, { resolveSetting }, { outboundAllowed }] = await Promise.all([
     import("./registry"),
     import("./resolve"),
+    import("../offline"),
   ]);
+  if (!(await outboundAllowed("gravatar"))) return false;
   const resolved = await resolveSetting(gravatarEnabled);
   if (resolved.source !== "default") return resolved.value;
 

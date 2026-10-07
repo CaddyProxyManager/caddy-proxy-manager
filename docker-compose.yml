@@ -130,8 +130,10 @@ services:
       # First-start defaults of Settings fields. A fork sets the repository to its own namespace.
       UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-true}
       UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/caddyproxymanager}
+      OFFLINE_MODE: ${OFFLINE_MODE:-false}
       HOST_HISTORY_KEEP_REVISIONS: ${HOST_HISTORY_KEEP_REVISIONS:-100}
       HOST_HISTORY_KEEP_DAYS: ${HOST_HISTORY_KEEP_DAYS:-365}
+      AUDIT_LOG_KEEP_DAYS: ${AUDIT_LOG_KEEP_DAYS:-0}
 
       # Settings toggles; the agent starts ClickHouse to match, so these matter only for a first
       # start or a deployment with no agent. Unset decides from whether the credentials are set.
@@ -203,6 +205,12 @@ services:
       clickhouse:
         condition: service_healthy
         required: false
+    # musl waits out its whole resolver timeout (5s) on the SERVFAIL Docker's DNS answers when no
+    # upstream is reachable, as for caddy-admin before Caddy runs on a host with no route out. The
+    # first timeout listed wins, so an override changing it needs `dns_opt: !override [...]`.
+    dns_opt:
+      - timeout:2
+      - attempts:2
     networks:
       # So Caddy can reach the dashboard and forward auth, and for egress.
       - caddy-network
@@ -371,6 +379,10 @@ services:
     depends_on:
       docker-socket-proxy:
         condition: service_started
+    # As for web: a failed lookup costs 2s rather than 5.
+    dns_opt:
+      - timeout:2
+      - attempts:2
     networks:
       - socket-proxy
       # Caddy's admin API, which it proxies for, and the controller.

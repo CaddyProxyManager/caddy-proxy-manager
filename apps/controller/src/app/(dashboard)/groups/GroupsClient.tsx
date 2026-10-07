@@ -54,6 +54,7 @@ import {
   setGroupMappingsAction,
   setGroupRoleAction,
 } from "./actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 import {
   GroupAccessDialog,
   type GroupAccess,
@@ -303,7 +304,7 @@ export default function GroupsClient({
         submitLabel={tCommon("create")}
         onClose={() => setCreateOpen(false)}
         onSubmit={async (formData) => {
-          const { id } = await createGroupAction(formData);
+          const { id } = unwrap(await createGroupAction(formData));
           setCreateOpen(false);
           setSearch("");
           setSelectedId(id);
@@ -343,6 +344,7 @@ function GroupDetail({
   const [accessOpen, setAccessOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewAsError, setViewAsError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const counts = grantCounts(access);
   const isIdp = group.source === "oidc";
 
@@ -429,6 +431,7 @@ function GroupDetail({
       </HStack>
 
       {viewAsError && <Banner status="error" title={t("viewAsGroup")} description={viewAsError} />}
+      {failure && <Banner status="error" title={failure} />}
 
       {isIdp && (
         <Banner status="info" title={t("idpManaged")} description={t("idpMembershipHelp")} />
@@ -455,6 +458,7 @@ function GroupDetail({
           users={users}
           onAdd={() => setAddOpen(true)}
           onChanged={onChanged}
+          onFailure={setFailure}
         />
       )}
       {tab === "access" && (
@@ -489,7 +493,7 @@ function GroupDetail({
         initial={{ name: group.name, description: group.description ?? "" }}
         onClose={() => setEditOpen(false)}
         onSubmit={async (formData) => {
-          await updateGroupAction(group.id, formData);
+          unwrap(await updateGroupAction(group.id, formData));
           setEditOpen(false);
           onChanged();
         }}
@@ -507,9 +511,10 @@ function GroupDetail({
         }
         actionLabel={t("deleteGroup")}
         onAction={async () => {
-          await deleteGroupAction(group.id);
+          const result = await deleteGroupAction(group.id);
           setConfirmDelete(false);
-          onChanged();
+          setFailure(result.ok ? null : result.error);
+          if (result.ok) onChanged();
         }}
       />
 
@@ -527,8 +532,9 @@ function GroupDetail({
             setAccessOpen(false);
             // Two tables, two writes. The mapping goes first: if the grants write then fails, the
             // group has gained nothing, the safe half to land alone.
-            await setGroupMappingsAction(group.id, next.mappings);
-            await setGroupGrantsAction(group.id, [
+            const mapped = await setGroupMappingsAction(group.id, next.mappings);
+            if (!mapped.ok) return setFailure(mapped.error);
+            const granted = await setGroupGrantsAction(group.id, [
               ...next.proxyHostIds.map((id) => ({
                 resource: { kind: "proxyHost" as const, id },
                 capability: next.capability,
@@ -542,6 +548,7 @@ function GroupDetail({
                 capability: next.capability,
               })),
             ]);
+            setFailure(granted.ok ? null : granted.error);
             onChanged();
           }}
         />
@@ -555,11 +562,13 @@ function MembersTab({
   users,
   onAdd,
   onChanged,
+  onFailure,
 }: {
   group: Group;
   users: UserEntry[];
   onAdd: () => void;
   onChanged: () => void;
+  onFailure: (message: string | null) => void;
 }) {
   const t = useTranslations("groups");
   const tCommon = useTranslations("common");
@@ -618,7 +627,8 @@ function MembersTab({
                       tooltip={t("removeMember")}
                       icon={<UserMinus />}
                       onClick={async () => {
-                        await removeGroupMemberAction(group.id, member.userId);
+                        const removed = await removeGroupMemberAction(group.id, member.userId);
+                        onFailure(removed.ok ? null : removed.error);
                         onChanged();
                       }}
                     />
@@ -779,7 +789,7 @@ function GroupRoleCard({
     setSaving(true);
     setError(null);
     try {
-      await setGroupRoleAction(group.id, value === NO_ROLE ? null : value);
+      unwrap(await setGroupRoleAction(group.id, value === NO_ROLE ? null : value));
       onChanged();
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t("roleFailed"));
@@ -832,6 +842,7 @@ function AddMemberDialog({
   // Stays open while picking, so several people join in one go; Add commits the whole selection.
   const [selected, setSelected] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const memberIds = new Set(group.members.map((m) => m.userId));
   const available = users.filter((u) => !memberIds.has(u.id));
   const q = query.trim().toLowerCase();
@@ -846,6 +857,7 @@ function AddMemberDialog({
     if (!open) {
       setQuery("");
       setSelected([]);
+      setError(null);
     }
   }, [open]);
 
@@ -862,15 +874,14 @@ function AddMemberDialog({
       isSubmitDisabled={selected.length === 0}
       onSubmit={async () => {
         setSubmitting(true);
-        try {
-          await addGroupMembersAction(group.id, selected);
-          onAdded();
-        } finally {
-          setSubmitting(false);
-        }
+        const result = await addGroupMembersAction(group.id, selected);
+        setSubmitting(false);
+        if (result.ok) onAdded();
+        else setError(result.error);
       }}
     >
       <VStack gap={3}>
+        {error && <Banner status="error" title={error} />}
         <Text type="body" size="sm" weight="medium">
           {t("memberPickerLabel")}
         </Text>
@@ -961,12 +972,14 @@ function GroupFormDialog({
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const formId = initial ? "edit-group-form" : "create-group-form";
 
   useEffect(() => {
     if (open) {
       setName(initial?.name ?? "");
       setDescription(initial?.description ?? "");
+      setError(null);
     }
   }, [open, initial?.name, initial?.description]);
 
@@ -984,14 +997,21 @@ function GroupFormDialog({
         id={formId}
         action={async (formData) => {
           setSubmitting(true);
+          setError(null);
           try {
             await onSubmit(formData);
+          } catch (err) {
+            // A form action that throws takes the whole page down with it.
+            setError(
+              err instanceof Error && err.message ? err.message : tCommon("somethingWentWrong"),
+            );
           } finally {
             setSubmitting(false);
           }
         }}
       >
         <VStack gap={3}>
+          {error && <Banner status="error" title={error} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label={tCommon("name")}

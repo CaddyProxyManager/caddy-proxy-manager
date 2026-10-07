@@ -17,6 +17,7 @@ import {
   Server,
   Settings2,
   ShieldBan,
+  Unplug,
   UserCheck,
   Waypoints,
 } from "lucide-react";
@@ -93,6 +94,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "Host history",
             envSearch: ["HOST_HISTORY_KEEP_REVISIONS", "HOST_HISTORY_KEEP_DAYS"],
           },
+          {
+            id: "audit-retention",
+            name: "Audit log retention",
+            envSearch: ["AUDIT_LOG_KEEP_DAYS"],
+          },
         ],
       },
       {
@@ -156,6 +162,19 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "Agent",
             env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
             envSearch: ["CADDY_MONITOR_ENABLED"],
+          },
+        ],
+      },
+      {
+        id: "outbound",
+        name: "Outbound connections",
+        desc: "Offline mode, and every connection this deployment makes",
+        icon: Unplug,
+        blocks: [
+          {
+            id: "outbound",
+            name: "Outbound connections",
+            envSearch: ["OFFLINE_MODE"],
           },
         ],
       },
@@ -478,6 +497,7 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   "caddy-build": "orange",
   dashboard: "purple",
   agent: "teal",
+  outbound: "gray",
   email: "pink",
   dns: "cyan",
   network: "green",

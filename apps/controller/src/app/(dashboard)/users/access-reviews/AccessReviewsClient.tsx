@@ -50,6 +50,7 @@ import {
   deleteAccessReviewAction,
   reassignAccessReviewItemsAction,
 } from "./actions";
+import { type ActionResult, unwrap } from "@/src/lib/errors/action-result";
 
 type RoleOption = { key: string; name: string | null; builtIn: boolean };
 type Person = { id: number; label: string };
@@ -159,6 +160,7 @@ export default function AccessReviewsClient({
       </VStack>
       {campaigns.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           title={t("emptyTitle")}
           description={canManage ? t("emptyDescription") : t("emptyReviewerDescription")}
         />
@@ -325,6 +327,7 @@ function CampaignTable({
           if (!target) return;
           setError(null);
           deleteAccessReviewAction(target.id)
+            .then(unwrap)
             .catch((err: unknown) => setError(message(err, t("actionFailed"))))
             .finally(() => router.refresh());
         }}
@@ -369,13 +372,15 @@ function CreateDialog({
     setSaving(true);
     setError(null);
     try {
-      const id = await createAccessReviewAction({
-        name,
-        scope,
-        scopeRef,
-        dueOn,
-        reviewerIds: reviewers.map(Number),
-      });
+      const id = unwrap(
+        await createAccessReviewAction({
+          name,
+          scope,
+          scopeRef,
+          dueOn,
+          reviewerIds: reviewers.map(Number),
+        }),
+      );
       onClose();
       router.push(`/users/access-reviews?id=${id}`);
     } catch (err) {
@@ -518,10 +523,10 @@ function CampaignView({
     return t(`decisions.${item.decision}`);
   }
 
-  async function run(work: () => Promise<void>) {
+  async function run(work: () => Promise<ActionResult>) {
     setError(null);
     try {
-      await work();
+      unwrap(await work());
     } catch (err) {
       setError(message(err, t("actionFailed")));
     } finally {
@@ -711,7 +716,11 @@ function CampaignView({
         </MetadataList>
       </Card>
       {items.length === 0 ? (
-        <EmptyState title={t("noItemsTitle")} description={t("emptyReviewerDescription")} />
+        <EmptyState
+          headingLevel={2}
+          title={t("noItemsTitle")}
+          description={t("emptyReviewerDescription")}
+        />
       ) : (
         <Card padding={0}>
           <Table
@@ -806,11 +815,13 @@ function DecideDialog({
     setSaving(true);
     setError(null);
     try {
-      await decideAccessReviewItemAction(item.id, {
-        decision,
-        changeTo: decision === "change" ? changeTo : null,
-        note,
-      });
+      unwrap(
+        await decideAccessReviewItemAction(item.id, {
+          decision,
+          changeTo: decision === "change" ? changeTo : null,
+          note,
+        }),
+      );
       onSaved();
       onClose();
     } catch (err) {
@@ -893,7 +904,7 @@ function ReassignDialog({
     setSaving(true);
     setError(null);
     try {
-      await reassignAccessReviewItemsAction(campaignId, [item.id], Number(reviewer));
+      unwrap(await reassignAccessReviewItemsAction(campaignId, [item.id], Number(reviewer)));
       onSaved();
       onClose();
     } catch (err) {

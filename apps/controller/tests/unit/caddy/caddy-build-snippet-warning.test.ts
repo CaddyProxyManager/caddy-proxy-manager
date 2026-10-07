@@ -50,7 +50,7 @@ async function render(outcome: string): Promise<string | null> {
 }
 
 const ADVICE =
-  'which may reference a module you just switched off. Review them - a snippet Caddy can no longer adapt is skipped silently.';
+  'which may reference a module you just switched off. Review them: Caddy silently skips a snippet it can no longer adapt.';
 
 describe('describeCaddyfileSnippetWarning', () => {
   it('names the first three hosts and counts the rest', async () => {

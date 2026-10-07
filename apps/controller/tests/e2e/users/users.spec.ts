@@ -70,7 +70,7 @@ test.describe('Users page', () => {
   });
 
   test('admin user shows admin role badge', async ({ page }) => {
-    await expect(page.getByText('admin', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible();
   });
 
   test('clicking edit opens the edit dialog', async ({ page }) => {
@@ -232,7 +232,7 @@ test.describe('Users page', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(railRow(page, email)).toBeVisible({ timeout: 5000 });
-    await expect(railRow(page, email).getByText('viewer', { exact: true })).toBeVisible();
+    await expect(railRow(page, email).getByText('Viewer', { exact: true })).toBeVisible();
 
     const created = getUserRecord(email);
     expect(created.role).toBe('viewer');

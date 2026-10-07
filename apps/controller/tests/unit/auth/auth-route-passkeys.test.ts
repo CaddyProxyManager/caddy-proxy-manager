@@ -1,6 +1,7 @@
 /**
  * The /api/auth wrapper around the passkey routes: adding and removing one is audited, the shared
- * demo account cannot touch them, and a passkey sign-in skips the password path's throttle.
+ * demo account cannot touch them, a passkey sign-in skips the password path's throttle, and SCIM's
+ * other methods reach the library.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -8,6 +9,7 @@ import { testTranslator } from '@/tests/helpers/next-intl';
 
 const ctx = vi.hoisted(() => ({
   seen: [] as string[],
+  methods: [] as string[],
   status: 200,
   userId: '7',
   audits: [] as Array<{ action: string; summary: string; userId: number }>,
@@ -17,6 +19,7 @@ vi.mock('@/src/lib/auth/server', () => ({
   getAuth: async () => ({
     handler: async (request: Request) => {
       ctx.seen.push(new URL(request.url).pathname);
+      ctx.methods.push(request.method);
       return new Response('{}', { status: ctx.status });
     },
     api: { getSession: async () => ({ user: { id: ctx.userId } }) },
@@ -35,7 +38,7 @@ vi.mock('next-intl/server', () => ({
   getTranslations: async (namespace?: string) => testTranslator(namespace),
 }));
 
-import { GET, POST } from '@/src/app/api/auth/[...all]/route';
+import { DELETE, GET, PATCH, POST, PUT } from '@/src/app/api/auth/[...all]/route';
 
 const post = (path: string, body: unknown = {}) =>
   POST(
@@ -48,6 +51,7 @@ const post = (path: string, body: unknown = {}) =>
 
 beforeEach(() => {
   ctx.seen = [];
+  ctx.methods = [];
   ctx.status = 200;
   ctx.userId = '7';
   ctx.audits = [];
@@ -106,5 +110,27 @@ describe('/api/auth passkey routes', () => {
       new Request('http://localhost:3000/api/auth/passkey/generate-authenticate-options'),
     );
     expect(response.status).toBe(200);
+  });
+});
+
+// A method the route does not export answers 405 before the library sees it.
+describe('/api/auth beyond GET and POST', () => {
+  it("hands SCIM's PUT, PATCH and DELETE to the library, method and all", async () => {
+    for (const [method, handle] of [
+      ['PUT', PUT],
+      ['PATCH', PATCH],
+      ['DELETE', DELETE],
+    ] as const) {
+      const response = await handle(
+        new Request('http://localhost:3000/api/auth/scim/v2/Users/u1', {
+          method,
+          headers: { 'content-type': 'application/scim+json' },
+          ...(method === 'DELETE' ? {} : { body: '{}' }),
+        }),
+      );
+      expect(response.status).toBe(200);
+    }
+    expect(ctx.methods).toEqual(['PUT', 'PATCH', 'DELETE']);
+    expect(ctx.seen).toEqual(Array(3).fill('/api/auth/scim/v2/Users/u1'));
   });
 });

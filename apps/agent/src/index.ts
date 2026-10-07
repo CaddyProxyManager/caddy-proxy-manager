@@ -15,7 +15,7 @@ import {
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { stop as stopAnalytics } from "./analytics/runner";
-import { loadConfig } from "./config";
+import { effectiveBuildMode, loadConfig } from "./config";
 import { AgentStore } from "./db";
 import { DockerHost } from "./docker";
 import { AgentLifecycle } from "./lifecycle";
@@ -89,6 +89,7 @@ const config = loadConfig({
 });
 
 function localFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  // outbound: agentSocket
   return fetch(`http://agent.local${path}`, {
     unix: config.socketPath,
     signal: AbortSignal.timeout(20_000),
@@ -232,6 +233,7 @@ try {
 
 const store = new AgentStore(join(config.dataDir, "agent.db"));
 const docker = new DockerHost(config);
+docker.setBuildModeSource(() => effectiveBuildMode(config, store));
 const operations = new Operations(config, store, docker);
 
 operations.clearStaleStatuses();

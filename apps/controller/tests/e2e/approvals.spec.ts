@@ -100,7 +100,7 @@ test.describe('Change approvals', () => {
     await waitForHydration(page);
     await expect(page.getByText('This change is waiting for approvers')).toBeVisible();
     // Nobody approves their own change.
-    await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
     await expect(page.getByText(`${HOST} to ${RENAMED}`)).toBeVisible();
   });
 
@@ -129,10 +129,10 @@ test.describe('Change approvals', () => {
       await waitForHydration(page);
       await page.getByRole('link', { name: `Edit proxy host ${HOST}` }).click();
       await waitForHydration(page);
-      await page.getByRole('button', { name: 'Approve' }).click();
+      await page.getByRole('button', { name: 'Approve', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: /Approve change request/ });
       await dialog.getByLabel('Note for the requester').fill('Looks right');
-      await dialog.getByRole('button', { name: 'Approve' }).click();
+      await dialog.getByRole('button', { name: 'Approve', exact: true }).click();
       await expect(page.getByText('Approved and applied.')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Looks right')).toBeVisible();
       expect(await hostName(page, hostId)).toBe(RENAMED);

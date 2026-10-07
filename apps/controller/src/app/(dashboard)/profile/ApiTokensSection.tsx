@@ -169,7 +169,12 @@ export function ApiTokensSection({
                         }
                       />
                       {expired && <Badge variant="error" label={t("expired")} />}
-                      <form action={deleteApiTokenAction.bind(null, token.id)}>
+                      <form
+                        action={async () => {
+                          const result = await deleteApiTokenAction(token.id);
+                          onError(result.ok ? null : result.error);
+                        }}
+                      >
                         <IconButton
                           type="submit"
                           variant="ghost"
@@ -256,8 +261,8 @@ function CreateTokenDialog({
         scope,
         permissions,
       });
-      if ("error" in result) setError(result.error);
-      else onCreated(result.rawToken);
+      if (result.ok) onCreated(result.data.rawToken);
+      else setError(result.error);
     } catch (thrown) {
       setError(thrown instanceof Error ? thrown.message : t("apiTokenCreateFailed"));
     } finally {

@@ -59,6 +59,7 @@ function failure(error: unknown, target: string): DomainError {
 
 async function sendUdp(address: string, family: 4 | 6, port: number, datagrams: Buffer[]) {
   let drained: (() => void) | null = null;
+  // outbound: auditStreaming
   const socket = await Bun.udpSocket({
     hostname: family === 6 ? "::" : "0.0.0.0",
     socket: {

@@ -280,6 +280,78 @@ describe("the lifecycle", () => {
   });
 });
 
+describe("a controller in offline mode", () => {
+  function lifecycle(builds: string[][], loads: number[]) {
+    return new AgentLifecycle({
+      config: loadConfig(),
+      store,
+      docker: fakeDocker(),
+      operations: {
+        applyL4Ports: () => {},
+        whenIdle: (listener: () => void) => listener(),
+        applyManagedServices: () => {},
+        applyCaddyBuild: (modules: string[]) => builds.push(modules),
+        loadCaddyImage: () => {
+          loads.push(1);
+          return Promise.resolve();
+        },
+        syncModulesFromImage: async () => ({ state: "found", modules: [L4] }),
+      } as unknown as Operations,
+    });
+  }
+
+  const desired = (offline: boolean): AgentDesiredState => ({
+    l4Ports: [],
+    caddyModules: [TAILSCALE],
+    services: { services: { clickhouse: false }, env: {} },
+    fleetConfig: { clickhouse: null, analytics: false, geoip: null, offline },
+    caddyEnabled: false,
+  });
+
+  const push = (agent: AgentLifecycle, state: AgentDesiredState) =>
+    (agent as unknown as { handle(e: unknown): Promise<void> }).handle({
+      type: "desired-state",
+      state,
+    });
+
+  beforeEach(() => {
+    process.env.CADDY_BUILD_MODE = "agent";
+  });
+
+  it("makes a building agent act as external: no build, a load on request, and says so", async () => {
+    const builds: string[][] = [];
+    const loads: number[] = [];
+    const agent = lifecycle(builds, loads);
+    await push(agent, desired(true));
+    expect(builds).toEqual([]);
+    expect(store.controllerOffline()).toBe(true);
+
+    const command: AgentCommand = { id: "c1", kind: "caddy-image-load", request: {} };
+    const ran = await (
+      agent as unknown as { runCommand(c: AgentCommand): Promise<unknown> }
+    ).runCommand(command);
+    expect(ran).toMatchObject({ ok: true });
+    expect(loads).toEqual([1]);
+
+    const status = await buildStatus({ config: loadConfig(), store, docker: fakeDocker() });
+    expect(status.caddyBuild.external).toBeDefined();
+    agent.stop();
+  });
+
+  it("builds again once offline mode is off, and remembers either across a restart", async () => {
+    const builds: string[][] = [];
+    const agent = lifecycle(builds, []);
+    await push(agent, desired(true));
+    const reopened = new AgentStore(join(dir, "agent.db"));
+    expect(reopened.controllerOffline()).toBe(true);
+    reopened.close();
+    await push(agent, desired(false));
+    expect(builds).toEqual([[TAILSCALE]]);
+    expect(store.controllerOffline()).toBe(false);
+    agent.stop();
+  });
+});
+
 describe("status", () => {
   it("reports the image and ids an operator's build needs, and only in external mode", async () => {
     process.env.PUID = "1000";

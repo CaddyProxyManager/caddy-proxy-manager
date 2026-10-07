@@ -12,6 +12,7 @@ import {
   type PushTarget,
 } from "../models/push-subscriptions";
 import { getPublicBaseUrl } from "../http/public-url";
+import { outboundAllowed } from "../offline";
 import { decryptSecret, encryptSecret } from "../secrets";
 import { getSetting as getStoredJson, setSetting as setStoredJson } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
@@ -105,6 +106,8 @@ export async function sendPush(
 ): Promise<PushOutcome> {
   const outcome: PushOutcome = { delivered: 0, failed: 0 };
   try {
+    // Every push service is on the internet; subscriptions are kept for when it is turned off.
+    if (!(await outboundAllowed("webPush"))) return outcome;
     const recipients = targets ?? (await adminPushTargets());
     if (recipients.length === 0 || notices.length === 0) return outcome;
     const [{ publicKey, privateKey }, subject] = await Promise.all([

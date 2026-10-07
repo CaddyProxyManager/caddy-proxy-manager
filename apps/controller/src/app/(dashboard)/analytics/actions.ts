@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCan } from "@/src/lib/users/permissions";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { type ActionState, extractErrorMessage } from "@/src/lib/errors/action-error";
@@ -30,6 +31,7 @@ export async function listAnalyticsViewsAction(): Promise<
     const session = await requireCan("analytics:read");
     return { status: "success", views: await listAnalyticsViews(Number(session.user.id)) };
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "viewsLoadFailed");
   }
 }
@@ -51,6 +53,7 @@ export async function saveAnalyticsViewAction(input: {
     const t = await getTranslations("analytics");
     return { status: "success", message: t("viewSaved", { name: view.name }), view };
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "viewSaveFailed");
   }
 }
@@ -62,6 +65,7 @@ export async function deleteAnalyticsViewAction(id: number): Promise<ActionState
     const t = await getTranslations("analytics");
     return { status: "success", message: t("viewDeleted") };
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "viewDeleteFailed");
   }
 }

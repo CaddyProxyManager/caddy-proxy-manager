@@ -6,6 +6,7 @@
 
 import { APP_VERSION } from "./app-version";
 import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
+import { outboundAllowed } from "../offline";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 
@@ -254,11 +255,12 @@ async function settings(): Promise<{ enabled: boolean; repository: string }> {
     import("../settings/registry"),
     import("../settings/resolve"),
   ]);
-  const [enabled, repository] = await Promise.all([
+  const [enabled, repository, allowed] = await Promise.all([
     resolve(registry.updateCheckEnabled),
     resolve(registry.updateImageRepository),
+    outboundAllowed("updateCheck"),
   ]);
-  return { enabled, repository: canonicalRepository(repository) };
+  return { enabled: enabled && allowed, repository: canonicalRepository(repository) };
 }
 
 /** Several readers finding the cache stale at once ask only once. */
@@ -277,6 +279,12 @@ export async function checkForUpdates(): Promise<CachedCheck> {
       errorCode: null,
       repository,
     };
+
+    // Not stored: the cached answer from before offline mode stays for when it is turned off.
+    if (!(await outboundAllowed("updateCheck"))) {
+      recordFailure(result, domainError("outboundOffline"));
+      return result;
+    }
 
     const parsed = parseRepository(repository);
     if (!parsed) {

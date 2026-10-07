@@ -154,6 +154,14 @@ jobs:
             echo "The repository copy follows \`latest\` on purpose; this one is a snapshot of one"
             echo "release and says so."
             echo
+            echo "## Installing without internet access"
+            echo
+            echo "The image build attaches an air-gap bundle per architecture once it finishes:"
+            echo "\`-airgap-<web|caddy|agent>.tar.gz\` hold our images, \`-airgap-deploy.tar.gz\` the"
+            echo "deployment files and a load script, and the signed \`-airgap-manifest.txt\` their"
+            echo "checksums and the third-party images to bring in by digest. See"
+            echo "https://caddyproxy.com/start/offline/."
+            echo
             echo "## Changes"
             echo
             if [ -n "$PREVIOUS" ]; then
@@ -182,85 +190,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # An archive, as GitHub renames a dotfile asset (`.env.example`); tar.gz opens on
-          # Windows too. Flat, each directory a file prefix, and the staged compose file
-          # rewritten to mount from beside itself so it deploys as it unpacks.
-          # package <output> <name> <mounted docker/ dirs...>
-          package() {
-            local output="$1" name="$2"
-            shift 2
-            local dirs=("$@") staging base dir f entry want
-            local entries=(docker-compose.yml .env.example)
-            staging="$(mktemp -d)"
-            # What the rewrites below start from, and so what the image check compares against.
-            base=docker-compose.yml
-            cp .env.example "$staging/"
-            cp "$base" "$staging/docker-compose.yml"
-
-            # A missing bind source becomes an empty directory the proxy cannot render.
-            for dir in "${dirs[@]}"; do
-              for f in "docker/${dir}"/*; do
-                entry="${dir}-$(basename "$f")"
-                cp "$f" "${staging}/${entry}"
-                entries+=("$entry")
-              done
-              # Host side only.
-              sed -i "s#\./docker/${dir}/#./${dir}-#g" "$staging/docker-compose.yml"
-            done
-
-            # A snapshot with `:latest` would silently upgrade on a later redeploy. Only our three
-            # images: third-party ones are pinned already, and our version would name missing tags.
-            # Caddy's is the default inside `${CADDY_IMAGE:-...}`, so an own build can replace it.
-            sed -i -E \
-              "s#(image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
-              "$staging/docker-compose.yml"
-
-            for service in web caddy agent; do
-              if ! grep -qE "image: (\\\$\\{CADDY_IMAGE:-)?ghcr\.io/.*/${service}:${VERSION}\\}?\$" "$staging/docker-compose.yml"; then
-                echo "::error::${name}: docker-compose.yml does not pin ${service} to ${VERSION}"
-                grep -n 'image:' "$staging/docker-compose.yml"
-                exit 1
-              fi
-            done
-
-            # Nor too far. Compared, not listed, so a Dependabot bump cannot break the release.
-            if ! diff <(grep -E '^[[:space:]]*image:' "$base" | grep -vE '/(web|caddy|agent):') \
-                      <(grep -E '^[[:space:]]*image:' "$staging/docker-compose.yml" | grep -vE '/(web|caddy|agent):'); then
-              echo "::error::${name}: docker-compose.yml changed a third-party image reference"
-              exit 1
-            fi
-
-            # A sed that matched nothing would ship mounts of a directory the archive lacks.
-            if grep -qE '\./docker/' "$staging/docker-compose.yml"; then
-              echo "::error::${name}: docker-compose.yml still references ./docker/"
-              grep -nE '\./docker/' "$staging/docker-compose.yml"
-              exit 1
-            fi
-            for entry in "${entries[@]:2}"; do
-              if ! grep -q "\./${entry}:" "$staging/docker-compose.yml"; then
-                echo "::error::${name}: docker-compose.yml does not mount ${entry}"
-                exit 1
-              fi
-            done
-
-            tar -czf "$name" -C "$staging" "${entries[@]}"
-
-            # Asserted: a misnamed `.env.example` would look fine until someone deployed.
-            for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
-              if ! tar -tzf "$name" | grep -qxF "$want"; then
-                echo "::error::${name} is missing ${want}"
-                tar -tzf "$name"
-                exit 1
-              fi
-            done
-
-            echo "${output}=${name}" >> "$GITHUB_OUTPUT"
-            echo "--- ${name} ---"
-            tar -tzvf "$name"
-          }
-
-          # CrowdSec is in it but behind its Compose profile, so it starts only once turned on.
-          package name "caddy-proxy-manager-${TAG}-deploy.tar.gz" clickhouse socket-proxy crowdsec
+          # Flat, and its compose file rewritten to deploy as it unpacks; see the script.
+          name="caddy-proxy-manager-${TAG}-deploy.tar.gz"
+          ./scripts/package-deploy.sh "$VERSION" "$name"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
 
       - name: Create the tag and release
         if: steps.version.outputs.release == 'true'

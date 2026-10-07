@@ -117,8 +117,9 @@ export function DnsDelegationSection({
   const runCheck = useCallback(async () => {
     setChecking(true);
     try {
-      const results = await checkDnsDelegationsAction();
-      setChecks(new Map(results.map((check) => [check.domain, check])));
+      const result = await checkDnsDelegationsAction();
+      // A failed check shows no warning rather than a false one.
+      if (result.ok) setChecks(new Map(result.data.map((check) => [check.domain, check])));
     } finally {
       setChecking(false);
     }

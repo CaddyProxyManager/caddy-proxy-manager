@@ -29,6 +29,7 @@ import { Timestamp } from "@/components/ui/Timestamp";
 import type { SinkInput, SinkView } from "@/src/lib/audit-stream/sinks";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "../SettingsFrame";
+import { unwrap } from "@/src/lib/errors/action-result";
 import {
   type SinkTestOutcome,
   deleteSinkAction,
@@ -135,13 +136,13 @@ function message(error: unknown, fallback: string): string {
 function TestResult({ result }: { result: SinkTestOutcome }) {
   const t = useTranslations("settings.auditStreaming");
   if (!result.ok) {
-    return <Banner status="error" title={t("testFailed")} description={result.message} />;
+    return <Banner status="error" title={t("testFailed")} description={result.error} />;
   }
   return (
     <Banner
-      status={result.encodingRefused ? "warning" : "success"}
+      status={result.data.encodingRefused ? "warning" : "success"}
       title={t("testDelivered")}
-      description={result.encodingRefused ? t("testEncodingRefused") : undefined}
+      description={result.data.encodingRefused ? t("testEncodingRefused") : undefined}
     />
   );
 }
@@ -175,7 +176,7 @@ function SinkDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveSinkAction(editing?.id ?? null, inputOf(form));
+      unwrap(await saveSinkAction(editing?.id ?? null, inputOf(form)));
       onSaved();
       onClose();
     } catch (err) {
@@ -191,7 +192,7 @@ function SinkDialog({
     try {
       setTested(await testSinkAction(editing?.id ?? null, inputOf(form)));
     } catch (err) {
-      setTested({ ok: false, message: message(err, t("testFailed")) });
+      setTested({ ok: false, error: message(err, t("testFailed")) });
     } finally {
       setTesting(false);
     }
@@ -485,7 +486,7 @@ export default function AuditStreamingClient({
 
   async function reload() {
     try {
-      setSinks(await loadSinksAction());
+      setSinks(unwrap(await loadSinksAction()));
     } catch {
       router.refresh();
     }
@@ -494,7 +495,7 @@ export default function AuditStreamingClient({
   async function remove(sink: SinkView) {
     setError(null);
     try {
-      await deleteSinkAction(sink.id);
+      unwrap(await deleteSinkAction(sink.id));
     } catch (err) {
       setError(message(err, t("deleteFailed")));
     } finally {
@@ -508,7 +509,7 @@ export default function AuditStreamingClient({
     try {
       setTested({ name: sink.name, result: await testSinkAction(sink.id, null) });
     } catch (err) {
-      setTested({ name: sink.name, result: { ok: false, message: message(err, t("testFailed")) } });
+      setTested({ name: sink.name, result: { ok: false, error: message(err, t("testFailed")) } });
     } finally {
       setTesting(null);
     }

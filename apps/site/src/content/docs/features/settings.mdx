@@ -14,9 +14,10 @@ The search field at the top of the Settings overview finds a setting by what it 
 words someone might use for it: `smtp` finds **Email**, `prometheus` finds **Metrics & monitoring**,
 `redis` finds the **HTTP cache** storage, `mfa` finds **Two-factor sign-in**. It also reaches the
 pages that configure the instance outside the settings sections - **Backup and restore** and its
-portable configuration, [audit streaming](../audit-streaming/), settings history, the WAF's tuning, per-host modes and exclusions, blocked
-sources and the sign-in overview - and the environment variables each section reads. The same
-index answers the command palette (Ctrl/Cmd+K) from any page.
+portable configuration, [audit streaming](../audit-streaming/), settings history, the WAF's
+tuning, per-host modes and exclusions, blocked sources and the sign-in overview - and the
+environment variables each section reads. The same index answers the command palette (Ctrl/Cmd+K)
+from any page.
 
 ## How a value is resolved
 
@@ -73,9 +74,8 @@ the [host history](../host-history/) with it.
 
 - **The passphrase is the only protection.** Everything the database keeps encrypted is decrypted
   into the file, and the file is sealed with the passphrase - at least 12 characters - using scrypt
-  and AES-256-GCM. That is what
-  lets it restore onto a new machine whose `SESSION_SECRET` is different - and what makes losing the
-  passphrase the same as losing the backup.
+  and AES-256-GCM. That lets it restore onto a new machine whose `SESSION_SECRET` is different,
+  and it also makes losing the passphrase the same as losing the backup.
 - **Restoring replaces everything**, after showing what the file holds and when it was made. The
   configuration being replaced is saved first, under the same passphrase, to `backups/` on the
   controller's data volume. Everyone is signed out afterwards, and restoring needs a sign-in from

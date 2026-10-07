@@ -8,7 +8,7 @@ import AnalyticsDemo from "../../../demos/samples/AnalyticsDemo";
 import LogViewerDemo from "../../../demos/samples/LogViewerDemo";
 
 Traffic and WAF events are written to a bundled ClickHouse instance and queried back as charts. It
-is optional - everything else works without it.
+is optional; everything else works without it.
 
 <Demo title="Traffic analytics" note="Add a filter from any list row, group the chart differently, turn the comparison off, or show only mitigated requests. The numbers are made up in your browser.">
   <AnalyticsDemo client:visible />
@@ -16,12 +16,12 @@ is optional - everything else works without it.
 
 ## What you get
 
-- **Five headline numbers** - requests, bandwidth, unique IPs, mitigated requests (and their
-  share), and the 5xx rate - each with a sparkline and its change from the period before.
+- **Five headline numbers**: requests, bandwidth, unique IPs, mitigated requests (and their
+  share) and the 5xx rate, each with a sparkline and its change from the period before.
 - **Requests over time**, with the previous period drawn behind as a dashed line. Split the chart
   by outcome, status class or host (the five busiest, the rest together).
 - **Why each request ended.** Every request is recorded with its outcome: **served**, or the gate
-  that answered it - **WAF**, **geo block**, **access list** (a refused address), **sign-in** (a
+  that answered it, which is one of **WAF**, **geo block**, **access list** (a refused address), **sign-in** (a
   wrong basic-auth password, or a forward-auth server that said no), **rate limit** or
   **CrowdSec**. Anything but served counts as mitigated. Its duration is recorded too.
 - **Filters on everything**: host, path, country, network (ASN), status code or class (`404`,
@@ -38,8 +38,8 @@ is optional - everything else works without it.
 - **Ranges** of 1 hour, 24 hours, 7 days and 30 days, or a custom range of up to 92 days. Ranges of
   a day or less refresh every 30 seconds.
 
-The page's whole state - range, comparison, grouping, filters - is in its address, so a link opens
-exactly what you were looking at.
+The page keeps its whole state (range, comparison, grouping, filters) in its address, so a link
+opens exactly what you were looking at.
 
 ### Saved views
 
@@ -51,13 +51,13 @@ owner can change it. Each person can keep up to 100. Saving, changing and deleti
 
 ### How the outcome is worked out
 
-The generated Caddy config marks each gate a request reaches - WAF, geo block, access list,
-sign-in, rate limit, CrowdSec - and logs the last one it got to with the request. A request a gate
+The generated Caddy config marks each gate a request reaches (WAF, geo block, access list,
+sign-in, rate limit, CrowdSec) and logs the last one it got to with the request. A request a gate
 turns away never gets past the mark, so that gate is its outcome; one that clears them all is
 served. A host with no gates logs no mark and is always served.
 
-Rows recorded before this existed, or relayed by an agent older than it, count as served - or as
-geo-blocked where the geo blocker logged them - and have no duration. The network column needs the
+Rows recorded before this existed, or relayed by an agent older than it, count as served (or as
+geo-blocked where the geo blocker logged them) and have no duration. The network column needs the
 GeoLite2 ASN database, which the controller downloads with the others when a MaxMind key is set.
 
 A **WAF rule** filter matches requests by client and path against the WAF events the rule logged,
@@ -72,7 +72,7 @@ The controller also looks for traffic worth a look, over the last 24 hours:
   minutes, with runs less than three minutes apart joined. A burst with a 5xx in the last five
   minutes is still going on.
 - **Mitigation spikes**: at least 50 mitigated requests, and at least three times the average for a
-  window that long over the 7 days before it - for one host, or for all of them together.
+  window that long over the 7 days before it, for one host or for all of them together.
 - **Blocked traffic concentrations**: one host, path and outcome with at least 50 mitigated
   requests.
 
@@ -81,8 +81,8 @@ runs out is reported as skipped rather than holding the answer up.
 
 ## Turning it on
 
-Open **Settings → Observability → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
-starts the container. You do not change `.env` or list a compose profile, because the
+Open **Settings → Observability → Analytics**, tick **Collect analytics**, and set a ClickHouse
+password. Saving starts the container. You do not change `.env` or list a compose profile, because the
 [agent](../agent/) runs the compose command for you with the saved credentials.
 
 Three things to expect:
@@ -105,8 +105,9 @@ CLICKHOUSE_PASSWORD=your-clickhouse-password   # openssl rand -base64 32
 ## Retention
 
 30 days by default, enforced by ClickHouse's own TTL. Change it under **Settings → Observability →
-Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored). Saving it re-checks the schema
-on the next write, which migrates the existing tables' TTL and purges expired data, without a restart.
+Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored). Saving it re-checks the
+schema on the next write, which migrates the existing tables' TTL and purges expired data, without
+a restart.
 
 ## Disk writes
 
@@ -118,17 +119,17 @@ a day on an idle machine. CPM never queries them.
 
 **Logs** in the sidebar tails the raw logs, read through an agent so a remote host's are there too:
 
-- **Access** - every request Caddy logged, one line each, when access logging is on
+- **Access**: every request Caddy logged, one line each, when access logging is on
   (**Settings → Observability → Logging**). A proxy host's **Logs** action opens this, filtered to
   its domain.
-- **WAF** - the rules the WAF matched.
-- **Caddy** - Caddy's own output, straight from its container.
-- **Certificates** - just the issuance and renewal lines from Caddy's output, for when a certificate
+- **WAF**: the rules the WAF matched.
+- **Caddy**: Caddy's own output, straight from its container.
+- **Certificates**: only the issuance and renewal lines from Caddy's output, for when a certificate
   won't come through.
 
 It follows new lines as they arrive, pauses on request, and filters what it has on screen. It
-needs no ClickHouse: the agent reads Caddy's log files and its container's output. Only administrators can open it:
-access logs name every client and every path they asked for. An agent older than the log viewer
+needs no ClickHouse: the agent reads Caddy's log files and its container's output. Only
+administrators can open it, because access logs name every client and every path they asked for. An agent older than the log viewer
 can't serve it; update it.
 
 <Demo title="Logs" note="Switch the log or the agent, filter, or pause. The lines are made up in your browser.">

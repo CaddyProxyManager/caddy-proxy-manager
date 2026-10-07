@@ -120,11 +120,11 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
     setError(null);
     startListing(async () => {
       const result = await listCertificateFilesAction(Number(next));
-      if (!result.success) {
+      if (!result.ok) {
         setError(result.error);
         return;
       }
-      const list = result.value ?? [];
+      const list = result.data;
       setEntries(list);
       const first = defaultCertificatePath(list);
       if (first) chooseCertificate(first, list);
@@ -136,21 +136,19 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
     const formData = new FormData(formRef.current!);
     setError(null);
     startTransition(async () => {
-      if (isEdit) {
-        await updateCertificateAction(cert.id, formData);
-      } else if (source === "agent-file") {
-        const result = await createCertificateFromFilesAction({
-          name,
-          agentRowId: Number(agentId),
-          certPath,
-          keyPath,
-        });
-        if (!result.success) {
-          setError(result.error);
-          return;
-        }
-      } else {
-        await createCertificateAction(formData);
+      const result = isEdit
+        ? await updateCertificateAction(cert.id, formData)
+        : source === "agent-file"
+          ? await createCertificateFromFilesAction({
+              name,
+              agentRowId: Number(agentId),
+              certPath,
+              keyPath,
+            })
+          : await createCertificateAction(formData);
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
       handleClose();
     });

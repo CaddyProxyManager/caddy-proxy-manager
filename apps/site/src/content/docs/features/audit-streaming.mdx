@@ -25,7 +25,7 @@ a syslog server, an HTTP collector, or a file a local log shipper picks up. Each
   every batch. The URL and the header's value are stored encrypted and never shown again;
   pointing the sink at another address asks for the value again. Plain http is allowed only to an
   address on your own network.
-- **Request compression** is a setting per HTTP sink - none, gzip or zstd - because a request body
+- **Request compression** is a setting per HTTP sink (none, gzip or zstd), because a request body
   has no negotiation. If the receiver answers **415**, that batch is sent again uncompressed, the
   sink keeps sending uncompressed, and its page says so until the sink is saved again.
 - **UDP** has a largest datagram per sink, 2048 bytes unless set (480 to 65,507). A longer record
@@ -78,9 +78,10 @@ on the controller.
 
 ## Gaps
 
-Pruning never waits for a slow sink. If events a sink had not received are removed first, the sink
-is sent a record of kind `gap` in their place - `{"kind":"gap","stream":"audit","from":5,"to":12}` -
-and the next audit record links to the last one removed, which the receiver never saw. The page
+[Audit log retention](../audit-log/#retention) never waits for a slow sink. If events a sink had
+not received are removed first, the sink is sent a record of kind `gap` in their place
+(`{"kind":"gap","stream":"audit","from":5,"to":12}`), and the next audit record links to the last
+one removed, which the receiver never saw. The page
 shows the gap and how many records the sink has missed in all, and an alert is raised.
 
 ## Security events
@@ -106,6 +107,6 @@ access list, rate limit, CrowdSec and the rest) to the same sink as records of k
 
 ## API
 
-`auditSinks` and `createAuditSink`, `updateAuditSink`, `deleteAuditSink` and `testAuditSink` in
-[GraphQL](../api/). Reading needs the audit area; changing a sink needs a full-access token, since
+[GraphQL](../api/) has `auditSinks`, plus `createAuditSink`, `updateAuditSink`, `deleteAuditSink`
+and `testAuditSink`. Reading needs the audit area; changing a sink needs a full-access token, since
 a sink receives the whole log.

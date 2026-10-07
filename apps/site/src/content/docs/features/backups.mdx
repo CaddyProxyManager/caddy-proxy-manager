@@ -6,8 +6,9 @@ description: Download a sealed backup, restore one, or let schedules write them 
 **Settings → Backup** makes a backup of the whole configuration: hosts, certificates and their
 keys, access lists, users and their two-factor secrets, groups, API tokens, agents, backup
 destinations and schedules, and every setting. The audit log and the settings history (with the
-[host history](/features/host-history/)) can be included too. What a backup holds, and how a restore works, is described under
-[Settings](/features/settings/#backup-and-restore); this page is about making them on a schedule.
+[host history](/features/host-history/)) can be included too. What a backup holds, and how a
+restore works, is described under [Settings](/features/settings/#backup-and-restore); this page
+covers making them on a schedule.
 
 ## The file
 
@@ -18,8 +19,7 @@ and is encrypted again under that machine's key on the way in.
 
 The contents are compressed with zstd before they are sealed; the header says so and is
 authenticated with the rest, so it cannot be edited to skip or change that step. A restore stops
-unpacking at 512 MiB rather than filling memory. Backups made before compression was added still
-restore.
+unpacking at 512 MiB rather than filling memory. Older, uncompressed backups still restore.
 
 ## Destinations
 
@@ -30,15 +30,15 @@ A destination is where scheduled backups go. Add one under **Backup destinations
   with permission to write, read, list and delete objects in the bucket. Some services want the
   bucket in the host name (`bucket.endpoint`) rather than the path; turn on **Bucket in the host
   name** for those. Large backups are uploaded in parts.
-- **Local folder**: a folder under `backups/` on the controller's data volume. Handy for a first
-  setup or with something else copying the folder away, but a backup on the same disk does not
-  survive losing that disk.
+- **Local folder**: a folder under `backups/` on the controller's data volume. It suits a first
+  setup, or a host where something else copies the folder off the machine. A backup on the same
+  disk does not survive losing that disk.
 
 An optional prefix keeps the backups apart from anything else in the bucket. **Test** writes a
 small file, reads it back and deletes it, so a wrong key or bucket shows up before the first run.
 
 The secret access key is stored encrypted and never sent back to the browser. Leave the field empty
-to keep it - unless the endpoint, bucket or key ID changes, in which case it must be typed again,
+to keep it, unless the endpoint, bucket or key ID changes, in which case it must be typed again,
 so a stored key can never be pointed somewhere else.
 
 | Service | Endpoint | Bucket in the host name |
@@ -62,7 +62,7 @@ A schedule says when to back up, where to, and how many to keep:
 - **Prefix**: added after the destination's, e.g. `nightly/`. Each backup is named for the time it
   was due, in UTC: `nightly/cpm-backup-2026-10-06-02-00-00.cpmbak`.
 - **Keep the last** and **Keep for days**: after each run, older backups are deleted until both
-  rules are met - a backup stays while either rule keeps it. Leave both empty to keep everything.
+  rules are met; a backup stays while either rule keeps it. Leave both empty to keep everything.
   Only files a schedule names (`cpm-backup-*.cpmbak`), directly under its own prefix, are ever
   deleted.
 - **Passphrase**: what each backup is sealed with. It is stored on the instance, encrypted with
@@ -77,7 +77,7 @@ A schedule says when to back up, where to, and how many to keep:
 ### When a run is missed
 
 Runs happen on the controller running the background jobs. If no controller was running when one
-was due, the next to start runs the latest missed slot of each schedule once - not every slot it
+was due, the next to start runs the latest missed slot of each schedule once, not every slot it
 missed. With [several controllers](/features/high-availability/) each slot is claimed in the
 database before it starts, so a controller taking over just as one was due never runs it twice.
 

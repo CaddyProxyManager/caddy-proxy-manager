@@ -2,7 +2,8 @@
 
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { getPublicBaseUrl } from "@/src/lib/http/public-url";
 import {
@@ -25,9 +26,11 @@ async function audit(userId: number, action: string, provider: SamlProvider) {
   });
 }
 
-export async function createSamlProviderAction(input: SamlProviderInput): Promise<SamlProvider> {
-  const session = await requireCan("settings:write");
-  return withTranslatedErrors(async () => {
+export async function createSamlProviderAction(
+  input: SamlProviderInput,
+): Promise<ActionResult<SamlProvider>> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const userId = Number(session.user.id);
     const provider = await createSamlProvider(input, { baseUrl: await getPublicBaseUrl() });
     await audit(userId, "create", provider);
@@ -40,9 +43,9 @@ export async function createSamlProviderAction(input: SamlProviderInput): Promis
 export async function updateSamlProviderAction(
   id: string,
   input: Partial<SamlProviderInput>,
-): Promise<SamlProvider> {
-  const session = await requireCan("settings:write");
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<SamlProvider>> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const provider = await updateSamlProvider(id, input);
     await audit(Number(session.user.id), "update", provider);
     revalidatePath("/settings");
@@ -50,9 +53,9 @@ export async function updateSamlProviderAction(
   });
 }
 
-export async function deleteSamlProviderAction(id: string): Promise<void> {
-  const session = await requireCan("settings:write");
-  await withTranslatedErrors(async () => {
+export async function deleteSamlProviderAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const provider = await deleteSamlProvider(id);
     await audit(Number(session.user.id), "delete", provider);
     revalidatePath("/settings");

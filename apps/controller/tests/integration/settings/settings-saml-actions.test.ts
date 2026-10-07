@@ -33,6 +33,7 @@ import {
   updateSamlProviderAction,
 } from '@/src/app/(dashboard)/settings/saml-actions';
 import { updateSsoEnforcementSettingsAction } from '@/src/app/(dashboard)/settings/actions';
+import { unwrap } from '@/src/lib/errors/action-result';
 import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import { getSamlProvider } from '@/src/lib/models/saml-providers';
 import { auditEvents, oauthProviders, ssoProviders } from '@/src/lib/db/schema';
@@ -65,7 +66,7 @@ describe('SAML providers', () => {
       linkDomains: 'example.com',
       roleMappingEnabled: true,
       adminGroup: 'cpm-admins',
-    });
+    }).then(unwrap);
     expect(created).toMatchObject({
       name: 'Keycloak SAML',
       enabled: true,
@@ -90,12 +91,12 @@ describe('SAML providers', () => {
       entryPoint: 'https://idp.example.com/realms/cpm/protocol/saml',
     });
 
-    const disabled = await updateSamlProviderAction(created.id, { enabled: false });
+    const disabled = await updateSamlProviderAction(created.id, { enabled: false }).then(unwrap);
     expect(disabled.enabled).toBe(false);
     // A switch alone keeps the stored metadata and attributes.
     expect(disabled.metadataXml).toBe(created.metadataXml);
 
-    await deleteSamlProviderAction(created.id);
+    await deleteSamlProviderAction(created.id).then(unwrap);
     expect(await getSamlProvider(created.id)).toBeNull();
     expect(await ctx.db.select().from(ssoProviders)).toHaveLength(0);
 
@@ -121,7 +122,7 @@ describe('SAML providers', () => {
   it("says why bad metadata, a clashing name or a bad domain is refused, in the reader's words", async () => {
     const attempt = async (input: Parameters<typeof createSamlProviderAction>[0]) => {
       try {
-        await createSamlProviderAction(input);
+        await createSamlProviderAction(input).then(unwrap);
         return null;
       } catch (error) {
         return (error as Error).message;
@@ -138,7 +139,7 @@ describe('SAML providers', () => {
         linkDomains: 'not a domain',
       }),
     ).toBe(domainErrorMessage('samlLinkDomainInvalid', { domain: 'not a domain' }));
-    await createSamlProviderAction({ name: 'Taken', metadataXml: idp.metadata() });
+    await createSamlProviderAction({ name: 'Taken', metadataXml: idp.metadata() }).then(unwrap);
     expect(await attempt({ name: 'Taken', metadataXml: idp.metadata() })).toBe(
       domainErrorMessage('ldapDirectoryNameTaken', { name: 'Taken' }),
     );
@@ -148,7 +149,7 @@ describe('SAML providers', () => {
     ctx.session = { user: await seedUser(ctx.db, 'viewer@example.com', 'viewer') };
     let refused = false;
     try {
-      await createSamlProviderAction({ name: 'Nope', metadataXml: idp.metadata() });
+      await createSamlProviderAction({ name: 'Nope', metadataXml: idp.metadata() }).then(unwrap);
     } catch {
       refused = true;
     }
@@ -159,7 +160,9 @@ describe('SAML providers', () => {
 
 describe('single sign-on enforcement', () => {
   it('stages the policy for the operator to apply', async () => {
-    await createSamlProviderAction({ name: 'Keycloak SAML', metadataXml: idp.metadata() });
+    await createSamlProviderAction({ name: 'Keycloak SAML', metadataXml: idp.metadata() }).then(
+      unwrap,
+    );
     const result = await updateSsoEnforcementSettingsAction(
       null,
       form({ enforced: 'true', allowLdap: 'false', breakGlassUserIds: admin.id }),

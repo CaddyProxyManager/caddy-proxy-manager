@@ -111,8 +111,8 @@ before it ever reaches Authelia, Authentik or the built-in portal.
 ## Exempt paths
 
 A challenge needs a browser. An API client, a mobile app, an RSS reader or a webhook sender gets
-a redirect to an HTML page it cannot solve, so list the paths they use - `/api/*`, `/feed.xml`,
-`/hooks/*` - under **Exempt paths**. They are Caddy path patterns, matched against the path the
+a redirect to an HTML page it cannot solve, so list the paths they use (`/api/*`, `/feed.xml`,
+`/hooks/*`) under **Exempt paths**. They are Caddy path patterns, matched against the path the
 visitor sent.
 
 Anubis's own policy can also let requests through, by path, user agent or address, with an `ALLOW`

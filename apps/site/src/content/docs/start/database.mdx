@@ -55,7 +55,7 @@ nothing has to be set up again.
 
 The source is `DATABASE_URL` and the target the `POSTGRES_*` values unless you name them:
 `--from file:/app/data/cpm.db` and `--to postgres://user:password@host:5432/cpm`. The target must be
-empty - a database that already holds rows is refused, unless `--allow-non-empty` asks to skip the
+empty: a database that already holds rows is refused, unless `--allow-non-empty` asks to skip the
 rows whose key is already taken, which the counts then report. From a checkout, the same command is
 `bun scripts/sqlite-to-postgres.ts` in `apps/controller`.
 

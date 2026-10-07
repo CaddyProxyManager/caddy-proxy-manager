@@ -73,6 +73,7 @@ import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/Dash
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 import { managedServiceView } from "@/src/lib/agent/managed-services";
+import { outboundCallViews } from "@/src/lib/offline";
 
 /** The section's own name: a screen reader announces the title on every switch between them. */
 export async function generateMetadata({
@@ -228,6 +229,9 @@ export default async function SettingsSectionPage({
   const dashboardSettings = dashboard ?? defaultDashboardSettings();
   const crowdsecManaged =
     section === "crowdsec" ? await managedServiceView("crowdsec", tRoot) : null;
+  // Every section: the client switches between them without a load. Staged, so a staged offline
+  // switch shows what applying it would turn off.
+  const outboundCalls = await withStagedReads(overlay, () => outboundCallViews());
 
   // Only on the dashboard section, so other sections don't pay for the host form's pickers.
   let dashboardOptions: DashboardHostOptionsData | null = null;
@@ -341,6 +345,7 @@ export default async function SettingsSectionPage({
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,
       }}
+      outboundCalls={outboundCalls}
       registry={registry}
       sequentialUserIdsField={registry["forward-auth"]?.find(
         (field) => field.key === forwardAuthSequentialUserIds.key,

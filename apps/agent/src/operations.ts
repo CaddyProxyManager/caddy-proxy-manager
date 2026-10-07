@@ -335,7 +335,7 @@ export class Operations {
           said(
             "imageUnhealthy",
             `Caddy's health check reports "${health}" on the new image. Check the Caddy container ` +
-              "logs - a config referencing a module the image lacks will fail to load.",
+              "logs: a config that uses a module the image lacks fails to load.",
             { health },
           ),
           `health=${health}`,
@@ -445,7 +445,7 @@ export class Operations {
         // Usually the running config naming a plugin the new binary lacks.
         const message =
           `Caddy was rebuilt but its health check reports "${health}". Check the Caddy ` +
-          `container logs - a config referencing a removed module will fail to load.`;
+          `container logs: a config that uses a removed module fails to load.`;
         this.store.setCaddyBuildStatus({
           state: "failed",
           ...said("buildUnhealthy", message, { health }),
@@ -536,7 +536,7 @@ export class Operations {
         const detail = failures.join("; ");
         this.store.setManagedServicesStatus({
           state: "failed",
-          ...said("servicesPartial", `Could not apply every optional service - ${detail}`, {
+          ...said("servicesPartial", `Could not apply every optional service: ${detail}`, {
             detail,
           }),
           triggeredAt,

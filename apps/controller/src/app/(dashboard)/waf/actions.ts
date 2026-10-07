@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -86,6 +87,7 @@ export async function saveWafPresetAction(
     revalidatePath("/waf");
     return actionSuccess(t("presetCreated", { name: input.name.trim() }));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "presetSaveFailed");
   }
 }
@@ -101,6 +103,7 @@ export async function deleteWafPresetAction(id: number): Promise<ActionState> {
     const t = await getTranslations("waf");
     return actionSuccess(t("presetDeleted"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "presetDeleteFailed");
   }
 }
@@ -148,6 +151,7 @@ export async function listCrsRegistryAction(): Promise<CrsRegistryListing> {
     await requireCan("security:read");
     return { status: "success", ...(await overview()) };
   } catch (error) {
+    unstable_rethrow(error);
     const result = await failure(error, "pluginRegistryFailed");
     return { status: "error", message: result.message };
   }
@@ -163,6 +167,7 @@ export async function checkCrsRegistryNowAction(): Promise<CrsRegistryListing> {
     revalidatePath("/waf");
     return { status: "success", ...(await overview(state)) };
   } catch (error) {
+    unstable_rethrow(error);
     const result = await failure(error, "pluginRegistryCheckFailed");
     return { status: "error", message: result.message };
   }
@@ -185,6 +190,7 @@ export async function saveCrsRegistrySettingsAction(
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginRegistrySaved"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginRegistrySaveFailed");
   }
 }
@@ -203,6 +209,7 @@ export async function installCrsPluginAction(
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginInstalled", { name: plugin.name, version: plugin.version }));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginInstallFailed");
   }
 }
@@ -216,6 +223,7 @@ export async function checkCrsPluginUpdatesAction(): Promise<CrsPluginUpdateChec
     await requireCan("security:read");
     return { status: "success", updates: Object.fromEntries(await checkCrsPluginUpdates()) };
   } catch (error) {
+    unstable_rethrow(error);
     const result = await failure(error, "pluginUpdateFailed");
     return { status: "error", message: result.message };
   }
@@ -232,6 +240,7 @@ export async function updateCrsPluginAction(id: number): Promise<ActionState> {
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginUpdated", { name: plugin.name, version: plugin.version }));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginUpdateFailed");
   }
 }
@@ -250,6 +259,7 @@ export async function saveCrsPluginConfigAction(
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginConfigSaved", { name: plugin.name }));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginConfigFailed");
   }
 }
@@ -265,6 +275,7 @@ export async function uninstallCrsPluginAction(id: number): Promise<ActionState>
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginUninstalled"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginUninstallFailed");
   }
 }
@@ -280,6 +291,7 @@ export async function retryCrsPluginAction(id: number, name: string): Promise<Ac
       ? actionSuccess(t("pluginRetryWorked", { name }))
       : { status: "error", message: t("pluginRetryFailed", { name }) };
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "pluginRetryError");
   }
 }
@@ -303,6 +315,7 @@ export async function saveWafExclusionAction(
     const t = await getTranslations("waf");
     return actionSuccess(id === null ? t("exclusionCreated") : t("exclusionUpdated"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "exclusionSaveFailed");
   }
 }
@@ -319,6 +332,7 @@ export async function deleteWafExclusionAction(id: number): Promise<ActionState>
     const t = await getTranslations("waf");
     return actionSuccess(t("exclusionDeleted"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "exclusionDeleteFailed");
   }
 }
@@ -332,6 +346,7 @@ export async function getWafEventDetailAction(key: string): Promise<WafEventDeta
     await requireCan("security:read");
     return { status: "success", detail: await getWafEventDetail(key) };
   } catch (error) {
+    unstable_rethrow(error);
     const result = await failure(error, "eventDetailFailed");
     return { status: "error", message: result.message };
   }
@@ -348,6 +363,7 @@ export async function reviewWafEventAction(
     const t = await getTranslations("waf");
     return actionSuccess(verdict === null ? t("reviewCleared") : t("reviewSaved"));
   } catch (error) {
+    unstable_rethrow(error);
     return failure(error, "reviewFailed");
   }
 }

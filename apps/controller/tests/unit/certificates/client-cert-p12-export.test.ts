@@ -29,6 +29,7 @@ import {
   generateCaCertificateAction,
   issueClientCertificateAction,
 } from '@/src/app/(dashboard)/certificates/ca-actions';
+import { unwrap } from '@/src/lib/errors/action-result';
 import {
   createCaCertificate,
   getCaCertificate,
@@ -68,8 +69,18 @@ async function issue(password = 'Correct-Horse-Battery-Staple1!') {
   form.set('common_name', 'alice');
   form.set('validity_days', '365');
   form.set('export_password', password);
-  const result = await issueClientCertificateAction(1, form);
+  const result = unwrap(await issueClientCertificateAction(1, form));
   return Buffer.from(result.pkcs12Base64, 'base64');
+}
+
+/** The error a refused issue answers with. */
+async function refusal(password: string): Promise<string> {
+  const form = new FormData();
+  form.set('common_name', 'alice');
+  form.set('export_password', password);
+  const result = await issueClientCertificateAction(1, form);
+  if (result.ok) throw new Error('expected a refusal');
+  return result.error;
 }
 
 describe('client certificate .p12 export', () => {
@@ -118,17 +129,17 @@ describe('client certificate .p12 export', () => {
   it('refuses an export password weaker than a login password', async () => {
     // Once the .p12 leaves as a file, this password is all that protects the private key.
     for (const weak of ['short', 'alllowercaseletters1!', 'NoDigitsInHere!!', 'NoSpecialChar123']) {
-      await expect(issue(weak)).rejects.toThrow(/Export password must/);
+      expect(await refusal(weak)).toMatch(/Export password must/);
     }
   });
 
   it('still refuses an empty export password', async () => {
-    await expect(issue('')).rejects.toThrow(/Export password is required/);
+    expect(await refusal('')).toMatch(/Export password is required/);
   });
 
   it('does no key generation when the password is rejected', async () => {
     // Otherwise a rejected request still costs the 2048-bit keygen and the database write.
-    await expect(issue('short')).rejects.toThrow();
+    expect(await refusal('short')).toBeString();
     expect(createIssuedClientCertificate).not.toHaveBeenCalled();
   });
 
@@ -155,7 +166,7 @@ describe('CA generation', () => {
     form.set('common_name', 'Internal CA');
     form.set('validity_days', '3650');
 
-    const result = await generateCaCertificateAction(form);
+    const result = unwrap(await generateCaCertificateAction(form));
     expect(result.id).toBe(7);
 
     const [input] = vi.mocked(createCaCertificate).mock.calls[0];

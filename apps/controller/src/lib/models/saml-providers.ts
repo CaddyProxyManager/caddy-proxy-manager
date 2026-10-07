@@ -18,7 +18,7 @@ import {
 } from "../roles/mappings";
 import { domainError } from "../errors/domain-error";
 import type { OAuthGroupMapping } from "./oauth-providers";
-import { fetchIdpMetadata, readIdpMetadata } from "../auth/saml/metadata";
+import { fetchIdpMetadata, readIdpMetadata, withUnsignedRequests } from "../auth/saml/metadata";
 import { SAML_GROUPS_FIELD, SAML_PROVIDER_TYPE, defaultSpEntityId } from "../auth/saml/urls";
 import type { OutboundFetch } from "../http/outbound";
 import { hasForbiddenControlCharacter } from "../settings/validation";
@@ -196,7 +196,7 @@ function samlConfig(spEntityId: string, metadataXml: string, attributes: Record<
   return JSON.stringify({
     issuer: spEntityId,
     entryPoint: idp.ssoUrl,
-    idpMetadata: { metadata: metadataXml.trim() },
+    idpMetadata: { metadata: withUnsignedRequests(metadataXml.trim()) },
     // The plugin then refuses an assertion that is not itself signed: a signed response around
     // an unsigned assertion is how signature wrapping gets in.
     wantAssertionsSigned: true,

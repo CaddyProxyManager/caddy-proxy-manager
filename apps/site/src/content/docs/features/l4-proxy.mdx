@@ -67,8 +67,9 @@ breaks the connection outright.
 
 ## Load balancing and health
 
-Seven selection policies, with active and passive health checks - a smaller set than the
-[HTTP hosts](../reverse-proxy/) have, since a stream has no URI or status to check: port, interval
+L4 hosts have seven selection policies and both active and passive health checks. The check
+options are fewer than on [HTTP hosts](../reverse-proxy/), since a stream has no URI or status to
+check: port, interval
 and timeout for active checks, fail duration and max fails for passive ones. There are no retries:
 a try duration and interval keep a new connection looking for a healthy upstream instead.
 
@@ -85,8 +86,7 @@ a connection: one from a client the list denies is closed before anything is pro
 hostname, country, continent and ASN rules all apply (the last three need the Geo Blocking module,
 as on HTTP). Only the rules apply - there is no request at this layer to ask a password in or send
 a deny response to - so the editor offers only lists that have some, and a list an L4 host uses
-keeps at least one rule. Behind a load balancer,
-turn on **Accept inbound PROXY protocol**: the rules, like geo blocking, then check the client in
+keeps at least one rule. Behind a load balancer, turn on **Accept inbound PROXY protocol**: the rules, like geo blocking, then check the client in
 the header rather than the balancer.
 
 With [CrowdSec](../crowdsec/) set up, an L4 host also closes connections from addresses CrowdSec
@@ -105,8 +105,8 @@ log before relying on a rule. The same applies to HTTP hosts.
 A published port has to exist on the container, and container ports are fixed when the container is
 created. Adding an L4 host therefore needs the Caddy container recreated - the [agent](../agent/)
 writes a compose override with the new port list and recreates Caddy, so the port appears without
-you editing a compose file. The dashboard shows when a port change is pending, and **Apply**
-is what recreates the container - it is not done behind your back.
+you editing a compose file. The dashboard shows when a port change is pending, and the container
+is recreated only when you press **Apply**.
 
 An agent publishes at most 2000 ports. Docker starts a `docker-proxy` process for every published
 port and address family, so for large ranges set `"userland-proxy": false` in Docker's

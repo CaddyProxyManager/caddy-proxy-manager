@@ -15,15 +15,15 @@
     "items": {
       "certificateExpired": {
         "title": "Certificate {name} has expired",
-        "detail": "It ran out on {date, date, medium}. Renew or replace it before clients stop connecting."
+        "detail": "It expired on {date, date, medium}. Renew or replace it before clients stop connecting."
       },
       "certificateExpiring": {
         "title": "Certificate {name} expires in {days, plural, one {# day} other {# days}}",
-        "detail": "Valid until {date, date, medium}. A certificate Caddy manages this close to expiry means its renewal is failing."
+        "detail": "Valid until {date, date, medium}. If Caddy manages it, being this close to expiry means its renewal is failing."
       },
       "certificateFileError": {
         "title": "Certificate {name} could not be read from its file",
-        "detail": "The last read failed ({error}). The copy read before is still being served."
+        "detail": "The last read failed ({error}). Caddy keeps serving the copy it read before."
       },
       "caddyApplyFailed": {
         "title": "{scope, select, agent {Caddy on {agent} refused the last configuration} other {Caddy refused the last configuration}}",
@@ -62,7 +62,7 @@
         "detail": "{stage, select, connect {Connecting to it failed} bind {Its service account could not bind} search {Reading its base DN failed} other {Its check failed}}, so sign-ins through it will fail."
       },
       "accountLocked": {
-        "title": "{email} is being made to wait after failed sign-ins",
+        "title": "{email} is locked for a while after failed sign-ins",
         "detail": "It can try again at {until, time, short}. Repeated failures can mean someone is guessing the password."
       },
       "accountDisabled": {
@@ -110,7 +110,7 @@
   "accessLists": {
     "network": "Network",
     "ipRuleCount": "{count, plural, one {# rule} other {# rules}}",
-    "ipRulesHelp": "Allow or deny by the client's IP address, checked top to bottom - the first rule that matches decides. Addresses are read after Settings > Network > Trusted proxies, so a CDN or load balancer in front is seen through. A hostname, such as a dynamic-DNS name, is looked up again as its record expires and stands for every address it resolves to: an IPv4 address exactly, an IPv6 one with its /64 (end the name in /56, /128 and so on to change that).",
+    "ipRulesHelp": "Allow or deny by the client's IP address. Rules are checked top to bottom and the first match decides. The address is taken after Settings > Network > Trusted proxies applies, so a CDN or load balancer in front does not hide the client. A hostname, such as a dynamic-DNS name, is looked up again when its record expires and matches every address it resolves to: an IPv4 address exactly, an IPv6 address with its /64 (end the name in /56, /128 and so on to change that).",
     "ipAction": "Action",
     "ipAllow": "Allow",
     "ipDeny": "Deny",
@@ -120,7 +120,7 @@
     "ipHostnameFailed": "{action, select, allow {Could not be resolved, so this rule admits nobody} other {Could not be resolved, so this rule denies nobody}}: {error}",
     "ipHostnamePending": "{action, select, allow {Not looked up yet. Until it is, this rule admits nobody.} other {Not looked up yet. Until it is, this rule denies nobody.}}",
     "ipHostnameFailOpenTitle": "A deny rule is not blocking anyone",
-    "ipHostnameFailOpenHelp": "Its hostname has not resolved, and a name that does not resolve stands for no addresses. The rule starts working as soon as a lookup succeeds.",
+    "ipHostnameFailOpenHelp": "Its hostname has not resolved, and a name that does not resolve matches no addresses. The rule starts working as soon as a lookup succeeds.",
     "ipNote": "Note",
     "ipMoveUp": "Move rule {index} up",
     "ipMoveDown": "Move rule {index} down",
@@ -165,10 +165,10 @@
       "never": "Never"
     },
     "failClosed": "Fail closed",
-    "failClosedHelp": "Refuse a request whose client cannot be told apart from a trusted proxy, for example one arriving through a proxy without X-Forwarded-For, before any rule or password is checked. Needs the Geo Blocking module and trusted proxies to be set.",
+    "failClosedHelp": "Refuse a request when its client cannot be distinguished from a trusted proxy, for example one that arrives through a proxy without X-Forwarded-For. This check runs before any rule or password. Needs the Geo Blocking module and trusted proxies to be set.",
     "denyResponse": "Deny response",
     "saveDenyResponse": "Save deny response",
-    "denyResponseHelp": "What a request the rules refuse gets back. With Satisfy set to Any, a refused visitor is asked for a password instead. Lists with a country, continent or ASN rule answer a visitor who sends credentials on the password alone.",
+    "denyResponseHelp": "The response to a request the rules refuse. With Satisfy set to Any, a refused visitor is asked for a password instead. On a list with a country, continent or ASN rule, a visitor who sends credentials is judged on the password alone.",
     "denyMode": "Respond with",
     "denyModes": {
       "default": "403 Access denied",
@@ -192,7 +192,7 @@
     "satisfyHelp": "With Any, an allowed address gets in without a password and everyone else is asked for one. A denied address is asked for a password too, rather than turned away.",
     "satisfyNeedsBoth": "Only matters once the list has both users and IP rules.",
     "passAuth": "Pass auth to host",
-    "passAuthHelp": "Forward the username and password to the upstream application. Off, it never sees them - leave it off unless the application itself reads them.",
+    "passAuthHelp": "Forward the username and password to the upstream application. When off, the application never sees them. Leave it off unless the application reads them itself.",
     "createListDescription": "Define a set of credentials you can attach to one or more proxy hosts.",
     "created": "Created",
     "dangerZone": "Danger zone",
@@ -228,7 +228,7 @@
     "selectionEmptyTitle": "Select an access list",
     "sortAccessLists": "Sort access lists",
     "unusedBadge": "unused",
-    "unusedListDescription": "This list is dormant. You can keep it for later, or delete it from Settings.",
+    "unusedListDescription": "You can keep it for later, or delete it from Settings.",
     "unusedListTitle": "Not used by any proxy host",
     "usernameAlreadyExists": "Username already exists",
     "strength": {
@@ -269,7 +269,6 @@
     "removedMemberToast": "Removed member",
     "addedToast": "Added {username}",
     "deletedToast": "Deleted \"{name}\"",
-    "deleteFailed": "Failed to delete access list",
     "createdToast": "Created \"{name}\"",
     "deleteInUseWarning": "This list is used by {count, plural, one {# host} other {# hosts}}. Choose another list on them before deleting it.",
     "deleteUnusedWarning": "Once deleted, the credentials cannot be recovered.",
@@ -292,7 +291,7 @@
     "fleetBuild": "Fleet default",
     "logAccessCleanupBlocked": "Caddy can write {path} but not list it, so rolled logs are never compressed or deleted and will fill the disk. Run on the agent's host:",
     "logAccessGroupMismatch": "{path} belongs to group {gid}, which the agent is not in, so it cannot use Caddy's logs. Set CADDY_GID={gid} in .env, then recreate the agent:",
-    "logAccessNotTruncatable": "The agent cannot write {path}, so it cannot truncate the file once ingested and it will keep growing. Run on the agent's host:",
+    "logAccessNotTruncatable": "The agent cannot write {path}, so it cannot truncate the file after reading it, and the file keeps growing. Run on the agent's host:",
     "logAccessTitle": "Caddy's log permissions need fixing",
     "logAccessUnreadable": "The agent cannot read {path}, so its events are not being recorded. Run on the agent's host:",
     "noneDescription": "Pair an agent from Settings → Agent to start serving traffic.",
@@ -325,7 +324,7 @@
       "imageNarrowing": "Waiting for the controller to stop using modules the new image lacks.",
       "imageRecreateFailed": "Recreating Caddy on the new image failed; the running container was left untouched. {detail}",
       "imageModulesUnreadableAfter": "Caddy was recreated, but its module list could not be read: {detail}",
-      "imageUnhealthy": "Caddy's health check reports \"{health}\" on the new image. Check the Caddy container logs - a config referencing a module the image lacks fails to load.",
+      "imageUnhealthy": "Caddy's health check reports \"{health}\" on the new image. Check the Caddy container logs: a config that uses a module the image lacks fails to load.",
       "imageLoaded": "{named, select, yes {Loaded {image} with {count, plural, one {# module} other {# modules}}.} other {Loaded the image with {count, plural, one {# module} other {# modules}}.}}",
       "imageLoadedNoList": "{named, select, yes {Loaded {image}} other {Loaded the image}}, which has no {path}, so it is treated as having no plugins. Build it from docker/caddy/Dockerfile.",
       "imageLoadFailed": "Loading the Caddy image failed: {detail}",
@@ -334,13 +333,13 @@
       "buildTimedOut": "Caddy image build failed; the running container was left untouched. The build was abandoned after {seconds}s.",
       "buildFailedOutput": "Caddy image build failed; the running container was left untouched. {detail}",
       "buildRecreateFailed": "Caddy was built, but recreating the container failed: {detail}",
-      "buildUnhealthy": "Caddy was rebuilt but its health check reports \"{health}\". Check the Caddy container logs - a config referencing a removed module fails to load.",
+      "buildUnhealthy": "Caddy was rebuilt but its health check reports \"{health}\". Check the Caddy container logs: a config that uses a removed module fails to load.",
       "buildApplied": "Caddy was rebuilt with the selected modules and is healthy.",
       "buildFailed": "The rebuild failed: {detail}",
       "servicesInterrupted": "The agent restarted while starting the optional services. Save the settings again to retry.",
       "servicesStarting": "Starting {services}. The first start pulls the image, which can take a few minutes.",
       "servicesStopping": "Stopping the optional services.",
-      "servicesPartial": "Could not apply every optional service - {detail}",
+      "servicesPartial": "Could not apply every optional service: {detail}",
       "servicesRunning": "Running: {services}.",
       "servicesOff": "The optional services are off.",
       "servicesFailed": "Applying the optional services failed: {detail}"
@@ -521,7 +520,7 @@
     "loading": "Loading the API reference…",
     "openApiSpec": "OpenAPI spec",
     "restApi": "REST API",
-    "restApiNote": "Bearer-token authenticated. Group grants are applied per request, so a scoped token sees a scoped list."
+    "restApiNote": "Authenticated with a bearer token. Group grants apply to each request, so a scoped token sees only what its scope allows."
   },
   "auditLog": {
     "action": "Action",
@@ -699,6 +698,7 @@
       "settingsApplied": "Applied settings revision {revision}",
       "auditChainVerified": "Verified the audit log's hash chain",
       "auditChainRekeyed": "Re-keyed the audit log's hash chain",
+      "auditPruned": "Removed audit events older than {cutoff} ({count})",
       "configExported": "Exported the configuration",
       "configImported": "Imported a configuration ({created} created, {updated} updated, {skipped} skipped)",
       "viewAsStarted": "Started viewing the dashboard as {role}",
@@ -752,7 +752,8 @@
       "samlProviderCreated": "Created SAML provider {name}",
       "samlProviderUpdated": "Updated SAML provider {name}",
       "samlProviderDeleted": "Deleted SAML provider {name}",
-      "ssoEnforcementLiftedConsole": "Lifted single sign-on enforcement from the server console"
+      "ssoEnforcementLiftedConsole": "Lifted single sign-on enforcement from the server console",
+      "geoipDatabaseUploaded": "Uploaded GeoIP database {name}"
     }
   },
   "auth": {
@@ -942,9 +943,7 @@
     "issuedLine": "Issued {date}",
     "fingerprintLine": "SHA-256 {fingerprint}",
     "revokedLine": "Revoked {date}",
-    "deleteCaCertificateConfirm": "Delete CA certificate <strong>{name}</strong>? This cannot be undone. Proxy hosts using this CA for mTLS will stop requiring client certificates.",
-    "deleteFailed": "Failed to delete",
-    "deleteCaCertificateFailed": "Failed to delete CA certificate"
+    "deleteCaCertificateConfirm": "Delete CA certificate <strong>{name}</strong>? This cannot be undone. Proxy hosts using this CA for mTLS will stop requiring client certificates."
   },
   "caddyModules": {
     "adding": "Adding:",
@@ -960,7 +959,7 @@
     "loadingImage": "Loading the Caddy image…",
     "buildTarget": "Module selection for",
     "buildTargetHelp": "Agents without a selection of their own follow the fleet default.",
-    "customModuleHelp": "Any Caddy plugin published as a Go module. Compiled from source at build time, so an unreachable or non-building module fails the rebuild, which leaves the running container untouched.",
+    "customModuleHelp": "Any Caddy plugin published as a Go module. It is compiled from source at build time, so a module that cannot be fetched or does not build fails the rebuild. The running container is left untouched.",
     "fleetDefault": "Fleet default (all agents)",
     "followFleetDefault": "Follow the fleet default",
     "followFleetDefaultHelp": "Clear this agent's own selection so it tracks the fleet default again.",
@@ -977,7 +976,7 @@
     "rebuildCouldNotStartHttp": "Rebuild could not be started (HTTP {status}).",
     "rebuildDescription": "Compiling Caddy takes several minutes. The proxy keeps serving on the current binary until the new one is ready, then restarts.",
     "rebuildFailedToStart": "Rebuild failed to start",
-    "rebuildRequiredDescription": "Turning a module off stops this app from generating config for it right away. Removing it from the binary - and adding a new one - needs a rebuild, which restarts the proxy.",
+    "rebuildRequiredDescription": "Turning a module off stops this app from generating config for it right away. Removing it from the binary, or adding a new one, needs a rebuild, which restarts the proxy.",
     "rebuildRequiredTitle": "Plugins are compiled into Caddy",
     "removing": "Removing:",
     "categoryProxy": "Proxying",
@@ -1063,14 +1062,13 @@
     "renewing": "Renewing…",
     "issuedBy": "Issued by {issuer}",
     "renew": "Renew",
-    "renewRequested": "Caddy is renewing it. The current certificate keeps working meanwhile.",
+    "renewRequested": "Caddy is renewing it. The current certificate keeps working in the meantime.",
     "renewFailed": "Could not ask Caddy to renew",
     "renewInvalidName": "That isn't a name a certificate can be issued for",
     "renewApplyFailed": "The renewal was requested, but the configuration could not be applied",
     "downloadCertificate": "Download certificate",
     "downloadKey": "Download private key",
     "downloadFailed": "Could not download it",
-    "certificateFilesFailed": "Could not read the certificate files",
     "sourceLabel": "Source",
     "sourceUpload": "Pasted or uploaded",
     "sourceAgentFile": "From a file on an agent",
@@ -1117,7 +1115,8 @@
         "noAnswer": "Resolves, but nothing answered on port 80",
         "otherServer": "Something else answers on port 80",
         "otherServerStatus": "Something else answers on port 80 (HTTP {status}), not this Caddy"
-      }
+      },
+      "outsideOffline": "Offline mode is on, so Let's Debug is not asked."
     },
     "acme": "ACME",
     "acmeNote": "{count} on enabled hosts",
@@ -1135,7 +1134,6 @@
     "commonNameCn": "Common name (CN)",
     "commonNameHelp": "CN field in the certificate. Defaults to the name above if left blank.",
     "deleteCertificate": "Delete certificate",
-    "deleteFailed": "Failed to delete certificate",
     "deleteImportedCertificate": "Delete imported certificate",
     "domainsOnePerLine": "Domains (one per line)",
     "expiredAccent": "{count} expired",
@@ -1150,8 +1148,8 @@
     "importedNote": "Next lapses in {count, plural, one {# day} other {# days}}",
     "issuedClientCertificates": "Issued client certificates",
     "keyStored": "Key stored",
-    "legacyCertificatesDescription": "These are redundant. Caddy handles HTTPS automatically, so consider deleting them.",
-    "legacyCertificatesTitle": "Legacy managed certificate entries detected",
+    "legacyCertificatesDescription": "Caddy handles HTTPS on its own, so these entries do nothing. You can delete them.",
+    "legacyCertificatesTitle": "Legacy managed certificate entries found",
     "loadCertificateFromFile": "Load certificate from file",
     "loadPrivateKeyLabel": "Load private key from file",
     "manage": "Manage",
@@ -1668,7 +1666,7 @@
     "wafPresetNameRequired": "A WAF preset needs a name",
     "wafPresetNameTaken": "A WAF preset named \"{name}\" already exists",
     "wafPresetDirectivesRequired": "A WAF preset needs at least one directive",
-    "wafPresetDirectiveBodyLimitOutOfRange": "The preset has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "wafPresetDirectiveBodyLimitOutOfRange": "The preset has an out-of-range body limit: \"{directive}\". The byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
     "wafPresetDirectivesDropped": "The preset has {count} directive(s) that would be dropped and never sent to Caddy: {details}. Remove them, or rewrite them so they take effect.",
     "wafPresetInUseGlobally": "The preset is still selected in the global WAF settings. Deselect it there first.",
     "wafPresetInUseByDashboard": "The preset is still selected by the dashboard host. Deselect it there first.",
@@ -1686,7 +1684,7 @@
     "crsPluginEngineIncompatible": "The plugin does not support Coraza, the WAF engine Caddy runs. It supports: {engines}",
     "crsPluginRejected": "The plugin cannot be loaded here: {count} directive(s) are refused, for example {details}",
     "quotedReason": "\"{line}\" - {reason}",
-    "crsPluginDirectiveNotAllowed": "not a directive a plugin may use - only SecRule, SecAction, SecMarker, SecRuleRemoveById, SecRuleRemoveByTag, SecRuleUpdateTargetById and SecRuleUpdateTargetByTag are permitted",
+    "crsPluginDirectiveNotAllowed": "not a directive a plugin may use; only SecRule, SecAction, SecMarker, SecRuleRemoveById, SecRuleRemoveByTag, SecRuleUpdateTargetById and SecRuleUpdateTargetByTag are permitted",
     "crsPluginNeedsFile": "it reads a Lua script, a data file or a GeoIP database, which Caddy cannot load for a plugin",
     "crsPluginRuleIdOutOfRange": "a rule id is outside the plugin's registered range, {start} to {end}",
     "crsPluginPersistentCollection": "it keeps per-client state in a persistent collection (IP, SESSION and the like), which Coraza cannot compile",
@@ -1701,7 +1699,7 @@
     "crsRegistryNameTaken": "Two registries are named \"{name}\".",
     "crsRegistryDuplicate": "The registry {url} is listed twice.",
     "crsRegistryIntervalInvalid": "The refresh interval must be a whole number of hours from 0 to {max}.",
-    "wafDirectiveBodyLimitOutOfRange": "waf.custom_directives has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "wafDirectiveBodyLimitOutOfRange": "waf.custom_directives has an out-of-range body limit: \"{directive}\". The byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
     "wafDirectivesDropped": "waf.custom_directives has {count} line(s) that would be dropped and never sent to Caddy: {details}. Remove them, or rewrite them so they take effect.",
     "wafDirectiveDroppedInclude": "Include is not allowed (it would read arbitrary files from the container filesystem)",
     "wafDirectiveDroppedRuleMutation": "rule-mutation and engine directives are not allowed (they can disable WAF protections or override rule actions)",
@@ -1715,8 +1713,8 @@
     "wafDirectiveDroppedChainPart": "part of a chained rule whose directive \"{line}\" is dropped",
     "wafDirectiveDroppedDuplicateId": "rule id {id} is already used by an earlier rule (Coraza refuses a duplicate id, and Caddy then refuses the whole config)",
     "wafDirectiveDroppedBodyLimit": "the body limit is out of range (the byte count must be an integer between {min} and {max} bytes)",
-    "wafDirectiveDroppedNotAllowed": "not an allowed directive - only SecRule, SecAction, SecMarker and SecDefaultAction are permitted",
-    "wafDirectiveDroppedUnterminated": "the last directive is never closed - it ends in a line continuation or an open backtick block",
+    "wafDirectiveDroppedNotAllowed": "not an allowed directive; only SecRule, SecAction, SecMarker and SecDefaultAction are permitted",
+    "wafDirectiveDroppedUnterminated": "the last directive is never closed: it ends in a line continuation or an open backtick block",
     "wafDirectivesInvalid": "waf.custom_directives has {count} problem(s) Coraza would refuse to load: {details}",
     "wafPresetDirectivesInvalid": "The preset has {count} problem(s) Coraza would refuse to load: {details}",
     "crsPluginInvalidSeclang": "Coraza would refuse it: {reason}",
@@ -1731,11 +1729,11 @@
     "seclangActionNeedsArgument": "the {name} action needs a value",
     "seclangActionTakesNoArgument": "the {name} action takes no value",
     "seclangInvalidActionArgument": "\"{value}\" is not a valid value for {name}",
-    "seclangInvalidId": "\"{value}\" is not a valid rule id - it must be a positive integer",
+    "seclangInvalidId": "\"{value}\" is not a valid rule id; it must be a positive integer",
     "seclangDuplicateId": "rule id {id} is already used on line {first}",
     "seclangUnknownTransformation": "\"{name}\" is not a transformation Coraza knows",
     "seclangSetvarNotTx": "setvar can only write the TX collection, as setvar:tx.name=value (\"{value}\")",
-    "seclangChainDisruptive": "a chained rule cannot have a disruptive action - only the rule starting the chain can",
+    "seclangChainDisruptive": "a chained rule cannot have a disruptive action; only the rule that starts the chain can",
     "seclangDefaultActionNeedsPhase": "SecDefaultAction needs a phase",
     "seclangDefaultActionNeedsDisruptive": "SecDefaultAction needs a disruptive action (pass, deny, block, drop, allow or redirect)",
     "seclangDefaultActionMetadata": "SecDefaultAction cannot set id, msg, tag, severity, rev, ver or maturity",
@@ -1766,13 +1764,13 @@
     "tailscaleUpstreamNodeNameInvalid": "Tailscale upstream node name \"{name}\" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. \"caddy\".",
     "tailscaleDefaultNodeRequired": "Default node name is required",
     "tailscaleDefaultNodeInvalid": "Default node name \"{name}\" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. \"caddy\".",
-    "tailscaleAuthKeyTooLong": "Tailscale auth key is implausibly long",
+    "tailscaleAuthKeyTooLong": "Tailscale auth key is too long",
     "tailscaleAuthKeyInvalidCharacters": "Tailscale auth key must not contain whitespace or control characters",
     "tailscaleControlUrlInvalid": "Control server URL \"{url}\" is not a valid URL",
     "tailscaleControlUrlProtocol": "Control server URL must be http or https",
     "tailscaleStateDirNotAbsolute": "State directory must be an absolute path inside the container",
     "tailscaleStateDirControlCharacter": "State directory contains a control character",
-    "tailscaleApiTokenTooLong": "API access token is implausibly long",
+    "tailscaleApiTokenTooLong": "API access token is too long",
     "tailscaleApiTokenInvalidCharacters": "API access token must not contain whitespace or control characters",
     "tailscaleTailnetInvalid": "Tailnet \"{tailnet}\" is not valid. Use \"-\" for the token's own tailnet.",
     "tailscaleTooManyTags": "At most {max} Tailscale tags are supported",
@@ -1792,9 +1790,9 @@
     "updateNoReleases": "The registry has no released version tags",
     "updateTimedOut": "The registry did not answer in time",
     "registryPaginationNotUrl": "The registry sent a pagination link that is not a URL",
-    "registryPaginatedElsewhere": "The registry paginated to {origin}, not {expected} - this check will not follow that",
+    "registryPaginatedElsewhere": "The registry paginated to {origin}, not {expected}, and this check does not follow it",
     "registryRealmNotUrl": "The registry sent an auth realm that is not a URL",
-    "registryRealmElsewhere": "The registry sent its auth challenge to {origin}, not {expected} - this check will not follow that",
+    "registryRealmElsewhere": "The registry sent its auth challenge to {origin}, not {expected}, and this check does not follow it",
     "registryCredentialsRequired": "The registry asked for credentials this check cannot supply",
     "registryTokenRefused": "The registry refused an anonymous token (HTTP {status})",
     "registryNoToken": "The registry issued no token",
@@ -1828,7 +1826,7 @@
     "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration, which would stop updates to every proxy host, this one included. Add an auth key in Settings → Network → Tailscale first.",
     "tailscaleKeyCheckNeedsToken": "Checking auth keys needs a Tailscale API access token (tskey-api-…). Add one, or turn the check off.",
     "tailscaleKeyCheckUnreachable": "Could not reach the Tailscale API to check the key ({detail}). Try again, or turn the check off to save without it.",
-    "tailscaleKeyCheckTokenRefused": "Tailscale refused the API access token. Check the token itself - this says nothing about the auth key.",
+    "tailscaleKeyCheckTokenRefused": "Tailscale refused the API access token. Check the token itself; this result says nothing about the auth key.",
     "tailscaleKeyNotFound": "Tailnet \"{tailnet}\" has no key with id \"{keyId}\". It may have been deleted, or belong to a different tailnet.",
     "tailscaleKeyCheckFailed": "The Tailscale API answered {status} when asked about the key. Try again, or turn the check off to save without it.",
     "tailscaleKeyInvalid": "Tailscale reports this key as invalid.",
@@ -1964,14 +1962,19 @@
     "changeRequestRequesterLacks": "The account that submitted this change may no longer make it",
     "changeRequestUnknownKind": "This kind of change can no longer be applied",
     "changeRequestInterrupted": "Applying this change was interrupted before it took effect. Submit it again",
-    "changeRequestInterruptedUnknown": "Applying this change was interrupted, and whether it took effect cannot be told. Check what it edits before submitting it again",
+    "changeRequestInterruptedUnknown": "Applying this change was interrupted, and it is not known whether it took effect. Check what it edits before submitting it again",
     "changeRequestNoteTooLong": "Keep it to {max} characters",
     "changeRequestBypassAdmin": "Only an administrator can bypass approval",
     "changeRequestBypassReason": "Give a reason for bypassing approval",
     "approvalPolicyNoApprovers": "Name at least one role or group whose members may approve",
     "approvalPolicyNoAreas": "Choose at least one area that needs approval",
     "approvalPolicyNoTags": "Enter at least one host tag that needs approval",
-    "approvalPolicyTagInvalid": "A tag is letters, digits and . _ : / - only, up to 40 characters"
+    "approvalPolicyTagInvalid": "A tag is letters, digits and . _ : / - only, up to 40 characters",
+    "outboundOffline": "Offline mode is on, so this deployment makes no calls to the internet. Turn it off under Settings → Outbound connections to use this.",
+    "geoipUploadInvalid": "That file is not a readable {edition} database. Upload the .mmdb file from MaxMind's archive, not the archive itself.",
+    "geoipUploadWrongEdition": "That file is a {type} database, not {edition}. Pick the edition it is, or upload the {edition} file.",
+    "geoipUploadMissing": "Choose an edition and an .mmdb file to upload.",
+    "geoipUploadFailed": "The database could not be uploaded."
   },
   "groups": {
     "roleHelp": "Every member holds this role besides their own, for as long as they are in the group. A group cannot give the administrator role.",
@@ -1996,7 +1999,7 @@
     "idpManaged": "IdP-managed",
     "idpMapping": "Identity provider groups",
     "idpMappingHelp": "Names this group is known by in your IdP. Applied when the provider has group sync switched on.",
-    "idpMembershipHelp": "Membership is reconciled from the identity provider on every sign-in.",
+    "idpMembershipHelp": "Membership is synced from the identity provider at every sign-in.",
     "memberPickerLabel": "Choose the users to add to this group",
     "membersExhaustedMessage": "All users are already in this group.",
     "namePlaceholder": "e.g. Developers",
@@ -2078,7 +2081,7 @@
     "restored": "Host restored.",
     "rollbackBannerTitle": "Rolling back to revision #{id}",
     "rollbackBannerDescription": "The editor holds this revision. Saving goes through the review and becomes a new revision; nothing is stored until then.",
-    "rollbackMissing": "Left out because they were deleted since - choose replacements or leave them unset:",
+    "rollbackMissing": "Left out because they have since been deleted. Choose replacements or leave them unset:",
     "references": {
       "certificate": "Certificate #{id}",
       "accessList": "Access list #{id}",
@@ -2104,7 +2107,7 @@
     "undoLabel": "Undo the change to {field}",
     "restoreLabel": "Restore the change to {field}",
     "undoneHeading": "Undone, left out of this save",
-    "undoneNote": "The editor still shows these edits. Back in the editor they count again.",
+    "undoneNote": "The editor still shows these edits. Once you go back to the editor, they count again.",
     "notSet": "Not set",
     "on": "On",
     "off": "Off",
@@ -2244,7 +2247,7 @@
     "acceptInboundProxyProtocol": "Accept inbound PROXY protocol",
     "accessListNone": "None",
     "accessListOption": "{name} ({count, plural, one {# rule} other {# rules}})",
-    "accessListHelp": "Connections from clients the list denies are closed. Only its rules apply here, by address, country, continent or ASN - there is no request to ask a password in or answer, so lists without rules are not offered and the list's deny response does not apply.",
+    "accessListHelp": "Connections from clients the list denies are closed. Only its rules apply here, by address, country, continent or ASN. A connection has no request to ask for a password in or to answer, so lists without rules are not offered and the list's deny response does not apply.",
     "ipRulesBadge": "IP rules",
     "ipRulesBadgeTooltip": "IP rules from the access list {name}",
     "activeHealthCheck": "Active health check",
@@ -2267,7 +2270,7 @@
     "countryCodesHelp": "ISO 3166-1 alpha-2 codes, comma-separated",
     "deleteL4ProxyHost": "Delete L4 proxy host",
     "deleteWarning": "This action cannot be undone.",
-    "dnsPinningDescription": "When enabled, upstream hostnames are resolved to IP addresses at config time, which pins DNS resolution.",
+    "dnsPinningDescription": "When on, upstream hostnames are resolved to IP addresses when the config is generated, and those addresses are pinned.",
     "dnsResolversHelp": "One per line. Used to resolve upstream hostnames.",
     "editL4ProxyHost": "Edit L4 proxy host",
     "enableActiveHealthCheck": "Enable active health check",
@@ -2284,7 +2287,7 @@
     "l4DisabledTitle": "Layer 4 proxying is switched off",
     "listen": "Listen",
     "listenAddress": "Listen address",
-    "listenAddressHelp": "Format: :PORT, HOST:PORT, or [IPv6]:PORT - an IPv6 address must be bracketed. PORT can be a range such as 27015-27030, up to 1000 ports. The agent publishes the ports on the Caddy container for you. Ports 80, 443, 2019, 3000, 9090 and the metrics port are reserved.",
+    "listenAddressHelp": "Format: :PORT, HOST:PORT, or [IPv6]:PORT. An IPv6 address must be in brackets. PORT can be a range such as 27015-27030, up to 1000 ports. The agent publishes the ports on the Caddy container for you. Ports 80, 443, 2019, 3000, 9090 and the metrics port are reserved.",
     "listenPortCount": "{count, plural, one {# port} other {# ports}}",
     "samePortUpstream": "Upstreams get the listen port",
     "samePortUpstreamHelp": "Each connection goes to the port it arrived on, so one host can forward a whole range. Upstreams are then hosts without a port.",
@@ -2339,7 +2342,7 @@
     "httpHostnames": "HTTP hostnames",
     "duplicateL4ProxyHost": "Duplicate L4 proxy host",
     "createL4ProxyHost": "Create L4 proxy host",
-    "deleteConfirm": "Are you sure you want to delete the L4 proxy host <strong>{name}</strong>?",
+    "deleteConfirm": "Delete the L4 proxy host <strong>{name}</strong>?",
     "portsChangesPending": "Docker port changes pending",
     "portsStatus": "Docker port status",
     "hostCreated": "L4 proxy host created and queued for Caddy reload.",
@@ -2359,7 +2362,7 @@
     "pageDescription": "Roles group client certificates for access control on proxy hosts.",
     "noRolesMatchSearch": "No roles match your search.",
     "noRolesYet": "No mTLS roles yet.",
-    "deleteRoleConfirm": "Delete role \"{name}\"? Proxy hosts referencing it will lose this grouping.",
+    "deleteRoleConfirm": "Delete role \"{name}\"? Proxy hosts that use it lose this grouping.",
     "assignToRole": "Assign {name} to this role"
   },
   "nav": {
@@ -2388,7 +2391,7 @@
     "more": {
       "allPages": "All pages",
       "allPagesCount": "{count} in total",
-      "chosenCount": "{count} of {total} chosen - {max} is the maximum",
+      "chosenCount": "{count} of {total} chosen, up to {max}",
       "customize": "Customize this drawer",
       "customizeDescription": "Choose which {max} appear here",
       "customizeMoreDescription": "Choose which {max} appear in the More drawer",
@@ -2514,7 +2517,7 @@
   "profile": {
     "notifications": {
       "title": "Notifications",
-      "description": "What you are told about, and how. Only administrators are notified. An event turned off under Settings → Email → Notifications is off for everyone.",
+      "description": "What you are notified about, and how. Only administrators receive notifications. An event turned off under Settings → Email → Notifications is off for everyone.",
       "emailHelp": "To {address}.",
       "emailOff": "Email is not set up on this server.",
       "emailUndeliverable": "{address} cannot receive mail. Change your email address to get notifications by email.",
@@ -2542,7 +2545,7 @@
     },
     "passkeys": {
       "title": "Passkeys",
-      "description": "Sign in with your fingerprint, face or device PIN instead of a password. A passkey stands in for both your password and a two-factor code.",
+      "description": "Sign in with your fingerprint, face or device PIN instead of a password. A passkey replaces both your password and a two-factor code.",
       "empty": "No passkeys yet.",
       "add": "Add a passkey",
       "addTitle": "Add a passkey",
@@ -2643,7 +2646,7 @@
     "revokeSessionOn": "Revoke session on {device}",
     "sessionsDescription": "Devices currently signed in to your account. Revoke any you don't recognise.",
     "thisDevice": "This device",
-    "tokenCopyWarning": "Copy this token now - it will not be shown again.",
+    "tokenCopyWarning": "Copy this token now. It will not be shown again.",
     "tokenNamePlaceholder": "e.g. CI/CD pipeline",
     "tokensEmptyDescription": "Create one below.",
     "unlinkDisabledTitle": "This connection cannot be unlinked",
@@ -2871,7 +2874,7 @@
       "unknownDetail": "No agent answered"
     },
     "accessList": "Access list",
-    "accessListEmptyWarning": "This list has no users and no IP rules, so this host will refuse every request until one is added.",
+    "accessListEmptyWarning": "This list has no users and no IP rules, so this host refuses every request until one is added.",
     "accessListNoMembers": "{name} (empty)",
     "locationAccessListInherit": "Same as the host",
     "locationAccessListNone": "None for this path",
@@ -2921,7 +2924,7 @@
     "cpmForwardAuth": "CPM forward auth",
     "cpmForwardAuthDescription": "Require users to sign in to Caddy Proxy Manager before they reach this host",
     "cpmForwardAuthRequireCaptcha": "Require the sign-in CAPTCHA",
-    "cpmForwardAuthRequireCaptchaHelp": "When a CAPTCHA is configured under Settings → Authentication, the portal asks for it before the password for this host. Turn off only for a host whose users cannot solve one - it leaves this host's sign-in open to scripted password guessing.",
+    "cpmForwardAuthRequireCaptchaHelp": "When a CAPTCHA is configured under Settings → Authentication, the portal asks for it before the password for this host. Turn it off only for a host whose users cannot solve one. Without it, this host's sign-in is open to scripted password guessing.",
     "customCaddyfile": "Custom Caddyfile",
     "customCaddyfileHelp": "Caddyfile directives for this host, adapted by Caddy and inserted before the reverse proxy. Rejected on save if Caddy cannot parse them.",
     "customDnsResolvers": "Custom DNS resolvers",
@@ -2932,7 +2935,7 @@
     "customReverseProxyJson": "Custom reverse proxy (JSON)",
     "customSeclangDirectives": "Custom SecLang directives",
     "customWafDirectivesHelp": "ModSecurity SecLang syntax. Appended after OWASP CRS if enabled.",
-    "deleteDescription": "This will remove the configuration for:",
+    "deleteDescription": "This removes the configuration for:",
     "deleteProxyHost": "Delete proxy host",
     "deleteWarning": "This action cannot be undone",
     "dnsPinningInfoDescription": "When enabled, hostname upstreams are written to Caddy as IP dials. If this handler has more than one distinct HTTPS upstream hostname, those HTTPS upstreams are not pinned, to avoid an SNI mismatch.",
@@ -2940,7 +2943,7 @@
     "dnsPinningModeHelp": "Inherit uses the global setting. Enabled/Disabled overrides per host.",
     "dnsConnectTimeout": "Connect timeout",
     "dnsConnectTimeoutHelp": "Caps name lookup and connecting together, e.g. 5s. A connect timeout under Upstream timeouts wins over it",
-    "dnsResolverOverrideDescription": "Useful for upstream services that require specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).",
+    "dnsResolverOverrideDescription": "For upstreams that need specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).",
     "dnsResolverOverrideTitle": "Per-host resolvers override global DNS settings",
     "dnsResolvers": "DNS resolvers",
     "dnsResolversDescription": "Configure per-host DNS resolution for upstream discovery and health checks",
@@ -2979,7 +2982,7 @@
     "forwardAuthAccessDeniedDescription": "No users or groups are selected, so forward auth will reject every request.",
     "forwardAuthAccessDeniedTitle": "Nobody can access this host",
     "forwardAuth": "Forward auth",
-    "forwardAuthApiSplitHelp": "A caller that did not ask for HTML - an API client, a WebSocket handshake - gets 401 instead of a redirect to the login page, which it cannot follow.",
+    "forwardAuthApiSplitHelp": "A caller that did not ask for HTML, such as an API client or a WebSocket handshake, gets 401 instead of a redirect to the login page, which it cannot follow.",
     "forwardAuthApiSplitLabel": "Answer non-browser callers with 401",
     "forwardAuthBypassHeaders": "Bypass headers",
     "forwardAuthBypassHeadersHelp": "A request carrying any of these headers skips forward auth entirely, and the upstream has to check the credential itself. Comma-separated.",
@@ -3032,7 +3035,7 @@
     "lbHealthRequestBody": "Probe body",
     "lbHealthRequestBodyHelp": "Sent with the probe. Distinct from the expected response body.",
     "lbPolicyClientIpHash": "Client IP hash",
-    "lbPolicyClientIpHashHelp": "Real client IP - set trusted proxies first",
+    "lbPolicyClientIpHashHelp": "Real client IP; set trusted proxies first",
     "lbPolicyCookie": "Cookie",
     "lbPolicyCookieHelp": "Cookie-based sticky sessions",
     "lbPolicyFirst": "First available",
@@ -3106,7 +3109,7 @@
     "outpostUpstreamUrl": "Outpost upstream URL",
     "overLimitAction": "Over-limit action",
     "overLimitActionHelpInherit": "Uses the action set on the WAF settings page.",
-    "overLimitActionHelpPartial": "The request is forwarded whole, but only the part of its body within the limit is inspected - the rest reaches the upstream unchecked.",
+    "overLimitActionHelpPartial": "The request is forwarded whole, but only the part of its body within the limit is inspected. The rest reaches the upstream unchecked.",
     "overLimitActionHelpReject": "A request whose body is over the limit is refused with 413 Payload Too Large and never reaches the upstream.",
     "overrideGlobal": "Override global",
     "overrideUpstreamPort": "Override upstream port",
@@ -3149,7 +3152,7 @@
     "requests24h": "Requests, 24h",
     "requireATailscaleIdentity": "Require a Tailscale identity",
     "resolutionMode": "Resolution mode",
-    "responseHeadersEmptyDescription": "No custom headers - use the + button to add one.",
+    "responseHeadersEmptyDescription": "No custom headers. Use the + button to add one.",
     "retrySettings": "Retry settings",
     "ruleId": "Rule ID",
     "searchHosts": "Search hosts…",
@@ -3164,10 +3167,10 @@
     "tailnetOnly": "Tailnet only",
     "tailnetOnlyHelp": "Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places.",
     "tailscale": "Tailscale",
-    "tailscaleAuthKeyMissingDescription": "Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up - that would stop every proxy host from being updated, not just this one. Add a key in Settings → Network → Tailscale first.",
+    "tailscaleAuthKeyMissingDescription": "Saving is refused. The node cannot register without a key, and Caddy rejects a configuration whose listener does not come up, which would stop every proxy host from being updated, not just this one. Add a key in Settings → Network → Tailscale first.",
     "tailscaleAuthKeyMissingTitle": "No Tailscale auth key is stored",
     "tailscaleDescription": "Serve this host on your tailnet instead of, or as well as, the public internet",
-    "tailscaleDisabledDescription": "This host will not be served at all until Settings → Network → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
+    "tailscaleDisabledDescription": "This host is not served at all until Settings → Network → Tailscale is enabled. It is left out of the configuration rather than published publicly.",
     "tailscaleDisabledTitle": "Tailscale is switched off in Settings",
     "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale, without ACME or a DNS provider.",
     "tailscaleDomainRequirementTitle": "Add the node's MagicDNS name to Domains",
@@ -3175,7 +3178,7 @@
     "tailscaleForwardIdentityHelp": "Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first.",
     "tailscaleIdentityHelp": "Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them.",
     "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Network → Tailscale. Several hosts can share one node.",
-    "tailscaleUpstreamNodeHelp": "Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply - names are resolved by MagicDNS on the far side.",
+    "tailscaleUpstreamNodeHelp": "Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply: MagicDNS resolves names on the far side.",
     "tailscaleUpstreamNodeLabel": "Reach upstreams over the tailnet",
     "timeout": "Timeout",
     "tls": "TLS",
@@ -3202,7 +3205,7 @@
     "upstreams": "Upstreams",
     "uri": "URI",
     "value": "Value",
-    "wafBodyLimitsDescription": "Coraza buffers request bodies for inspection and rejects anything larger than its limit - 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large uploads. Leave blank to inherit.",
+    "wafBodyLimitsDescription": "Coraza buffers request bodies for inspection and rejects anything larger than its limit, which is 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large uploads. Leave blank to inherit.",
     "wafDescription": "Inspect and block malicious requests via Coraza / OWASP CRS",
     "webApplicationFirewall": "Web application firewall",
     "features": {
@@ -3244,7 +3247,7 @@
     "maintenanceActiveTitle": "Visitors get a 503",
     "maintenanceActiveDescription": "Only the bypass addresses reach the upstream. Access lists, sign-in and the WAF still apply to them",
     "maintenanceBypass": "Bypass addresses",
-    "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page - yours, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted proxies",
+    "maintenanceBypassHelp": "IP addresses or CIDR ranges, one per line, that skip the maintenance page. Add your own, so you can check the site before reopening it. The client IP honours Settings → Network → Trusted proxies",
     "maintenanceRetryAfter": "Retry-After",
     "maintenanceRetryAfterHelp": "Tells clients and crawlers when to come back. Leave it empty to send none",
     "maintenanceBody": "Page",
@@ -3359,10 +3362,10 @@
       "ready": "GeoIP ready",
       "missing": "GeoIP missing",
       "partial": "GeoIP partial",
-      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP databases - country, continent and ASN blocking will not work.",
-      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP databases.",
-      "countryMissingHelp": "GeoLite2-Country database missing - country/continent blocking disabled",
-      "asnMissingHelp": "GeoLite2-ASN database missing - ASN blocking disabled",
+      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP databases, so country, continent and ASN blocking does not work.",
+      "missingHelp": "GeoIP databases not found, so country, continent and ASN blocking does not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP databases.",
+      "countryMissingHelp": "GeoLite2-Country database missing, so country and continent blocking is off",
+      "asnMissingHelp": "GeoLite2-ASN database missing, so ASN blocking is off",
       "loadedHelp": "GeoLite2-Country and GeoLite2-ASN databases loaded"
     },
     "continentNames": {
@@ -3377,7 +3380,7 @@
     "addToLabel": "Add to {label}",
     "removeHeaderLabel": "Remove header {index}",
     "searchCountries": "Search countries…",
-    "asnsHelp": "Autonomous System Numbers - press Enter to add",
+    "asnsHelp": "Autonomous System Numbers. Press Enter to add each one",
     "pressEnterToAdd": "Press Enter to add",
     "trustedProxiesHelp": "Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges.",
     "trustedProxiesBlockResponse": "Trusted proxies & block response",
@@ -3387,7 +3390,7 @@
     "removePathBlockLabel": "Remove path block {index}",
     "removePathRewriteLabel": "Remove path rewrite {index}",
     "removeRedirectLabel": "Remove redirect {index}",
-    "deleteConfirm": "Are you sure you want to delete the proxy host <strong>{name}</strong>?",
+    "deleteConfirm": "Delete the proxy host <strong>{name}</strong>?",
     "deleteDomainsLine": "• Domains: {domains}",
     "deleteUpstreamsLine": "• Upstreams: {upstreams}",
     "trustedRoleCertCount": "{count, plural, one {# cert} other {# certs}}",
@@ -3408,9 +3411,9 @@
     "maintenanceOffResult": "Maintenance mode is off.",
     "errorPageDefaultBody": "<h1>Service temporarily unavailable</h1>",
     "wafPresetsHelpMerge": "Added to the presets the global WAF settings select.",
-    "wafPresetsHelpOverride": "Only these presets apply - the global selection is ignored in override mode.",
+    "wafPresetsHelpOverride": "Only these presets apply. Override mode ignores the global selection.",
     "wafPluginsHelpMerge": "Added to the plugins the global WAF settings select. Plugins load only with the OWASP CRS.",
-    "wafPluginsHelpOverride": "Only these plugins apply - the global selection is ignored in override mode. Plugins load only with the OWASP CRS.",
+    "wafPluginsHelpOverride": "Only these plugins apply. Override mode ignores the global selection. Plugins load only with the OWASP CRS.",
     "detectionOnly": "Detection only",
     "wafExclusionsTitle": "Rule exclusions",
     "wafExclusionsMoved": "Rule exclusions for this host, scoped to a path or a variable if you like, are managed on the WAF page.",
@@ -3461,7 +3464,7 @@
       "caHelp": "A PEM certificate to trust for this sink, besides the system's authorities. For a receiver with a certificate from a private CA.",
       "urlHelp": "Plain http is allowed only to an address on this network.",
       "encoding": "Request compression",
-      "encodingHelp": "A request body has no negotiation, so pick what the receiver accepts. If it answers 415, batches go uncompressed and this page says so.",
+      "encodingHelp": "HTTP cannot negotiate the encoding of a request body, so pick what the receiver accepts. If it answers 415, batches go uncompressed and this page says so.",
       "encodings": {
         "identity": "No compression",
         "gzip": "gzip",
@@ -3510,7 +3513,7 @@
         "other": "Other rows"
       },
       "keepAgents": "Keep the agent pairings",
-      "keepAgentsHelp": "Leave on when restoring onto the same machine. Turn off when moving to a new one: its agents will pair afresh, and hosts assigned to the old agents serve on every agent.",
+      "keepAgentsHelp": "Leave on when restoring onto the same machine. Turn off when moving to a new one: its agents pair again, and hosts assigned to the old agents serve on every agent.",
       "newerTitle": "Made by a newer version",
       "newerHelp": "Upgrade this instance first. An older version would silently drop what it doesn't understand.",
       "restore": "Restore",
@@ -3524,7 +3527,7 @@
       "chooseRemoteBackup": "Choose a backup",
       "remoteEmpty": "This destination holds no backups yet.",
       "listFailed": "Could not list the destination's backups",
-      "confirmHelp": "Every host, user and setting here is replaced by the backup's. Caddy's certificates will be issued again, which can hit your certificate authority's rate limits if there are many hosts."
+      "confirmHelp": "Every host, user and setting here is replaced by the backup's. Caddy's certificates are issued again, which can hit your certificate authority's rate limits if there are many hosts."
     },
     "backupSchedules": {
       "destinationsTitle": "Backup destinations",
@@ -3676,12 +3679,12 @@
       "confirmTitle": "Import this configuration?",
       "confirmHelp": "The rows listed are created or updated and Caddy is reloaded. Nothing else here changes."
     },
-    "abortResponseDescription": "Caddy writes no status line or body - the native equivalent of a \"444 / no response\" policy.",
+    "abortResponseDescription": "Caddy writes no status line or body, the same as a \"444 / no response\" policy.",
     "abortResponseTitle": "Unmatched connections are closed without a response",
     "accessLogsCommand": "View with: docker exec caddy-proxy-manager-caddy tail -f /logs/access.log",
     "accessLogsInfoTitle": "Access logs live in the caddy-logs Docker volume",
     "acmeContactEmail": "ACME contact email",
-    "acmeDirectoryHelp": "Leave empty to use the Let's Encrypt default. For an internal CA (OpenBao, Step-CA, Windows ADCS), paste its ACME directory URL - must be HTTPS.",
+    "acmeDirectoryHelp": "Leave empty to use the Let's Encrypt default. For an internal CA (OpenBao, Step-CA, Windows ADCS), paste its ACME directory URL. It must be HTTPS.",
     "acmeDirectoryUrl": "ACME directory URL",
     "acmeEmailHelp": "Used by Let's Encrypt for expiry notifications.",
     "acmeRootCertificateHelp": "If the ACME endpoint's TLS certificate is signed by an internal root not in the system trust store, paste the root (or chain) here so Caddy can connect to it.",
@@ -3690,7 +3693,7 @@
     "adminGroups": "Admin groups",
     "madeRoleGroups": "{role} groups",
     "agentManagementUnavailableTitle": "No agent is answering, so the container cannot be managed from here",
-    "agentsDescription": "An agent recreates, rebuilds and configures the Caddy container on its host. The controller has no Docker access of its own, and no address for any Caddy - everything reaches a proxy through its agent.",
+    "agentsDescription": "An agent recreates, rebuilds and configures the Caddy container on its host. The controller has no Docker access of its own, and no address for any Caddy: everything reaches a proxy through its agent.",
     "agentsUnavailableTitle": "No agent is answering",
     "autoPairingDisabledDescription": "Unpairing the bundled agent turned auto-pairing off, so it stays idle instead of pairing itself straight back. Turn it on again to let it pair within a few seconds.",
     "passkeyHostnameWarningTitle": "Passkeys are tied to this hostname",
@@ -3722,7 +3725,7 @@
     "clearPrimary": "Stop offering this one first",
     "clientId": "Client ID",
     "clientIpHeaders": "Client IP headers",
-    "clientIpHeadersHelp": "Headers Caddy reads the client IP from - one per line. Empty defaults to X-Forwarded-For. Set Cf-Connecting-Ip for Cloudflare, etc.",
+    "clientIpHeadersHelp": "Headers Caddy reads the client IP from, one per line. Empty defaults to X-Forwarded-For. For Cloudflare, set Cf-Connecting-Ip.",
     "clientIpHeadersPlaceholder": "X-Forwarded-For",
     "collectAnalytics": "Collect analytics",
     "configuredProviders": "Configured providers",
@@ -3733,12 +3736,12 @@
     "customAcmeDirectory": "Custom ACME directory",
     "dashboardCheckNeedsSaveDescription": "The check asks the domain that is saved, not the one in the field. Save first, then check.",
     "dashboardCheckNeedsSaveTitle": "Save the domain before checking it",
-    "dashboardDisableConfirmBody": "You are reading this page on {domain}, which is the domain about to stop being served. Saving will take this route away while you are using it.",
-    "dashboardDisableConfirmRecovery": "The dashboard stays reachable on the controller's own port - http://'<host>':3000 - which is where you would turn this back on.",
-    "dashboardDisableConfirmTitle": "This will end your current connection",
+    "dashboardDisableConfirmBody": "You are reading this page on {domain}, which is the domain about to stop being served. Saving takes this route away while you are using it.",
+    "dashboardDisableConfirmRecovery": "The dashboard stays reachable on the controller's own port, http://'<host>':3000, where you can turn this back on.",
+    "dashboardDisableConfirmTitle": "This ends your current connection",
     "dashboardDnsMatchDescription": "A request sent to that domain came back to this instance, signed. DNS, the network in between, and Caddy's route all work, so HTTPS has been switched on.",
     "dashboardDnsMatchTitle": "The domain reaches this instance",
-    "dashboardDnsMismatchDescription": "The domain resolves to {resolved}, but a request sent to it did not arrive here - it reached a different server, or nothing answered on port 80. HTTPS has been switched off; a certificate order would fail the same way.",
+    "dashboardDnsMismatchDescription": "The domain resolves to {resolved}, but a request sent to it did not arrive here: it reached a different server, or nothing answered on port 80. HTTPS has been switched off; a certificate order would fail the same way.",
     "dashboardDnsMismatchTitle": "The domain does not reach this instance",
     "dashboardDnsUnresolvedDescription": "Nothing answers for that name yet. Create an A or AAAA record pointing at this deployment, then check again.",
     "dashboardDnsUnresolvedTitle": "The domain does not resolve",
@@ -3776,11 +3779,11 @@
     "dnsAddressFamilyHelp": "Both resolves AAAA and A records and orders IPv6 addresses first.",
     "dnsPinningHelp": "Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config.",
     "dnsPinningInfoDescription": "Resolution happens at config save/reload time, and resolved IPs are written into Caddy's active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid SNI mismatch.",
-    "dnsProviderModuleDisabledDescription": "Enable it under Settings → Caddy build and rebuild Caddy before using it for DNS-01 challenges. Credentials saved now will not be used until then.",
+    "dnsProviderModuleDisabledDescription": "Enable it under Settings → Caddy build and rebuild Caddy before using it for DNS-01 challenges. Credentials saved now are not used until then.",
     "dnsProviderModuleDisabledTitle": "This provider's Caddy module is disabled",
     "dnsProviderPlaceholder": "Select a DNS provider…",
     "dnsQueryTimeoutHelp": "e.g. 5s, 10s",
-    "dnsResolversInfoDescription": "Useful when your DNS provider has slow propagation or when using split-horizon DNS. Common public resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).",
+    "dnsResolversInfoDescription": "For a DNS provider with slow propagation, or for split-horizon DNS. Common public resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).",
     "dnsResolversInfoTitle": "When to use custom resolvers",
     "enableAccessLogging": "Enable access logging",
     "enableCustomDnsResolvers": "Enable custom DNS resolvers",
@@ -3813,7 +3816,7 @@
     "faviconTooltipUpload": "Upload a favicon",
     "faviconTooltipReplace": "Replace the favicon with another image",
     "faviconTooltipPicked": "Choose a different image",
-    "faviconWillBeRemoved": "The custom favicon will be removed when saved.",
+    "faviconWillBeRemoved": "The custom favicon is removed when you save.",
     "format": "Format",
     "generatePairingCode": "Generate a pairing code",
     "geoblockTrustedProxiesHelp": "Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins.",
@@ -3823,11 +3826,11 @@
     "geoipDownloadedNow": "Downloaded {editions} from MaxMind.",
     "geoipDownloadsDescription": "It checks MaxMind on the interval below using these credentials. Agents fetch the databases from this controller rather than each holding a licence key.",
     "geoipDownloadsTitle": "This controller downloads the databases itself",
-    "geoipHelp": "Country lookups for analytics, and the country matching that geo blocking is built on. With this off, the geo block fields are marked as such and no country is recorded against an event.",
+    "geoipHelp": "Country lookups for analytics, and the country matching that geo blocking is built on. With this off, the geo block fields are marked as off and events record no country.",
     "geoipLastChecked": "MaxMind last checked for updates {when}.",
     "geoipNeverChecked": "MaxMind has never been checked for updates.",
     "geoipSavedDisabled": "GeoIP disabled. Country matching is no longer offered.",
-    "geoipSavedEnabled": "GeoIP enabled - downloading the databases from MaxMind.",
+    "geoipSavedEnabled": "GeoIP enabled. Downloading the databases from MaxMind.",
     "geoipSavedNeedsCredentials": "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
     "geoipUpdateDisabled": "Turn GeoIP on and save to download the databases.",
     "geoipUpdateInterval": "Check for updates every",
@@ -3860,7 +3863,7 @@
     "homeStatusEnv": "Set in the environment",
     "homeStatusHealthy": "Healthy",
     "homeStatusUnset": "Not configured",
-    "imageRepositoryHelp": "Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, or it will report releases you cannot pull.",
+    "imageRepositoryHelp": "Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, otherwise it reports releases you cannot pull.",
     "imageRepositoryPlaceholder": "ghcr.io/owner",
     "issuerUrl": "Issuer URL",
     "issuerUrlHelp": "For OIDC providers, the issuer URL lets CPM discover the endpoints automatically.",
@@ -3929,7 +3932,7 @@
         "label": "Revocations wait for confirmation"
       },
       "access_review_reminder_days": {
-        "description": "How many days before an access review is due its undecided items are reported, through the access review notifications.",
+        "description": "How many days before an access review's due date its undecided items are reported, through the access review notifications.",
         "fieldLabel": "Reminder before due",
         "label": "Access review reminder (days before due)"
       },
@@ -3975,7 +3978,7 @@
         "label": "Allow self-registration"
       },
       "auth_disable_local_users": {
-        "description": "Remove local accounts entirely: no credential sign-in, no password management, no bootstrap admin. Enable only once OAuth sign-in is confirmed working.",
+        "description": "Remove local accounts entirely: no credential sign-in, no password management, no bootstrap admin. Turn it on only after confirming that OAuth sign-in works.",
         "label": "OIDC-only mode"
       },
       "auth_rate_limit_enabled": {
@@ -4013,10 +4016,10 @@
       },
       "caddy_monitor_enabled": {
         "label": "Re-apply after a Caddy restart",
-        "description": "Watch every Caddy for a restart onto a config this controller did not send, and push its configuration back. Turn it off only on a controller sharing a Caddy it does not own, or the two push their own idea of the config at each other every pass."
+        "description": "Watch every Caddy for a restart onto a config this controller did not send, and push its configuration back. Turn it off only on a controller sharing a Caddy it does not own; otherwise the two keep pushing their own config over each other's."
       },
       "caddy_build_timeout": {
-        "description": "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow or ARM hosts can take considerably longer than the default.",
+        "description": "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow or ARM hosts can take much longer than the default.",
         "fieldLabel": "Caddy build timeout",
         "label": "Caddy build timeout (seconds)"
       },
@@ -4029,13 +4032,18 @@
         "label": "ClickHouse password"
       },
       "host_history_keep_revisions": {
-        "description": "Each host keeps at least this many of its latest revisions, however old. Older ones go once they are also past the age below.",
+        "description": "Each host keeps at least this many of its latest revisions, however old. Older ones are removed once they are also past the age below.",
         "label": "Host revisions kept"
       },
       "host_history_keep_days": {
         "description": "Revisions younger than this are kept, however many a host has. A deleted host keeps its history too, so it can be restored.",
         "fieldLabel": "Host history kept",
         "label": "Host history kept (days)"
+      },
+      "audit_log_keep_days": {
+        "description": "Audit events older than this are removed once a day, and the removal is itself recorded. 0 keeps them forever.",
+        "fieldLabel": "Audit log kept",
+        "label": "Audit log kept (days)"
       },
       "clickhouse_retention_days": {
         "description": "How long traffic and WAF events are kept. Lowering it uses less disk, and migrates the existing tables' TTL on the next start.",
@@ -4059,7 +4067,7 @@
         "label": "Numeric forward-auth user IDs"
       },
       "forward_auth_internal_url": {
-        "description": "The address Caddy uses to reach this app for forward_auth. Derived from the container network when empty; set it only if that derivation is wrong.",
+        "description": "The address Caddy uses to reach this app for forward_auth. When empty, it is derived from the container network. Set it only if that address is wrong.",
         "label": "Internal forward-auth address"
       },
       "geoip_enabled": {
@@ -4098,7 +4106,7 @@
         "label": "Check for updates"
       },
       "update_image_repository": {
-        "description": "Where this deployment's images come from, without the image name - the update check reads its tags. Point it at your own namespace if you run a fork, or it will report releases you cannot pull.",
+        "description": "Where this deployment's images come from, without the image name. The update check reads its tags. Point it at your own namespace if you run a fork, otherwise it reports releases you cannot pull.",
         "label": "Image repository"
       },
       "smtp_enabled": {
@@ -4155,7 +4163,7 @@
         "label": "Agent offline"
       },
       "notify_agent_offline_minutes": {
-        "description": "How long an agent may be disconnected before anyone is told. After a restart of this server every agent gets this long to reconnect.",
+        "description": "How long an agent may be disconnected before anyone is notified. After a restart of this server every agent gets this long to reconnect.",
         "fieldLabel": "Agent offline after",
         "label": "Agent offline after (minutes)"
       },
@@ -4165,8 +4173,8 @@
       },
       "notify_upstream_error_count": {
         "description": "How many 502, 503 or 504 responses from one host, within the minutes below.",
-        "fieldLabel": "Upstream errors before telling",
-        "label": "Upstream errors before telling (responses)"
+        "fieldLabel": "Upstream errors before notifying",
+        "label": "Upstream errors before notifying (responses)"
       },
       "notify_upstream_error_minutes": {
         "description": "Also how long a host must go without one before it counts as recovered.",
@@ -4174,7 +4182,7 @@
         "label": "Upstream error window (minutes)"
       },
       "notify_caddy_apply": {
-        "description": "When Caddy refuses a configuration, and when it loads one again. An unreachable Caddy is the agent's to report.",
+        "description": "When Caddy refuses a configuration, and when it loads one again. The agent reports an unreachable Caddy.",
         "label": "Caddy configuration refused"
       },
       "notify_agent_problems": {
@@ -4186,7 +4194,7 @@
         "label": "GeoIP update failing"
       },
       "notify_crs_plugin_disabled": {
-        "description": "When a CRS plugin Caddy refuses is switched off so the rest of the configuration loads.",
+        "description": "When a CRS plugin that Caddy refuses is switched off so the rest of the configuration loads.",
         "label": "CRS plugin switched off"
       },
       "notify_update_available": {
@@ -4210,12 +4218,16 @@
         "label": "Change approval bypassed"
       },
       "notify_channel_failing": {
-        "description": "When sends to an alert channel keep failing, told on the other channels, and when it works again.",
+        "description": "When sends to an alert channel keep failing, reported through the other channels, and when it works again.",
         "label": "Alert channel failing"
       },
       "notify_disabled_account_owner": {
         "description": "Email one message to an account's own address when it is disabled, by an administrator or after failed sign-ins. A disabled account gets nothing else.",
-        "label": "Tell the owner of a disabled account"
+        "label": "Notify the owner of a disabled account"
+      },
+      "offline_mode": {
+        "description": "Stop every call this deployment makes to the internet on its own: the update check, reachability diagnosis, Gravatar, the CRS plugin registry, MaxMind downloads, browser push and agent-built Caddy images. Destinations an administrator configured are still reached.",
+        "label": "Offline mode"
       }
     },
     "releaseUpdates": "Release updates",
@@ -4227,7 +4239,7 @@
     "reviewHistoryTitle": "Recent applies",
     "reviewNoConfigChange": "These settings do not change the Caddy config.",
     "reviewSecretsMasked": "Credentials are masked in this view.",
-    "reviewSubtitle": "Revision #{from} to #{to} - nothing has reached Caddy yet.",
+    "reviewSubtitle": "Revision #{from} to #{to}. Nothing has reached Caddy yet.",
     "reviewTabConfig": "Config diff",
     "reviewTitle": "Review & apply",
     "reviewUnchangedLines": "{count, plural, one {# unchanged line} other {# unchanged lines}}",
@@ -4261,10 +4273,10 @@
       "notComparable": "A revision in this range was applied before values were recorded, so it cannot be compared.",
       "restore": "Restore #{id}",
       "restoreHelp": "Stages the settings revision #{id} had, on top of anything you already have pending. Review and apply them like any other change.",
-      "restoreStaged": "{count, plural, =0 {Revision #{id} matches the current settings - nothing to restore.} one {# change staged. Review and apply to restore revision #{id}.} other {# changes staged. Review and apply to restore revision #{id}.}}",
+      "restoreStaged": "{count, plural, =0 {Revision #{id} matches the current settings, so there is nothing to restore.} one {# change staged. Review and apply to restore revision #{id}.} other {# changes staged. Review and apply to restore revision #{id}.}}",
       "viewAll": "View history"
     },
-    "roleGroupNamesHelp": "Name the groups exactly as your provider reports them. Separate several with commas - platform-owners, sre-oncall - and any one of them grants the role. A role left blank falls back to the prefix above, so the two styles can be mixed. The most privileged match wins.",
+    "roleGroupNamesHelp": "Name the groups exactly as your provider reports them. Separate several with commas, such as platform-owners, sre-oncall; any one of them grants the role. A role left blank falls back to the prefix above, so the two styles can be mixed. The most privileged match wins.",
     "roleMappingAuthorityHelp": "The provider becomes authoritative: a user who loses the admin group is demoted on their next sign-in. The last remaining admin is never demoted.",
     "rotate": "Rotate",
     "scopes": "Scopes",
@@ -4295,7 +4307,7 @@
     "tailscaleStateDirectoryHelp": "Where each node keeps its identity, one subdirectory per node. Must be on a volume, or every restart registers a new machine.",
     "tokenUrl": "Token URL",
     "trafficAndWafEvents": "Traffic and WAF events",
-    "trustedProxiesInfoDescription": "This fixes client-IP attribution everywhere at once - access logs, analytics, the country map, and any downstream handler using the client_ip placeholder.",
+    "trustedProxiesInfoDescription": "This fixes client-IP attribution everywhere at once: access logs, analytics, the country map, and any downstream handler using the client_ip placeholder.",
     "trustedProxiesInfoTitle": "Nothing else on the host has to change",
     "trustedProxiesScopeDescription": "Applied to the main HTTP server",
     "http2": "HTTP/2",
@@ -4307,7 +4319,7 @@
     "globalCaddyfile": "Caddyfile",
     "globalCaddyfileHelp": "A global options block, site blocks on ports of their own, or both. It can only add: settings CPM manages, like the admin API, storage, certificate automation and ports 80 and 443, are refused by name. Each agent's Caddy checks it before it's saved. A new port also has to be published on the Caddy container.",
     "trustedProxyRanges": "Trusted proxy ranges",
-    "trustedProxyRangesHelp": "CIDRs, IPs, or the private_ranges shorthand - one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour.",
+    "trustedProxyRangesHelp": "CIDRs, IPs, or the private_ranges shorthand, one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour.",
     "type": "Type",
     "unexpectedError": "An error occurred",
     "unknownHostHandling": "Unknown host handling",
@@ -4343,7 +4355,7 @@
     "addOrUpdateDnsProviderTitle": "Add or update provider",
     "addDnsProviderTitle": "Add a provider",
     "dnsProvidersSupported": "{count} providers supported",
-    "dnsProvidersSupportedWithUnavailable": "{count} providers supported - {unavailable} unavailable because their Caddy module is disabled",
+    "dnsProvidersSupportedWithUnavailable": "{count} providers supported, {unavailable} unavailable because their Caddy module is disabled",
     "tailscaleAuthKeyStored": "An auth key is stored. Leave this empty to keep it.",
     "tailscaleAuthKeyHelp": "A reusable auth key from the Tailscale admin console. A Caddy placeholder such as '{env.TS_AUTHKEY}' works too, and keeps the key out of the database.",
     "tailscaleTagsHelp": "ACL tags applied when a node registers, comma-separated. Most reusable auth keys require at least one, e.g. \"tag:caddy\".",
@@ -4356,7 +4368,7 @@
     "updateAvailableTitle": "Version {version} has been published",
     "runningVersionTitle": "Running {version}",
     "clickhousePasswordStored": "A password is stored. Leave this empty to keep it.",
-    "clickhousePasswordRequired": "Required - the ClickHouse container refuses to start without one.",
+    "clickhousePasswordRequired": "Required: the ClickHouse container refuses to start without one.",
     "maxmindLicenceKeyStored": "A licence key is stored. Leave this empty to keep it.",
     "agentNotReachableTitle": "{name} is not reachable",
     "currentAgentTitle": "Current agent",
@@ -4371,7 +4383,7 @@
     "envProviderCannotEdit": "Environment-sourced providers cannot be edited",
     "editProvider": "Edit provider",
     "envProviderCannotDelete": "Environment-sourced providers cannot be deleted",
-    "deleteProviderConfirm": "Delete \"{name}\"? Users who sign in through it will lose access.",
+    "deleteProviderConfirm": "Delete \"{name}\"? Users who sign in through it lose access.",
     "editOauthProviderTitle": "Edit OAuth provider",
     "addOauthProviderTitle": "Add OAuth provider",
     "updateOauthProvider": "Update provider",
@@ -4452,6 +4464,10 @@
       "email": {
         "name": "Email",
         "desc": "The SMTP server resets, invitations and notifications are sent through"
+      },
+      "outbound": {
+        "name": "Outbound connections",
+        "desc": "Offline mode, and every connection this deployment makes"
       }
     },
     "blocks": {
@@ -4472,6 +4488,9 @@
       },
       "hostHistory": {
         "name": "Host history"
+      },
+      "auditRetention": {
+        "name": "Audit log retention"
       },
       "avatars": {
         "name": "User avatars"
@@ -4574,6 +4593,9 @@
       },
       "accessReviews": {
         "name": "Access reviews"
+      },
+      "outbound": {
+        "name": "Outbound connections"
       }
     },
     "dnsDelegation": {
@@ -4584,7 +4606,7 @@
       "columnCname": "CNAME to create",
       "columnStatus": "Check",
       "cnameRecord": "{record} CNAME {target}",
-      "noCnameNeeded": "None - this row only picks the provider",
+      "noCnameNeeded": "None. This row only picks the provider",
       "providerDefault": "Default",
       "statusOk": "CNAME found",
       "statusMissing": "No CNAME found",
@@ -4873,7 +4895,7 @@
     "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one: Caddy finds out only when it tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
     "faviconSelected": "Selected: {name}. Save to apply it.",
     "faviconCustomSet": "A custom favicon is set. Click it to replace it.",
-    "faviconNone": "No custom favicon - browsers show their own default. Click the tile to upload one.",
+    "faviconNone": "No custom favicon, so browsers show their own default. Click the tile to upload one.",
     "updateAvailableBody": "You are running {current}. Pull the new images and recreate the stack to move to it.",
     "updateCheckIncomplete": "The last check did not complete: {error}",
     "updateUpToDate": "{latest} is the newest release published, so this is up to date.",
@@ -4894,7 +4916,7 @@
     "agentLastReported": "last reported {when}",
     "agentRowPorts": "{count, plural, one {# published port} other {# published ports}} · ports: {portsState} · build: {buildState}",
     "sharedAgentConfigBody": "Proxy hosts, certificates and published ports belong to this controller, not to a host. A change is applied to all {count} agents or to none of them, so the fleet cannot drift apart.",
-    "agentsNothingReached": "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers.",
+    "agentsNothingReached": "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes all fail until an agent answers.",
     "agentsStartContainer": "Start the agent container, or pair a remote one below. Everything else keeps working without it.",
     "agentsAnsweringNote": "{answering} of {total} answering. Unpairing forgets the agent here; on its next reconnect the agent finds it is no longer recognised, forgets its own pairing and stops Caddy.",
     "metricsScrapeNote": "Scrape http://caddy-proxy-manager-caddy:{port}/metrics from within the Docker network.",
@@ -4923,6 +4945,10 @@
       },
       "hostHistory": {
         "value": "Latest {count} per host, or {days} days"
+      },
+      "auditRetention": {
+        "valueDays": "{days, plural, one {# day} other {# days}}",
+        "valueForever": "Kept forever"
       },
       "errorPages": {
         "valueRules": "{count, plural, one {# custom page} other {# custom pages}}",
@@ -4992,7 +5018,7 @@
       },
       "dnsProviders": {
         "valueMore": "{provider} and {count} more",
-        "valueNone": "No provider - DNS-01 unavailable",
+        "valueNone": "No provider, so DNS-01 is unavailable",
         "detailNone": "Wildcard certificates and internal-only hosts need a DNS provider to solve the challenge."
       },
       "acme": {
@@ -5056,6 +5082,10 @@
       },
       "ssoEnforcement": {
         "valueEnforced": "{count, plural, =0 {Enforced, no break-glass account} one {Enforced, # break-glass account} other {Enforced, # break-glass accounts}}"
+      },
+      "outbound": {
+        "valueOffline": "Offline mode on",
+        "valueOnline": "Offline mode off"
       }
     },
     "stagedLabels": {
@@ -5139,10 +5169,10 @@
       "passwordPolicyFailed": "Failed to save password policy settings",
       "avatarsFromEnv": "Gravatar is controlled by the AVATAR_GRAVATAR environment variable and cannot be changed here.",
       "gravatarEnabled": "Gravatar fallback enabled",
-      "gravatarDisabled": "Gravatar fallback disabled - users without an icon show their initial",
+      "gravatarDisabled": "Gravatar fallback disabled. Users without an icon show their initial",
       "avatarsFailed": "Failed to save avatar settings",
-      "analyticsPasswordRequired": "Analytics needs a ClickHouse password - the container will not start without one.",
-      "analyticsEnabled": "Analytics enabled - the agent is starting ClickHouse, which can take a few minutes on first run.",
+      "analyticsPasswordRequired": "Analytics needs a ClickHouse password: the container does not start without one.",
+      "analyticsEnabled": "Analytics enabled. The agent is starting ClickHouse, which can take a few minutes the first time.",
       "analyticsDisabled": "Analytics disabled. The ClickHouse container is stopped; its data is kept.",
       "analyticsFailed": "Failed to save analytics settings",
       "geoipFailed": "Failed to save GeoIP settings",
@@ -5215,7 +5245,7 @@
       "rebuildTriggered": "Rebuild triggered.",
       "stagedApplied": "Applied as revision #{revision}",
       "stagedAppliedReloadFailed": "Changes applied, but Caddy did not reload: {error}",
-      "caddyBuildSavedSnippetWarning": "{outcome, select, building {Caddy module selection saved. The agent is rebuilding Caddy with it; the running Caddy keeps serving until the new build is ready.} loadImage {Caddy module selection saved. Build the image with the build command, then load it to apply the change.} noAgent {Caddy module selection saved. Caddy is rebuilt with it once an agent connects.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them - a snippet Caddy can no longer adapt is skipped silently.",
+      "caddyBuildSavedSnippetWarning": "{outcome, select, building {Caddy module selection saved. The agent is rebuilding Caddy with it; the running Caddy keeps serving until the new build is ready.} loadImage {Caddy module selection saved. Build the image with the build command, then load it to apply the change.} noAgent {Caddy module selection saved. Caddy is rebuilt with it once an agent connects.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them: Caddy silently skips a snippet it can no longer adapt.",
       "registrySaved": "Settings saved",
       "registryFailed": "Could not save the settings",
       "registryUnknownBlock": "Those settings do not belong to a settings block",
@@ -5230,7 +5260,7 @@
       "ssoEnforcementFailed": "Could not save single sign-on enforcement."
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
-    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard host first.",
+    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it. Turn on HTTPS under Dashboard host first.",
     "onThisPage": "On this page",
     "envOverride": "From the environment",
     "envPinned": "Set by the environment",
@@ -5327,7 +5357,7 @@
     "rateLimit": {
       "help": "Zones here apply to every proxy host left to inherit them, and to hosts that merge them with their own. Each host keeps its own count, so a zone of 100 requests a minute allows 100 on every host. The dashboard host never takes them.",
       "enabled": "Apply the global zones",
-      "enabledHelp": "Off, hosts that inherit have no rate limiting; the never-limited list still applies.",
+      "enabledHelp": "When off, hosts that inherit have no rate limiting. The never-limited list still applies.",
       "allowlist": "Never limited",
       "allowlistHelp": "IP addresses and CIDR ranges no zone ever counts, on any host, one per line, up to {max}. Read after trusted proxies.",
       "unavailable": "Rate limiting is not in Caddy"
@@ -5358,7 +5388,7 @@
         "managed": "Managed (bundled host only)"
       },
       "onlineApi": "Share signals with CrowdSec's Central API",
-      "onlineApiHelp": "Off by default. On, the container registers with CrowdSec, sends it the addresses it decides against and receives the community blocklist in return. Off, nothing leaves this host but the downloads of CrowdSec's detection rules.",
+      "onlineApiHelp": "Off by default. When on, the container registers with CrowdSec, sends it the addresses it decides against and receives the community blocklist in return. When off, nothing leaves this host but the downloads of CrowdSec's detection rules.",
       "managedAppsec": "Inspect requests with AppSec",
       "managedAppsecHelp": "Every request on an HTTP host is also sent to the container's AppSec component, with CrowdSec's virtual patching and generic rules, after rate limiting and geo blocking.",
       "managedRemoteTitle": "Only hosts served by the bundled agent are checked",
@@ -5377,13 +5407,13 @@
       "saveFailed": "Failed to save the email settings.",
       "incompleteTitle": "Email is on, but nothing can be sent yet",
       "incompleteBody": "Name an SMTP server and a sender address, then save.",
-      "enabledHelp": "Password reset links, user invitations, certificate alerts and notifications go out through this server. Off, the sign-in page offers no password reset.",
+      "enabledHelp": "Password reset links, user invitations, certificate alerts and notifications go out through this server. When off, the sign-in page offers no password reset.",
       "security": "Encryption",
       "securityHelp": "Choose what the server supports. Changing it also changes the port, unless you set a custom one.",
       "securityModes": {
         "starttls": "STARTTLS (usually port 587)",
         "tls": "Implicit TLS (usually port 465)",
-        "none": "None - trusted networks only (usually port 25)"
+        "none": "None, for trusted networks only (usually port 25)"
       },
       "passwordHelp": "Stored encrypted, and never shown again once saved.",
       "testRecipient": "Send a test message to",
@@ -5537,6 +5567,7 @@
         "instance": "app name, public url, base url, address",
         "avatars": "gravatar, profile picture, photo",
         "hostHistory": "revisions, rollback, undo, restore deleted host, retention",
+        "auditRetention": "audit log, audit events, prune, purge, delete old events, retention",
         "defaultResponse": "fallback, unknown host, catch-all, 404",
         "errorPages": "custom error page, 502, 503, maintenance page",
         "caddyBuild": "plugins, modules, image, build",
@@ -5577,7 +5608,8 @@
         "wafHostModes": "per host waf, detection, blocking",
         "wafExclusions": "false positive, rule exclusion, suppress rule",
         "blockedSources": "ban, deny list, blocklist, block ip, block country",
-        "signInOverview": "login methods, sso, ldap, passkeys, linked accounts, group mappings"
+        "signInOverview": "login methods, sso, ldap, passkeys, linked accounts, group mappings",
+        "outbound": "offline, air-gapped, air gap, internet, network, egress, firewall"
       },
       "pages": {
         "backup": {
@@ -5630,7 +5662,7 @@
       "linkDomains": "Domains to link",
       "linkDomainsHelp": "Comma-separated. A first sign-in whose email is in one of these domains joins the CPM account with the same email; any other needs an account of its own.",
       "groupsAttribute": "Groups attribute",
-      "groupsAttributeHelp": "The assertion attribute listing the user's groups, one value a group.",
+      "groupsAttributeHelp": "The assertion attribute listing the user's groups, one value per group.",
       "idpSummary": "Identity provider {entityId}, {certificates, plural, one {# signing certificate} other {# signing certificates}}.",
       "acsUrl": "Assertion consumer service URL",
       "spMetadataUrl": "Service provider metadata URL",
@@ -5644,6 +5676,133 @@
       "allowLdap": "Allow LDAP while single sign-on is enforced",
       "allowLdapHelp": "Directory accounts are created and removed in the directory, but their password is typed into CPM and the identity provider's second factor never runs. Turn this off to send them through a provider too.",
       "liftHelp": "Locked out? Run cpm-server --lift-sso-enforcement inside the web container to turn enforcement off."
+    },
+    "outbound": {
+      "listTitle": "Connections",
+      "listDescription": "Every connection this deployment opens. Offline mode turns off those to the internet that it makes on its own; anything you configured, and anything inside the stack, keeps working.",
+      "columns": {
+        "connection": "Connection",
+        "kind": "Reaches",
+        "state": "State"
+      },
+      "kinds": {
+        "internet": "Internet",
+        "configured": "Configured by you",
+        "internal": "Inside the stack"
+      },
+      "states": {
+        "on": "Runs when needed",
+        "offline": "Off: offline mode",
+        "switchedOff": "Off: its own setting",
+        "configured": "When configured",
+        "internal": "Always"
+      },
+      "calls": {
+        "updateCheck": {
+          "name": "Update check",
+          "description": "Asks the image registry a few times a day whether a newer release exists."
+        },
+        "letsdebug": {
+          "name": "Let's Debug",
+          "description": "Checks a domain from the internet, only when an administrator asks."
+        },
+        "gravatar": {
+          "name": "Gravatar",
+          "description": "Avatars for users without their own icon, fetched by each viewer's browser."
+        },
+        "crsRegistry": {
+          "name": "CRS plugin registry",
+          "description": "Lists, checks and downloads WAF plugins from their registries and GitHub."
+        },
+        "maxmind": {
+          "name": "MaxMind GeoIP downloads",
+          "description": "Checks for and downloads the GeoLite2 databases. Offline, upload them instead."
+        },
+        "caddyBuild": {
+          "name": "Caddy image builds",
+          "description": "Agents compile Caddy with its plugins, downloading Go modules. Offline, agents load an image built elsewhere."
+        },
+        "webPush": {
+          "name": "Browser push services",
+          "description": "Notifications through the push service of each subscribed browser."
+        },
+        "alerts": {
+          "name": "Alert deliveries",
+          "description": "Webhooks, chat and push channels you added under Alerts."
+        },
+        "auditStreaming": {
+          "name": "Audit stream destinations",
+          "description": "The syslog and HTTP destinations audit events are streamed to."
+        },
+        "backupStorage": {
+          "name": "Backup storage",
+          "description": "The S3-compatible destinations scheduled backups go to."
+        },
+        "smtp": {
+          "name": "Outgoing mail",
+          "description": "The mail server notifications and invitations are sent through."
+        },
+        "ldap": {
+          "name": "LDAP directories",
+          "description": "The directories users sign in against."
+        },
+        "oidcProvider": {
+          "name": "OpenID Connect providers",
+          "description": "Discovery and user details from the single sign-on providers you added."
+        },
+        "samlMetadata": {
+          "name": "SAML metadata",
+          "description": "Identity provider metadata read from the address you gave."
+        },
+        "acmeDns": {
+          "name": "acme-dns",
+          "description": "Registration with the acme-dns server a DNS provider names."
+        },
+        "captcha": {
+          "name": "Sign-in CAPTCHA",
+          "description": "The CAPTCHA provider's widget and its answer check."
+        },
+        "tailscale": {
+          "name": "Tailscale API",
+          "description": "Auth key checks against the control server you set."
+        },
+        "crowdsecLapi": {
+          "name": "CrowdSec Local API",
+          "description": "The connection check against your CrowdSec Local API."
+        },
+        "reachability": {
+          "name": "Reachability check",
+          "description": "Each host's own domains, asked over HTTP from the controller."
+        },
+        "dashboardHost": {
+          "name": "Dashboard host check",
+          "description": "The dashboard's own domain, asked before it is served through Caddy."
+        },
+        "caddyAdmin": {
+          "name": "Caddy configuration loads",
+          "description": "Through Caddy's admin API, inside the stack or through an agent."
+        },
+        "clickhouse": {
+          "name": "ClickHouse",
+          "description": "The analytics database."
+        },
+        "agentController": {
+          "name": "Agent and controller",
+          "description": "Each agent's connection to its controller, GeoIP files included."
+        },
+        "agentSocket": {
+          "name": "Agent command line",
+          "description": "The agent's own commands, over its local socket."
+        }
+      }
+    },
+    "geoipUpload": {
+      "title": "Upload a database",
+      "description": "For a deployment that cannot reach MaxMind: download the GeoLite2 .mmdb file on a connected machine and upload it here. Agents fetch it from this controller as they would a download.",
+      "edition": "Edition",
+      "file": "Database file",
+      "upload": "Upload",
+      "uploaded": "{edition} uploaded, built {build}."
     }
   },
   "setup": {
@@ -5662,7 +5821,7 @@
       "migratedDescription": "Everything you chose from {source} is already in place. You asked to leave the old users behind, so this instance still needs its first administrator.",
       "migratedTitle": "Your data was migrated, but its accounts were not",
       "oauthCardTitle": "OAuth provider",
-      "redirectUriDescription": "Your provider needs to allow this instance's /api/auth/callback/oauth2 address, or the sign-in on the next screen will fail.",
+      "redirectUriDescription": "Your provider needs to allow this instance's /api/auth/callback/oauth2 address, or the sign-in on the next screen fails.",
       "redirectUriTitle": "Register the redirect URI first",
       "roleAgent": "Agent",
       "roleCardTitle": "What is this instance?",
@@ -5672,10 +5831,10 @@
       "subtitle": "Nothing can sign in to this instance yet. Create the first administrator, or point it at an identity provider."
     },
     "accountsExcludedTitle": "No accounts will be brought across",
-    "acmeEmailHelp": "Where Let's Encrypt sends expiry warnings and account notices. Optional, and worth setting: without it nobody is told when a certificate is about to lapse.",
+    "acmeEmailHelp": "Where Let's Encrypt sends expiry warnings and account notices. Optional, but without it nobody is warned when a certificate is about to lapse.",
     "adminGroup": "Admin group",
     "composeRestartHelp": "Under Docker Compose that is:",
-    "composeSettingsDescription": "Docker Compose provisions the clickhouse container from {variables}, and it cannot read the database - so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start that container there. With an agent the saved values are passed to Compose for you, and these lines can go as well - but drop clickhouse from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the container from the now-stale values in the file.",
+    "composeSettingsDescription": "Docker Compose provisions the clickhouse container from {variables}, and Compose cannot read the database, so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start that container there. With an agent the saved values are passed to Compose for you, and these lines can go as well. Drop clickhouse from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the container from the now-stale values in the file.",
     "composeSettingsTitle": "Compose reads these too",
     "databaseSettingsDescription": "These are stored in the database once you save, so they can be changed later without editing a file or restarting.",
     "dashboardClaimDescription": "The dashboard host takes priority for this exact domain, so {name} would stop answering on it.",
@@ -5694,7 +5853,7 @@
     "emptyDatabaseRequiredDescription": "This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported.",
     "emptyDatabaseRequiredTitle": "Migrate into an empty database",
     "envBadgeLegend": "Purple badges show the environment variable each setting can also be set by.",
-    "environmentCleanupEmptyDescription": "Nothing to remove - none of the settings you migrated were configured by an environment variable.",
+    "environmentCleanupEmptyDescription": "Nothing to remove: none of the settings you migrated were configured by an environment variable.",
     "environmentCleanupTitle": "Tidy up your .env",
     "errors": {
       "clientIdAndSecretRequired": "A client ID and secret are required.",
@@ -5709,7 +5868,7 @@
       "adminToFinish": "You need to be signed in as an administrator to finish setup.",
       "analyticsPasswordRequired": "Analytics needs a ClickHouse password, or switch analytics off to continue.",
       "settingsSaveFailed": "Could not save the configuration. Try again.",
-      "identityProviderIncomplete": "An identity provider needs a display name, issuer URL, client ID and client secret - or leave all four blank to skip it.",
+      "identityProviderIncomplete": "An identity provider needs a display name, issuer URL, client ID and client secret, or leave all four blank to skip it.",
       "identityProviderCreateFailed": "The settings were saved, but the identity provider could not be created. Check its values and try again.",
       "defaultDomainInvalid": "Enter a default domain of 253 characters or fewer.",
       "dashboardDomainInvalid": "The dashboard domain has to be a hostname, such as cpm.example.com.",
@@ -5721,7 +5880,7 @@
     "groupSyncLabel": "Mirror the remaining prefixed groups into this app's groups",
     "groupsClaimHelp": "Dot-separated for a nested claim, e.g. resource_access.cpm.roles.",
     "identityProvider": "Identity provider",
-    "identityProviderDescription": "Sign in through an OIDC provider, as well as or instead of local accounts. Leave these blank to skip - one can be added from Settings at any time.",
+    "identityProviderDescription": "Sign in through an OIDC provider, as well as or instead of local accounts. Leave these blank to skip; you can add one from Settings at any time.",
     "identityProviderOptional": "Identity provider (optional)",
     "importedBadgeLegend": "Blue badges mark values imported from environment variables that are already set.",
     "importedFromEnvironment": "Imported from env",
@@ -5758,7 +5917,7 @@
     "migrationRestartDescription": "Your data is in PostgreSQL. The application is restarting so it runs from it: this process started against an empty database and is still working from what it read then.",
     "migrationRestartTitle": "Restarting to finish the migration",
     "migrationSelectionHelp": "Anything left unticked stays in the old file, which is not modified either way.",
-    "oauthAutoLinkHelp": "Off means a sign-in matching a local account is refused rather than merged - that user links the provider from their profile instead.",
+    "oauthAutoLinkHelp": "Off means a sign-in matching a local account is refused rather than merged, and that user links the provider from their profile instead.",
     "oauthAutoLinkLabel": "Link to an existing account with the same email",
     "oauthEnvironmentDescription": "Saving stores the provider in the database, after which those variables can be removed.",
     "oauthEnvironmentTitle": "Filled in from your OAUTH_ environment variables",
@@ -5776,7 +5935,7 @@
     "settingsStep": {
       "heading": "Finish setting up"
     },
-    "skipMigrationDescription": "Skip the migration and configure this instance from scratch. The old file is left alone, and this offer will not appear again.",
+    "skipMigrationDescription": "Skip the migration and configure this instance from scratch. The old file is left alone, and this offer does not appear again.",
     "skippedFilesTitle": "Files that were skipped",
     "skippedFile": "{path} - {reason}",
     "skippedReasons": {
@@ -5785,7 +5944,7 @@
       "notCpm": "Missing the {tables} tables, so this is not a Caddy Proxy Manager database.",
       "readFailed": "Could not read the database: {detail}"
     },
-    "sqliteWarningDescription": "SQLite is only intended for legacy installs and demos. The standard Docker Compose install runs PostgreSQL for you, so there is no database server to set up yourself. For an instance you rely on, switch to it before finishing setup - see the <link>installation guide</link>.",
+    "sqliteWarningDescription": "SQLite is only intended for legacy installs and demos. The standard Docker Compose install runs PostgreSQL for you, so there is no database server to set up yourself. For an instance you rely on, switch to it before finishing setup. See the <link>installation guide</link>.",
     "sqliteWarningTitle": "This instance is using SQLite",
     "steps": {
       "label": "Setup progress",
@@ -5803,13 +5962,13 @@
     "secretKeepCurrent": "{description} Leave blank to keep the current value.",
     "alreadyConfigured": "Already configured: {providers}",
     "moreOptions": "More options",
-    "restartManually": "Restart it yourself, then continue - the migration itself is finished and does not need repeating.",
-    "restartManuallyWithDetail": "{detail} Restart it yourself, then continue - the migration itself is finished and does not need repeating.",
+    "restartManually": "Restart it yourself, then continue. The migration itself is finished and does not need repeating.",
+    "restartManuallyWithDetail": "{detail} Restart it yourself, then continue. The migration itself is finished and does not need repeating.",
     "migrationGroupWithRows": "{group} - {rows, plural, one {# row} other {# rows}}",
     "migrationGroupRequiredBy": "{description} Required by {groups}.",
     "migrationGroupUntickFirst": "Untick {groups} first to leave this behind.",
     "accountsExcludedDescription": "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator, or configure single sign-on, on the next screen.",
-    "accountsExcludedOAuthDescription": "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next - unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead.",
+    "accountsExcludedOAuthDescription": "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next, unless one of the migrated OAuth providers is enabled; then you can sign in through it instead.",
     "migrationGroups": {
       "users": {
         "label": "Users and their sign-in",
@@ -5837,11 +5996,11 @@
       },
       "settings": {
         "label": "Settings",
-        "description": "The stored configuration the Settings page writes - primary domain, ACME details, and the rest."
+        "description": "The stored configuration the Settings page writes: primary domain, ACME details and the rest."
       },
       "auditLog": {
         "label": "Audit log",
-        "description": "The history of who changed what. Usually the largest table, and never load-bearing."
+        "description": "The history of who changed what. Usually the largest table, and nothing else depends on it."
       }
     },
     "restartStopping": "Stopping the application…",
@@ -5854,10 +6013,10 @@
     "setupCompleteDescription": "Everything you entered is saved.",
     "setupRestartTitle": "Restarting to finish setup",
     "setupRestartDescription": "The application is restarting so it runs from the configuration you just saved: this process started against an empty database and is still working from what it read then. Coming back is also what hands your dashboard host to Caddy.",
-    "setupRestartManually": "Restart it yourself, then continue - the settings themselves are saved and do not need entering again.",
-    "setupRestartManuallyWithDetail": "{detail} Restart it yourself, then continue - the settings themselves are saved and do not need entering again.",
+    "setupRestartManually": "Restart it yourself, then continue. The settings themselves are saved and do not need entering again.",
+    "setupRestartManuallyWithDetail": "{detail} Restart it yourself, then continue. The settings themselves are saved and do not need entering again.",
     "restartSignInSetup": "The dashboard opens as soon as the application is back, and you stay signed in.",
-    "restartSignInDashboard": "This dashboard is served at {domain} from now on. You will be taken there once it answers, and asked to sign in again - the session you are using belongs to the address you are on now.",
+    "restartSignInDashboard": "This dashboard is served at {domain} from now on. You will be taken there once it answers, and asked to sign in again, because the session you are using belongs to the address you are on now.",
     "restartRefused": "The restart request was refused (HTTP {status}).",
     "restartStillRunning": "The application is still running after being asked to stop, so nothing appears to be supervising it.",
     "restartNotBack": "The application stopped but has not come back.",
@@ -5866,22 +6025,22 @@
     "migrationCandidateLastWritten": "Last written {date}",
     "legacySecretRequiredDescription": "Certificate private keys, DNS provider credentials, OAuth client secrets and agent secrets in this file are encrypted with the <code>SESSION_SECRET</code> the old installation ran with, and this deployment has a different one. Enter the old value to bring them across.",
     "migrationConnectionDropped": "The connection dropped before the migration reported back. Check whether it completed before running it again: a second run against a partly populated database is not supported.",
-    "legacyDatabaseBackupDescription": "The file at <code>{source}</code> was read, not modified. Download it now if you want a copy - once you are satisfied the migration is correct, it can be deleted.",
+    "legacyDatabaseBackupDescription": "The file at <code>{source}</code> was read, not modified. Download it now if you want a copy. Once you are satisfied the migration is correct, you can delete it.",
     "legacyDatabaseDownloadLink": "Download the old database",
     "environmentCleanupDescription": "These are stored in the database now and are no longer read from the environment: <code>{variables}</code>. Run this beside your <code>docker-compose.yml</code> to comment them out of your <code>.env</code>. It edits nothing else, leaves a <code>.env.bak</code> next to it, and comments rather than deletes so you keep a copy of the values.",
-    "environmentCleanupElsewhere": "If this deployment's environment comes from somewhere else - Compose's own <code>environment:</code> block, Swarm or Kubernetes secrets, a systemd unit - remove those variables from wherever you set them instead. Either way it is optional: a variable that is still set is simply ignored now that a value is stored.",
+    "environmentCleanupElsewhere": "If this deployment's environment comes from somewhere else, such as Compose's own <code>environment:</code> block, Swarm or Kubernetes secrets or a systemd unit, remove those variables from wherever you set them instead. Either way it is optional: a variable that is still set is simply ignored now that a value is stored.",
     "migrateErrors": {
       "expectedJson": "Expected a JSON body.",
       "chooseDatabase": "Choose a database to migrate.",
       "chooseGroups": "Choose at least one thing to migrate, or start fresh instead.",
       "unknownDatabase": "That is not one of the databases found on this host. Reload the page and choose one of the files it offers.",
-      "legacyKeyRequired": "This database's secrets - certificate keys, provider credentials, agent secrets - are encrypted with the SESSION_SECRET the old installation ran with, which is not the one this deployment uses. Enter the old value to bring them across.",
+      "legacyKeyRequired": "This database's secrets (certificate keys, provider credentials, agent secrets) are encrypted with the SESSION_SECRET the old installation ran with, which is not the one this deployment uses. Enter the old value to bring them across.",
       "legacyKeyInvalid": "That SESSION_SECRET does not decrypt this database's secrets. Take it from the `.env` the old installation ran with, exactly as it appears there.",
       "secretKeyMissing": "This database holds secrets encrypted with a different SESSION_SECRET than this deployment uses. Enter the old one to bring them across.",
       "secretKeyWrong": "The SESSION_SECRET provided does not decrypt this database's secrets. Check it against the `.env` the old installation ran with.",
       "secretUnreadableInTable": "{reason} (reading {table})",
-      "nothingWritten": "{reason} Nothing was written - the import stops before writing when a value cannot be read.",
-      "failedPartway": "The migration failed partway through. The database may be partly populated - empty it before trying again, so a retry does not merge two attempts.",
+      "nothingWritten": "{reason} Nothing was written: the import stops before writing when a value cannot be read.",
+      "failedPartway": "The migration failed partway through. The database may be partly populated. Empty it before trying again, so a retry does not merge two attempts.",
       "nothingMigrated": "Nothing has been migrated on this instance.",
       "noBackupAvailable": "No migrated database is available to download."
     }
@@ -5921,7 +6080,7 @@
       "copy": "Copy",
       "issuesLabel": "Problems found in this text",
       "issueAt": "Line {line}: {message}",
-      "errorLabel": "Error - saving will be refused",
+      "errorLabel": "Error: saving is refused",
       "warningLabel": "Warning",
       "moreIssues": "{count, plural, one {# more problem} other {# more problems}}"
     },
@@ -5931,7 +6090,7 @@
     },
     "passwordField": {
       "copyLabel": "Copy password",
-      "copyUnavailableDescription": "Your browser only allows copying to the clipboard over HTTPS. The password is shown in the field - select it and copy it manually.",
+      "copyUnavailableDescription": "Your browser only allows copying to the clipboard over HTTPS. The password is shown in the field; select it and copy it manually.",
       "copyUnavailableTitle": "Copy it manually",
       "generateLabel": "Generate a strong password",
       "generateTooltip": "Generate strong password",
@@ -5987,11 +6146,11 @@
     "twoFactorOff": "Off",
     "resetTwoFactor": "Reset two-factor sign-in",
     "reset": "Reset",
-    "resetTwoFactorConfirm": "{name} will be signed out everywhere and can sign in with just their password until they set up an authenticator again. Only do this once you're sure it's really them asking.",
+    "resetTwoFactorConfirm": "{name} is signed out everywhere and can sign in with just their password until they set up an authenticator again. Do this only once you're sure it's really them asking.",
     "twoFactorResetDone": "Two-factor sign-in reset",
     "passkeyCount": "{count, plural, =0 {None} one {# passkey} other {# passkeys}}",
     "removePasskeys": "Remove passkeys",
-    "removePasskeysConfirm": "{name} will be signed out everywhere, and their passkeys will no longer sign them in. They sign in with a password or single sign-on until they add a new one. Only do this once you're sure it's really them asking.",
+    "removePasskeysConfirm": "{name} is signed out everywhere, and their passkeys no longer sign them in. They sign in with a password or single sign-on until they add a new one. Do this only once you're sure it's really them asking.",
     "passkeysRemovedDone": "Passkeys removed",
     "createUser": "Create user",
     "deleteUser": "Delete user",
@@ -6050,7 +6209,7 @@
     "signInUsername": "Sign-in username",
     "signInUsernameCreateHelp": "What they type on the login page. Leave empty to use their email address when it qualifies.",
     "signInUsernameHelp": "What they type on the login page: lowercase letters, digits and _ . @ -",
-    "signInUsernameNone": "None - the login page cannot sign them in with a password until one is set",
+    "signInUsernameNone": "None. The login page cannot sign them in with a password until one is set",
     "statusFilterLabel": "Filter users by status",
     "subject": "Provider subject",
     "setupMethod": "Password",
@@ -6085,7 +6244,7 @@
       "filterToken": "Administrators without a second factor",
       "bannerTitle": "{count, plural, one {# administrator signs in with a password alone} other {# administrators sign in with a password alone}}",
       "bannerDescriptionOff": "{names}. A stolen password is all it takes to sign in as them. Ask them to add an authenticator app or a passkey, or require one.",
-      "bannerDescriptionPolicy": "{names}. The two-factor policy will ask them to set one up when they next sign in, once any grace period ends."
+      "bannerDescriptionPolicy": "{names}. The two-factor policy asks them to set one up when they next sign in, once any grace period ends."
     }
   },
   "waf": {
@@ -6143,7 +6302,7 @@
     "uri": "URI",
     "wafEvent": "WAF event",
     "matchesTab": "Matches ({count})",
-    "noRuleDescription": "No description available - the rule has not triggered yet",
+    "noRuleDescription": "No description available: the rule has not triggered yet",
     "rangeAllTime": "All time",
     "rangeCustom": "Custom",
     "bodyLimitActionDefault": "Default",
@@ -6161,7 +6320,7 @@
     "ruleNumber": "Rule #{id}",
     "contentLengthBytes": "{length} bytes",
     "presets": "Presets",
-    "presetsDescription": "Named sets of SecLang rules - rule exclusions for an application, say - that the global settings and each host can select. They load ahead of the OWASP CRS rules, where a CRS plugin's exclusions go.",
+    "presetsDescription": "Named sets of SecLang rules, such as the rule exclusions an application needs, that the global settings and each host can select. They load ahead of the OWASP CRS rules, where a CRS plugin's exclusions go.",
     "presetsEmptyTitle": "No presets yet",
     "presetsEmptyDescription": "Collect the exclusions an application needs once, then select them on every host that serves it.",
     "presetNew": "New preset",
@@ -6194,7 +6353,7 @@
     "pluginDisabled": "Disabled",
     "pluginDisabledTooltip": "Caddy refused to load the WAF with this plugin, so it was switched off.",
     "pluginDisabledTitle": "Switched off: Caddy refused to load it",
-    "pluginDisabledDescription": "Coraza could not build the WAF with this plugin, which would have stopped every host's config from loading, so it was left out. Hosts that select it run the rest of their WAF. Updating the plugin or editing its configuration tries it again, or retry it as it is.",
+    "pluginDisabledDescription": "Coraza could not build the WAF with this plugin, which would have stopped every host's config from loading, so it was left out. Hosts that select it run the rest of their WAF. Updating the plugin or editing its configuration tries it again, or you can retry it as it is.",
     "pluginRetryWorked": "{name} loads again",
     "pluginRetryFailed": "Caddy still refuses {name}, so it stays switched off",
     "pluginRetryError": "Could not retry the plugin",
@@ -6412,8 +6571,8 @@
       "hosts": "Most attacked hosts",
       "paths": "Most attacked paths",
       "rules": "Most triggered WAF rules",
-      "newCountries": "Countries new against the previous 30 days",
-      "newAsns": "Networks new against the previous 30 days",
+      "newCountries": "Countries not seen in the previous 30 days",
+      "newAsns": "Networks not seen in the previous 30 days",
       "certificates": {
         "title": "Certificates expiring within {days} days",
         "none": "No certificate expires within {days} days.",
@@ -6542,7 +6701,7 @@
         },
         "channelFailing": {
           "title": "Alert channel {channel} is failing",
-          "item": "Alerts to {channel} failed {failures, plural, one {# time} other {# times}} in a row: {error}. They are retried with growing waits."
+          "item": "Alerts to {channel} failed {failures, plural, one {# time} other {# times}} in a row: {error}. Each retry waits longer than the last."
         },
         "channelRecovered": {
           "title": "Alert channel {channel} works again",
@@ -6768,7 +6927,7 @@
       "mitigationSpikeFleet": "Blocked requests rising everywhere",
       "blockedConcentration": "Blocks concentrated on one path",
       "ldapUnreachable": "Directory unreachable",
-      "accountLocked": "Account made to wait after failed sign-ins",
+      "accountLocked": "Account temporarily locked after failed sign-ins",
       "accountDisabled": "Account disabled by failed sign-ins",
       "l4PortsPending": "L4 ports waiting to be applied",
       "l4PortsFailed": "L4 ports failed to apply",
@@ -6782,9 +6941,9 @@
     },
     "rules": {
       "title": "Alert rules",
-      "help": "Each rule watches for something and tells the channels it names. The built-in rules follow the notification switches under Settings; their channels, severity and quiet period are changed here.",
+      "help": "Each rule watches for something and alerts the channels it names. The built-in rules follow the notification switches under Settings; their channels, severity and quiet period are changed here.",
       "emptyTitle": "No rules yet",
-      "emptyDescription": "Add a rule to be told about events, Needs attention items, traffic signals or a metric crossing a threshold.",
+      "emptyDescription": "Add a rule to be alerted about events, Needs attention items, traffic signals or a metric crossing a threshold.",
       "editTitle": "Edit rule",
       "saveFailed": "The rule could not be saved.",
       "deleteFailed": "The rule could not be deleted.",
@@ -6804,7 +6963,7 @@
       },
       "sourceHelp": {
         "event": "Events CPM raises itself, grouped as the notification switches in Settings group them. Recoveries come with them.",
-        "attention": "Items on the Needs attention list, told when they appear and again when they clear.",
+        "attention": "Items on the Needs attention list, reported when they appear and again when they clear.",
         "signal": "Unusual traffic the analytics notice on their own, such as a burst of errors.",
         "metric": "A per-host number from analytics checked over a sliding window. Needs analytics to be on."
       },
@@ -6844,7 +7003,7 @@
       "severity": "Severity",
       "quiet": "Quiet",
       "quietMinutes": "Quiet period (minutes)",
-      "quietHelp": "After an alert, the same alert is not repeated for this long. 0 tells every time.",
+      "quietHelp": "After an alert, the same alert is not repeated for this long. 0 repeats it every time.",
       "quietValue": "{minutes, plural, =0 {None} other {# min}}",
       "enabled": "Rule on",
       "state": {
@@ -7093,7 +7252,7 @@
     "title": "Provisioning",
     "description": "SCIM connections let an identity provider create, update and disable accounts and groups here. Each identity provider gets its own connection and token, separate from API tokens.",
     "postgresOnlyTitle": "Needs PostgreSQL",
-    "postgresOnly": "SCIM provisioning is available only when CPM runs on PostgreSQL. SQLite is meant for trying CPM out, not for an identity provider writing to it all day.",
+    "postgresOnly": "SCIM provisioning is available only when CPM runs on PostgreSQL. SQLite is for trying CPM out and does not suit an identity provider writing to it all day.",
     "endpoint": "SCIM base URL",
     "endpointHelp": "Give this to the identity provider with the connection's token, as a bearer token.",
     "tokenOnce": "Copy this token now. It is shown once and cannot be read back.",
@@ -7109,9 +7268,9 @@
     "emptyTitle": "No connections yet",
     "emptyDescription": "Make one for each identity provider that should provision accounts here.",
     "newTitle": "New SCIM connection",
-    "enabledHelp": "Off, the token is refused until it is turned back on.",
+    "enabledHelp": "When off, the token is refused until it is turned back on.",
     "linkExisting": "Link existing accounts",
-    "linkExistingHelp": "An account that already has the provisioned email is taken over by this connection, keeping its name and role. Off, provisioning that email is refused.",
+    "linkExistingHelp": "An account that already has the provisioned email is taken over by this connection, keeping its name and role. When off, provisioning that email is refused.",
     "roleMappingHelp": "A provisioned group whose name is listed under a role gives its members that role. Groups cannot give the administrator role.",
     "groupNamesPlaceholder": "Group names, separated by commas",
     "saveFailed": "Could not save the connection",
@@ -7293,7 +7452,7 @@
     "approveWaits": "It still needs another approval after yours before it applies.",
     "rejectHelp": "A rejected request is closed. Whoever submitted it can make the change again.",
     "withdrawHelp": "Nothing is applied. You can make the change again whenever you like.",
-    "bypassHelp": "This applies the change now, without its approvals, as whoever submitted it. The audit log keeps your reason, and the alert channels are told.",
+    "bypassHelp": "This applies the change now, without its approvals, as whoever submitted it. The audit log keeps your reason, and the alert channels are notified.",
     "noteLabel": "Note for the requester",
     "actionFailed": "That could not be done",
     "bypassApplied": "Applied without its approvals.",
@@ -7356,7 +7515,7 @@
       "description": "A covered change is saved as a request instead of applied. Approvers see what it changes and what it sets off, and the approval it still needs applies it, as whoever submitted it. Nobody approves their own change.",
       "readOnly": "Only someone who manages settings can change the policy.",
       "enabled": "Require approval",
-      "enabledHelp": "Off, every change applies as it is saved.",
+      "enabledHelp": "When off, every change applies as it is saved.",
       "scope": "What needs approval",
       "scopes": {
         "everything": "Every change the policy can hold",
@@ -7378,7 +7537,7 @@
       "one": "One",
       "two": "Two",
       "applyToTokens": "Apply to API tokens",
-      "applyToTokensHelp": "On, a covered write over the API answers 202 with a request id and waits, as the token's owner. Off, it applies at once and its audit event says approval was skipped.",
+      "applyToTokensHelp": "When on, a covered write over the API answers 202 with a request id and waits, as the token's owner. When off, it applies at once and its audit event says approval was skipped.",
       "saved": "Approval policy saved",
       "saveFailed": "The approval policy could not be saved"
     }

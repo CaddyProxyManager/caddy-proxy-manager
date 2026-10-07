@@ -52,15 +52,14 @@ on your tailnet.
 
 Routing is still by `Host` header, so add the node's MagicDNS name to the host's domains. Caddy gets
 the certificate for that name from Tailscale, without ACME or a DNS provider, and there is nothing
-to configure. A
-`.ts.net` name is never sent to a public CA, which could not validate it anyway.
+to configure. A `.ts.net` name is never sent to a public CA, which could not validate it anyway.
 
 **Require a Tailscale identity** admits only devices signed in to your tailnet, identified by their
 tailnet login, with the same protected and excluded path lists the other authentication
 integrations use. The identity can be forwarded upstream as headers.
 
-**Reach upstreams over the tailnet** reaches a service that only exists on the tailnet, without exposing
-it anywhere else.
+**Reach upstreams over the tailnet** proxies to a service that exists only on the tailnet, without
+exposing it anywhere else.
 
 ## Fail-closed
 

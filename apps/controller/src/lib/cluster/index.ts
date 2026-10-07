@@ -5,7 +5,7 @@
  */
 import { postgresClient } from "../db/connection";
 import { catchUpOnAnnouncements, listenForAnnouncements } from "./announcements";
-import { listenForMessages, runSyncHooks } from "./bus";
+import { listenForMessages, runSyncHooks, stopListening } from "./bus";
 import { contendForLeadership, resignLeadership } from "./leader";
 import { deregisterReplica, replicaHeartbeat } from "./replicas";
 import { cluster, HEARTBEAT_MS } from "./state";
@@ -60,6 +60,7 @@ export async function stopCluster(): Promise<void> {
   if (cluster.heartbeat) clearInterval(cluster.heartbeat);
   cluster.heartbeat = null;
   cluster.started = false;
+  await stopListening();
   await resignLeadership();
   await deregisterReplica().catch((error: unknown) => {
     console.error("[cluster] could not deregister this replica:", error);

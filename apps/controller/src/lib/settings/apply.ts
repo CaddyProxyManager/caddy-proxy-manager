@@ -116,6 +116,11 @@ async function commitSettings(
     const { applyManagedServices } = await import("../agent/managed-services");
     await applyManagedServices();
   }
+  // Agents decide whether they may build Caddy from their desired state.
+  if (keys.includes("config:offline_mode")) {
+    const { pushFleetConfig } = await import("../agent/fleet-config");
+    await pushFleetConfig();
+  }
   // English: the revision row is history, not a message for one reader.
   const error = failure?.message ?? null;
 

@@ -42,6 +42,7 @@ import {
   testLdapDirectoryAction,
   updateLdapDirectoryAction,
 } from '@/src/app/(dashboard)/settings/ldap-actions';
+import { unwrap } from '@/src/lib/errors/action-result';
 import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import { DEFAULT_LDAP_CONFIG } from '@/src/lib/ldap/defaults';
 import { getLdapDirectory } from '@/src/lib/models/ldap-directories';
@@ -81,7 +82,7 @@ describe('OAuth providers', () => {
   };
 
   it('creates a provider, returns it without its secret, and audits it', async () => {
-    const view = await createOAuthProviderAction(INPUT);
+    const view = unwrap(await createOAuthProviderAction(INPUT));
 
     expect(view).toMatchObject({
       name: 'Keycloak',
@@ -100,13 +101,17 @@ describe('OAuth providers', () => {
         data: { providerId: view.id },
       },
     ]);
-    expect((await getOAuthProvidersAction()).map((provider) => provider.id)).toEqual([view.id]);
+    expect(unwrap(await getOAuthProvidersAction()).map((provider) => provider.id)).toEqual([
+      view.id,
+    ]);
   });
 
   it('updates only the fields given, and audits which', async () => {
-    const { id } = await createOAuthProviderAction(INPUT);
+    const { id } = unwrap(await createOAuthProviderAction(INPUT));
 
-    const view = await updateOAuthProviderAction(id, { enabled: false, scopes: 'openid email' });
+    const view = unwrap(
+      await updateOAuthProviderAction(id, { enabled: false, scopes: 'openid email' }),
+    );
 
     expect(view).toMatchObject({ enabled: false, scopes: 'openid email', name: 'Keycloak' });
     expect((await audit()).at(-1)).toMatchObject({
@@ -116,22 +121,23 @@ describe('OAuth providers', () => {
   });
 
   it('answers null for a provider that does not exist', async () => {
-    expect(await updateOAuthProviderAction('missing', { enabled: false })).toBeNull();
+    expect(unwrap(await updateOAuthProviderAction('missing', { enabled: false }))).toBeNull();
   });
 
   it('refuses to turn a provider into an LDAP directory', async () => {
-    await expect(createOAuthProviderAction({ ...INPUT, type: 'ldap' })).rejects.toThrow(
-      domainErrorMessage('oauthProviderTypeInvalid'),
-    );
+    expect(await createOAuthProviderAction({ ...INPUT, type: 'ldap' })).toEqual({
+      ok: false,
+      error: domainErrorMessage('oauthProviderTypeInvalid'),
+    });
     expect(await ctx.db.select().from(oauthProviders)).toEqual([]);
   });
 
   it('records the primary provider, and clears it', async () => {
-    const { id } = await createOAuthProviderAction(INPUT);
+    const { id } = unwrap(await createOAuthProviderAction(INPUT));
 
-    await setPrimaryOAuthProviderAction(id);
+    unwrap(await setPrimaryOAuthProviderAction(id));
     expect(await getPrimaryProviderId()).toBe(id);
-    await setPrimaryOAuthProviderAction(null);
+    unwrap(await setPrimaryOAuthProviderAction(null));
     expect(await getPrimaryProviderId()).toBeNull();
 
     expect((await audit()).slice(-2).map((event) => event.summary)).toEqual([
@@ -141,9 +147,9 @@ describe('OAuth providers', () => {
   });
 
   it('deletes a provider by name in the audit trail', async () => {
-    const { id } = await createOAuthProviderAction(INPUT);
+    const { id } = unwrap(await createOAuthProviderAction(INPUT));
 
-    await deleteOAuthProviderAction(id);
+    unwrap(await deleteOAuthProviderAction(id));
 
     expect(await getOAuthProvider(id)).toBeNull();
     expect((await audit()).at(-1)).toMatchObject({
@@ -153,12 +159,13 @@ describe('OAuth providers', () => {
   });
 
   it('refuses to delete a provider the environment defines', async () => {
-    const { id } = await createOAuthProviderAction(INPUT);
+    const { id } = unwrap(await createOAuthProviderAction(INPUT));
     await ctx.db.update(oauthProviders).set({ source: 'env' }).where(eq(oauthProviders.id, id));
 
-    await expect(deleteOAuthProviderAction(id)).rejects.toThrow(
-      domainErrorMessage('environmentOAuthProviderDeletionForbidden'),
-    );
+    expect(await deleteOAuthProviderAction(id)).toEqual({
+      ok: false,
+      error: domainErrorMessage('environmentOAuthProviderDeletionForbidden'),
+    });
     expect(await getOAuthProvider(id)).not.toBeNull();
   });
 });
@@ -173,7 +180,7 @@ describe('LDAP directories', () => {
   };
 
   it('creates a directory, keeps its bind password write-only, and audits it', async () => {
-    const view = await createLdapDirectoryAction(INPUT);
+    const view = await createLdapDirectoryAction(INPUT).then(unwrap);
 
     expect(view).toMatchObject({ name: 'Corp LDAP', hasBindPassword: true, enabled: true });
     expect(view).not.toHaveProperty('bindPassword');
@@ -190,13 +197,13 @@ describe('LDAP directories', () => {
   });
 
   it('keeps the stored bind password across an edit that leaves it blank', async () => {
-    const { id } = await createLdapDirectoryAction(INPUT);
+    const { id } = await createLdapDirectoryAction(INPUT).then(unwrap);
 
     const view = await updateLdapDirectoryAction(id, {
       ...INPUT,
       name: 'Corporate LDAP',
       bindPassword: '',
-    });
+    }).then(unwrap);
 
     expect(view.name).toBe('Corporate LDAP');
     expect((await getLdapDirectory(id))?.bindPassword).toBe('bind-secret');
@@ -207,34 +214,39 @@ describe('LDAP directories', () => {
   });
 
   it('will not send the stored password to a new address', async () => {
-    const { id } = await createLdapDirectoryAction(INPUT);
+    const { id } = await createLdapDirectoryAction(INPUT).then(unwrap);
 
-    await expect(
-      updateLdapDirectoryAction(id, { ...INPUT, url: 'ldap://attacker.test', bindPassword: '' }),
-    ).rejects.toThrow(domainErrorMessage('ldapBindPasswordReentry'));
+    expect(
+      await updateLdapDirectoryAction(id, {
+        ...INPUT,
+        url: 'ldap://attacker.test',
+        bindPassword: '',
+      }),
+    ).toEqual({ ok: false, error: domainErrorMessage('ldapBindPasswordReentry') });
     expect((await getLdapDirectory(id))?.url).toBe('ldap://ldap.example.com');
   });
 
   it("refuses a second directory with the same name, in the reader's words", async () => {
-    await createLdapDirectoryAction(INPUT);
+    await createLdapDirectoryAction(INPUT).then(unwrap);
 
-    await expect(createLdapDirectoryAction(INPUT)).rejects.toThrow(
-      domainErrorMessage('ldapDirectoryNameTaken', { name: 'Corp LDAP' }),
-    );
+    expect(await createLdapDirectoryAction(INPUT)).toEqual({
+      ok: false,
+      error: domainErrorMessage('ldapDirectoryNameTaken', { name: 'Corp LDAP' }),
+    });
   });
 
   it('switches a directory off and on', async () => {
-    const { id } = await createLdapDirectoryAction(INPUT);
+    const { id } = await createLdapDirectoryAction(INPUT).then(unwrap);
 
-    expect((await setLdapDirectoryEnabledAction(id, false)).enabled).toBe(false);
+    expect((await setLdapDirectoryEnabledAction(id, false).then(unwrap)).enabled).toBe(false);
     expect((await getLdapDirectory(id))?.enabled).toBe(false);
-    expect((await setLdapDirectoryEnabledAction(id, true)).enabled).toBe(true);
+    expect((await setLdapDirectoryEnabledAction(id, true).then(unwrap)).enabled).toBe(true);
   });
 
   it('deletes a directory and audits it by name', async () => {
-    const { id } = await createLdapDirectoryAction(INPUT);
+    const { id } = await createLdapDirectoryAction(INPUT).then(unwrap);
 
-    await deleteLdapDirectoryAction(id);
+    await deleteLdapDirectoryAction(id).then(unwrap);
 
     expect(await getLdapDirectory(id)).toBeNull();
     expect((await audit()).at(-1)).toMatchObject({
@@ -244,17 +256,17 @@ describe('LDAP directories', () => {
   });
 
   it('says a missing directory is missing', async () => {
-    const missing = domainErrorMessage('ldapDirectoryNotFound');
-    await expect(setLdapDirectoryEnabledAction('missing', true)).rejects.toThrow(missing);
-    await expect(deleteLdapDirectoryAction('missing')).rejects.toThrow(missing);
-    await expect(updateLdapDirectoryAction('missing', INPUT)).rejects.toThrow(missing);
+    const missing = { ok: false as const, error: domainErrorMessage('ldapDirectoryNotFound') };
+    expect(await setLdapDirectoryEnabledAction('missing', true)).toEqual(missing);
+    expect(await deleteLdapDirectoryAction('missing')).toEqual(missing);
+    expect(await updateLdapDirectoryAction('missing', INPUT)).toEqual(missing);
   });
 
   it('tests an unsaved form and says the connection failed', async () => {
     const result = await testLdapDirectoryAction({ ...INPUT, url: 'ldap://127.0.0.1:1' }, null, {
       username: '  ',
       password: 'ignored without a username',
-    });
+    }).then(unwrap);
 
     expect(result).toMatchObject({
       ok: false,
@@ -266,20 +278,23 @@ describe('LDAP directories', () => {
   });
 
   it('refuses to test a form that could not be saved', async () => {
-    await expect(testLdapDirectoryAction({ ...INPUT, name: ' ' }, null, null)).rejects.toThrow(
-      domainErrorMessage('ldapNameRequired'),
-    );
+    expect(await testLdapDirectoryAction({ ...INPUT, name: ' ' }, null, null)).toEqual({
+      ok: false,
+      error: domainErrorMessage('ldapNameRequired'),
+    });
   });
 });
 
 describe('a non-administrator', () => {
   it('can neither read nor change providers or directories', async () => {
-    const provider = await createOAuthProviderAction({
-      name: 'Keycloak',
-      type: 'oidc',
-      clientId: 'cpm',
-      clientSecret: 'secret',
-    });
+    const provider = unwrap(
+      await createOAuthProviderAction({
+        name: 'Keycloak',
+        type: 'oidc',
+        clientId: 'cpm',
+        clientSecret: 'secret',
+      }),
+    );
     ctx.session = { user: await seedUser(ctx.db, 'op@example.com', 'operator') };
     const directory = {
       name: 'X',
@@ -288,17 +303,22 @@ describe('a non-administrator', () => {
     };
 
     const attempts = [
-      () => getOAuthProvidersAction(),
+      () => getOAuthProvidersAction().then(unwrap),
       () =>
-        createOAuthProviderAction({ name: 'X', type: 'oidc', clientId: 'x', clientSecret: 'x' }),
-      () => updateOAuthProviderAction(provider.id, { enabled: false }),
-      () => deleteOAuthProviderAction(provider.id),
-      () => setPrimaryOAuthProviderAction(provider.id),
-      () => createLdapDirectoryAction(directory),
-      () => updateLdapDirectoryAction('any', directory),
-      () => setLdapDirectoryEnabledAction('any', false),
-      () => deleteLdapDirectoryAction('any'),
-      () => testLdapDirectoryAction(directory, null, null),
+        createOAuthProviderAction({
+          name: 'X',
+          type: 'oidc',
+          clientId: 'x',
+          clientSecret: 'x',
+        }).then(unwrap),
+      () => updateOAuthProviderAction(provider.id, { enabled: false }).then(unwrap),
+      () => deleteOAuthProviderAction(provider.id).then(unwrap),
+      () => setPrimaryOAuthProviderAction(provider.id).then(unwrap),
+      () => createLdapDirectoryAction(directory).then(unwrap),
+      () => updateLdapDirectoryAction('any', directory).then(unwrap),
+      () => setLdapDirectoryEnabledAction('any', false).then(unwrap),
+      () => deleteLdapDirectoryAction('any').then(unwrap),
+      () => testLdapDirectoryAction(directory, null, null).then(unwrap),
     ];
     for (const attempt of attempts) await expect(attempt()).rejects.toThrow(ADMIN_REQUIRED);
 

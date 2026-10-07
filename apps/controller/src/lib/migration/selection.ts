@@ -151,8 +151,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "settings",
     label: "Settings",
     description:
-      "The stored configuration the Settings page writes - primary domain, ACME details, and the " +
-      "rest.",
+      "The stored configuration the Settings page writes: primary domain, ACME details and the rest.",
     // Staged, revisions and the cluster tables are claimed only for coverage: always empty in a
     // legacy source, and an old replica row is ignored once its heartbeat is stale.
     // waf_presets and crs_plugins because WAF settings select them; a lost one drops just itself.
@@ -185,7 +184,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "auditLog",
     label: "Audit log",
     description:
-      "The history of who changed what. Usually the largest table, and never load-bearing.",
+      "The history of who changed what. Usually the largest table, and nothing else depends on it.",
     tables: [
       "audit_events",
       "audit_chain",

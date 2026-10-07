@@ -5,6 +5,7 @@
  */
 
 import { DomainError, type StoredErrorCode, storedErrorCode } from "../../errors/domain-error";
+import { outboundAllowed } from "../../offline";
 import { getSetting, setSetting } from "../../settings";
 import { outsideStagingScope } from "../../settings/staging-context";
 import {
@@ -214,7 +215,7 @@ async function syncOnce({
 /** Runs a pass when the interval has passed since the last complete one. */
 export async function syncCrsRegistryIfDue(options: CrsSyncOptions = {}): Promise<boolean> {
   const { refreshIntervalHours } = await getCrsRegistrySettings();
-  if (refreshIntervalHours === 0) return false;
+  if (refreshIntervalHours === 0 || !(await outboundAllowed("crsRegistry"))) return false;
   const state = await getCrsRegistryState();
   const last =
     state.checkedAt && !(await crsRegistryListsStale()) ? Date.parse(state.checkedAt) : 0;

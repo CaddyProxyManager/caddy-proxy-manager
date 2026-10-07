@@ -24,7 +24,8 @@ import {
 } from "@/src/lib/backup/manage";
 import type { BackupRun } from "@/src/lib/backup/runs";
 import type { BackupScheduleInput } from "@/src/lib/backup/schedules";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 
 export type BackupOverview = {
   destinations: BackupDestinationView[];
@@ -38,22 +39,24 @@ async function adminId(): Promise<number> {
   return Number((await requireCan("backups:write")).user.id);
 }
 
-export async function loadBackupOverviewAction(): Promise<BackupOverview> {
-  await requireCan("backups:read");
-  const [destinations, schedules, runs] = await Promise.all([
-    listDestinations(),
-    listSchedulesWithRuns(),
-    listRuns({ limit: 20 }),
-  ]);
-  return { destinations, schedules, runs };
+export async function loadBackupOverviewAction(): Promise<ActionResult<BackupOverview>> {
+  return runAction(async () => {
+    await requireCan("backups:read");
+    const [destinations, schedules, runs] = await Promise.all([
+      listDestinations(),
+      listSchedulesWithRuns(),
+      listRuns({ limit: 20 }),
+    ]);
+    return { destinations, schedules, runs };
+  });
 }
 
 export async function saveDestinationAction(
   id: number | null,
   input: BackupDestinationInput,
-): Promise<BackupDestinationView> {
-  const userId = await adminId();
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<BackupDestinationView>> {
+  return runAction(async () => {
+    const userId = await adminId();
     const saved =
       id === null
         ? await createDestinationAudited(input, userId)
@@ -63,9 +66,9 @@ export async function saveDestinationAction(
   });
 }
 
-export async function deleteDestinationAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteDestinationAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteDestinationAudited(id, userId);
     revalidatePath(PAGE);
   });
@@ -75,19 +78,16 @@ export async function deleteDestinationAction(id: number): Promise<void> {
 export async function testDestinationAction(
   id: number | null,
   input: BackupDestinationInput,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  await requireCan("backups:write");
-  try {
-    await withTranslatedErrors(() => testDestinationInput(id, input));
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
+): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireCan("backups:write");
+    await testDestinationInput(id, input);
+  });
 }
 
 export async function saveScheduleAction(id: number | null, input: BackupScheduleInput) {
-  const userId = await adminId();
-  return withTranslatedErrors(async () => {
+  return runAction(async () => {
+    const userId = await adminId();
     const saved =
       id === null
         ? await createScheduleAudited(input, userId)
@@ -98,39 +98,43 @@ export async function saveScheduleAction(id: number | null, input: BackupSchedul
 }
 
 export async function setScheduleEnabledAction(id: number, enabled: boolean) {
-  const userId = await adminId();
-  return withTranslatedErrors(() => setScheduleEnabledAudited(id, enabled, userId));
+  return runAction(async () => setScheduleEnabledAudited(id, enabled, await adminId()));
 }
 
-export async function deleteScheduleAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteScheduleAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteScheduleAudited(id, userId);
     revalidatePath(PAGE);
   });
 }
 
-export async function runScheduleNowAction(id: number): Promise<BackupRun | null> {
-  const userId = await adminId();
-  return withTranslatedErrors(() => runNowAudited(id, userId));
+export async function runScheduleNowAction(id: number): Promise<ActionResult<BackupRun | null>> {
+  return runAction(async () => runNowAudited(id, await adminId()));
 }
 
-export async function listRemoteBackupsAction(destinationId: number): Promise<RemoteBackup[]> {
-  await requireCan("backups:read");
-  return withTranslatedErrors(() => listRemoteBackups(destinationId));
+export async function listRemoteBackupsAction(
+  destinationId: number,
+): Promise<ActionResult<RemoteBackup[]>> {
+  return runAction(async () => {
+    await requireCan("backups:read");
+    return listRemoteBackups(destinationId);
+  });
 }
 
 /** The next run for an expression being typed, or why it can't be saved. Nothing is stored. */
 export async function previewTimingAction(
   cron: string,
   timeZone: string,
-): Promise<{ nextRunAt: string } | { message: string }> {
-  await requireCan("backups:read");
-  const problem = cronProblem(cron.trim(), timeZone.trim() || "UTC");
-  if (problem) {
-    const t = await getTranslations("errors");
-    return { message: t(problem) };
-  }
-  const next = nextRun(cron.trim(), timeZone.trim() || "UTC");
-  return next === null ? { message: "" } : { nextRunAt: new Date(next).toISOString() };
+): Promise<ActionResult<{ nextRunAt: string } | { message: string }>> {
+  return runAction(async () => {
+    await requireCan("backups:read");
+    const problem = cronProblem(cron.trim(), timeZone.trim() || "UTC");
+    if (problem) {
+      const t = await getTranslations("errors");
+      return { message: t(problem) };
+    }
+    const next = nextRun(cron.trim(), timeZone.trim() || "UTC");
+    return next === null ? { message: "" } : { nextRunAt: new Date(next).toISOString() };
+  });
 }

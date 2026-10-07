@@ -14,6 +14,7 @@ import {
   type LdapConfig,
   activeDirectoryBindTemplate,
 } from '@/src/lib/ldap/defaults';
+import { unwrap } from '@/src/lib/errors/action-result';
 import { DomainError } from '@/src/lib/errors/domain-error';
 import type { LdapDirectory } from '@/src/lib/models/ldap-directories';
 import { createTestDatabase } from '@/tests/helpers/db';
@@ -309,28 +310,30 @@ describe('binding as the user against Active Directory', () => {
       stage: 'connect',
     });
 
-    const reachable = await env.actions.testLdapDirectoryAction(
-      directoryInput(ad!.ldapsUrl),
-      null,
-      null,
-    );
+    const reachable = await env.actions
+      .testLdapDirectoryAction(directoryInput(ad!.ldapsUrl), null, null)
+      .then(unwrap);
     expect(reachable).toMatchObject({ ok: true, identity: null });
     expect(reachable.message).toMatch(/TLS is working/);
 
-    const signedIn = await env.actions.testLdapDirectoryAction(directoryInput(ad!.ldapsUrl), null, {
-      username: 'alice',
-      password: AD_PASSWORDS.alice,
-    });
+    const signedIn = await env.actions
+      .testLdapDirectoryAction(directoryInput(ad!.ldapsUrl), null, {
+        username: 'alice',
+        password: AD_PASSWORDS.alice,
+      })
+      .then(unwrap);
     expect(signedIn.ok).toBe(true);
     expect(signedIn.identity).toMatchObject({ dn: ALICE_DN, role: 'admin' });
 
-    const wrongEntry = await env.actions.testLdapDirectoryAction(
-      directoryInput(ad!.ldapsUrl, {
-        userFilter: '(|(sAMAccountName=bob)(sAMAccountName={username}-nobody))',
-      }),
-      null,
-      { username: 'alice', password: AD_PASSWORDS.alice },
-    );
+    const wrongEntry = await env.actions
+      .testLdapDirectoryAction(
+        directoryInput(ad!.ldapsUrl, {
+          userFilter: '(|(sAMAccountName=bob)(sAMAccountName={username}-nobody))',
+        }),
+        null,
+        { username: 'alice', password: AD_PASSWORDS.alice },
+      )
+      .then(unwrap);
     expect(wrongEntry.ok).toBe(false);
     expect(wrongEntry.message).toMatch(/different entry/);
   });

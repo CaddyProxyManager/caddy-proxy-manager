@@ -4,7 +4,7 @@
  * Each action re-checks the stage before writing: a page guard is only a redirect, and these are
  * what create an administrator, so an unauthenticated POST could otherwise mint one.
  */
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { createOAuthProvider } from "@/src/lib/models/oauth-providers";
@@ -42,10 +42,19 @@ async function withAccountStep(create: () => Promise<string | null>): Promise<st
     await assertAccountStepOpen();
     return await create();
   } catch (error) {
+    unstable_rethrow(error);
     return extractErrorMessage(await getTranslations(), error, t("noLongerOpen"));
   } finally {
     await releaseSetupStep(SETUP_ACCOUNT_CLAIM, claim);
   }
+}
+
+/** The reader's words for whatever escaped; `redirect()` still throws. */
+async function setupFailure(error: unknown): Promise<SetupActionState> {
+  unstable_rethrow(error);
+  console.error("Setup: an account step failed", error);
+  const t = await getTranslations();
+  return { error: extractErrorMessage(t, error, t("common.somethingWentWrong")) };
 }
 
 /** Create the first administrator from the setup form. */
@@ -53,42 +62,47 @@ export async function createFirstAdmin(
   _previous: SetupActionState,
   formData: FormData,
 ): Promise<SetupActionState> {
-  const username = String(formData.get("username") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  const confirmation = String(formData.get("passwordConfirmation") ?? "");
+  try {
+    const username = String(formData.get("username") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    const confirmation = String(formData.get("passwordConfirmation") ?? "");
 
-  const t = await getTranslations();
+    const t = await getTranslations();
 
-  if (!username) return { error: t("setup.errors.usernameRequired") };
-  if (password !== confirmation) return { error: t("setup.errors.passwordsDiffer") };
+    if (!username) return { error: t("setup.errors.usernameRequired") };
+    if (password !== confirmation) return { error: t("setup.errors.passwordsDiffer") };
 
-  const policyFailure = passwordPolicyMessage(t, password, t("passwordPolicy.subject.password"));
-  if (policyFailure) return { error: policyFailure };
+    const policyFailure = passwordPolicyMessage(t, password, t("passwordPolicy.subject.password"));
+    if (policyFailure) return { error: policyFailure };
 
-  // Hashed before the claim, so the slow part doesn't hold it.
-  const passwordHash = await hashPassword(password);
-  // The same synthetic address the environment-seeded admin has always used, so an operator who
-  // later sets ADMIN_USERNAME to the same name updates this account rather than making a second.
-  const email = `${username.toLowerCase()}@localhost`;
-  const failure = await withAccountStep(async () => {
-    if (await findUserByEmail(email)) return t("setup.errors.usernameTaken");
-    await createUser({
-      email,
-      name: username,
-      role: "admin",
-      provider: "credentials",
-      subject: username,
-      username: username.toLowerCase(),
-      displayUsername: username,
-      passwordHash,
+    // Hashed before the claim, so the slow part doesn't hold it.
+    const passwordHash = await hashPassword(password);
+    // The same synthetic address the environment-seeded admin has always used, so an operator who
+    // later sets ADMIN_USERNAME to the same name updates this account rather than making a second.
+    const email = `${username.toLowerCase()}@localhost`;
+    const failure = await withAccountStep(async () => {
+      if (await findUserByEmail(email)) return t("setup.errors.usernameTaken");
+      await createUser({
+        email,
+        name: username,
+        role: "admin",
+        provider: "credentials",
+        subject: username,
+        username: username.toLowerCase(),
+        displayUsername: username,
+        passwordHash,
+      });
+      return null;
     });
-    return null;
-  });
-  if (failure) return { error: failure };
+    if (failure) return { error: failure };
 
-  // To the login page rather than onwards: the point of this step is to prove the credentials work
-  // before any more configuration is entered.
-  redirect("/login");
+    // To the login page rather than onwards: the point of this step is to prove the credentials
+    // work before any more configuration is entered.
+    redirect("/login");
+  } catch (error) {
+    unstable_rethrow(error);
+    return setupFailure(error);
+  }
 }
 
 /** Configure an OAuth provider as the way in, instead of a local account. */
@@ -96,39 +110,45 @@ export async function configureFirstOAuthProvider(
   _previous: SetupActionState,
   formData: FormData,
 ): Promise<SetupActionState> {
-  const name = String(formData.get("providerName") ?? "").trim();
-  const clientId = String(formData.get("clientId") ?? "").trim();
-  const clientSecret = String(formData.get("clientSecret") ?? "").trim();
-  const issuer = String(formData.get("issuer") ?? "").trim();
+  try {
+    const name = String(formData.get("providerName") ?? "").trim();
+    const clientId = String(formData.get("clientId") ?? "").trim();
+    const clientSecret = String(formData.get("clientSecret") ?? "").trim();
+    const issuer = String(formData.get("issuer") ?? "").trim();
 
-  const t = await getTranslations("setup.errors");
+    const t = await getTranslations("setup.errors");
 
-  if (!name) return { error: t("displayNameRequired") };
-  if (!clientId || !clientSecret) return { error: t("clientIdAndSecretRequired") };
-  if (!/^https?:\/\/\S+$/.test(issuer)) {
-    return { error: t("issuerMustBeUrl") };
-  }
-
-  const failure = await withAccountStep(async () => {
-    try {
-      await createOAuthProvider({
-        name,
-        type: "oidc",
-        clientId,
-        clientSecret,
-        issuer,
-        scopes: "openid email profile",
-        autoLink: false,
-        enabled: true,
-        source: "ui",
-      });
-      return null;
-    } catch (error) {
-      console.error("Setup: failed to create the OAuth provider", error);
-      return t("providerSaveFailed");
+    if (!name) return { error: t("displayNameRequired") };
+    if (!clientId || !clientSecret) return { error: t("clientIdAndSecretRequired") };
+    if (!/^https?:\/\/\S+$/.test(issuer)) {
+      return { error: t("issuerMustBeUrl") };
     }
-  });
-  if (failure) return { error: failure };
 
-  redirect("/login");
+    const failure = await withAccountStep(async () => {
+      try {
+        await createOAuthProvider({
+          name,
+          type: "oidc",
+          clientId,
+          clientSecret,
+          issuer,
+          scopes: "openid email profile",
+          autoLink: false,
+          enabled: true,
+          source: "ui",
+        });
+        return null;
+      } catch (error) {
+        unstable_rethrow(error);
+        console.error("Setup: failed to create the OAuth provider", error);
+        return t("providerSaveFailed");
+      }
+    });
+    if (failure) return { error: failure };
+
+    redirect("/login");
+  } catch (error) {
+    unstable_rethrow(error);
+    return setupFailure(error);
+  }
 }

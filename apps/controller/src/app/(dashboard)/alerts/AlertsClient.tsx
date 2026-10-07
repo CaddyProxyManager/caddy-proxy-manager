@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { type AlertsOverview, loadAlertsOverviewAction } from "./actions";
 import { ChannelsTab } from "./ChannelsTab";
 import { DigestsTab } from "./DigestsTab";
@@ -25,9 +26,11 @@ export default function AlertsClient({ initial }: { initial: AlertsOverview }) {
   const [overview, setOverview] = useState(initial);
   const [tab, setTab] = useState<TabId>("rules");
   const reload = useCallback(() => {
-    loadAlertsOverviewAction().then(setOverview, (error: unknown) => {
-      console.error("Failed to reload the alerts:", error);
-    });
+    loadAlertsOverviewAction()
+      .then(unwrap)
+      .then(setOverview, (error: unknown) => {
+        console.error("Failed to reload the alerts:", error);
+      });
   }, []);
 
   return (

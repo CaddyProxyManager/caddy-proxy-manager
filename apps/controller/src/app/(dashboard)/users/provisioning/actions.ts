@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import {
   type ScimConnection,
   type ScimConnectionInput,
@@ -23,9 +24,9 @@ async function actor() {
 export async function saveScimConnectionAction(
   id: number | null,
   input: ScimConnectionInput,
-): Promise<{ connection: ScimConnection; token: string | null }> {
-  const by = await actor();
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<{ connection: ScimConnection; token: string | null }>> {
+  return runAction(async () => {
+    const by = await actor();
     const result =
       id === null
         ? await createScimConnection(input, by)
@@ -35,19 +36,17 @@ export async function saveScimConnectionAction(
   });
 }
 
-export async function rotateScimTokenAction(id: number): Promise<string> {
-  const by = await actor();
-  return withTranslatedErrors(async () => {
-    const { token } = await rotateScimConnectionToken(id, by);
+export async function rotateScimTokenAction(id: number): Promise<ActionResult<string>> {
+  return runAction(async () => {
+    const { token } = await rotateScimConnectionToken(id, await actor());
     revalidatePath(PAGE);
     return token;
   });
 }
 
-export async function deleteScimConnectionAction(id: number): Promise<void> {
-  const by = await actor();
-  await withTranslatedErrors(async () => {
-    await deleteScimConnection(id, by);
+export async function deleteScimConnectionAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    await deleteScimConnection(id, await actor());
     revalidatePath(PAGE);
   });
 }

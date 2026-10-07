@@ -7,24 +7,24 @@ import Demo from "../../../components/Demo.astro";
 import CaddyBuildDemo from "../../../demos/samples/CaddyBuildDemo";
 
 Caddy is a single static binary. A plugin either was compiled in with
-[xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime - there is no
+[xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime; there is no
 loading one later. **Settings → Caddy build** makes that list editable from the dashboard.
 
-The default image ships with every supported module except the opt-in ones - Rate Limit, CrowdSec
-and the HTTP caching modules - so an existing install behaves exactly as it did before this page
+The default image ships with every supported module except the opt-in ones (Rate Limit, CrowdSec
+and the HTTP caching modules), so an existing install behaves exactly as it did before this page
 existed.
 
 ## Choosing modules
 
-Each supported plugin has a toggle: Layer 4 Proxy, Tailscale, Request Blocker, Coraza WAF, and every DNS
-provider. Turning one off does two things:
+Each supported plugin has a toggle: Layer 4 Proxy, Tailscale, Request Blocker, Coraza WAF, and
+every DNS provider. Turning one off does two things:
 
 - **The app stops generating config that uses it, immediately.** The handler stops being
   emitted, which is what lets you remove a plugin without Caddy rejecting the stored config on the
   way out.
 - **Every setting that depends on it is disabled**, with a tooltip naming the module. Geo blocking
   follows Request Blocker, the WAF pages follow Coraza, L4 hosts follow caddy-l4, tailnet options
-  follow caddy-tailscale, and each DNS provider follows its own module - so disabling Cloudflare
+  follow caddy-tailscale, and each DNS provider follows its own module, so disabling Cloudflare
   leaves Route 53 alone.
 
 **Rate Limit** ([caddy-ratelimit](https://github.com/mholt/caddy-ratelimit)), **CrowdSec**
@@ -33,8 +33,7 @@ caching** modules are the ones the shipped image leaves out: each is off until y
 rebuild. Rate Limit unlocks a host's [Rate limiting](/features/reverse-proxy/#rate-limiting).
 CrowdSec unlocks [CrowdSec](/features/crowdsec/); it is one module for proxy hosts, AppSec and L4
 hosts alike, and because its L4 part is built on caddy-l4, selecting it compiles caddy-l4 in even
-with Layer 4 Proxy switched off.
-**HTTP Cache** unlocks the **Caddy cache** mode of a host's
+with Layer 4 Proxy switched off. **HTTP Cache** unlocks the **Caddy cache** mode of a host's
 [Cache assets](/features/reverse-proxy/#cache-assets); the storage modules beside it give that
 cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-storage)).
 
@@ -44,19 +43,18 @@ cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-
 
 ## You cannot turn off something in use
 
-A module still being used cannot be switched off. The save is refused and names what is using it -
-"3 enabled L4 proxy hosts need the Layer 4 Proxy module". That check covers global and per-host WAF
-and geo blocking, CrowdSec while it is switched on, enabled L4 hosts, hosts served on the tailnet,
-and every DNS provider with credentials on file. Turn the
-feature off first.
+A module still being used cannot be switched off. The save is refused and names what is using it,
+such as "3 enabled L4 proxy hosts need the Layer 4 Proxy module". That check covers global and
+per-host WAF and geo blocking, CrowdSec while it is switched on, enabled L4 hosts, hosts served on
+the tailnet, and every DNS provider with credentials on file. Turn the feature off first.
 
 Rate Limit and the HTTP caching modules are the exception: turning one off is allowed. Hosts with
 rate limiting are served without limits, hosts in Caddy cache mode fall back to browser caching, and
 a storage falls back to memory.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
-only Caddy's adapter knows what a directive resolves to - for the binary running *now* rather than
-the one a rebuild would produce. Saving a module change while any host has a snippet adds an
+only Caddy's adapter knows what a directive resolves to, and only for the binary running *now*
+rather than the one a rebuild would produce. Saving a module change while any host has a snippet adds an
 advisory note listing those hosts so you can review them first.
 
 ## Your own modules
@@ -66,8 +64,8 @@ commit. It is compiled from source at build time.
 
 ## Rebuilding
 
-Saving a changed selection starts the rebuild - in Settings and over `PUT /api/v1/caddy/modules`
-alike. The [agent](../agent/) runs the build and recreates the Caddy container when it finishes,
+Saving a changed selection starts the rebuild, whether in Settings or over
+`PUT /api/v1/caddy/modules`. The [agent](../agent/) runs the build and recreates the Caddy container when it finishes,
 reporting progress as it goes. The running Caddy keeps serving until the new binary is ready.
 **Rebuild** retries a build that failed; an agent that was offline builds when it next connects.
 
@@ -79,7 +77,8 @@ agent then never builds: the page's **Build command** is a `docker build` for yo
 **Load built image** takes the Rebuild button's place. The command builds from this release's tag
 on GitHub, so it runs anywhere Docker can build, without a checkout. In a fleet where only some
 agents are external, Rebuild leaves those alone; pick one under **Module selection for** to load
-its image.
+its image. [Offline mode](../../start/offline/#caddy-builds) makes every agent external, since a
+build downloads Go modules.
 
 1. Run the command, on the agent's host or anywhere else. Push the image to a registry if it was
    built elsewhere.
@@ -97,8 +96,8 @@ plugins, so the config stays loadable and every feature needing a module stays o
 
 ## HTTP cache storage
 
-**Settings → Caddy build → HTTP cache** picks where the Caddy cache keeps entries. Memory is
-built in; each other storage is its own module, and can be chosen once that module is selected above:
+**Settings → Caddy build → HTTP cache** picks where the Caddy cache keeps entries. Memory is built
+in; each other storage is its own module, and can be chosen once that module is selected above:
 
 | Storage | Kept | Shared between Caddys |
 | --- | --- | --- |
@@ -125,14 +124,15 @@ Once either is set, CPM writes the `cache` app itself and the global one is refu
 
 ## Global Caddyfile
 
-**Settings → Caddy build → Global Caddyfile** takes raw Caddyfile text - a global options block,
-site blocks, or both - and adds it to every agent's config. Each agent's Caddy adapts it, so a
+**Settings → Caddy build → Global Caddyfile** takes raw Caddyfile text (a global options block,
+site blocks, or both) and adds it to every agent's config. Each agent's Caddy adapts it, so a
 directive from a module that agent was built with works there.
 
 It can only add to what CPM generates. CPM rebuilds the whole config on every change, so anything
 that would replace part of it is refused by name rather than merged:
 
-- the admin API and storage - the agent drives the first and reads certificates from the second;
+- the admin API and storage, since the agent drives the first and reads certificates from the
+  second;
 - TLS certificate automation, and any other setting CPM already writes;
 - ports 80 and 443, and every other port a CPM server listens on;
 - the `http_access` and `waf_rules` logs, and the layer 4 and Tailscale apps.
@@ -140,8 +140,8 @@ that would replace part of it is refused by name rather than merged:
 A site block on a port of its own gets that port inside the Caddy container; publish it in
 `docker-compose.yml` to reach it from outside. A save is checked by every connected agent's Caddy,
 with `caddy validate` where the agent supports it, and refused with Caddy's own message. If a saved
-one later stops adapting - after a rebuild drops a module, say - it is skipped with a warning in the
-controller log and the rest of the config still loads.
+one later stops adapting (after a rebuild drops a module, for example), it is skipped with a warning
+in the controller log and the rest of the config still loads.
 
 :::caution
 This is Caddy itself: a site block can serve any file the Caddy container can read, including its

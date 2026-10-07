@@ -16,6 +16,7 @@ export type OutgoingEmail = EmailMessage & { from: { name: string; address: stri
 type Deliver = (config: SmtpConfig, message: OutgoingEmail) => Promise<void>;
 
 async function deliverOverSmtp(config: SmtpConfig, message: OutgoingEmail) {
+  // outbound: smtp
   const transport = nodemailer.createTransport({
     host: config.host,
     port: config.port,

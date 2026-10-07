@@ -6,10 +6,10 @@ description: Every resource under one GraphQL endpoint, with Bearer token authen
 import Demo from "../../../components/Demo.astro";
 import ApiExplorerDemo from "../../../demos/samples/ApiExplorerDemo";
 
-Most of what the dashboard does, it does through an API you can use too - certificates and
-agents are read-only there, and users are managed rather than created.
+Most of what the dashboard does goes through an API you can use too. Certificates and agents are
+read-only there, and users are managed rather than created.
 
-<Demo title="The GraphQL API" note="Nothing leaves the page - the responses are canned.">
+<Demo title="The GraphQL API" note="Nothing leaves the page; the responses are canned.">
   <ApiExplorerDemo client:visible />
 </Demo>
 
@@ -31,7 +31,7 @@ rather than being told about it.
 ## What is a field, and what is JSON
 
 Stable, queryable things are fields: ids, names, domains, timestamps, foreign keys. Configuration
-that the model layer owns - load balancing, WAF and geoblock overrides, location rules, mTLS -
+that the model layer owns (load balancing, WAF and geoblock overrides, location rules, mTLS)
 travels as a `JSON` scalar: readable through `config` on a host, and passed back as `input` on a
 mutation.
 
@@ -127,8 +127,8 @@ There is no REST route for it: new queries and mutations are added to GraphQL on
 
 `analyticsReport(query)` answers what the [analytics](../analytics/) page shows for one state:
 totals against the previous period, the timeline, the chart's groups, ten rows of each top list and
-the latest requests. `query` takes the page's own fields - `range` (or `from` and `to`), `compare`,
-`group`, `filters` and `mitigatedOnly` - and is sanitised the way a hand-edited link is.
+the latest requests. `query` takes the page's own fields: `range` (or `from` and `to`), `compare`,
+`group`, `filters` and `mitigatedOnly`. It is sanitised the way a hand-edited link is.
 `analyticsTopList` returns one list at up to 100 rows, and `trafficSignals` the 5xx bursts,
 mitigation spikes and blocked-traffic concentrations of the last 24 hours, with `budgetMs` capping
 how long it waits.
@@ -183,7 +183,7 @@ mutation {
 
 `wafExclusions`, `updateWafExclusion` and `deleteWafExclusion` manage exclusions; a refused one
 answers with Coraza's reason. `reviewWafEvent(key, verdict)` marks an event `intended` or
-`false_positive`, and null clears it. `blockedSources` and `deleteBlockedSource` round out the
+`false_positive`, and null clears it. `blockedSources` and `deleteBlockedSource` manage the
 deny list.
 
 ## Access lists
@@ -209,9 +209,8 @@ Global rate-limit zones and the never-limited list are the `rate-limit` settings
 
 ## Authentication
 
-Requests authenticate with a Bearer token, created from **Profile → API tokens** in an authenticated
-dashboard session. That
-restriction is deliberate: an existing token cannot mint replacement credentials, so a leaked one
+Requests authenticate with a Bearer token, created from **Profile → API tokens** in an
+authenticated dashboard session. That restriction is deliberate: an existing token cannot mint replacement credentials, so a leaked one
 cannot extend its own life. An account holds at most ten, and each expires in 30 days, 90 days (the
 default), a year, on a date you pick, or never. A token stops working while its owner is overdue
 for [two-factor setup](../users-and-groups/#the-two-factor-policy).
@@ -219,7 +218,7 @@ for [two-factor setup](../users-and-groups/#the-two-factor-policy).
 A token carries its owner's role, [custom](../users-and-groups/#custom-roles) or built-in: each
 field and endpoint needs a permission the role holds outright. Hosts and agents a role reaches only
 through a [group grant](../users-and-groups/) don't count, so an operator's token gets nothing a
-user's doesn't - grants delegate the dashboard, not the API. Managing your own tokens is the
+user's doesn't: grants delegate the dashboard, not the API. Managing your own tokens is the
 exception, and open to every signed-in role. A refusal answers 403 with
 `This account's role does not allow this request`.
 
@@ -271,7 +270,7 @@ cannot disagree about what a write does.
 
 ## Health
 
-`/api/health` is public and unauthenticated - it is what the container health check probes. It also
+`/api/health` is public and unauthenticated; the container health check probes it. It also
 answers the [dashboard host](../dashboard-host/) reachability probe when asked with a nonce. Its
 `boot` field is a random id that changes each time the process starts, which is how setup tells a
 restart that finished between two checks from one that never happened.

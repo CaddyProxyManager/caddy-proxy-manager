@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
 import { createApiToken, deleteApiToken } from "@/src/lib/models/api-tokens";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { domainError } from "@/src/lib/errors/domain-error";
+import { runAction } from "@/src/lib/errors/run-action";
 import { resolveTokenExpiry, tokenExpiryPreset } from "@/src/lib/api-tokens/expiry";
 import { parseTokenScope } from "@/src/lib/api-tokens/scope";
 
@@ -19,38 +20,31 @@ export type CreateApiTokenInput = {
 
 export async function createApiTokenAction(
   input: CreateApiTokenInput,
-): Promise<{ rawToken: string } | { error: string }> {
-  const session = await requireUser();
-  const userId = Number(session.user.id);
-  const name = String(input.name ?? "").trim();
+): Promise<ActionResult<{ rawToken: string }>> {
+  return runAction(async () => {
+    const session = await requireUser();
+    const userId = Number(session.user.id);
+    const name = String(input.name ?? "").trim();
 
-  // A token carries the account's real role, a confusing thing to mint mid-preview.
-  if (session.viewAs) {
-    const t = await getTranslations("errors");
-    return { error: t("viewAsForbidden") };
-  }
+    // A token carries the account's real role, a confusing thing to mint mid-preview.
+    if (session.viewAs) throw domainError("viewAsForbidden");
+    if (!name) throw domainError("nameRequired");
 
-  if (!name) {
-    const t = await getTranslations("errors");
-    return { error: t("nameRequired") };
-  }
-
-  // The model refuses with codes; translate them before the client shows the message.
-  const { rawToken } = await withTranslatedErrors(async () =>
-    createApiToken(
+    const { rawToken } = await createApiToken(
       name,
       userId,
       resolveTokenExpiry(tokenExpiryPreset(input.expiry), input.expiresAt),
       parseTokenScope(input.scope, input.permissions),
-    ),
-  );
-  revalidatePath("/profile");
-  return { rawToken };
+    );
+    revalidatePath("/profile");
+    return { rawToken };
+  });
 }
 
-export async function deleteApiTokenAction(id: number) {
-  const session = await requireUser();
-  const userId = Number(session.user.id);
-  await deleteApiToken(id, userId);
-  revalidatePath("/profile");
+export async function deleteApiTokenAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireUser();
+    await deleteApiToken(id, Number(session.user.id));
+    revalidatePath("/profile");
+  });
 }

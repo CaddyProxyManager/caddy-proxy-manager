@@ -1060,6 +1060,10 @@ export const SEPARATE_DUPLICATES: readonly {
     ],
   },
   {
+    reason: 'composed',
+    keys: ['settings.sections.outbound.name', 'settings.blocks.outbound.name'],
+  },
+  {
     reason: 'sense',
     keys: [
       'groups.access',

@@ -190,6 +190,19 @@ export async function POST(request: Request) {
   return response;
 }
 
+/** SCIM's replace, update and delete (lib/scim/gate.ts); a missing export answers 405. */
+export async function PUT(request: Request) {
+  return toNextJsHandler(await getAuth()).PUT(await withClientIp(request));
+}
+
+export async function PATCH(request: Request) {
+  return toNextJsHandler(await getAuth()).PATCH(await withClientIp(request));
+}
+
+export async function DELETE(request: Request) {
+  return toNextJsHandler(await getAuth()).DELETE(await withClientIp(request));
+}
+
 /** The session hook skips password sign-ins, as the 2FA plugin may yet delete that session. */
 async function auditCompletedSignIn(
   response: Response,

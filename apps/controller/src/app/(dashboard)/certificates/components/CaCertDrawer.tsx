@@ -2,6 +2,7 @@
 
 import { CalendarDays } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@astryxdesign/core/Button";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
@@ -69,7 +70,11 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
     e.preventDefault();
     const formData = new FormData(generateRef.current!);
     startTransition(async () => {
-      await generateCaCertificateAction(formData);
+      const result = await generateCaCertificateAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       handleClose();
     });
   }
@@ -78,7 +83,11 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
     e.preventDefault();
     const formData = new FormData(importRef.current!);
     startTransition(async () => {
-      await createCaCertificateAction(formData);
+      const result = await createCaCertificateAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       handleClose();
     });
   }
@@ -87,7 +96,11 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
     e.preventDefault();
     const formData = new FormData(editRef.current!);
     startTransition(async () => {
-      await updateCaCertificateAction(cert!.id, formData);
+      const result = await updateCaCertificateAction(cert!.id, formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       handleClose();
     });
   }

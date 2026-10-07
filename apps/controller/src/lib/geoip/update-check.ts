@@ -5,6 +5,7 @@
  */
 
 import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
+import { outboundAllowed } from "../offline";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 
@@ -109,6 +110,12 @@ export async function checkGeoipUpdates(
       result.error = failure.message;
       result.errorCode = storedErrorCode(failure);
     };
+
+    // Not stored, like a check that was never asked for: offline, uploads are the only source.
+    if (!(await outboundAllowed("maxmind"))) {
+      recordFailure(domainError("outboundOffline"));
+      return result;
+    }
 
     const { accountId, licenseKey } = await geoipCredentials();
     if (!accountId || !licenseKey) {

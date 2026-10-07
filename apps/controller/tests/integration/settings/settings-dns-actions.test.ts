@@ -319,15 +319,17 @@ describe('registering with acme-dns', () => {
 
 describe('checking delegations', () => {
   it('has nothing to look up before any delegation exists', async () => {
-    expect(await checkDnsDelegationsAction()).toEqual([]);
+    expect(await checkDnsDelegationsAction()).toEqual({ ok: true, data: [] });
   });
 
   it('is for administrators only', async () => {
     ctx.session = { user: await seedUser(ctx.db, 'op@example.com', 'operator') };
 
-    await expect(checkDnsDelegationsAction()).rejects.toThrow(domainErrorMessage('accessDenied'));
-    await expect(save({ provider: 'cloudflare', credential_api_token: 'x' })).rejects.toThrow(
-      domainErrorMessage('accessDenied'),
-    );
+    const denied = domainErrorMessage('accessDenied');
+    expect(await checkDnsDelegationsAction()).toEqual({ ok: false, error: denied });
+    expect(await save({ provider: 'cloudflare', credential_api_token: 'x' })).toEqual({
+      success: false,
+      message: denied,
+    });
   });
 });

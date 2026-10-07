@@ -8,19 +8,19 @@ import AuditLogDemo from "../../../demos/samples/AuditLogDemo";
 
 Every configuration change is recorded: what changed, which account changed it, and when.
 
-<Demo title="The audit log" note="Filtering and paging really run - over nine rows.">
+<Demo title="The audit log" note="Filtering and paging really run, over nine rows.">
   <AuditLogDemo client:visible />
 </Demo>
 
 ## What it covers
 
 Creating, editing, enabling, disabling and deleting proxy hosts, L4 hosts, certificates, access
-lists, users, groups, WAF presets, CRS plugins and OAuth providers - the operations that alter what
-the proxy does - plus sign-ins, forward-auth logins and denials, password changes, two-factor
+lists, users, groups, WAF presets, CRS plugins and OAuth providers (the operations that alter what
+the proxy does), plus sign-ins, forward-auth logins and denials, password changes, two-factor
 turned on, off or reset, backups made and restored, certificate renewals asked for and private
 keys downloaded, saved [analytics views](../analytics/#saved-views) created, changed and deleted,
-and an administrator starting and ending [View as](../users-and-groups/#viewing-as-a-role). Each settings
-apply is logged too, with [Settings → History](../settings/) keeping the full revisions. Reads are
+and an administrator starting and ending [View as](../users-and-groups/#viewing-as-a-role). Each
+settings apply is logged too, with [Settings → History](../settings/) keeping the full revisions. Reads are
 not logged, key, backup and configuration exports aside; the log exists to answer "why is this
 host configured like this", not to track browsing.
 
@@ -43,8 +43,8 @@ back; a deletion's **Restore** opens a deleted host's history, ready to bring it
 Every event stores a keyed hash (HMAC-SHA256) of the event before it plus its own content, under a
 key derived from `SESSION_SECRET`, so the log is a chain: changing an event, removing one or
 slipping one in breaks it from that point on, and write access to the database alone is not enough
-to rebuild it. **Verify** recomputes the chain and reports the first broken link - which
-event changed, which is missing, or that the newest events are gone. The check is itself logged.
+to rebuild it. **Verify** recomputes the chain and reports the first broken link:
+which event changed, which is missing, or that the newest events are gone. The check is itself logged.
 
 - Events logged before the upgrade that introduced the chain are older history, outside the
   sequence. Each carries a keyed mark of its own instead of a link, so editing one, removing one or
@@ -74,6 +74,21 @@ carries its diff.
 [Audit streaming](../audit-streaming/) sends every event, as it is written, to a syslog server, an
 HTTP receiver or a file, with the chain fields a receiver needs to check nothing is missing.
 
+## Retention
+
+By default the log keeps every event. **Settings → General → Audit log retention**
+(`AUDIT_LOG_KEEP_DAYS`) sets how many days of it to keep instead; `0` keeps everything again. Once
+a day the controller leading the cluster removes the events older than that, counted from
+midnight UTC, and records an event saying how many went and where the cut was. The removal
+anchors the chain at the newest event removed, so **Verify** still passes afterwards and a gap
+nobody sanctioned is still reported. Events from before the chain existed are removed by age as
+well.
+
+Removing old events is a system job, so it is never held for
+[change approval](../change-approvals/). A [streaming sink](../audit-streaming/#gaps) that had not
+yet received what was removed is sent a `gap` record in its place and raises an alert, so keep the window comfortably longer than any
+outage a receiver might have.
+
 ## Reading it
 
 The page opens with the last 24 hours at a glance: an hourly activity strip with the busiest hour
@@ -84,15 +99,15 @@ the context for whatever you are looking through.
 ## Searching it
 
 Filtering and paging run on the server. Type to search the summary, action and resource, or pick a
-field - **User**, **Resource** or **Action** - to narrow on it exactly. Filters combine, so "every
+field (**User**, **Resource** or **Action**) to narrow on it exactly. Filters combine, so "every
 certificate change Avery made" is two tokens rather than a scroll. The filters live in the address
 bar, so a filtered view can be bookmarked or linked.
 
 ## Attribution
 
-Changes made through the [API](../api/) are attributed to the token's owner, so an
-automated change is traceable to the person whose token made it rather than appearing anonymous.
+Changes made through the [API](../api/) are attributed to the token's owner, so an automated
+change traces back to the person whose token made it rather than appearing anonymous.
 
 ## Access
 
-Admin-only, alongside analytics and the API docs.
+Only administrators can open it, as with analytics and the API docs.

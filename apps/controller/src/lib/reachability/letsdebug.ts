@@ -3,6 +3,8 @@
  * Only run when an administrator asks, per domain: it tells a third party the domain name.
  */
 
+import { outboundAllowed } from "../offline";
+
 const BASE = "https://letsdebug.net";
 const POLL_MS = 2000;
 const TOTAL_MS = 60_000;
@@ -10,9 +12,11 @@ const TOTAL_MS = 60_000;
 export type LetsDebugProblem = { name: string; severity: string; explanation: string };
 export type LetsDebugResult =
   | { state: "done"; problems: LetsDebugProblem[] }
-  | { state: "unavailable" };
+  | { state: "unavailable" }
+  | { state: "offline" };
 
 export async function askLetsDebug(domain: string): Promise<LetsDebugResult> {
+  if (!(await outboundAllowed("letsdebug"))) return { state: "offline" };
   const deadline = Date.now() + TOTAL_MS;
   try {
     const created = await fetch(BASE, {

@@ -67,7 +67,7 @@ function receive(raw: string): void {
 
 export async function listenForMessages(pg: SQL): Promise<void> {
   let first = true;
-  await pg.listen(CHANNEL, receive, () => {
+  const subscription = await pg.listen(CHANNEL, receive, () => {
     // The first call is the subscription itself; later ones follow a reconnect.
     if (first) {
       first = false;
@@ -75,4 +75,11 @@ export async function listenForMessages(pg: SQL): Promise<void> {
     }
     void runSyncHooks();
   });
+  cluster.subscriptions.push(subscription);
+}
+
+/** Concurrently: the last one closes the connection, which settles an UNLISTEN still waiting. */
+export async function stopListening(): Promise<void> {
+  const held = cluster.subscriptions.splice(0);
+  await Promise.allSettled(held.map((subscription) => subscription.unlisten()));
 }

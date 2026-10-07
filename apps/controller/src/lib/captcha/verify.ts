@@ -47,6 +47,7 @@ export async function verifyCaptchaToken(
   }
 
   try {
+    // outbound: captcha
     const response = await fetchImpl(request.url, {
       ...request.init,
       method: "POST",

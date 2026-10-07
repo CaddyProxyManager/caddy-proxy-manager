@@ -92,6 +92,9 @@ export const RULES: readonly Rule[] = [
       "scripts/check-bundle-budget.ts",
       "scripts/test-all.sh",
       "scripts/publish-deploy-repo.sh",
+      "scripts/package-deploy.sh",
+      "scripts/check-image-size.sh",
+      "scripts/airgap/",
       "docker/deploy-repo/",
       ".github/ISSUE_TEMPLATE/",
       ".github/FUNDING.yml",
@@ -204,8 +207,20 @@ export const RULES: readonly Rule[] = [
     specs: WAF,
   },
   {
+    match: [
+      `${LIB}geoip/upload.ts`,
+      `${APP}api/geoip/upload/`,
+      `${DASH}settings/GeoipUploadField.tsx`,
+    ],
+    specs: ["settings/outbound"],
+  },
+  {
     match: [`${LIB}geoip/`, `${LIB}agent/geoip.ts`, `${APP}api/geoip-status/`],
     specs: GEOIP,
+  },
+  {
+    match: [`${LIB}offline/`, `${DASH}settings/OutboundCallsList.tsx`],
+    specs: ["settings/outbound"],
   },
   {
     match: [

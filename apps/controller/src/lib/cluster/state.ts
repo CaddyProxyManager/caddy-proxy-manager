@@ -3,6 +3,7 @@
  * modules, and a second heartbeat or leader loop would hold a lock the first never lets go of.
  */
 import { randomUUID } from "node:crypto";
+import type { SQL } from "bun";
 
 export type LeaderJob = { name: string; start: () => void; stop: () => void };
 
@@ -14,6 +15,8 @@ type ClusterState = {
   leader: boolean;
   jobs: LeaderJob[];
   heartbeat: ReturnType<typeof setInterval> | null;
+  /** Bun keeps the process alive while any is held, so stopping must let go of them. */
+  subscriptions: SQL.ListenSubscription[];
   /** Last generation seen per announced name. */
   generations: Map<string, number>;
   handlers: Map<string, Set<() => void>>;
@@ -34,6 +37,7 @@ partial.started ??= false;
 partial.leader ??= false;
 partial.jobs ??= [];
 partial.heartbeat ??= null;
+partial.subscriptions ??= [];
 partial.generations ??= new Map();
 partial.handlers ??= new Map();
 partial.messageHandlers ??= new Map();

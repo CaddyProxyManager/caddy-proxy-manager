@@ -280,8 +280,8 @@ export const caddyMonitorEnabled = booleanSetting({
   label: "Re-apply after a Caddy restart",
   description:
     "Watch every Caddy for a restart onto a config this controller did not send, and push its " +
-    "configuration back. Turn it off only on a controller sharing a Caddy it does not own, or " +
-    "the two push their own idea of the config at each other every pass.",
+    "configuration back. Turn it off only on a controller sharing a Caddy it does not own; " +
+    "otherwise the two keep pushing their own config over each other's.",
   default: true,
 });
 
@@ -302,8 +302,8 @@ export const forwardAuthInternalUrl = stringSetting({
   group: "application",
   label: "Internal forward-auth address",
   description:
-    "The address Caddy uses to reach this app for forward_auth. Derived from the container " +
-    "network when empty; set it only if that derivation is wrong.",
+    "The address Caddy uses to reach this app for forward_auth. When empty, it is derived from " +
+    "the container network. Set it only if that address is wrong.",
   default: "",
   pattern: URL_PATTERN,
   patternHint: "must start with http:// or https://",
@@ -318,7 +318,7 @@ export const caddyBuildTimeout = numberSetting({
   label: "Caddy build timeout (seconds)",
   description:
     "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow " +
-    "or ARM hosts can take considerably longer than the default.",
+    "or ARM hosts can take much longer than the default.",
   default: 1800,
   min: 60,
   max: 24 * 60 * 60,
@@ -336,15 +336,27 @@ export const updateCheckEnabled = booleanSetting({
   default: true,
 });
 
+export const offlineMode = booleanSetting({
+  name: "offline_mode",
+  env: "OFFLINE_MODE",
+  group: "application",
+  label: "Offline mode",
+  description:
+    "Stop every call this deployment makes to the internet on its own: the update check, " +
+    "reachability diagnosis, Gravatar, the CRS plugin registry, MaxMind downloads, browser push " +
+    "and agent-built Caddy images. Destinations an administrator configured are still reached.",
+  default: false,
+});
+
 export const updateImageRepository = stringSetting({
   name: "update_image_repository",
   env: "UPDATE_IMAGE_REPOSITORY",
   group: "application",
   label: "Image repository",
   description:
-    "Where this deployment's images come from, without the image name - the update check reads " +
-    "its tags. Point it at your own namespace if you run a fork, or it will report releases you " +
-    "cannot pull.",
+    "Where this deployment's images come from, without the image name. The update check reads " +
+    "its tags. Point it at your own namespace if you run a fork, otherwise it reports releases " +
+    "you cannot pull.",
   default: "ghcr.io/caddyproxymanager",
   // Lowercase because the registry API requires it; no scheme because the check forces https.
   pattern: /^[a-z0-9][a-z0-9.-]*(:\d{1,5})?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$/,
@@ -392,7 +404,7 @@ export const disableLocalUsers = booleanSetting({
   label: "OIDC-only mode",
   description:
     "Remove local accounts entirely: no credential sign-in, no password management, no bootstrap " +
-    "admin. Enable only once OAuth sign-in is confirmed working.",
+    "admin. Turn it on only after confirming that OAuth sign-in works.",
   default: false,
 });
 
@@ -575,7 +587,7 @@ export const accessReviewReminderDays = numberSetting({
   group: "authentication",
   label: "Access review reminder (days before due)",
   description:
-    "How many days before an access review is due its undecided items are reported, " +
+    "How many days before an access review's due date its undecided items are reported, " +
     "through the access review notifications.",
   default: 3,
   min: 1,
@@ -764,7 +776,7 @@ export const notifyAgentOfflineMinutes = numberSetting({
   group: "email",
   label: "Agent offline after (minutes)",
   description:
-    "How long an agent may be disconnected before anyone is told. After a restart of this " +
+    "How long an agent may be disconnected before anyone is notified. After a restart of this " +
     "server every agent gets this long to reconnect.",
   default: 5,
   min: 1,
@@ -784,7 +796,7 @@ export const notifyUpstreamErrorCount = numberSetting({
   unit: "responses",
   env: "NOTIFY_UPSTREAM_ERROR_COUNT",
   group: "email",
-  label: "Upstream errors before telling (responses)",
+  label: "Upstream errors before notifying (responses)",
   description: "How many 502, 503 or 504 responses from one host, within the minutes below.",
   default: 10,
   min: 1,
@@ -807,8 +819,8 @@ export const notifyCaddyApply = notifySetting(
   "notify_caddy_apply",
   "NOTIFY_CADDY_APPLY",
   "Caddy configuration refused",
-  "When Caddy refuses a configuration, and when it loads one again. An unreachable Caddy is " +
-    "the agent's to report.",
+  "When Caddy refuses a configuration, and when it loads one again. The agent reports an " +
+    "unreachable Caddy.",
 );
 
 export const notifyAgentProblems = notifySetting(
@@ -830,7 +842,7 @@ export const notifyCrsPluginDisabled = notifySetting(
   "notify_crs_plugin_disabled",
   "NOTIFY_CRS_PLUGIN_DISABLED",
   "CRS plugin switched off",
-  "When a CRS plugin Caddy refuses is switched off so the rest of the configuration loads.",
+  "When a CRS plugin that Caddy refuses is switched off so the rest of the configuration loads.",
 );
 
 export const notifyUpdateAvailable = notifySetting(
@@ -873,7 +885,7 @@ export const notifyChannelFailing = notifySetting(
   "notify_channel_failing",
   "NOTIFY_CHANNEL_FAILING",
   "Alert channel failing",
-  "When sends to an alert channel keep failing, told on the other channels, and when it works again.",
+  "When sends to an alert channel keep failing, reported through the other channels, and when it works again.",
 );
 
 /** Off by default, unlike the rest: it mails someone who is not an administrator. */
@@ -881,7 +893,7 @@ export const notifyDisabledAccountOwner = booleanSetting({
   name: "notify_disabled_account_owner",
   env: "NOTIFY_DISABLED_ACCOUNT_OWNER",
   group: "email",
-  label: "Tell the owner of a disabled account",
+  label: "Notify the owner of a disabled account",
   description:
     "Email one message to an account's own address when it is disabled, by an administrator or " +
     "after failed sign-ins. A disabled account gets nothing else.",
@@ -983,8 +995,8 @@ export const hostHistoryKeepRevisions = numberSetting({
   group: "application",
   label: "Host revisions kept",
   description:
-    "Each host keeps at least this many of its latest revisions, however old. Older ones go " +
-    "once they are also past the age below.",
+    "Each host keeps at least this many of its latest revisions, however old. Older ones are " +
+    "removed once they are also past the age below.",
   default: 100,
   min: 1,
   max: 10000,
@@ -1002,6 +1014,21 @@ export const hostHistoryKeepDays = numberSetting({
   default: 365,
   min: 1,
   max: 3650,
+});
+
+/** 0 keeps everything, so an upgrade never drops what an installation has kept so far. */
+export const auditLogKeepDays = numberSetting({
+  name: "audit_log_keep_days",
+  unit: "days",
+  env: "AUDIT_LOG_KEEP_DAYS",
+  group: "application",
+  label: "Audit log kept (days)",
+  description:
+    "Audit events older than this are removed once a day, and the removal is itself recorded. " +
+    "0 keeps them forever.",
+  default: 0,
+  min: 0,
+  max: 36500,
 });
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
@@ -1065,8 +1092,10 @@ export const SETTING_DEFINITIONS = [
   caddyBuildTimeout,
   updateCheckEnabled,
   updateImageRepository,
+  offlineMode,
   hostHistoryKeepRevisions,
   hostHistoryKeepDays,
+  auditLogKeepDays,
   allowSelfRegistration,
   allowOauthRegistration,
   allowOauthRoleFromClaims,

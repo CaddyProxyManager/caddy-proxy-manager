@@ -7,6 +7,7 @@ import type {
   AccessListSettingsInput,
   AccessListStats,
 } from "@cpm/controller/src/lib/models/access-lists";
+import type { ActionResult } from "@cpm/controller/src/lib/errors/action-result";
 
 const lists = new Map<number, AccessList>();
 
@@ -15,18 +16,19 @@ export function rememberAccessList(list: AccessList): void {
   lists.set(list.id, list);
 }
 
-function save(id: number, change: Partial<AccessList>): AccessList {
+function save(id: number, change: Partial<AccessList>): ActionResult<AccessList> {
   const current = lists.get(id);
-  if (!current) throw new Error("There is no controller behind the documentation site.");
+  if (!current)
+    return { ok: false, error: "There is no controller behind the documentation site." };
   const next = { ...current, ...change, updatedAt: new Date().toISOString() };
   lists.set(id, next);
-  return next;
+  return { ok: true, data: next };
 }
 
 export async function updateAccessListAction(
   id: number,
   input: AccessListSettingsInput,
-): Promise<AccessList> {
+): Promise<ActionResult<AccessList>> {
   const { denyResponse, ...rest } = input;
   const change = rest as Partial<AccessList>;
   if (denyResponse !== undefined) {
@@ -52,7 +54,7 @@ export async function setAccessListIpRulesAction(
     note?: string | null;
     expiresAt?: string | null;
   }[],
-): Promise<AccessList> {
+): Promise<ActionResult<AccessList>> {
   // A name saved before keeps its answer; a new one has nothing to look it up with, so it shows as
   // not looked up yet.
   const known = new Map(
@@ -85,6 +87,6 @@ export async function setAccessListIpRulesAction(
 }
 
 /** The docs site has no analytics, so traffic reads as switched off. */
-export async function getAccessListStatsAction(id: number): Promise<AccessListStats> {
-  return { hosts: lists.get(id) ? 2 : 0, traffic: null };
+export async function getAccessListStatsAction(id: number): Promise<ActionResult<AccessListStats>> {
+  return { ok: true, data: { hosts: lists.get(id) ? 2 : 0, traffic: null } };
 }

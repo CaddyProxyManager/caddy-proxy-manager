@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { stopViewAsAction } from "./view-as/actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { Button } from "@astryxdesign/core/Button";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -256,7 +257,7 @@ export default function DashboardLayoutClient({
           size="sm"
           label={t("viewAsExit")}
           onClick={async () => {
-            await stopViewAsAction();
+            unwrap(await stopViewAsAction());
             // A full load: the whole shell changes.
             window.location.reload();
           }}

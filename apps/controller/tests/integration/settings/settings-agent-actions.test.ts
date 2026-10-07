@@ -48,6 +48,7 @@ import {
 import { redeemRepairCode, resetPairingCodes } from '@/src/lib/agent/pairing-codes';
 import { connectedAgents } from '@/src/lib/agent/registry';
 import { CADDY_MODULES } from '@/src/lib/caddy/image-build/modules';
+import { unwrap } from '@/src/lib/errors/action-result';
 import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import { findAgentById, getAgentBuildSettings, insertPairedAgent } from '@/src/lib/models/agents';
 import { getCaddyBuildSettings, saveWafSettings, setSetting } from '@/src/lib/settings';
@@ -98,23 +99,23 @@ afterEach(async () => {
 
 describe('the pairing code', () => {
   it('stays the same until revoked, then a fresh one is minted', async () => {
-    const first = await pairingCodeAction();
+    const first = unwrap(await pairingCodeAction());
     expect(first.code).toMatch(/^[A-Z0-9]{6}$/);
     expect(first.expiresAt).toBeGreaterThan(Date.now());
-    expect((await pairingCodeAction()).code).toBe(first.code);
+    expect(unwrap(await pairingCodeAction()).code).toBe(first.code);
 
-    await revokePairingCodeAction();
+    unwrap(await revokePairingCodeAction());
 
-    expect((await pairingCodeAction()).code).not.toBe(first.code);
+    expect(unwrap(await pairingCodeAction()).code).not.toBe(first.code);
   });
 });
 
 describe('unpairing', () => {
   it('forgets the agent, drops its stream and its re-pair code', async () => {
     const id = await pairFakeAgent();
-    const { code } = (await repairAgentAction(id)) as { kind: 'code'; code: string };
+    const { code } = unwrap(await repairAgentAction(id)) as { kind: 'code'; code: string };
 
-    await unpairAgentAction(form({ agentId: String(id) }));
+    unwrap(await unpairAgentAction(form({ agentId: String(id) })));
 
     expect(await findAgentById(id)).toBeNull();
     expect(connectedAgents().map((connected) => connected.agentId)).not.toContain(agent.agentId);
@@ -125,7 +126,7 @@ describe('unpairing', () => {
     const id = await pairFakeAgent();
     await recordBundledAgent(agent.agentId);
 
-    await unpairAgentAction(form({ agentId: String(id) }));
+    unwrap(await unpairAgentAction(form({ agentId: String(id) })));
 
     expect(await autoPairingDisabled()).toBe(true);
   });
@@ -134,7 +135,7 @@ describe('unpairing', () => {
     const id = await pairFakeAgent();
     await recordBundledAgent('someone-else');
 
-    await unpairAgentAction(form({ agentId: String(id) }));
+    unwrap(await unpairAgentAction(form({ agentId: String(id) })));
 
     expect(await autoPairingDisabled()).toBe(false);
   });
@@ -142,7 +143,7 @@ describe('unpairing', () => {
   it('ignores a form without an agent id', async () => {
     const id = await pairFakeAgent();
 
-    await unpairAgentAction(form({ agentId: 'abc' }));
+    unwrap(await unpairAgentAction(form({ agentId: 'abc' })));
 
     expect(await findAgentById(id)).not.toBeNull();
   });
@@ -152,7 +153,7 @@ describe('re-pairing', () => {
   it('gives a remote agent a code that re-pairs it and nothing else', async () => {
     const id = await pairFakeAgent();
 
-    const result = await repairAgentAction(id);
+    const result = unwrap(await repairAgentAction(id));
 
     expect(result.kind).toBe('code');
     const { code } = result as { kind: 'code'; code: string };
@@ -164,12 +165,12 @@ describe('re-pairing', () => {
     const id = await pairFakeAgent();
     await recordBundledAgent(agent.agentId);
 
-    expect(await repairAgentAction(id)).toEqual({ kind: 'bootstrap' });
+    expect(unwrap(await repairAgentAction(id))).toEqual({ kind: 'bootstrap' });
     expect(existsSync(join(dataDir, AGENT_BOOTSTRAP_FILE))).toBe(true);
   });
 
   it('fails for an agent that is not paired', async () => {
-    expect(await repairAgentAction(42)).toEqual({ kind: 'failed' });
+    expect(unwrap(await repairAgentAction(42))).toEqual({ kind: 'failed' });
   });
 });
 
@@ -177,7 +178,7 @@ describe('auto-pairing', () => {
   it('is turned back on, with a token written for the bundled agent to find', async () => {
     await setSetting('agent_bootstrap_disabled', true);
 
-    await enableAutoPairingAction();
+    unwrap(await enableAutoPairingAction());
 
     expect(await autoPairingDisabled()).toBe(false);
     expect(existsSync(join(dataDir, AGENT_BOOTSTRAP_FILE))).toBe(true);
@@ -281,11 +282,12 @@ describe('a non-administrator', () => {
     const id = await pairFakeAgent();
     ctx.session = { user: await seedUser(ctx.db, 'op@example.com', 'operator') };
 
-    await expect(pairingCodeAction()).rejects.toThrow(ADMIN_REQUIRED);
-    await expect(revokePairingCodeAction()).rejects.toThrow(ADMIN_REQUIRED);
-    await expect(unpairAgentAction(form({ agentId: String(id) }))).rejects.toThrow(ADMIN_REQUIRED);
-    await expect(repairAgentAction(id)).rejects.toThrow(ADMIN_REQUIRED);
-    await expect(enableAutoPairingAction()).rejects.toThrow(ADMIN_REQUIRED);
+    const denied = { ok: false as const, error: ADMIN_REQUIRED };
+    expect(await pairingCodeAction()).toEqual(denied);
+    expect(await revokePairingCodeAction()).toEqual(denied);
+    expect(await unpairAgentAction(form({ agentId: String(id) }))).toEqual(denied);
+    expect(await repairAgentAction(id)).toEqual(denied);
+    expect(await enableAutoPairingAction()).toEqual(denied);
     const refused = { success: false, message: ADMIN_REQUIRED };
     expect(await rebuildCaddyAction(null, form())).toEqual(refused);
     expect(await updateCaddyBuildSettingsAction(null, modules(['caddy-l4']))).toEqual(refused);

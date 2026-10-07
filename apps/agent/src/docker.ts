@@ -8,6 +8,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type CaddyBuildMode,
   isValidL4PortMapping,
   isValidModuleSpec,
   MANAGED_SERVICE_ENV_KEYS,
@@ -35,6 +36,7 @@ async function run(
     : null;
 
   try {
+    // outbound: caddyBuild
     const proc = Bun.spawn(argv, {
       stdout: "pipe",
       stderr: "pipe",
@@ -99,7 +101,16 @@ export class DockerHost {
   /** Same, for the host path the operator's own compose was run from. "" means "asked, none found". */
   private detectedHostDir: string | null = null;
 
-  constructor(private readonly config: AgentConfig) {}
+  /** Replaced once the store exists; see effectiveBuildMode. */
+  private buildMode: () => CaddyBuildMode;
+
+  constructor(private readonly config: AgentConfig) {
+    this.buildMode = () => config.caddyBuildMode;
+  }
+
+  setBuildModeSource(mode: () => CaddyBuildMode): void {
+    this.buildMode = mode;
+  }
 
   /**
    * One compose label off Caddy's container, "" when unreadable. Bounded: it runs before every
@@ -247,7 +258,7 @@ export class DockerHost {
 
   /** In external mode a missing image must fail, not fall through to a build it has no grant for. */
   private noBuild(): string[] {
-    return this.config.caddyBuildMode === "external" ? ["--no-build"] : [];
+    return this.buildMode() === "external" ? ["--no-build"] : [];
   }
 
   async recreateCaddy(): Promise<CommandResult> {

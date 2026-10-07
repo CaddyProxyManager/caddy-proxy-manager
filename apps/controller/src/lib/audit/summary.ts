@@ -647,6 +647,13 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     message: "backupRunNow",
     pattern: /^Ran backup schedule (?<name>.+) now$/s,
   },
+  // geoip/upload.ts
+  {
+    entityType: "geoip_database",
+    action: "geoip_uploaded",
+    message: "geoipDatabaseUploaded",
+    pattern: /^Uploaded GeoIP database (?<name>\S+)$/,
+  },
   {
     entityType: "backup",
     action: "backup_restored",
@@ -670,6 +677,13 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "audit_rekeyed",
     message: "auditChainRekeyed",
     pattern: /^Re-keyed the audit log's hash chain$/,
+  },
+  // audit/retention.ts
+  {
+    entityType: "audit_log",
+    action: "audit_pruned",
+    message: "auditPruned",
+    pattern: /^Removed audit events older than (?<cutoff>\S+) \((?<count>\S+)\)$/,
   },
   {
     entityType: "config",

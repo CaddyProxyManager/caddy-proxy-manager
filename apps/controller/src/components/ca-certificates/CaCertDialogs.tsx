@@ -25,6 +25,7 @@ import {
   issueClientCertificateAction,
   revokeIssuedClientCertificateAction,
 } from "@/src/app/(dashboard)/certificates/ca-actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 
 function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
@@ -125,7 +126,7 @@ export function IssueClientCertDialog({
 
     startTransition(async () => {
       try {
-        const result = await issueClientCertificateAction(cert.id, formData);
+        const result = unwrap(await issueClientCertificateAction(cert.id, formData));
         setIssued({
           ...result,
           name: sanitizeFilenameSegment(String(formData.get("common_name") ?? "client")),
@@ -270,7 +271,7 @@ export function ManageIssuedClientCertsDialog({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await revokeIssuedClientCertificateAction(id);
+        const result = unwrap(await revokeIssuedClientCertificateAction(id));
         setItems((current) =>
           current.map((item) =>
             item.id === id
@@ -410,11 +411,8 @@ export function DeleteCaCertDialog({
     setError(null);
     startTransition(async () => {
       const result = await deleteCaCertificateAction(cert.id);
-      if (result.success) {
-        onClose();
-      } else {
-        setError(result.error ?? t("deleteFailed"));
-      }
+      if (result.ok) onClose();
+      else setError(result.error);
     });
   }
 

@@ -65,6 +65,7 @@ import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-featu
 import type { TailscaleSettingsView } from "@/src/lib/caddy/tailscale";
 import type { DashboardHostSettings } from "@/src/lib/dashboard-host";
 import { pairingHostFor } from "@/src/lib/dashboard-host/address";
+import { unwrap } from "@/src/lib/errors/action-result";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import type { UpdateStatus } from "@/src/lib/runtime/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
@@ -79,6 +80,7 @@ import { ErrorPagesFields } from "@/components/proxy-hosts/routing/ErrorPagesFie
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import LdapDirectoriesSection from "./LdapDirectoriesSection";
 import type { LdapDirectoryView } from "@/src/lib/models/ldap-directories";
+import type { OutboundCallView } from "@/src/lib/offline";
 import SettingsFrame from "./SettingsFrame";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
@@ -138,6 +140,8 @@ import type { RepairAgentResult } from "./actions";
 import { findSettingsItem, SETTINGS_ITEMS, settingsBlockName } from "./sections";
 import { FocusField, OnThisPage, PageSaveBar, SettingsBlockShell } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
+import { GeoipUploadField } from "./GeoipUploadField";
+import { OutboundCallsList } from "./OutboundCallsList";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
 import { AccentColorPicker } from "./AccentColorPicker";
 import { SequentialUserIdsBanner } from "./SequentialUserIdsBanner";
@@ -215,6 +219,8 @@ type Props = {
   /** The custom favicon as staged, as a data URL; null when there is none. */
   faviconSrc: string | null;
   updates: UpdateStatus;
+  /** Every registered outbound connection and what offline mode does to it. */
+  outboundCalls?: OutboundCallView[];
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
   registry: Record<string, readonly RegistryField[]>;
   /** Picked out on the server: the registry module is not browser-safe. */
@@ -292,6 +298,7 @@ export default function SettingsClient({
   tailscale,
   faviconSrc,
   updates,
+  outboundCalls = [],
   registry,
   sequentialUserIdsField,
   analytics,
@@ -343,6 +350,10 @@ export default function SettingsClient({
     updateRegistrySettingsAction,
     null,
   );
+  const [auditRetentionState, auditRetentionFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
   const [accessReviewsState, accessReviewsFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
@@ -351,6 +362,7 @@ export default function SettingsClient({
     updateRegistrySettingsAction,
     null,
   );
+  const [outboundState, outboundFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [forwardAuthRegistryState, forwardAuthRegistryFormAction] = useActionState(
     updateRegistrySettingsAction,
     null,
@@ -485,7 +497,7 @@ export default function SettingsClient({
         options={dashboardOptions ?? null}
         dashboardState={dashboardState}
         dashboardFormAction={dashboardFormAction}
-        checkDns={checkDashboardDnsAction}
+        checkDns={async () => unwrap(await checkDashboardDnsAction())}
       />
     ),
     agent: (
@@ -498,6 +510,17 @@ export default function SettingsClient({
           formAction={agentRegistryFormAction}
         />
       </>
+    ),
+    outbound: (
+      <VStack gap={4}>
+        <RegistrySettingsBlock
+          block="outbound"
+          fields={registry.outbound ?? []}
+          state={outboundState}
+          formAction={outboundFormAction}
+        />
+        <OutboundCallsList calls={outboundCalls} />
+      </VStack>
     ),
     instance: (
       <VStack gap={4}>
@@ -520,6 +543,14 @@ export default function SettingsClient({
         fields={registry["host-history"] ?? []}
         state={hostHistoryState}
         formAction={hostHistoryFormAction}
+      />
+    ),
+    "audit-retention": (
+      <RegistrySettingsBlock
+        block="audit-retention"
+        fields={registry["audit-retention"] ?? []}
+        state={auditRetentionState}
+        formAction={auditRetentionFormAction}
       />
     ),
     "access-reviews": (
@@ -2534,6 +2565,7 @@ function GeoipSection({
               : t("geoipNoneInstalled")}
           </Text>
           <GeoipUpdateCheckLine geoip={geoip} />
+          <GeoipUploadField />
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
           <EnvLabelledField
             label={t("registry.geoipupdate_account_id.label")}
@@ -2674,6 +2706,7 @@ function AgentSection({
   const tNav = useTranslations("nav");
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const [repair, setRepair] = useState<{ name: string; result: RepairAgentResult } | null>(null);
 
   const { paired, statuses } = agents;
@@ -2691,11 +2724,17 @@ function AgentSection({
         label={t("repairAgent")}
         onClick={() => {
           repairAgentAction(agent.id)
+            .then(unwrap)
             .then((result) => setRepair({ name: agent.name, result }))
             .catch(() => setRepair({ name: agent.name, result: { kind: "failed" } }));
         }}
       />
-      <form action={unpairAgentAction}>
+      <form
+        action={async (formData) => {
+          const result = await unpairAgentAction(formData);
+          setAgentError(result.ok ? null : result.error);
+        }}
+      >
         <input type="hidden" name="agentId" value={agent.id} />
         <Button type="submit" size="sm" variant="secondary" label={t("unpair")} />
       </form>
@@ -2749,6 +2788,7 @@ function AgentSection({
                 );
               })}
 
+              {agentError && <StatusAlert message={agentError} success={false} />}
               {repair && repairResult?.kind === "failed" && (
                 <StatusAlert message={t("repairFailed")} success={false} />
               )}
@@ -2790,7 +2830,12 @@ function AgentSection({
             <InfoAlert title={t("autoPairingDisabledTitle")}>
               <VStack gap={2}>
                 <Text size="sm">{t("autoPairingDisabledDescription")}</Text>
-                <form action={enableAutoPairingAction}>
+                <form
+                  action={async () => {
+                    const result = await enableAutoPairingAction();
+                    setCodeError(result.ok ? null : result.error);
+                  }}
+                >
                   <Button
                     type="submit"
                     size="sm"
@@ -2835,6 +2880,7 @@ function AgentSection({
               onClick={() => {
                 setCodeError(null);
                 pairingCodeAction()
+                  .then(unwrap)
                   .then(setCode)
                   .catch(() => setCodeError(t("pairingCodeFailed")));
               }}

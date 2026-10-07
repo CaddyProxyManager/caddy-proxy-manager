@@ -82,7 +82,13 @@ for tag in "$@"; do
     echo "::warning::${tag} has no deploy archive - not published"
     continue
   fi
-  tar -xzf "$work/archive-${tag}"/*-deploy.tar.gz -C "$staging"
+  # The air-gap bundle's deploy archives match the pattern too; they carry a load script besides.
+  archive="$(find "$work/archive-${tag}" -name '*-deploy.tar.gz' ! -name '*-airgap-*' | head -n 1)"
+  if [ -z "$archive" ]; then
+    echo "::warning::${tag} has no deploy archive - not published"
+    continue
+  fi
+  tar -xzf "$archive" -C "$staging"
   cp "$root/docker/deploy-repo/README.md" "$root/docker/deploy-repo/.gitignore" "$root/LICENSE" "$staging/"
 
   # GitHub adds the blank line between headline and body itself.

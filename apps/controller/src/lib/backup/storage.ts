@@ -70,6 +70,7 @@ export function s3Store(
   const endpoint = s3Endpoint(config);
   const client: S3Like =
     options.client ??
+    // outbound: backupStorage
     new S3Client({
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,

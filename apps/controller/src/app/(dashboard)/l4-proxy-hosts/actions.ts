@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { assertCanManage, requireReach, requireCan } from "@/src/lib/users/permissions";
 import { getTranslations } from "next-intl/server";
@@ -40,6 +41,7 @@ export async function createL4ProxyHostAction(
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostCreated"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to create L4 proxy host:");
     return actionError(t, error, t("errors.createL4HostFailed"));
@@ -72,6 +74,7 @@ export async function updateL4ProxyHostAction(
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostUpdated"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to update L4 proxy host:", id);
     return actionError(t, error, t("errors.updateL4HostFailed"));
@@ -91,6 +94,7 @@ export async function deleteL4ProxyHostAction(
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(t("hostDeleted"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to delete L4 proxy host:", id);
     return actionError(t, error, t("errors.deleteL4HostFailed"));
@@ -109,6 +113,7 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
     const t = await getTranslations("l4ProxyHosts");
     return actionSuccess(enabled ? t("hostEnabledMessage") : t("hostDisabledMessage"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to toggle L4 proxy host:", id);
     return actionError(t, error, t("errors.toggleL4HostFailed"));
@@ -133,6 +138,7 @@ export async function bulkL4ProxyHostsAction(request: L4HostBulkRequest): Promis
         : t("bulk.updatedResult", { count }),
     );
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to change L4 proxy hosts in bulk:");
     return actionError(t, error, t("errors.bulkHostsFailed"));
@@ -169,6 +175,7 @@ export async function previewL4ProxyHostAction(
     );
     return { ok: true, preview, approval };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
   }
@@ -189,6 +196,7 @@ export async function restoreL4ProxyHostAction(
     const t = await getTranslations("hostHistory");
     return actionSuccess(t("restored"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to restore L4 proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));

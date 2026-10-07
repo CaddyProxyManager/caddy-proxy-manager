@@ -168,6 +168,16 @@ const VOLATILE_ROWS: Array<{ table: string; matches: (row: Row) => boolean; why:
     matches: (row) => row.builtin !== null,
     why: "each notification category's built-in rule is created on first use, with that time",
   },
+  {
+    table: 'agent_pairing_secrets',
+    matches: (row) => row.slot === 'bootstrap',
+    why: 'each start issues or withdraws the bundled agent token by whether an agent is paired',
+  },
+  {
+    table: 'controller_replicas',
+    matches: () => true,
+    why: 'every controller registers itself at start and heartbeats',
+  },
 ];
 
 const isVolatile = (table: string, row: Row) =>
@@ -222,7 +232,9 @@ function compareTables(before: Tables, after: Tables, failures: Failure[]): stri
     }
   }
   for (const move of MOVED_COLUMNS) {
-    if (!before[move.table]) continue;
+    // A previous version that already made the move has nothing left to carry over.
+    const carried = (row: Row) => move.columns.some((column) => column in row);
+    if (!before[move.table]?.some(carried)) continue;
     const problems = move.check(before, after);
     for (const problem of problems) failures.push(`${move.into}: ${problem}`);
     if (problems.length === 0) {
@@ -246,12 +258,13 @@ function rowKey(row: Row): string {
 function bootWrites(migrated: Tables, booted: Tables): Array<{ table: string; change: string }> {
   const writes: Array<{ table: string; change: string }> = [];
   for (const [table, rows] of Object.entries(booted)) {
-    const earlier = new Map((migrated[table] ?? []).map((row) => [rowKey(row), row]));
+    const earlier = new Map(
+      (migrated[table] ?? [])
+        .filter((row) => !isVolatile(table, row))
+        .map((row) => [rowKey(row), row]),
+    );
     for (const row of rows) {
-      if (isVolatile(table, row)) {
-        earlier.delete(rowKey(row));
-        continue;
-      }
+      if (isVolatile(table, row)) continue;
       const was = earlier.get(rowKey(row));
       if (!was) writes.push({ table, change: `added ${JSON.stringify(row).slice(0, 160)}` });
       else if (JSON.stringify(was) !== JSON.stringify(row)) {
@@ -361,15 +374,18 @@ async function runDialect(dialect: 'postgres' | 'sqlite'): Promise<Failure[]> {
       ['document.json', 'fleet'],
       ['document-agent.json', 'pinned agent'],
     ]) {
+      const previous = read<unknown>(join(out, file));
       let normalized = read<unknown>(join(out, 'upgrade', file));
       for (const change of KNOWN_DOCUMENT_CHANGES) {
+        // Undoing it on a version that already made it would strip or reorder handlers both share.
+        if (jsonDiff(previous, undoing(previous, change.undo)).length > 0) continue;
         const undone = undoing(normalized, change.undo);
         if (jsonDiff(normalized, undone).length > 0) {
           console.log(`  ${label} document differs as expected: ${change.why}`);
         }
         normalized = undone;
       }
-      const documentDiff = jsonDiff(read<unknown>(join(out, file)), normalized);
+      const documentDiff = jsonDiff(previous, normalized);
       for (const line of documentDiff) failures.push(`${label} document: ${line.slice(0, 400)}`);
       if (documentDiff.length === 0) {
         console.log(`  ${label} Caddy document otherwise identical to the previous version`);

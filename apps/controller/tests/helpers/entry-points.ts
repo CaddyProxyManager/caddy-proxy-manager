@@ -15,6 +15,8 @@ export type EntryPoint = {
   file: string;
   /** The exported function's own body, plus the bodies of same-file functions it calls. */
   body: string;
+  /** The exported function's body alone. */
+  ownBody: string;
 };
 
 function walk(dir: string, keep: (path: string) => boolean): string[] {
@@ -88,7 +90,7 @@ function bodyAfterParameters(source: string, start: number): number {
 }
 
 /** Every named function in the file, declared or assigned, with its body. */
-function localFunctions(source: string): Map<string, string> {
+export function localFunctions(source: string): Map<string, string> {
   const found = new Map<string, string>();
   const patterns = [
     /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(/g,
@@ -141,7 +143,12 @@ export function serverActions(): EntryPoint[] {
         const assignment = source.match(new RegExp(`export const ${name} = ([^;]+);`));
         body = assignment?.[1] ?? '';
       }
-      return { id: `${label(file)}#${name}`, file, body: withLocalCallees(body, functions) };
+      return {
+        id: `${label(file)}#${name}`,
+        file,
+        body: withLocalCallees(body, functions),
+        ownBody: body,
+      };
     });
   });
 }
@@ -160,6 +167,7 @@ export function restHandlers(): EntryPoint[] {
       id: `${method} ${path}`,
       file,
       body: withLocalCallees(functions.get(method) ?? '', functions),
+      ownBody: functions.get(method) ?? '',
     }));
     for (const match of reexported) {
       const assignment = source.slice(match.index).split(';')[0];
@@ -167,6 +175,7 @@ export function restHandlers(): EntryPoint[] {
         id: `${match[1]} ${path}`,
         file,
         body: withLocalCallees(assignment, functions),
+        ownBody: assignment,
       });
     }
     return entries;

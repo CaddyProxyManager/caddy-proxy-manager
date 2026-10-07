@@ -177,7 +177,8 @@ protocol, the address inside the PROXY header is the one checked.
 
 CrowdSec's [AppSec component](https://docs.crowdsec.net/docs/appsec/intro) inspects requests
 themselves, like a WAF. Switch it on in managed mode, or enter its URL (for example
-`http://crowdsec:7422`) in external mode, and every request on an HTTP host is also sent there, after rate limiting and geo blocking and before the WAF. By default a
+`http://crowdsec:7422`) in external mode, and every request on an HTTP host is also sent there,
+after rate limiting and geo blocking and before the WAF. By default a
 request is refused while AppSec cannot be reached or answers with an error; **Let requests through
 when AppSec is unavailable** reverses that. AppSec does not apply to L4 hosts.
 
@@ -203,5 +204,5 @@ internet needs `https`.
 Switching CrowdSec off in Settings removes the check from every host at the next apply, and in
 managed mode stops the container. Its volumes are kept; remove them with
 `docker volume rm <project>_crowdsec-data <project>_crowdsec-config` if you are done with it. The
-CrowdSec module cannot be dropped from the Caddy build while CrowdSec is switched on - the save is
-refused until you turn it off first.
+CrowdSec module cannot be dropped from the Caddy build while CrowdSec is switched on: the save is
+refused until you turn CrowdSec off.

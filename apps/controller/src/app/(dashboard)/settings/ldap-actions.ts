@@ -3,7 +3,8 @@
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import {
   type LdapDirectoryInput,
@@ -31,9 +32,9 @@ async function audit(userId: number, action: string, summary: string, directoryI
 
 export async function createLdapDirectoryAction(
   input: LdapDirectoryInput,
-): Promise<LdapDirectoryView> {
-  const session = await requireCan("settings:write");
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<LdapDirectoryView>> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const directory = await createLdapDirectory(input);
     await audit(
       Number(session.user.id),
@@ -49,9 +50,9 @@ export async function createLdapDirectoryAction(
 export async function updateLdapDirectoryAction(
   id: string,
   input: LdapDirectoryInput,
-): Promise<LdapDirectoryView> {
-  const session = await requireCan("settings:write");
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<LdapDirectoryView>> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const directory = await updateLdapDirectory(id, input);
     await audit(Number(session.user.id), "update", `Updated directory ${directory.name}`, id);
     revalidatePath("/settings");
@@ -62,9 +63,9 @@ export async function updateLdapDirectoryAction(
 export async function setLdapDirectoryEnabledAction(
   id: string,
   enabled: boolean,
-): Promise<LdapDirectoryView> {
-  const session = await requireCan("settings:write");
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<LdapDirectoryView>> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const directory = await setLdapDirectoryEnabled(id, enabled);
     await audit(Number(session.user.id), "update", `Updated directory ${directory.name}`, id);
     revalidatePath("/settings");
@@ -72,9 +73,9 @@ export async function setLdapDirectoryEnabledAction(
   });
 }
 
-export async function deleteLdapDirectoryAction(id: string): Promise<void> {
-  const session = await requireCan("settings:write");
-  await withTranslatedErrors(async () => {
+export async function deleteLdapDirectoryAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
     const directory = await deleteLdapDirectory(id);
     await audit(Number(session.user.id), "delete", `Deleted directory ${directory.name}`, id);
     revalidatePath("/settings");
@@ -114,10 +115,10 @@ export async function testLdapDirectoryAction(
   input: LdapDirectoryInput,
   existingId: string | null,
   probe: { username: string; password: string } | null,
-): Promise<LdapTestView> {
-  await requireCan("settings:write");
-  const t = await getTranslations("settings.ldap.test");
-  return withTranslatedErrors(async () => {
+): Promise<ActionResult<LdapTestView>> {
+  return runAction(async () => {
+    await requireCan("settings:write");
+    const t = await getTranslations("settings.ldap.test");
     const directory = await previewLdapDirectory(input, existingId);
     const result = await testLdapConnection(
       directory,

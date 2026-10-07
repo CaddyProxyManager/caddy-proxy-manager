@@ -167,6 +167,8 @@ async function remainingBlocks() {
       confirmRevocations: await getSetting(registry.accessReviewConfirmRevocations),
       reminderDays: await getSetting(registry.accessReviewReminderDays),
     },
+    offlineMode: await getSetting(registry.offlineMode),
+    auditLogKeepDays: await getSetting(registry.auditLogKeepDays),
     requireChangeOnLegacyHash: passwordPolicy?.requireChangeOnLegacyHash ?? false,
     authentikOutpost: authentik?.outpostDomain ?? "",
     forwardAuth: forwardAuth?.authUpstream

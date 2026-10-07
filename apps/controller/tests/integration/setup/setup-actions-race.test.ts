@@ -57,6 +57,9 @@ vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Error(`REDIRECT:${to}`);
   },
+  unstable_rethrow: (error: unknown) => {
+    if (error instanceof Error && error.message.startsWith('REDIRECT:')) throw error;
+  },
 }));
 
 const { createFirstAdmin, configureFirstOAuthProvider } = await import('@/src/app/setup/actions');

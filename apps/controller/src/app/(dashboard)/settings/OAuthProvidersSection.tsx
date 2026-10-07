@@ -41,6 +41,7 @@ import {
   updateSamlProviderAction,
 } from "./saml-actions";
 import type { SamlProvider } from "@/src/lib/models/saml-providers";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { SAML_PROVIDER_TYPE, samlAcsUrl } from "@/src/lib/auth/saml/urls";
 import {
   type SamlForm,
@@ -175,10 +176,10 @@ export default function OAuthProvidersSection({
     try {
       const input = { name: form.name.trim(), ...samlInputOf(samlForm, made) };
       if (editingSaml) {
-        const updated = await updateSamlProviderAction(editingSaml.id, input);
+        const updated = unwrap(await updateSamlProviderAction(editingSaml.id, input));
         setSamlProviders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       } else {
-        const created = await createSamlProviderAction(input);
+        const created = unwrap(await createSamlProviderAction(input));
         setSamlProviders((prev) => [...prev, created]);
       }
       closeDialog();
@@ -191,7 +192,9 @@ export default function OAuthProvidersSection({
 
   async function handleSamlToggle(provider: SamlProvider) {
     try {
-      const updated = await updateSamlProviderAction(provider.id, { enabled: !provider.enabled });
+      const updated = unwrap(
+        await updateSamlProviderAction(provider.id, { enabled: !provider.enabled }),
+      );
       setSamlProviders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch (err) {
       console.error("Failed to toggle provider:", err);
@@ -200,7 +203,7 @@ export default function OAuthProvidersSection({
 
   async function handleSamlDelete(id: string) {
     try {
-      await deleteSamlProviderAction(id);
+      unwrap(await deleteSamlProviderAction(id));
       setSamlProviders((prev) => prev.filter((p) => p.id !== id));
       setDeleteSamlConfirm(null);
     } catch (err) {
@@ -290,33 +293,35 @@ export default function OAuthProvidersSection({
           },
           secretRequired ? form.clientSecret : undefined,
         );
-        const updated = await updateOAuthProviderAction(editingProvider.id, update);
+        const updated = unwrap(await updateOAuthProviderAction(editingProvider.id, update));
         if (updated) {
           setProviders((prev) => prev.map((p) => (p.id === editingProvider.id ? updated : p)));
         }
       } else {
-        const created = await createOAuthProviderAction({
-          name: form.name.trim(),
-          type: form.type,
-          clientId: form.clientId.trim(),
-          clientSecret: form.clientSecret.trim(),
-          issuer: form.issuer.trim() || undefined,
-          authorizationUrl: form.authorizationUrl.trim() || undefined,
-          tokenUrl: form.tokenUrl.trim() || undefined,
-          userinfoUrl: form.userinfoUrl.trim() || undefined,
-          scopes: form.scopes.trim() || undefined,
-          autoLink: form.autoLink,
-          groupsClaim: form.groupsClaim.trim() || undefined,
-          groupPrefix: form.groupPrefix.trim() || null,
-          roleMappingEnabled: form.roleMappingEnabled,
-          adminGroup: form.adminGroup.trim() || null,
-          operatorGroup: form.operatorGroup.trim() || null,
-          userGroup: form.userGroup.trim() || null,
-          viewerGroup: form.viewerGroup.trim() || null,
-          roleGroups: roleGroupsInput(form, made),
-          defaultRole: form.defaultRole,
-          syncGroups: form.syncGroups,
-        });
+        const created = unwrap(
+          await createOAuthProviderAction({
+            name: form.name.trim(),
+            type: form.type,
+            clientId: form.clientId.trim(),
+            clientSecret: form.clientSecret.trim(),
+            issuer: form.issuer.trim() || undefined,
+            authorizationUrl: form.authorizationUrl.trim() || undefined,
+            tokenUrl: form.tokenUrl.trim() || undefined,
+            userinfoUrl: form.userinfoUrl.trim() || undefined,
+            scopes: form.scopes.trim() || undefined,
+            autoLink: form.autoLink,
+            groupsClaim: form.groupsClaim.trim() || undefined,
+            groupPrefix: form.groupPrefix.trim() || null,
+            roleMappingEnabled: form.roleMappingEnabled,
+            adminGroup: form.adminGroup.trim() || null,
+            operatorGroup: form.operatorGroup.trim() || null,
+            userGroup: form.userGroup.trim() || null,
+            viewerGroup: form.viewerGroup.trim() || null,
+            roleGroups: roleGroupsInput(form, made),
+            defaultRole: form.defaultRole,
+            syncGroups: form.syncGroups,
+          }),
+        );
         setProviders((prev) => [...prev, created]);
       }
       closeDialog();
@@ -332,7 +337,7 @@ export default function OAuthProvidersSection({
     const next = primaryId === provider.id ? null : provider.id;
     setPrimaryId(next);
     try {
-      await setPrimaryOAuthProviderAction(next);
+      unwrap(await setPrimaryOAuthProviderAction(next));
     } catch (err) {
       console.error("Failed to set the primary provider:", err);
       setPrimaryId(primaryId);
@@ -341,9 +346,9 @@ export default function OAuthProvidersSection({
 
   async function handleToggleEnabled(provider: OAuthProviderView) {
     try {
-      const updated = await updateOAuthProviderAction(provider.id, {
-        enabled: !provider.enabled,
-      });
+      const updated = unwrap(
+        await updateOAuthProviderAction(provider.id, { enabled: !provider.enabled }),
+      );
       if (updated) {
         setProviders((prev) => prev.map((p) => (p.id === provider.id ? updated : p)));
       }
@@ -354,7 +359,7 @@ export default function OAuthProvidersSection({
 
   async function handleDelete(id: string) {
     try {
-      await deleteOAuthProviderAction(id);
+      unwrap(await deleteOAuthProviderAction(id));
       setProviders((prev) => prev.filter((p) => p.id !== id));
       setDeleteConfirm(null);
     } catch (err) {

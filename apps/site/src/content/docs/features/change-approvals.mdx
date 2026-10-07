@@ -3,7 +3,7 @@ title: Change approvals
 description: Hold changes to hosts, access lists, the WAF and settings until another person approves them.
 ---
 
-Some changes deserve a second pair of eyes: turning off the WAF on the payment site, widening an
+Some changes should be checked by another person first: turning off the WAF on the payment site, widening an
 access list, a new global Caddy snippet. With **change approvals** on, such a change is not applied
 when it is saved. It becomes a **change request**, and it applies only once enough approvers agree,
 as the person who made it.
@@ -39,7 +39,7 @@ approval like anything else.
 | WAF | Presets, rule exclusions, and installing, updating, configuring or uninstalling CRS plugins |
 | Settings | Applying staged settings (everything on the Settings pages that goes through **Review**), a settings group saved over the API, and the approval policy itself |
 
-Some writes stay outside it, each for a reason:
+These writes are never held:
 
 - **Regenerating an access list member's password** replaces a credential for someone who already
   has access; it changes nobody's access, and the new password is shown once, to whoever made it.
@@ -53,7 +53,7 @@ Some writes stay outside it, each for a reason:
 
 ## Submitting a change
 
-Nothing new to learn: edit as usual. When the policy covers what you are saving, the host editor's
+You edit as usual. When the policy covers what you are saving, the host editor's
 review says so and its button reads **Submit** instead of **Save**; the staged settings review does
 the same in place of **Apply**. Other pages save as always and tell you the change was submitted,
 with its request number.
@@ -69,7 +69,7 @@ certificates are requested, and warnings such as a protection being removed; for
 the changed fields and the Caddy configuration they produce; for anything else, field by field.
 Secrets are masked throughout.
 
-- **Approve** adds your approval, with an optional note. The approval a request still needs applies
+- **Approve** adds your approval, with an optional note. The last approval a request needs applies
   it, **as the person who submitted it**: the host history and the audit log name them, with the
   request and its approvers recorded beside the change.
 - **Reject** closes it. One rejection is enough.
@@ -90,15 +90,15 @@ or their account is disabled, the request fails rather than applying.
 
 Two approvers pressing **Approve** at the same moment apply the change once.
 
-If the controller stops while a request is applying, it is settled once it has been applying for ten
-minutes, and never by applying it again. A change that was written is marked applied; one that was
-not fails, and the request says whether its target is untouched or whether that cannot be told, in
-which case check the target before submitting it again.
+If the controller stops while a request is applying, the request is settled after ten minutes in
+that state, never by applying it again. A change that was written is marked applied; one that was
+not fails, and the request says whether its target is untouched or that it cannot tell. In that
+case, check the target before you submit the change again.
 
 ## Emergency bypass
 
-During an outage, waiting for an approver may not be an option. An administrator can **Bypass** a
-pending request, with a reason. It applies at once, still as its requester and still refused if its
+When an outage cannot wait for an approver, an administrator can **Bypass** a pending request,
+with a reason. It applies at once, still as its requester and still refused if its
 target changed. Every bypass is in the audit log with the reason, and raises the **Change approval
 bypassed** alert, which goes to the administrators' email and push by default and to any
 [alert channel](../alerts/) a rule sends it to.

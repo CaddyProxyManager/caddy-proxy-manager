@@ -27,6 +27,7 @@ import { AUTOFILL_NEW_PASSWORD, NO_SPELLCHECK } from "@/components/ui/native-inp
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { ChannelInput, ChannelView } from "@/src/lib/alerts/channels";
+import { unwrap } from "@/src/lib/errors/action-result";
 import {
   type ChannelTestOutcome,
   deleteChannelAction,
@@ -103,9 +104,9 @@ function TestResult({ result }: { result: ChannelTestOutcome }) {
   const t = useTranslations("alerts.channels");
   const format = useFormatter();
   if (!result.ok) {
-    return <Banner status="error" title={t("testFailed")} description={result.message} />;
+    return <Banner status="error" title={t("testFailed")} description={result.error} />;
   }
-  if (result.outcome === "accepted") {
+  if (result.data.outcome === "accepted") {
     return <Banner status="info" title={t("testAccepted")} description={t("testAcceptedHelp")} />;
   }
   return (
@@ -113,8 +114,8 @@ function TestResult({ result }: { result: ChannelTestOutcome }) {
       status="success"
       title={t("testDelivered")}
       description={
-        result.recipients.length > 0
-          ? t("testRecipients", { recipients: format.list(result.recipients) })
+        result.data.recipients.length > 0
+          ? t("testRecipients", { recipients: format.list(result.data.recipients) })
           : undefined
       }
     />
@@ -154,7 +155,7 @@ function ChannelDialog({
     setSaving(true);
     setError(null);
     try {
-      const saved = await saveChannelAction(editing?.id ?? null, inputOf(form));
+      const saved = unwrap(await saveChannelAction(editing?.id ?? null, inputOf(form)));
       onSaved(saved.signingSecret);
       onClose();
     } catch (err) {
@@ -170,7 +171,7 @@ function ChannelDialog({
     try {
       setTested(await testChannelAction(editing?.id ?? null, inputOf(form)));
     } catch (err) {
-      setTested({ ok: false, message: message(err, t("testFailed")) });
+      setTested({ ok: false, error: message(err, t("testFailed")) });
     } finally {
       setTesting(false);
     }
@@ -415,7 +416,7 @@ export function ChannelsTab({
   async function remove(channel: ChannelView) {
     setError(null);
     try {
-      await deleteChannelAction(channel.id);
+      unwrap(await deleteChannelAction(channel.id));
     } catch (err) {
       setError(message(err, t("deleteFailed")));
     } finally {
@@ -431,7 +432,7 @@ export function ChannelsTab({
     } catch (err) {
       setTested({
         name: channelName(channel),
-        result: { ok: false, message: message(err, t("testFailed")) },
+        result: { ok: false, error: message(err, t("testFailed")) },
       });
     } finally {
       setTesting(null);

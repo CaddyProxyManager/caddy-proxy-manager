@@ -1,10 +1,12 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { domainError } from "@/src/lib/errors/domain-error";
 import { internalCaSubject } from "@/src/lib/certificates/ca-subject";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import {
   createCaCertificate,
   deleteCaCertificate,
@@ -57,110 +59,108 @@ async function generateForgeKeyPair(bits: number) {
 function validatePem(pem: string): void {
   try {
     new X509Certificate(pem);
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
     throw domainError("certificatePemInvalid");
   }
 }
 
-async function createCaCertificateActionUntranslated(formData: FormData) {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  const name = String(formData.get("name") ?? "").trim();
-  const certificatePem = String(formData.get("certificate_pem") ?? "").trim();
+export async function createCaCertificateAction(formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    const userId = Number(session.user.id);
+    const name = String(formData.get("name") ?? "").trim();
+    const certificatePem = String(formData.get("certificate_pem") ?? "").trim();
 
-  if (!name) throw domainError("nameRequired");
-  if (!certificatePem) throw domainError("certificatePemRequired");
-  validatePem(certificatePem);
-
-  await createCaCertificate({ name, certificatePem: certificatePem }, userId);
-  revalidatePath("/certificates");
-}
-
-export async function updateCaCertificateAction(id: number, formData: FormData) {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
-  const certificatePem = formData.get("certificate_pem")
-    ? String(formData.get("certificate_pem")).trim()
-    : undefined;
-
-  if (certificatePem) {
+    if (!name) throw domainError("nameRequired");
+    if (!certificatePem) throw domainError("certificatePemRequired");
     validatePem(certificatePem);
-  }
 
-  await updateCaCertificate(
-    id,
-    {
-      ...(name ? { name } : {}),
-      ...(certificatePem ? { certificatePem: certificatePem } : {}),
-    },
-    userId,
-  );
-  revalidatePath("/certificates");
-}
-
-export async function deleteCaCertificateAction(
-  id: number,
-): Promise<{ success: boolean; error?: string }> {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  try {
-    // Translates a DomainError before the catch hands it to the dialog. `requireCan` stays
-    // outside: its redirect throws.
-    await withTranslatedErrors(() => deleteCaCertificate(id, userId));
+    await createCaCertificate({ name, certificatePem: certificatePem }, userId);
     revalidatePath("/certificates");
-    return { success: true };
-  } catch (e) {
-    const t = await getTranslations("caCertificates");
-    return {
-      success: false,
-      error: e instanceof Error ? e.message : t("deleteCaCertificateFailed"),
-    };
-  }
+  });
 }
 
-async function generateCaCertificateActionUntranslated(
+export async function updateCaCertificateAction(
+  id: number,
   formData: FormData,
-): Promise<{ id: number }> {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  const name = String(formData.get("name") ?? "").trim();
-  const commonName = String(formData.get("common_name") ?? name).trim() || name;
-  const validityDays = Math.min(
-    3650,
-    Math.max(1, parseInt(String(formData.get("validity_days") ?? "3650"), 10) || 3650),
-  );
+): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    const userId = Number(session.user.id);
+    const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
+    const certificatePem = formData.get("certificate_pem")
+      ? String(formData.get("certificate_pem")).trim()
+      : undefined;
 
-  if (!name) throw domainError("nameRequired");
+    if (certificatePem) {
+      validatePem(certificatePem);
+    }
 
-  const keypair = await generateForgeKeyPair(4096);
-  const cert = forge.pki.createCertificate();
-  cert.publicKey = keypair.publicKey;
-  cert.serialNumber = randomSerialNumber();
-  cert.validity.notBefore = new Date();
-  cert.validity.notAfter = new Date();
-  cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
+    await updateCaCertificate(
+      id,
+      {
+        ...(name ? { name } : {}),
+        ...(certificatePem ? { certificatePem: certificatePem } : {}),
+      },
+      userId,
+    );
+    revalidatePath("/certificates");
+  });
+}
 
-  const attrs = await internalCaSubject(commonName);
-  cert.setSubject(attrs);
-  cert.setIssuer(attrs);
-  cert.setExtensions([
-    { name: "basicConstraints", cA: true, critical: true },
-    { name: "keyUsage", keyCertSign: true, cRLSign: true, critical: true },
-    { name: "subjectKeyIdentifier" },
-  ]);
+export async function deleteCaCertificateAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    await deleteCaCertificate(id, Number(session.user.id));
+    revalidatePath("/certificates");
+  });
+}
 
-  cert.sign(keypair.privateKey, forge.md.sha256.create());
+export async function generateCaCertificateAction(
+  formData: FormData,
+): Promise<ActionResult<{ id: number }>> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    const userId = Number(session.user.id);
+    const name = String(formData.get("name") ?? "").trim();
+    const commonName = String(formData.get("common_name") ?? name).trim() || name;
+    const validityDays = Math.min(
+      3650,
+      Math.max(1, parseInt(String(formData.get("validity_days") ?? "3650"), 10) || 3650),
+    );
 
-  const certificatePem = forge.pki.certificateToPem(cert);
-  const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
+    if (!name) throw domainError("nameRequired");
 
-  const record = await createCaCertificate(
-    { name, certificatePem: certificatePem, privateKeyPem: privateKeyPem },
-    userId,
-  );
-  revalidatePath("/certificates");
-  return { id: record.id };
+    const keypair = await generateForgeKeyPair(4096);
+    const cert = forge.pki.createCertificate();
+    cert.publicKey = keypair.publicKey;
+    cert.serialNumber = randomSerialNumber();
+    cert.validity.notBefore = new Date();
+    cert.validity.notAfter = new Date();
+    cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
+
+    const attrs = await internalCaSubject(commonName);
+    cert.setSubject(attrs);
+    cert.setIssuer(attrs);
+    cert.setExtensions([
+      { name: "basicConstraints", cA: true, critical: true },
+      { name: "keyUsage", keyCertSign: true, cRLSign: true, critical: true },
+      { name: "subjectKeyIdentifier" },
+    ]);
+
+    cert.sign(keypair.privateKey, forge.md.sha256.create());
+
+    const certificatePem = forge.pki.certificateToPem(cert);
+    const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
+
+    const record = await createCaCertificate(
+      { name, certificatePem: certificatePem, privateKeyPem: privateKeyPem },
+      userId,
+    );
+    revalidatePath("/certificates");
+    return { id: record.id };
+  });
 }
 
 export type IssuedClientCert = {
@@ -168,128 +168,111 @@ export type IssuedClientCert = {
   passwordProtected: boolean;
 };
 
-async function issueClientCertificateActionUntranslated(
+export async function issueClientCertificateAction(
   caCertId: number,
   formData: FormData,
-): Promise<IssuedClientCert> {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  const commonName = String(formData.get("common_name") ?? "").trim();
-  const validityDays = Math.min(
-    3650,
-    Math.max(1, parseInt(String(formData.get("validity_days") ?? "365"), 10) || 365),
-  );
-  const exportPassword = String(formData.get("export_password") ?? "");
+): Promise<ActionResult<IssuedClientCert>> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    const userId = Number(session.user.id);
+    const commonName = String(formData.get("common_name") ?? "").trim();
+    const validityDays = Math.min(
+      3650,
+      Math.max(1, parseInt(String(formData.get("validity_days") ?? "365"), 10) || 365),
+    );
+    const exportPassword = String(formData.get("export_password") ?? "");
 
-  if (!commonName) throw domainError("commonNameRequired");
-  if (!exportPassword) throw domainError("exportPasswordRequired");
+    if (!commonName) throw domainError("commonNameRequired");
+    if (!exportPassword) throw domainError("exportPasswordRequired");
 
-  // The .p12 leaves as a file with a SHA-1 MAC, so this password alone guards the private key:
-  // hold it to the login-password bar.
-  const t = await getTranslations();
-  const exportPasswordError = passwordPolicyMessage(
-    t,
-    exportPassword,
-    t("passwordPolicy.subject.exportPassword"),
-  );
-  if (exportPasswordError) throw new Error(exportPasswordError);
+    // The .p12 leaves as a file with a SHA-1 MAC, so this password alone guards the private key:
+    // hold it to the login-password bar. Already translated, so a plain Error that runAction keeps.
+    const t = await getTranslations();
+    const exportPasswordError = passwordPolicyMessage(
+      t,
+      exportPassword,
+      t("passwordPolicy.subject.exportPassword"),
+    );
+    if (exportPasswordError) throw new Error(exportPasswordError);
 
-  const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
-  // A code, not a sentence: see `errors/domain-error.ts`.
-  if (!caPrivateKeyPem) throw domainError("caCertificatePrivateKeyMissing");
+    const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
+    // A code, not a sentence: see `errors/domain-error.ts`.
+    if (!caPrivateKeyPem) throw domainError("caCertificatePrivateKeyMissing");
 
-  const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
-    m.getCaCertificate(caCertId),
-  );
-  if (!caCertRecord) throw domainError("caCertificateNotFound");
+    const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
+      m.getCaCertificate(caCertId),
+    );
+    if (!caCertRecord) throw domainError("caCertificateNotFound");
 
-  const caKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
-  const caCert = forge.pki.certificateFromPem(caCertRecord.certificatePem);
+    const caKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
+    const caCert = forge.pki.certificateFromPem(caCertRecord.certificatePem);
 
-  const keypair = await generateForgeKeyPair(2048);
-  const cert = forge.pki.createCertificate();
-  cert.publicKey = keypair.publicKey;
-  cert.serialNumber = randomSerialNumber();
-  cert.validity.notBefore = new Date();
-  cert.validity.notAfter = new Date();
-  cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
+    const keypair = await generateForgeKeyPair(2048);
+    const cert = forge.pki.createCertificate();
+    cert.publicKey = keypair.publicKey;
+    cert.serialNumber = randomSerialNumber();
+    cert.validity.notBefore = new Date();
+    cert.validity.notAfter = new Date();
+    cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + validityDays);
 
-  cert.setSubject([{ name: "commonName", value: commonName }]);
-  cert.setIssuer(caCert.subject.attributes);
-  cert.setExtensions([
-    { name: "basicConstraints", cA: false },
-    { name: "keyUsage", digitalSignature: true, keyEncipherment: true },
-    { name: "extKeyUsage", clientAuth: true },
-  ]);
+    cert.setSubject([{ name: "commonName", value: commonName }]);
+    cert.setIssuer(caCert.subject.attributes);
+    cert.setExtensions([
+      { name: "basicConstraints", cA: false },
+      { name: "keyUsage", digitalSignature: true, keyEncipherment: true },
+      { name: "extKeyUsage", clientAuth: true },
+    ]);
 
-  cert.sign(caKey, forge.md.sha256.create());
-  const certificatePem = forge.pki.certificateToPem(cert);
-  const certificate = new X509Certificate(certificatePem);
+    cert.sign(caKey, forge.md.sha256.create());
+    const certificatePem = forge.pki.certificateToPem(cert);
+    const certificate = new X509Certificate(certificatePem);
 
-  await createIssuedClientCertificate(
-    {
-      caCertificateId: caCertId,
-      commonName: commonName,
-      serialNumber: certificate.serialNumber,
-      fingerprintSha256: certificate.fingerprint256,
-      certificatePem: certificatePem,
-      validFrom: new Date(certificate.validFrom).toISOString(),
-      validTo: new Date(certificate.validTo).toISOString(),
-    },
-    userId,
-  );
-  revalidatePath("/certificates");
+    await createIssuedClientCertificate(
+      {
+        caCertificateId: caCertId,
+        commonName: commonName,
+        serialNumber: certificate.serialNumber,
+        fingerprintSha256: certificate.fingerprint256,
+        certificatePem: certificatePem,
+        validFrom: new Date(certificate.validFrom).toISOString(),
+        validTo: new Date(certificate.validTo).toISOString(),
+      },
+      userId,
+    );
+    revalidatePath("/certificates");
 
-  // Forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF) raised, since the bundle
-  // leaves as a file. The PKCS#12 MAC stays SHA-1.
-  const pkcs12Options = {
-    algorithm: "aes256",
-    friendlyName: commonName,
-    count: 100000,
-    saltSize: 16,
-    prfAlgorithm: "sha256",
-  } satisfies Pkcs12ExportOptions;
+    // Forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF) raised, since the bundle
+    // leaves as a file. The PKCS#12 MAC stays SHA-1.
+    const pkcs12Options = {
+      algorithm: "aes256",
+      friendlyName: commonName,
+      count: 100000,
+      saltSize: 16,
+      prfAlgorithm: "sha256",
+    } satisfies Pkcs12ExportOptions;
 
-  const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(
-    keypair.privateKey,
-    [cert, caCert],
-    exportPassword,
-    pkcs12Options,
-  );
-  const pkcs12Der = forge.asn1.toDer(pkcs12Asn1).getBytes();
+    const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(
+      keypair.privateKey,
+      [cert, caCert],
+      exportPassword,
+      pkcs12Options,
+    );
+    const pkcs12Der = forge.asn1.toDer(pkcs12Asn1).getBytes();
 
-  return {
-    pkcs12Base64: forge.util.encode64(pkcs12Der),
-    passwordProtected: true,
-  };
+    return {
+      pkcs12Base64: forge.util.encode64(pkcs12Der),
+      passwordProtected: true,
+    };
+  });
 }
 
 export async function revokeIssuedClientCertificateAction(
   id: number,
-): Promise<{ revokedAt: string }> {
-  const session = await requireCan("certificates:write");
-  const userId = Number(session.user.id);
-  const record = await revokeIssuedClientCertificate(id, userId);
-  revalidatePath("/certificates");
-  return { revokedAt: record.revokedAt! };
-}
-
-/*
- * These return data, so they throw rather than return an `ActionState`; the wrapper translates
- * first, since only the server can reach the catalog.
- */
-
-export async function createCaCertificateAction(formData: FormData) {
-  return withTranslatedErrors(() => createCaCertificateActionUntranslated(formData));
-}
-
-export async function generateCaCertificateAction(formData: FormData): Promise<{ id: number }> {
-  return withTranslatedErrors(() => generateCaCertificateActionUntranslated(formData));
-}
-
-export async function issueClientCertificateAction(
-  caCertId: number,
-  formData: FormData,
-): Promise<IssuedClientCert> {
-  return withTranslatedErrors(() => issueClientCertificateActionUntranslated(caCertId, formData));
+): Promise<ActionResult<{ revokedAt: string }>> {
+  return runAction(async () => {
+    const session = await requireCan("certificates:write");
+    const record = await revokeIssuedClientCertificate(id, Number(session.user.id));
+    revalidatePath("/certificates");
+    return { revokedAt: record.revokedAt! };
+  });
 }

@@ -2,7 +2,7 @@
  * Sending what is due on the channels an administrator added: each on its own queue and its own
  * backoff, a message per batch. A send claims its rows first, so a leader that lost the lead mid
  * send and the one that took over never both post the same alert. Three failures in a row raise
- * the channel's own problem, told on the other channels.
+ * the channel's own problem, reported through the other channels.
  */
 
 import { and, eq, inArray, isNull } from "drizzle-orm";

@@ -22,30 +22,21 @@ COPY apps/agent/src ./apps/agent/src
 # Runs on the host arch, so the binary is cross-compiled for the target.
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
-      amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
-      arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
+      amd64) export BUN_COMPILE_TARGET=bun-linux-x64-musl ;; \
+      arm64) export BUN_COMPILE_TARGET=bun-linux-arm64-musl ;; \
       *) echo "docker/agent/Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
     esac && \
     cd apps/agent && bun run build:binary
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# Debian, not docker:cli: the binary's glibc-linked Bun runtime will not start on Alpine's musl.
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
+# Alpine, not docker:cli, so the Docker tools are pinned here rather than by that image's tag. The
+# binary's Bun is musl-linked and still loads libgcc and libstdc++.
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runner
 
 # buildx because the legacy builder cannot build docker/caddy/Dockerfile. Pinned to majors, not
 # exact builds, since the repository drops old ones. Bump the majors by hand.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl gnupg \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg \
-       | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-       https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
-      'docker-ce-cli=5:29.*' 'docker-compose-plugin=5.*' 'docker-buildx-plugin=0.*' \
-    && apt-get purge -y gnupg && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates libgcc libstdc++ \
+      'docker-cli~29' 'docker-cli-compose~5' 'docker-cli-buildx~0'
 
 WORKDIR /app
 COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
@@ -54,15 +45,17 @@ ENV PATH="/app:${PATH}"
 
 # Non-root, though the socket proxy makes it host-root-equivalent anyway. /data/geoip exists up
 # front because Caddy mounts it as a subpath, which fails if missing. Colliding IDs are removed
-# first so a PUID/PGID override never fails the build.
+# first so a PUID/PGID override never fails the build. `shadow` is only for useradd/userdel.
 ARG PUID=10002
 ARG PGID=10002
-RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
+RUN apk add --no-cache --virtual .user-setup shadow && \
+    (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
     groupadd -g ${PGID} agent && \
     useradd -r -u ${PUID} -g agent -m -d /home/agent agent && \
     mkdir -p /data/geoip && \
-    chown -R agent:agent /data
+    chown -R agent:agent /data && \
+    apk del .user-setup
 
 # Static facts only: version, revision and timestamp come from docker-build-trusted.yml's labels.
 LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
@@ -72,7 +65,7 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
       org.opencontainers.image.url="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
       org.opencontainers.image.source="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
       org.opencontainers.image.documentation="https://caddyproxy.com/" \
-      org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
+      org.opencontainers.image.base.name="docker.io/library/alpine:3.24"
 
 ENV DATA_DIR=/data
 ENV COMPOSE_DIR=/compose

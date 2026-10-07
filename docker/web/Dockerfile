@@ -35,18 +35,19 @@ ARG APP_VERSION
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/controller/node_modules ./apps/controller/node_modules
 COPY . .
-# Cross-compiled for the target; the glibc variants match the trixie runtime.
+# Cross-compiled for the target; the musl variants match the Alpine runtime.
 RUN case "$TARGETARCH" in \
-      amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
-      arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
+      amd64) export BUN_COMPILE_TARGET=bun-linux-x64-musl ;; \
+      arm64) export BUN_COMPILE_TARGET=bun-linux-arm64-musl ;; \
       *) echo "docker/web/Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
     esac && \
     bun run build && bun run build:binary
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# The binary carries its own Bun. Must match oven/bun's Debian release (its node_modules may hold
-# native binaries): check `docker run --rm oven/bun:1.4.2-slim cat /etc/debian_version`.
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
+# The binary carries its own musl-linked Bun, which still loads libgcc and libstdc++. node_modules
+# is installed on Debian, so a native addon in it must ship a musl build too: today only sharp
+# (next's optional dependency) does, and nothing imports it.
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runner
 ARG PUID=10001
 ARG PGID=10001
 
@@ -55,14 +56,15 @@ ENV PORT=3000
 WORKDIR /app
 
 # Without a trust store every TLS call (ACME, OIDC, ClickHouse) fails at runtime, not build time.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates libgcc libstdc++
 
-RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
+# `shadow` is only for useradd/userdel, removed in the same layer.
+RUN apk add --no-cache --virtual .user-setup shadow && \
+    (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
     groupadd -g ${PGID} cpm && \
-    useradd -r -u ${PUID} -g cpm cpm
+    useradd -r -u ${PUID} -g cpm cpm && \
+    apk del .user-setup
 
 # Verbatim, package.json included ("type": "module"). The bundle stays on disk: vinext import()s a
 # real path, which Bun's embedded-asset filesystem does not support.
@@ -87,7 +89,7 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
       org.opencontainers.image.url="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
       org.opencontainers.image.source="https://github.com/CaddyProxyManager/caddy-proxy-manager" \
       org.opencontainers.image.documentation="https://caddyproxy.com/" \
-      org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
+      org.opencontainers.image.base.name="docker.io/library/alpine:3.24"
 
 EXPOSE 3000
 USER cpm

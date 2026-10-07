@@ -48,12 +48,14 @@ test.describe('Custom roles', () => {
     await dialog.getByLabel('Name').fill(ROLE_NAME);
     await dialog
       .getByRole('radiogroup', { name: 'Audit log' })
-      .getByRole('radio', { name: 'Read' })
+      .getByRole('radio', { name: 'Read', exact: true })
       .click();
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole('cell', { name: new RegExp(ROLE_NAME) })).toBeVisible();
-    await expect(page.getByText('2 permissions')).toBeVisible();
+    await expect(page.getByRole('cell', { name: ROLE_NAME, exact: true })).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: ROLE_NAME })).toContainText(
+      '1 permission',
+    );
   });
 
   test.describe('an account holding it', () => {

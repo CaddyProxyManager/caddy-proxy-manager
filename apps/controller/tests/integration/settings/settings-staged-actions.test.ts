@@ -642,9 +642,8 @@ describe('WAF settings', () => {
 describe('dashboard host', () => {
   it('checks no DNS before a domain is saved', async () => {
     expect(await actions.checkDashboardDnsAction()).toEqual({
-      ok: false,
-      resolved: [],
-      reason: 'noDomain',
+      ok: true,
+      data: { ok: false, resolved: [], reason: 'noDomain' },
     });
   });
 
@@ -781,9 +780,10 @@ describe('the favicon', () => {
 
   it('refuses a non-administrator', async () => {
     ctx.session = { user: viewer };
-    await expect(actions.updateFaviconAction(null, form({ intent: 'remove' }))).rejects.toThrow(
-      domainErrorMessage('accessDenied'),
-    );
+    expect(await actions.updateFaviconAction(null, form({ intent: 'remove' }))).toEqual({
+      success: false,
+      message: domainErrorMessage('accessDenied'),
+    });
   });
 });
 
@@ -792,9 +792,10 @@ describe('who may stage', () => {
     ctx.session = { user: viewer };
 
     for (const save of VALID_SAVES) {
-      await expect(save.action(null, form(save.fields))).rejects.toThrow(
-        domainErrorMessage('accessDenied'),
-      );
+      expect(await save.action(null, form(save.fields))).toEqual({
+        success: false,
+        message: domainErrorMessage('accessDenied'),
+      });
     }
     expect(await stagedKeys()).toEqual([]);
   });

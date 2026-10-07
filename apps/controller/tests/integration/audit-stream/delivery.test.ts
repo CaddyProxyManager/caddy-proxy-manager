@@ -21,7 +21,7 @@ ctx.db = await createTestDb();
 
 vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
-import { eq } from 'drizzle-orm';
+import { eq, gt } from 'drizzle-orm';
 import {
   alertEvents,
   alertRules,
@@ -31,7 +31,13 @@ import {
   notificationChannels,
 } from '../../../src/lib/db/schema';
 import { type AuditEventParams, auditEventRow, insertAuditRows } from '../../../src/lib/audit';
-import { auditEventHash, GENESIS_HASH, pruneAuditEvents } from '../../../src/lib/audit/chain';
+import {
+  auditEventHash,
+  GENESIS_HASH,
+  pruneAuditEvents,
+  verifyAuditChain,
+} from '../../../src/lib/audit/chain';
+import { runAuditRetention } from '../../../src/lib/audit/retention';
 import { createSink, deliverSink, testSink, updateSink } from '../../../src/lib/audit-stream';
 import type { StreamRecord } from '../../../src/lib/audit-stream/records';
 import {
@@ -40,7 +46,7 @@ import {
 } from '../../../src/lib/audit-stream/transports';
 import { resetNotificationsForTests } from '../../../src/lib/notifications';
 import { encryptSecret } from '../../../src/lib/secrets';
-import { invalidateSettingsCache } from '../../../src/lib/settings/resolve';
+import { invalidateSettingsCache, saveSettings } from '../../../src/lib/settings/resolve';
 
 // ── Receivers ────────────────────────────────────────────────────────────────
 
@@ -535,6 +541,69 @@ describe('pruning past a slow sink', () => {
       sink: sink.name,
       errorCode: { code: 'auditSinkGapAudit', params: { from: caughtUp + 1, to: pruned } },
     });
+  });
+
+  it('tells a sink of the retention job removals as a gap, and the chain carries on', async () => {
+    const at = new Date().toISOString();
+    const [channel] = await ctx.db
+      .insert(notificationChannels)
+      .values({
+        name: 'retention-hook',
+        kind: 'webhook',
+        secret: encryptSecret(JSON.stringify({ url: `http://127.0.0.1:${http.port}/alerts` })),
+        createdAt: at,
+        updatedAt: at,
+      })
+      .returning();
+    await ctx.db.insert(alertRules).values({
+      name: 'retention',
+      source: 'event',
+      sourceConfig: JSON.stringify({ kinds: ['auditSinkFailed'] }),
+      severity: 'critical',
+      channelIds: JSON.stringify([channel.id]),
+      createdAt: at,
+      updatedAt: at,
+    });
+    const sink = await createSink(
+      { name: name('retained'), kind: 'file', fileName: 'retained.jsonl' },
+      null,
+    );
+    await deliverSink(sink.id);
+    const caughtUp = (await sinkRow(sink.id)).auditCursor;
+    await events(3, 'aged');
+    await ctx.db
+      .update(auditEvents)
+      .set({ createdAt: '2020-01-01T00:00:00.000Z' })
+      .where(gt(auditEvents.seq, caughtUp));
+    await saveSettings({ 'config:audit_log_keep_days': 30 });
+    invalidateSettingsCache();
+
+    expect((await runAuditRetention())?.deleted).toBe(3);
+    const [{ anchorSeq: pruned }] = await ctx.db.select().from(auditChain);
+    expect(pruned).toBe(caughtUp + 3);
+    expect(await deliverSink(sink.id)).toBe('delivered');
+
+    const records = lines(await readFile(join(auditStreamDirectory(), 'retained.jsonl'), 'utf8'));
+    const gapAt = records.findIndex((record) => record.kind === 'gap');
+    expect(records[gapAt]).toMatchObject({ stream: 'audit', from: caughtUp + 1, to: pruned });
+    // The removal's own record follows the gap and links to the last event it removed.
+    expect(records[gapAt + 1]).toMatchObject({ kind: 'audit', action: 'audit_pruned' });
+    expect(verifyChain(records.slice(gapAt))).toEqual({ ok: true, checked: 1 });
+    expect(await verifyAuditChain()).toMatchObject({ ok: true });
+
+    expect(await sinkRow(sink.id)).toMatchObject({
+      gapStream: 'audit',
+      gapFrom: caughtUp + 1,
+      gapTo: pruned,
+      missed: 3,
+    });
+    const told = await ctx.db
+      .select()
+      .from(alertEvents)
+      .where(eq(alertEvents.kind, 'auditSinkFailed'));
+    expect(told.map((event) => JSON.parse(event.event).errorCode)).toEqual([
+      { code: 'auditSinkGapAudit', params: { from: caughtUp + 1, to: pruned } },
+    ]);
   });
 
   it('raises a failing sink after repeated failures and resolves it when it catches up', async () => {

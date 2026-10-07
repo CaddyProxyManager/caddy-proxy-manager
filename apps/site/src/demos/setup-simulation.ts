@@ -474,6 +474,13 @@ export const SETTING_FIELDS: Array<{
     value: "ghcr.io/caddyproxymanager",
   },
   {
+    key: "config:offline_mode",
+    env: "OFFLINE_MODE",
+    group: "application",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:host_history_keep_revisions",
     env: "HOST_HISTORY_KEEP_REVISIONS",
     group: "application",
@@ -486,6 +493,13 @@ export const SETTING_FIELDS: Array<{
     group: "application",
     kind: "number",
     value: 365,
+  },
+  {
+    key: "config:audit_log_keep_days",
+    env: "AUDIT_LOG_KEEP_DAYS",
+    group: "application",
+    kind: "number",
+    value: 0,
   },
   {
     key: "config:auth_allow_self_registration",

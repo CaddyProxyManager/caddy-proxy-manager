@@ -1,13 +1,12 @@
 ---
 title: Alerts
-description: Rules that decide what is worth telling and where, channels from email to Discord, Slack, Teams, ntfy and signed webhooks, the history of every delivery, and a daily digest.
+description: Rules that decide what to report and where, channels for email, Discord, Slack, Teams, ntfy and signed webhooks, the history of every delivery, and a daily digest.
 ---
 
-The **Alerts** page holds three things: **rules** that decide what is worth telling, **channels**
-that carry it, and the **history** of what was raised and how each delivery went. A fourth tab sets
-up **daily digests**.
+The **Alerts** page has **rules** that decide what to report, **channels** that carry it, and the
+**history** of what was raised and how each delivery went. A fourth tab sets up **daily digests**.
 
-Nothing changes on upgrade. Every kind of [notification](/features/email/#notifications) is a
+Upgrading changes nothing. Every kind of [notification](/features/email/#notifications) is a
 built-in rule routed to email and browser push, and its on switch stays where it was, under
 **Settings → Email → Notifications**, with each administrator's own choices under **Profile →
 Notifications**. Until someone edits a rule, the same people get the same emails and pushes.
@@ -44,7 +43,8 @@ Webhook requests follow the Standard Webhooks scheme, so any of its verifiers wo
 - `webhook-signature`: `v1,` and the base64 HMAC-SHA256 of `id.timestamp.body`, keyed with the
   bytes after `whsec_` in the signing secret, base64-decoded.
 
-Leave the signing secret empty on a new channel and one is made for you and shown once; copy it then.
+Leave the signing secret empty on a new channel and one is made for you and shown once; copy it
+then.
 The body is `{ "type": "alerts", "timestamp": ..., "data": { "subject", "url", "alerts": [...] } }`,
 each alert with its kind, severity, title, sentence, time and the event's own fields. A digest
 arrives with `"type": "digest"`.
@@ -53,16 +53,16 @@ arrives with `"type": "digest"`.
 
 Each channel sends at most one message a minute: whatever is raised within it goes together, as
 email always has. Discord takes up to 10 alerts a message, Slack, Teams and ntfy a handful more;
-the rest follow in the next. A problem is told once while it lasts and its recovery once, and one
-that is over before it was sent costs nothing.
+the rest follow in the next. A problem is reported once while it lasts, and its recovery once. One
+that ends before its message goes out is never sent.
 
 A failed send is retried after 30 seconds, then a minute, doubling to an hour. A service asking to
 slow down is obeyed: Discord's `retry_after` (to the millisecond) and Slack's and Teams'
 `Retry-After` are waited out when short and become the retry time when long. Alerts a day old are
 dropped rather than sent late. The built-in email keeps its five-minute retry.
 
-Three failures in a row make the channel itself a problem, told on your other channels (never on
-the failing one) through the built-in **Alert channel failing** rule, and resolved when it works
+Three failures in a row make the channel itself a problem, reported on your other channels (never
+on the failing one) through the built-in **Alert channel failing** rule, and resolved when it works
 again.
 
 ## Rules
@@ -82,14 +82,14 @@ Rules on Needs attention, signals and metrics are checked once a minute. Each th
 that could not be read resolves nothing, and metric rules wait while analytics are off.
 
 - **Scope**: all hosts, chosen proxy hosts, or hosts with any of some [tags](/features/reverse-proxy/).
-  A scoped rule only matches what names a host.
-- **Quiet period**: after telling, the rule stays quiet about the same thing for this long, so a
-  host that flaps is told once.
+  A scoped rule ignores anything that does not name a host.
+- **Quiet period**: after an alert, the rule stays quiet about the same thing for this long, so a
+  host that flaps is reported once.
 - **Silence**: nothing is raised until the time you pick.
 
 A built-in rule keeps its source; its channels, severity, quiet period and silence can be changed,
-and its on switch stays the Settings toggle. **Test** on a rule queues a test alert through its
-channels, as anything it raises would go.
+and the toggle in Settings still turns it on and off. **Test** on a rule queues a test alert
+through its channels, the same way anything it raises would go.
 
 ## History
 

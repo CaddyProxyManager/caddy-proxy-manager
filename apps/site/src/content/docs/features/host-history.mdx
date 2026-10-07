@@ -16,8 +16,8 @@ it - not a list of differences, so any one of them can be put back on its own.
 
 A proxy host's page has **Overview** and **History** tabs; an L4 host's history is under
 **History** in its row menu. The tab lists the revisions newest first, with what made each one and
-who, and is open to everyone who may manage the host. A deleted host's history stays, for
-administrators, reached from its deletion in the [audit log](../audit-log/).
+who, and is open to everyone who may manage the host. A deleted host's history stays too;
+administrators open it from the deletion in the [audit log](../audit-log/).
 
 Pick any two revisions to compare. The fields that differ are listed as the audit log and the
 editor's review name them - certificates, access lists and agents by name, anything secret-looking
@@ -45,9 +45,9 @@ change with the revision before it, ready to go back to the state before the cha
 ## Restoring a deleted host
 
 Deleting a host keeps its history, and its last revision holds the host exactly as it was. An
-administrator opens it from the deletion in the audit log and chooses **Restore**, which brings
-the host back under its old id, so its history carries on, and records a revision of its own. Any
-earlier revision can be restored instead.
+administrator opens it from the deletion in the audit log and chooses **Restore**. The host comes
+back under its old id, so its history continues, and the restore records a revision of its own.
+Any earlier revision can be restored instead.
 
 A restore is refused when one of the host's domains is now served by another proxy host, or, for
 an L4 host, when its port is now taken on an agent it shares. If the revision names anything
@@ -62,9 +62,10 @@ makes names the change request, and the history links to it.
 ## How long history is kept
 
 Each host keeps at least its latest **100** revisions, however old, and every revision younger than
-**365 days**, however many: a revision goes only once both would let it. Change either under
-**Settings → General → Host history** (`HOST_HISTORY_KEEP_REVISIONS` and `HOST_HISTORY_KEEP_DAYS`
-until a value is stored). Pruning happens as hosts change, and a deleted host keeps its history.
+**365 days**, however many. A revision is pruned only when neither rule keeps it. Change either
+under **Settings → General → Host history** (`HOST_HISTORY_KEEP_REVISIONS` and
+`HOST_HISTORY_KEEP_DAYS` until a value is stored). Pruning runs as hosts change, and a deleted host
+keeps its history.
 
 ## Secrets, backups and the API
 
@@ -78,7 +79,7 @@ with the settings history. Restoring hosts without their history clears the hist
 there, since the restored hosts reuse ids it names.
 
 Over GraphQL, `hostRevisions`, `hostRevision`, `compareHostRevisions` and `deletedHosts` read it,
-`rollbackHost` puts a live host back as a revision stored it - refusing while the revision names
-anything since deleted - and `restoreHost` brings a deleted one back. REST lists a host's revisions
+`rollbackHost` returns a live host to a stored revision (refused while the revision names anything
+deleted since), and `restoreHost` brings a deleted one back. REST lists a host's revisions
 at `GET /api/v1/proxy-hosts/{id}/revisions` and `/api/v1/l4-proxy-hosts/{id}/revisions`. Audit
 events for host changes carry the `revisionId` their change made.

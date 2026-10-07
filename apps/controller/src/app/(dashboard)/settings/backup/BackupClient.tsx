@@ -21,6 +21,7 @@ import { Timestamp } from "@/components/ui/Timestamp";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import type { RemoteBackup } from "@/src/lib/backup/manage";
 import SettingsFrame from "../SettingsFrame";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { type BackupOverview, listRemoteBackupsAction } from "./actions";
 import { ConfigTransfer } from "./ConfigTransfer";
 import { ScheduledBackups } from "./ScheduledBackups";
@@ -194,7 +195,7 @@ function RestoreCard({ destinations }: { destinations: BackupOverview["destinati
     setRemoteKey("");
     void describe(null);
     try {
-      setRemote(await listRemoteBackupsAction(Number(id)));
+      setRemote(unwrap(await listRemoteBackupsAction(Number(id))));
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t("listFailed"));
     }

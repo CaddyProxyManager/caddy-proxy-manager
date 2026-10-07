@@ -62,6 +62,7 @@ export async function registerAcmeDnsAccount(
 
   let response: Response;
   try {
+    // outbound: acmeDns
     response = await fetchImpl(`${base}/register`, {
       method: "POST",
       headers: { Accept: "application/json" },

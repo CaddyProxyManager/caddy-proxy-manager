@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCanAccess } from "@/src/lib/users/permissions";
 import { localUsersDisabled } from "@/src/lib/auth/policy";
 import { revalidatePath } from "next/cache";
@@ -89,6 +90,7 @@ async function createUserActionUntranslated(formData: FormData): Promise<unknown
     await sendEmailedLink(user.id, session.user.name || session.user.email, await getLocale());
     return null;
   } catch (error) {
+    unstable_rethrow(error);
     console.error("createUserAction: the invitation was not sent:", error);
     return error;
   }
@@ -211,6 +213,7 @@ export async function createUserAction(formData: FormData): Promise<ActionState>
       }),
     );
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("createUserAction failed:", error);
     return actionError(t, error, t("errors.createUserFailed"));
@@ -225,6 +228,7 @@ export async function updateUserRoleAction(
     await updateUserRoleActionUntranslated(userId, role);
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("updateUserRoleAction failed:", error);
     return actionError(t, error, t("errors.updateUserRoleFailed"));
@@ -236,6 +240,7 @@ export async function updateUserStatusAction(userId: number, status: string): Pr
     await updateUserStatusActionUntranslated(userId, status);
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("updateUserStatusAction failed:", error);
     return actionError(t, error, t("errors.updateUserStatusFailed"));
@@ -250,6 +255,7 @@ export async function updateUserInfoAction(
     await updateUserInfoActionUntranslated(userId, formData);
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("updateUserInfoAction failed:", error);
     return actionError(t, error, t("errors.updateUserInfoFailed"));
@@ -261,6 +267,7 @@ export async function deleteUserAction(userId: number): Promise<ActionState> {
     await deleteUserActionUntranslated(userId);
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("deleteUserAction failed:", error);
     return actionError(t, error, t("errors.deleteUserFailed"));
@@ -294,6 +301,7 @@ export async function resetUserTwoFactorAction(userId: number): Promise<ActionSt
     const t = await getTranslations("users");
     return actionSuccess(t("twoFactorResetDone"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("resetUserTwoFactorAction failed:", error);
     return actionError(t, error, t("errors.resetTwoFactorFailed"));
@@ -327,6 +335,7 @@ export async function removeUserPasskeysAction(userId: number): Promise<ActionSt
     const t = await getTranslations("users");
     return actionSuccess(t("passkeysRemovedDone"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("removeUserPasskeysAction failed:", error);
     return actionError(t, error, t("errors.removePasskeysFailed"));
@@ -359,6 +368,7 @@ export async function sendEmailedLinkAction(userId: number): Promise<ActionState
         : t("resetLinkSent", { email: target?.email ?? "" }),
     );
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("sendEmailedLinkAction failed:", error);
     return actionError(t, error, t("errors.emailSendFailedUnknown"));

@@ -96,7 +96,7 @@ export type NotificationEvent =
       by: string;
       reason: string;
     }
-  /** An alert channel whose sends keep failing, told on the others. */
+  /** An alert channel whose sends keep failing, reported through the others. */
   | { kind: "channelFailing"; channelId: number; channel: string; failures: number; error: string }
   | { kind: "channelRecovered"; channelId: number; channel: string }
   /** "Send test" on a channel, straight to it; and a test queued through a rule's channels. */

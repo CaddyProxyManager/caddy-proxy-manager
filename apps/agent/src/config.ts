@@ -78,6 +78,14 @@ function resolveMode(): AgentMode {
   throw new Error(`AGENT_MODE must be "standalone" or "managed"; got "${raw}".`);
 }
 
+/** External also while the controller is in offline mode: a build downloads Go modules. */
+export function effectiveBuildMode(
+  config: Pick<AgentConfig, "caddyBuildMode">,
+  store: { controllerOffline(): boolean },
+): CaddyBuildMode {
+  return config.caddyBuildMode === "external" || store.controllerOffline() ? "external" : "agent";
+}
+
 function resolveBuildMode(): CaddyBuildMode {
   const raw = optional("CADDY_BUILD_MODE") ?? "agent";
   if (raw === "agent" || raw === "external") return raw;

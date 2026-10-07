@@ -371,6 +371,14 @@ export async function register() {
       stop: stopAuditStreaming,
     });
 
+    // Removes nothing while audit_log_keep_days is 0, the default.
+    const { startAuditRetention, stopAuditRetention } = await import("./lib/audit/retention");
+    cluster.runAsLeader({
+      name: "the audit log retention",
+      start: startAuditRetention,
+      stop: stopAuditRetention,
+    });
+
     try {
       await cluster.startCluster();
     } catch (error) {

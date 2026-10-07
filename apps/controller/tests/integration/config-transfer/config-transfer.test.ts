@@ -152,13 +152,31 @@ async function seedTarget() {
   });
 }
 
-async function exported(sections?: ConfigSection[]) {
-  db = await createTestDb();
-  await seedSource();
-  return await exportConfig(PASSPHRASE, { sections });
-}
+// The sources are built once, at import so the per-test cleanup leaves them be: a schema costs a
+// full migration, seconds under a parallel run, and made inside a test it counted against the
+// test's timeout. Nothing writes to them.
+const source = await createTestDb();
+db = source;
+await seedSource();
+const sourceFiles = new Map<string, Promise<Buffer>>();
 
-beforeEach(() => {});
+/** The instance a test imports into: made in a hook, as other suites do, outside the test's 5s. */
+let target: TestDb;
+beforeEach(async () => {
+  target = await createTestDb();
+});
+
+/** The source's export, made once per selection; `db` is left on the source. */
+async function exported(sections?: ConfigSection[]) {
+  db = source;
+  const key = sections?.join(',') ?? '';
+  let file = sourceFiles.get(key);
+  if (!file) {
+    file = exportConfig(PASSPHRASE, { sections });
+    sourceFiles.set(key, file);
+  }
+  return await file;
+}
 
 describe('config export', () => {
   it('writes readable JSON with every secret sealed', async () => {
@@ -202,7 +220,7 @@ describe('config export', () => {
   });
 
   it('refuses a short passphrase and an empty selection', async () => {
-    db = await createTestDb();
+    db = source;
     await expect(exportConfig('short')).rejects.toMatchObject({ code: 'backupPassphraseTooShort' });
     await expect(exportConfig(PASSPHRASE, { sections: [] })).rejects.toMatchObject({
       code: 'configNothingSelected',
@@ -213,7 +231,7 @@ describe('config export', () => {
 describe('config import', () => {
   it('previews creates and the conflicting domain, writing nothing', async () => {
     const file = await exported();
-    db = await createTestDb();
+    db = target;
     await seedTarget();
     const preview = await previewConfigImport(file, PASSPHRASE);
     const host = (name: string) =>
@@ -230,7 +248,7 @@ describe('config import', () => {
 
   it('applies with every id remapped and secrets re-encrypted, then finds nothing to do', async () => {
     const file = await exported();
-    db = await createTestDb();
+    db = target;
     await seedTarget();
     await db
       .insert(schema.wafPresets)
@@ -288,7 +306,7 @@ describe('config import', () => {
 
   it('skips a host pinned to an agent this instance lacks rather than unpinning it', async () => {
     const file = await exported();
-    db = await createTestDb();
+    db = target;
     await user(1, 'admin@example.com');
     const preview = await previewConfigImport(file, PASSPHRASE);
     expect(preview.items.find((i) => i.label === 'app')).toMatchObject({
@@ -329,8 +347,7 @@ describe('over GraphQL', () => {
   });
 
   it('refuses the export and the import to a session that is not fresh', async () => {
-    db = await createTestDb();
-    await seedSource();
+    db = source;
     const exportedOverSession = await graphql({
       schema: gqlSchema,
       source: 'mutation ($p: String!) { exportConfig(passphrase: $p) }',
@@ -344,8 +361,7 @@ describe('over GraphQL', () => {
   });
 
   it('exports, previews and verifies for an administrator only', async () => {
-    db = await createTestDb();
-    await seedSource();
+    db = source;
     const exported = await graphql({
       schema: gqlSchema,
       source: 'mutation ($p: String!) { exportConfig(passphrase: $p, sections: ["security"]) }',
@@ -472,47 +488,67 @@ describe('the file is authenticated', () => {
   });
 });
 
+/** Rows a save would refuse, as another source built at import. */
+async function seedInvalidSource() {
+  await user(1, 'admin@example.com');
+  await db.insert(schema.accessLists).values([
+    { id: 1, name: 'redirect', denyRedirectUrl: 'https://x.example/{http.request.uri}', ...at },
+    { id: 2, name: 'zone', ...at },
+  ]);
+  await db.insert(schema.accessListIpRules).values({
+    accessListId: 2,
+    action: 'deny',
+    cidr: 'fe80::%eth0/64',
+    sortOrder: 0,
+    ...at,
+  });
+  await db.insert(schema.blockedSources).values({
+    kind: 'cidr',
+    value: '10.0.0.0/8"',
+    createdAt: NOW,
+  });
+  await db.insert(schema.proxyHosts).values([
+    { id: 3, name: 'bad domain', domains: '["exa mple.com"]', upstreams: '["a:80"]', ...at },
+    { id: 4, name: 'first', domains: '["dup.example.com"]', upstreams: '["a:80"]', ...at },
+    { id: 5, name: 'second', domains: '["DUP.example.com"]', upstreams: '["b:80"]', ...at },
+    {
+      id: 6,
+      name: 'bad waf',
+      domains: '["waf.example.com"]',
+      upstreams: '["a:80"]',
+      meta: JSON.stringify({ waf: { enabled: true, custom_directives: 'SecRule ARGS "' } }),
+      ...at,
+    },
+  ]);
+  await db.insert(schema.wafExclusions).values({
+    ruleId: 942100,
+    path: '/x" "id:1,phase:1,deny',
+    reason: '',
+    ...at,
+  });
+}
+const invalidSource = await createTestDb();
+db = invalidSource;
+await seedInvalidSource();
+
+const plainDnsSource = await createTestDb();
+db = plainDnsSource;
+await user(1, 'admin@example.com');
+await db.insert(schema.settings).values({
+  key: 'dns_provider',
+  value: JSON.stringify({ providers: { cloudflare: { api_token: 'plain-token' } } }),
+  updatedAt: NOW,
+});
+
 describe('imported rows are checked as a save checks them', () => {
+  let invalidFile: Promise<Buffer> | null = null;
+
+  /** The invalid source's export, made once, and a fresh target to import it into. */
   async function seedInvalid() {
-    db = await createTestDb();
-    await user(1, 'admin@example.com');
-    await db.insert(schema.accessLists).values([
-      { id: 1, name: 'redirect', denyRedirectUrl: 'https://x.example/{http.request.uri}', ...at },
-      { id: 2, name: 'zone', ...at },
-    ]);
-    await db.insert(schema.accessListIpRules).values({
-      accessListId: 2,
-      action: 'deny',
-      cidr: 'fe80::%eth0/64',
-      sortOrder: 0,
-      ...at,
-    });
-    await db.insert(schema.blockedSources).values({
-      kind: 'cidr',
-      value: '10.0.0.0/8"',
-      createdAt: NOW,
-    });
-    await db.insert(schema.proxyHosts).values([
-      { id: 3, name: 'bad domain', domains: '["exa mple.com"]', upstreams: '["a:80"]', ...at },
-      { id: 4, name: 'first', domains: '["dup.example.com"]', upstreams: '["a:80"]', ...at },
-      { id: 5, name: 'second', domains: '["DUP.example.com"]', upstreams: '["b:80"]', ...at },
-      {
-        id: 6,
-        name: 'bad waf',
-        domains: '["waf.example.com"]',
-        upstreams: '["a:80"]',
-        meta: JSON.stringify({ waf: { enabled: true, custom_directives: 'SecRule ARGS "' } }),
-        ...at,
-      },
-    ]);
-    await db.insert(schema.wafExclusions).values({
-      ruleId: 942100,
-      path: '/x" "id:1,phase:1,deny',
-      reason: '',
-      ...at,
-    });
-    const file = await exportConfig(PASSPHRASE);
-    db = await createTestDb();
+    db = invalidSource;
+    invalidFile ??= exportConfig(PASSPHRASE);
+    const file = await invalidFile;
+    db = target;
     await user(1, 'admin@example.com');
     return file;
   }
@@ -560,16 +596,10 @@ describe('imported rows are checked as a save checks them', () => {
   });
 
   it('encrypts a DNS credential the file carried in the clear', async () => {
-    db = await createTestDb();
-    await user(1, 'admin@example.com');
-    await db.insert(schema.settings).values({
-      key: 'dns_provider',
-      value: JSON.stringify({ providers: { cloudflare: { api_token: 'plain-token' } } }),
-      updatedAt: NOW,
-    });
+    db = plainDnsSource;
     const file = await exportConfig(PASSPHRASE, { sections: ['settings'] });
     expect(file.toString('utf8')).not.toContain('plain-token');
-    db = await createTestDb();
+    db = target;
     await user(1, 'admin@example.com');
     await applyConfigImport(file, PASSPHRASE, 1);
     const [row] = await db.select().from(schema.settings);
@@ -579,24 +609,27 @@ describe('imported rows are checked as a save checks them', () => {
   });
 });
 
+const ambiguousSource = await createTestDb();
+db = ambiguousSource;
+await user(1, 'admin@example.com');
+await db.insert(schema.accessLists).values([
+  { id: 1, name: 'office', ...at },
+  { id: 2, name: 'office', ipDefault: 'allow', ...at },
+]);
+await db.insert(schema.proxyHosts).values({
+  id: 3,
+  name: 'app',
+  domains: '["app.example.com"]',
+  upstreams: '["a:80"]',
+  accessListId: 2,
+  ...at,
+});
+
 describe('matching by natural key', () => {
   it('skips a name more than one row shares rather than guessing by id', async () => {
-    db = await createTestDb();
-    await user(1, 'admin@example.com');
-    await db.insert(schema.accessLists).values([
-      { id: 1, name: 'office', ...at },
-      { id: 2, name: 'office', ipDefault: 'allow', ...at },
-    ]);
-    await db.insert(schema.proxyHosts).values({
-      id: 3,
-      name: 'app',
-      domains: '["app.example.com"]',
-      upstreams: '["a:80"]',
-      accessListId: 2,
-      ...at,
-    });
+    db = ambiguousSource;
     const file = await exportConfig(PASSPHRASE);
-    db = await createTestDb();
+    db = target;
     await user(1, 'admin@example.com');
     await db.insert(schema.accessLists).values({ id: 9, name: 'office', ...at });
     const preview = await previewConfigImport(file, PASSPHRASE);
@@ -611,7 +644,7 @@ describe('matching by natural key', () => {
 
   it('pins to the agent with the same agent id, not the one with the same name', async () => {
     const file = await exported(['hosts']);
-    db = await createTestDb();
+    db = target;
     await seedTarget();
     // Agent 11 is called edge; agent 12 is the source's machine under another name.
     await db.insert(schema.agents).values({
@@ -643,7 +676,7 @@ describe('matching by natural key', () => {
 
 describe('revocation is one-way', () => {
   it('keeps a local revocation an older export would undo', async () => {
-    db = await createTestDb();
+    db = target;
     await user(1, 'admin@example.com');
     const cert = {
       id: 1,
@@ -679,7 +712,7 @@ describe('revocation is one-way', () => {
 describe('the preview shows what changes', () => {
   it('lists before and after with secrets masked and references by name', async () => {
     const file = await exported();
-    db = await createTestDb();
+    db = target;
     await seedTarget();
     const preview = await previewConfigImport(file, PASSPHRASE);
     const text = JSON.stringify(preview);

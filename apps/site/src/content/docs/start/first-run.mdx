@@ -17,8 +17,8 @@ the app serves nothing else until the flow finishes.
 
 <Steps>
 
-1. **Controller or agent.** Agents are set up from their own host and paired later; choosing here
-   just says which this is.
+1. **Controller or agent.** Agents are set up from their own host and paired later; this choice
+   only says which one this is.
 
 2. **Create the first administrator**, or configure an OAuth provider instead of a local account.
 
@@ -49,8 +49,8 @@ live one under [signing in](../../features/users-and-groups/#signing-in).
 
 ## What it decides for you
 
-Setup switches on the [dashboard host](../../features/dashboard-host/), so the instance is already
-reverse-proxying something - itself - before you have created anything. It comes up on HTTP; HTTPS
+Setup switches on the [dashboard host](../../features/dashboard-host/), so before you have created
+anything the instance is already reverse-proxying one host: itself. It comes up on HTTP; HTTPS
 is a check you run once the domain reaches you.
 
 ## Finishing restarts the application
@@ -62,7 +62,7 @@ the empty one, and the screen waits for it to go away and come back. Coming back
 applies the Caddy configuration, which is how the dashboard host you just created starts answering.
 
 If you gave the dashboard host a domain, that is where you land once it has been confirmed to reach
-this deployment - otherwise you stay on the address you set up at, which always works. Your session
+this deployment. Otherwise you stay on the address you set up at, which always works. Your session
 belongs to the address you signed in at, so the new domain asks you to sign in again. A deployment
 with nothing supervising the container never comes back on its own: the screen says so, and gives
 you the command to restart it by hand.

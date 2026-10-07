@@ -111,6 +111,7 @@ export default defineConfig({
           items: [
             { label: "What it is", slug: "start/what-it-is" },
             { label: "Install", slug: "start/install" },
+            { label: "Without internet access", slug: "start/offline" },
             { label: "First run", slug: "start/first-run" },
             { label: "Database", slug: "start/database" },
           ],

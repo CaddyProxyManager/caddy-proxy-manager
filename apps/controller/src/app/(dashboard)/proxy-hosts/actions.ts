@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   assertCanManage,
@@ -68,6 +69,7 @@ export async function createProxyHostAction(
     }
     return actionSuccess(t("hostCreated"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to create proxy host:");
     return actionError(t, error, t("errors.createProxyHostFailed"));
@@ -114,6 +116,7 @@ export async function updateProxyHostAction(
     }
     return actionSuccess(t("hostUpdated"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to update proxy host:", id);
     return actionError(t, error, t("errors.updateProxyHostFailed"));
@@ -133,6 +136,7 @@ export async function deleteProxyHostAction(
     const t = await getTranslations("proxyHosts");
     return actionSuccess(t("hostDeleted"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to delete proxy host:", id);
     return actionError(t, error, t("errors.deleteProxyHostFailed"));
@@ -151,6 +155,7 @@ export async function toggleProxyHostAction(id: number, enabled: boolean): Promi
     const t = await getTranslations("proxyHosts");
     return actionSuccess(enabled ? t("hostEnabledResult") : t("hostDisabledResult"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to toggle proxy host:", id);
     return actionError(t, error, t("errors.toggleProxyHostFailed"));
@@ -172,6 +177,7 @@ export async function setProxyHostMaintenanceAction(
     const t = await getTranslations("proxyHosts");
     return actionSuccess(enabled ? t("maintenanceOnResult") : t("maintenanceOffResult"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to switch maintenance mode:", id);
     return actionError(t, error, t("errors.toggleMaintenanceFailed"));
@@ -196,6 +202,7 @@ export async function bulkProxyHostsAction(request: ProxyHostBulkRequest): Promi
         : t("bulk.updatedResult", { count }),
     );
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to change proxy hosts in bulk:");
     return actionError(t, error, t("errors.bulkHostsFailed"));
@@ -210,6 +217,7 @@ export async function hostEditorOptionsAction(): Promise<
     await requireReach("hosts:write");
     return { ok: true, options: await loadHostEditorOptions() };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to read the host editor's options:", error);
     return {
@@ -230,6 +238,7 @@ export async function hostForwardAuthAccessAction(
     assertCanView(access, "proxyHost", id);
     return { ok: true, access: await loadForwardAuthAccess(id) };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to read forward auth access:", id, error);
     return {
@@ -248,6 +257,7 @@ export async function proxyHostUpstreamHealthAction(
     assertCanView(access, "proxyHost", id);
     return { ok: true, health: await getProxyHostUpstreamHealth(id) };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to read upstream health:", id, error);
     return { ok: false, message: extractErrorMessage(t, error, t("errors.upstreamHealthFailed")) };
@@ -292,6 +302,7 @@ export async function previewProxyHostAction(
     );
     return { ok: true, preview, approval };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.previewHostFailed")) };
   }
@@ -312,6 +323,7 @@ export async function restoreProxyHostAction(
     const t = await getTranslations("hostHistory");
     return actionSuccess(t("restored"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     logWriteFailure(error, "Failed to restore proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));

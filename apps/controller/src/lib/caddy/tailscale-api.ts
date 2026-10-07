@@ -62,6 +62,7 @@ export async function checkTailscaleAuthKey(options: {
 
   let response: Response;
   try {
+    // outbound: tailscale
     response = await doFetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -83,6 +83,7 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
 
   return new Promise((resolve, reject) => {
     const lib = parsed.protocol === "https:" ? https : http;
+    // outbound: caddyAdmin
     const req = lib.request(
       {
         hostname: parsed.hostname,

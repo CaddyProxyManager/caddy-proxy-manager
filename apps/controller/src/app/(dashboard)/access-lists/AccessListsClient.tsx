@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import type { AccessList, AccessListStats, AccessListUsage } from "@/lib/models/access-lists";
 import { isSubmittedForApproval } from "@/lib/approvals/submitted";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { withRowId, type WithRowId } from "@/lib/forms/row-id";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -157,7 +158,12 @@ function MembersTab({
 
   const removeSelected = async () => {
     const ids = Array.from(selected);
-    const updated = await bulkDeleteEntriesAction(list.id, ids);
+    const result = await bulkDeleteEntriesAction(list.id, ids);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const updated = result.data;
     if (isSubmittedForApproval(updated)) toast.success(updated.message);
     else {
       if (updated) onListUpdated(updated);
@@ -168,7 +174,12 @@ function MembersTab({
 
   const removeOne = async (id: number) => {
     const entry = list.entries.find((e) => e.id === id);
-    const updated = await deleteAccessEntryAction(list.id, id);
+    const result = await deleteAccessEntryAction(list.id, id);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const updated = result.data;
     if (isSubmittedForApproval(updated)) {
       toast.success(updated.message);
       return;
@@ -181,8 +192,12 @@ function MembersTab({
 
   const regen = async (id: number) => {
     const pw = generatePassword();
-    const updated = await regeneratePasswordAction(list.id, id, pw);
-    if (updated) onListUpdated(updated);
+    const result = await regeneratePasswordAction(list.id, id, pw);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    onListUpdated(result.data);
     try {
       await navigator.clipboard.writeText(pw);
       toast.success(t("passwordCopiedToast"));
@@ -199,10 +214,15 @@ function MembersTab({
     }
     setSubmitting(true);
     try {
-      const updated = await addAccessEntryAction(list.id, {
+      const result = await addAccessEntryAction(list.id, {
         username: draft.username.trim(),
         password: draft.password,
       });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const updated = result.data;
       setDraft({ username: "", password: "" });
       setAdding(false);
       if (isSubmittedForApproval(updated)) {
@@ -470,7 +490,7 @@ function SettingsTab({
   // Applied as soon as they're changed, like the IP default: each is one choice, not a draft.
   const saveOption = async (input: { satisfy?: string; passAuth?: boolean }) => {
     try {
-      const updated = await updateAccessListAction(list.id, input);
+      const updated = unwrap(await updateAccessListAction(list.id, input));
       if (isSubmittedForApproval(updated)) toast.success(updated.message);
       else {
         onListUpdated(updated);
@@ -484,10 +504,15 @@ function SettingsTab({
   const save = async () => {
     setSaving(true);
     try {
-      const updated = await updateAccessListAction(list.id, {
+      const result = await updateAccessListAction(list.id, {
         name: name.trim() || list.name,
         description: desc.trim() || null,
       });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const updated = result.data;
       if (isSubmittedForApproval(updated)) toast.success(updated.message);
       else {
         onListUpdated(updated);
@@ -502,12 +527,12 @@ function SettingsTab({
     setDeleting(true);
     try {
       const result = await deleteAccessListAction(list.id);
-      if (!result.success) {
-        toast.error(result.error ?? t("deleteFailed"));
+      if (!result.ok) {
+        toast.error(result.error);
         return;
       }
-      if (result.submitted) {
-        toast.success(result.submitted);
+      if (result.data.submitted) {
+        toast.success(result.data.submitted);
         return;
       }
       toast.success(t("deletedToast", { name: list.name }));
@@ -651,6 +676,7 @@ function UsageStats({ listId }: { listId: number }) {
   useEffect(() => {
     let live = true;
     getAccessListStatsAction(listId)
+      .then(unwrap)
       .then((next) => {
         if (live) setStats(next);
       })
@@ -869,13 +895,18 @@ function NewListDialog({
     if (!valid) return;
     setSubmitting(true);
     try {
-      const list = await createAccessListAction({
+      const result = await createAccessListAction({
         name: name.trim(),
         description: desc.trim() || null,
         users: seed
           .filter((s) => s.username.trim() && s.password)
           .map(({ username, password }) => ({ username, password })),
       });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const list = result.data;
       onClose();
       if (isSubmittedForApproval(list)) {
         toast.success(list.message);

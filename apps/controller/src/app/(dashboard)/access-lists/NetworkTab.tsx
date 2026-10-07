@@ -30,6 +30,7 @@ import { FlagIcon, isKnownCountry } from "@/components/ui/CountryFlag";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
 
 type Rule = {
@@ -134,17 +135,19 @@ export function NetworkTab({
     setSaving(true);
     setError(null);
     try {
-      const updated = await setAccessListIpRulesAction(
-        list.id,
-        rules
-          .filter((rule) => rule.target.trim())
-          .map(({ action, kind, target, note, expiresAt }) => ({
-            action,
-            kind,
-            target: target.trim(),
-            note: note.trim() || null,
-            expiresAt,
-          })),
+      const updated = unwrap(
+        await setAccessListIpRulesAction(
+          list.id,
+          rules
+            .filter((rule) => rule.target.trim())
+            .map(({ action, kind, target, note, expiresAt }) => ({
+              action,
+              kind,
+              target: target.trim(),
+              note: note.trim() || null,
+              expiresAt,
+            })),
+        ),
       );
       if (isSubmittedForApproval(updated)) toast.success(updated.message);
       else {
@@ -160,7 +163,7 @@ export function NetworkTab({
 
   const saveSetting = async (input: Parameters<typeof updateAccessListAction>[1]) => {
     try {
-      const updated = await updateAccessListAction(list.id, input);
+      const updated = unwrap(await updateAccessListAction(list.id, input));
       if (isSubmittedForApproval(updated)) toast.success(updated.message);
       else {
         onListUpdated(updated);

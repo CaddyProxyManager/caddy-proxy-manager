@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { requireCan } from "@/src/lib/users/permissions";
 import { getTranslations } from "next-intl/server";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -8,7 +9,6 @@ import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import type { VerifyChainResult } from "./AuditLogClient";
 
 export async function verifyAuditChainAction(): Promise<VerifyChainResult> {
-  const t = await getTranslations();
   try {
     const session = await requireCan("audit:write");
     const verification = await verifyAuditChain();
@@ -26,7 +26,9 @@ export async function verifyAuditChainAction(): Promise<VerifyChainResult> {
     });
     return { ok: true, verification };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to verify the audit log:", error);
+    const t = await getTranslations();
     return { ok: false, message: extractErrorMessage(t, error, t("errors.auditVerifyFailed")) };
   }
 }

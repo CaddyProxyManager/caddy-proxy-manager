@@ -13,7 +13,8 @@ import {
   updateSink,
 } from "@/src/lib/audit-stream";
 import { storedErrorMessage } from "@/src/lib/errors/action-error";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 
 const PAGE = "/settings/audit-streaming";
 
@@ -22,46 +23,44 @@ async function adminId(): Promise<number> {
 }
 
 /** The last error rendered here, in the reader's language: the catalog stays on the server. */
-export async function loadSinksAction(): Promise<SinkView[]> {
-  await requireCan("audit:read");
-  const [sinks, t] = await Promise.all([listSinks(), getTranslations()]);
-  return sinks.map((sink) => ({
-    ...sink,
-    lastError: sink.lastError && storedErrorMessage(t, sink.lastError, sink.lastErrorCode),
-  }));
+export async function loadSinksAction(): Promise<ActionResult<SinkView[]>> {
+  return runAction(async () => {
+    await requireCan("audit:read");
+    const [sinks, t] = await Promise.all([listSinks(), getTranslations()]);
+    return sinks.map((sink) => ({
+      ...sink,
+      lastError: sink.lastError && storedErrorMessage(t, sink.lastError, sink.lastErrorCode),
+    }));
+  });
 }
 
-export async function saveSinkAction(id: number | null, input: SinkInput): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function saveSinkAction(id: number | null, input: SinkInput): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     if (id === null) await createSink(input, userId);
     else await updateSink(id, input, userId);
     revalidatePath(PAGE);
   });
 }
 
-export async function deleteSinkAction(id: number): Promise<void> {
-  const userId = await adminId();
-  await withTranslatedErrors(async () => {
+export async function deleteSinkAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const userId = await adminId();
     await deleteSink(id, userId);
     revalidatePath(PAGE);
   });
 }
 
-export type SinkTestOutcome =
-  | { ok: true; encodingRefused: boolean }
-  | { ok: false; message: string };
+export type SinkTestOutcome = ActionResult<{ encodingRefused: boolean }>;
 
 /** A saved sink as stored, or with `input` the form as typed: its blank secrets are the stored ones. */
 export async function testSinkAction(
   id: number | null,
   input: SinkInput | null,
 ): Promise<SinkTestOutcome> {
-  await requireCan("audit:write");
-  try {
-    const result = await withTranslatedErrors(() => testSink(id, input));
-    return { ok: true, encodingRefused: result.encodingRefused };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
+  return runAction(async () => {
+    await requireCan("audit:write");
+    const result = await testSink(id, input);
+    return { encodingRefused: result.encodingRefused };
+  });
 }

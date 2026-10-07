@@ -122,6 +122,11 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
                   {t("outsideUnavailable")}
                 </Text>
               )}
+              {check && check !== "pending" && check.state === "offline" && (
+                <Text type="body" size="sm" color="secondary">
+                  {t("outsideOffline")}
+                </Text>
+              )}
               {check && check !== "pending" && check.state === "done" && (
                 <VStack gap={1}>
                   {check.problems.length === 0 ? (

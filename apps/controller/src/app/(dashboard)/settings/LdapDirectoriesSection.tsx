@@ -32,6 +32,7 @@ import {
   type LdapGroupSource,
 } from "@/src/lib/ldap/defaults";
 import type { LdapDirectoryInput, LdapDirectoryView } from "@/src/lib/models/ldap-directories";
+import { unwrap } from "@/src/lib/errors/action-result";
 import {
   type GroupMappingForm,
   GroupMappingFields,
@@ -206,9 +207,11 @@ export default function LdapDirectoriesSection({
     setSaving(true);
     setError(null);
     try {
-      const saved = editing
-        ? await updateLdapDirectoryAction(editing.id, toInput(form, made))
-        : await createLdapDirectoryAction(toInput(form, made));
+      const saved = unwrap(
+        editing
+          ? await updateLdapDirectoryAction(editing.id, toInput(form, made))
+          : await createLdapDirectoryAction(toInput(form, made)),
+      );
       setDirectories((prev) =>
         editing ? prev.map((d) => (d.id === saved.id ? saved : d)) : [...prev, saved],
       );
@@ -225,10 +228,12 @@ export default function LdapDirectoriesSection({
     setTestResult(null);
     try {
       setTestResult(
-        await testLdapDirectoryAction(
-          toInput(form, made),
-          editing?.id ?? null,
-          probe.username.trim() ? probe : null,
+        unwrap(
+          await testLdapDirectoryAction(
+            toInput(form, made),
+            editing?.id ?? null,
+            probe.username.trim() ? probe : null,
+          ),
         ),
       );
     } catch (err) {
@@ -245,7 +250,7 @@ export default function LdapDirectoriesSection({
 
   async function handleToggle(directory: LdapDirectoryView) {
     try {
-      const updated = await setLdapDirectoryEnabledAction(directory.id, !directory.enabled);
+      const updated = unwrap(await setLdapDirectoryEnabledAction(directory.id, !directory.enabled));
       setDirectories((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
     } catch (err) {
       console.error("Failed to toggle the directory:", err);
@@ -254,7 +259,7 @@ export default function LdapDirectoriesSection({
 
   async function handleDelete(directory: LdapDirectoryView) {
     try {
-      await deleteLdapDirectoryAction(directory.id);
+      unwrap(await deleteLdapDirectoryAction(directory.id));
       setDirectories((prev) => prev.filter((d) => d.id !== directory.id));
       setDeleteConfirm(null);
     } catch (err) {

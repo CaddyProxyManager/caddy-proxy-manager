@@ -36,6 +36,7 @@ import type { BackupDestinationView } from "@/src/lib/backup/destinations";
 import type { ScheduleListItem } from "@/src/lib/backup/manage";
 import type { BackupRun } from "@/src/lib/backup/runs";
 import { formatBytes } from "../../analytics/explore/format";
+import { type ActionResult, unwrap } from "@/src/lib/errors/action-result";
 import {
   type BackupOverview,
   deleteDestinationAction,
@@ -130,7 +131,7 @@ function DestinationDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveDestinationAction(editing?.id ?? null, form);
+      unwrap(await saveDestinationAction(editing?.id ?? null, form));
       onSaved();
       onClose();
     } catch (err) {
@@ -145,7 +146,9 @@ function DestinationDialog({
     setTested(null);
     try {
       const result = await testDestinationAction(editing?.id ?? null, form);
-      setTested(result.ok ? { ok: true, message: t("testPassed") } : result);
+      setTested(
+        result.ok ? { ok: true, message: t("testPassed") } : { ok: false, message: result.error },
+      );
     } catch (err) {
       setTested({ ok: false, message: message(err, t("testFailed")) });
     } finally {
@@ -302,7 +305,7 @@ function DestinationsCard({
   async function remove(destination: BackupDestinationView) {
     setError(null);
     try {
-      await deleteDestinationAction(destination.id);
+      unwrap(await deleteDestinationAction(destination.id));
       onChanged();
     } catch (err) {
       setError(message(err, t("deleteFailed")));
@@ -565,7 +568,7 @@ function ScheduleDialog({
     let current = true;
     const timer = setTimeout(() => {
       previewTimingAction(cron, form.timeZone).then(
-        (result) => current && setTiming(result),
+        (result) => current && setTiming(result.ok ? result.data : null),
         () => current && setTiming(null),
       );
     }, 300);
@@ -585,7 +588,7 @@ function ScheduleDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveScheduleAction(editing?.id ?? null, {
+      const result = await saveScheduleAction(editing?.id ?? null, {
         name: form.name,
         destinationId: Number(form.destinationId),
         cron,
@@ -598,6 +601,7 @@ function ScheduleDialog({
         passphrase: form.passphrase,
         enabled: form.enabled,
       });
+      unwrap(result);
       setForm((prev) => ({ ...prev, passphrase: "", confirmation: "" }));
       onSaved();
       onClose();
@@ -840,10 +844,10 @@ function SchedulesCard({
   const [running, setRunning] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function act(work: () => Promise<unknown>, fallback: string) {
+  async function act(work: () => Promise<ActionResult<unknown>>, fallback: string) {
     setError(null);
     try {
-      await work();
+      unwrap(await work());
     } catch (err) {
       setError(message(err, fallback));
     } finally {
@@ -854,8 +858,11 @@ function SchedulesCard({
   async function runNow(schedule: ScheduleListItem) {
     setRunning(schedule.id);
     await act(async () => {
-      const run = await runScheduleNowAction(schedule.id);
-      if (run?.status === "failed") throw new Error(run.error ?? t("runFailed"));
+      const result = await runScheduleNowAction(schedule.id);
+      if (result.ok && result.data?.status === "failed") {
+        return { ok: false, error: result.data.error ?? t("runFailed") };
+      }
+      return result;
     }, t("runFailed"));
     setRunning(null);
   }
@@ -1114,9 +1121,11 @@ function SchedulesCard({
 export function ScheduledBackups({ initial }: { initial: BackupOverview }) {
   const [overview, setOverview] = useState(initial);
   const reload = useCallback(() => {
-    loadBackupOverviewAction().then(setOverview, (error: unknown) => {
-      console.error("Failed to reload the backup schedules:", error);
-    });
+    loadBackupOverviewAction()
+      .then(unwrap)
+      .then(setOverview, (error: unknown) => {
+        console.error("Failed to reload the backup schedules:", error);
+      });
   }, []);
   return (
     <>

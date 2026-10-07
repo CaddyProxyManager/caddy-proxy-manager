@@ -133,7 +133,7 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
   function reread() {
     startTransition(async () => {
       const result = await rereadCertificateFileAction(cert.id);
-      if (result.success) toast.success(t("rereadDone"));
+      if (result.ok) toast.success(t("rereadDone"));
       else toast.error(result.error);
     });
   }
@@ -141,13 +141,9 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
   function handleDelete() {
     setError(null);
     startTransition(async () => {
-      try {
-        const result = await deleteCertificateAction(cert.id);
-        if (result.success) setDeleteOpen(false);
-        else setError(result.error ?? t("deleteFailed"));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t("deleteFailed"));
-      }
+      const result = await deleteCertificateAction(cert.id);
+      if (result.ok) setDeleteOpen(false);
+      else setError(result.error);
     });
   }
 
@@ -254,11 +250,11 @@ export function ImportedTab({
     setUnusedError(null);
     startDeletingUnused(async () => {
       const result = await deleteUnusedCertificatesAction(unused.map((c) => c.id));
-      if (!result.success) {
-        setUnusedError(result.error ?? t("deleteFailed"));
+      if (!result.ok) {
+        setUnusedError(result.error);
         return;
       }
-      toast.success(result.message);
+      toast.success(result.data);
       setUnusedOpen(false);
     });
   }
@@ -428,7 +424,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
           onClick={() =>
             startTransition(async () => {
               const result = await deleteCertificateAction(c.id);
-              if (!result.success) toast.error(result.error ?? t("deleteFailed"));
+              if (!result.ok) toast.error(result.error);
             })
           }
         />

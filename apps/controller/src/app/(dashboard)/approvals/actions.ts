@@ -12,42 +12,49 @@ import {
 import { orSubmitted } from "@/src/lib/approvals/action-result";
 import { type ApprovalPolicy, readApprovalPolicy } from "@/src/lib/approvals/policy";
 import type { ChangeStatus } from "@/src/lib/approvals/types";
-import { withTranslatedErrors } from "@/src/lib/errors/translated-action";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import { currentAccess, requireCanAccess } from "@/src/lib/users/permissions";
 
 const PAGE = "/approvals";
 
 /** Any account: the policy, not a capability, names who approves, and the model checks it. */
-export async function approveChangeAction(id: number, note: string): Promise<ChangeStatus> {
-  const { access } = await currentAccess();
-  return withTranslatedErrors(async () => {
+export async function approveChangeAction(
+  id: number,
+  note: string,
+): Promise<ActionResult<ChangeStatus>> {
+  return runAction(async () => {
+    const { access } = await currentAccess();
     const result = await approveChange(id, access, note);
     revalidatePath("/", "layout");
     return result.status;
   });
 }
 
-export async function rejectChangeAction(id: number, note: string): Promise<void> {
-  const { access } = await currentAccess();
-  await withTranslatedErrors(async () => {
+export async function rejectChangeAction(id: number, note: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const { access } = await currentAccess();
     await rejectChange(id, access, note);
     revalidatePath(PAGE);
   });
 }
 
 /** The requester's own request only; the model checks it. */
-export async function withdrawChangeAction(id: number): Promise<void> {
-  const { access } = await currentAccess();
-  await withTranslatedErrors(async () => {
+export async function withdrawChangeAction(id: number): Promise<ActionResult> {
+  return runAction(async () => {
+    const { access } = await currentAccess();
     await withdrawChange(id, access);
     revalidatePath(PAGE);
   });
 }
 
 /** Administrators only; the model checks it. */
-export async function bypassChangeAction(id: number, reason: string): Promise<ChangeStatus> {
-  const { access } = await currentAccess();
-  return withTranslatedErrors(async () => {
+export async function bypassChangeAction(
+  id: number,
+  reason: string,
+): Promise<ActionResult<ChangeStatus>> {
+  return runAction(async () => {
+    const { access } = await currentAccess();
     const status = await bypassChange(id, access, reason);
     revalidatePath("/", "layout");
     return status;
@@ -55,9 +62,11 @@ export async function bypassChangeAction(id: number, reason: string): Promise<Ch
 }
 
 /** The policy is a settings change: it waits for approval itself while settings are covered. */
-export async function saveApprovalPolicyAction(input: ApprovalPolicy): Promise<string> {
-  const { access } = await requireCanAccess("settings:write");
-  return withTranslatedErrors(async () => {
+export async function saveApprovalPolicyAction(
+  input: ApprovalPolicy,
+): Promise<ActionResult<string>> {
+  return runAction(async () => {
+    const { access } = await requireCanAccess("settings:write");
     const outcome = await orSubmitted(() =>
       submitOrApply(
         { userId: access.userId },

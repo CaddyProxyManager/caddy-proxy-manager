@@ -33,6 +33,7 @@ import {
   rotateScimTokenAction,
   saveScimConnectionAction,
 } from "./actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 
 export type MappableRole = { key: string; name: string | null; builtIn: boolean };
 
@@ -80,7 +81,7 @@ export default function ScimConnectionsClient({
   async function rotate(connection: ScimConnection) {
     setError(null);
     try {
-      setToken(await rotateScimTokenAction(connection.id));
+      setToken(unwrap(await rotateScimTokenAction(connection.id)));
     } catch (err) {
       setError(message(err, t("actionFailed")));
     } finally {
@@ -91,7 +92,7 @@ export default function ScimConnectionsClient({
   async function remove(connection: ScimConnection) {
     setError(null);
     try {
-      await deleteScimConnectionAction(connection.id);
+      unwrap(await deleteScimConnectionAction(connection.id));
     } catch (err) {
       setError(message(err, t("actionFailed")));
     } finally {
@@ -239,7 +240,11 @@ export default function ScimConnectionsClient({
             </Text>
           </VStack>
           {connections.length === 0 ? (
-            <EmptyState title={t("emptyTitle")} description={t("emptyDescription")} />
+            <EmptyState
+              headingLevel={2}
+              title={t("emptyTitle")}
+              description={t("emptyDescription")}
+            />
           ) : (
             <Card padding={0}>
               <Table
@@ -340,12 +345,14 @@ function ConnectionDialog({
             .filter(Boolean),
         ]),
       );
-      const result = await saveScimConnectionAction(connection?.id ?? null, {
-        name,
-        enabled,
-        linkExisting,
-        roleGroups,
-      });
+      const result = unwrap(
+        await saveScimConnectionAction(connection?.id ?? null, {
+          name,
+          enabled,
+          linkExisting,
+          roleGroups,
+        }),
+      );
       onSaved(result.token);
       onClose();
     } catch (err) {

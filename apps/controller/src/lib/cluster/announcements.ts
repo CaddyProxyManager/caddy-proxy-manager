@@ -77,11 +77,12 @@ export async function listenForAnnouncements(pg: SQL): Promise<void> {
   const rows = await db.select().from(clusterGenerations);
   for (const row of rows) cluster.generations.set(row.name, row.generation);
   // Bun re-listens on its own after the connection drops, and calls back each time it has.
-  await pg.listen(CHANNEL, receive, () => {
+  const subscription = await pg.listen(CHANNEL, receive, () => {
     void catchUpOnAnnouncements().catch((error: unknown) => {
       console.error("[cluster] could not catch up on announcements:", error);
     });
   });
+  cluster.subscriptions.push(subscription);
 }
 
 export async function catchUpOnAnnouncements(): Promise<void> {

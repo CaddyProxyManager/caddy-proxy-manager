@@ -9,7 +9,7 @@ import {
 import { accessLogPresent } from "./analytics/log-parser";
 import { analyticsEnabled } from "./analytics/relay";
 import { checkLogAccess } from "./analytics/log-access";
-import type { AgentConfig } from "./config";
+import { type AgentConfig, effectiveBuildMode } from "./config";
 import type { AgentStore } from "./db";
 import type { DockerHost } from "./docker";
 import pkg from "../package.json";
@@ -42,7 +42,7 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
     caddyBuild: {
       applied: store.appliedCaddyModules(),
       status: store.caddyBuildStatus(),
-      ...(config.caddyBuildMode === "external"
+      ...(effectiveBuildMode(config, store) === "external"
         ? {
             external: {
               image: store.caddyImage(),

@@ -43,6 +43,9 @@ export function redirect(href: string): never {
   throw new Error(`redirect(${href}) has no server to run on in the documentation site`);
 }
 
+/** As `redirect`: for `runAction` and the setup actions' catches, which the typecheck reads. */
+export function unstable_rethrow(_error: unknown): void {}
+
 export function useRouter() {
   // Inside the setup demo a push is a page of the simulation, not the docs' query string.
   const simulation = currentSimulation();

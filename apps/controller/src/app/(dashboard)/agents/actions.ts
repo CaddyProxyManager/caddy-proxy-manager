@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 /**
  * Only rebuild and rename per agent: pairing and disabling are fleet questions, so they stay on
  * Settings, which needs `agents:write` over every agent.
@@ -31,6 +32,7 @@ export async function rebuildAgentCaddyAction(
     const t = await getTranslations();
     return actionSuccess(agentStatusMessage(t, status) ?? t("settings.results.rebuildTriggered"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to trigger a Caddy rebuild for agent:", agentRowId, error);
     return actionError(t, error, t("errors.rebuildCaddyFailed"));
@@ -53,6 +55,7 @@ export async function renameAgentAction(
     revalidatePath("/agents");
     return actionSuccess(t("agents.renamed"));
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to rename agent:", agentRowId, error);
     return actionError(t, error, t("errors.renameAgentFailed"));

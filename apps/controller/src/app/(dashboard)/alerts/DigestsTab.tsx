@@ -26,6 +26,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { Timestamp } from "@/components/ui/Timestamp";
 import type { DigestRun, DigestView } from "@/src/lib/alerts/digests";
+import { type ActionResult, unwrap } from "@/src/lib/errors/action-result";
 import {
   type AlertsOverview,
   deleteDigestAction,
@@ -147,10 +148,12 @@ function DigestDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveDigestAction(editing?.id ?? null, {
-        ...form,
-        channelIds: form.channelIds.map(Number),
-      });
+      unwrap(
+        await saveDigestAction(editing?.id ?? null, {
+          ...form,
+          channelIds: form.channelIds.map(Number),
+        }),
+      );
       onSaved();
       onClose();
     } catch (err) {
@@ -227,7 +230,11 @@ function PreviewDialog({ digest, onClose }: { digest: DigestView; onClose: () =>
   useEffect(() => {
     let current = true;
     previewDigestAction(digest.id).then(
-      (result) => current && setPreview(result),
+      (result) => {
+        if (!current) return;
+        if (result.ok) setPreview(result.data);
+        else setError(result.error);
+      },
       (err: unknown) => current && setError(message(err, t("previewFailed"))),
     );
     return () => {
@@ -290,10 +297,10 @@ export function DigestsTab({
     .map((channel) => ({ value: String(channel.id), label: channelName(channel) }));
   const channelsById = new Map(overview.channels.map((channel) => [channel.id, channel]));
 
-  async function act(work: () => Promise<unknown>, fallback: string) {
+  async function act(work: () => Promise<ActionResult<unknown>>, fallback: string) {
     setError(null);
     try {
-      await work();
+      unwrap(await work());
     } catch (err) {
       setError(message(err, fallback));
     } finally {
@@ -305,8 +312,9 @@ export function DigestsTab({
     setSending(digest.id);
     setSent(null);
     await act(async () => {
-      const run = await sendDigestNowAction(digest.id);
-      if (run) setSent({ name: digest.name, run });
+      const result = await sendDigestNowAction(digest.id);
+      if (result.ok && result.data) setSent({ name: digest.name, run: result.data });
+      return result;
     }, t("sendFailed"));
     setSending(null);
   }

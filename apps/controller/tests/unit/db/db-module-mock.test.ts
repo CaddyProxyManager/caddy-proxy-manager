@@ -9,10 +9,15 @@ import { Glob } from 'bun';
 import { eq } from 'drizzle-orm';
 import * as realDbModule from '../../../src/lib/db';
 import { users } from '../../../src/lib/db/schema';
-import { createTestDb } from '../../helpers/db';
+import { createTestDb, type TestDb } from '../../helpers/db';
 import { dbModuleMock } from '../../helpers/db-module';
 
 const NOW = new Date().toISOString();
+
+// One schema for the file, made at import so the per-test cleanup keeps it: each costs a full
+// migration, which is what made this file slow under a parallel run. Tests use their own emails.
+const shared = await createTestDb();
+const byEmail = (email: string) => shared.select().from(users).where(eq(users.email, email));
 
 describe('dbModuleMock', () => {
   it('provides every export of src/lib/db', () => {
@@ -38,31 +43,32 @@ describe('dbModuleMock', () => {
   });
 
   it('runs a transaction on the database it was given', async () => {
-    const db = await createTestDb();
-    const { runInTransaction } = dbModuleMock(() => db);
+    const { runInTransaction } = dbModuleMock(() => shared);
     await runInTransaction((tx) => [
       tx.insert(users).values({ email: 'a@example.com', createdAt: NOW, updatedAt: NOW }),
     ]);
-    expect(await db.select().from(users).where(eq(users.email, 'a@example.com'))).toHaveLength(1);
+    expect(await byEmail('a@example.com')).toHaveLength(1);
   });
 
   it('rolls the whole batch back when a statement fails', async () => {
-    const db = await createTestDb();
-    const { runInTransaction } = dbModuleMock(() => db);
+    const { runInTransaction } = dbModuleMock(() => shared);
     await expect(
       runInTransaction((tx) => [
         tx.insert(users).values({ email: 'b@example.com', createdAt: NOW, updatedAt: NOW }),
         tx.insert(users).values({ email: 'b@example.com', createdAt: NOW, updatedAt: NOW }),
       ]),
     ).rejects.toThrow();
-    expect(await db.select().from(users)).toHaveLength(0);
+    expect(await byEmail('b@example.com')).toHaveLength(0);
   });
 
   it('follows the database the getter returns now', async () => {
-    let db = await createTestDb();
+    // Never queried: reading it would throw rather than find the row.
+    let db = {} as TestDb;
     const mock = dbModuleMock(() => db);
-    db = await createTestDb();
+    db = shared;
     await db.insert(users).values({ email: 'c@example.com', createdAt: NOW, updatedAt: NOW });
-    expect(await mock.default.select().from(users)).toHaveLength(1);
+    expect(
+      await mock.default.select().from(users).where(eq(users.email, 'c@example.com')),
+    ).toHaveLength(1);
   });
 });

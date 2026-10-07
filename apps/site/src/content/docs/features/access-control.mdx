@@ -10,7 +10,7 @@ import Demo from "../../../components/Demo.astro";
 import PasswordFieldDemo from "../../../demos/samples/PasswordFieldDemo";
 import MtlsDemo from "../../../demos/samples/MtlsDemo";
 
-Two ways to put something in front of a host that does not involve a login page. For the login-page
+This page covers two ways to guard a host without a login page. For the login-page
 version, see [forward auth](../forward-auth/).
 
 <Demo title="Access lists" note="Pick a list to see its members and the hosts it protects - Board preview has none.">
@@ -29,22 +29,22 @@ is chosen.
 
 ### IP rules
 
-A list's **Network** tab holds allow and deny rules on the client - single IPs, CIDR ranges or
-hostnames, IPv4 or IPv6, and countries, continents or networks (below) - checked from the top, where the first rule that matches decides. **When no rule
-matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
+A list's **Network** tab holds allow and deny rules on the client: single IPs, CIDR ranges or
+hostnames, IPv4 or IPv6, and countries, continents or networks (below). Rules are checked from the
+top, and the first one that matches decides. **When no rule matches** sets what everyone else gets; it defaults to deny, so a list of allow rules is an allowlist.
 The address is the one Caddy resolves after [trusted proxies](../geo-blocking/#trusted-proxies), so
 a CDN or load balancer in front is seen through rather than allowed or denied as a whole.
 
 The same rules can guard an [L4 host](../l4-proxy/#ip-rules-from-an-access-list), where only they
-apply - a list's users, passwords and deny response have no meaning below HTTP. Country, continent
-and ASN rules apply there too, through the blocker module's layer 4 matcher. Either way the rules can only see
-the address that reaches Caddy: with Docker's userland proxy in the path, some setups show every
+apply, since a list's users, passwords and deny response mean nothing below HTTP. Country,
+continent and ASN rules apply there too, through the blocker module's layer 4 matcher. Either way
+the rules see only the address that reaches Caddy: with Docker's userland proxy in the path, some setups show every
 client as the bridge gateway, which the L4 page explains.
 
 #### Hostnames
 
-A rule can name a host instead of an address - a dynamic-DNS name for someone's home connection,
-say. Caddy's IP matchers only take ranges, so the controller does the lookup: it resolves A and
+A rule can name a host instead of an address, such as a dynamic-DNS name for someone's home
+connection. Caddy's IP matchers only take ranges, so the controller does the lookup: it resolves A and
 AAAA records, writes the answer into the config, and looks the name up again whenever the record's
 TTL runs out (clamped to between a minute and an hour), reloading Caddy only when the answer
 changed. A name is looked up as soon as it is saved, and the Network tab shows what each one
@@ -58,10 +58,10 @@ currently stands for, or why it stands for nothing.
   a name that has never resolved, the name stands for no addresses at all.
 - **No addresses fails closed for allow, and open for deny.** An allow rule with nothing behind it
   admits nobody; a deny rule with nothing behind it denies nobody, and the Network tab warns about
-  it. A list whose only rule is an unresolved allow shuts everyone out - on an L4 host too.
+  it. A list whose only rule is an unresolved allow shuts everyone out, on an L4 host too.
 - A name counts as one rule towards a list's limit of 500, and stands for at most 16 addresses.
   Lookups go to the servers under **Settings → DNS → DNS resolvers** when those are enabled, and
-  to the controller's own resolver otherwise - so a name that only resolves inside a network needs
+  to the controller's own resolver otherwise, so a name that only resolves inside a network needs
   a controller that can see that network's DNS.
 
 #### Countries, continents and networks
@@ -70,9 +70,9 @@ A rule can also match where the client is: a **country** (`DE`), a **continent**
 provider network by its **ASN** (`AS13335`), looked up in the GeoIP databases from
 [GeoIP settings](../geo-blocking/). They mix freely with address and hostname rules and keep the
 same order, so "deny `192.0.2.7`, allow `PT`, deny `EU`" lets Portugal in except that one address,
-and refuses the rest of Europe. They need the Geo Blocking module; without it they are skipped -
-an allow of this kind admits nobody, a deny denies nobody - and the Network tab and Needs attention
-both say so.
+and refuses the rest of Europe. They need the Geo Blocking module; without it they are skipped
+(an allow of this kind admits nobody, a deny denies nobody), and the Network tab and Needs
+attention both say so.
 
 A list with one of these rules is decided by the blocker module rather than Caddy's own IP
 matcher. It reads the client from `X-Forwarded-For` behind the same trusted proxies as geo
@@ -92,20 +92,20 @@ A list can hold IP rules alone, users alone, or both. With both, **Satisfy** dec
 combine:
 
 - **All** (the default): the address has to be allowed *and* the password right.
-- **Any**: an allowed address gets straight in, and everyone else - a denied address included - is
+- **Any**: an allowed address gets straight in, and everyone else, a denied address included, is
   asked for the password. The office network walks in; working from home means logging in.
 
 With **Any** and a country, continent or ASN rule, a visitor who sends credentials is checked on
-them alone, and everyone else on the rules - a refused visitor is asked for the password.
+them alone, and everyone else on the rules; a refused visitor is asked for the password.
 
 ### Deny response and failing closed
 
 By default a refused request gets `403 Access denied`. The Network tab's **Deny response** sets a
 status from 400 to 599 with a body of your own (sent as written, up to 8 KiB), or a `302` redirect
-to an absolute URL - a page explaining how to get access, say.
+to an absolute URL, such as a page explaining how to get access.
 
-**Fail closed** refuses a request whose client cannot be told apart from a trusted proxy - one that
-arrives through your load balancer without an `X-Forwarded-For`, for instance - before any rule or
+**Fail closed** refuses a request whose client cannot be told apart from a trusted proxy (one that
+arrives through your load balancer without an `X-Forwarded-For`, for instance) before any rule or
 password is checked. It needs the Geo Blocking module and trusted proxies to be set.
 
 ### What a list did
@@ -122,7 +122,7 @@ protected host.
 
 ### Deleting a list
 
-A list a host still uses cannot be deleted - whether the host itself, a location rule on it, an L4
+A list a host still uses cannot be deleted, whether the host itself, a location rule on it, an L4
 host or the dashboard host uses it. The page names the hosts, and the REST API answers 409. Choose
 another list on them first, so nothing that was protected quietly stops being so.
 
@@ -133,7 +133,8 @@ header before forwarding the request. Turn on **Pass auth to host** for an appli
 the username from it itself. Lists made before this setting existed have it on, which is how they
 always behaved.
 
-Access lists are simple, and fit the cases basic auth fits: an internal tool, a staging site, something you want off the open internet without standing up an identity provider.
+Access lists are simple, and fit the cases basic auth fits: an internal tool, a staging site,
+something you want off the open internet without standing up an identity provider.
 
 <Demo title="Adding an account to an access list" note="Generate, reveal and copy all work.">
   <PasswordFieldDemo client:visible />
@@ -142,7 +143,7 @@ Access lists are simple, and fit the cases basic auth fits: an internal tool, a 
 ## Mutual TLS
 
 mTLS asks the *client* for a certificate. A visitor without one does not get a connection at all,
-which is a stronger boundary than any password - there is nothing to phish and nothing to guess.
+which is a stronger boundary than any password: there is nothing to phish and nothing to guess.
 
 CPM includes a CA for this. Issue client certificates from the Certificates page, hand them to the
 people or machines that need them, and enable mTLS on the hosts they should reach. The CA's private

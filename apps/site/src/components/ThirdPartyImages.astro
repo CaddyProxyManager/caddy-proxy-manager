@@ -1,0 +1,47 @@
+---
+/** The third-party images this release pins, rendered at build time; see src/data. */
+// biome-ignore lint/correctness/noUnusedImports: used in the markup, which Biome does not read
+import { Code } from "@astrojs/starlight/components";
+import compose from "../../../../docker-compose.yml?raw";
+import { documentedThirdPartyImages } from "../data/third-party-images";
+
+const images = documentedThirdPartyImages(compose);
+const pulls = images.map((image) => `docker pull ${image.image}`).join("\n");
+---
+
+<table>
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Image</th>
+      <th>Runs</th>
+    </tr>
+  </thead>
+  <tbody>
+    {
+      images.map((image) => (
+        <tr>
+          <td>
+            <code>{image.service}</code>
+          </td>
+          <td>
+            <code>{image.name}</code>
+          </td>
+          <td>
+            {image.profile ? (
+              <>
+                with the <code>{image.profile}</code> profile
+              </>
+            ) : (
+              "always"
+            )}
+          </td>
+        </tr>
+      ))
+    }
+  </tbody>
+</table>
+
+<p>By digest, as this release's compose file and air-gap manifest name them:</p>
+
+<Code code={pulls} lang="bash" />

@@ -6,6 +6,7 @@
 
 import { findCrsPluginRejections } from "../caddy";
 import { DomainError, type DomainErrorDetail, domainError } from "../../errors/domain-error";
+import { outboundAllowed } from "../../offline";
 
 /** The OWASP registry; an operator may point at a registry of their own instead. */
 export const OFFICIAL_CRS_REGISTRY_URL =
@@ -124,6 +125,9 @@ export function withGitHubToken(fetcher: Fetcher, token: string | null): Fetcher
 }
 
 async function get(fetcher: Fetcher, url: string, accept?: string): Promise<Response> {
+  if (!(await outboundAllowed("crsRegistry"))) {
+    throw domainError("outboundOffline", {}, { status: 400 });
+  }
   try {
     return await fetcher(url, {
       headers: {

@@ -112,21 +112,21 @@ administrator or after failed sign-ins, and nothing more while it stays disabled
 | Audit streaming failing | An audit sink that keeps failing or falls behind | It catches up |
 | Access reviews | An [access review](../access-reviews/#reminders) nearing or past its due date with items undecided, or closed with revocations waiting for confirmation | - |
 | Change approval bypassed | An administrator [applying a change request](../change-approvals/#emergency-bypass) without its approvals | - |
-| Alert channel failing | An [alert channel](../alerts/#batching-retries-and-failing-channels) failing three sends in a row, told on the others | It works again |
+| Alert channel failing | An [alert channel](../alerts/#batching-retries-and-failing-channels) failing three sends in a row, reported through the others | It works again |
 
-Each of these is a built-in [alert rule](../alerts/): on the Alerts page it can also go to Discord,
-Slack, Teams, ntfy or a webhook, get a quiet period or be silenced for a while.
+Each of these is a built-in [alert rule](../alerts/). On the Alerts page you can also send it to
+Discord, Slack, Teams, ntfy or a webhook, give it a quiet period, or silence it for a while.
 
 - **One email and one browser notification a minute at most.** Whatever happens within a minute
-  goes out together. A problem is told once however long it lasts, and its recovery once; one that
-  is over before it goes out costs nothing at all.
+  goes out together. A problem is reported once however long it lasts, and its recovery once; one
+  that ends before the batch goes out sends nothing.
 - **A failed email is retried** every five minutes for a day, to whoever did not get it; a browser
   notification is sent once. The block shows when a notification was last sent, how many are
   waiting, and the last error. **Send a test notification** emails everyone notifications are
   emailed to, straight away; **Test** under Profile pushes to that browser alone.
 - **Nothing is queued while there is nowhere to send it** - no email and no browser turned on - so
   setting one up later does not bring a backlog.
-- **Times are in UTC**, and say so: an email has no reader whose time zone could be asked.
+- **Times are in UTC**, and say so: an email has no browser to ask for the reader's time zone.
 
 ### Agents going offline
 

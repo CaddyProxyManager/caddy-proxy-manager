@@ -361,6 +361,7 @@ export async function probeCrowdSecLapi(
 
   let response: Response;
   try {
+    // outbound: crowdsecLapi
     response = await fetchImpl(`${parsed.url}/v1/decisions?ip=127.0.0.1`, {
       method: "GET",
       headers: { "X-Api-Key": apiKey, Accept: "application/json" },

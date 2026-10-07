@@ -3,7 +3,7 @@
  * an identity provider provisions an account and a mapped group with it, and deactivating the
  * account through SCIM disables it. The e2e stack runs on PostgreSQL, which SCIM needs.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type PlaywrightWorkerArgs } from '@playwright/test';
 import { runSeedScript } from '../../helpers/seed';
 import { waitForHydration } from '../../helpers/hydration';
 
@@ -12,6 +12,14 @@ const EMAIL = 'scim.e2e@example.com';
 const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
+
+/** Without the admin's cookie: Better Auth refuses a cookie-bearing POST that has no Origin. */
+function idpRequest(playwright: PlaywrightWorkerArgs['playwright']) {
+  return playwright.request.newContext({
+    baseURL: 'http://localhost:3000',
+    storageState: { cookies: [], origins: [] },
+  });
+}
 
 function cleanUp(): void {
   runSeedScript(`
@@ -44,7 +52,7 @@ test.describe('SCIM provisioning', () => {
     await expect(page.getByText('Copy this token now.', { exact: false })).toBeVisible();
     token = (await page.locator('code', { hasText: 'cpm_scim_' }).first().innerText()).trim();
     expect(token.startsWith('cpm_scim_')).toBe(true);
-    await expect(page.getByRole('cell', { name: new RegExp(CONNECTION) })).toBeVisible();
+    await expect(page.getByRole('cell', { name: new RegExp(`^${CONNECTION}`) })).toBeVisible();
 
     await page.getByRole('button', { name: 'Done' }).click();
     await page.reload();
@@ -53,8 +61,9 @@ test.describe('SCIM provisioning', () => {
   });
 
   test('the identity provider provisions, groups and deactivates an account', async ({
-    request,
+    playwright,
   }) => {
+    const request = await idpRequest(playwright);
     const headers = {
       authorization: `Bearer ${token}`,
       'content-type': 'application/scim+json',
@@ -101,7 +110,8 @@ test.describe('SCIM provisioning', () => {
     await expect(page.getByText(EMAIL).first()).toBeVisible();
   });
 
-  test('rotating the token turns the old one away', async ({ page, request }) => {
+  test('rotating the token turns the old one away', async ({ page, playwright }) => {
+    const request = await idpRequest(playwright);
     await page.goto('/users/provisioning');
     await waitForHydration(page);
     await page.getByRole('button', { name: `Actions for ${CONNECTION}` }).click();

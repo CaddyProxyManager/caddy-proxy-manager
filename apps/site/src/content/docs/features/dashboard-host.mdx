@@ -6,9 +6,9 @@ description: CPM reverse-proxying its own dashboard, on a domain of its own.
 import Demo from "../../../components/Demo.astro";
 import DashboardHostDemo from "../../../demos/samples/DashboardHostDemo";
 
-The quickest way to see what this product does is to watch it proxy something, and the one upstream
-every deployment already has is the dashboard you are reading it in. Setup offers to switch this
-on, with the domain filled in.
+The dashboard host is CPM proxying its own dashboard. Every deployment already has that upstream, so
+it is the quickest way to watch the proxy work. Setup offers to switch it on, with the domain
+filled in.
 
 ## How it differs from an ordinary host
 
@@ -66,10 +66,10 @@ a stored host:
 | Discourage search engines | Always off |
 | Compression override | Follows the global switch in **Settings → Network → Compression** |
 
-## HTTPS is checked, not assumed
+## HTTPS waits for a check
 
-It comes up on HTTP. Forcing HTTPS before the domain reaches you would mean a fresh install's first
-act is a certificate order failing on a name nobody has pointed at it yet.
+The dashboard host comes up on HTTP. Forcing HTTPS before the domain reaches you would make a fresh
+install's first act a certificate order that fails, on a name nobody has pointed at it yet.
 
 **Settings → Dashboard host** offers a reachability check: it sends a request to the domain and
 looks for a signature only this instance can produce. Any server can return 200 and echo a nonce
@@ -81,8 +81,8 @@ back; only yours can sign it.
 | The domain resolves but arrives elsewhere | HTTPS off, with the address it currently points at |
 | Nothing answers for the name | HTTPS off - create the record and check again |
 
-Nothing is asked of a third party. The trade-off is that the request is made from the deployment
-itself, so it cannot see through split-horizon DNS (passes, and ACME still fails) or a network
+No third party is involved. The trade-off is that the deployment makes the request itself, so it
+cannot see through split-horizon DNS (passes, and ACME still fails) or a network
 without NAT hairpinning (fails, though the outside world reaches you fine). The toggle is a default
 you can override in both.
 

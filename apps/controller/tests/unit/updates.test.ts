@@ -28,7 +28,11 @@ vi.mock('@/src/lib/settings', () => ({
 vi.mock('@/src/lib/settings/resolve', () => ({
   // By `name`, not `key`: the key carries a namespace prefix the registry owns.
   getSetting: async (definition: { name: string }) =>
-    definition.name === 'update_check_enabled' ? store.enabled : store.repository,
+    definition.name === 'offline_mode'
+      ? false
+      : definition.name === 'update_check_enabled'
+        ? store.enabled
+        : store.repository,
 }));
 
 const {
@@ -241,7 +245,7 @@ describe('following registry pagination', () => {
     // fetch of whatever the registry named, carrying the caller's bearer token.
     expect(() =>
       nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
-    ).toThrow(/will not follow/);
+    ).toThrow(/does not follow it/);
   });
 
   it('names both origins, since the message is what the operator is shown', () => {
@@ -253,13 +257,13 @@ describe('following registry pagination', () => {
   it('refuses a link that downgrades to http on the same host', () => {
     expect(() =>
       nextPageUrl('<http://ghcr.io/v2/owner/name/tags/list>; rel="next"', 'ghcr.io'),
-    ).toThrow(/will not follow/);
+    ).toThrow(/does not follow it/);
   });
 
   it('refuses a link to a different port on the same host', () => {
     expect(() =>
       nextPageUrl('<https://registry.test:8443/v2/x/tags/list>; rel="next"', 'registry.test'),
-    ).toThrow(/will not follow/);
+    ).toThrow(/does not follow it/);
   });
 
   it('keeps the port when the registry itself has one', () => {
@@ -289,23 +293,23 @@ describe('following the registry auth challenge', () => {
 
   it('refuses a realm on another host rather than fetching it', () => {
     expect(() => tokenRealmUrl('https://169.254.169.254/latest/meta-data', 'ghcr.io')).toThrow(
-      /will not follow/,
+      /does not follow it/,
     );
   });
 
   it('does not lend one registry the token service of another', () => {
     expect(() => tokenRealmUrl('https://auth.docker.io/token', 'ghcr.io')).toThrow(
-      /will not follow/,
+      /does not follow it/,
     );
   });
 
   it('refuses a realm that downgrades to http on the same host', () => {
-    expect(() => tokenRealmUrl('http://ghcr.io/token', 'ghcr.io')).toThrow(/will not follow/);
+    expect(() => tokenRealmUrl('http://ghcr.io/token', 'ghcr.io')).toThrow(/does not follow it/);
   });
 
   it('refuses a known token service on another port', () => {
     expect(() => tokenRealmUrl('https://auth.docker.io:8443/token', 'docker.io')).toThrow(
-      /will not follow/,
+      /does not follow it/,
     );
   });
 

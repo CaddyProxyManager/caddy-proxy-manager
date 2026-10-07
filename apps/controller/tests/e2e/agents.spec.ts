@@ -5,9 +5,16 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { COMPOSE_CWD } from '../helpers/compose';
 import { waitForHydration } from '../helpers/hydration';
 
 const REMOTE = 'caddy-proxy-manager-agent-remote';
+const SEED_IMAGE = readFileSync(
+  resolve(COMPOSE_CWD, 'apps/controller/tests/docker-compose.test.yml'),
+  'utf8',
+).match(/db-seed:\s*\n\s*image:\s*(\S+)/)![1];
 
 function pairRemote(code: string, extra: string[] = ['--yes']): { ok: boolean; output: string } {
   try {
@@ -37,16 +44,24 @@ function pairRemote(code: string, extra: string[] = ['--yes']): { ok: boolean; o
 
 /** The agent's own view, from its local socket. */
 function remoteState(): { lifecycle: string; message: string | null } | null {
+  // The agent image has no curl, so db-seed's Bun dials the socket through the agent's volume.
+  const uid = spawnSync('docker', ['exec', REMOTE, 'id', '-u'], { encoding: 'utf8' }).stdout.trim();
   const res = spawnSync(
     'docker',
     [
-      'exec',
+      'run',
+      '--rm',
+      '--network',
+      'none',
+      '--volumes-from',
       REMOTE,
-      'curl',
-      '-s',
-      '--unix-socket',
-      '/data/agent.sock',
-      'http://agent.local/local/state',
+      '--user',
+      uid,
+      '--entrypoint',
+      'bun',
+      SEED_IMAGE,
+      '-e',
+      `process.stdout.write(await (await fetch("http://agent.local/local/state", { unix: "/data/agent.sock" })).text())`,
     ],
     { encoding: 'utf8' },
   );

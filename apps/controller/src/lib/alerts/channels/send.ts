@@ -45,6 +45,7 @@ export async function postJson(
   for (let attempt = 0; ; attempt++) {
     let response: Response;
     try {
+      // outbound: alerts
       response = await outboundFetch(url, {
         method: "POST",
         headers: { "content-type": "application/json", ...headers },

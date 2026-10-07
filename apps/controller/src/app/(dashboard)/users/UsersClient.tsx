@@ -61,6 +61,7 @@ import {
   sendEmailedLinkAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 import type { AccountSource } from "@/src/lib/users/account-source";
 import type { MfaPolicyMode } from "@/src/lib/auth/two-factor/mfa-policy";
 import { isSignInMethod } from "@/src/lib/auth/sign-in-methods";
@@ -851,10 +852,14 @@ function GroupsCard({
                     aria-label={t("removeFromGroupNamed", { group: group.name })}
                     onClick={async () => {
                       try {
-                        await removeGroupMemberAction(group.id, user.id);
+                        unwrap(await removeGroupMemberAction(group.id, user.id));
                         onDone(null);
-                      } catch {
-                        onDone(t("groupChangeFailed"));
+                      } catch (err) {
+                        onDone(
+                          err instanceof Error && err.message
+                            ? err.message
+                            : t("groupChangeFailed"),
+                        );
                       }
                     }}
                   />
@@ -880,11 +885,13 @@ function GroupsCard({
               isDisabled={adding === ""}
               onClick={async () => {
                 try {
-                  await addGroupMemberAction(Number(adding), user.id);
+                  unwrap(await addGroupMemberAction(Number(adding), user.id));
                   setAdding("");
                   onDone(null);
-                } catch {
-                  onDone(t("groupChangeFailed"));
+                } catch (err) {
+                  onDone(
+                    err instanceof Error && err.message ? err.message : t("groupChangeFailed"),
+                  );
                 }
               }}
             />

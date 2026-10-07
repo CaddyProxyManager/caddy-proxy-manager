@@ -14,8 +14,8 @@ and some things need the Caddy *container* recreated rather than its configurati
 Two things are fixed when a container is created and cannot be changed by reloading config:
 
 - **Published ports**, which [L4 hosts](../l4-proxy/) need.
-- **Compiled-in plugins**, which [Caddy build](../caddy-build/) changes - by building the image,
-  or with `CADDY_BUILD_MODE=external` only loading one you built.
+- **Compiled-in plugins**, which [Caddy build](../caddy-build/) changes, either by building the
+  image or, with `CADDY_BUILD_MODE=external`, by loading one you built.
 
 The agent also starts and stops the optional ClickHouse container for [analytics](../analytics/)
 and, in [managed mode](../crowdsec/#managed), the CrowdSec one, so each becomes a toggle in Settings
@@ -33,7 +33,7 @@ It is also how the controller sees what only the Caddy host has:
 - `caddy validate` against the real binary, in a throwaway container with no network, which checks
   a WAF save or a [global Caddyfile](../caddy-build/#global-caddyfile) without loading anything.
 
-An agent tells the controller which of these it supports, and an older one is simply not asked.
+An agent tells the controller which of these it supports, and an older one is not asked.
 Update it to get them.
 
 ## The agent dials out
@@ -43,7 +43,7 @@ and the controller pushes work down it. A Caddy host can therefore sit behind NA
 port and no port forwarding.
 
 If the controller is unreachable, the agent retries with backoff and keeps Caddy serving whatever it
-already had. Only a 401 - the controller having forgotten this agent - ends the loop.
+already had. Only a 401, meaning the controller has forgotten this agent, ends the loop.
 
 ## Same host
 
@@ -62,14 +62,14 @@ the command that fixes it.
 ## A different host
 
 An agent elsewhere cannot read that volume, so it pairs with a code you carry. Generate one under
-**Settings → Agent** - six letters, valid five minutes, single use, at most five wrong guesses a
-minute per address - then run on the agent's host:
+**Settings → Agent** (six letters, valid five minutes, single use, at most five wrong guesses a
+minute per address), then run on the agent's host:
 
 ```bash
 docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
 ```
 
-The agent first asks the controller its name - without spending the code - and waits for you to
+The agent first asks the controller its name, without spending the code, and waits for you to
 confirm it:
 
 ```text
@@ -78,26 +78,26 @@ This agent is about to pair with "Caddy Proxy Manager" (controller 3f9a1c2e)
 Confirm pairing? [y/N]
 ```
 
-The name is the controller's Application name - the one its sidebar shows. Answering no changes
+The name is the controller's Application name, the one its sidebar shows. Answering no changes
 nothing and the code stays valid. The prompt needs a terminal, which is what `-it` is for; a script
 can pass `--yes` instead.
 
 A bare host means `https://`. Plain `http://` works towards a private address with a warning and is
 refused towards a public one unless `CONTROLLER_ALLOW_INSECURE_HTTP=true`, because the secret
-travels over this link. The two exchange a secret - encrypted at rest on the controller, kept in the agent's own state
-volume - and the code is never used again. An agent that is already paired re-pairs only with a code from **Re-pair** on its
-row. `CONTROLLER_URL` and `PAIRING_CODE` do the same without a terminal, on an agent that is not
-yet paired; a stored pairing wins over them.
+travels over this link. The two exchange a secret (encrypted at rest on the controller, kept in the
+agent's own state volume) and the code is never used again. An agent that is already paired
+re-pairs only with a code from **Re-pair** on its row. `CONTROLLER_URL` and `PAIRING_CODE` do the
+same without a terminal, on an agent that is not yet paired; a stored pairing wins over them.
 
 ## Fleets
 
 Any number of Caddy hosts can serve one configuration. Every apply goes to all of them, and if
-any host refuses the config or cannot be reached the apply fails and names it - the change is not
+any host refuses the config or cannot be reached, the apply fails and names it. The change is not
 recorded as applied until every host has it, so the disagreement is visible rather than silent.
 
-A configuration a host's Caddy refuses stays on that agent's card on the **Agents** page - when it
-happened and Caddy's reason, with the whole message a click away when it is long - until a later
-apply to that agent loads. Caddy keeps serving the last configuration it accepted meanwhile. The
+A configuration a host's Caddy refuses stays on that agent's card on the **Agents** page until a
+later apply to that agent loads. The card shows when it happened and Caddy's reason, with the whole
+message a click away when it is long. Caddy keeps serving the last configuration it accepted meanwhile. The
 same refusal is listed in Needs attention, which links straight to the card, and the GraphQL `Agent`
 type answers it as `lastApplyFailure`. An operator sees it on the agents their groups were granted.
 
@@ -110,14 +110,15 @@ Hosts can also be pinned to specific agents, so one machine serves a subset rath
 ## Unpairing
 
 Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
-stops Caddy** - so unpairing takes that host out of service. Pair it again with a fresh code to
+stops Caddy**, so unpairing takes that host out of service. Pair it again with a fresh code to
 bring it back. A stream that goes silent for three keepalives (60 seconds) is reconnected, so an
 agent whose stream stayed open after the controller closed it still notices within a minute.
 
 ## Stopping the agent
 
-The agent owns Caddy on its host, so **stopping the agent stops Caddy** first - `docker compose
-stop agent`, a host shutdown, anything that sends it `SIGTERM`. It gives Caddy 40 seconds, inside
+The agent owns Caddy on its host, so **stopping the agent stops Caddy** first, whether through
+`docker compose stop agent`, a host shutdown or anything else that sends it `SIGTERM`. It gives
+Caddy 40 seconds, inside
 the minute the bundled compose file allows the agent to exit. When the agent starts again with a
 pairing it starts Caddy straight away, without waiting for the controller, so a host that reboots
 while its controller is unreachable still serves; the controller's own setting still wins once it

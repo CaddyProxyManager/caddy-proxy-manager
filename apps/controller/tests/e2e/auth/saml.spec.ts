@@ -71,7 +71,7 @@ test.describe('SAML single sign-on (Keycloak)', () => {
   test('the sign-in overview lists it as SAML', async ({ page }) => {
     await page.goto('/users/sign-in');
     await waitForHydration(page);
-    await expect(page.getByText(providerName)).toBeVisible();
+    await expect(page.getByRole('list').getByText(providerName)).toBeVisible();
     await expect(page.getByText('Single sign-on (SAML)').first()).toBeVisible();
   });
 

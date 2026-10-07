@@ -96,6 +96,7 @@ async function openClient(directory: LdapDirectory): Promise<Client> {
   const parsed = parseLdapUrl(directory.url);
   if (!parsed) throw domainError("ldapUrlInvalid");
   const tlsOptions = ldapTlsOptions(directory);
+  // outbound: ldap
   const client = new Client({
     url: parsed.url,
     connectTimeout: CONNECT_TIMEOUT_MS,

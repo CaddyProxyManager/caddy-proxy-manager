@@ -34,7 +34,8 @@ import {
   updateCaCertificateAction,
 } from '@/src/app/(dashboard)/certificates/ca-actions';
 import { logAuditEvent } from '@/src/lib/audit';
-import { DomainError, domainErrorMessage } from '@/src/lib/errors/domain-error';
+import { unwrap } from '@/src/lib/errors/action-result';
+import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import {
   getIssuedClientCertificate,
   listIssuedClientCertificates,
@@ -76,8 +77,10 @@ beforeAll(async () => {
     createdAt: NOW,
     updatedAt: NOW,
   });
-  const { id } = await generateCaCertificateAction(
-    form({ name: ' Internal CA ', common_name: 'Internal Root', validity_days: '99999' }),
+  const { id } = unwrap(
+    await generateCaCertificateAction(
+      form({ name: ' Internal CA ', common_name: 'Internal Root', validity_days: '99999' }),
+    ),
   );
   const row = await caRow(id);
   generated = { id, certificatePem: row.certificatePem, privateKeyPem: row.privateKeyPem };
@@ -113,17 +116,20 @@ describe('generateCaCertificateAction', () => {
 
   it('refuses a blank name before generating anything', async () => {
     const before = await ctx.db.select().from(caCertificates);
-    await expect(generateCaCertificateAction(form({ name: '  ' }))).rejects.toThrow(
-      domainErrorMessage('nameRequired'),
-    );
+    expect(await generateCaCertificateAction(form({ name: '  ' }))).toEqual({
+      ok: false,
+      error: domainErrorMessage('nameRequired'),
+    });
     expect(await ctx.db.select().from(caCertificates)).toHaveLength(before.length);
   });
 });
 
 describe('createCaCertificateAction', () => {
   it('stores an uploaded CA without a private key and audits it', async () => {
-    await createCaCertificateAction(
-      form({ name: 'Uploaded', certificate_pem: `\n${generated.certificatePem}\n` }),
+    unwrap(
+      await createCaCertificateAction(
+        form({ name: 'Uploaded', certificate_pem: `\n${generated.certificatePem}\n` }),
+      ),
     );
 
     const [row] = await ctx.db
@@ -142,22 +148,27 @@ describe('createCaCertificateAction', () => {
     [{ name: 'CA' }, 'certificatePemRequired'],
     [{ name: 'CA', certificate_pem: 'not a certificate' }, 'certificatePemInvalid'],
   ] as const)('refuses %p with the %s sentence', async (fields, code) => {
-    await expect(createCaCertificateAction(form(fields))).rejects.toThrow(domainErrorMessage(code));
+    expect(await createCaCertificateAction(form(fields))).toEqual({
+      ok: false,
+      error: domainErrorMessage(code),
+    });
     expect(auditRows()).toEqual([]);
   });
 });
 
 describe('updateCaCertificateAction', () => {
   it('renames and keeps the certificate when none is sent', async () => {
-    await createCaCertificateAction(
-      form({ name: 'Before', certificate_pem: generated.certificatePem }),
+    unwrap(
+      await createCaCertificateAction(
+        form({ name: 'Before', certificate_pem: generated.certificatePem }),
+      ),
     );
     const [row] = await ctx.db
       .select()
       .from(caCertificates)
       .where(eq(caCertificates.name, 'Before'));
 
-    await updateCaCertificateAction(row.id, form({ name: ' After ' }));
+    unwrap(await updateCaCertificateAction(row.id, form({ name: ' After ' })));
 
     const updated = await caRow(row.id);
     expect(updated.name).toBe('After');
@@ -166,22 +177,20 @@ describe('updateCaCertificateAction', () => {
 
   it('refuses a PEM that does not parse, leaving the row alone', async () => {
     const before = await caRow(generated.id);
-    const error = await updateCaCertificateAction(
-      generated.id,
-      form({ certificate_pem: 'garbage' }),
-    ).catch((caught: unknown) => caught);
-
-    expect(error).toBeInstanceOf(DomainError);
-    expect((error as DomainError).code).toBe('certificatePemInvalid');
+    expect(
+      await updateCaCertificateAction(generated.id, form({ certificate_pem: 'garbage' })),
+    ).toEqual({ ok: false, error: domainErrorMessage('certificatePemInvalid') });
     expect(await caRow(generated.id)).toEqual(before);
   });
 });
 
 describe('issueClientCertificateAction', () => {
   it('issues a client certificate that chains to the CA and records it', async () => {
-    const result = await issueClientCertificateAction(
-      generated.id,
-      form({ common_name: ' alice ', validity_days: '30', export_password: EXPORT_PASSWORD }),
+    const result = unwrap(
+      await issueClientCertificateAction(
+        generated.id,
+        form({ common_name: ' alice ', validity_days: '30', export_password: EXPORT_PASSWORD }),
+      ),
     );
     expect(result.passwordProtected).toBe(true);
     expect(result.pkcs12Base64.length).toBeGreaterThan(0);
@@ -220,8 +229,8 @@ describe('issueClientCertificateAction', () => {
   it('gives certificates issued together distinct random 16-byte serials', async () => {
     const fields = form({ common_name: 'bob', export_password: EXPORT_PASSWORD });
     await Promise.all([
-      issueClientCertificateAction(generated.id, fields),
-      issueClientCertificateAction(generated.id, fields),
+      issueClientCertificateAction(generated.id, fields).then(unwrap),
+      issueClientCertificateAction(generated.id, fields).then(unwrap),
     ]);
     const serials = (await listIssuedClientCertificates()).map((row) => row.serialNumber);
     expect(serials).toHaveLength(2);
@@ -233,27 +242,30 @@ describe('issueClientCertificateAction', () => {
     [{ export_password: EXPORT_PASSWORD }, 'commonNameRequired'],
     [{ common_name: 'alice' }, 'exportPasswordRequired'],
   ] as const)('refuses %p with the %s sentence', async (fields, code) => {
-    await expect(issueClientCertificateAction(generated.id, form(fields))).rejects.toThrow(
-      domainErrorMessage(code),
-    );
+    expect(await issueClientCertificateAction(generated.id, form(fields))).toEqual({
+      ok: false,
+      error: domainErrorMessage(code),
+    });
     expect(await listIssuedClientCertificates()).toEqual([]);
   });
 
   it('refuses a CA that was uploaded without its private key', async () => {
-    await createCaCertificateAction(
-      form({ name: 'Keyless', certificate_pem: generated.certificatePem }),
+    unwrap(
+      await createCaCertificateAction(
+        form({ name: 'Keyless', certificate_pem: generated.certificatePem }),
+      ),
     );
     const [keyless] = await ctx.db
       .select()
       .from(caCertificates)
       .where(eq(caCertificates.name, 'Keyless'));
 
-    await expect(
-      issueClientCertificateAction(
+    expect(
+      await issueClientCertificateAction(
         keyless.id,
         form({ common_name: 'alice', export_password: EXPORT_PASSWORD }),
       ),
-    ).rejects.toThrow(domainErrorMessage('caCertificatePrivateKeyMissing'));
+    ).toEqual({ ok: false, error: domainErrorMessage('caCertificatePrivateKeyMissing') });
     expect(await listIssuedClientCertificates()).toEqual([]);
   });
 });
@@ -287,7 +299,7 @@ describe('issued certificate serials', () => {
 
     expect((await getIssuedClientCertificate(row.id))?.serialNumber).toBe(shown);
     expect((await listIssuedClientCertificates())[0]?.serialNumber).toBe(shown);
-    const { revokedAt } = await revokeIssuedClientCertificateAction(row.id);
+    const { revokedAt } = unwrap(await revokeIssuedClientCertificateAction(row.id));
     expect((await getIssuedClientCertificate(row.id))?.revokedAt).toBe(revokedAt);
   });
 
@@ -299,9 +311,11 @@ describe('issued certificate serials', () => {
 
 describe('revokeIssuedClientCertificateAction', () => {
   async function issueOne() {
-    await issueClientCertificateAction(
-      generated.id,
-      form({ common_name: 'bob', export_password: EXPORT_PASSWORD }),
+    unwrap(
+      await issueClientCertificateAction(
+        generated.id,
+        form({ common_name: 'bob', export_password: EXPORT_PASSWORD }),
+      ),
     );
     return (await listIssuedClientCertificates())[0];
   }
@@ -310,7 +324,7 @@ describe('revokeIssuedClientCertificateAction', () => {
     const issued = await issueOne();
     vi.mocked(logAuditEvent).mockClear();
 
-    const { revokedAt } = await revokeIssuedClientCertificateAction(issued.id);
+    const { revokedAt } = unwrap(await revokeIssuedClientCertificateAction(issued.id));
 
     expect(Date.parse(revokedAt)).not.toBeNaN();
     expect((await getIssuedClientCertificate(issued.id))?.revokedAt).toBe(revokedAt);
@@ -325,17 +339,19 @@ describe('revokeIssuedClientCertificateAction', () => {
 
   it('refuses a second revoke, keeping the first time', async () => {
     const issued = await issueOne();
-    const { revokedAt } = await revokeIssuedClientCertificateAction(issued.id);
+    const { revokedAt } = unwrap(await revokeIssuedClientCertificateAction(issued.id));
 
-    await expect(revokeIssuedClientCertificateAction(issued.id)).rejects.toMatchObject({
-      code: 'issuedClientCertificateAlreadyRevoked',
+    expect(await revokeIssuedClientCertificateAction(issued.id)).toEqual({
+      ok: false,
+      error: domainErrorMessage('issuedClientCertificateAlreadyRevoked'),
     });
     expect((await getIssuedClientCertificate(issued.id))?.revokedAt).toBe(revokedAt);
   });
 
   it('refuses a certificate that does not exist', async () => {
-    await expect(revokeIssuedClientCertificateAction(9999)).rejects.toMatchObject({
-      code: 'issuedClientCertificateNotFound',
+    expect(await revokeIssuedClientCertificateAction(9999)).toEqual({
+      ok: false,
+      error: domainErrorMessage('issuedClientCertificateNotFound'),
     });
     expect(await getIssuedClientCertificate(9999)).toBeNull();
   });
@@ -343,14 +359,16 @@ describe('revokeIssuedClientCertificateAction', () => {
 
 describe('deleteCaCertificateAction', () => {
   async function uploadedCa(name: string): Promise<number> {
-    await createCaCertificateAction(form({ name, certificate_pem: generated.certificatePem }));
+    unwrap(
+      await createCaCertificateAction(form({ name, certificate_pem: generated.certificatePem })),
+    );
     const [row] = await ctx.db.select().from(caCertificates).where(eq(caCertificates.name, name));
     return row.id;
   }
 
   it('answers a missing CA with the translated sentence', async () => {
     expect(await deleteCaCertificateAction(9999)).toEqual({
-      success: false,
+      ok: false,
       error: domainErrorMessage('caCertificateNotFound'),
     });
   });
@@ -368,8 +386,8 @@ describe('deleteCaCertificateAction', () => {
 
     const result = await deleteCaCertificateAction(id);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Payroll');
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error).toContain('Payroll');
     expect(await caRow(id)).toBeDefined();
   });
 
@@ -387,7 +405,7 @@ describe('deleteCaCertificateAction', () => {
       updatedAt: NOW,
     });
 
-    expect(await deleteCaCertificateAction(id)).toEqual({ success: true });
+    expect(await deleteCaCertificateAction(id)).toEqual({ ok: true, data: undefined });
     expect(await caRow(id)).toBeUndefined();
     expect(await listIssuedClientCertificates()).toEqual([]);
   });

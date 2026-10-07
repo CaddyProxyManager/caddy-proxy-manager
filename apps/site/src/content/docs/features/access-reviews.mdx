@@ -65,7 +65,7 @@ recorded in the [audit log](../audit-log/) with its item, the decision and the n
 An identity provider that [provisions accounts over SCIM](../scim-provisioning/) owns them: it
 would re-enable an account disabled here on its next update, and put back a membership of a group
 it provisioned. So **revoking is refused** for an account a SCIM connection provisioned and for a
-membership of a SCIM group - the item says **Provisioned by SCIM**. Remove that access in the
+membership of a SCIM group; the item says **Provisioned by SCIM**. Remove that access in the
 identity provider instead. Keeping it, or changing the account's role (which is CPM's own), still
 works.
 
@@ -87,7 +87,7 @@ checks they would meet doing each by hand:
 
 So a review can never do what its closer could not. An item that fails is marked **Not applied**
 with the reason, the review waits as **Awaiting confirmation**, and **Confirm** tries the failures
-again - as whoever presses it, so an administrator can finish what a narrower role could not.
+again as whoever presses it, so an administrator can finish what a narrower role could not.
 Something already gone (a token deleted meanwhile) is marked **Already gone**.
 
 ### Waiting for confirmation
@@ -109,13 +109,13 @@ and to any alert rule's channels that name them:
 | Access review overdue | The due date passed with items still undecided |
 | Access review waits for confirmation | A review closed with revocations held for confirmation |
 
-Each is told once per review. A review is due at the end of its due date, in UTC.
+Each is sent once per review. A review is due at the end of its due date, in UTC.
 
 ## Exporting
 
 **Export** downloads a review as CSV, one row per item: what it was, who reviewed it, the decision
 and note, when it was decided, and whether it was applied (or why not). Kinds, decisions and
-outcomes are written as codes - `role`, `revoke`, `applied` - so a spreadsheet filter works whatever
+outcomes are written as codes (`role`, `revoke`, `applied`), so a spreadsheet filter works whatever
 language the file was exported in. An export is recorded in the audit log, since it lists who holds
 what.
 

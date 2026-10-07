@@ -1,15 +1,20 @@
 /** src/lib/waf/crs-plugins/registry.ts against a fake GitHub; an unloadable plugin is never stored. */
 import { describe, it, expect } from 'bun:test';
-import {
+import { vi } from '@/tests/helpers/vi';
+import { DomainError } from '../../../src/lib/errors/domain-error';
+import { FAKE_BOT, REGISTRY, WORDPRESS, fakeGithub } from '../../helpers/fake-github';
+
+// The offline switch is a setting, and nothing here has a database; online, as by default.
+vi.mock('../../../src/lib/offline', () => ({ outboundAllowed: async () => true }));
+
+const {
   fetchCrsPluginRelease,
   fetchCrsRegistry,
   checkCrsPluginSupport,
   parseCrsRegistry,
   resolveCrsPluginVersion,
   withGitHubToken,
-} from '../../../src/lib/waf/crs-plugins/registry';
-import { DomainError } from '../../../src/lib/errors/domain-error';
-import { FAKE_BOT, REGISTRY, WORDPRESS, fakeGithub } from '../../helpers/fake-github';
+} = await import('../../../src/lib/waf/crs-plugins/registry');
 
 const WORDPRESS_REPO = 'coreruleset/wordpress-rule-exclusions-plugin';
 

@@ -1,11 +1,14 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { type ActionState, actionError, actionSuccess } from "@/src/lib/errors/action-error";
 import { logAuditEvent } from "@/src/lib/audit";
 import { getCurrentSessionId, requireUser } from "@/src/lib/auth";
+import type { ActionResult } from "@/src/lib/errors/action-result";
 import { domainError } from "@/src/lib/errors/domain-error";
+import { runAction } from "@/src/lib/errors/run-action";
 import { startViewAs, stopViewAs } from "@/src/lib/users/view-as";
 
 async function startViewAsActionUntranslated(role: string, groupIds: number[]) {
@@ -33,23 +36,26 @@ export async function startViewAsAction(role: string, groupIds: number[]): Promi
     await startViewAsActionUntranslated(role, groupIds);
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     return actionError(t, error, t("errors.viewAsStartFailed"));
   }
 }
 
 /** Open to any session: all it can do is put the caller back to their own role. */
-export async function stopViewAsAction(): Promise<void> {
-  const session = await requireUser();
-  const sessionId = await getCurrentSessionId();
-  if (!session.viewAs || sessionId === null) return;
-  await stopViewAs(sessionId);
-  await logAuditEvent({
-    userId: Number(session.user.id),
-    action: "view_as_stopped",
-    entityType: "session",
-    entityId: sessionId,
-    summary: `Stopped viewing the dashboard as ${session.viewAs.role}`,
+export async function stopViewAsAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireUser();
+    const sessionId = await getCurrentSessionId();
+    if (!session.viewAs || sessionId === null) return;
+    await stopViewAs(sessionId);
+    await logAuditEvent({
+      userId: Number(session.user.id),
+      action: "view_as_stopped",
+      entityType: "session",
+      entityId: sessionId,
+      summary: `Stopped viewing the dashboard as ${session.viewAs.role}`,
+    });
+    revalidatePath("/", "layout");
   });
-  revalidatePath("/", "layout");
 }

@@ -84,6 +84,7 @@ export async function checkDomainReachability(domain: string): Promise<DomainRea
   if (addresses.length === 0) return { domain: name, addresses, caa, result: "unresolved" };
 
   try {
+    // outbound: reachability
     const response = await fetch(`http://${name}${REACHABILITY_PATH}`, {
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),

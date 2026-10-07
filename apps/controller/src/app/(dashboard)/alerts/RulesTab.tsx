@@ -29,6 +29,7 @@ import { Timestamp } from "@/components/ui/Timestamp";
 import type { RuleInput, RuleView } from "@/src/lib/alerts/rule-store";
 import { ATTENTION_CODES } from "@/src/lib/attention/types";
 import { ALERT_METRICS } from "@/src/lib/notifications/events";
+import { type ActionResult, unwrap } from "@/src/lib/errors/action-result";
 import {
   type AlertsOverview,
   deleteRuleAction,
@@ -211,7 +212,7 @@ function RuleDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveRuleAction(editing?.id ?? null, inputOf(form, overview, builtin));
+      unwrap(await saveRuleAction(editing?.id ?? null, inputOf(form, overview, builtin)));
       onSaved();
       onClose();
     } catch (err) {
@@ -477,7 +478,7 @@ function SilenceDialog({
         preset === "custom"
           ? new Date(until ?? "").toISOString()
           : new Date(Date.now() + SILENCE_PRESETS[preset] * 3_600_000).toISOString();
-      await silenceRuleAction(rule.id, at);
+      unwrap(await silenceRuleAction(rule.id, at));
       onSilenced();
       onClose();
     } catch (err) {
@@ -564,11 +565,11 @@ export function RulesTab({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ queued: boolean; name: string } | null>(null);
 
-  async function act(work: () => Promise<unknown>, fallback: string) {
+  async function act(work: () => Promise<ActionResult<unknown>>, fallback: string) {
     setError(null);
     setNotice(null);
     try {
-      await work();
+      unwrap(await work());
     } catch (err) {
       setError(message(err, fallback));
     } finally {
@@ -689,8 +690,9 @@ export function RulesTab({
                 label: tCommon("test"),
                 onClick: () =>
                   void act(async () => {
-                    const { queued } = await testRuleAction(row.id, ruleName(row));
-                    setNotice({ queued, name: ruleName(row) });
+                    const result = await testRuleAction(row.id, ruleName(row));
+                    if (result.ok) setNotice({ queued: result.data.queued, name: ruleName(row) });
+                    return result;
                   }, t("testFailed")),
               },
               silenced

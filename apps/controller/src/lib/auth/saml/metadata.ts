@@ -109,6 +109,18 @@ export function readIdpMetadata(xml: string): IdpMetadata {
   return { entityId, ssoUrl, signingCertificates: certificates };
 }
 
+const WANTS_SIGNED_REQUESTS =
+  /(<(?:[\w.-]+:)?IDPSSODescriptor\b[^>]*?\bWantAuthnRequestsSigned\s*=\s*)(["'])(?:true|1)\2/;
+
+/**
+ * The plugin refuses to sign in at all against metadata asking for signed requests, which
+ * Keycloak's realm descriptor always does. CPM never signs them, so the IdP's own client
+ * setting decides: one that requires a signature turns the request away on its side.
+ */
+export function withUnsignedRequests(xml: string): string {
+  return xml.replace(WANTS_SIGNED_REQUESTS, "$1$2false$2");
+}
+
 /** Fetched when the provider is saved, never at sign-in: the stored copy is what is trusted. */
 export async function fetchIdpMetadata(
   url: string,
@@ -125,6 +137,7 @@ export async function fetchIdpMetadata(
   }
   let response: Response;
   try {
+    // outbound: samlMetadata
     response = await fetcher(parsed, {
       headers: { Accept: "application/samlmetadata+xml, application/xml, text/xml" },
       maxResponseBytes: MAX_IDP_METADATA_BYTES,

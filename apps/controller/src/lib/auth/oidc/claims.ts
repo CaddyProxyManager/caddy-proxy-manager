@@ -57,6 +57,7 @@ async function discover(issuer: string): Promise<DiscoveredEndpoints> {
 
   const endpoints: DiscoveredEndpoints = { userinfoUrl: null, jwksUri: null };
   try {
+    // outbound: oidcProvider
     const response = await fetch(discoveryUrl, { headers: { Accept: "application/json" } });
     if (response.ok) {
       const doc = (await response.json()) as Record<string, unknown>;

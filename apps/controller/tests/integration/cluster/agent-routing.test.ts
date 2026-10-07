@@ -30,7 +30,7 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 import * as schema from '../../../src/lib/db/schema';
 const registry = await import('../../../src/lib/agent/registry');
 const { syncAgentConnections } = await import('../../../src/lib/agent/broker');
-const { listenForMessages } = await import('../../../src/lib/cluster/bus');
+const { listenForMessages, stopListening } = await import('../../../src/lib/cluster/bus');
 const { cluster } = await import('../../../src/lib/cluster/state');
 const { postgresClient } = await import('../../../src/lib/db/connection');
 
@@ -100,6 +100,7 @@ describe.skipIf(postgresClient === null)('agent routing across replicas', () => 
   });
 
   afterAll(async () => {
+    await stopListening();
     await other.close();
   });
 
@@ -190,7 +191,13 @@ describe.skipIf(postgresClient === null)('agent routing across replicas', () => 
       createdAt: Date.now(),
     });
     await fromOther('agent-result', undefined, cluster.replicaId);
-    await expect(answer).rejects.toBeInstanceOf(registry.AgentNotConnectedError);
+    // Not `expect(answer).rejects`: on a rejection from a LISTEN callback, Bun 1.4.2 stops
+    // delivering notifications and the process never exits.
+    const error = await answer.then(
+      () => null,
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeInstanceOf(registry.AgentNotConnectedError);
   });
 
   it("passes on an answer to another replica's command that the agent sent here", async () => {

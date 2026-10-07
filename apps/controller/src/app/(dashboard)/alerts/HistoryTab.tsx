@@ -16,6 +16,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { Timestamp } from "@/components/ui/Timestamp";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { type AlertsOverview, type HistoryRow, loadHistoryAction } from "./actions";
 import { message, SEVERITIES, SeverityToken, useChannelName, useRuleName } from "./shared";
 
@@ -111,7 +112,7 @@ export function HistoryTab({ overview }: { overview: AlertsOverview }) {
       setLoading(true);
       setError(null);
       try {
-        const page = await loadHistoryAction(filterOf(filters, before));
+        const page = unwrap(await loadHistoryAction(filterOf(filters, before)));
         setRows((prev) => (before === null ? page.rows : [...prev, ...page.rows]));
         setHasMore(page.hasMore);
       } catch (err) {

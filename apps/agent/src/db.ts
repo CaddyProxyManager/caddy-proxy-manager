@@ -74,6 +74,7 @@ const BUILD_STATUS_KEY = "caddy_build_status";
 const APPLIED_PORTS_KEY = "applied_l4_ports";
 const APPLIED_MODULES_KEY = "applied_caddy_modules";
 const CADDY_IMAGE_KEY = "caddy_image";
+const CONTROLLER_OFFLINE_KEY = "controller_offline";
 const FLEET_CONFIG_KEY = "fleet_config";
 const SERVICES_STATUS_KEY = "managed_services_status";
 const APPLIED_SERVICES_KEY = "applied_managed_services";
@@ -247,6 +248,15 @@ export class AgentStore {
 
   setCaddyImage(image: string): void {
     this.writeState(CADDY_IMAGE_KEY, image);
+  }
+
+  /** `FleetConfig.offline`, kept so a restart before the controller answers still never builds. */
+  controllerOffline(): boolean {
+    return this.readState(CONTROLLER_OFFLINE_KEY) === "true";
+  }
+
+  setControllerOffline(offline: boolean): void {
+    this.writeState(CONTROLLER_OFFLINE_KEY, offline ? "true" : "false");
   }
 
   /**

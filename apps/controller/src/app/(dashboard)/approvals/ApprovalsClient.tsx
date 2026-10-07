@@ -52,6 +52,7 @@ import {
   saveApprovalPolicyAction,
   withdrawChangeAction,
 } from "./actions";
+import { unwrap } from "@/src/lib/errors/action-result";
 
 type RoleOption = { key: string; name: string | null; builtIn: boolean };
 type GroupOption = { id: number; name: string };
@@ -242,6 +243,7 @@ function RequestsTab({
       </HStack>
       {shown.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           title={filter === "pending" ? t("emptyPending") : t("empty")}
           description={t("emptyDescription")}
         />
@@ -504,8 +506,8 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           onSubmit={() =>
             void run(async () => {
               if (dialog === "approve")
-                return resultText(await approveChangeAction(request.id, note));
-              await rejectChangeAction(request.id, note);
+                return resultText(unwrap(await approveChangeAction(request.id, note)));
+              unwrap(await rejectChangeAction(request.id, note));
               return resultText("rejected");
             })
           }
@@ -542,7 +544,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           isSubmitting={busy}
           onSubmit={() =>
             void run(async () => {
-              await withdrawChangeAction(request.id);
+              unwrap(await withdrawChangeAction(request.id));
               return resultText("withdrawn");
             })
           }
@@ -567,7 +569,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           isSubmitDisabled={note.trim() === ""}
           onSubmit={() =>
             void run(async () => {
-              const status = await bypassChangeAction(request.id, note);
+              const status = unwrap(await bypassChangeAction(request.id, note));
               return status === "applied" ? t("bypassApplied") : resultText(status);
             })
           }
@@ -618,13 +620,15 @@ function PolicyTab({
     setSaving(true);
     setResult(null);
     try {
-      const text = await saveApprovalPolicyAction({
-        ...draft,
-        tags: tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      });
+      const text = unwrap(
+        await saveApprovalPolicyAction({
+          ...draft,
+          tags: tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        }),
+      );
       setResult({ ok: true, text });
       router.refresh();
     } catch (err) {

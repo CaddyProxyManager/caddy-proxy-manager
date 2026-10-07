@@ -6,6 +6,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { collectAttention } from "@/src/lib/attention";
 import type { AttentionList } from "@/src/lib/attention/types";
@@ -19,21 +20,23 @@ import {
 import { can, currentAccess, requireCan } from "@/src/lib/users/permissions";
 
 export async function loadAttentionAction(): Promise<AttentionList | null> {
-  const { access } = await currentAccess();
   try {
+    const { access } = await currentAccess();
     return await collectAttention(access);
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to collect Needs attention:", error);
     return null;
   }
 }
 
 export async function loadSetupChecklistAction(): Promise<SetupChecklist | null> {
-  const { access } = await currentAccess();
-  if (!can(access, "overview:read")) return null;
   try {
+    const { access } = await currentAccess();
+    if (!can(access, "overview:read")) return null;
     return await getSetupChecklist();
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to read the setup checklist:", error);
     return null;
   }
@@ -46,6 +49,7 @@ export async function setSetupStepDoneAction(step: string, done: boolean): Promi
     revalidatePath("/");
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     return actionError(t, error, t("errors.setupChecklistFailed"));
   }
@@ -58,6 +62,7 @@ export async function setSetupChecklistHiddenAction(hidden: boolean): Promise<Ac
     revalidatePath("/");
     return actionSuccess();
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     return actionError(t, error, t("errors.setupChecklistFailed"));
   }

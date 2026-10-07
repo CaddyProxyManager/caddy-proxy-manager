@@ -42,7 +42,7 @@ import {
   loadsConfig,
   pinAdminListen,
 } from "./caddy-admin";
-import type { AgentConfig } from "./config";
+import { type AgentConfig, effectiveBuildMode } from "./config";
 import { ControllerClient, ControllerRejected } from "./controller-client";
 import {
   ControllerAddressError,
@@ -599,6 +599,8 @@ export class AgentLifecycle {
     }
     this.desired = state;
     const { store, operations } = this.deps;
+    // Before the build decision below, which reads it.
+    store.setControllerOffline(state.fleetConfig.offline === true);
 
     if (!state.caddyEnabled) {
       await this.stopCaddy("the controller has it switched off");
@@ -617,7 +619,7 @@ export class AgentLifecycle {
       // External mode never builds: the operator does, and loads the result on request.
       const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
       if (
-        this.deps.config.caddyBuildMode === "agent" &&
+        effectiveBuildMode(this.deps.config, store) === "agent" &&
         !sameList(state.caddyModules, appliedModules)
       ) {
         operations.applyCaddyBuild(state.caddyModules);
@@ -750,7 +752,7 @@ export class AgentLifecycle {
   }
 
   private runCaddyImageLoad(id: string): AgentCommandResult {
-    if (this.deps.config.caddyBuildMode !== "external") {
+    if (effectiveBuildMode(this.deps.config, this.deps.store) !== "external") {
       return {
         id,
         ok: false,
@@ -881,7 +883,7 @@ export class AgentLifecycle {
       if (!result.ok) console.error("[agent] could not start Caddy:", result.output);
     }
     // Also when already running: the operator may have swapped the image while the agent was down.
-    if (this.deps.config.caddyBuildMode === "external") {
+    if (effectiveBuildMode(this.deps.config, this.deps.store) === "external") {
       const list = await this.deps.operations.syncModulesFromImage();
       if (list.state === "unreadable") {
         console.warn(`[agent] could not read Caddy's module list: ${list.reason}`);

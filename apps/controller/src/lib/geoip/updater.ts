@@ -9,6 +9,7 @@ import { basename, dirname } from "node:path";
 import { GEOIP_EDITIONS, type GeoipEdition } from "@cpm/shared";
 import { geoipDatabasePath, geoipEnabled } from "../agent/geoip";
 import { type StoredErrorCode, domainError, storedErrorCode } from "../errors/domain-error";
+import { outboundAllowed } from "../offline";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import { shareGeoipDatabase } from "./replicas";
@@ -25,7 +26,7 @@ const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 /** Several times the largest archive; only stops an endless body exhausting memory. */
 export const MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
 
-const STATE_KEY = "geoip_downloads";
+export const GEOIP_DOWNLOADS_KEY = "geoip_downloads";
 
 /** The mmdb format puts this before its metadata section, within the file's last 128 KiB. */
 const METADATA_MARKER = Buffer.from([0xab, 0xcd, 0xef, ...Buffer.from("MaxMind.com", "ascii")]);
@@ -56,11 +57,11 @@ export type GeoipUpdateResult = {
   checkError?: { message: string; code: StoredErrorCode | null } | null;
   failures?: GeoipDownloadFailure[];
   /** Why nothing was attempted. */
-  skipped?: "disabled" | "unconfigured";
+  skipped?: "disabled" | "unconfigured" | "offline";
 };
 
 export async function getGeoipDownloadState(): Promise<GeoipDownloadState> {
-  const stored = await getSetting<GeoipDownloadState>(STATE_KEY);
+  const stored = await getSetting<GeoipDownloadState>(GEOIP_DOWNLOADS_KEY);
   return {
     ranAt: stored?.ranAt ?? null,
     error: stored?.error ?? null,
@@ -206,6 +207,8 @@ export function updateGeoipDatabases(fetchImpl: typeof fetch = fetch): Promise<G
 
 async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
   if (!(await geoipEnabled())) return { downloaded: [], error: null, skipped: "disabled" };
+  if (!(await outboundAllowed("maxmind")))
+    return { downloaded: [], error: null, skipped: "offline" };
   const { accountId, licenseKey } = await geoipCredentials();
   if (!accountId || !licenseKey) return { downloaded: [], error: null, skipped: "unconfigured" };
 
@@ -253,7 +256,7 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
       : null;
   // A cache of what is on disk, not configuration, so it must not land in a staged change set.
   await outsideStagingScope(() =>
-    setSetting<GeoipDownloadState>(STATE_KEY, {
+    setSetting<GeoipDownloadState>(GEOIP_DOWNLOADS_KEY, {
       ranAt: new Date().toISOString(),
       error: stored,
       failures,

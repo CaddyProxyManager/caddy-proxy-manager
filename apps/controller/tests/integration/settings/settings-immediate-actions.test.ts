@@ -415,9 +415,10 @@ describe('a non-administrator', () => {
   });
 
   it('cannot read what an administrator can', async () => {
-    await expect(actions.lookupWafRuleMessageAction(942100)).rejects.toThrow(
-      domainErrorMessage('accessDenied'),
-    );
+    expect(await actions.lookupWafRuleMessageAction(942100)).toEqual({
+      ok: false,
+      error: domainErrorMessage('accessDenied'),
+    });
     await expect(
       actions.testCrowdSecConnectionAction({ apiUrl: 'http://x', apiKey: 'k' }),
     ).resolves.toEqual(REFUSED);

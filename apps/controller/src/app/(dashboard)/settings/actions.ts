@@ -2,6 +2,9 @@
 
 import { requireCan } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
+import type { ActionResult } from "@/src/lib/errors/action-result";
+import { runAction } from "@/src/lib/errors/run-action";
 import { extractErrorMessage, storedErrorMessage } from "@/src/lib/errors/action-error";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { domainError } from "@/src/lib/errors/domain-error";
@@ -144,7 +147,7 @@ import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/mod
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
 
-type ActionResult = {
+type SettingsResult = {
   success: boolean;
   message?: string;
   /** Set by staged actions: the edit is in the change set, not applied. */
@@ -160,53 +163,80 @@ async function errorText(error: unknown, fallback: string): Promise<string> {
 }
 
 /**
+ * For what throws outside an action's own try: the lock, the permission check, staging. Every
+ * result type here only adds optional fields to `SettingsResult`, so a bare failure fits each.
+ */
+async function wrapperFailure<TResult extends SettingsResult>(error: unknown): Promise<TResult> {
+  unstable_rethrow(error);
+  console.error("Settings action failed:", error);
+  const t = await getTranslations();
+  return {
+    success: false,
+    message: await errorText(error, t("common.somethingWentWrong")),
+  } as TResult;
+}
+
+/**
  * Applies at once, under the settings lock. For actions staging cannot represent: side effects
  * beyond a settings write (uploads, other tables, containers), which staging would split in half.
  */
-function serializedSettingsAction<TArgs extends unknown[], TResult>(
+function serializedSettingsAction<TArgs extends unknown[], TResult extends SettingsResult>(
   action: (...args: TArgs) => Promise<TResult>,
 ): (...args: TArgs) => Promise<TResult> {
-  return async (...args: TArgs) => withSettingsUpdateLock(() => action(...args));
+  return async (...args: TArgs): Promise<TResult> => {
+    try {
+      return await withSettingsUpdateLock(() => action(...args));
+    } catch (error) {
+      unstable_rethrow(error);
+      return await wrapperFailure<TResult>(error);
+    }
+  };
 }
 
 /**
  * Diverts the action's settings writes into the operator's change set; its `applyCaddyConfig()`
  * is suppressed. Still locked: two staged forms would race on the read-modify-write.
  */
-function stagedSettingsAction<TArgs extends unknown[], TResult extends ActionResult>(
+function stagedSettingsAction<TArgs extends unknown[], TResult extends SettingsResult>(
   action: (...args: TArgs) => Promise<TResult>,
 ): (...args: TArgs) => Promise<TResult> {
-  return async (...args: TArgs) =>
-    withSettingsUpdateLock(async () => {
-      const session = await requireCan("settings:write");
-      const userId = Number(session.user.id);
-      const overlay = await stagedOverlay(userId);
+  return async (...args: TArgs): Promise<TResult> => {
+    try {
+      return await withSettingsUpdateLock(async () => {
+        const session = await requireCan("settings:write");
+        const userId = Number(session.user.id);
+        const overlay = await stagedOverlay(userId);
 
-      const { result, writes } = await withCapturedWrites(overlay, () => action(...args));
-      // A failed action may have written before it threw; don't stage its half-finished state.
-      if (!result.success) {
-        return result;
-      }
+        const { result, writes } = await withCapturedWrites(overlay, () => action(...args));
+        // A failed action may have written before it threw; don't stage its half-finished state.
+        if (!result.success) {
+          return result;
+        }
 
-      await stageWrites(userId, writes);
-      // "layout" scope: the bare path would leave every /settings/[section] route stale.
-      revalidatePath("/settings", "layout");
+        await stageWrites(userId, writes);
+        // "layout" scope: the bare path would leave every /settings/[section] route stale.
+        revalidatePath("/settings", "layout");
 
-      if (writes.size === 0) {
-        return result;
-      }
+        if (writes.size === 0) {
+          return result;
+        }
 
-      // The action bodies say "saved and applied"; nothing is applied yet, so the wrapper corrects
-      // the wording in one place rather than in every action's message.
-      const t = await getTranslations("settings");
-      return { ...result, staged: true, message: t("stagedSaved") };
-    });
+        // The action bodies say "saved and applied"; nothing is applied yet, so the wrapper
+        // corrects the wording in one place rather than in every action's message.
+        const t = await getTranslations("settings");
+        return { ...result, staged: true, message: t("stagedSaved") };
+      });
+    } catch (error) {
+      unstable_rethrow(error);
+      return await wrapperFailure<TResult>(error);
+    }
+  };
 }
 
 async function updateGeneralSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -222,6 +252,7 @@ async function updateGeneralSettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.generalSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save general settings:", error);
     return {
       success: false,
@@ -231,9 +262,9 @@ async function updateGeneralSettingsActionUnlocked(
 }
 
 async function updateAcmeSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -245,7 +276,8 @@ async function updateAcmeSettingsActionUnlocked(
       let parsed: URL;
       try {
         parsed = new URL(caUrl);
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
         return { success: false, message: t("results.acmeInvalidUrl") };
       }
       if (parsed.protocol !== "https:") {
@@ -263,6 +295,7 @@ async function updateAcmeSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.acmeSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -272,6 +305,7 @@ async function updateAcmeSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save ACME settings:", error);
     return {
       success: false,
@@ -281,9 +315,9 @@ async function updateAcmeSettingsActionUnlocked(
 }
 
 async function updateCloudflareSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -310,6 +344,7 @@ async function updateCloudflareSettingsActionUnlocked(
         message: t("results.cloudflareSaved"),
       };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -319,6 +354,7 @@ async function updateCloudflareSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save Cloudflare settings:", error);
     return {
       success: false,
@@ -328,9 +364,9 @@ async function updateCloudflareSettingsActionUnlocked(
 }
 
 async function updateDnsProviderSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -366,7 +402,8 @@ async function updateDnsProviderSettingsActionUnlocked(
       await saveDnsProviderSettings(settings);
       try {
         await applyCaddyConfig();
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
         /* non-fatal */
       }
       revalidatePath("/settings");
@@ -391,7 +428,8 @@ async function updateDnsProviderSettingsActionUnlocked(
       await saveDnsProviderSettings(settings);
       try {
         await applyCaddyConfig();
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
         /* non-fatal */
       }
       revalidatePath("/settings");
@@ -473,6 +511,7 @@ async function updateDnsProviderSettingsActionUnlocked(
           : t("results.dnsProviderSaved", { name: def.displayName }),
       };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -482,6 +521,7 @@ async function updateDnsProviderSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save DNS provider settings:", error);
     return {
       success: false,
@@ -495,7 +535,7 @@ async function saveDnsDelegation(
   action: "delegation-save" | "delegation-remove",
   formData: FormData,
   settings: DnsProviderSettings,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   const domain = normalizeDnsName(challengeBaseName(String(formData.get("domain") ?? "")));
   if (!domain) return { success: false, message: t("results.dnsDelegationDomainInvalid") };
@@ -536,7 +576,7 @@ async function saveDnsDelegation(
   return { success: true, message: t("results.dnsDelegationSaved", { domain }) };
 }
 
-export type AcmeDnsRegisterResult = ActionResult & {
+export type AcmeDnsRegisterResult = SettingsResult & {
   /** The one record the operator creates; present on success. */
   cname?: { name: string; target: string };
 };
@@ -575,22 +615,25 @@ async function registerAcmeDnsAccountActionUnlocked(
       cname,
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to register an acme-dns account:", error);
     return { success: false, message: await errorText(error, t("results.acmeDnsRegisterFailed")) };
   }
 }
 
 /** Read-only lookups, so no lock; a warning on the screen, never a refusal. */
-export async function checkDnsDelegationsAction(): Promise<DelegationCheck[]> {
-  await requireCan("settings:read");
-  const settings = await getDnsProviderSettings();
-  return await checkDelegations(settings?.delegations ?? [], settings?.acmeDnsAccounts);
+export async function checkDnsDelegationsAction(): Promise<ActionResult<DelegationCheck[]>> {
+  return runAction(async () => {
+    await requireCan("settings:read");
+    const settings = await getDnsProviderSettings();
+    return await checkDelegations(settings?.delegations ?? [], settings?.acmeDnsAccounts);
+  });
 }
 
 async function updateAuthentikSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -613,6 +656,7 @@ async function updateAuthentikSettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.authentikSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save Authentik settings:", error);
     return {
       success: false,
@@ -623,9 +667,9 @@ async function updateAuthentikSettingsActionUnlocked(
 
 /** Prefill for a new host's forward-auth block; nothing is applied, each host carries its own. */
 async function updateForwardAuthSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -647,6 +691,7 @@ async function updateForwardAuthSettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.forwardAuthSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save forward auth settings:", error);
     return {
       success: false,
@@ -660,9 +705,9 @@ async function updateForwardAuthSettingsActionUnlocked(
  * unrelated edit would wipe the credential and nodes would fail to re-register.
  */
 async function updateTailscaleSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -718,6 +763,7 @@ async function updateTailscaleSettingsActionUnlocked(
     await applyCaddyConfig();
     return { success: true, message: t("results.tailscaleSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save Tailscale settings:", error);
     return {
       success: false,
@@ -731,9 +777,9 @@ async function updateTailscaleSettingsActionUnlocked(
  * switch could never verify, and that gate would refuse every local sign-in.
  */
 async function updateCaptchaSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -774,15 +820,16 @@ async function updateCaptchaSettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.captchaSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save CAPTCHA settings:", error);
     return { success: false, message: await errorText(error, t("results.captchaFailed")) };
   }
 }
 
 async function updatePasswordPolicySettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -806,6 +853,7 @@ async function updatePasswordPolicySettingsActionUnlocked(
         : t("results.passwordPolicyPromptDisabled"),
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save password policy settings:", error);
     return {
       success: false,
@@ -815,9 +863,9 @@ async function updatePasswordPolicySettingsActionUnlocked(
 }
 
 async function updateAvatarSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -841,6 +889,7 @@ async function updateAvatarSettingsActionUnlocked(
       message: gravatarEnabled ? t("results.gravatarEnabled") : t("results.gravatarDisabled"),
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save avatar settings:", error);
     return {
       success: false,
@@ -850,9 +899,9 @@ async function updateAvatarSettingsActionUnlocked(
 }
 
 async function updateAnalyticsSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -884,6 +933,7 @@ async function updateAnalyticsSettingsActionUnlocked(
       message: enabled ? t("results.analyticsEnabled") : t("results.analyticsDisabled"),
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save analytics settings:", error);
     return {
       success: false,
@@ -893,9 +943,9 @@ async function updateAnalyticsSettingsActionUnlocked(
 }
 
 async function updateGeoipSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -925,6 +975,7 @@ async function updateGeoipSettingsActionUnlocked(
           : t("geoipSavedNeedsCredentials"),
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save GeoIP settings:", error);
     return {
       success: false,
@@ -935,9 +986,9 @@ async function updateGeoipSettingsActionUnlocked(
 
 /** Upload or remove in one form: the page's save bar submits it, and `intent` says which. */
 async function updateFaviconActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -958,6 +1009,7 @@ async function updateFaviconActionUnlocked(
     revalidatePath("/", "layout");
     return { success: true, message: t("results.faviconUpdated") };
   } catch (error) {
+    unstable_rethrow(error);
     if (error instanceof FaviconValidationError) {
       return { success: false, message: await errorText(error, error.message) };
     }
@@ -974,9 +1026,9 @@ async function updateFaviconActionUnlocked(
  * and the accent should wait for Review & apply like every other change on the page.
  */
 async function updateAccentColorActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -991,6 +1043,7 @@ async function updateAccentColorActionUnlocked(
     try {
       await setSetting(accentColor.key, accentColor.parse(formData.get(accentColor.key)));
     } catch (error) {
+      unstable_rethrow(error);
       if (error instanceof SettingValidationError) {
         const [tRoot, { settingValidationMessage }] = await Promise.all([
           getTranslations(),
@@ -1002,6 +1055,7 @@ async function updateAccentColorActionUnlocked(
     }
     return { success: true, message: t("results.registrySaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save the accent colour:", error);
     return { success: false, message: await errorText(error, t("results.registryFailed")) };
   }
@@ -1012,9 +1066,9 @@ async function updateAccentColorActionUnlocked(
  * `saveSettings` validates the whole batch before writing, so one bad field changes nothing.
  */
 async function updateRegistrySettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1055,6 +1109,7 @@ async function updateRegistrySettingsActionUnlocked(
     try {
       await saveSettings(values);
     } catch (error) {
+      unstable_rethrow(error);
       if (error instanceof SettingValidationError) {
         const [tRoot, { settingValidationMessage }] = await Promise.all([
           getTranslations(),
@@ -1068,8 +1123,11 @@ async function updateRegistrySettingsActionUnlocked(
     // The auth instance caches these; drop it or the old policy stays live.
     const { invalidateProviderCache } = await import("@/src/lib/auth/server");
     invalidateProviderCache();
-    // The agents count upstream errors only while that notification is on.
-    if (keys.some((key) => key.startsWith("config:notify_upstream"))) {
+    // The agents count upstream errors only while that notification is on, and build Caddy
+    // only while offline mode is off.
+    if (
+      keys.some((key) => key.startsWith("config:notify_upstream") || key === "config:offline_mode")
+    ) {
       const { pushFleetConfig } = await import("@/src/lib/agent/fleet-config");
       void pushFleetConfig().catch(() => {});
     }
@@ -1078,6 +1136,7 @@ async function updateRegistrySettingsActionUnlocked(
     revalidatePath("/", "layout");
     return { success: true, message: t("results.registrySaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save registry settings:", error);
     return { success: false, message: await errorText(error, t("results.registryFailed")) };
   }
@@ -1087,7 +1146,7 @@ async function updateRegistrySettingsActionUnlocked(
 async function saveEmailRegistryValues(
   values: Record<string, unknown>,
   t: Awaited<ReturnType<typeof getTranslations<"settings">>>,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const [{ SettingValidationError }, { saveSettings }] = await Promise.all([
     import("@/src/lib/settings/registry"),
     import("@/src/lib/settings/resolve"),
@@ -1095,6 +1154,7 @@ async function saveEmailRegistryValues(
   try {
     await saveSettings(values);
   } catch (error) {
+    unstable_rethrow(error);
     if (error instanceof SettingValidationError) {
       const [tRoot, { settingValidationMessage }] = await Promise.all([
         getTranslations(),
@@ -1114,9 +1174,9 @@ async function saveEmailRegistryValues(
 
 /** An empty password keeps the stored one: the form never receives it to send back. */
 async function updateEmailSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1138,15 +1198,16 @@ async function updateEmailSettingsActionUnlocked(
     }
     return await saveEmailRegistryValues(values, t);
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save the email settings:", error);
     return { success: false, message: await errorText(error, t("email.saveFailed")) };
   }
 }
 
 async function updateCertificateAlertSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1159,6 +1220,7 @@ async function updateCertificateAlertSettingsActionUnlocked(
       t,
     );
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save the certificate alert settings:", error);
     return { success: false, message: await errorText(error, t("email.saveFailed")) };
   }
@@ -1166,9 +1228,9 @@ async function updateCertificateAlertSettingsActionUnlocked(
 
 /** Checks inline after saving: "never checked" straight after a save reads as a failed save. */
 async function updateUpdateSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1208,6 +1270,7 @@ async function updateUpdateSettingsActionUnlocked(
           message: t("results.updatesSavedLatest", { latest: String(result.latest) }),
         };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save update settings:", error);
     return {
       success: false,
@@ -1217,7 +1280,7 @@ async function updateUpdateSettingsActionUnlocked(
 }
 
 /** Check now, ignoring how recently the last one ran. */
-async function checkForUpdatesActionUnlocked(): Promise<ActionResult> {
+async function checkForUpdatesActionUnlocked(): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1230,6 +1293,7 @@ async function checkForUpdatesActionUnlocked(): Promise<ActionResult> {
         }
       : { success: true, message: t("results.updatesLatest", { latest: String(result.latest) }) };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Update check failed:", error);
     return {
       success: false,
@@ -1239,9 +1303,9 @@ async function checkForUpdatesActionUnlocked(): Promise<ActionResult> {
 }
 
 async function updateMetricsSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1259,6 +1323,7 @@ async function updateMetricsSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.metricsSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1268,6 +1333,7 @@ async function updateMetricsSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save metrics settings:", error);
     return {
       success: false,
@@ -1277,9 +1343,9 @@ async function updateMetricsSettingsActionUnlocked(
 }
 
 async function updateLoggingSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1300,6 +1366,7 @@ async function updateLoggingSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.loggingSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1309,6 +1376,7 @@ async function updateLoggingSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save logging settings:", error);
     return {
       success: false,
@@ -1330,9 +1398,9 @@ function parseResolverList(value: string | null): string[] {
  * `http://<host>:3000` still works; the form warns first when the request came that way.
  */
 async function updateDashboardSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1354,12 +1422,14 @@ async function updateDashboardSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.dashboardSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
       return { success: true, message: t("results.dashboardApplyFailed", { error: errorMsg }) };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save dashboard settings:", error);
     return {
       success: false,
@@ -1372,16 +1442,18 @@ async function updateDashboardSettingsActionUnlocked(
  * No argument on purpose: it checks the *saved*, validated domain, since taking the typed one
  * would make form input the host of a server-side request (SSRF).
  */
-export async function checkDashboardDnsAction(): Promise<DashboardDnsCheck> {
-  await requireCan("settings:read");
-  const saved = await getDashboardSettings();
-  return await checkDashboardDns(saved?.domain ?? "");
+export async function checkDashboardDnsAction(): Promise<ActionResult<DashboardDnsCheck>> {
+  return runAction(async () => {
+    await requireCan("settings:read");
+    const saved = await getDashboardSettings();
+    return await checkDashboardDns(saved?.domain ?? "");
+  });
 }
 
 async function updateTrustedProxiesSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1407,6 +1479,7 @@ async function updateTrustedProxiesSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.trustedProxiesSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1416,6 +1489,7 @@ async function updateTrustedProxiesSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save trusted proxies settings:", error);
     return {
       success: false,
@@ -1425,9 +1499,9 @@ async function updateTrustedProxiesSettingsActionUnlocked(
 }
 
 async function updateHttpProtocolsSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1440,6 +1514,7 @@ async function updateHttpProtocolsSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.httpProtocolsSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       return {
@@ -1450,6 +1525,7 @@ async function updateHttpProtocolsSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save HTTP protocol settings:", error);
     return {
       success: false,
@@ -1459,9 +1535,9 @@ async function updateHttpProtocolsSettingsActionUnlocked(
 }
 
 async function updateCompressionSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1471,6 +1547,7 @@ async function updateCompressionSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.compressionSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       return {
@@ -1481,6 +1558,7 @@ async function updateCompressionSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save compression settings:", error);
     return {
       success: false,
@@ -1490,9 +1568,9 @@ async function updateCompressionSettingsActionUnlocked(
 }
 
 async function updateCrowdSecSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1512,6 +1590,7 @@ async function updateCrowdSecSettingsActionUnlocked(
     await applyCaddyConfig();
     return { success: true, message: t("results.crowdsecSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save CrowdSec settings:", error);
     return { success: false, message: await errorText(error, t("results.crowdsecFailed")) };
   }
@@ -1524,9 +1603,9 @@ async function updateCrowdSecSettingsActionUnlocked(
 export async function testCrowdSecConnectionAction(input: {
   apiUrl: string;
   apiKey: string;
-}): Promise<ActionResult> {
-  const t = await getTranslations("settings");
+}): Promise<SettingsResult> {
   try {
+    const t = await getTranslations("settings");
     await requireCan("settings:write");
     const typed = normalizeCrowdSecSettings({ apiUrl: input.apiUrl, apiKey: input.apiKey });
     if (!typed.apiUrl) return { success: false, message: t("results.crowdsecTestNoUrl") };
@@ -1558,14 +1637,16 @@ export async function testCrowdSecConnectionAction(input: {
         };
     }
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations("settings");
     return { success: false, message: await errorText(error, t("results.crowdsecTestFailed")) };
   }
 }
 
 async function updateHttpCacheSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   const field = (name: string) => String(formData.get(name) ?? "");
   try {
@@ -1595,6 +1676,7 @@ async function updateHttpCacheSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.httpCacheSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       return {
@@ -1605,6 +1687,7 @@ async function updateHttpCacheSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save the HTTP cache settings:", error);
     return {
       success: false,
@@ -1614,9 +1697,9 @@ async function updateHttpCacheSettingsActionUnlocked(
 }
 
 async function updateGlobalCaddyConfigActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1626,6 +1709,7 @@ async function updateGlobalCaddyConfigActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.globalCaddyConfigSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       return {
@@ -1636,6 +1720,7 @@ async function updateGlobalCaddyConfigActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save the global Caddyfile:", error);
     return {
       success: false,
@@ -1645,9 +1730,9 @@ async function updateGlobalCaddyConfigActionUnlocked(
 }
 
 async function updateTwoFactorPolicySettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1659,6 +1744,7 @@ async function updateTwoFactorPolicySettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.twoFactorPolicySaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save two-factor policy:", error);
     return {
       success: false,
@@ -1668,9 +1754,9 @@ async function updateTwoFactorPolicySettingsActionUnlocked(
 }
 
 async function updateSsoEnforcementSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1686,6 +1772,7 @@ async function updateSsoEnforcementSettingsActionUnlocked(
     revalidatePath("/settings");
     return { success: true, message: t("results.ssoEnforcementSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save single sign-on enforcement:", error);
     return {
       success: false,
@@ -1695,9 +1782,9 @@ async function updateSsoEnforcementSettingsActionUnlocked(
 }
 
 async function updateDnsSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1725,6 +1812,7 @@ async function updateDnsSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.dnsSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1734,6 +1822,7 @@ async function updateDnsSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save DNS settings:", error);
     return {
       success: false,
@@ -1743,9 +1832,9 @@ async function updateDnsSettingsActionUnlocked(
 }
 
 async function updateUpstreamDnsResolutionSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1773,6 +1862,7 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
         message: t("results.upstreamDnsSaved"),
       };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1782,6 +1872,7 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save upstream DNS resolution settings:", error);
     return {
       success: false,
@@ -1798,7 +1889,8 @@ function parseRedirectUrl(raw: FormDataEntryValue | null): string {
     const url = new URL(trimmed);
     if (url.protocol !== "http:" && url.protocol !== "https:") return "";
     return trimmed;
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
     return "";
   }
 }
@@ -1832,9 +1924,9 @@ function parseGeoBlockResponseHeaders(formData: FormData): Record<string, string
 }
 
 async function updateGeoBlockSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1885,6 +1977,7 @@ async function updateGeoBlockSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.geoblockSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1894,6 +1987,7 @@ async function updateGeoBlockSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save geoblocking settings:", error);
     return {
       success: false,
@@ -1903,9 +1997,9 @@ async function updateGeoBlockSettingsActionUnlocked(
 }
 
 async function updateRateLimitSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1913,7 +2007,8 @@ async function updateRateLimitSettingsActionUnlocked(
     let zones: unknown = [];
     try {
       zones = typeof zonesRaw === "string" && zonesRaw ? JSON.parse(zonesRaw) : [];
-    } catch {
+    } catch (error) {
+      unstable_rethrow(error);
       zones = [];
     }
     const allowlistRaw = formData.get("rateLimitAllowlist");
@@ -1929,12 +2024,14 @@ async function updateRateLimitSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.rateLimitSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
       return { success: true, message: t("results.applyFailed", { error: errorMsg }) };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save rate limit settings:", error);
     return {
       success: false,
@@ -1944,9 +2041,9 @@ async function updateRateLimitSettingsActionUnlocked(
 }
 
 async function updateErrorPagesSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -1956,7 +2053,8 @@ async function updateErrorPagesSettingsActionUnlocked(
     if (raw && typeof raw === "string") {
       try {
         rules = sanitizeErrorPageRules(JSON.parse(raw));
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
         return { success: false, message: t("results.errorPagesInvalid") };
       }
     }
@@ -1968,6 +2066,7 @@ async function updateErrorPagesSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.errorPagesSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -1977,6 +2076,7 @@ async function updateErrorPagesSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save error pages settings:", error);
     return {
       success: false,
@@ -1986,9 +2086,9 @@ async function updateErrorPagesSettingsActionUnlocked(
 }
 
 async function updateDefaultResponseSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -2022,6 +2122,7 @@ async function updateDefaultResponseSettingsActionUnlocked(
       revalidatePath("/settings");
       return { success: true, message: t("results.defaultResponseSaved") };
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -2031,6 +2132,7 @@ async function updateDefaultResponseSettingsActionUnlocked(
       };
     }
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save default response settings:", error);
     return {
       success: false,
@@ -2045,16 +2147,20 @@ async function updateDefaultResponseSettingsActionUnlocked(
 
 export async function lookupWafRuleMessageAction(
   ruleId: number,
-): Promise<{ message: string | null }> {
-  await requireCan("settings:read");
-  const map = await getWafRuleMessages([ruleId]);
-  return { message: map[ruleId] ?? null };
+): Promise<ActionResult<{ message: string | null }>> {
+  return runAction(async () => {
+    await requireCan("settings:read");
+    const map = await getWafRuleMessages([ruleId]);
+    return { message: map[ruleId] ?? null };
+  });
 }
 
 export async function getOAuthProvidersAction() {
-  await requireCan("settings:read");
-  const { listOAuthProviders } = await import("@/src/lib/models/oauth-providers");
-  return listOAuthProviders();
+  return runAction(async () => {
+    await requireCan("settings:read");
+    const { listOAuthProviders } = await import("@/src/lib/models/oauth-providers");
+    return listOAuthProviders();
+  });
 }
 
 export async function createOAuthProviderAction(data: {
@@ -2079,40 +2185,44 @@ export async function createOAuthProviderAction(data: {
   roleGroups?: Record<string, string[]>;
   syncGroups?: boolean;
 }) {
-  const session = await requireCan("settings:write");
-  const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
-  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
-  const provider = await createOAuthProvider({ ...data, source: "ui" });
-  invalidateProviderCache();
-  const { createAuditEvent } = await import("@/src/lib/models/audit");
-  await createAuditEvent({
-    userId: Number(session.user.id),
-    action: "oauth_provider_created",
-    entityType: "oauth_provider",
-    entityId: null,
-    summary: `OAuth provider "${data.name}" created`,
-    data: JSON.stringify({ providerId: provider.id }),
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
+    const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
+    const { invalidateProviderCache } = await import("@/src/lib/auth/server");
+    const provider = await createOAuthProvider({ ...data, source: "ui" });
+    invalidateProviderCache();
+    const { createAuditEvent } = await import("@/src/lib/models/audit");
+    await createAuditEvent({
+      userId: Number(session.user.id),
+      action: "oauth_provider_created",
+      entityType: "oauth_provider",
+      entityId: null,
+      summary: `OAuth provider "${data.name}" created`,
+      data: JSON.stringify({ providerId: provider.id }),
+    });
+    revalidatePath("/settings");
+    return toOAuthProviderView(provider);
   });
-  revalidatePath("/settings");
-  return toOAuthProviderView(provider);
 }
 
 /**
  * Null means alphabetical. Not on the provider row, which would make every write police
  * "exactly one primary".
  */
-export async function setPrimaryOAuthProviderAction(id: string | null): Promise<void> {
-  const session = await requireCan("settings:write");
-  const { setPrimaryProviderId } = await import("@/src/lib/models/oauth-providers");
-  await setPrimaryProviderId(id);
-  const { createAuditEvent } = await import("@/src/lib/models/audit");
-  await createAuditEvent({
-    userId: Number(session.user.id),
-    action: "oauth_provider_updated",
-    entityType: "oauth_provider",
-    entityId: null,
-    summary: id ? `Made OAuth provider "${id}" primary` : "Cleared the primary OAuth provider",
-    data: JSON.stringify({ primaryProviderId: id }),
+export async function setPrimaryOAuthProviderAction(id: string | null): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
+    const { setPrimaryProviderId } = await import("@/src/lib/models/oauth-providers");
+    await setPrimaryProviderId(id);
+    const { createAuditEvent } = await import("@/src/lib/models/audit");
+    await createAuditEvent({
+      userId: Number(session.user.id),
+      action: "oauth_provider_updated",
+      entityType: "oauth_provider",
+      entityId: null,
+      summary: id ? `Made OAuth provider "${id}" primary` : "Cleared the primary OAuth provider",
+      data: JSON.stringify({ primaryProviderId: id }),
+    });
   });
 }
 
@@ -2142,43 +2252,47 @@ export async function updateOAuthProviderAction(
     syncGroups: boolean;
   }>,
 ) {
-  const session = await requireCan("settings:write");
-  const { updateOAuthProvider } = await import("@/src/lib/models/oauth-providers");
-  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
-  const updated = await updateOAuthProvider(id, data);
-  invalidateProviderCache();
-  const { createAuditEvent } = await import("@/src/lib/models/audit");
-  await createAuditEvent({
-    userId: Number(session.user.id),
-    action: "oauth_provider_updated",
-    entityType: "oauth_provider",
-    entityId: null,
-    summary: `Updated OAuth provider "${id}"`,
-    data: JSON.stringify({ providerId: id, fields: Object.keys(data) }),
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
+    const { updateOAuthProvider } = await import("@/src/lib/models/oauth-providers");
+    const { invalidateProviderCache } = await import("@/src/lib/auth/server");
+    const updated = await updateOAuthProvider(id, data);
+    invalidateProviderCache();
+    const { createAuditEvent } = await import("@/src/lib/models/audit");
+    await createAuditEvent({
+      userId: Number(session.user.id),
+      action: "oauth_provider_updated",
+      entityType: "oauth_provider",
+      entityId: null,
+      summary: `Updated OAuth provider "${id}"`,
+      data: JSON.stringify({ providerId: id, fields: Object.keys(data) }),
+    });
+    revalidatePath("/settings");
+    return updated ? toOAuthProviderView(updated) : null;
   });
-  revalidatePath("/settings");
-  return updated ? toOAuthProviderView(updated) : null;
 }
 
-export async function deleteOAuthProviderAction(id: string) {
-  const session = await requireCan("settings:write");
-  const { getOAuthProvider, deleteOAuthProvider } = await import(
-    "@/src/lib/models/oauth-providers"
-  );
-  const { invalidateProviderCache } = await import("@/src/lib/auth/server");
-  const existing = await getOAuthProvider(id);
-  await deleteOAuthProvider(id);
-  invalidateProviderCache();
-  const { createAuditEvent } = await import("@/src/lib/models/audit");
-  await createAuditEvent({
-    userId: Number(session.user.id),
-    action: "oauth_provider_deleted",
-    entityType: "oauth_provider",
-    entityId: null,
-    summary: `Deleted OAuth provider "${existing?.name ?? id}"`,
-    data: JSON.stringify({ providerId: id }),
+export async function deleteOAuthProviderAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const session = await requireCan("settings:write");
+    const { getOAuthProvider, deleteOAuthProvider } = await import(
+      "@/src/lib/models/oauth-providers"
+    );
+    const { invalidateProviderCache } = await import("@/src/lib/auth/server");
+    const existing = await getOAuthProvider(id);
+    await deleteOAuthProvider(id);
+    invalidateProviderCache();
+    const { createAuditEvent } = await import("@/src/lib/models/audit");
+    await createAuditEvent({
+      userId: Number(session.user.id),
+      action: "oauth_provider_deleted",
+      entityType: "oauth_provider",
+      entityId: null,
+      summary: `Deleted OAuth provider "${existing?.name ?? id}"`,
+      data: JSON.stringify({ providerId: id }),
+    });
+    revalidatePath("/settings");
   });
-  revalidatePath("/settings");
 }
 
 /** Blank or absent fields keep the CRS defaults, so an untuned WAF emits nothing new. */
@@ -2222,9 +2336,9 @@ function parseWafTuning(formData: FormData): WafTuning {
 type WafTuningErrorCode = "wafParanoiaLevelInvalid" | "wafAnomalyThresholdInvalid";
 
 async function updateWafSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -2320,6 +2434,7 @@ async function updateWafSettingsActionUnlocked(
     try {
       await applyCaddyConfig();
     } catch (err) {
+      unstable_rethrow(err);
       const errorMsg = await errorText(err, String(err));
       return {
         success: true,
@@ -2331,6 +2446,7 @@ async function updateWafSettingsActionUnlocked(
     revalidatePath("/waf");
     return { success: true, message: t("results.wafSaved") };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save WAF settings:", error);
     return {
       success: false,
@@ -2347,9 +2463,9 @@ async function updateWafSettingsActionUnlocked(
  * agent would stay frozen at today's default.
  */
 async function updateCaddyBuildSettingsActionUnlocked(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   const t = await getTranslations("settings");
   try {
     await requireCan("settings:write");
@@ -2394,6 +2510,7 @@ async function updateCaddyBuildSettingsActionUnlocked(
     try {
       await applyCaddyConfig();
     } catch (error) {
+      unstable_rethrow(error);
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = await errorText(error, t("results.unknownError"));
@@ -2433,6 +2550,7 @@ async function updateCaddyBuildSettingsActionUnlocked(
             : t("results.caddyBuildSaved");
     return { success: true, message };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Failed to save Caddy build settings:", error);
     return {
       success: false,
@@ -2443,12 +2561,12 @@ async function updateCaddyBuildSettingsActionUnlocked(
 
 /** Write the compose override and signal the agent to rebuild. */
 export async function rebuildCaddyAction(
-  _prevState: ActionResult | null,
+  _prevState: SettingsResult | null,
   _formData: FormData,
-): Promise<ActionResult> {
+): Promise<SettingsResult> {
   void _formData;
-  const t = await getTranslations();
   try {
+    const t = await getTranslations();
     await requireCan("settings:write");
     const status = await applyCaddyBuild();
     revalidatePath("/settings");
@@ -2457,6 +2575,8 @@ export async function rebuildCaddyAction(
       message: agentStatusMessage(t, status) ?? t("settings.results.rebuildTriggered"),
     };
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations();
     console.error("Failed to trigger a Caddy rebuild:", error);
     return {
       success: false,
@@ -2470,7 +2590,8 @@ function parseCustomModules(raw: FormDataEntryValue | null): CaddyCustomModule[]
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
     throw domainError("customModulesUnreadable");
   }
   if (!Array.isArray(parsed)) return [];
@@ -2583,9 +2704,9 @@ export const updateCertificateAlertSettingsAction = serializedSettingsAction(
 );
 
 /** To whoever the notifications go to, so it proves the recipients as well as the server. */
-export async function sendTestNotificationAction(): Promise<ActionResult> {
-  const t = await getTranslations("settings");
+export async function sendTestNotificationAction(): Promise<SettingsResult> {
   try {
+    const t = await getTranslations("settings");
     await requireCan("settings:write");
     const { sendTestNotification } = await import("@/src/lib/notifications");
     const recipients = await sendTestNotification();
@@ -2600,15 +2721,17 @@ export async function sendTestNotificationAction(): Promise<ActionResult> {
       }),
     };
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations("settings");
     console.error("Failed to send a test notification:", error);
     return { success: false, message: await errorText(error, t("email.testNotificationFailed")) };
   }
 }
 
 /** Sends with the saved settings, to `recipient` or the signed-in administrator. */
-export async function sendTestEmailAction(recipient: string): Promise<ActionResult> {
-  const t = await getTranslations("settings");
+export async function sendTestEmailAction(recipient: string): Promise<SettingsResult> {
   try {
+    const t = await getTranslations("settings");
     const session = await requireCan("settings:write");
     const to = recipient.trim() || session.user.email;
     if (!isEmailAddress(to)) return { success: false, message: t("email.testInvalidRecipient") };
@@ -2623,13 +2746,15 @@ export async function sendTestEmailAction(recipient: string): Promise<ActionResu
     await sendEmail(await testEmail(to, smtp.host, await getLocale()));
     return { success: true, message: t("email.testSent", { email: to }) };
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations("settings");
     console.error("Failed to send a test email:", error);
     return { success: false, message: await errorText(error, t("email.testFailed")) };
   }
 }
 
 /** Not staged: it writes only the databases, and there is nothing for an operator to review. */
-export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
+export async function updateGeoipDatabasesAction(): Promise<SettingsResult> {
   try {
     await requireCan("settings:write");
     const { updateGeoipDatabases } = await import("@/src/lib/geoip/updater");
@@ -2641,6 +2766,9 @@ export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
     if (result.skipped === "disabled") return { success: false, message: t("geoipUpdateDisabled") };
     if (result.skipped === "unconfigured") {
       return { success: false, message: t("geoipUpdateUnconfigured") };
+    }
+    if (result.skipped === "offline") {
+      return { success: false, message: (await getTranslations("errors"))("outboundOffline") };
     }
     if (result.error) {
       const { geoipUpdateErrorMessage } = await import("@/src/lib/geoip/messages");
@@ -2657,6 +2785,7 @@ export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
           : t("geoipCheckedNow"),
     };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to check MaxMind for updates:", error);
     return {
@@ -2672,9 +2801,9 @@ export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
  * Not wrapped in `serializedSettingsAction`: `applyStagedSettings` locks around both the commit
  * and the push, so no staged write lands between them.
  */
-export async function applyStagedSettingsAction(): Promise<ActionResult> {
-  const t = await getTranslations();
+export async function applyStagedSettingsAction(): Promise<SettingsResult> {
   try {
+    const t = await getTranslations();
     const session = await requireCan("settings:write");
     const userId = Number(session.user.id);
     const staged = await listStagedSettings(userId);
@@ -2715,6 +2844,8 @@ export async function applyStagedSettingsAction(): Promise<ActionResult> {
       message: t("settings.results.stagedApplied", { revision: String(outcome.revision) }),
     };
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations();
     console.error("Failed to apply staged settings:", error);
     return {
       success: false,
@@ -2723,7 +2854,7 @@ export async function applyStagedSettingsAction(): Promise<ActionResult> {
   }
 }
 
-export async function discardStagedSettingsAction(key?: string): Promise<ActionResult> {
+export async function discardStagedSettingsAction(key?: string): Promise<SettingsResult> {
   try {
     const session = await requireCan("settings:write");
     const userId = Number(session.user.id);
@@ -2735,6 +2866,7 @@ export async function discardStagedSettingsAction(key?: string): Promise<ActionR
     revalidatePath("/settings", "layout");
     return { success: true };
   } catch (error) {
+    unstable_rethrow(error);
     const t = await getTranslations();
     console.error("Failed to discard staged settings:", error);
     return {
@@ -2745,9 +2877,9 @@ export async function discardStagedSettingsAction(key?: string): Promise<ActionR
 }
 
 /** Stage the values an earlier revision had. The operator applies it through the review sheet. */
-export async function restoreRevisionAction(revision: number): Promise<ActionResult> {
-  const t = await getTranslations();
+export async function restoreRevisionAction(revision: number): Promise<SettingsResult> {
   try {
+    const t = await getTranslations();
     const session = await requireCan("settings:write");
     const { staged } = await stageRevisionRestore(Number(session.user.id), revision);
     revalidatePath("/settings", "layout");
@@ -2757,6 +2889,8 @@ export async function restoreRevisionAction(revision: number): Promise<ActionRes
       message: t("settings.history.restoreStaged", { count: staged, id: revision }),
     };
   } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations();
     console.error("Failed to stage a revision restore:", error);
     return {
       success: false,
@@ -2771,34 +2905,42 @@ export async function restoreRevisionAction(revision: number): Promise<ActionRes
  * Only the code comes back: the secret is minted at `/api/agent/v1/pair`, since an action's
  * return value is serialized to the browser.
  */
-export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
-  await requireCan("agents:write");
-  const { code, expiresAt } = await ensurePairingCode();
-  return { code, expiresAt };
+export async function pairingCodeAction(): Promise<
+  ActionResult<{ code: string; expiresAt: number }>
+> {
+  return runAction(async () => {
+    await requireCan("agents:write");
+    const { code, expiresAt } = await ensurePairingCode();
+    return { code, expiresAt };
+  });
 }
 
 /** Throw the live code away, so the next read mints a fresh one. */
-export async function revokePairingCodeAction(): Promise<void> {
-  await requireCan("agents:write");
-  await revokePairingCode();
-  revalidatePath("/settings");
+export async function revokePairingCodeAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireCan("agents:write");
+    await revokePairingCode();
+    revalidatePath("/settings");
+  });
 }
 
 /**
  * The agent goes idle, which stops its Caddy. For the bundled agent this also turns auto-pairing
  * off, or it would find a fresh bootstrap token and pair straight back.
  */
-export async function unpairAgentAction(formData: FormData): Promise<void> {
-  await requireCan("agents:write");
-  const id = Number(formData.get("agentId"));
-  if (Number.isNaN(id)) return;
-  const agentId = await deleteAgent(id);
-  if (agentId) {
-    await revokeRepairCode(agentId);
-    await forgetBootstrapAgent(agentId);
-    detach(agentId);
-  }
-  revalidatePath("/settings");
+export async function unpairAgentAction(formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireCan("agents:write");
+    const id = Number(formData.get("agentId"));
+    if (Number.isNaN(id)) return;
+    const agentId = await deleteAgent(id);
+    if (agentId) {
+      await revokeRepairCode(agentId);
+      await forgetBootstrapAgent(agentId);
+      detach(agentId);
+    }
+    revalidatePath("/settings");
+  });
 }
 
 export type RepairAgentResult =
@@ -2810,20 +2952,28 @@ export type RepairAgentResult =
  * Recovery for a lost or undecryptable secret. The bundled agent gets a bootstrap token bound to
  * its id; any other gets a code that re-pairs it and nothing else.
  */
-export async function repairAgentAction(agentRowId: number): Promise<RepairAgentResult> {
-  await requireCan("agents:write");
-  const agent = await findAgentById(agentRowId);
-  if (!agent) return { kind: "failed" };
-  if (await isBundledAgent(agent.agentId)) {
-    return (await issueBootstrapToken(agent.agentId)) ? { kind: "bootstrap" } : { kind: "failed" };
-  }
-  const { code, expiresAt } = await mintRepairCode(agent.agentId);
-  return { kind: "code", code, expiresAt };
+export async function repairAgentAction(
+  agentRowId: number,
+): Promise<ActionResult<RepairAgentResult>> {
+  return runAction(async () => {
+    await requireCan("agents:write");
+    const agent = await findAgentById(agentRowId);
+    if (!agent) return { kind: "failed" };
+    if (await isBundledAgent(agent.agentId)) {
+      return (await issueBootstrapToken(agent.agentId))
+        ? { kind: "bootstrap" }
+        : { kind: "failed" };
+    }
+    const { code, expiresAt } = await mintRepairCode(agent.agentId);
+    return { kind: "code", code, expiresAt };
+  });
 }
 
 /** Let the bundled agent pair itself again, after unpairing it turned that off. */
-export async function enableAutoPairingAction(): Promise<void> {
-  await requireCan("agents:write");
-  await enableAutoPairing();
-  revalidatePath("/settings");
+export async function enableAutoPairingAction(): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireCan("agents:write");
+    await enableAutoPairing();
+    revalidatePath("/settings");
+  });
 }

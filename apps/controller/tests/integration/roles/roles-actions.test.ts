@@ -30,6 +30,7 @@ import { graphql } from 'graphql';
 import { schema as servedSchema } from '@/src/lib/graphql/schema';
 import type { GraphQLContext } from '@/src/lib/graphql/context';
 import { deleteRoleAction, saveRoleAction } from '@/src/app/(dashboard)/users/roles/actions';
+import { unwrap } from '@/src/lib/errors/action-result';
 import {
   addGroupMemberAction,
   setGroupGrantsAction,
@@ -83,33 +84,41 @@ beforeEach(async () => {
 
 describe('the Roles page', () => {
   it('makes, changes and deletes a role for an administrator', async () => {
-    const made = await saveRoleAction(null, { name: 'Auditors', capabilities: ['audit:read'] });
+    const made = await saveRoleAction(null, {
+      name: 'Auditors',
+      capabilities: ['audit:read'],
+    }).then(unwrap);
     const changed = await saveRoleAction(made.key, {
       name: 'Auditors',
       capabilities: ['audit:write'],
-    });
+    }).then(unwrap);
     expect(changed.capabilities).toEqual(['audit:read', 'audit:write']);
-    await deleteRoleAction(made.key);
+    await deleteRoleAction(made.key).then(unwrap);
     expect(await ctx.db.select().from(schema.roles)).toHaveLength(1);
   });
 
   it('turns a made role away from more than it holds, and from its own role', async () => {
     ctx.session = { user: manager };
     expect(
-      await thrown(saveRoleAction(null, { name: 'Wider', capabilities: ['settings:read'] })),
+      await thrown(
+        saveRoleAction(null, { name: 'Wider', capabilities: ['settings:read'] }).then(unwrap),
+      ),
     ).toContain('permissions you hold');
     expect(
-      await thrown(saveRoleAction(managerRole, { name: 'People', capabilities: [] })),
+      await thrown(saveRoleAction(managerRole, { name: 'People', capabilities: [] }).then(unwrap)),
     ).toContain('role you hold');
-    const narrow = await saveRoleAction(null, { name: 'Narrow', capabilities: ['users:read'] });
+    const narrow = await saveRoleAction(null, {
+      name: 'Narrow',
+      capabilities: ['users:read'],
+    }).then(unwrap);
     expect(narrow.capabilities).toEqual(['users:read']);
   });
 
   it('is refused to a role without roles:write', async () => {
     ctx.session = { user: await seedUser(ctx.db, 'viewer@example.com', 'viewer') };
-    expect(await thrown(saveRoleAction(null, { name: 'X', capabilities: [] }))).toContain(
-      'You do not have access',
-    );
+    expect(
+      await thrown(saveRoleAction(null, { name: 'X', capabilities: [] }).then(unwrap)),
+    ).toContain('You do not have access');
   });
 });
 
@@ -124,16 +133,18 @@ describe('a group', () => {
 
   it('gives a role an administrator sets, and never admin', async () => {
     const id = await seedGroup();
-    await setGroupRoleAction(id, 'operator');
+    unwrap(await setGroupRoleAction(id, 'operator'));
     const [row] = await ctx.db.select().from(schema.groups);
     expect(row.role).toBe('operator');
-    expect(await thrown(setGroupRoleAction(id, 'admin'))).toContain('administrator role');
+    expect(await thrown(setGroupRoleAction(id, 'admin').then(unwrap))).toContain(
+      'administrator role',
+    );
   });
 
   it('cannot be joined by a manager when it gives more than the manager holds', async () => {
     const id = await seedGroup('operator');
     ctx.session = { user: manager };
-    expect(await thrown(addGroupMemberAction(id, Number(manager.id)))).toContain(
+    expect(await thrown(addGroupMemberAction(id, Number(manager.id)).then(unwrap))).toContain(
       'permissions you hold',
     );
     expect(await ctx.db.select().from(schema.groupMembers)).toEqual([]);
@@ -153,9 +164,11 @@ describe('a group', () => {
     const grant = [
       { resource: { kind: 'proxyHost' as const, id: 1 }, capability: 'manage' as const },
     ];
-    expect(await thrown(setGroupGrantsAction(id, grant))).toContain('permissions you hold');
+    expect(await thrown(setGroupGrantsAction(id, grant).then(unwrap))).toContain(
+      'permissions you hold',
+    );
     ctx.session = { user: admin };
-    await setGroupGrantsAction(id, grant);
+    unwrap(await setGroupGrantsAction(id, grant));
     expect(await ctx.db.select().from(schema.groupGrants)).toHaveLength(1);
   });
 });

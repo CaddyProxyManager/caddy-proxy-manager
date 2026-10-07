@@ -30,6 +30,9 @@ const {
   isLeader,
 } = await import('../../../src/lib/cluster');
 const { catchUpOnAnnouncements } = await import('../../../src/lib/cluster/announcements');
+const { listenForMessages, onClusterMessage, stopListening } = await import(
+  '../../../src/lib/cluster/bus'
+);
 const { contendForLeadership, resignLeadership } = await import('../../../src/lib/cluster/leader');
 const { keyFingerprint, liveReplicas, replicaHeartbeat } = await import(
   '../../../src/lib/cluster/replicas'
@@ -139,6 +142,32 @@ describe('announcements', () => {
     await catchUpOnAnnouncements();
     await catchUpOnAnnouncements();
     expect(dropped).toBe(1);
+  });
+});
+
+describe.skipIf(!onPostgres)('listening to the other replicas', () => {
+  it('lets go of its subscriptions when stopped', async () => {
+    const other = otherReplica();
+    const heard: unknown[] = [];
+    onClusterMessage('test-ping', (data) => heard.push(data));
+    const send = (n: number) =>
+      other.notify('cpm_bus', JSON.stringify({ from: 'other', type: 'test-ping', data: n }));
+    try {
+      await listenForMessages(postgresClient!);
+      expect(cluster.subscriptions).toHaveLength(1);
+      await send(1);
+      await eventually(() => heard.length === 1);
+
+      await stopListening();
+      expect(cluster.subscriptions).toEqual([]);
+      await send(2);
+      await Bun.sleep(200);
+      expect(heard).toEqual([1]);
+    } finally {
+      cluster.messageHandlers.delete('test-ping');
+      await stopListening();
+      await other.close();
+    }
   });
 });
 

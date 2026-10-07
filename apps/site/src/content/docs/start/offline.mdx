@@ -1,0 +1,224 @@
+---
+title: Installing without internet access
+description: Running Caddy Proxy Manager on a host with no route out - the air-gap bundle, bringing in third-party images, offline mode and certificates.
+sidebar:
+  order: 3
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import ThirdPartyImages from "../../../components/ThirdPartyImages.astro";
+
+A host with no route to the internet runs the same stack as any other. Two things differ: the
+images arrive some other way, and the controller is told not to reach out on its own.
+
+Each release carries CPM's own three images (web, caddy and agent) as files. The other images the
+stack runs (the database, the Docker socket proxy, ClickHouse and CrowdSec) belong to other
+projects, and you fetch them through whatever channel your site approves. They are pinned by
+digest, so whichever way they come in, they can be checked against the release.
+
+## The air-gap bundle
+
+Every [release](https://source.caddyproxy.com/releases/latest) has, per architecture (`amd64` and
+`arm64`):
+
+| File | What it holds |
+| --- | --- |
+| `-airgap-web.tar.gz`, `-airgap-caddy.tar.gz`, `-airgap-agent.tar.gz` | `docker save` of each of CPM's images |
+| `-airgap-deploy.tar.gz` | The release's deployment files, plus `airgap-load.sh` |
+| `-airgap-manifest.txt` | The checksum of every file above, and the third-party images by digest |
+| `-airgap-manifest.txt.sigstore.json` | The manifest's signature |
+
+A file of 2 GiB or more ships in parts (`.part-aa`, `.part-ab`, ...). Keep the parts together;
+the load script reads them in order and needs no joining.
+
+Check the signature on a connected machine before carrying the files over. It is a keyless
+[Sigstore](https://www.sigstore.dev/) signature made by the release workflow, so it names that
+workflow at the release's tag:
+
+```bash
+cosign verify-blob \
+  --bundle caddy-proxy-manager-v<version>-amd64-airgap-manifest.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/CaddyProxyManager/caddy-proxy-manager/\.github/workflows/docker-build-trusted\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  caddy-proxy-manager-v<version>-amd64-airgap-manifest.txt
+```
+
+The checksums come from the manifest itself, so a verified manifest vouches for every other file.
+The load script checks them again on the target host.
+
+## Third-party images
+
+<ThirdPartyImages />
+
+PostgreSQL is not needed when the controller keeps its data in [SQLite](../database/). ClickHouse
+and CrowdSec are needed only if you turn on [analytics](../../features/analytics/) or
+[managed CrowdSec](../../features/crowdsec/#managed); the agent starts them, and it runs them from
+images already on the host.
+
+Pick one way to bring them in.
+
+### Through a registry mirror
+
+All four come from Docker Hub, so a pull-through mirror covers them without touching the compose
+file. Point the Docker daemon at it in `/etc/docker/daemon.json`:
+
+```json
+{ "registry-mirrors": ["https://mirror.example.internal"] }
+```
+
+Restart the daemon, then pull them through the mirror before you run the load script:
+
+```bash
+docker compose --profile '*' pull postgres docker-socket-proxy clickhouse crowdsec
+```
+
+The compose file names each one by digest, so what the mirror hands over is checked on the way in.
+
+### Through a private registry
+
+If the images live in your own registry under other names, name them in a
+`docker-compose.override.yml` beside `docker-compose.yml`, with the same digests:
+
+```yaml
+services:
+  postgres:
+    image: registry.example.internal/postgres:18-alpine@sha256:<the digest above>
+  docker-socket-proxy:
+    image: registry.example.internal/docker-socket-proxy:v0.5.0@sha256:<the digest above>
+```
+
+Keep the digest. The load script and Compose both refuse a reference whose digest differs from the
+release's. The agent passes `docker-compose.override.yml` to every Compose call it makes, so the
+ClickHouse and CrowdSec containers it starts use your names too.
+
+### With `docker save` and `docker load`
+
+On a connected machine, pull each image by its reference above and save them to one file:
+
+```bash
+docker save -o third-party.tar \
+  postgres:18-alpine@sha256:<digest> \
+  tecnativa/docker-socket-proxy:v0.5.0@sha256:<digest>
+```
+
+Then `docker load -i third-party.tar` on the target host. Only Docker's containerd image store
+keeps the digest an image was pulled by through a save and load, and Compose finds the image by
+that digest. It is the default on fresh installs of Docker Engine 29;
+`docker info -f '{{ .DriverStatus }}'` shows `io.containerd.snapshotter.v1` when it is on. With
+the older store, use a registry instead; the load script names every image it cannot find.
+
+## Install
+
+<Steps>
+
+1. Put every file of the bundle for your architecture in one directory, say `~/cpm-bundle`, and
+   unpack the deploy archive into the installation's own directory:
+
+   ```bash
+   mkdir caddy-proxy-manager
+   tar -xzf ~/cpm-bundle/caddy-proxy-manager-v<version>-amd64-airgap-deploy.tar.gz -C caddy-proxy-manager
+   cd caddy-proxy-manager
+   ```
+
+   Keep that directory name, for the reason the [install guide](../install/) gives.
+
+2. Generate `.env` as for any install, and turn [offline mode](#offline-mode) on from the start:
+
+   ```bash
+   echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+   echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+   echo "OFFLINE_MODE=true" >> .env
+   chmod 600 .env
+   ```
+
+3. Load the images:
+
+   ```bash
+   ./airgap-load.sh ~/cpm-bundle
+   ```
+
+   It checks every file against the manifest, refuses a bundle for another architecture, loads
+   CPM's images, then checks that each third-party image the compose files would run is on this
+   host at the release's digest. It pulls nothing and starts nothing. When an image is missing, it
+   names it and stops.
+
+4. Start the stack:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Then carry on with [first run](../first-run/).
+
+</Steps>
+
+To upgrade, do the same with the next release's bundle: unpack its deploy archive over the
+directory (your `.env` and `docker-compose.override.yml` are not in it), run the load script, and
+`docker compose up -d`.
+
+### Name lookups
+
+With no DNS server reachable, Docker answers a name it does not know (`caddy-admin` before Caddy
+first runs, an upstream on another network) with a failure the controller and the agent would
+otherwise wait 5 seconds on. The compose file gives both `dns_opt` of `timeout:2` and `attempts:2`,
+so such a lookup gives up after 2 seconds; on a connected host, answers arrive long before that.
+For a slower DNS server, replace the list in `docker-compose.override.yml` with `!override`,
+since the first `timeout` listed is the one that counts:
+
+```yaml
+services:
+  web:
+    dns_opt: !override ["timeout:5", "attempts:2"]
+```
+
+## Offline mode
+
+Offline mode stops every call the controller would make to the internet on its own:
+
+- the update check;
+- [Let's Debug](../../features/certificates/), when someone asks it about a domain;
+- Gravatar, so avatars fall back to initials;
+- the [CRS plugin registry](../../features/waf/);
+- MaxMind's GeoIP downloads;
+- browser push notifications;
+- Caddy image builds by the agents.
+
+Turn it on in **Settings → Outbound connections**, or with `OFFLINE_MODE=true` in `.env` as
+above. That page lists every connection the deployment can open, whether it goes to the internet,
+to a destination you configured, or stays inside the stack, and what offline mode does to it.
+Destinations you configured, such as SMTP, LDAP, single sign-on providers, alert webhooks and
+backup storage, are still reached, since an offline network can host all of them itself.
+
+### GeoIP databases
+
+With downloads off, upload the databases instead. Download the GeoLite2 `.mmdb` files on a
+connected machine, then pick each under **Settings → Geo-blocking → GeoIP databases → Upload a
+database**. The file is opened first, so a corrupt file or another edition is refused rather than
+replacing a working one. Agents then fetch it from the controller as they would a download.
+
+### Caddy builds
+
+Building Caddy downloads its Go modules, so in offline mode every agent behaves as if it had
+`CADDY_BUILD_MODE=external`: it never builds, and a change of modules waits for an image you
+built. Build it on a connected machine as [Caddy build](../../features/caddy-build/#building-the-image-yourself)
+describes, bring it in like any other image, and use **Load built image**. The shipped Caddy
+image, from the bundle, already carries every module CPM ships with.
+
+### CrowdSec
+
+The CrowdSec image downloads the collections it is configured with from its hub the first time it
+starts, and talks to CrowdSec's online API if signal sharing is on. Offline, keep signal sharing
+off, and expect the managed container to need its collections from a mirror of the hub, or use an
+[external](../../features/crowdsec/#external) CrowdSec your site already runs.
+
+## Certificates
+
+Caddy's default issuers are public ACME certificate authorities, which an offline host cannot
+reach. Use one of:
+
+- **An internal ACME CA.** Set its directory under **Settings → General → ACME server** and supply
+  its root, as [certificates](../../features/certificates/#automatic) describes.
+- **Imported certificates**, issued however your site issues them, with expiry tracked. See
+  [manual imports](../../features/certificates/#manual-imports).
+- **Certificates from files** that something else renews on the agent's host. See
+  [certificates from files](../../features/certificates/#certificates-from-files).

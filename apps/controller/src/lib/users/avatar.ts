@@ -6,6 +6,7 @@
 
 import { createHash } from "node:crypto";
 
+// outbound: gravatar
 export const GRAVATAR_ORIGIN = "https://www.gravatar.com";
 
 /**

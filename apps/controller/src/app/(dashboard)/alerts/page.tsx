@@ -1,6 +1,7 @@
 import { requireCan } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { unwrap } from "@/src/lib/errors/action-result";
 import { loadAlertsOverviewAction } from "./actions";
 import AlertsClient from "./AlertsClient";
 
@@ -11,5 +12,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AlertsPage() {
   await requireCan("alerts:read");
-  return <AlertsClient initial={await loadAlertsOverviewAction()} />;
+  return <AlertsClient initial={unwrap(await loadAlertsOverviewAction())} />;
 }

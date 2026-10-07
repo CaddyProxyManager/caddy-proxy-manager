@@ -29,8 +29,8 @@ import WafDemo from "../../../demos/samples/WafDemo";
 - **Blocking** - a request that reaches the anomaly threshold, or matches a rule that denies on
   its own, gets 403.
 
-Detect first is the usual order: it tells you what the rules would have done to your traffic
-before they start doing it. A host's WAF card sets its own mode or leaves it on **Global
+The usual order is to detect first, which shows what the rules would do to your traffic before they
+start doing it. A host's WAF card sets its own mode or leaves it on **Global
 default**, and the **Hosts** tab lists every proxy host with its mode, where that mode comes from
 (the global setting, the host's own, turned off on the host, or a host overriding the global WAF)
 and its WAF events in the last 7 days.
@@ -113,8 +113,8 @@ anything still selects it; the error names what does.
 
 The [CRS plugin registry](https://github.com/coreruleset/plugin-registry) lists plugins for the
 Core Rule Set: rule exclusions for WordPress, Nextcloud, Drupal, phpMyAdmin and other applications,
-and extra detections. **WAF → Plugins** lists the registry with whether each plugin is official or third party, how far
-it has been tested and its license, and installs one with a click.
+and extra detections. **WAF → Plugins** lists the registry with whether each plugin is official or
+third party, how far it has been tested and its license, and installs one with a click.
 
 Installing fetches the plugin's latest release from its GitHub repository - or the newest commit,
 for a plugin that has never tagged one - and stores its files, so what runs is exactly what was
@@ -163,10 +163,9 @@ An install, an update and a configuration edit also go through the checks in
 [Before anything is saved](#before-anything-is-saved), Caddy's own included. A plugin that gets
 past all of them can still, rarely, be one Coraza refuses - one seeded from a backup, say, or
 checked while no agent could run Caddy - and Coraza building the WAF is part of Caddy loading its
-config, so one such plugin would stop every host's config from loading. When that happens the
-plugin is found and switched off, and the config loads without it: hosts that select it keep the
-rest of their WAF.
-The plugin is marked **Disabled** in its row, the audit log records it, and opening the plugin
+config, so one such plugin would stop every host's config from loading. When that happens, CPM
+finds the plugin and switches it off, and the config loads without it: hosts that select it keep
+the rest of their WAF. The plugin is marked **Disabled** in its row, the audit log records it, and opening the plugin
 shows what happened with a **Retry** button. Updating it or editing its configuration tries it
 again too.
 
@@ -220,7 +219,8 @@ before they are stored - custom directives, presets and a CRS plugin's files ali
   RE2 engine does not support. An error blocks the save. A warning - a rule with no id, or one in
   the range the CRS reserves - does not.
 - **On save.** The agent has its own Caddy validate the WAFs the change produces - the edited one,
-  and every host that merges or selects it - without loading them. This is what catches the rest:
+  and every host that merges or selects it - without loading them. This catches what the editor
+  cannot:
   a rule id the CRS already uses, rules from the global settings and a host colliding once merged,
   or a pattern Go refuses to compile. The error says which WAF was refused and quotes Coraza.
 
