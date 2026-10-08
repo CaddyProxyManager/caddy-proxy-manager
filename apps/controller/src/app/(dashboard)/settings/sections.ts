@@ -65,9 +65,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           { id: "general", name: "General" },
           {
-            id: "updates",
-            name: "Updates",
-            envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
+            id: "instance",
+            name: "Instance",
+            envSearch: ["APP_NAME", "BASE_URL"],
           },
           {
             id: "branding",
@@ -75,9 +75,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             envSearch: ["ACCENT_COLOR"],
           },
           {
-            id: "instance",
-            name: "Instance",
-            envSearch: ["APP_NAME", "BASE_URL"],
+            id: "updates",
+            name: "Updates",
+            envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
           },
           {
             id: "avatars",
