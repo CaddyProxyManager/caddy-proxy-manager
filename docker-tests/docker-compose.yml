@@ -90,7 +90,7 @@ services:
 
   # dnsmasq forwards dyn.cpm.test here. No healthcheck: the image has nothing to run one with.
   coredns:
-    image: coredns/coredns:1.12.4@sha256:986f04c2e15e147d00bdd51e8c51bcef3644b13ff806be7d2ff1b261d6dfbae1
+    image: coredns/coredns:1.14.7@sha256:7efd3c635b03efd68c4e8398fc45f0d993d0e9ab016f72c1cefb0fd6d01aa286
     container_name: cpm-test-coredns
     command: ["-conf", "/etc/coredns/Corefile"]
     volumes:
@@ -550,7 +550,7 @@ services:
   # Two SMTP servers with the rig CA's certificate: STARTTLS required with credentials, and
   # implicit TLS. Each keeps what it received behind its own API on :8025.
   mailpit:
-    image: axllent/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     container_name: cpm-test-mailpit
     environment:
       MP_SMTP_TLS_CERT: /certs/mailpit.crt.pem
@@ -575,7 +575,7 @@ services:
       retries: 20
 
   mailpit-tls:
-    image: axllent/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     container_name: cpm-test-mailpit-tls
     environment:
       MP_SMTP_TLS_CERT: /certs/mailpit.crt.pem
@@ -761,7 +761,7 @@ services:
   # The HTTP cache's storage, for agent-tests/78-http-cache.
   redis:
     profiles: ["agent"]
-    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     container_name: cpm-test-redis
     networks:
       cpm-test:

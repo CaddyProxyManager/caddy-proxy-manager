@@ -59,7 +59,12 @@
   },
   "overrides": {
     "@astrojs/starlight": "0.42.5",
-    "@esbuild-kit/esm-loader": "file:./patches/esbuild-kit-esm-loader-stub"
+    "@esbuild-kit/esm-loader": "file:./patches/esbuild-kit-esm-loader-stub",
+    "@graphql-tools/utils": "^12.0.3",
+    "fflate": "^0.7.5",
+    "http-cache-semantics": "^4.3.0",
+    "postcss-selector-parser": "^7.1.6",
+    "source-map-js": "^1.2.2"
   },
   "trustedDependencies": [
     "@astryxdesign/core",

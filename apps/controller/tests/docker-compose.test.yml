@@ -296,7 +296,7 @@ services:
       start_period: 20s
 
   dex:
-    image: dexidp/dex:v2.45.1
+    image: dexidp/dex:v2.46.0
     command: ["dex", "serve", "/etc/dex/config.yml"]
     volumes:
       - ./apps/controller/tests/dex/config.yml:/etc/dex/config.yml:ro
@@ -336,7 +336,7 @@ services:
   # Hostile IdP for the role-injection (H3) test: Dex cannot emit custom claims, so this injects
   # `role: admin`. The browser uses localhost:5557; mock-oidc:8080 is also the token `iss`.
   mock-oidc:
-    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.4
     environment:
       JSON_CONFIG_PATH: /config.json
     volumes:
@@ -348,7 +348,7 @@ services:
   # A real IdP for back-channel logout. One name for the browser and web alike, since the issuer
   # must match both: specs map `keycloak` to 127.0.0.1 with --host-resolver-rules.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.8.0
     command: ["start-dev", "--import-realm"]
     environment:
       KC_HTTP_PORT: "8180"
@@ -376,7 +376,7 @@ services:
       start_period: 30s
   # Catches the mail web sends. SMTP auth is enforced, so a send proves the stored password.
   mailpit:
-    image: axllent/mailpit:v1.31.3
+    image: axllent/mailpit:v1.31.4
     environment:
       MP_SMTP_AUTH: "cpm-smtp:SmtpE2ePassword2026"
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
@@ -397,7 +397,7 @@ services:
     networks:
       - caddy-network
   cap-valkey:
-    image: valkey/valkey:8.1-alpine
+    image: valkey/valkey:9.2-alpine
     networks:
       - caddy-network
   echo-server:
