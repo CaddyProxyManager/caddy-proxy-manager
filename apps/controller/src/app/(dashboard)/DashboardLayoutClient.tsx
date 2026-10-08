@@ -18,7 +18,6 @@ import { NavIcon } from "@astryxdesign/core/NavIcon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
@@ -370,11 +369,6 @@ export default function DashboardLayoutClient({
                 heading={appName}
                 headingHref="/"
                 subheading={formatAppVersion()}
-                // Beside the version, not a banner, so there is nothing to dismiss.
-                subheadingHref={updateAvailable ? "/settings" : undefined}
-                headerEndContent={
-                  updateAvailable ? <Badge variant="warning" label={t("updateBadge")} /> : undefined
-                }
                 icon={
                   <NavIcon
                     icon={
@@ -390,7 +384,18 @@ export default function DashboardLayoutClient({
           >
             {/* No shortcut to advertise on a phone, where the tab bar navigates. */}
             <div className="cpm-desktop-only">
-              <VStack padding={2}>
+              <VStack padding={2} gap={2}>
+                {/* Not a banner, so there is nothing to dismiss; not in the heading, which is one
+                    link home, and whose xsm version link is under axe's 24px target size. */}
+                {updateAvailable && (
+                  <Button
+                    label={t("updateBadge")}
+                    size="sm"
+                    width="100%"
+                    href="/settings"
+                    as={Link}
+                  />
+                )}
                 <PaletteSearchButton />
               </VStack>
             </div>
