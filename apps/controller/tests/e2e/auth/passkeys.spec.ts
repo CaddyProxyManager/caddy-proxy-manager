@@ -8,6 +8,7 @@ import * as seed from '../../helpers/seed';
 import { waitForHydration } from '../../helpers/hydration';
 import { waitForStatus } from '../../helpers/http';
 import { signInWithCredentials } from '../../helpers/sign-in';
+import { goToSetting, savePage } from '../../helpers/settings-nav';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,6 +70,27 @@ async function admin(browser: Browser) {
   return (await browser.newContext({ storageState: ADMIN_STATE })).request;
 }
 
+/** Offer passkeys automatically, off by default; a registry setting, so only Settings saves it. */
+async function setPasskeyAutofill(browser: Browser, on: boolean) {
+  const adminContext = await browser.newContext({ storageState: ADMIN_STATE, baseURL: BASE });
+  try {
+    const adminPage = await adminContext.newPage();
+    await goToSetting(adminPage, 'Sign-in');
+    const toggle = adminPage.getByRole('switch', { name: /^Offer passkeys automatically/ });
+    if ((await toggle.isChecked()) === on) return;
+    await toggle.click();
+    await savePage(adminPage);
+    await expect(
+      adminPage
+        .getByRole('status')
+        .filter({ hasText: /settings saved/i })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await adminContext.close();
+  }
+}
+
 test.describe('Passkeys', () => {
   let authenticator: Awaited<ReturnType<typeof attachAuthenticator>>;
 
@@ -120,7 +142,23 @@ test.describe('Passkeys', () => {
     await expect(page.getByText(EMAIL).first()).toBeVisible();
   });
 
-  test('signs in from the username field autofill, with no click at all', async () => {
+  test('asks for nothing until the button is clicked, with autofill off', async () => {
+    await context.clearCookies();
+    await context.addCookies([{ name: AUTOFILL_COOKIE, value: '1', url: BASE }]);
+    try {
+      await page.goto(`${BASE}/login`);
+      await waitForHydration(page);
+      // The autofill ceremony would finish ~100ms after hydration; give it ample time not to.
+      await page.waitForTimeout(2_000);
+      await expect(page).toHaveURL(/\/login/);
+      await expect(page.getByLabel(/^username/i)).toHaveAttribute('autocomplete', 'username');
+    } finally {
+      await context.clearCookies({ name: AUTOFILL_COOKIE });
+    }
+  });
+
+  test('signs in from the username field autofill, with no click at all', async ({ browser }) => {
+    await setPasskeyAutofill(browser, true);
     await context.clearCookies();
     await context.addCookies([{ name: AUTOFILL_COOKIE, value: '1', url: BASE }]);
     try {
@@ -131,6 +169,7 @@ test.describe('Passkeys', () => {
       await expect(page.getByText(EMAIL).first()).toBeVisible();
     } finally {
       await context.clearCookies({ name: AUTOFILL_COOKIE });
+      await setPasskeyAutofill(browser, false);
     }
   });
 
