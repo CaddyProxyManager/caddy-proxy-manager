@@ -89,7 +89,7 @@ import type { OAuthProviderView } from "@/src/lib/auth/oidc/provider-view";
 import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
-import { useFormatter, useNow, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useNow, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   updateDnsProviderSettingsAction,
@@ -1079,12 +1079,12 @@ function DnsProviderCredentialFields({ providerDef }: { providerDef: DnsProvider
 
 function DnsProvidersSection({
   dnsProvider,
-  dnsProviderDefinitions,
+  dnsProviderDefinitions: registryOrder,
   dnsProviderState,
   dnsProviderFormAction,
   selectedProvider,
   setSelectedProvider,
-  configuredProviders,
+  configuredProviders: savedOrder,
 }: {
   dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
@@ -1097,6 +1097,15 @@ function DnsProvidersSection({
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
   const { enabledModuleIds } = useModuleGate();
+  const locale = useLocale();
+  // By the name shown: the registry is in no order a reader can search by.
+  const dnsProviderDefinitions = [...registryOrder].sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, locale),
+  );
+  const configuredProviders = dnsProviderDefinitions
+    .map((p) => p.name)
+    .filter((name) => savedOrder.includes(name))
+    .concat(savedOrder.filter((name) => !registryOrder.some((p) => p.name === name)));
   // Each provider is its own caddy-dns module; one switched off would make Caddy reject the config,
   // so it is refused here rather than at issuance time.
   const isProviderAvailable = (name: string) =>
