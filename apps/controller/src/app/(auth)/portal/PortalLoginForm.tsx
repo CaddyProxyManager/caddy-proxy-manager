@@ -33,6 +33,7 @@ import {
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import {
   AUTOFILL_CURRENT_PASSWORD,
+  AUTOFILL_USERNAME,
   AUTOFILL_USERNAME_WEBAUTHN,
 } from "@/components/ui/native-input-attrs";
 import { startProviderSignIn } from "@/src/components/auth/provider-sign-in";
@@ -56,6 +57,8 @@ interface PortalLoginFormProps {
   cspNonce?: string;
   /** As on /login: one is a silent fallback, several get a selector. */
   directories?: DirectoryChoice[];
+  /** As on /login: start the passkey autofill request on load. */
+  passkeyAutofill?: boolean;
 }
 
 function PortalCard({
@@ -100,6 +103,7 @@ export default function PortalLoginForm({
   captcha = null,
   cspNonce,
   directories = [],
+  passkeyAutofill = false,
 }: PortalLoginFormProps) {
   const frame = usePageFrame();
   const t = useTranslations("auth");
@@ -165,6 +169,7 @@ export default function PortalLoginForm({
   // The portal is on the Public URL's origin, so the dashboard's passkeys work here too.
   const passkey = usePasskeySignIn({
     enabled: localLoginEnabled && hasRedirect && !errorMessage && !existingSession,
+    autoFill: passkeyAutofill,
     onSignedIn: exchangeSession,
     onError: setError,
   });
@@ -417,7 +422,7 @@ export default function PortalLoginForm({
                 <>
                   <TextInput
                     startIcon={User}
-                    {...AUTOFILL_USERNAME_WEBAUTHN}
+                    {...(passkeyAutofill ? AUTOFILL_USERNAME_WEBAUTHN : AUTOFILL_USERNAME)}
                     label={tCommon("username")}
                     htmlName="username"
                     value={username}

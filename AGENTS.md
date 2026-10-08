@@ -170,8 +170,11 @@ A variable the app reads must also be listed under `web.environment` in `docker-
 `env_file`, so an undeclared one is simply unset in the container: documented, honored in
 development, silently ignored in production.
 
-Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
-- `??` does not catch the empty string that form produces, so the fallback lands as 0.
+A registry setting is passed as `${VAR:-}`, never with a default: the registry already holds it, and
+a value Compose always sets shows up in setup as imported from the environment.
+`settings/compose-defaults.test.ts` holds the line. That form passes an unset variable as the empty
+string, so anything reading it straight off `process.env` falls back with `||`, not `??` - with
+`Number(process.env.X ?? d)` the fallback lands as 0.
 
 ### The optional containers
 

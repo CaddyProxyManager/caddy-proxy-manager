@@ -191,7 +191,8 @@ export function readConfig() {
     caddyApiUrl:
       process.env.CADDY_API_URL ??
       (process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019"),
-    baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
+    // `||`: Compose passes an unset variable as the empty string.
+    baseUrl: process.env.BASE_URL || "http://localhost:3000",
     /**
      * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out
      * with `title: { absolute: ... }` - see app/layout.tsx.

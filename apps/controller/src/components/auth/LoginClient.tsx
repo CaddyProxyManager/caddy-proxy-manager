@@ -28,6 +28,7 @@ import { usePasskeySignIn } from "@/src/components/auth/usePasskeySignIn";
 import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
 import {
   AUTOFILL_CURRENT_PASSWORD,
+  AUTOFILL_USERNAME,
   AUTOFILL_USERNAME_WEBAUTHN,
   NO_SPELLCHECK,
 } from "@/src/components/ui/native-input-attrs";
@@ -60,6 +61,8 @@ interface LoginClientProps {
   directories?: DirectoryChoice[];
   /** Passwords and passkeys then work only for break-glass accounts. */
   ssoEnforced?: boolean;
+  /** Start the passkey autofill request on load; otherwise only the button starts one. */
+  passkeyAutofill?: boolean;
 }
 
 export default function LoginClient({
@@ -72,6 +75,7 @@ export default function LoginClient({
   passwordResetEnabled = false,
   directories = [],
   ssoEnforced = false,
+  passkeyAutofill = false,
 }: LoginClientProps) {
   const frame = usePageFrame();
   const t = useTranslations("auth.login");
@@ -98,6 +102,7 @@ export default function LoginClient({
   // No CAPTCHA or second step: a passkey is both factors, and there is no name to guess against.
   const passkey = usePasskeySignIn({
     enabled: localLoginEnabled,
+    autoFill: passkeyAutofill,
     onSignedIn: () => {
       router.replace("/");
       router.refresh();
@@ -320,7 +325,7 @@ export default function LoginClient({
                     <>
                       <TextInput
                         startIcon={User}
-                        {...AUTOFILL_USERNAME_WEBAUTHN}
+                        {...(passkeyAutofill ? AUTOFILL_USERNAME_WEBAUTHN : AUTOFILL_USERNAME)}
                         {...NO_SPELLCHECK}
                         label={tCommon("username")}
                         htmlName="username"

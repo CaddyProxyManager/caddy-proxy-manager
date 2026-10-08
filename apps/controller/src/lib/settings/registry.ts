@@ -419,6 +419,17 @@ export const trustHost = booleanSetting({
   default: false,
 });
 
+export const passkeyAutofill = booleanSetting({
+  name: "auth_passkey_autofill",
+  env: "AUTH_PASSKEY_AUTOFILL",
+  group: "authentication",
+  label: "Offer passkeys automatically",
+  description:
+    "Start a passkey sign-in as soon as the sign-in screen opens, offered in the username field's " +
+    "autofill. Off, a passkey is used only when someone clicks Sign in with a passkey.",
+  default: false,
+});
+
 export const requirePasswordChangeOnLegacyHash = optionalBooleanSetting({
   name: "auth_require_password_change_on_legacy_hash",
   env: "AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH",
@@ -1101,6 +1112,7 @@ export const SETTING_DEFINITIONS = [
   allowOauthRoleFromClaims,
   disableLocalUsers,
   trustHost,
+  passkeyAutofill,
   requirePasswordChangeOnLegacyHash,
   authRateLimitEnabled,
   authRateLimitWindow,

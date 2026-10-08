@@ -211,8 +211,10 @@ docker compose exec web /app/cpm-server --lift-mfa-policy
 
 A passkey signs in with a fingerprint, a face or the device's PIN, and no password. **Profile →
 Passkeys** lists them, renames and removes them, and adds new ones; the sign-in screen and the
-forward-auth portal get a **Sign in with a passkey** button, and browsers that support it also
-offer saved passkeys in the username field's autofill.
+forward-auth portal get a **Sign in with a passkey** button. With **Offer passkeys automatically**
+(**Settings → Authentication**, `AUTH_PASSKEY_AUTOFILL`) on, browsers that support it also offer
+saved passkeys in the username field's autofill as the screen opens; off, the default, nothing
+asks for a passkey until the button is clicked.
 
 - **A passkey is both factors.** The authenticator must verify the person, not just that someone
   is present, and a passkey that did not is refused. So a passkey sign-in never asks for a

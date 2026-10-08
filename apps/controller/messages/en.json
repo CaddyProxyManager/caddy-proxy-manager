@@ -3995,6 +3995,10 @@
         "fieldLabel": "Auth rate-limit window",
         "label": "Auth rate-limit window (seconds)"
       },
+      "auth_passkey_autofill": {
+        "description": "Start a passkey sign-in as soon as the sign-in screen opens, offered in the username field's autofill. Off, a passkey is used only when someone clicks Sign in with a passkey.",
+        "label": "Offer passkeys automatically"
+      },
       "auth_require_password_change_on_legacy_hash": {
         "description": "Require anyone still on a pre-argon2id bcrypt hash to change their password. Leave unset to let the Security toggle decide.",
         "label": "Force a reset for legacy password hashes"

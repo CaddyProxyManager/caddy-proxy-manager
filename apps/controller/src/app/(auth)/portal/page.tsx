@@ -11,6 +11,8 @@ import {
 import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { cspNonce } from "@/src/lib/http/csp";
 import PortalLoginForm from "./PortalLoginForm";
+import { passkeyAutofill } from "@/src/lib/settings/registry";
+import { getSetting } from "@/src/lib/settings/resolve";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { oauthCallbackErrorMessage } from "@/src/lib/auth/oauth-callback-error";
@@ -115,6 +117,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       enabledProviders={enabledProviders}
       localLoginEnabled={localLoginEnabled}
       directories={directories}
+      passkeyAutofill={await getSetting(passkeyAutofill)}
       captcha={captcha}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
       existingSession={

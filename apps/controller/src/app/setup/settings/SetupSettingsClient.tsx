@@ -29,6 +29,7 @@ import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 import { usePageFrame } from "@/src/components/ui/standalone-page";
+import { ACCENT_COLORS, DEFAULT_ACCENT_COLOR } from "@/src/lib/branding/accent-colors";
 
 export type SettingField = {
   key: string;
@@ -503,6 +504,7 @@ function SettingRow({
   onChange: (next: string | boolean) => void;
 }) {
   const t = useTranslations("setup");
+  const tSettings = useTranslations("settings");
   const label = (
     <FieldLabel
       label={field.label}
@@ -542,6 +544,27 @@ function SettingRow({
           htmlName={field.key}
           value={value === true}
           onChange={(next: boolean) => onChange(next)}
+        />
+      </VStack>
+    );
+  }
+
+  // Matched by variable: the registry itself would pull server modules into this bundle.
+  if (field.env === "ACCENT_COLOR") {
+    return (
+      <VStack gap={1}>
+        {label}
+        <Selector
+          label={field.label}
+          isLabelHidden
+          description={field.description}
+          htmlName={field.key}
+          value={typeof value === "string" && value !== "" ? value : DEFAULT_ACCENT_COLOR}
+          onChange={(next: string) => onChange(next)}
+          options={ACCENT_COLORS.map((color) => ({
+            value: color,
+            label: tSettings(`accentColors.${color}`),
+          }))}
         />
       </VStack>
     );

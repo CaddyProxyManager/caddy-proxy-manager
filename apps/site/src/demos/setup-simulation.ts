@@ -537,6 +537,13 @@ export const SETTING_FIELDS: Array<{
     value: false,
   },
   {
+    key: "config:auth_passkey_autofill",
+    env: "AUTH_PASSKEY_AUTOFILL",
+    group: "authentication",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:auth_require_password_change_on_legacy_hash",
     env: "AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH",
     group: "authentication",

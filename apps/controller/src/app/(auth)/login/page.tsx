@@ -13,6 +13,8 @@ import type { Metadata } from "next";
 import { oauthCallbackErrorMessage } from "@/src/lib/auth/oauth-callback-error";
 import { emailReady } from "@/src/lib/email/config";
 import { getSsoEnforcement } from "@/src/lib/auth/sso-break-glass";
+import { passkeyAutofill } from "@/src/lib/settings/registry";
+import { getSetting } from "@/src/lib/settings/resolve";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("auth.login");
@@ -51,6 +53,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       passwordResetEnabled={localLoginEnabled && (await emailReady())}
       directories={directories}
       ssoEnforced={(await getSsoEnforcement()).enforced}
+      passkeyAutofill={await getSetting(passkeyAutofill)}
       cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
     />
   );

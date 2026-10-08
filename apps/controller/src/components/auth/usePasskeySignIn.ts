@@ -12,15 +12,18 @@ type PasskeySignInResult = {
 type SignInPasskey = (options?: { autoFill?: boolean }) => Promise<PasskeySignInResult>;
 
 /**
- * Passkey sign-in for /login and the portal: a button, and the username field's autofill where the
- * browser offers conditional UI. Either way the result is a dashboard session.
+ * Passkey sign-in for /login and the portal: a button, and with `autoFill` the username field's
+ * autofill where the browser offers conditional UI. Either way the result is a dashboard session.
  */
 export function usePasskeySignIn({
   enabled,
+  autoFill,
   onSignedIn,
   onError,
 }: {
   enabled: boolean;
+  /** Some browsers and password managers raise the conditional request as a prompt on load. */
+  autoFill: boolean;
   onSignedIn: () => void;
   onError: (message: string) => void;
 }) {
@@ -53,6 +56,7 @@ export function usePasskeySignIn({
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !window.PublicKeyCredential) return;
     setSupported(true);
+    if (!autoFill) return;
     let cancelled = false;
     PublicKeyCredential.isConditionalMediationAvailable?.()
       .then((available) => {
@@ -63,7 +67,7 @@ export function usePasskeySignIn({
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, autoFill]);
 
   const start = async () => {
     setPending(true);

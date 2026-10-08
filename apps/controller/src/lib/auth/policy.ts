@@ -25,8 +25,9 @@ function fromEnvironment(): AuthPolicy {
     trustHost: process.env.AUTH_TRUST_HOST === "true",
     rateLimit: {
       enabled: process.env.AUTH_RATE_LIMIT_ENABLED !== "false",
-      window: Number(process.env.AUTH_RATE_LIMIT_WINDOW ?? 60),
-      max: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 5),
+      // `||`: Compose passes an unset variable as the empty string, which Number() reads as 0.
+      window: Number(process.env.AUTH_RATE_LIMIT_WINDOW || 60),
+      max: Number(process.env.AUTH_RATE_LIMIT_MAX || 5),
     },
   };
 }

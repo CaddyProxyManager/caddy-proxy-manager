@@ -58,7 +58,7 @@ export const DESTINATION_HUES: Record<DestinationId, Hue> = {
   waf: "red",
   security: "orange",
   "audit-log": "orange",
-  logs: "gray",
+  logs: "cyan",
   alerts: "red",
   approvals: "green",
   "api-docs": "teal",

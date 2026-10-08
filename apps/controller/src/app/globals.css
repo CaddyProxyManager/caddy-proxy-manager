@@ -102,6 +102,8 @@
       color-mix(in srgb, #111111 40%, black)
     );
     border-top: 1px solid var(--color-border);
+    /* SideNav pads it 4px above and 8px below, which the border makes look lopsided. */
+    padding-top: var(--spacing-2);
   }
 
   /* A full-page Layout's `height="fill"` is a percentage of this wrapper, so it needs a height. */
