@@ -25,6 +25,11 @@
   --sl-color-red-high: hsl(347, 87%, 30%);
 }
 
+/* Starlight caps the column at 45rem, which leaves the live demos cramped beside empty margins. */
+:root {
+  --sl-content-width: 100%;
+}
+
 /* The plugin puts the shortcut on gray-5, where no Latte grey reads at this size. */
 :root[data-theme="light"] site-search kbd {
   background-color: var(--sl-color-gray-6);
