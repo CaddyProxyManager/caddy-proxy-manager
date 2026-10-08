@@ -144,9 +144,10 @@ jobs:
             fi
             echo
             # Flag both differences from the repository so nobody diffs the two and files a bug.
-            echo "\`caddy-proxy-manager-${TAG}-deploy.tar.gz\` holds every file at its top level and"
-            echo "deploys as it unpacks - extract it into one directory and \`docker compose up -d\`"
-            echo "needs nothing moved. It includes the managed CrowdSec container, which stays off"
+            echo "\`caddy-proxy-manager-${TAG}-deploy.tar.gz\` deploys as it unpacks - extract it into"
+            echo "one directory and \`docker compose up -d\` needs nothing moved. Only Caddy's build"
+            echo "context keeps its \`docker/caddy/\` path, for Settings -> Caddy build to rebuild"
+            echo "from. It includes the managed CrowdSec container, which stays off"
             echo "until Settings -> CrowdSec turns it on. Its \`docker-compose.yml\` differs from the"
             echo "copy in the repository in exactly two ways: it mounts its files from beside itself"
             echo "rather than from \`./docker/\`, and it pins the three images to \`${VERSION}\` rather"

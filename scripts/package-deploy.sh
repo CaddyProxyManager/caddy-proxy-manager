@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Packages the deployment files of one release into a flat tar.gz that deploys as it unpacks: each
+# Packages the deployment files of one release into a tar.gz that deploys as it unpacks: each
 # mounted docker/ directory becomes a file prefix, and the staged compose file is rewritten to
-# mount from beside itself and to pin our three images to the release. Extra files land at the top.
+# mount from beside itself and to pin our three images to the release. Extra files land at the top;
+# only Caddy's build context keeps its docker/caddy/ path.
 #
 #   package-deploy.sh <version> <output.tar.gz> [extra-file ...]
 #
@@ -71,6 +72,22 @@ for entry in "${entries[@]:2}"; do
   fi
 done
 
+# Caddy's build context, unflattened: the agent's "Rebuild Caddy" runs the compose build stanza
+# as is, and the Dockerfile copies from docker/caddy/. Read off the Dockerfile so none goes missing.
+build_files=(docker/caddy/Dockerfile)
+while IFS= read -r f; do
+  build_files+=("$f")
+done < <(grep -E '^COPY ' docker/caddy/Dockerfile | grep -oE 'docker/caddy/[A-Za-z0-9._-]+' | sort -u)
+for f in "${build_files[@]}"; do
+  mkdir -p "${staging}/$(dirname "$f")"
+  cp "$f" "${staging}/${f}"
+  entries+=("$f")
+done
+if ! grep -qE '^ *dockerfile: docker/caddy/Dockerfile$' "$staging/docker-compose.yml"; then
+  echo "::error::${name}: docker-compose.yml no longer builds caddy from docker/caddy/Dockerfile"
+  exit 1
+fi
+
 for extra in "${extras[@]}"; do
   cp -p "$extra" "$staging/"
   entries+=("$(basename "$extra")")
@@ -81,7 +98,7 @@ tar -czf "$name" -C "$staging" "${entries[@]}"
 # Asserted: a misnamed `.env.example` would look fine until someone deployed. Listed once: under
 # pipefail, `tar | grep -q` fails whenever grep exits before tar has written everything.
 listing="$(tar -tzf "$name")"
-for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
+for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template "${build_files[@]}"; do
   if ! grep -qxF "$want" <<<"$listing"; then
     echo "::error::${name} is missing ${want}"
     echo "$listing"
