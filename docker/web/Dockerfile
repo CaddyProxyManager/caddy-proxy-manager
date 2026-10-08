@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
-# $BUILDPLATFORM: emulated, `vinext build` deadlocks until the runner's 6-hour cap, so the binary
+# $BUILDPLATFORM: emulated, `vite build` deadlocks until the runner's 6-hour cap, so the binary
 # is cross-compiled instead. Keep the tag in step with bun-version in the workflows and db-seed.
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS base
 WORKDIR /app

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test';
 import { root, runtimeImports, walkClientGraph } from '@/tests/helpers/client-graph';
 
 // A `node:` import reached from a "use client" module breaks the browser bundle, and only in
-// vinext dev ("externalized for browser compatibility") - the production build and every bun
+// vite dev ("externalized for browser compatibility") - the production build and every bun
 // test still pass. So walk the graph statically instead.
 
 const builtins = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]));

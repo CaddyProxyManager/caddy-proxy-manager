@@ -59,7 +59,7 @@ export async function getClientIp(headers: Headers, trusted?: string[]): Promise
   const forwardedFor = headers.get("x-forwarded-for");
 
   if (!isPeerAddressStamped()) {
-    // No socket address under `vinext dev`/`start`: the hop the nearest proxy appended is the best
+    // No socket address under `vite dev`/`vinext start`: the hop the nearest proxy appended is the best
     // left, and a client reaching the port directly can forge it - the per-account limit still holds.
     const last = lastHeaderValue(forwardedFor);
     return isValidIP(last) ? normalizeIP(last) : null;

@@ -11,7 +11,7 @@ import { deleteUserPasskeys } from "@/src/lib/auth/passkeys";
 /**
  * `cpm-server --reset-2fa <username>`: turns off 2FA and removes the passkeys, the recovery for a
  * lost or stolen authenticator. Only a signed loopback request from the compiled server is
- * answered; anything else, `vinext dev` included, gets a missing path's 404.
+ * answered; anything else, `vite dev` included, gets a missing path's 404.
  */
 export async function POST(request: NextRequest) {
   const notFound = NextResponse.json({ error: "Not found" }, { status: 404 });

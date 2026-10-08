@@ -5,9 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "vite dev",
     "demo": "bun scripts/demo.ts",
-    "build": "vinext build && bun scripts/inject-runtime-guard.mjs",
+    "build": "vite build && bun scripts/inject-runtime-guard.mjs",
     "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/standalone/cpm-server scripts/standalone-entry.ts",
     "start": "vinext start",
     "typecheck": "tsc --noEmit",

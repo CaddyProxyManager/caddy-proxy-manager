@@ -23,7 +23,7 @@ export function installPeerAddressStamp(serverClass: typeof Server): void {
   (globalThis as Record<symbol, unknown>)[STAMPED] = true;
 }
 
-/** False under `vinext dev`/`start`, where nothing overwrites a client-sent copy of the header. */
+/** False under `vite dev`/`vinext start`, where nothing overwrites a client-sent copy of the header. */
 export function isPeerAddressStamped(): boolean {
   return (globalThis as Record<symbol, unknown>)[STAMPED] === true;
 }

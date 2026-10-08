@@ -21,7 +21,7 @@ afterEach(() => {
   setStamped(false);
 });
 
-describe('getClientIp without a stamped peer (vinext dev/start)', () => {
+describe('getClientIp without a stamped peer (vite dev/vinext start)', () => {
   it('takes the right-most X-Forwarded-For hop and never X-Real-IP', async () => {
     const headers = new Headers({
       'x-real-ip': '6.6.6.6',
