@@ -125,8 +125,13 @@ function RailRevision({ staged }: { staged: StagedView }) {
   );
   if (staged.currentRevision === null) return row;
   // Named by its visible text, not "View history": a spoken name should match what is shown, and
-  // the rail's History entry already says where it leads.
-  return <Link href="/settings/history">{row}</Link>;
+  // the rail's History entry already says where it leads. Full width, so the whole shaded box is
+  // the target; the staged buttons below stay outside it rather than nested in a link.
+  return (
+    <Link href="/settings/history" className="block w-full hover:bg-overlay-hover">
+      {row}
+    </Link>
+  );
 }
 
 function ReviewSheet({

@@ -118,7 +118,7 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
                   step.detected
                     ? t("detected")
                     : step.markedDone
-                      ? t("markedDone")
+                      ? t("ignored")
                       : t(`steps.${step.step}.description`)
                 }
                 status={isComplete ? "success" : undefined}
@@ -136,7 +136,7 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      label={step.markedDone ? tCommon("undo") : t("markDone")}
+                      label={step.markedDone ? tCommon("undo") : t("ignore")}
                       onClick={() => markDone(step.step, !step.markedDone)}
                       isDisabled={isPending}
                     />

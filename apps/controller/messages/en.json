@@ -2434,8 +2434,8 @@
       "title": "Get started",
       "progress": "{done} of {total} done",
       "detected": "Done",
-      "markedDone": "Marked done",
-      "markDone": "Mark done",
+      "ignored": "Ignored",
+      "ignore": "Ignore",
       "steps": {
         "certificate": {
           "title": "Serve a domain with a valid certificate",

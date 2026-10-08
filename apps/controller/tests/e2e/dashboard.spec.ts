@@ -166,15 +166,15 @@ test.describe('Needs attention and the setup checklist', () => {
     await expect(page.getByText('Could not check what needs attention.')).toHaveCount(0);
   });
 
-  test('a step can be marked done by hand and undone', async ({ page }) => {
+  test('a step can be ignored by hand and undone', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Get started', level: 2 })).toBeVisible();
     const step = page.getByRole('listitem').filter({ hasText: 'Invite a second user' });
-    const mark = step.getByRole('button', { name: 'Mark done' });
+    const mark = step.getByRole('button', { name: 'Ignore' });
     // The e2e stack may already have a second user, which ticks the step with no button.
     test.skip(!(await mark.isVisible()), 'detected already');
     await mark.click();
-    await expect(step.getByText('Marked done')).toBeVisible();
+    await expect(step.getByText('Ignored')).toBeVisible();
     await step.getByRole('button', { name: 'Undo' }).click();
-    await expect(step.getByRole('button', { name: 'Mark done' })).toBeVisible();
+    await expect(step.getByRole('button', { name: 'Ignore' })).toBeVisible();
   });
 });

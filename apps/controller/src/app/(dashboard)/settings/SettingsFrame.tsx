@@ -83,10 +83,16 @@ function StagedSummary({ staged }: { staged: StagedView }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useEffect(() => setSlot(document.getElementById(STAGED_SLOT_ID)), []);
 
+  // A shade above the user footer below it, so the two read as separate blocks. The negative
+  // margins cancel the side nav footer's padding, so the shade reaches its edges.
   const controls = (
-    <VStack gap={2} hAlign="start">
+    <VStack className="-mx-2 -mt-1 bg-muted border-t border-border">
       <RevisionPill staged={staged} inRail />
-      <StagedControls view={staged} fill />
+      {staged.changes.length > 0 && (
+        <VStack paddingInline={2} paddingBlockEnd={2}>
+          <StagedControls view={staged} fill />
+        </VStack>
+      )}
     </VStack>
   );
   if (slot && !isNarrow) return createPortal(controls, slot);
