@@ -577,6 +577,34 @@ describe("optional services", () => {
     expect(argv.at(-1)).toBe("clickhouse");
   });
 
+  it("recreates a container left on a network compose has since replaced", async () => {
+    // A plain `up` only restarts it, which fails on the old network id at every attempt.
+    process.env.COMPOSE_PROJECT_NAME = "proj";
+    const stale =
+      "Error response from daemon: failed to set up container networking: network a988a210ccf6f8174b222fe69661e8437b1f9629c2b50c4c90ab1c4788ad5948 not found";
+    results.push({ exitCode: 1, stdout: stale });
+    const result = await new DockerHost(loadConfig()).startService("clickhouse");
+
+    expect(result.ok).toBe(true);
+    const ups = spawned.filter((a) => a[1] === "compose" && a.includes("up"));
+    expect(ups).toHaveLength(2);
+    expect(ups[0]).not.toContain("--force-recreate");
+    expect(ups[1]?.slice(-2)).toEqual(["--force-recreate", "clickhouse"]);
+
+    results.push({ exitCode: 1, stdout: stale });
+    await new DockerHost(loadConfig()).startCaddy();
+    expect(lastCompose().slice(-2)).toEqual(["--force-recreate", "caddy"]);
+  });
+
+  it("does not recreate on any other failure", async () => {
+    process.env.COMPOSE_PROJECT_NAME = "proj";
+    results.push({ exitCode: 1, stdout: "pull access denied" });
+    const result = await new DockerHost(loadConfig()).startService("clickhouse");
+
+    expect(result.ok).toBe(false);
+    expect(spawned.filter((a) => a[1] === "compose" && a.includes("up"))).toHaveLength(1);
+  });
+
   it("stops rather than removes, so the data volume outlives the toggle", async () => {
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).stopService("clickhouse");

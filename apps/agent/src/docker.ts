@@ -25,6 +25,8 @@ export const CADDY_MODULE_LIST_PATH = "/etc/caddy/caddy-modules.txt";
 
 export type CommandResult = { ok: boolean; exitCode: number; output: string; timedOut: boolean };
 
+const STALE_NETWORK = /network [0-9a-f]{12,64} not found/;
+
 /** One transcript for an operator: a build's cause is often on stdout, its context on stderr. */
 async function run(
   argv: string[],
@@ -275,11 +277,28 @@ export class DockerHost {
   }
 
   /**
+   * A profiled container outlives a network Compose recreates without it, and `up` only restarts
+   * it, which fails on the old network's id forever. Its data is all in volumes, so it is recreated.
+   */
+  private async upRecreatingStale(
+    argv: string[],
+    options: { timeoutSeconds?: number; env?: Record<string, string> },
+  ): Promise<CommandResult> {
+    const first = await this.compose(argv, options);
+    if (first.ok || !STALE_NETWORK.test(first.output)) return first;
+    const service = argv.at(-1) ?? "";
+    console.warn(
+      `[agent] ${service} is attached to a network that no longer exists; recreating it`,
+    );
+    return this.compose([...argv.slice(0, -1), "--force-recreate", service], options);
+  }
+
+  /**
    * The only thing that starts Caddy, so "paired" and "serving traffic" are one state. `--profile`
    * explicitly: inferring it from the service name fails on older compose v2.
    */
   async startCaddy(): Promise<CommandResult> {
-    return this.compose(
+    return this.upRecreatingStale(
       ["--profile", "caddy", "up", "-d", "--no-deps", ...this.noBuild(), "caddy"],
       { timeoutSeconds: this.config.serviceTimeoutSeconds },
     );
@@ -324,7 +343,7 @@ export class DockerHost {
 
   /** Recreates only when the tag now names another image. */
   async upCaddyImage(): Promise<CommandResult> {
-    return this.compose(
+    return this.upRecreatingStale(
       ["--profile", "caddy", "up", "-d", "--no-deps", "--pull", "never", "--no-build", "caddy"],
       { timeoutSeconds: this.config.serviceTimeoutSeconds },
     );
@@ -429,7 +448,7 @@ export class DockerHost {
     service: ManagedServiceName,
     env: Record<string, string> = {},
   ): Promise<CommandResult> {
-    return this.compose(["--profile", service, "up", "-d", "--no-deps", service], {
+    return this.upRecreatingStale(["--profile", service, "up", "-d", "--no-deps", service], {
       timeoutSeconds: this.config.serviceTimeoutSeconds,
       env,
     });
