@@ -102,7 +102,7 @@ require (
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0 // indirect
-	github.com/corazawaf/coraza/v3 v3.7.0 // indirect
+	github.com/corazawaf/coraza/v3 v3.8.1 // indirect
 	github.com/corazawaf/libinjection-go v0.3.3 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -366,6 +366,12 @@ require (
 // pinned Caddy by update-compatibility-pins.sh, which Dependabot cannot run. Caddy moved to the
 // cel.dev/cel-go path in v2.11.6; plugins still requiring github.com/google/cel-go import none of it.
 replace cel.dev/cel-go => cel.dev/cel-go v0.32.0
+
+// A security floor for the WAF engine, which coraza-caddy v2.6.1 still pins at v3.7.0 (rule
+// bypass by argument flooding, multipart and audit-log fixes). Only a replace reaches the build:
+// build.sh passes xcaddy the plugins and these lines, never an indirect requirement. Drop it once
+// coraza-caddy requires v3.8.1 or later.
+replace github.com/corazawaf/coraza/v3 => github.com/corazawaf/coraza/v3 v3.8.1
 
 // Temporarily a fork, for a crash upstream has not merged. caddy-tailscale releases a tsnet node
 // without checking whether it was ever started, and tsnet.Server.Close panics there - so a host
