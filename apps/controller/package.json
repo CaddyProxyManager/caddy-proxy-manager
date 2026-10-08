@@ -1,6 +1,6 @@
 {
   "name": "@cpm/controller",
-  "version": "3.7.0",
+  "version": "3.7.1",
   "description": "Caddy Proxy Manager controller - the web UI and REST API",
   "type": "module",
   "private": true,
