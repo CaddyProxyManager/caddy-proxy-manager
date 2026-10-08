@@ -79,12 +79,27 @@ describe('release tags', () => {
   });
 
   it('picks the newest release out of a real tag list', () => {
-    expect(newestRelease(REAL_TAGS)).toBe('3.0.0-beta.2');
+    expect(newestRelease(REAL_TAGS, '3.0.0-beta.1')).toBe('3.0.0-beta.2');
   });
 
   it('returns nothing when a repository has no releases yet', () => {
-    expect(newestRelease(['latest', 'sha-abc1234'])).toBeNull();
-    expect(newestRelease([])).toBeNull();
+    expect(newestRelease(['latest', 'sha-abc1234'], '3.0.0')).toBeNull();
+    expect(newestRelease([], '3.0.0')).toBeNull();
+  });
+
+  it('never offers a stable install a beta or RC', () => {
+    const tags = ['3.7.3', '3.7.4', '3.7.5-beta.1', '3.8.0-rc.1', 'latest'];
+    expect(newestRelease(tags, '3.7.4')).toBe('3.7.4');
+    expect(newestRelease(tags, '3.7.3')).toBe('3.7.4');
+    // A dev build has no channel of its own, so it gets the stable one.
+    expect(newestRelease(tags, 'unknown')).toBe('3.7.4');
+    expect(newestRelease(REAL_TAGS, '3.0.0')).toBeNull();
+  });
+
+  it('offers a prerelease install the next beta, RC or release alike', () => {
+    expect(newestRelease(['3.7.5-beta.1', '3.7.5-beta.2'], '3.7.5-beta.1')).toBe('3.7.5-beta.2');
+    expect(newestRelease(['3.7.5-beta.2', '3.7.5'], '3.7.5-beta.1')).toBe('3.7.5');
+    expect(newestRelease(['3.7.5', '3.8.0-rc.1'], '3.7.5-beta.1')).toBe('3.8.0-rc.1');
   });
 });
 
@@ -337,6 +352,14 @@ describe('what the status reports', () => {
       latest: '9.9.9',
       checkedAt: CACHED.checkedAt,
     });
+  });
+
+  it('drops a cached beta on a stable install', async () => {
+    // Cached by a build before the channel filter; a test build counts as stable.
+    store.cache = { ...CACHED, latest: '9.9.9-beta.1' };
+
+    const status = await getUpdateStatus();
+    expect(status).toMatchObject({ latest: null, updateAvailable: false });
   });
 
   it('knows nothing while checks are off, rather than repeating a stale answer', async () => {

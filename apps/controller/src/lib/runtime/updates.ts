@@ -93,11 +93,21 @@ export function compareSemver(a: Semver, b: Semver): number {
   return a.prerelease.length - b.prerelease.length;
 }
 
-export function newestRelease(tags: string[]): string | null {
+/**
+ * A stable install is never offered a beta or RC; one running a prerelease is offered both, as
+ * the deploy repository's `next` branch carries both. A dev build counts as stable.
+ */
+export function onChannel(current: string, tag: string): boolean {
+  const parsed = parseSemver(tag);
+  if (!parsed) return false;
+  return parsed.prerelease.length === 0 || (parseSemver(current)?.prerelease.length ?? 0) > 0;
+}
+
+export function newestRelease(tags: string[], current: string = APP_VERSION): string | null {
   let best: { tag: string; parsed: Semver } | null = null;
   for (const tag of tags) {
     const parsed = parseSemver(tag);
-    if (!parsed) continue;
+    if (!parsed || !onChannel(current, tag)) continue;
     if (!best || compareSemver(parsed, best.parsed) > 0) best = { tag, parsed };
   }
   return best?.tag ?? null;
@@ -365,6 +375,8 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
     void checkForUpdates().catch(() => {});
   }
 
+  // A beta cached before this install left the prerelease channel, or by a build before the filter.
+  if (status.latest && !onChannel(status.current, status.latest)) status.latest = null;
   status.updateAvailable = isNewer(status.current, status.latest);
   return status;
 }
