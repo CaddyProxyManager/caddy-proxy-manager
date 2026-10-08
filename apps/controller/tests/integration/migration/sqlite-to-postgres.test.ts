@@ -3,7 +3,7 @@
  * rows out, sequences moved past the copied ids and the audit hash chain untouched. PostgreSQL
  * only: under `test:sqlite` there is no server to copy into.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { SQL } from 'bun';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,6 +21,9 @@ import { MIGRATION_GROUPS } from '../../../src/lib/migration/selection';
 const adminUrl = process.env.TEST_POSTGRES_URL;
 const MIGRATIONS = resolve(import.meta.dir, '../../../drizzle');
 const NOW = '2026-01-02T03:04:05.000Z';
+
+// One test runs every PostgreSQL migration and a copy, which a loaded parallel run takes past 5s.
+setDefaultTimeout(30_000);
 
 let dir: string;
 let sqlitePath: string;
