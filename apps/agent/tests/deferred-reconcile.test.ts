@@ -170,6 +170,59 @@ describe("a frame deferred by a running operation", () => {
   });
 });
 
+// A deploy-repo install has no build context, so a rebuild failed in under a second; each retry
+// started it again and the services deferred behind it never ran.
+describe("a build that fails at once", () => {
+  it("is not restarted by the retry, which applies the services instead", async () => {
+    let running = false;
+    let idle: (() => void) | null = null;
+    let builds = 0;
+    const applies: ManagedServicesRequest[] = [];
+    const lifecycle = new AgentLifecycle({
+      config: loadConfig(),
+      store,
+      docker: { caddyRunning: async () => false } as unknown as DockerHost,
+      operations: {
+        applyL4Ports: () => {},
+        applyCaddyBuild: () => {
+          builds++;
+          running = true;
+        },
+        applyManagedServices: (request: ManagedServicesRequest) => {
+          if (running) throw new OperationBusyError("caddy-build");
+          applies.push(request);
+        },
+        whenIdle: (listener: () => void) => {
+          idle = listener;
+        },
+      } as unknown as Operations,
+    });
+    const inner = lifecycle as unknown as {
+      handle(event: unknown): Promise<void>;
+      reconciling: Promise<void>;
+    };
+    const withBouncer = {
+      ...desired(ON),
+      caddyModules: [...SHIPPED_CADDY_MODULES, "github.com/hslatman/caddy-crowdsec-bouncer/http"],
+    };
+
+    await inner.handle({ type: "desired-state", state: withBouncer });
+    expect(builds).toBe(1);
+    expect(applies).toEqual([]);
+
+    running = false;
+    (idle as (() => void) | null)?.();
+    await inner.reconciling;
+    expect(builds).toBe(1);
+    expect(applies).toEqual([ON]);
+
+    // The Rebuild button is a fresh frame, and still retries.
+    await inner.handle({ type: "desired-state", state: withBouncer });
+    expect(builds).toBe(2);
+    lifecycle.stop();
+  });
+});
+
 // The controller reloads a recreated Caddy on hearing the port change finished; at the heartbeat,
 // an L4 host saved during the recreate stayed unserved for up to a minute.
 describe("a port change", () => {

@@ -24,6 +24,7 @@ import {
   type LogReadResponse,
   MANAGED_SERVICES,
   type ManagedServiceName,
+  type ManagedServicesRequest,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
   sameL4PortSet,
@@ -103,6 +104,8 @@ export class AgentLifecycle {
   /** Frames and deferred retries apply one at a time, each against the newest desired state. */
   private reconciling: Promise<void> = Promise.resolve();
   private retryQueued = false;
+  /** What each operation was last started with, so a deferred retry never repeats a failure. */
+  private attempted: { l4Ports?: string[]; modules?: string[]; services?: string } = {};
   /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
   private caddyRestore: Promise<void> | null = null;
   /** The same for the managed services; awaited before a frame may stop them. */
@@ -556,10 +559,10 @@ export class AgentLifecycle {
 
   // ─── Reconciliation ────────────────────────────────────────────────────────
 
-  private queueReconcile(state: () => AgentDesiredState | null): Promise<void> {
+  private queueReconcile(state: () => AgentDesiredState | null, retry = false): Promise<void> {
     const next = this.reconciling.then(() => {
       const latest = state();
-      return latest ? this.reconcile(latest) : undefined;
+      return latest ? this.reconcile(latest, retry) : undefined;
     });
     this.reconciling = next.catch(() => {});
     return next;
@@ -581,14 +584,14 @@ export class AgentLifecycle {
       this.retryQueued = false;
       // Unpairing clears `desired`, so an agent gone idle meanwhile applies nothing.
       if (this.stopped) return;
-      this.queueReconcile(() => this.desired).catch((error: unknown) => {
+      this.queueReconcile(() => this.desired, true).catch((error: unknown) => {
         console.warn("[agent] could not apply a deferred desired state:", error);
       });
     });
   }
 
   /** Diffs only: each reconnect resends full state, and a blind apply rebuilds Caddy's image. */
-  private async reconcile(state: AgentDesiredState): Promise<void> {
+  private async reconcile(state: AgentDesiredState, retry = false): Promise<void> {
     // Else a "Caddy off" finds nothing running yet and the restore brings it up anyway.
     if (this.caddyRestore) {
       await this.caddyRestore;
@@ -609,10 +612,18 @@ export class AgentLifecycle {
       await this.startCaddy();
     }
 
+    // A retry skips what already ran with this input: a build failing in under a second otherwise
+    // restarted forever, starving the services queued behind it. A controller frame still retries.
+    const tried = this.attempted;
+    const services = servicesKey(state.services);
     try {
       // As port sets: the same ports come as ranges or one by one, as the controller knew this agent.
-      if (!sameL4PortSet(state.l4Ports, store.appliedL4Ports())) {
+      if (
+        !sameL4PortSet(state.l4Ports, store.appliedL4Ports()) &&
+        !(retry && tried.l4Ports && sameL4PortSet(state.l4Ports, tried.l4Ports))
+      ) {
         operations.applyL4Ports(state.l4Ports);
+        tried.l4Ports = state.l4Ports;
         this.reportWhenRecreated();
       }
 
@@ -621,18 +632,23 @@ export class AgentLifecycle {
       const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
       if (
         effectiveBuildMode(this.deps.config, store) === "agent" &&
-        !sameList(state.caddyModules, appliedModules)
+        !sameList(state.caddyModules, appliedModules) &&
+        !(retry && tried.modules && sameList(state.caddyModules, tried.modules))
       ) {
         operations.applyCaddyBuild(state.caddyModules);
+        tried.modules = state.caddyModules;
         this.reportWhenRecreated();
       }
 
       const appliedServices = store.appliedManagedServices();
       if (
-        !sameServices(state.services.services, appliedServices) ||
-        managedServicesEnvFingerprint(state.services.env) !== store.appliedManagedServicesEnv()
+        (!sameServices(state.services.services, appliedServices) ||
+          managedServicesEnvFingerprint(state.services.env) !==
+            store.appliedManagedServicesEnv()) &&
+        !(retry && tried.services === services)
       ) {
         operations.applyManagedServices(state.services);
+        tried.services = services;
       }
     } catch (busy) {
       if (busy instanceof OperationBusyError) {
@@ -937,6 +953,11 @@ function sameList(a: string[], b: string[]): boolean {
   const left = [...a].sort();
   const right = [...b].sort();
   return left.every((value, index) => value === right[index]);
+}
+
+function servicesKey(request: ManagedServicesRequest): string {
+  const wanted = MANAGED_SERVICES.map((name) => request.services[name] ?? false);
+  return `${wanted.join()}|${managedServicesEnvFingerprint(request.env)}`;
 }
 
 function sameServices(
