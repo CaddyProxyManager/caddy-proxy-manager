@@ -1,6 +1,7 @@
 "use server";
 
-import { requireCan } from "@/src/lib/users/permissions";
+import { requireCan, requireCanAccess } from "@/src/lib/users/permissions";
+import { assertMayConfigureSignIn } from "@/src/lib/roles/sign-in-sources";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/src/lib/errors/action-result";
 import { runAction } from "@/src/lib/errors/run-action";
@@ -11,8 +12,16 @@ import {
   type SamlProviderInput,
   createSamlProvider,
   deleteSamlProvider,
+  getSamlProvider,
+  normalizeLinkDomains,
   updateSamlProvider,
 } from "@/src/lib/models/saml-providers";
+
+/** A SAML provider links accounts whenever it names a domain to link. */
+function withAutoLink<T extends { linkDomains?: string }>(provider: T) {
+  if (provider.linkDomains === undefined) return provider;
+  return { ...provider, autoLink: normalizeLinkDomains(provider.linkDomains) !== "" };
+}
 
 async function audit(userId: number, action: string, provider: SamlProvider) {
   const verb = { create: "Created", update: "Updated", delete: "Deleted" }[action];
@@ -30,7 +39,8 @@ export async function createSamlProviderAction(
   input: SamlProviderInput,
 ): Promise<ActionResult<SamlProvider>> {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
+    const { session, access } = await requireCanAccess("settings:write");
+    await assertMayConfigureSignIn(access.capabilities, null, withAutoLink(input));
     const userId = Number(session.user.id);
     const provider = await createSamlProvider(input, { baseUrl: await getPublicBaseUrl() });
     await audit(userId, "create", provider);
@@ -45,7 +55,13 @@ export async function updateSamlProviderAction(
   input: Partial<SamlProviderInput>,
 ): Promise<ActionResult<SamlProvider>> {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
+    const { session, access } = await requireCanAccess("settings:write");
+    const existing = await getSamlProvider(id);
+    await assertMayConfigureSignIn(
+      access.capabilities,
+      existing && withAutoLink(existing),
+      withAutoLink(input),
+    );
     const provider = await updateSamlProvider(id, input);
     await audit(Number(session.user.id), "update", provider);
     revalidatePath("/settings");

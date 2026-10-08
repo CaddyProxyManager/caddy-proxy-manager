@@ -25,11 +25,9 @@ describe('maplibre worker wiring', () => {
     expect(() => require.resolve(WORKER_SPECIFIER)).not.toThrow();
   });
 
-  it('imports that worker through Vite so its sibling chunks get bundled in', () => {
-    // It imports ./maplibre-gl-shared.mjs, which a bare `?url` copy would 404 on.
-    expect(readFileSync(require.resolve(WORKER_SPECIFIER), 'utf8')).toContain(
-      './maplibre-gl-shared.mjs',
-    );
+  it('imports that worker through Vite so any chunk it pulls in gets bundled too', () => {
+    // 6.13 inlines what earlier releases imported from ./maplibre-gl-shared.mjs, which a bare
+    // `?url` copy would 404 on; bundling still covers a release that splits it out again.
     // Quote-agnostic: the formatter's quoting is not the point.
     expect(worldMapInner.replace(/'/g, '"')).toContain(`"${WORKER_SPECIFIER}?worker&url"`);
   });

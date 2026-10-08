@@ -74,6 +74,7 @@ import {
   regeneratePasswordAction,
   getAccessListStatsAction,
 } from "./actions";
+import { wideMeasure } from "@/components/ui/measure";
 
 type Props = {
   lists: AccessList[];
@@ -545,7 +546,7 @@ function SettingsTab({
   const confirmMismatch = confirm.length > 0 && confirm !== list.name;
 
   return (
-    <VStack gap={6} maxWidth={672}>
+    <VStack gap={6} maxWidth={wideMeasure(672)}>
       <VStack gap={3}>
         <TextInput label={tCommon("name")} isRequired size="sm" value={name} onChange={setName} />
         <TextArea

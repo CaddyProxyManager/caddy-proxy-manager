@@ -57,6 +57,10 @@ Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns, 
 Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider.
 The netcup provider ships with slow-propagation defaults because it needs them.
 
+Hetzner uses the Cloud DNS API, so it needs a Hetzner Cloud API token and zones that live in the
+Hetzner Console. A token from the retired DNS Console no longer works: move the zones and create a
+Cloud token. Caddy keeps the old module until its image is rebuilt.
+
 A provider can be overridden per certificate when one domain lives somewhere else, but only through
 the REST [API](../api/) (`providerOptions.provider`); the dashboard uses the global provider. The
 override needs that provider's credentials saved in Settings, or the global provider is used.

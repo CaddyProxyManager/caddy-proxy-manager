@@ -6,15 +6,17 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
-import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { loadAttentionAction } from "@/src/app/(dashboard)/overview-actions";
 import { AttentionList } from "@/components/attention/AttentionList";
-import type { AttentionList as AttentionListData } from "@/lib/attention/types";
+import { type AttentionList as AttentionListData, hasAttentionToShow } from "@/lib/attention/types";
 
-/** Loads after the page, since a provider may use its whole budget. `preview` is the docs'. */
+/**
+ * Loads after the page, since a provider may use its whole budget. Absent until there is something
+ * to say: an item, a check that ran out of time, or a load that failed. `preview` is the docs'.
+ */
 export function NeedsAttentionCard({ preview }: { preview?: AttentionListData }) {
   const t = useTranslations("attention");
   const [list, setList] = useState<AttentionListData | null>(preview ?? null);
@@ -37,6 +39,7 @@ export function NeedsAttentionCard({ preview }: { preview?: AttentionListData })
     };
   }, [preview]);
 
+  if (!failed && (!list || !hasAttentionToShow(list))) return null;
   const critical = list?.items.filter((item) => item.severity === "critical").length ?? 0;
 
   return (
@@ -58,12 +61,10 @@ export function NeedsAttentionCard({ preview }: { preview?: AttentionListData })
         </HStack>
         {list ? (
           <AttentionList list={list} emptyTitle={t("empty")} />
-        ) : failed ? (
+        ) : (
           <Text type="body" size="sm" color="secondary">
             {t("loadFailed")}
           </Text>
-        ) : (
-          <Spinner label={t("loading")} size="sm" />
         )}
       </VStack>
     </Card>

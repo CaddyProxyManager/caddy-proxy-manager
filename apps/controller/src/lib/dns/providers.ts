@@ -157,9 +157,10 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
   {
     name: "hetzner",
     displayName: "Hetzner",
-    description: "Hetzner DNS API",
+    // v2 speaks the Cloud DNS API (zones in the Hetzner Console); the DNS Console API is retired.
+    description: "Hetzner Cloud DNS API, for zones in the Hetzner Console",
     docsUrl: "https://github.com/caddy-dns/hetzner",
-    modulePath: "github.com/caddy-dns/hetzner",
+    modulePath: "github.com/caddy-dns/hetzner/v2",
     fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
   },
   {

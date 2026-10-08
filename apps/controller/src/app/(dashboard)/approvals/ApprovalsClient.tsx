@@ -53,6 +53,7 @@ import {
   withdrawChangeAction,
 } from "./actions";
 import { unwrap } from "@/src/lib/errors/action-result";
+import { wideMeasure } from "@/components/ui/measure";
 
 type RoleOption = { key: string; name: string | null; builtIn: boolean };
 type GroupOption = { id: number; name: string };
@@ -640,7 +641,7 @@ function PolicyTab({
 
   return (
     <Card padding={6}>
-      <VStack gap={4} maxWidth={672}>
+      <VStack gap={4} maxWidth={wideMeasure(672)}>
         <VStack gap={1}>
           <Heading level={2}>{t("title")}</Heading>
           <Text type="supporting" color="secondary">

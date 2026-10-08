@@ -6,6 +6,7 @@
 
 import { Resolver } from "node:dns/promises";
 import { config } from "../config";
+import { outboundFetch } from "../http/outbound";
 import {
   PROBE_PARAM,
   PROBE_PATH,
@@ -186,7 +187,12 @@ async function probeSelf(domain: string, scheme: "http" | "https" = "http"): Pro
   const answered = await withTimeout(async (signal) => {
     // Following a redirect could hand the nonce to a third party.
     // outbound: dashboardHost
-    const response = await fetch(url, { signal, redirect: "manual", cache: "no-store" });
+    const response = await outboundFetch(url, {
+      signal,
+      redirect: "manual",
+      headers: { "Cache-Control": "no-store" },
+      maxResponseBytes: 4096,
+    });
     if (!response.ok) return null;
     const body = (await response.json()) as { probe?: unknown };
     return typeof body.probe === "string" ? body.probe : null;

@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/FormBooleanControls";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { unwrap } from "@/src/lib/errors/action-result";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
+import { wideMeasure } from "@/components/ui/measure";
 
 type Rule = {
   action: "allow" | "deny";
@@ -273,7 +274,7 @@ export function NetworkTab({
   };
 
   return (
-    <VStack gap={4} maxWidth={880}>
+    <VStack gap={4} maxWidth={wideMeasure(880)}>
       <Text type="body" size="sm" color="secondary">
         {t("ipRulesHelp")}
       </Text>

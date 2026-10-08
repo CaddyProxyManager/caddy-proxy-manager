@@ -10,7 +10,7 @@ import { accessReviewCampaigns, accessReviewItems, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { diffAuditRecords } from "../audit/changes";
 import { domainError } from "../errors/domain-error";
-import { type CapabilitySet, holds } from "../roles/capabilities";
+import { type CapabilitySet, capabilitySetOf, holds } from "../roles/capabilities";
 import { type Access, can } from "../users/permissions";
 import { assignReviewers, checkScope, collectItems } from "./collect";
 import {
@@ -535,6 +535,15 @@ export async function decideItem(
   return toItem(updated, null);
 }
 
+/** Every capability `next` holds, `current` holds as widely: outright, or both through grants. */
+function narrows(current: CapabilitySet, next: CapabilitySet): boolean {
+  return Object.entries(next).every(
+    ([capability, reach]) =>
+      current[capability as keyof CapabilitySet] === "all" ||
+      (reach === "granted" && current[capability as keyof CapabilitySet] === "granted"),
+  );
+}
+
 async function checkChange(
   kind: ItemKind,
   item: ItemRow,
@@ -550,10 +559,21 @@ async function checkChange(
   if (kind === "grant" && changeTo !== "view" && changeTo !== "manage") {
     throw domainError("accessReviewChangeInvalid", {}, { status: 400 });
   }
+  // A reviewer may hold nothing, and the change is carried out with the closer's power: only
+  // narrowing keeps a review from being a way to promote someone.
+  if (kind === "grant" && changeTo === "manage") {
+    throw domainError("accessReviewChangeRaises", {}, { status: 400 });
+  }
   if (kind === "role") {
     const { getRole } = await import("../roles/store");
-    if (!(await getRole(changeTo)))
-      throw domainError("accessReviewChangeInvalid", {}, { status: 400 });
+    const [next, current] = await Promise.all([
+      getRole(changeTo),
+      item.current ? getRole(item.current) : null,
+    ]);
+    if (!next) throw domainError("accessReviewChangeInvalid", {}, { status: 400 });
+    if (!narrows(current ? capabilitySetOf([current]) : {}, capabilitySetOf([next]))) {
+      throw domainError("accessReviewChangeRaises", {}, { status: 400 });
+    }
   }
   return changeTo;
 }

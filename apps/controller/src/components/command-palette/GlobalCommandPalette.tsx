@@ -11,7 +11,7 @@ import { type LucideIcon, Search, Settings2 } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Kbd } from "@astryxdesign/core/Kbd";
-import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
+import type { SearchSource } from "@astryxdesign/core/Typeahead/utils";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -28,7 +28,10 @@ import {
   settingsSectionDescription,
   settingsSectionName,
 } from "@/src/app/(dashboard)/settings/sections";
-import { settingsSearchEntries } from "@/src/app/(dashboard)/settings/search-index";
+import {
+  searchEntries as rankEntries,
+  settingsSearchEntries,
+} from "@/src/app/(dashboard)/settings/search-index";
 
 type PaletteItem = {
   /** The page it opens; unique, so it doubles as the id. */
@@ -40,6 +43,8 @@ type PaletteItem = {
     desc: string;
     /** Searchable but not shown. */
     keywords: string[];
+    /** Where a settings block lives; matched last, so its own words rank first. */
+    context?: string;
     icon: LucideIcon;
     /** The colour the navigation shows it in. */
     hue?: Hue;
@@ -170,14 +175,28 @@ export function GlobalCommandPaletteProvider({
           group: tNav("settings"),
           desc: entry.context,
           keywords: entry.keywords,
+          context: entry.context,
           icon: Settings2,
         },
       }));
 
     const items = [...pages, ...settings, ...settingsBlocks];
-    return createStaticSource(items, {
-      keywords: (item) => [item.auxiliaryData.desc, ...item.auxiliaryData.keywords],
+    const ranked = items.map((item) => {
+      const { desc, keywords, context } = item.auxiliaryData;
+      return {
+        item,
+        title: item.label,
+        keywords: context === undefined ? [desc, ...keywords] : keywords,
+        context: context ?? "",
+      };
     });
+    const source: SearchSource<PaletteItem> = {
+      // Every word must match and titles rank first, so "smtp server" finds the block it names.
+      search: (query) =>
+        query.trim() ? rankEntries(ranked, query, 30).map((entry) => entry.item) : items,
+      bootstrap: () => items,
+    };
+    return source;
   }, [capabilities, t, tNav, tSettings]);
 
   return (

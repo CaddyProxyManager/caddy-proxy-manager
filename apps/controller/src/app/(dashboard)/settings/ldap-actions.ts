@@ -1,6 +1,7 @@
 "use server";
 
-import { requireCan } from "@/src/lib/users/permissions";
+import { requireCan, requireCanAccess } from "@/src/lib/users/permissions";
+import { assertMayConfigureSignIn } from "@/src/lib/roles/sign-in-sources";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import type { ActionResult } from "@/src/lib/errors/action-result";
@@ -11,6 +12,7 @@ import {
   type LdapDirectoryView,
   createLdapDirectory,
   deleteLdapDirectory,
+  getLdapDirectory,
   previewLdapDirectory,
   setLdapDirectoryEnabled,
   toLdapDirectoryView,
@@ -34,7 +36,8 @@ export async function createLdapDirectoryAction(
   input: LdapDirectoryInput,
 ): Promise<ActionResult<LdapDirectoryView>> {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
+    const { session, access } = await requireCanAccess("settings:write");
+    await assertMayConfigureSignIn(access.capabilities, null, input);
     const directory = await createLdapDirectory(input);
     await audit(
       Number(session.user.id),
@@ -52,7 +55,8 @@ export async function updateLdapDirectoryAction(
   input: LdapDirectoryInput,
 ): Promise<ActionResult<LdapDirectoryView>> {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
+    const { session, access } = await requireCanAccess("settings:write");
+    await assertMayConfigureSignIn(access.capabilities, await getLdapDirectory(id), input);
     const directory = await updateLdapDirectory(id, input);
     await audit(Number(session.user.id), "update", `Updated directory ${directory.name}`, id);
     revalidatePath("/settings");

@@ -78,7 +78,7 @@ test.describe('Branding - custom favicon', () => {
     expect((await page.request.get(FAVICON_URL)).status()).toBe(200);
 
     await page.getByRole('button', { name: /^Remove .*favicon/i }).click();
-    await expect(page.getByText('will be removed when saved')).toBeVisible();
+    await expect(page.getByText('is removed when you save')).toBeVisible();
     await saveAndApply(page);
     expect((await page.request.get(FAVICON_URL)).status()).toBe(404);
   });

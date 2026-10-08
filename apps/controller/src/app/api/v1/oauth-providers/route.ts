@@ -9,6 +9,7 @@ import {
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth/server";
 import { getPublicBaseUrl } from "@/src/lib/http/public-url";
+import { assertMayConfigureSignIn } from "@/src/lib/roles/sign-in-sources";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
 
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await requireApiUser(request);
+    const { userId, access } = await requireApiUser(request);
     const body = await request.json();
 
     if (!body.name || typeof body.name !== "string") {
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "clientSecret is required" }, { status: 400 });
     }
 
+    await assertMayConfigureSignIn(access.capabilities, null, body);
     const provider = await createOAuthProvider({
       name: body.name,
       type: body.type ?? "oidc",

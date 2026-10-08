@@ -65,11 +65,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         blocks: [
           { id: "general", name: "General" },
           {
-            id: "acme",
-            name: "ACME server",
-            envSearch: ["ACME_CA_ROOT_DIR"],
-          },
-          {
             id: "updates",
             name: "Updates",
             envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
@@ -88,6 +83,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "avatars",
             name: "User avatars",
             envSearch: ["AVATAR_GRAVATAR"],
+          },
+          {
+            id: "acme",
+            name: "ACME server",
+            envSearch: ["ACME_CA_ROOT_DIR"],
           },
           {
             id: "host-history",

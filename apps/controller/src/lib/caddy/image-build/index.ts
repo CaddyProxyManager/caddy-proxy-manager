@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import { type CaddyBuildState, type CaddyBuildStatus, SHIPPED_CADDY_MODULES } from "@cpm/shared";
 import {
   CADDY_MODULES,
+  PREVIOUS_MODULE_PATHS,
   type CaddyCustomModule,
   type CaddyFeatureId,
   type CaddyModuleDefinition,
@@ -187,7 +188,12 @@ export async function getCaddyModuleAvailability(
     ),
   );
   // Custom modules map to no feature, but a caller checking a path must still find them.
-  const appliedPaths = new Set(appliedSpecs.map((spec) => stripVersion(spec)));
+  const appliedPaths = new Set(
+    appliedSpecs.map((spec) => {
+      const path = stripVersion(spec);
+      return PREVIOUS_MODULE_PATHS[path] ?? path;
+    }),
+  );
   return {
     desired: featuresForPaths(desiredPaths),
     applied: featuresForPaths(appliedPaths),

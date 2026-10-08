@@ -152,7 +152,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByRole('menuitem', { name: /delete/i }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText(/are you sure/i)).toBeVisible();
+    await expect(page.getByText(/Delete the L4 proxy host/i)).toBeVisible();
     await page.getByRole('button', { name: /delete/i }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });

@@ -93,15 +93,29 @@ function analyticsSink(store: AgentStore, controllerId: string): AnalyticsSink |
   return { client: new ControllerClient(url, store.agentId()), secret };
 }
 
-/** A parse that throws must not kill its interval and silently stop the parser. */
+/**
+ * A parse that throws must not kill its interval and silently stop the parser, and one slower than
+ * the interval is waited for rather than overlapped, which would read the same offset twice.
+ */
+function parseEvery(label: string, parse: () => Promise<void>): NodeJS.Timeout {
+  let running = false;
+  return setInterval(() => {
+    if (running) return;
+    running = true;
+    void parse()
+      .catch((error: unknown) => {
+        console.error(`[analytics] ${label} log parse failed:`, error);
+      })
+      .finally(() => {
+        running = false;
+      });
+  }, PARSE_INTERVAL_MS);
+}
+
 async function syncParsers(access: boolean, waf: boolean): Promise<void> {
   if (access && !accessTimer) {
     await initLogParser();
-    accessTimer = setInterval(() => {
-      void parseNewLogEntries().catch((error: unknown) => {
-        console.error("[analytics] access log parse failed:", error);
-      });
-    }, PARSE_INTERVAL_MS);
+    accessTimer = parseEvery("access", parseNewLogEntries);
     console.log("[analytics] access log parser started");
   } else if (!access && accessTimer) {
     clearInterval(accessTimer);
@@ -111,11 +125,7 @@ async function syncParsers(access: boolean, waf: boolean): Promise<void> {
   }
   if (waf && !wafTimer) {
     await initWafLogParser();
-    wafTimer = setInterval(() => {
-      void parseNewWafLogEntries().catch((error: unknown) => {
-        console.error("[analytics] WAF log parse failed:", error);
-      });
-    }, PARSE_INTERVAL_MS);
+    wafTimer = parseEvery("WAF", parseNewWafLogEntries);
     console.log("[analytics] WAF log parser started");
   } else if (!waf && wafTimer) {
     clearInterval(wafTimer);

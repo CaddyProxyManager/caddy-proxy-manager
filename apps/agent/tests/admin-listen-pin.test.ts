@@ -1,6 +1,11 @@
-/** The controller's admin block binds every interface, including the upstreams' network. */
+/**
+ * The controller's admin block binds every interface, including the upstreams' network; and the
+ * monitor's fingerprint is hashed here rather than shipped whole.
+ */
 import { describe, expect, it } from "bun:test";
-import { loadsConfig, pinAdminListen } from "../src/caddy-admin";
+import { createHash } from "node:crypto";
+import { CADDY_DIGEST_HEADER } from "@cpm/shared";
+import { digestResponse, loadsConfig, pinAdminListen } from "../src/caddy-admin";
 
 const LISTEN = "caddy-admin:2019";
 
@@ -47,5 +52,22 @@ describe("loadsConfig", () => {
     expect(loadsConfig({ method: "PATCH", path: "/config/" })).toBe(true);
     expect(loadsConfig({ method: "GET", path: "/config/" })).toBe(false);
     expect(loadsConfig({ method: "POST", path: "/adapt" })).toBe(false);
+  });
+});
+
+describe("digestResponse", () => {
+  it("answers a 2xx body with the hash the controller would take of it", () => {
+    const text = JSON.stringify({ apps: { http: {} } });
+    const digest = digestResponse({ status: 200, text, headers: { etag: "x" } });
+    expect(digest).toEqual({
+      status: 200,
+      text: createHash("sha256").update(text).digest("hex"),
+      headers: { [CADDY_DIGEST_HEADER]: "sha256" },
+    });
+  });
+
+  it("leaves an error as it is, so the controller sees why", () => {
+    const failed = { status: 500, text: "boom", headers: {} };
+    expect(digestResponse(failed)).toBe(failed);
   });
 });

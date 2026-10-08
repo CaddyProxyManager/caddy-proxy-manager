@@ -37,6 +37,7 @@ import { join } from "node:path";
 import { applyFleetConfig } from "./analytics/runner";
 import {
   CaddyAdminUnreachable,
+  digestResponse,
   forwardToCaddy,
   isAllowedAdminPath,
   loadsConfig,
@@ -724,7 +725,11 @@ export class AgentLifecycle {
       if (loadsConfig(request) && response.status < 300) {
         for (const resolve of this.configLoadWaiters.splice(0)) resolve();
       }
-      return { id: command.id, ok: true, response };
+      return {
+        id: command.id,
+        ok: true,
+        response: request.digest ? digestResponse(response) : response,
+      };
     } catch (error) {
       const code = error instanceof CaddyAdminUnreachable ? "BUSY" : "INTERNAL";
       return {

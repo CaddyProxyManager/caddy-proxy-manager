@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCan } from "@/src/lib/users/permissions";
+import { requireCan, requireCanAccess } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import type { ActionResult } from "@/src/lib/errors/action-result";
@@ -2186,7 +2186,9 @@ export async function createOAuthProviderAction(data: {
   syncGroups?: boolean;
 }) {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
+    const { session, access } = await requireCanAccess("settings:write");
+    const { assertMayConfigureSignIn } = await import("@/src/lib/roles/sign-in-sources");
+    await assertMayConfigureSignIn(access.capabilities, null, data);
     const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
     const { invalidateProviderCache } = await import("@/src/lib/auth/server");
     const provider = await createOAuthProvider({ ...data, source: "ui" });
@@ -2253,8 +2255,12 @@ export async function updateOAuthProviderAction(
   }>,
 ) {
   return runAction(async () => {
-    const session = await requireCan("settings:write");
-    const { updateOAuthProvider } = await import("@/src/lib/models/oauth-providers");
+    const { session, access } = await requireCanAccess("settings:write");
+    const { getOAuthProvider, updateOAuthProvider } = await import(
+      "@/src/lib/models/oauth-providers"
+    );
+    const { assertMayConfigureSignIn } = await import("@/src/lib/roles/sign-in-sources");
+    await assertMayConfigureSignIn(access.capabilities, await getOAuthProvider(id), data);
     const { invalidateProviderCache } = await import("@/src/lib/auth/server");
     const updated = await updateOAuthProvider(id, data);
     invalidateProviderCache();

@@ -6,6 +6,7 @@
 import { createHmac } from "node:crypto";
 import { Resolver } from "node:dns/promises";
 import { derivePurposeKey } from "../secrets/derived-key";
+import { outboundFetch } from "../http/outbound";
 
 export const REACHABILITY_PATH = "/.well-known/cpm-reachability";
 const TIMEOUT_MS = 5000;
@@ -84,10 +85,13 @@ export async function checkDomainReachability(domain: string): Promise<DomainRea
   if (addresses.length === 0) return { domain: name, addresses, caa, result: "unresolved" };
 
   try {
+    // Through the outbound guard: a domain anyone may save must not point this at the metadata
+    // service. Private addresses stay allowed, as a LAN install answers on one.
     // outbound: reachability
-    const response = await fetch(`http://${name}${REACHABILITY_PATH}`, {
+    const response = await outboundFetch(`http://${name}${REACHABILITY_PATH}`, {
       redirect: "manual",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      timeoutMs: TIMEOUT_MS,
+      maxResponseBytes: 4096,
       headers: { "Cache-Control": "no-cache" },
     });
     const body = (await response.text()).slice(0, 200).trim();

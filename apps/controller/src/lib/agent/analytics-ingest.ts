@@ -22,6 +22,8 @@ import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../cli
 import db from "../db";
 import { proxyHosts } from "../db/schema";
 import { listHostAssignments, servedByAgent } from "../models/host-agents";
+import { onAnnouncement } from "../cluster/announcements";
+import { dropProcessMemo, processMemo } from "../settings/process-memo";
 
 /** A URI or user agent past this is noise, not a request. */
 const MAX_FIELD_CHARS = 64 * 1024;
@@ -172,7 +174,15 @@ function matchesDomain(domains: ReadonlySet<string>, host: string): boolean {
  * Whether a row's host is one this agent may report on: a host it serves, or one no proxy host
  * claims (scanners, the catch-all). A host pinned only to other agents is not its to report.
  */
-export async function agentHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
+export function agentHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
+  // Asked for every batch, so held until a host or assignment changes; each ends in an apply.
+  return processMemo(`${HOST_FILTERS}:${agentRowId}`, () => loadHostFilter(agentRowId));
+}
+
+const HOST_FILTERS = "agent_host_filter";
+onAnnouncement("proxy-hosts", () => dropProcessMemo(HOST_FILTERS));
+
+async function loadHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
   const [rows, assignments] = await Promise.all([
     db.select({ id: proxyHosts.id, domains: proxyHosts.domains }).from(proxyHosts),
     listHostAssignments("http"),

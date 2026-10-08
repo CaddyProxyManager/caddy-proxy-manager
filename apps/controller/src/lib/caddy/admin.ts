@@ -18,6 +18,8 @@ export type CaddyAdminRequest = {
   timeoutMs?: number;
   /** Defaults to application/json; /adapt needs text/caddyfile. */
   contentType?: string;
+  /** Ask an agent for the body's digest only; see `CaddyAdminProxyRequest.digest`. */
+  digest?: true;
   /**
    * Required when the answer shapes a config loaded onto that agent: one agent's answer must never
    * shape another's. A pinned request never falls back to a direct connection.
@@ -132,6 +134,7 @@ export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): Caddy
           method: request.method,
           body: request.body,
           contentType: request.contentType,
+          ...(request.digest && { digest: true as const }),
         },
         request.agentId,
       );

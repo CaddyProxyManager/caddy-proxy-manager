@@ -99,6 +99,11 @@ export async function accessFor(
   const groupRoles = await rolesOfGroups(groupIds);
   const capabilities =
     groupRoles.length === 0 ? own : capabilitySetOf(await roleDefinitions([role, ...groupRoles]));
+  // A backup carries every secret and account, and restoring one replaces them: it is anyone's
+  // whole power, so only a caller holding everything may take or restore one.
+  if (!CAPABILITIES.every((capability) => holds(capabilities, capability))) {
+    delete capabilities["backups:write"];
+  }
   const scoped = Object.values(capabilities).includes("granted");
   const grants = scoped ? await grantsForGroups(groupIds) : emptyGrants();
   return { userId, role, capabilities, grants };

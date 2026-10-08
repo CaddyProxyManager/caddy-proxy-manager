@@ -3,7 +3,6 @@
     "title": "Needs attention",
     "count": "{count, plural, one {# item} other {# items}}",
     "empty": "Nothing needs attention",
-    "loading": "Checking",
     "loadFailed": "Could not check what needs attention.",
     "skipped": "{count, plural, one {One check took} other {# checks took}} too long and {count, plural, one {was} other {were}} skipped, so items may be missing.",
     "truncated": "{count, plural, one {# more item is} other {# more items are}} not shown.",
@@ -1360,6 +1359,7 @@
     "acmeDnsRegisterInvalidResponse": "The acme-dns server's answer was not an account",
     "cannotChangeOwnRole": "Cannot change your own role",
     "roleExceedsYours": "You can only hand out a role whose permissions you hold yourself",
+    "signInLinkNeedsEverything": "Only someone who holds every permission can let a sign-in source link to existing accounts",
     "accountExceedsYours": "That account holds permissions you do not, so only someone who holds them can change it",
     "roleNameInvalid": "A role needs a name of at most {max} characters",
     "roleDescriptionTooLong": "A role's description can be at most {max} characters",
@@ -1947,6 +1947,7 @@
     "accessReviewDecisionInvalid": "A decision is keep, revoke or change",
     "accessReviewChangeUnavailable": "Only a role or a grant can be changed; keep or revoke this one",
     "accessReviewChangeInvalid": "Choose access different from what it has now",
+    "accessReviewChangeRaises": "A review can only narrow access: choose less than it has now",
     "accessReviewScimManaged": "This access comes from SCIM provisioning, which would restore it. Remove it in the identity provider",
     "accessReviewNoteTooLong": "A note must be {max} characters or fewer",
     "accessReviewApplyFailed": "It could not be applied; the server log says why",
@@ -4681,7 +4682,7 @@
         }
       },
       "hetzner": {
-        "description": "Hetzner DNS API",
+        "description": "Hetzner Cloud DNS API, for zones in the Hetzner Console",
         "fields": {
           "apiToken": {
             "label": "API token"
@@ -5556,9 +5557,6 @@
       "breakGlass": "Locked out by the policy? Run cpm-server --lift-mfa-policy inside the web container to turn it off."
     },
     "search": {
-      "label": "Search settings",
-      "placeholder": "Search settings, e.g. smtp or prometheus",
-      "empty": "No setting matches",
       "synonyms": {
         "general": "domain, default domain, hostname",
         "acme": "certificate authority, ca, lets encrypt, ssl, tls, https, issuer",

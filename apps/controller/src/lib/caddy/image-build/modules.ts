@@ -50,6 +50,16 @@ export type CaddyModuleDefinition = {
 /** Named by the build-conflict check, which refuses dropping it while CrowdSec is on. */
 export const CROWDSEC_MODULE_ID = "caddy-crowdsec";
 
+/**
+ * Paths a module shipped under before, to the one it has now. A binary built with the old one
+ * still carries it - the plugin registers the same Caddy module and takes the same config - and
+ * the spec difference alone asks for the rebuild that moves it.
+ */
+export const PREVIOUS_MODULE_PATHS: Readonly<Record<string, string>> = {
+  // v1 spoke Hetzner's retired DNS Console API.
+  "github.com/caddy-dns/hetzner": "github.com/caddy-dns/hetzner/v2",
+};
+
 const CORE_MODULES: CaddyModuleDefinition[] = [
   {
     id: "caddy-l4",

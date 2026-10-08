@@ -46,6 +46,12 @@ export function invalidateProcessMemos(): void {
   memos.clear();
 }
 
+/** For a value some other write than a setting makes stale: `key`, and every `key:...` under it. */
+export function dropProcessMemo(key: string): void {
+  for (const held of memos.keys())
+    if (held === key || held.startsWith(`${key}:`)) memos.delete(held);
+}
+
 /** The held value, without loading it: for a writer folding its change into one already held. */
 export function peekProcessMemo<T>(key: string): Promise<T> | null {
   const hit = memos.get(key);

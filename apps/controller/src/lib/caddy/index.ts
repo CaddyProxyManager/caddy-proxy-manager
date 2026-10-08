@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
+import { CADDY_DIGEST_HEADER } from "@cpm/shared";
 import { buildDashboardHostRow, DASHBOARD_HOST_ID } from "../dashboard-host";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
@@ -36,6 +37,7 @@ import {
   sortTlsPoliciesBySniPriority,
 } from "../proxy-hosts/pattern-priority";
 import db from "../db";
+import { announce } from "../cluster/announcements";
 import { asc, eq, isNull } from "drizzle-orm";
 import { config } from "../config";
 import {
@@ -1591,6 +1593,37 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }),
   );
 
+  // Pinned upstreams are looked up for every host at once, so an apply waits for the slowest name
+  // rather than the sum of them; the loop below takes each host's answer in order.
+  const pinnedDials = new Map<ProxyHostRow, Promise<ResolveUpstreamsResult>>();
+  for (const row of rows) {
+    const upstreams = parseJson<string[]>(row.upstreams, []);
+    if (!row.enabled || upstreams.length === 0) continue;
+    // A host the loop skips for its certificate is not looked up either.
+    if (row.certificateId && !tlsReadyCertificates.has(row.certificateId)) continue;
+    const meta = metaOf(row);
+    const tailscale = parseTailscaleConfig(meta.tailscale, context.tailscale ?? null);
+    // Pinning resolves the upstream here and writes the address into the config. Through a
+    // tailnet node the name has to be resolved by MagicDNS on the other side, and this
+    // container's resolver knows nothing about it - so the pin is skipped rather than baked in wrong.
+    const dnsResolution = tailscale?.upstreamNode
+      ? { enabled: false as const, family: "both" as const }
+      : resolveEffectiveUpstreamDnsResolution(
+          context.globalUpstreamDnsResolutionSettings,
+          parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution),
+        );
+    const pending = resolveUpstreamDials(
+      row,
+      upstreams,
+      parseDnsResolverConfig(meta.dns_resolver),
+      context.globalDnsSettings,
+      dnsResolution,
+    );
+    // Awaited in the loop, perhaps after it settles: handled now so it is never "unhandled".
+    pending.catch(() => {});
+    pinnedDials.set(row, pending);
+  }
+
   for (const row of rows) {
     if (!row.enabled) {
       continue;
@@ -1873,23 +1906,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const lbConfig = parseLoadBalancerConfig(meta.load_balancer);
     const dnsConfig = parseDnsResolverConfig(meta.dns_resolver);
     const hostTimeouts = sanitizeHostUpstreamTimeouts(meta.upstream_timeouts);
-    const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
-    // Pinning resolves the upstream here and writes the address into the config. Through a tailnet
-    // node the name has to be resolved by MagicDNS on the other side, and this container's resolver
-    // knows nothing about it - so the pin is skipped rather than baked in wrong.
-    const effectiveDnsResolution = tailscale?.upstreamNode
-      ? { enabled: false as const, family: "both" as const }
-      : resolveEffectiveUpstreamDnsResolution(
-          context.globalUpstreamDnsResolutionSettings,
-          hostDnsResolutionConfig,
-        );
-    const resolvedUpstreams = await resolveUpstreamDials(
-      row,
-      upstreams,
-      dnsConfig,
-      context.globalDnsSettings,
-      effectiveDnsResolution,
-    );
+    const resolvedUpstreams = await (pinnedDials.get(row) as Promise<ResolveUpstreamsResult>);
 
     const reverseProxyHandler: Record<string, unknown> = {
       handler: "reverse_proxy",
@@ -3169,34 +3186,12 @@ async function runsManagedServices(agentRowId: number | undefined): Promise<bool
   return runsControllerServices(agentRowId);
 }
 
-export async function buildCaddyDocument(
-  agentRowId?: number,
-  /**
-   * `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands.
-   * `includeAgentFileCertificates` is for a document never loaded anywhere, such as a diff.
-   * `hostOverride` renders one host as a revision had it (null: absent), for host history.
-   */
-  options: {
-    adaptVia?: string;
-    globalCaddyfile?: string;
-    includeAgentFileCertificates?: boolean;
-    hostOverride?: HostOverride;
-  } = {},
-) {
-  const [
-    storedProxyHostRecords,
-    certRows,
-    accessListEntryRecords,
-    accessListRecords,
-    accessListIpRuleRecords,
-    accessListDnsRecords,
-    caCertRows,
-    issuedClientCertRows,
-    allIssuedCaCertIds,
-    httpAssignments,
-    dashboardSettings,
-    { roleCertIdMap, roleFingerprintMap },
-  ] = await Promise.all([
+/**
+ * The table reads a document starts from. Fleet-wide, so an apply reads them once and hands them
+ * to every agent's build rather than each agent repeating them.
+ */
+function loadDocumentInputs(perAgent: boolean) {
+  return Promise.all([
     db
       .select({
         id: proxyHosts.id,
@@ -3288,10 +3283,44 @@ export async function buildCaddyDocument(
     db
       .selectDistinct({ caCertificateId: issuedClientCertificates.caCertificateId })
       .from(issuedClientCertificates),
-    agentRowId === undefined ? null : listHostAssignments("http"),
+    perAgent ? listHostAssignments("http") : null,
     getDashboardSettings(),
     buildRoleMaps(),
   ]);
+}
+
+type DocumentInputs = Awaited<ReturnType<typeof loadDocumentInputs>>;
+
+export async function buildCaddyDocument(
+  agentRowId?: number,
+  /**
+   * `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands.
+   * `includeAgentFileCertificates` is for a document never loaded anywhere, such as a diff.
+   * `hostOverride` renders one host as a revision had it (null: absent), for host history.
+   */
+  options: {
+    adaptVia?: string;
+    globalCaddyfile?: string;
+    includeAgentFileCertificates?: boolean;
+    hostOverride?: HostOverride;
+    /** From `loadDocumentInputs`, when one apply builds several agents' documents. */
+    inputs?: DocumentInputs;
+  } = {},
+) {
+  const [
+    storedProxyHostRecords,
+    certRows,
+    accessListEntryRecords,
+    accessListRecords,
+    accessListIpRuleRecords,
+    accessListDnsRecords,
+    caCertRows,
+    issuedClientCertRows,
+    allIssuedCaCertIds,
+    httpAssignments,
+    dashboardSettings,
+    { roleCertIdMap, roleFingerprintMap },
+  ] = await (options.inputs ?? loadDocumentInputs(agentRowId !== undefined));
 
   const override = options.hostOverride;
   const proxyHostRecords =
@@ -3963,8 +3992,11 @@ export async function getCaddyLiveConfigHash(agentId?: string): Promise<string |
       method: "GET",
       timeoutMs: 5000,
       agentId,
+      digest: true,
     });
     if (response.status < 200 || response.status >= 300) return null;
+    // The same hash either way, so an applied fingerprint survives the agent being upgraded.
+    if (response.headers[CADDY_DIGEST_HEADER] === "sha256") return response.text;
     return createHash("sha256").update(response.text).digest("hex");
   } catch {
     return null;
@@ -3998,6 +4030,8 @@ export async function applyCaddyConfig() {
   if (currentStagingScope()?.suppressApply) {
     return;
   }
+  // Every host write ends here: forward auth's host index (models/forward-auth.ts) drops on it.
+  announce("proxy-hosts");
   // A CRS plugin Coraza will not build is switched off rather than left to fail every apply.
   await reportedApply(null, () => loadWithCrsPluginRecovery(loadEveryAgent));
 }
@@ -4040,10 +4074,21 @@ async function loadEveryAgent(): Promise<void> {
 
   // Each agent adapts the snippets in its own document. Adapted routes are nested unmodified, and
   // an agent is trusted to describe its own Caddy, never to write another agent's config.
+  // Read by whichever agent's build starts first, and shared by the rest.
+  let inputs: Promise<DocumentInputs> | undefined;
+  const sharedInputs = () => {
+    inputs ??= loadDocumentInputs(true);
+    return inputs;
+  };
   const results = await broadcastCaddyAdmin(async (agent) => ({
     path: "/load",
     method: "POST",
-    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId, { adaptVia: agent.agentId })),
+    body: JSON.stringify(
+      await buildCaddyDocument(agent.agentRowId, {
+        adaptVia: agent.agentId,
+        inputs: await sharedInputs(),
+      }),
+    ),
   }));
   const unreachable = results.filter((result) => !result.ok);
   if (unreachable.length > 0) {

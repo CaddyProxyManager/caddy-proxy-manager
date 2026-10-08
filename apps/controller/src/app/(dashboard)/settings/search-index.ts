@@ -2,7 +2,8 @@
  * Settings search: every block, plus the admin pages that configure the instance outside the
  * settings sections, each with the words someone might look for it by. Synonyms live in the
  * catalog (`settings.search.synonyms.<block>`), so a translation can add its own; matching is
- * plain words, so "prometheus" finds Metrics and "smtp" finds Email.
+ * plain words, so "prometheus" finds Metrics and "smtp" finds Email. The global search palette
+ * lists these and ranks everything it holds with `searchEntries`.
  */
 import type { useTranslations } from "next-intl";
 import {
@@ -98,18 +99,21 @@ function fold(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
+/** What `searchEntries` reads: a title, the words it is found by, and where it lives. */
+export type RankedEntry = { title: string; keywords: readonly string[]; context: string };
+
 /**
  * Every word of the query must appear somewhere. A title match outranks a synonym, which outranks
- * the place a block lives; ties keep the rail's order.
+ * the place an entry lives; ties keep the given order.
  */
-export function searchSettings(
-  entries: readonly SettingsSearchEntry[],
+export function searchEntries<T extends RankedEntry>(
+  entries: readonly T[],
   query: string,
   limit = 12,
-): SettingsSearchEntry[] {
+): T[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
-  const scored: Array<{ entry: SettingsSearchEntry; score: number; index: number }> = [];
+  const scored: Array<{ entry: T; score: number; index: number }> = [];
   entries.forEach((entry, index) => {
     const title = fold(entry.title);
     const keywords = entry.keywords.map(fold);

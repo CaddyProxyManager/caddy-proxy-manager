@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readLines } from "../../src/analytics/log-parser";
+import { readLines as readCapped } from "../../src/analytics/log-read";
 
 describe("readLines (real filesystem)", () => {
   let dir: string;
@@ -14,6 +15,20 @@ describe("readLines (real filesystem)", () => {
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("drains a backlog a capped slice at a time, never splitting a line", async () => {
+    writeFileSync(file, "aaaa\nbbbb\ncccc\n");
+    const first = await readCapped(0, file, 12);
+    expect(first).toEqual({ lines: ["aaaa", "bbbb"], newOffset: 10 });
+    const second = await readCapped(first.newOffset, file, 12);
+    expect(second).toEqual({ lines: ["cccc"], newOffset: 15 });
+  });
+
+  it("skips a line longer than a whole pass rather than stalling on it", async () => {
+    writeFileSync(file, `${"x".repeat(20)}\nnext\n`);
+    const first = await readCapped(0, file, 8);
+    expect(first).toEqual({ lines: [], newOffset: 8 });
   });
 
   it("returns complete lines and advances offset to their byte length", async () => {

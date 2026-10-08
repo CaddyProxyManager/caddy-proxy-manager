@@ -5,6 +5,7 @@ import {
   updateOAuthProvider,
   deleteOAuthProvider,
 } from "@/src/lib/models/oauth-providers";
+import { assertMayConfigureSignIn } from "@/src/lib/roles/sign-in-sources";
 import {
   oauthCallbackUrl,
   toOAuthProviderView,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId } = await requireApiUser(request);
+    const { userId, access } = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
 
@@ -66,6 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    await assertMayConfigureSignIn(access.capabilities, existing, body);
     const updated = await updateOAuthProvider(id, body);
     if (!updated) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

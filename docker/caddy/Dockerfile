@@ -3,7 +3,7 @@
 # On BUILDPLATFORM, cross-compiling, to avoid QEMU for arm64. The -builder image ships xcaddy and a
 # pinned Go toolchain, so cold builds skip compiling xcaddy. This tag pins only those; go.mod pins
 # Caddy and the plugins, and the two may drift.
-FROM --platform=$BUILDPLATFORM caddy:2.11.6-builder@sha256:9fa405e7bb28572759e7c75bea68ed39c4266a509f0c0237c464c6e13ed4dc25 AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.7-builder@sha256:1ab914bd604996ab195f6326665cd2ae5d3df62feba973e776c4c8d5967d57a5 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -19,7 +19,7 @@ github.com/caddy-dns/cloudflare \
 github.com/caddy-dns/route53 \
 github.com/caddy-dns/digitalocean \
 github.com/caddy-dns/duckdns \
-github.com/caddy-dns/hetzner \
+github.com/caddy-dns/hetzner/v2 \
 github.com/caddy-dns/vultr \
 github.com/caddy-dns/porkbun \
 github.com/caddy-dns/godaddy \

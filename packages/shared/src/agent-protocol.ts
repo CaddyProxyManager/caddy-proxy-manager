@@ -239,7 +239,14 @@ export type CaddyAdminProxyRequest = {
   body?: string;
   /** Defaults to application/json; /adapt needs text/caddyfile. */
   contentType?: string;
+  /**
+   * A 2xx body comes back as its SHA-256 in hex, marked by `CADDY_DIGEST_HEADER`, so a monitor
+   * polling the whole config moves 64 bytes. An older agent ignores it and sends the body.
+   */
+  digest?: true;
 };
+
+export const CADDY_DIGEST_HEADER = "x-cpm-digest";
 
 /** A non-2xx status is data here, not an error. */
 export type CaddyAdminProxyResponse = {

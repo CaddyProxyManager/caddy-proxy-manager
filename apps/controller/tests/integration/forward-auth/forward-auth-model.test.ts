@@ -36,6 +36,7 @@ import {
 import { logAuditEvent } from '@/src/lib/audit';
 import { DomainError } from '@/src/lib/errors/domain-error';
 import { invalidateSettingsCache } from '@/src/lib/settings/resolve';
+import { announce } from '@/src/lib/cluster/announcements';
 import {
   forwardAuthAccess,
   forwardAuthExchanges,
@@ -269,6 +270,8 @@ describe('redirect intents', () => {
       .update(proxyHosts)
       .set({ meta: JSON.stringify({ cpm_forward_auth: { enabled: false } }) })
       .where(eq(proxyHosts.id, host));
+    // What the apply after a host write announces.
+    announce('proxy-hosts');
 
     expect(await consumeRedirectIntent(rid)).toBeNull();
     // Consumed regardless: a retry cannot succeed later either.

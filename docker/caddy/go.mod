@@ -15,7 +15,7 @@
 
 module github.com/ingres-si/caddy-proxy-manager/docker/caddy
 
-go 1.26.6
+go 1.27.1
 
 require (
 	github.com/caddy-dns/acmedns v0.7.0
@@ -26,7 +26,7 @@ require (
 	github.com/caddy-dns/duckdns v0.5.0
 	github.com/caddy-dns/dynu v1.0.0
 	github.com/caddy-dns/godaddy v1.2.0
-	github.com/caddy-dns/hetzner v1.0.0
+	github.com/caddy-dns/hetzner/v2 v2.0.1
 	github.com/caddy-dns/infomaniak v1.0.2
 	github.com/caddy-dns/inwx v0.4.1
 	github.com/caddy-dns/ionos v1.2.0
@@ -41,7 +41,7 @@ require (
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/cache-handler v0.17.0
-	github.com/caddyserver/caddy/v2 v2.11.6
+	github.com/caddyserver/caddy/v2 v2.11.7
 	github.com/corazawaf/coraza-caddy/v2 v2.6.1
 	github.com/darkweak/storages/badger/caddy v0.0.20
 	github.com/darkweak/storages/etcd/caddy v0.0.20
@@ -129,6 +129,7 @@ require (
 	github.com/digitalocean/godo v1.148.0 // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
 	github.com/dunglas/go-urlpattern v1.0.0 // indirect
+	github.com/dunglas/httpsfv v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
@@ -184,6 +185,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hdevalence/ed25519consensus v0.2.0 // indirect
+	github.com/hetznercloud/hcloud-go/v2 v2.37.0 // indirect
 	github.com/hslatman/ipstore v0.5.0 // indirect
 	github.com/huandu/xstrings v1.6.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
@@ -209,7 +211,7 @@ require (
 	github.com/libdns/duckdns v0.3.0 // indirect
 	github.com/libdns/dynu v1.0.0 // indirect
 	github.com/libdns/godaddy v1.1.0 // indirect
-	github.com/libdns/hetzner v1.0.0 // indirect
+	github.com/libdns/hetzner/v2 v2.0.1 // indirect
 	github.com/libdns/infomaniak v0.2.0 // indirect
 	github.com/libdns/inwx v0.3.1 // indirect
 	github.com/libdns/ionos v1.2.0 // indirect

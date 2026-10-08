@@ -806,9 +806,10 @@ function DecideDialog({
       ? roles
           .filter((role) => role.key !== item.current)
           .map((role) => ({ value: role.key, label: roleName(role.key) }))
-      : (["view", "manage"] as const)
-          .filter((level) => level !== item.current)
-          .map((level) => ({ value: level, label: t(`levels.${level}`) }));
+      : // A review only narrows, so a grant can go from manage to view and no further.
+        item.current === "manage"
+        ? [{ value: "view", label: t("levels.view") }]
+        : [];
   const revokeBlocked = item.scimManaged && (kind === "role" || kind === "membership");
 
   async function save() {
@@ -858,7 +859,9 @@ function DecideDialog({
         >
           <SegmentedControlItem value="keep" label={t("decisions.keep")} />
           <SegmentedControlItem value="revoke" label={t("decisions.revoke")} />
-          {canChange(kind) && <SegmentedControlItem value="change" label={t("decisions.change")} />}
+          {canChange(kind) && changeOptions.length > 0 && (
+            <SegmentedControlItem value="change" label={t("decisions.change")} />
+          )}
         </SegmentedControl>
         {decision === "revoke" && !revokeBlocked && (
           <Text type="supporting">{t(`revokeHelp.${kind}`)}</Text>

@@ -84,6 +84,14 @@ export type AttentionList = {
   truncated: number;
 };
 
+/**
+ * Whether a list has anything to say. A check that ran out of time does: its items may be
+ * missing, so the list cannot claim that nothing needs attention.
+ */
+export function hasAttentionToShow(list: AttentionList): boolean {
+  return list.items.length > 0 || list.skipped.length > 0;
+}
+
 export const ATTENTION_LIMIT = 50;
 export const ATTENTION_PROVIDER_BUDGET_MS = 4000;
 

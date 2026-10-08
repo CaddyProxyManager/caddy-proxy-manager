@@ -22,19 +22,20 @@ import {
   STAGED_SLOT_ID,
 } from "./sections";
 import { RevisionPill, StagedControls } from "./StagedChanges";
+import { wideMeasure } from "@/components/ui/measure";
 
 /**
  * Capped and centred: full-width inputs sit a screen away from their labels. The header shares the
- * measure so the title sits over the cards.
+ * measure so the title sits over the cards; SettingsClient's column is the same width.
  */
-const COLUMN = 768;
+export const COLUMN = wideMeasure(768);
 const ASIDE = 176;
 
 function Measure({ aside, children }: { aside: boolean; children: ReactNode }) {
   return (
     <VStack
       width="100%"
-      maxWidth={aside ? `calc(${COLUMN}px + ${ASIDE}px + var(--spacing-5))` : COLUMN}
+      maxWidth={aside ? `calc(${COLUMN} + ${ASIDE}px + var(--spacing-5))` : COLUMN}
       className="mx-auto"
     >
       {children}

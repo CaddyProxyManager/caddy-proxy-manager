@@ -4,7 +4,7 @@ import { testTranslator } from '../../helpers/next-intl';
 import messages from '../../../messages/en.json';
 import {
   EXTRA_SEARCH_PAGES,
-  searchSettings,
+  searchEntries,
   settingsSearchEntries,
 } from '../../../src/app/(dashboard)/settings/search-index';
 import {
@@ -13,7 +13,7 @@ import {
 } from '../../../src/app/(dashboard)/settings/sections';
 
 const entries = settingsSearchEntries(testTranslator('settings') as never);
-const first = (query: string) => searchSettings(entries, query)[0]?.id;
+const first = (query: string) => searchEntries(entries, query)[0]?.id;
 
 describe('settings search', () => {
   it('finds a block by a word it never shows', () => {
@@ -33,8 +33,8 @@ describe('settings search', () => {
 
   it('ranks a title over a synonym, ignores accents and case, and needs every word', () => {
     expect(first('COMPRESSIÓN')).toBe('compression');
-    expect(searchSettings(entries, 'smtp nonsense-word')).toEqual([]);
-    expect(searchSettings(entries, '   ')).toEqual([]);
+    expect(searchEntries(entries, 'smtp nonsense-word')).toEqual([]);
+    expect(searchEntries(entries, '   ')).toEqual([]);
   });
 
   it('links every result somewhere', () => {

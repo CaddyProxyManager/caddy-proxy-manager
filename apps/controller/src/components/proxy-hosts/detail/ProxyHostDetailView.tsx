@@ -30,6 +30,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { AttentionList } from "@/components/attention/AttentionList";
+import { hasAttentionToShow } from "@/lib/attention/types";
 import { HostTagList } from "@/components/proxy-hosts/HostTagsField";
 import {
   CertificateDaysCell,
@@ -256,9 +257,11 @@ export function ProxyHostDetailView({
         )}
       </VStack>
 
-      <SectionCard icon={TriangleAlert} title={tAttention("title")}>
-        <AttentionList list={detail.attention} emptyTitle={t("attentionEmpty")} />
-      </SectionCard>
+      {hasAttentionToShow(detail.attention) && (
+        <SectionCard icon={TriangleAlert} title={tAttention("title")}>
+          <AttentionList list={detail.attention} emptyTitle={t("attentionEmpty")} />
+        </SectionCard>
+      )}
 
       {traffic ? (
         <>

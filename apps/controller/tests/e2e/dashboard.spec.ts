@@ -144,12 +144,25 @@ test.describe('Needs attention and the setup checklist', () => {
     await waitForHydration(page);
   });
 
-  test('lists what needs attention, or says nothing does', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Needs attention', level: 2 })).toBeVisible();
-    // Loaded after the page; either outcome is a finished load, never the spinner.
-    await expect(
-      page.getByText(/^(Nothing needs attention|Critical|Warning|Info)$/).first(),
-    ).toBeVisible({ timeout: 15_000 });
+  test('lists what needs attention, and is absent when nothing does', async ({ page }) => {
+    // Loaded after the page by a server action, whose answer decides whether the card shows.
+    const answer = page.waitForResponse(
+      async (response) =>
+        response.request().method() === 'POST' &&
+        Boolean(response.request().headers()['next-action']) &&
+        // A response of the page the reload replaces has no body left to read.
+        /"skipped":/.test(await response.text().catch(() => '')),
+      { timeout: 15_000 },
+    );
+    await page.reload();
+    await waitForHydration(page);
+    const body = await (await answer).text();
+    const heading = page.getByRole('heading', { name: 'Needs attention', level: 2 });
+    if (/"items":\[\]/.test(body) && /"skipped":\[\]/.test(body)) {
+      await expect(heading).toHaveCount(0);
+    } else {
+      await expect(heading).toBeVisible();
+    }
     await expect(page.getByText('Could not check what needs attention.')).toHaveCount(0);
   });
 

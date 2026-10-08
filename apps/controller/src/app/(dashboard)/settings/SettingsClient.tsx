@@ -81,7 +81,7 @@ import OAuthProvidersSection from "./OAuthProvidersSection";
 import LdapDirectoriesSection from "./LdapDirectoriesSection";
 import type { LdapDirectoryView } from "@/src/lib/models/ldap-directories";
 import type { OutboundCallView } from "@/src/lib/offline";
-import SettingsFrame from "./SettingsFrame";
+import SettingsFrame, { COLUMN } from "./SettingsFrame";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
@@ -766,7 +766,7 @@ export default function SettingsClient({
       <SettingsFrame sectionId={active} staged={staged} aside>
         <FocusField />
         <HStack gap={5} align="start">
-          <VStack gap={5} maxWidth={768} className="min-w-0 grow">
+          <VStack gap={5} maxWidth={COLUMN} className="min-w-0 grow">
             <PageSaveBar stagedFields={stagedFields}>
               <VStack gap={5}>
                 {page.blocks.map((block) => (

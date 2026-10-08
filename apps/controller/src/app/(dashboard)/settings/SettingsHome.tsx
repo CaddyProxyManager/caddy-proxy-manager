@@ -18,7 +18,6 @@ import type { SectionHealth } from "@/src/lib/settings/health";
 import { SETTINGS_GROUPS, SETTINGS_HUES, settingsGroupLabel, settingsHref } from "./sections";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "./SettingsFrame";
-import { SettingsSearch } from "./SettingsSearch";
 
 type Props = {
   sections: SectionHealth[];
@@ -70,7 +69,6 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
   return (
     <SettingsFrame sectionId={null} staged={staged}>
       <VStack gap={5}>
-        <SettingsSearch />
         {attention.length > 0 && (
           <Card padding={0}>
             <VStack gap={0}>
@@ -163,11 +161,6 @@ function SectionTile({ section, hue }: { section: SectionHealth; hue: Hue }) {
         <Text type="body" color="secondary" maxLines={1}>
           {section.value}
         </Text>
-        {section.detail && (
-          <Text type="supporting" color="secondary" maxLines={2}>
-            {section.detail}
-          </Text>
-        )}
       </VStack>
     </ClickableCard>
   );

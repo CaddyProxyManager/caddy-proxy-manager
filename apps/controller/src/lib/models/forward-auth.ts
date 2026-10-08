@@ -7,8 +7,11 @@ import {
   forwardAuthAccess,
   forwardAuthRedirectIntents,
   groupMembers,
+  proxyHosts,
 } from "../db/schema";
-import { and, eq, gt, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, lt } from "drizzle-orm";
+import { onAnnouncement } from "../cluster/announcements";
+import { dropProcessMemo, processMemo } from "../settings/process-memo";
 import { hostMatchesPattern } from "../proxy-hosts/pattern-priority";
 import { domainError } from "../errors/domain-error";
 import { takeFromWindow } from "../auth/rate-limit";
@@ -547,35 +550,55 @@ function hasForwardAuthEnabled(ph: { meta: string | null }): boolean {
   return !!parseCpmForwardAuthMeta(ph)?.enabled;
 }
 
-async function findForwardAuthProxyHost(host: string) {
-  const allHosts = await db.query.proxyHosts.findMany({
-    where: (table, operators) => operators.eq(table.enabled, true),
+type ForwardAuthHostEntry = { id: number; domains: string[]; forwardAuth: boolean };
+
+const ENABLED_HOSTS = "forward_auth_enabled_hosts";
+
+// Caddy asks on every request to a protected host, so the table is read once per change, not per
+// request. Every host write ends in an apply, which announces "proxy-hosts"; restore and import
+// clear every memo through the settings cache.
+onAnnouncement("proxy-hosts", () => dropProcessMemo(ENABLED_HOSTS));
+
+function loadEnabledHosts(): Promise<ForwardAuthHostEntry[]> {
+  return processMemo(ENABLED_HOSTS, async () => {
+    const rows = await db
+      .select({ id: proxyHosts.id, domains: proxyHosts.domains, meta: proxyHosts.meta })
+      .from(proxyHosts)
+      .where(eq(proxyHosts.enabled, true))
+      .orderBy(asc(proxyHosts.id));
+    return rows.flatMap((ph) => {
+      let domains: string[];
+      try {
+        domains = (JSON.parse(ph.domains) as string[]).map((d) => d.toLowerCase());
+      } catch {
+        return [];
+      }
+      return [{ id: ph.id, domains, forwardAuth: hasForwardAuthEnabled(ph) }];
+    });
   });
+}
+
+async function findForwardAuthProxyHost(host: string): Promise<{ id: number } | null> {
+  const allHosts = await loadEnabledHosts();
 
   // An exact host decides alone, never falling back to a wildcard - as Caddy routes it.
   let exactMatchFound = false;
-  let wildcardMatch: (typeof allHosts)[number] | null = null;
+  let wildcardMatch: ForwardAuthHostEntry | null = null;
   const hostLower = host.toLowerCase();
 
   for (const ph of allHosts) {
-    let parsed: string[];
-    try {
-      parsed = JSON.parse(ph.domains);
-    } catch {
-      continue;
-    }
-    if (parsed.some((d) => d.toLowerCase() === hostLower)) {
+    if (ph.domains.includes(hostLower)) {
       exactMatchFound = true;
-      if (hasForwardAuthEnabled(ph)) return ph;
+      if (ph.forwardAuth) return ph;
       continue;
     }
-    if (!wildcardMatch && parsed.some((d) => hostMatchesPattern(host, d))) {
+    if (!wildcardMatch && ph.domains.some((d) => hostMatchesPattern(host, d))) {
       wildcardMatch = ph;
     }
   }
 
   if (!exactMatchFound && wildcardMatch) {
-    return hasForwardAuthEnabled(wildcardMatch) ? wildcardMatch : null;
+    return wildcardMatch.forwardAuth ? wildcardMatch : null;
   }
 
   return null;

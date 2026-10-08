@@ -708,7 +708,7 @@ test.describe('Access Lists - used-by tab', () => {
 
     await page.getByRole('button', { name: /^Used by/ }).click();
     await expect(page.getByText('Not used by any proxy host')).toBeVisible();
-    await expect(page.getByText(/dormant/i)).toBeVisible();
+    await expect(page.getByText(/keep it for later/i)).toBeVisible();
   });
 
   test('used-by tab shows proxy host when one is assigned', async ({ page }) => {

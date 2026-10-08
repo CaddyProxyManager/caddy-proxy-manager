@@ -388,6 +388,12 @@ describe('a reviewer', () => {
     expect(
       await failure(decideItem(role.id, { decision: 'change', changeTo: 'nope' }, ids.dave)),
     ).toBe('accessReviewChangeInvalid');
+    // A reviewer holding nothing must not be able to promote anyone through the closer.
+    for (const changeTo of ['admin', 'operator']) {
+      expect(await failure(decideItem(role.id, { decision: 'change', changeTo }, ids.dave))).toBe(
+        'accessReviewChangeRaises',
+      );
+    }
     expect(await failure(decideItem(role.id, { decision: 'drop' }, ids.dave))).toBe(
       'accessReviewDecisionInvalid',
     );
@@ -536,7 +542,8 @@ describe('closing', () => {
   it('never does what the closer could not do by hand, and Confirm retries as someone who can', async () => {
     const { campaign, find, decide } = await decided();
     await decide(find('membership', ids.alice), 'revoke');
-    await decide(find('role', ids.bob), 'change', 'admin');
+    // Narrower, but alice's operator role holds what the closer does not.
+    await decide(find('role', ids.alice), 'change', 'viewer');
     await decide(find('role', ids.admin), 'revoke');
     // Manages users, but not groups, and holds less than an administrator.
     const usersOnly = {
@@ -551,7 +558,7 @@ describe('closing', () => {
       return [item.outcome, item.outcomeCode];
     };
     expect(outcome('membership', ids.alice)).toEqual(['failed', 'accessDenied']);
-    expect(outcome('role', ids.bob)).toEqual(['failed', 'roleExceedsYours']);
+    expect(outcome('role', ids.alice)).toEqual(['failed', 'accountExceedsYours']);
     expect(outcome('role', ids.admin)).toEqual(['failed', 'accountExceedsYours']);
 
     // The administrator may do the first two, but not disable themselves.
@@ -561,7 +568,7 @@ describe('closing', () => {
     const state = (kind: string, userId: number) =>
       after.find((entry) => entry.kind === kind && entry.userId === userId)!;
     expect(state('membership', ids.alice).outcome).toBe('applied');
-    expect(state('role', ids.bob).outcome).toBe('applied');
+    expect(state('role', ids.alice).outcome).toBe('applied');
     expect(state('role', ids.admin)).toMatchObject({
       outcome: 'failed',
       outcomeCode: 'cannotChangeOwnStatus',

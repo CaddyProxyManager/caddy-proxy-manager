@@ -201,6 +201,19 @@ describe('feature gating', () => {
     expect(isDnsProviderUsable(availability, 'not-a-provider')).toBe(false);
   });
 
+  it('counts a binary built under a module path since renamed, until it is rebuilt', async () => {
+    setAppliedModules(['github.com/caddy-dns/hetzner@v1.0.0']);
+    await saveCaddyBuildSettings({
+      modules: Object.fromEntries(
+        CADDY_MODULES.map((m) => [m.id, m.id === dnsModuleId('hetzner')]),
+      ),
+      customModules: [],
+    });
+
+    const availability = await getCaddyModuleAvailability();
+    expect(isDnsProviderUsable(availability, 'hetzner')).toBe(true);
+  });
+
   it('ignores the @version suffix when matching a custom module path', async () => {
     setAppliedModules([`${L4}@v0.0.1`]);
     const availability = await getCaddyModuleAvailability();

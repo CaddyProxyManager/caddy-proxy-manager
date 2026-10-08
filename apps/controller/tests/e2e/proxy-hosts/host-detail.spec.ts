@@ -45,7 +45,7 @@ test.describe('Proxy host page', () => {
     await row.getByText('localhost:9978').click();
     await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${id}$`));
     await expect(page.getByRole('heading', { name: NAME, level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Needs attention', level: 2 })).toBeVisible();
+    // Needs attention shows only with something in it, which a fresh host may not have.
     await expect(page.getByRole('heading', { name: 'Configuration', level: 2 })).toBeVisible();
   });
 
