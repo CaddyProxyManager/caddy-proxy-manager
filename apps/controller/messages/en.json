@@ -4107,8 +4107,12 @@
         "label": "Login window (milliseconds)"
       },
       "update_check_enabled": {
-        "description": "Ask the registry below, a few times a day, whether a newer release has been published. Turn it off to make no such request; the CRS plugin registry check and GeoIP downloads have switches of their own.",
+        "description": "Ask the registry below, a few times a day, whether a newer release has been published.",
         "label": "Check for updates"
+      },
+      "update_check_prereleases": {
+        "description": "Also look for betas and release candidates, and say here when one is newer than this install. A stable install is still only offered stable releases.",
+        "label": "Check for prereleases"
       },
       "update_image_repository": {
         "description": "Where this deployment's images come from, without the image name. The update check reads its tags. Point it at your own namespace if you run a fork, otherwise it reports releases you cannot pull.",
@@ -4906,6 +4910,8 @@
     "updateUpToDate": "{latest} is the newest release published, so this is up to date.",
     "updateNoCheckYet": "No check has completed yet. Save or check now to run one.",
     "updateChecksOff": "Update checks are off, so nothing is known about newer releases.",
+    "updatePrereleaseTitle": "Prerelease {version} is out",
+    "updatePrereleaseBody": "This install follows stable releases, so it is not offered this one. To try it, switch the deploy repository to its next branch and pull the images. That branch gets every stable release too, so you can switch back to main once one newer than this is out.",
     "updateNotChecking": "Not checking.",
     "updateLastChecked": "Last checked {when}.",
     "updateNeverChecked": "Never checked.",

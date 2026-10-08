@@ -467,6 +467,13 @@ export const SETTING_FIELDS: Array<{
     value: true,
   },
   {
+    key: "config:update_check_prereleases",
+    env: "UPDATE_CHECK_PRERELEASES",
+    group: "application",
+    kind: "boolean",
+    value: false,
+  },
+  {
     key: "config:update_image_repository",
     env: "UPDATE_IMAGE_REPOSITORY",
     group: "application",

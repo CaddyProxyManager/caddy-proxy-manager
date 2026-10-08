@@ -1241,7 +1241,10 @@ async function updateUpdateSettingsActionUnlocked(
     ]);
 
     const enabled = formData.get("updateCheckEnabled") === "on";
-    const values: Record<string, unknown> = { [registry.updateCheckEnabled.key]: enabled };
+    const values: Record<string, unknown> = {
+      [registry.updateCheckEnabled.key]: enabled,
+      [registry.updateCheckPrereleases.key]: formData.get("updateCheckPrereleases") === "on",
+    };
 
     // A disabled Astryx input submits nothing (see components/ui/FormBooleanControls), so absent
     // means "leave it alone" - not an empty string that wipes the repository.

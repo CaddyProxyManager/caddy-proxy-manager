@@ -330,10 +330,19 @@ export const updateCheckEnabled = booleanSetting({
   group: "application",
   label: "Check for updates",
   description:
-    "Ask the registry below, a few times a day, whether a newer release has been published. Turn " +
-    "it off to make no such request; the CRS plugin registry check and GeoIP downloads have " +
-    "switches of their own.",
+    "Ask the registry below, a few times a day, whether a newer release has been published.",
   default: true,
+});
+
+export const updateCheckPrereleases = booleanSetting({
+  name: "update_check_prereleases",
+  env: "UPDATE_CHECK_PRERELEASES",
+  group: "application",
+  label: "Check for prereleases",
+  description:
+    "Also look for betas and release candidates, and say here when one is newer than this " +
+    "install. A stable install is still only offered stable releases.",
+  default: false,
 });
 
 export const offlineMode = booleanSetting({
@@ -1102,6 +1111,7 @@ export const SETTING_DEFINITIONS = [
   forwardAuthInternalUrl,
   caddyBuildTimeout,
   updateCheckEnabled,
+  updateCheckPrereleases,
   updateImageRepository,
   offlineMode,
   hostHistoryKeepRevisions,

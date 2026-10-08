@@ -25,6 +25,8 @@ const MAX_TAG_PAGES = 10;
 type CachedCheck = {
   checkedAt: string;
   latest: string | null;
+  /** The newest tag of all, when it is a beta or RC; absent from results stored before it. */
+  prerelease?: string | null;
   error: string | null;
   /** Absent from results stored before codes existed. */
   errorCode?: StoredErrorCode | null;
@@ -43,6 +45,10 @@ export type UpdateStatus = {
   current: string;
   latest: string | null;
   updateAvailable: boolean;
+  /** Whether to look for betas and RCs at all. */
+  prereleases: boolean;
+  /** A newer beta or RC a stable install is not offered, for the Settings page to mention. */
+  prerelease: string | null;
   checkedAt: string | null;
   error: string | null;
   /** For `storedErrorMessage` to say it in the reader's language. */
@@ -102,6 +108,10 @@ export function onChannel(current: string, tag: string): boolean {
   if (!parsed) return false;
   return parsed.prerelease.length === 0 || (parseSemver(current)?.prerelease.length ?? 0) > 0;
 }
+
+/** Stand-ins for the running version, to ask what either channel would be offered. */
+const STABLE_CHANNEL = "0.0.0";
+const PRERELEASE_CHANNEL = "0.0.0-0";
 
 export function newestRelease(tags: string[], current: string = APP_VERSION): string | null {
   let best: { tag: string; parsed: Semver } | null = null;
@@ -260,17 +270,26 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
 
 // ── Checking ─────────────────────────────────────────────────────────────────
 
-async function settings(): Promise<{ enabled: boolean; repository: string }> {
+async function settings(): Promise<{
+  enabled: boolean;
+  prereleases: boolean;
+  repository: string;
+}> {
   const [registry, { getSetting: resolve }] = await Promise.all([
     import("../settings/registry"),
     import("../settings/resolve"),
   ]);
-  const [enabled, repository, allowed] = await Promise.all([
+  const [enabled, prereleases, repository, allowed] = await Promise.all([
     resolve(registry.updateCheckEnabled),
+    resolve(registry.updateCheckPrereleases),
     resolve(registry.updateImageRepository),
     outboundAllowed("updateCheck"),
   ]);
-  return { enabled: enabled && allowed, repository: canonicalRepository(repository) };
+  return {
+    enabled: enabled && allowed,
+    prereleases,
+    repository: canonicalRepository(repository),
+  };
 }
 
 /** Several readers finding the cache stale at once ask only once. */
@@ -285,6 +304,7 @@ export async function checkForUpdates(): Promise<CachedCheck> {
     const result: CachedCheck = {
       checkedAt: new Date().toISOString(),
       latest: null,
+      prerelease: null,
       error: null,
       errorCode: null,
       repository,
@@ -307,6 +327,8 @@ export async function checkForUpdates(): Promise<CachedCheck> {
           AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         );
         result.latest = newestRelease(tags);
+        const newest = newestRelease(tags, PRERELEASE_CHANNEL);
+        result.prerelease = newest && !onChannel(STABLE_CHANNEL, newest) ? newest : null;
         if (!result.latest) recordFailure(result, domainError("updateNoReleases"));
         else if (isNewer(APP_VERSION, result.latest)) {
           // Imported here: the notifications reach the settings, and this module is read by pages.
@@ -337,7 +359,7 @@ export async function checkForUpdates(): Promise<CachedCheck> {
 
 /** Never awaits the network: a stale answer is refreshed for the next render. */
 export async function getUpdateStatus(): Promise<UpdateStatus> {
-  const { enabled, repository } = await settings();
+  const { enabled, prereleases, repository } = await settings();
 
   // Hide the cached answer while off (it may be months stale and "Check" is disabled), but
   // keep the row so re-enabling shows it at once.
@@ -347,6 +369,8 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
       current: APP_VERSION,
       latest: null,
       updateAvailable: false,
+      prereleases,
+      prerelease: null,
       checkedAt: null,
       error: null,
       errorCode: null,
@@ -361,6 +385,8 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
     current: APP_VERSION,
     latest: cached?.repository === repository ? (cached.latest ?? null) : null,
     updateAvailable: false,
+    prereleases,
+    prerelease: null,
     checkedAt: cached?.repository === repository ? cached.checkedAt : null,
     error: cached?.repository === repository ? (cached.error ?? null) : null,
     errorCode: cached?.repository === repository ? (cached.errorCode ?? null) : null,
@@ -378,7 +404,27 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
   // A beta cached before this install left the prerelease channel, or by a build before the filter.
   if (status.latest && !onChannel(status.current, status.latest)) status.latest = null;
   status.updateAvailable = isNewer(status.current, status.latest);
+  if (prereleases) {
+    status.prerelease = unofferedPrerelease(
+      status.current,
+      status.latest,
+      cached?.repository === repository ? (cached.prerelease ?? null) : null,
+    );
+  }
   return status;
+}
+
+/**
+ * A beta or RC worth mentioning to a stable install: newer than it and than the newest stable
+ * release. A prerelease install is offered it as `latest` instead, and a dev build has no channel.
+ */
+export function unofferedPrerelease(
+  current: string,
+  latest: string | null,
+  prerelease: string | null,
+): string | null {
+  if (!prerelease || parseSemver(current)?.prerelease.length !== 0) return null;
+  return isNewer(latest ?? current, prerelease) && isNewer(current, prerelease) ? prerelease : null;
 }
 
 /** False when the comparison cannot be made: a wrong "yes" sends an operator chasing nothing. */

@@ -134,6 +134,7 @@ services:
 
       # First-start defaults of Settings fields. A fork sets the repository to its own namespace.
       UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-}
+      UPDATE_CHECK_PRERELEASES: ${UPDATE_CHECK_PRERELEASES:-}
       UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-}
       OFFLINE_MODE: ${OFFLINE_MODE:-}
       HOST_HISTORY_KEEP_REVISIONS: ${HOST_HISTORY_KEEP_REVISIONS:-}

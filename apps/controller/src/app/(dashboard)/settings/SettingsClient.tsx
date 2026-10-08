@@ -2213,6 +2213,7 @@ function UpdatesSection({
   const format = useFormatter();
   const now = useNow();
   const [enabled, setEnabled] = useState(updates.enabled);
+  const [prereleases, setPrereleases] = useState(updates.prereleases);
   const [repository, setRepository] = useState(updates.repository);
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<{ success: boolean; message?: string } | null>(
@@ -2259,6 +2260,27 @@ function UpdatesSection({
               onChange={setEnabled}
             />
           </EnvLabelledField>
+
+          <EnvLabelledField
+            label={t("registry.update_check_prereleases.label")}
+            env={["UPDATE_CHECK_PRERELEASES"]}
+            description={t("registry.update_check_prereleases.description")}
+            layout="inline"
+          >
+            {/* Never disabled: a disabled switch submits nothing, which would save it as off. */}
+            <Switch
+              label={t("registry.update_check_prereleases.label")}
+              htmlName="updateCheckPrereleases"
+              value={prereleases}
+              onChange={setPrereleases}
+            />
+          </EnvLabelledField>
+
+          {updates.prerelease && (
+            <InfoAlert title={t("updatePrereleaseTitle", { version: updates.prerelease })}>
+              {t("updatePrereleaseBody")}
+            </InfoAlert>
+          )}
 
           <EnvLabelledField
             label={t("registry.update_image_repository.label")}

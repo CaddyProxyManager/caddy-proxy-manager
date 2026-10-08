@@ -77,7 +77,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "updates",
             name: "Updates",
-            envSearch: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
+            envSearch: [
+              "UPDATE_CHECK_ENABLED",
+              "UPDATE_CHECK_PRERELEASES",
+              "UPDATE_IMAGE_REPOSITORY",
+            ],
           },
           {
             id: "avatars",

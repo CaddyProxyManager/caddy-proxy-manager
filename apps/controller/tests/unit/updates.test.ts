@@ -13,6 +13,7 @@ import { vi } from '@/tests/helpers/vi';
 const store = vi.hoisted(() => ({
   cache: null as unknown,
   enabled: true,
+  prereleases: false,
   repository: 'ghcr.io/owner/name',
 }));
 
@@ -32,7 +33,9 @@ vi.mock('@/src/lib/settings/resolve', () => ({
       ? false
       : definition.name === 'update_check_enabled'
         ? store.enabled
-        : store.repository,
+        : definition.name === 'update_check_prereleases'
+          ? store.prereleases
+          : store.repository,
 }));
 
 const {
@@ -42,6 +45,7 @@ const {
   getUpdateStatus,
   isNewer,
   newestRelease,
+  unofferedPrerelease,
   nextPageUrl,
   parseRepository,
   parseSemver,
@@ -55,6 +59,7 @@ const unpublished = (async () => new Response('', { status: 404 })) as unknown a
 beforeEach(() => {
   store.cache = null;
   store.enabled = true;
+  store.prereleases = false;
   store.repository = 'ghcr.io/owner/name';
   globalThis.fetch = unpublished;
 });
@@ -100,6 +105,24 @@ describe('release tags', () => {
     expect(newestRelease(['3.7.5-beta.1', '3.7.5-beta.2'], '3.7.5-beta.1')).toBe('3.7.5-beta.2');
     expect(newestRelease(['3.7.5-beta.2', '3.7.5'], '3.7.5-beta.1')).toBe('3.7.5');
     expect(newestRelease(['3.7.5', '3.8.0-rc.1'], '3.7.5-beta.1')).toBe('3.8.0-rc.1');
+  });
+});
+
+describe('a prerelease a stable install is not offered', () => {
+  it('is mentioned while it is ahead of every stable release', () => {
+    expect(unofferedPrerelease('3.7.4', '3.7.4', '3.7.5-beta.1')).toBe('3.7.5-beta.1');
+    expect(unofferedPrerelease('3.7.3', '3.7.4', '3.7.5-beta.1')).toBe('3.7.5-beta.1');
+  });
+
+  it('is not once a stable release overtakes it', () => {
+    expect(unofferedPrerelease('3.7.4', '3.7.5', '3.7.5-beta.1')).toBeNull();
+    expect(unofferedPrerelease('3.7.5', '3.7.5', '3.7.5-beta.1')).toBeNull();
+  });
+
+  it('is not to a prerelease install, which is offered it, nor to a dev build', () => {
+    expect(unofferedPrerelease('3.7.5-beta.1', '3.7.5-beta.1', '3.7.5-beta.2')).toBeNull();
+    expect(unofferedPrerelease('unknown', '3.7.4', '3.7.5-beta.1')).toBeNull();
+    expect(unofferedPrerelease('3.7.4', '3.7.4', null)).toBeNull();
   });
 });
 
@@ -232,6 +255,14 @@ describe('the move to the org namespace', () => {
     expect(asked.every((url) => url.includes('/v2/caddyproxymanager/web/'))).toBe(true);
   });
 
+  it('records a newer beta beside the stable release it would not offer', async () => {
+    registry({ 'owner/name/web': ['3.7.4', '3.7.5-beta.1', 'latest'] });
+    expect(await checkForUpdates()).toMatchObject({ latest: '3.7.4', prerelease: '3.7.5-beta.1' });
+
+    registry({ 'owner/name/web': ['3.7.5-beta.1', '3.7.5'] });
+    expect(await checkForUpdates()).toMatchObject({ latest: '3.7.5', prerelease: null });
+  });
+
   it('asks a fork only of its own namespace', async () => {
     store.repository = 'ghcr.io/somerandomuser/caddy-proxy-manager';
     const asked = registry({ 'somerandomuser/caddy-proxy-manager/web': ['3.0.0'] });
@@ -352,6 +383,15 @@ describe('what the status reports', () => {
       latest: '9.9.9',
       checkedAt: CACHED.checkedAt,
     });
+  });
+
+  it('mentions no prerelease unless asked to look for them', async () => {
+    store.cache = { ...CACHED, latest: '3.7.4', prerelease: '3.7.5-beta.1' };
+    expect(await getUpdateStatus()).toMatchObject({ prereleases: false, prerelease: null });
+
+    store.prereleases = true;
+    // Still null here: a test build's version is unknown, and a dev build has no channel.
+    expect(await getUpdateStatus()).toMatchObject({ prereleases: true, prerelease: null });
   });
 
   it('drops a cached beta on a stable install', async () => {
