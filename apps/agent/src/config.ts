@@ -38,6 +38,8 @@ export type AgentConfig = {
   composeProject: string | null;
   /** Passed to compose as --project-directory, for a host path the agent cannot see. */
   composeHostDir: string | null;
+  /** `COMPOSE_FILE`, as the operator's own compose reads it from `.env`; null for the default pair. */
+  composeFiles: string[] | null;
   /** Test rigs only. */
   composeExtraFile: string | null;
   /** Test rigs only. */
@@ -155,6 +157,21 @@ function resolvePairingCode(overrides: ConfigOverrides): string | null {
   return raw === null || raw === undefined ? null : normalizePairingCode(raw);
 }
 
+/**
+ * Compose's own separator rule, except that a Windows host's `;` is inferred: the agent runs on
+ * Linux, where Compose would default to `:` and split a `C:\` path in two.
+ */
+function composeFileList(): string[] | null {
+  const raw = optional("COMPOSE_FILE");
+  if (raw === null) return null;
+  const separator = optional("COMPOSE_PATH_SEPARATOR") ?? (raw.includes(";") ? ";" : ":");
+  const files = raw
+    .split(separator)
+    .map((file) => file.trim())
+    .filter((file) => file.length > 0);
+  return files.length > 0 ? files : null;
+}
+
 export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
   const mode = resolveMode();
   const dataDir = resolve(optional("DATA_DIR") ?? "/data");
@@ -174,6 +191,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     caddyAdminListen: optional("CADDY_ADMIN_LISTEN"),
     composeProject: optional("COMPOSE_PROJECT_NAME"),
     composeHostDir: optional("COMPOSE_HOST_DIR"),
+    composeFiles: composeFileList(),
     composeExtraFile: optional("COMPOSE_EXTRA_FILE"),
     composeSkipOverride: optional("COMPOSE_SKIP_OVERRIDE") !== null,
     caddyBuildMode: resolveBuildMode(),

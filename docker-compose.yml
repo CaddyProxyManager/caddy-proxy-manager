@@ -358,6 +358,9 @@ services:
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       # A host directory certificates may be read from, as the daemon sees it; unset is off.
       CERT_FILES_HOST_DIR: ${CERT_FILES_HOST_DIR:-}
+      # The files your own compose reads, so a recreate keeps an override kept elsewhere.
+      COMPOSE_FILE: ${COMPOSE_FILE:-}
+      COMPOSE_PATH_SEPARATOR: ${COMPOSE_PATH_SEPARATOR:-}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       # The agent never reads .env (it holds the secrets), so what caddy and clickhouse
       # interpolate, including from an override file, is forwarded here.

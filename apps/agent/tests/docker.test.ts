@@ -2,7 +2,7 @@
  * The exact argv the agent runs and the state each operation writes. Each invariant is a way a
  * recreate that does slightly too much takes the proxy down.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
@@ -35,6 +35,8 @@ beforeEach(() => {
   delete process.env.COMPOSE_EXTRA_FILE;
   delete process.env.COMPOSE_SKIP_OVERRIDE;
   delete process.env.COMPOSE_PROJECT_NAME;
+  delete process.env.COMPOSE_FILE;
+  delete process.env.COMPOSE_PATH_SEPARATOR;
   config = loadConfig();
 
   spawned = [];
@@ -197,6 +199,49 @@ describe("compose invocation", () => {
     const argv = lastCompose().join(" ");
     expect(argv).toContain("docker-compose.l4-ports.yml");
     expect(argv).toContain("docker-compose.caddy-build.yml");
+  });
+
+  it("reads the files COMPOSE_FILE names, as the operator's own compose does", async () => {
+    // A submodule checkout keeps its override in the parent; the default pair would drop it.
+    const project = join(dir, "caddy-proxy-manager");
+    mkdirSync(project);
+    writeFileSync(join(project, "docker-compose.yml"), "services: {}");
+    writeFileSync(join(dir, "docker-compose.override.yml"), "services: {}");
+    process.env.COMPOSE_DIR = project;
+    process.env.COMPOSE_FILE = "docker-compose.yml:../docker-compose.override.yml";
+    results.push({ exitCode: 0, stdout: "proj" });
+
+    await new DockerHost(loadConfig()).recreateCaddy();
+    const files = lastCompose().filter((_, i, argv) => argv[i - 1] === "-f");
+    expect(files.slice(0, 2)).toEqual([
+      join(project, "docker-compose.yml"),
+      join(dir, "docker-compose.override.yml"),
+    ]);
+  });
+
+  it("splits a Windows host's COMPOSE_FILE on semicolons", () => {
+    process.env.COMPOSE_FILE = String.raw`docker-compose.yml;..\docker-compose.override.yml`;
+    expect(loadConfig().composeFiles).toEqual([
+      "docker-compose.yml",
+      String.raw`..\docker-compose.override.yml`,
+    ]);
+    process.env.COMPOSE_PATH_SEPARATOR = ",";
+    process.env.COMPOSE_FILE = "a.yml,b.yml";
+    expect(loadConfig().composeFiles).toEqual(["a.yml", "b.yml"]);
+  });
+
+  it("falls back to the default pair when no file COMPOSE_FILE names is visible", async () => {
+    // A host-absolute path cannot resolve in here; recreating from nothing would be worse.
+    writeFileSync(join(dir, "docker-compose.override.yml"), "services: {}");
+    process.env.COMPOSE_FILE = "/srv/elsewhere/docker-compose.yml";
+    results.push({ exitCode: 0, stdout: "proj" });
+
+    await new DockerHost(loadConfig()).recreateCaddy();
+    const files = lastCompose().filter((_, i, argv) => argv[i - 1] === "-f");
+    expect(files.slice(0, 2)).toEqual([
+      join(dir, "docker-compose.yml"),
+      join(dir, "docker-compose.override.yml"),
+    ]);
   });
 
   it("detects --project-directory from the host path the operator's compose recorded", async () => {

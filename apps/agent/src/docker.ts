@@ -6,7 +6,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   type CaddyBuildMode,
   isValidL4PortMapping,
@@ -102,6 +102,8 @@ export class DockerHost {
   private detectedProject: string | null = null;
   /** Same, for the host path the operator's own compose was run from. "" means "asked, none found". */
   private detectedHostDir: string | null = null;
+  /** Each recreate rebuilds the argv; a missing file is reported once, not on every one. */
+  private readonly warnedComposeFiles = new Set<string>();
 
   /** Replaced once the store exists; see effectiveBuildMode. */
   private buildMode: () => CaddyBuildMode;
@@ -190,12 +192,40 @@ export class DockerHost {
   }
 
   /**
+   * What the operator's own compose reads, so a recreate keeps their changes: `COMPOSE_FILE` when
+   * set, resolved against the mounted project, else the base file and the override beside it.
+   */
+  private composeFiles(): string[] {
+    const { composeDir, composeFiles, composeSkipOverride } = this.config;
+    const base = join(composeDir, "docker-compose.yml");
+    const override = join(composeDir, "docker-compose.override.yml");
+    const fallback = !composeSkipOverride && existsSync(override) ? [base, override] : [base];
+    if (!composeFiles) return fallback;
+
+    const found: string[] = [];
+    for (const file of composeFiles) {
+      const path = resolve(composeDir, file);
+      if (existsSync(path)) {
+        found.push(path);
+      } else if (!this.warnedComposeFiles.has(path)) {
+        // Loud, once: a file skipped quietly is a recreate that drops the operator's changes.
+        this.warnedComposeFiles.add(path);
+        console.warn(
+          `[docker] COMPOSE_FILE names ${file}, which is not at ${path} in this container. ` +
+            "Mount the directory holding it, and set COMPOSE_DIR to where the project is inside it.",
+        );
+      }
+    }
+    return found.length > 0 ? found : fallback;
+  }
+
+  /**
    * Both overrides always: omitting either lets a rebuild drop the L4 ports, or vice versa.
    * `readsBuildContext` drops `--project-directory`: this CLI reads `context: .`, and the host path
    * does not exist here ("unable to prepare context").
    */
   private async composeArgs(readsBuildContext = false): Promise<string[]> {
-    const { composeDir, composeSkipOverride, composeExtraFile, dataDir } = this.config;
+    const { composeExtraFile, dataDir } = this.config;
     // Two independent inspects, each bounded at 15s; in series an unresponsive daemon doubled it.
     const [project, hostDir] = await Promise.all([
       this.composeProject(),
@@ -208,9 +238,7 @@ export class DockerHost {
     // their values through the agent's own environment instead.
     args.push("--env-file", "/dev/null");
 
-    args.push("-f", join(composeDir, "docker-compose.yml"));
-    const override = join(composeDir, "docker-compose.override.yml");
-    if (!composeSkipOverride && existsSync(override)) args.push("-f", override);
+    for (const file of this.composeFiles()) args.push("-f", file);
     if (composeExtraFile && existsSync(composeExtraFile)) args.push("-f", composeExtraFile);
 
     if (overrideIsUsable(dataDir, BUILD_OVERRIDE_FILE)) {

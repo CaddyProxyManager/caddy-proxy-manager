@@ -216,6 +216,81 @@ If you already updated the compose file, put the two old lines back for the firs
 A server you run yourself (`POSTGRES_HOST`) is unaffected: the app supports 17 and 18 alike, and
 when to upgrade it is yours to decide.
 
+## Keeping your configuration in git
+
+`.env` and `docker-compose.override.yml` are deliberately untracked by the deploy repository, so
+your changes never conflict with a release. To version them anyway, make the deploy repository a
+submodule of a repository of your own. A parent repository cannot track a file inside a submodule,
+so the override lives in the parent, and `COMPOSE_FILE` tells Compose and the agent where:
+
+```
+my-config/                           your repository
+├── docker-compose.override.yml      tracked here
+└── caddy-proxy-manager/             the deploy repository, as a submodule
+    ├── .env                         ignored by the submodule, never tracked
+    └── docker-compose.yml
+```
+
+<Steps>
+
+1. Add the submodule under the same directory name as a clone, since the name is the project's:
+
+   ```bash
+   git submodule add -b main https://github.com/CaddyProxyManager/deploy.git caddy-proxy-manager
+   ```
+
+2. Create `.env` inside `caddy-proxy-manager/` as in [installation](#installation), and add the
+   list of compose files to it:
+
+   ```bash
+   echo "COMPOSE_FILE=docker-compose.yml:../docker-compose.override.yml" >> caddy-proxy-manager/.env
+   ```
+
+   Compose reads it from `.env` in place of looking for an override beside `docker-compose.yml`. On
+   a Windows host, separate the two with `;` instead.
+
+3. Let the agent see the parent. It recreates Caddy from the same list, resolved against its own
+   mount of the project, where `../` leads outside the mount. Mount the parent and point the agent
+   at the project inside it, in the override itself:
+
+   ```yaml
+   # docker-compose.override.yml
+   services:
+     agent:
+       environment:
+         COMPOSE_DIR: /config/caddy-proxy-manager
+       volumes:
+         - ..:/config:ro
+   ```
+
+   Without this the agent logs that it cannot find the override and recreates Caddy without your
+   changes. A directory rather than the file alone: a single-file mount keeps the file an editor
+   replaced on save, not the new one. The agent can read the whole parent, so keep nothing there it
+   should not. An agent older than this release ignores `COMPOSE_FILE`.
+
+4. Run `docker compose` from `caddy-proxy-manager/`, where `.env` is.
+
+</Steps>
+
+Commit `.env` to neither repository in plaintext. `SESSION_SECRET` decrypts every secret in the
+database, and without it those cannot be recovered, so keep it in a password manager or encrypt it
+into the parent with sops or git-crypt. Only `SESSION_SECRET` and `POSTGRES_PASSWORD` need to be
+secret; anything else can sit in the override's `environment:` blocks, though most settings live in
+the database by now.
+
+To upgrade, move the submodule to the newest release and commit the new pointer, which records in
+your history which release each change ran on:
+
+```bash
+git submodule update --remote caddy-proxy-manager
+git commit -am "Caddy Proxy Manager $(git -C caddy-proxy-manager describe --tags)"
+cd caddy-proxy-manager
+docker compose pull
+docker compose up -d
+```
+
+On a new machine, `git clone --recurse-submodules`, then recreate `.env`: it is in no repository.
+
 ## The legacy method
 
 Before 3.0 the configuration lived in `.env`, and installing meant copying the whole reference over
