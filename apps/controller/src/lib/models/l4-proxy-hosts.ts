@@ -20,6 +20,7 @@ import { pruneHostRevisions } from "../host-history/retention";
 import { hostAuditChanges } from "../host-review/audit";
 import { accessListIpRules, accessLists, l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
+import { parseHostUuid } from "../hosts/ref";
 import { domainError } from "../errors/domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { agentIdsForHost } from "./host-agents";
@@ -173,6 +174,8 @@ const VALID_L4_UPSTREAM_DNS_FAMILIES: L4UpstreamDnsResolutionConfig["family"][] 
 
 export type L4ProxyHost = {
   id: number;
+  /** What URLs and the REST API name the host by. */
+  uuid: string;
   name: string;
   description: string | null;
   /** Lowercase, sorted; for finding hosts only. */
@@ -459,6 +462,7 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
   const meta = safeJsonParse<L4ProxyHostMeta>(row.meta, {});
   return {
     id: row.id,
+    uuid: row.uuid ?? "",
     name: row.name,
     description: row.description ?? null,
     tags: parseStoredTags(row.tags),
@@ -800,6 +804,7 @@ export function blankL4ProxyHost(): L4ProxyHost {
   const now = nowIso();
   return parseL4ProxyHost({
     id: 0,
+    uuid: null,
     name: "",
     description: null,
     tags: "[]",
@@ -847,6 +852,7 @@ function plannedL4ProxyHost(
   return parseL4ProxyHost({
     ...values,
     id: 0,
+    uuid: null,
     description: values.description ?? null,
     tags: values.tags ?? "[]",
     matcherType: values.matcherType ?? "none",
@@ -914,6 +920,18 @@ export async function getL4ProxyHost(id: number): Promise<L4ProxyHost | null> {
     where: (table, { eq }) => eq(table.id, id),
   });
   return host ? parseL4ProxyHost(host) : null;
+}
+
+/** The serial id of the host a URL or REST path names by uuid; null when there is no such host. */
+export async function resolveL4ProxyHostId(raw: string): Promise<number | null> {
+  const uuid = parseHostUuid(raw);
+  if (!uuid) return null;
+  const [row] = await db
+    .select({ id: l4ProxyHosts.id })
+    .from(l4ProxyHosts)
+    .where(eq(l4ProxyHosts.uuid, uuid))
+    .limit(1);
+  return row?.id ?? null;
 }
 
 /** Every check an update runs, and the columns it would set; nothing is written. */

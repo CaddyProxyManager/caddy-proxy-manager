@@ -14,6 +14,8 @@ export type WafModeSource = "global" | "host" | "hostOff" | "override";
 
 export type WafHostMode = {
   id: number;
+  /** Empty for the dashboard host. */
+  uuid: string;
   name: string;
   domains: string[];
   enabled: boolean;
@@ -59,6 +61,7 @@ export function wafHostModes(
   global: WafSettings | null,
   hosts: readonly {
     id: number;
+    uuid: string;
     name: string;
     domains: string[];
     enabled: boolean;
@@ -68,6 +71,7 @@ export function wafHostModes(
 ): WafHostMode[] {
   return hosts.map((host) => ({
     id: host.id,
+    uuid: host.uuid,
     name: host.name,
     domains: host.domains,
     enabled: host.enabled,

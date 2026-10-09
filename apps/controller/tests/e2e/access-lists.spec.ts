@@ -724,7 +724,7 @@ test.describe('Access Lists - used-by tab', () => {
       },
     });
     expect(hostRes.ok()).toBeTruthy();
-    const host = (await hostRes.json()) as { id: number };
+    const host = (await hostRes.json()) as { uuid: string };
 
     try {
       await page.goto('/access-lists');
@@ -746,7 +746,7 @@ test.describe('Access Lists - used-by tab', () => {
       expect(refused.status()).toBe(409);
       expect(((await refused.json()) as { error: string }).error).toContain('E2E Usage Host');
     } finally {
-      await page.request.delete(`${proxyApi}/${host.id}`, {
+      await page.request.delete(`${proxyApi}/${host.uuid}`, {
         headers: { Origin: 'http://localhost:3000' },
       });
     }

@@ -79,7 +79,7 @@ async function waitForStepCaCert(
 
 test.describe
   .serial('Custom ACME directory - real issuance via Step-CA', () => {
-    let hostId: number | undefined;
+    let hostId: string | undefined;
 
     test.beforeAll(async ({ browser }) => {
       const page = await browser.newPage();
@@ -101,7 +101,7 @@ test.describe
         headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
       });
       expect(hostRes.status()).toBe(201);
-      hostId = (await hostRes.json()).id as number;
+      hostId = (await hostRes.json()).uuid as string;
 
       await page.close();
     });

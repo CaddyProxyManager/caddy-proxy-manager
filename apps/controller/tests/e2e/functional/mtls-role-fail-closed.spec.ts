@@ -101,7 +101,7 @@ test.describe('mTLS - role-based trust fails closed on revocation', () => {
     const server = createSelfSignedServerCertificate(domain, [domain]);
     const clientIdentity: ClientTlsIdentity = { cert: client.pem, key: client.keyPem };
 
-    const ids = { caId: 0, certId: 0, roleId: 0, serverCertId: 0, hostId: 0 };
+    const ids = { caId: 0, certId: 0, roleId: 0, serverCertId: 0, hostId: '' };
 
     try {
       const caResp = await post(API_CA, {
@@ -152,7 +152,7 @@ test.describe('mTLS - role-based trust fails closed on revocation', () => {
         mtls: { enabled: true, trusted_role_ids: [ids.roleId] },
       });
       expect(hostResp.ok(), 'create role-trusting host').toBeTruthy();
-      ids.hostId = (await hostResp.json()).id;
+      ids.hostId = (await hostResp.json()).uuid;
 
       // ── Baseline: role has one active cert → mTLS enforced normally. ──
       await waitForHttpsRoute(domain, clientIdentity);

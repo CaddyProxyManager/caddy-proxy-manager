@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScreen";
+import { deletedHostIdForUuid } from "@/src/lib/host-history";
 import { loadHostHistory } from "@/src/lib/host-history/page";
-import { getProxyHost } from "@/src/lib/models/proxy-hosts";
+import { getProxyHost, resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
 import { proxyHostDetailHref, proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreProxyHostAction } from "../../actions";
@@ -13,10 +14,6 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function parseId(raw: string): number | null {
-  return /^\d{1,9}$/.test(raw) ? Number(raw) : null;
-}
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("settings");
   return { title: t("history.navLabel") };
@@ -24,7 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Managers of a live host, and of every host for a deleted one: its grants went with it. */
 export default async function ProxyHostHistoryPage({ params, searchParams }: PageProps) {
-  const id = parseId((await params).id);
+  const { id: raw } = await params;
+  const id = (await resolveProxyHostId(raw)) ?? (await deletedHostIdForUuid("http", raw));
   if (id === null) notFound();
   const access = await requireReach("hosts:read");
   const host = await getProxyHost(id);
@@ -35,11 +33,11 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
 
   return (
     <HostHistoryScreen
-      name={host?.name ?? data.name ?? `#${id}`}
+      name={host?.name ?? data.name ?? raw}
       listHref="/proxy-hosts"
       listLabel={tNav("proxyHosts")}
-      overviewHref={host ? proxyHostDetailHref(id) : null}
-      historyHref={proxyHostHistoryHref(id)}
+      overviewHref={host ? proxyHostDetailHref(host.uuid) : null}
+      historyHref={proxyHostHistoryHref(raw)}
       view={{
         live: host !== null,
         revisions: data.revisions,
@@ -51,12 +49,12 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
         selection: data.selection,
         comparison: data.comparison,
         showConfig: data.showConfig,
-        rollbackHref: host ? `/proxy-hosts?edit=${id}&revision=` : null,
+        rollbackHref: host ? `/proxy-hosts?edit=${host.uuid}&revision=` : null,
         restore:
           !host && can(access, "hosts:write")
             ? {
                 missing: data.missing,
-                name: data.name ?? `#${id}`,
+                name: data.name ?? raw,
                 action: restoreProxyHostAction,
               }
             : null,

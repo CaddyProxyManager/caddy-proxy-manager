@@ -78,6 +78,7 @@ async function loadHostRefs(): Promise<HostRef[]> {
   const rows = await db
     .select({
       id: proxyHosts.id,
+      uuid: proxyHosts.uuid,
       name: proxyHosts.name,
       domains: proxyHosts.domains,
       enabled: proxyHosts.enabled,
@@ -92,7 +93,7 @@ async function loadHostRefs(): Promise<HostRef[]> {
     } catch {
       // A malformed row names no domain.
     }
-    return { ...row, domains };
+    return { ...row, uuid: row.uuid ?? "", domains };
   });
 }
 

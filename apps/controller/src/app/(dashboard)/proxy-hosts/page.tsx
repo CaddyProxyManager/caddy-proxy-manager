@@ -6,6 +6,7 @@ import {
   listProxyHostsPaginated,
   countProxyHostsByState,
   getProxyHost,
+  resolveProxyHostId,
   proxyHostFromRow,
   getProxyHostsByIds,
   listProxyHostDomainRefs,
@@ -81,7 +82,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // filtered set and paged after.
   const analyticsOn = await isAnalyticsEnabled().catch(() => false);
   const sortBy = sortByParam || (analyticsOn ? "requests" : undefined);
-  const editId = Number.parseInt(editParam ?? "", 10);
+  const editId = editParam ? await resolveProxyHostId(editParam) : null;
 
   // Everything independent starts now; the insights' slow inputs (signals, the agents' certificate
   // inventory) run under their budgets alongside the list rather than after it.
@@ -121,10 +122,11 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const total = enabled === undefined ? counts.total : enabled ? counts.enabled : counts.disabled;
 
   // The editor opened from a host's page, which may sit on another page of the list.
-  const editHost = Number.isInteger(editId)
-    ? (hosts.find((h) => h.id === editId) ??
-      (canView(access, "proxyHost", editId) ? await getProxyHost(editId) : null))
-    : null;
+  const editHost =
+    editId !== null
+      ? (hosts.find((h) => h.id === editId) ??
+        (canView(access, "proxyHost", editId) ? await getProxyHost(editId) : null))
+      : null;
   const dialogHosts = editHost && !hosts.includes(editHost) ? [...hosts, editHost] : hosts;
   const managed = editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null;
   const revisionId = strictId(revisionParam);

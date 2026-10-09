@@ -468,30 +468,40 @@ export const issuedClientCertificates = pgTable(
   }),
 );
 
-export const proxyHosts = pgTable("proxy_hosts", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  /** JSON array, normalised on save; labels for finding hosts, never read by the config build. */
-  tags: text("tags").notNull().default("[]"),
-  domains: text("domains").notNull(),
-  upstreams: text("upstreams").notNull(),
-  certificateId: integer("certificateId").references(() => certificates.id, {
-    onDelete: "set null",
+export const proxyHosts = pgTable(
+  "proxy_hosts",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** JSON array, normalised on save; labels for finding hosts, never read by the config build. */
+    tags: text("tags").notNull().default("[]"),
+    domains: text("domains").notNull(),
+    upstreams: text("upstreams").notNull(),
+    certificateId: integer("certificateId").references(() => certificates.id, {
+      onDelete: "set null",
+    }),
+    accessListId: integer("accessListId").references(() => accessLists.id, {
+      onDelete: "set null",
+    }),
+    ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
+    sslForced: boolean("sslForced").notNull().default(true),
+    hstsEnabled: boolean("hstsEnabled").notNull().default(true),
+    hstsSubdomains: boolean("hstsSubdomains").notNull().default(false),
+    allowWebsocket: boolean("allowWebsocket").notNull().default(true),
+    preserveHostHeader: boolean("preserveHostHeader").notNull().default(true),
+    meta: text("meta"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+    skipHttpsHostnameValidation: boolean("skipHttpsHostnameValidation").notNull().default(false),
+    // The id in URLs and the REST API; the serial id stays the key every table points at.
+    uuid: text("uuid").$defaultFn(() => uuidv7()),
+  },
+  (table) => ({
+    uuidUnique: uniqueIndex("proxy_hosts_uuid_unique").on(table.uuid),
   }),
-  accessListId: integer("accessListId").references(() => accessLists.id, { onDelete: "set null" }),
-  ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
-  sslForced: boolean("sslForced").notNull().default(true),
-  hstsEnabled: boolean("hstsEnabled").notNull().default(true),
-  hstsSubdomains: boolean("hstsSubdomains").notNull().default(false),
-  allowWebsocket: boolean("allowWebsocket").notNull().default(true),
-  preserveHostHeader: boolean("preserveHostHeader").notNull().default(true),
-  meta: text("meta"),
-  enabled: boolean("enabled").notNull().default(true),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-  skipHttpsHostnameValidation: boolean("skipHttpsHostnameValidation").notNull().default(false),
-});
+);
 
 export const apiTokens = pgTable(
   "api_tokens",
@@ -861,28 +871,38 @@ export const forwardAuthRedirectIntents = pgTable(
 
 // ── L4 Proxy Hosts ───────────────────────────────────────────────────
 
-export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  /** As on proxy_hosts. */
-  tags: text("tags").notNull().default("[]"),
-  protocol: text("protocol").notNull(),
-  listenAddress: text("listenAddress").notNull(),
-  upstreams: text("upstreams").notNull(),
-  matcherType: text("matcherType").notNull().default("none"),
-  matcherValue: text("matcherValue"),
-  tlsTermination: boolean("tlsTermination").notNull().default(false),
-  proxyProtocolVersion: text("proxyProtocolVersion"),
-  proxyProtocolReceive: boolean("proxyProtocolReceive").notNull().default(false),
-  /** Its IP rules only. Deleting a list a host uses is refused by the model, not this key. */
-  accessListId: integer("accessListId").references(() => accessLists.id, { onDelete: "set null" }),
-  ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
-  meta: text("meta"),
-  enabled: boolean("enabled").notNull().default(true),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-});
+export const l4ProxyHosts = pgTable(
+  "l4_proxy_hosts",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** As on proxy_hosts. */
+    tags: text("tags").notNull().default("[]"),
+    protocol: text("protocol").notNull(),
+    listenAddress: text("listenAddress").notNull(),
+    upstreams: text("upstreams").notNull(),
+    matcherType: text("matcherType").notNull().default("none"),
+    matcherValue: text("matcherValue"),
+    tlsTermination: boolean("tlsTermination").notNull().default(false),
+    proxyProtocolVersion: text("proxyProtocolVersion"),
+    proxyProtocolReceive: boolean("proxyProtocolReceive").notNull().default(false),
+    /** Its IP rules only. Deleting a list a host uses is refused by the model, not this key. */
+    accessListId: integer("accessListId").references(() => accessLists.id, {
+      onDelete: "set null",
+    }),
+    ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
+    meta: text("meta"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+    // The id in URLs and the REST API; the serial id stays the key every table points at.
+    uuid: text("uuid").$defaultFn(() => uuidv7()),
+  },
+  (table) => ({
+    uuidUnique: uniqueIndex("l4_proxy_hosts_uuid_unique").on(table.uuid),
+  }),
+);
 
 /**
  * Which agents serve a host; no rows means every agent, so upgrades change nothing. Many-to-many

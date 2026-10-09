@@ -38,9 +38,9 @@ test.describe('Demo mode', () => {
 
   test.afterAll(async () => {
     const hosts = await admin.get(`${API}/proxy-hosts`);
-    for (const host of (await hosts.json()) as { id: number; domains: string[] }[]) {
+    for (const host of (await hosts.json()) as { uuid: string; domains: string[] }[]) {
       if (host.domains.includes(DOMAIN)) {
-        await admin.delete(`${API}/proxy-hosts/${host.id}`, { headers: { Origin: BASE } });
+        await admin.delete(`${API}/proxy-hosts/${host.uuid}`, { headers: { Origin: BASE } });
       }
     }
     await closeAdmin?.();
@@ -60,9 +60,9 @@ test.describe('Demo mode', () => {
       data: { name: 'Demo host', domains: [DOMAIN], upstreams: ['echo-server:8080'] },
     });
     expect(created.status(), await created.text()).toBe(201);
-    const { id } = await created.json();
+    const { uuid } = await created.json();
 
-    const read = await admin.get(`${API}/proxy-hosts/${id}`);
+    const read = await admin.get(`${API}/proxy-hosts/${uuid}`);
     expect(read.ok()).toBe(true);
     expect((await read.json()).domains).toEqual([DOMAIN]);
 

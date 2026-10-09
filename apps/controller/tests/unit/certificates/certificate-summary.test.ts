@@ -17,6 +17,7 @@ describe('certificate summary helpers', () => {
   it('counts healthy ACME hosts from the full deduplicated set', () => {
     const allAcmeHosts = Array.from({ length: 28 }, (_, index) => ({
       id: index + 1,
+      uuid: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
       name: `host-${index + 1}`,
       domains: [`host-${index + 1}.example.com`],
       sslForced: true,

@@ -36,7 +36,7 @@ test.describe('Analytics - traffic ingestion', () => {
   test('requests through Caddy reach ClickHouse and the analytics API', async ({ page }) => {
     test.skip(!(await clickhouseUp()), 'ClickHouse not started (analytics-disabled run)');
     const agent = `cpm-ingest-e2e/${Date.now()}`;
-    let hostId: number | undefined;
+    let hostId: string | undefined;
     const ch = clickhouse();
     const LOGGING = `${ORIGIN}/api/v1/settings/logging`;
     const previousLogging = await (await page.request.get(LOGGING)).json();
@@ -58,7 +58,7 @@ test.describe('Analytics - traffic ingestion', () => {
         },
       });
       expect(created.status(), await created.text()).toBe(201);
-      hostId = (await created.json()).id;
+      hostId = (await created.json()).uuid;
       await waitForStatus(DOMAIN, 200, 20_000);
 
       for (let i = 0; i < REQUESTS; i++) {

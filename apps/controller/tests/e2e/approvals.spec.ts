@@ -34,8 +34,8 @@ async function graphql(page: Page, query: string, variables: Record<string, unkn
   return body.data!;
 }
 
-async function hostName(page: Page, id: number): Promise<string> {
-  const host = (await (await page.request.get(`${API_PROXY_HOSTS}/${id}`)).json()) as {
+async function hostName(page: Page, uuid: string): Promise<string> {
+  const host = (await (await page.request.get(`${API_PROXY_HOSTS}/${uuid}`)).json()) as {
     name: string;
   };
   return host.name;
@@ -43,7 +43,7 @@ async function hostName(page: Page, id: number): Promise<string> {
 
 test.describe('Change approvals', () => {
   test.describe.configure({ mode: 'serial' });
-  let hostId = 0;
+  let hostId = '';
 
   test.beforeAll(() => {
     cleanUp();
@@ -62,7 +62,7 @@ test.describe('Change approvals', () => {
       },
     });
     expect(created.ok()).toBe(true);
-    hostId = ((await created.json()) as { id: number }).id;
+    hostId = ((await created.json()) as { uuid: string }).uuid;
     await graphql(
       page,
       'mutation ($input: JSON!) { setApprovalPolicy(input: $input) { enabled } }',

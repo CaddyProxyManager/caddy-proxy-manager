@@ -430,7 +430,7 @@ export default function ProxyHostsClient({
           <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
           <VStack gap={0} className="cpm-cell-lines">
             <HStack gap={1} vAlign="center">
-              <AstryxLink href={proxyHostDetailHref(host.id)}>
+              <AstryxLink href={proxyHostDetailHref(host.uuid)}>
                 <Text type="body" size="sm" weight="semibold">
                   {host.name}
                 </Text>
@@ -624,7 +624,7 @@ export default function ProxyHostsClient({
       <HStack justify="between" vAlign="start" gap={2}>
         <StackItem size="fill">
           <VStack gap={1}>
-            <AstryxLink href={proxyHostDetailHref(host.id)}>
+            <AstryxLink href={proxyHostDetailHref(host.uuid)}>
               <Text type="body" size="sm" weight="semibold">
                 {host.name}
               </Text>
@@ -761,7 +761,7 @@ export default function ProxyHostsClient({
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
-        rowHref={(host) => proxyHostDetailHref(host.id)}
+        rowHref={(host) => proxyHostDetailHref(host.uuid)}
         rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("filterDisabled") })}
         selection={{
           selectedKeys,
@@ -796,7 +796,7 @@ export default function ProxyHostsClient({
       {checkingHost && (
         <ReachabilityDialog
           open
-          hostId={checkingHost.id}
+          hostUuid={checkingHost.uuid}
           hostName={checkingHost.name}
           onClose={() => setCheckingHost(null)}
         />

@@ -81,7 +81,7 @@ test.describe('Proxy hosts', () => {
     try {
       const listResp = await page.request.get(API_PROXY_HOSTS);
       const hosts = (await listResp.json()) as Array<{
-        id: number;
+        uuid: string;
         name: string;
         hstsSubdomains: boolean;
         skipHttpsHostnameValidation: boolean;
@@ -117,7 +117,7 @@ test.describe('Proxy hosts', () => {
       await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
-      const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.id}`);
+      const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.uuid}`);
       const after = (await afterResp.json()) as {
         hstsSubdomains: boolean;
         skipHttpsHostnameValidation: boolean;
@@ -146,11 +146,11 @@ test.describe('Proxy hosts', () => {
         .click();
     } finally {
       const listResp2 = await page.request.get(API_PROXY_HOSTS);
-      const hosts2 = (await listResp2.json()) as Array<{ id: number; name: string }>;
+      const hosts2 = (await listResp2.json()) as Array<{ uuid: string; name: string }>;
       const toDelete = hosts2.find((h) => h.name === 'Advanced Options Test');
       if (toDelete) {
         // Mutating requests are same-origin checked; without it the cleanup 403s silently.
-        await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.id}`, {
+        await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.uuid}`, {
           headers: { Origin: 'http://localhost:3000' },
         });
       }
@@ -175,7 +175,7 @@ test.describe('Proxy hosts', () => {
     });
     expect(createResp.ok()).toBeTruthy();
     const created = (await createResp.json()) as {
-      id: number;
+      uuid: string;
       redirects: unknown[];
       rewrite: unknown;
     };
@@ -197,7 +197,7 @@ test.describe('Proxy hosts', () => {
       await expect(rowSwitch).not.toBeChecked({ timeout: 10000 });
 
       const afterDisable = (await (
-        await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
+        await page.request.get(`${API_PROXY_HOSTS}/${created.uuid}`)
       ).json()) as {
         redirects: unknown[];
         rewrite: unknown;
@@ -211,7 +211,7 @@ test.describe('Proxy hosts', () => {
       await expect(rowSwitch).toBeChecked({ timeout: 10000 });
 
       const afterEnable = (await (
-        await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
+        await page.request.get(`${API_PROXY_HOSTS}/${created.uuid}`)
       ).json()) as {
         redirects: unknown[];
         rewrite: unknown;
@@ -221,7 +221,7 @@ test.describe('Proxy hosts', () => {
       expect(afterEnable.redirects).toHaveLength(1);
       expect(afterEnable.rewrite).toBeDefined();
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.uuid}`, {
         headers: { Origin: origin },
       });
     }
@@ -314,7 +314,7 @@ test.describe('Proxy hosts', () => {
       },
     });
     expect(createResp.ok()).toBeTruthy();
-    const created = (await createResp.json()) as { id: number };
+    const created = (await createResp.json()) as { uuid: string };
 
     try {
       const saveResp = await page.request.put(API_AUTHENTIK_SETTINGS, {
@@ -351,7 +351,7 @@ test.describe('Proxy hosts', () => {
         defaultSettings.authEndpoint,
       );
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.uuid}`, {
         headers: { Origin: origin },
       });
       if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
@@ -401,7 +401,7 @@ test.describe('Proxy hosts', () => {
     });
     expect(createResp.ok()).toBeTruthy();
     const created = (await createResp.json()) as {
-      id: number;
+      uuid: string;
       authentik: { outpostDomain: string | null; outpostUpstream: string | null } | null;
     };
     // If the payload shape drifts, this would silently assert the default path instead.
@@ -433,7 +433,7 @@ test.describe('Proxy hosts', () => {
         hostSettings.outpostUpstream,
       );
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.uuid}`, {
         headers: { Origin: origin },
       });
       if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
@@ -477,7 +477,7 @@ test.describe('Proxy hosts', () => {
 
     const listResp = await page.request.get(API_PROXY_HOSTS);
     const hosts = (await listResp.json()) as Array<{
-      id: number;
+      uuid: string;
       name: string;
       geoblockMode: string;
     }>;
@@ -550,7 +550,7 @@ test.describe('Proxy hosts', () => {
     });
     expect(withResp.ok()).toBeTruthy();
     const withHost = (await withResp.json()) as {
-      id: number;
+      uuid: string;
       cpmForwardAuth: { enabled: boolean } | null;
     };
     expect(withHost.cpmForwardAuth?.enabled).toBe(true);
@@ -564,7 +564,7 @@ test.describe('Proxy hosts', () => {
       },
     });
     expect(withoutResp.ok()).toBeTruthy();
-    const withoutHost = (await withoutResp.json()) as { id: number };
+    const withoutHost = (await withoutResp.json()) as { uuid: string };
 
     try {
       await page.reload();
@@ -580,10 +580,10 @@ test.describe('Proxy hosts', () => {
       await expect(disabledRow).toBeVisible({ timeout: 10000 });
       await expect(disabledRow.getByText(badge)).toHaveCount(0);
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${withHost.id}`, {
+      await page.request.delete(`${API_PROXY_HOSTS}/${withHost.uuid}`, {
         headers: { Origin: origin },
       });
-      await page.request.delete(`${API_PROXY_HOSTS}/${withoutHost.id}`, {
+      await page.request.delete(`${API_PROXY_HOSTS}/${withoutHost.uuid}`, {
         headers: { Origin: origin },
       });
     }

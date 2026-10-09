@@ -52,7 +52,7 @@ const DISABLED_HOST_GEOBLOCK = {
 
 test.describe
   .serial('GeoBlock Response Body', () => {
-    let proxyHostId: number | null = null;
+    let proxyHostId: string | null = null;
 
     test.afterEach(async ({ page }) => {
       if (proxyHostId !== null) {
@@ -97,7 +97,7 @@ test.describe
       expect(hostRes.status()).toBe(201);
 
       const host = await hostRes.json();
-      proxyHostId = host.id;
+      proxyHostId = host.uuid;
 
       await waitForStatus(DOMAIN, 451, 20_000);
 

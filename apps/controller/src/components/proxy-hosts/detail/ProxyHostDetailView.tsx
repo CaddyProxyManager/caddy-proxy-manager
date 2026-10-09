@@ -243,7 +243,7 @@ export function ProxyHostDetailView({
                 variant="primary"
                 icon={<Pencil />}
                 label={tCommon("edit")}
-                href={editorSectionHref(host.id)}
+                href={editorSectionHref(host.uuid)}
               />
             )}
           </HStack>
@@ -251,7 +251,7 @@ export function ProxyHostDetailView({
         {historyHref && (
           <HostPageTabs
             active="overview"
-            overviewHref={proxyHostDetailHref(host.id)}
+            overviewHref={proxyHostDetailHref(host.uuid)}
             historyHref={historyHref}
           />
         )}
@@ -318,7 +318,7 @@ export function ProxyHostDetailView({
                 variant="ghost"
                 size="sm"
                 label={tCommon("edit")}
-                href={editorSectionHref(host.id, "upstreams")}
+                href={editorSectionHref(host.uuid, "upstreams")}
               />
             ) : undefined
           }
@@ -370,7 +370,7 @@ export function ProxyHostDetailView({
                   key={summary.section}
                   label={t(`sections.${summary.section}`)}
                   description={factText(summary.facts)}
-                  href={canManage ? editorSectionHref(host.id, summary.section) : undefined}
+                  href={canManage ? editorSectionHref(host.uuid, summary.section) : undefined}
                 />
               ))}
             </List>

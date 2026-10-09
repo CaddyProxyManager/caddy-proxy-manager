@@ -15,6 +15,7 @@ import type { AttentionItem, AttentionProviderId } from "./types";
 
 export type HostRef = {
   id: number;
+  uuid: string;
   name: string;
   domains: string[];
   enabled: boolean;
@@ -52,8 +53,8 @@ export const AGENT_OFFLINE_GRACE_MS = 2 * 60_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /** One host: its page. Several or none: the analytics page narrowed to the name. */
-async function trafficHref(name: string, ids: readonly number[]): Promise<string> {
-  if (ids.length === 1) return proxyHostDetailHref(ids[0]!);
+async function trafficHref(name: string, uuids: readonly string[]): Promise<string> {
+  if (uuids.length === 1) return proxyHostDetailHref(uuids[0]!);
   const { DEFAULT_EXPLORE_STATE, serializeExploreState } = await import(
     "../analytics/explore-state"
   );
@@ -234,12 +235,14 @@ export async function signalItems(
   hostRows: readonly HostRef[],
 ): Promise<AttentionItem[]> {
   const index = indexHostsByName(hostRows);
+  const uuidById = new Map(hostRows.map((host) => [host.id, host.uuid]));
   const items: AttentionItem[] = [];
   for (const signal of signals) {
     const name = signal.host === null ? null : trafficHostName(signal.host);
     const ids = name === null ? [] : (index.get(name) ?? []);
     // A name no host serves is still traffic someone sent, but only an administrator can act.
     const scope = { proxyHosts: ids };
+    const uuids = ids.flatMap((id) => uuidById.get(id) ?? []);
     switch (signal.kind) {
       case "serverErrorBurst":
         items.push({
@@ -255,7 +258,7 @@ export async function signalItems(
             to: iso(signal.to * 1000),
             ongoing: signal.ongoing ? "yes" : "no",
           },
-          href: await trafficHref(name ?? signal.host, ids),
+          href: await trafficHref(name ?? signal.host, uuids),
           at: iso(signal.to * 1000),
           scope,
         });
@@ -274,7 +277,7 @@ export async function signalItems(
           href:
             signal.host === null
               ? "/analytics?log=mitigated"
-              : await trafficHref(name ?? signal.host, ids),
+              : await trafficHref(name ?? signal.host, uuids),
           at: null,
           scope: signal.host === null ? {} : scope,
         });
@@ -291,7 +294,7 @@ export async function signalItems(
             outcome: signal.outcome,
             requests: signal.requests,
           },
-          href: await trafficHref(name ?? signal.host, ids),
+          href: await trafficHref(name ?? signal.host, uuids),
           at: null,
           scope,
         });
@@ -317,7 +320,7 @@ export function serverErrorShareItems(
         code: "serverErrorShare",
         severity: "warning",
         values: { host: host.name, errors: row.serverErrors, share: row.serverErrors / row.total },
-        href: proxyHostDetailHref(host.id),
+        href: proxyHostDetailHref(host.uuid),
         at: null,
         scope: { proxyHosts: [host.id] },
       } satisfies AttentionItem,

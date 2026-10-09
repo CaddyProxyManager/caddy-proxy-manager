@@ -18,7 +18,7 @@ async function createFixtureHost(page: Page, name: string, listenAddress: string
     },
   });
   expect(res.ok(), `L4 fixture host create failed: ${res.status()} ${await res.text()}`).toBe(true);
-  return ((await res.json()) as { id: number }).id;
+  return ((await res.json()) as { uuid: string }).uuid;
 }
 
 test.describe('L4 Proxy Hosts page', () => {
@@ -51,7 +51,7 @@ test.describe('L4 Proxy Hosts page', () => {
   });
 
   test.describe('column sorting', () => {
-    let fixtureId: number | null = null;
+    let fixtureId: string | null = null;
 
     test.beforeAll(async ({ browser }) => {
       const page = await browser.newPage();
@@ -222,10 +222,10 @@ test.describe('L4 Proxy Hosts page', () => {
     try {
       const res = await page.request.get(API_L4_HOSTS);
       if (!res.ok()) return;
-      const hosts = (await res.json()) as Array<{ id: number; name: string }>;
+      const hosts = (await res.json()) as Array<{ uuid: string; name: string }>;
       for (const host of hosts) {
         if (!/^E2E (Rapid|Toggle) Host/.test(host.name)) continue;
-        await page.request.delete(`${API_L4_HOSTS}/${host.id}`, { headers: { Origin: ORIGIN } });
+        await page.request.delete(`${API_L4_HOSTS}/${host.uuid}`, { headers: { Origin: ORIGIN } });
       }
     } finally {
       await page.close();

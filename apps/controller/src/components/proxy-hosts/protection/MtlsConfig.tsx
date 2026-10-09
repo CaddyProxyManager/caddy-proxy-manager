@@ -33,7 +33,7 @@ type Props = {
   value?: MtlsConfig | null;
   caCertificates: CaCertificate[];
   issuedClientCerts?: IssuedClientCertificate[];
-  proxyHostId?: number;
+  proxyHostUuid?: string;
   mtlsRoles?: MtlsRole[];
 };
 
@@ -41,7 +41,7 @@ export function MtlsFields({
   value,
   caCertificates,
   issuedClientCerts = [],
-  proxyHostId,
+  proxyHostUuid,
   mtlsRoles = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
@@ -61,7 +61,7 @@ export function MtlsFields({
   const [addRuleOpen, setAddRuleOpen] = useState(false);
   const [editRule, setEditRule] = useState<MtlsAccessRule | null>(null);
 
-  const isEditMode = !!proxyHostId;
+  const isEditMode = !!proxyHostUuid;
   // Revoked certs and those whose CA is gone are excluded, so orphaned rows never resurface here.
   const knownCaIds = new Set(caCertificates.map((c) => c.id));
   const activeCerts = issuedClientCerts.filter(
@@ -76,8 +76,8 @@ export function MtlsFields({
   }
 
   const loadRules = useCallback(() => {
-    if (!proxyHostId) return;
-    fetch(`/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules`)
+    if (!proxyHostUuid) return;
+    fetch(`/api/v1/proxy-hosts/${proxyHostUuid}/mtls-access-rules`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: MtlsAccessRule[]) => {
         setRules(data);
@@ -87,7 +87,7 @@ export function MtlsFields({
         setRules([]);
         setRulesLoaded(true);
       });
-  }, [proxyHostId]);
+  }, [proxyHostUuid]);
 
   useEffect(() => {
     if (isEditMode && enabled) loadRules();
@@ -103,7 +103,7 @@ export function MtlsFields({
 
   async function deleteRule(ruleId: number) {
     try {
-      const res = await fetch(`/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules/${ruleId}`, {
+      const res = await fetch(`/api/v1/proxy-hosts/${proxyHostUuid}/mtls-access-rules/${ruleId}`, {
         method: "DELETE",
       });
       if (res.ok) setRules((prev) => prev.filter((r) => r.id !== ruleId));
@@ -366,7 +366,7 @@ export function MtlsFields({
                 {addRuleOpen && (
                   <RuleDialog
                     onClose={() => setAddRuleOpen(false)}
-                    proxyHostId={proxyHostId!}
+                    proxyHostUuid={proxyHostUuid!}
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
                     title={t("addAccessRule")}
@@ -377,7 +377,7 @@ export function MtlsFields({
                 {editRule && (
                   <RuleDialog
                     onClose={() => setEditRule(null)}
-                    proxyHostId={proxyHostId!}
+                    proxyHostUuid={proxyHostUuid!}
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
                     title={t("editAccessRule")}
@@ -397,7 +397,7 @@ export function MtlsFields({
 
 function RuleDialog({
   onClose,
-  proxyHostId,
+  proxyHostUuid,
   roles,
   activeCerts,
   title,
@@ -406,7 +406,7 @@ function RuleDialog({
   onSaved,
 }: {
   onClose: () => void;
-  proxyHostId: number;
+  proxyHostUuid: string;
   roles: MtlsRole[];
   activeCerts: IssuedClientCertificate[];
   title: string;
@@ -434,8 +434,8 @@ function RuleDialog({
     setError("");
     try {
       const url = existing
-        ? `/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules/${existing.id}`
-        : `/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules`;
+        ? `/api/v1/proxy-hosts/${proxyHostUuid}/mtls-access-rules/${existing.id}`
+        : `/api/v1/proxy-hosts/${proxyHostUuid}/mtls-access-rules`;
       const res = await fetch(url, {
         method: existing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },

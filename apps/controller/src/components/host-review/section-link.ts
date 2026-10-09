@@ -1,10 +1,10 @@
 /**
- * The editor's place in the URL: `?edit=<id>#<section>`, as the host page links to it. Set with
+ * The editor's place in the URL: `?edit=<uuid>#<section>`, as the host page links to it. Set with
  * replaceState, so jumping around the form neither navigates nor fills the history.
  */
-export function linkEditorSection(hostId: number, section: string): void {
+export function linkEditorSection(hostRef: string | number, section: string): void {
   const url = new URL(window.location.href);
-  url.searchParams.set("edit", String(hostId));
+  url.searchParams.set("edit", String(hostRef));
   url.hash = section;
   window.history.replaceState(window.history.state, "", url);
 }

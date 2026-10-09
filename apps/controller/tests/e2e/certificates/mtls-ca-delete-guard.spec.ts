@@ -103,7 +103,7 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
     });
     expect(hostResp.ok()).toBeTruthy();
     const hostRow = (await hostResp.json()) as {
-      id: number;
+      uuid: string;
       mtls: { trusted_client_cert_ids?: number[] } | null;
     };
     expect(hostRow.mtls?.trusted_client_cert_ids).toContain(certRow.id);
@@ -122,7 +122,7 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
       expect((await page.request.get(`${API_CA}/${caRow.id}`)).status()).toBe(200);
       expect((await page.request.get(`${API_CLIENT_CERTS}/${certRow.id}`)).status()).toBe(200);
 
-      const delHost = await page.request.delete(`${API_HOSTS}/${hostRow.id}`, {
+      const delHost = await page.request.delete(`${API_HOSTS}/${hostRow.uuid}`, {
         headers: { Origin: origin },
       });
       expect(delHost.ok()).toBeTruthy();
@@ -135,7 +135,7 @@ test.describe('mTLS - CA delete guard (in-use protection)', () => {
       expect((await page.request.get(`${API_CLIENT_CERTS}/${certRow.id}`)).status()).toBe(404);
     } finally {
       if (!hostDeleted) {
-        await page.request.delete(`${API_HOSTS}/${hostRow.id}`, { headers: { Origin: origin } });
+        await page.request.delete(`${API_HOSTS}/${hostRow.uuid}`, { headers: { Origin: origin } });
       }
       // Best-effort CA cleanup in case an assertion above failed before delete.
       await page.request.delete(`${API_CA}/${caRow.id}`, { headers: { Origin: origin } });

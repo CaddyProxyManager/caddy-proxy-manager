@@ -26,15 +26,16 @@ export function editorSectionAnchor(section: EditorSection): string {
 }
 
 /** Opens the list page's editor on this host, scrolled to the section. */
-export function editorSectionHref(hostId: number, section?: EditorSection): string {
-  return `/proxy-hosts?edit=${hostId}${section ? `#${section}` : ""}`;
+/** `hostRef` is the host's uuid; a serial id still resolves, and the host page redirects it. */
+export function editorSectionHref(hostRef: string | number, section?: EditorSection): string {
+  return `/proxy-hosts?edit=${hostRef}${section ? `#${section}` : ""}`;
 }
 
-export function proxyHostDetailHref(hostId: number): string {
-  return `/proxy-hosts/${hostId}`;
+export function proxyHostDetailHref(hostRef: string | number): string {
+  return `/proxy-hosts/${hostRef}`;
 }
 
 /** Optionally opened on one revision, compared with the one before it. */
-export function proxyHostHistoryHref(hostId: number, revisionId?: number): string {
-  return `/proxy-hosts/${hostId}/history${revisionId ? `?to=${revisionId}` : ""}`;
+export function proxyHostHistoryHref(hostRef: string | number, revisionId?: number): string {
+  return `/proxy-hosts/${hostRef}/history${revisionId ? `?to=${revisionId}` : ""}`;
 }

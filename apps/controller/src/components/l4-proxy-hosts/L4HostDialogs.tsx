@@ -904,7 +904,7 @@ export function EditL4HostDialog({
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(host.id, data)}
       sections={l4SectionLinks("")}
-      onSectionLink={(section) => linkEditorSection(host.id, section)}
+      onSectionLink={(section) => linkEditorSection(host.uuid, section)}
     >
       {rollback && <RollbackNotice rollback={rollback} formId="edit-l4-host-form" />}
       <L4HostForm

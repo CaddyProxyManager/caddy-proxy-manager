@@ -19,6 +19,7 @@ import { settingsHref } from '@/src/app/(dashboard)/settings/sections';
 function host(overrides: Partial<ProxyHost> = {}): ProxyHost {
   return {
     id: 1,
+    uuid: '00000000-0000-4000-8000-000000000001',
     name: 'App',
     description: null,
     tags: [],

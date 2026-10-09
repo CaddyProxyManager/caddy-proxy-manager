@@ -29,6 +29,7 @@ const ACCESS_LISTS = [
  */
 const POSTGRES: L4ProxyHost = {
   id: 1,
+  uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f01",
   name: "postgres",
   description: "Primary and replica. Failover is manual; see the runbook.",
   tags: ["database", "prod"],
@@ -71,6 +72,7 @@ const POSTGRES: L4ProxyHost = {
 const GAME_SERVERS: L4ProxyHost = {
   ...POSTGRES,
   id: 2,
+  uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f02",
   name: "game servers",
   description: null,
   protocol: "udp",

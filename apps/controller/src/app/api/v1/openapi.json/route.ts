@@ -259,7 +259,7 @@ const spec = {
         tags: ["Proxy Hosts"],
         summary: "Get a proxy host",
         operationId: "getProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         responses: {
           "200": {
             description: "Proxy host",
@@ -277,7 +277,7 @@ const spec = {
         tags: ["Proxy Hosts"],
         summary: "Update a proxy host",
         operationId: "updateProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         requestBody: {
           required: true,
           content: {
@@ -304,7 +304,7 @@ const spec = {
         tags: ["Proxy Hosts"],
         summary: "Delete a proxy host",
         operationId: "deleteProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "401": { $ref: "#/components/responses/Unauthorized" },
@@ -351,7 +351,7 @@ const spec = {
           "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
         operationId: "previewProxyHostUpdate",
         parameters: [
-          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/HostPath" },
           { $ref: "#/components/parameters/RevertQuery" },
         ],
         requestBody: {
@@ -386,7 +386,7 @@ const spec = {
           "Newest first, one per write. Summaries only: GraphQL's hostRevision answers a revision in full, and rollbackHost and restoreHost go back to one.",
         operationId: "listProxyHostRevisions",
         parameters: [
-          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/HostPath" },
           { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 200 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
         ],
@@ -493,7 +493,7 @@ const spec = {
         tags: ["L4 Proxy Hosts"],
         summary: "Get an L4 proxy host",
         operationId: "getL4ProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         responses: {
           "200": {
             description: "L4 proxy host",
@@ -511,7 +511,7 @@ const spec = {
         tags: ["L4 Proxy Hosts"],
         summary: "Update an L4 proxy host",
         operationId: "updateL4ProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         requestBody: {
           required: true,
           content: {
@@ -538,7 +538,7 @@ const spec = {
         tags: ["L4 Proxy Hosts"],
         summary: "Delete an L4 proxy host",
         operationId: "deleteL4ProxyHost",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "401": { $ref: "#/components/responses/Unauthorized" },
@@ -585,7 +585,7 @@ const spec = {
           "Runs every check the save runs and returns the field diff, secrets masked, and its impact: agents that reload, certificates requested, warnings. Stores nothing.",
         operationId: "previewL4ProxyHostUpdate",
         parameters: [
-          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/HostPath" },
           { $ref: "#/components/parameters/RevertQuery" },
         ],
         requestBody: {
@@ -620,7 +620,7 @@ const spec = {
           "Newest first, one per write. Summaries only: GraphQL's hostRevision answers a revision in full, and rollbackHost and restoreHost go back to one.",
         operationId: "listL4ProxyHostRevisions",
         parameters: [
-          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/HostPath" },
           { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 200 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
         ],
@@ -2206,7 +2206,7 @@ const spec = {
         tags: ["Forward Auth"],
         summary: "Get forward auth access list for a proxy host",
         operationId: "getForwardAuthAccess",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         responses: {
           "200": {
             description: "Access list with user IDs and group IDs",
@@ -2229,7 +2229,7 @@ const spec = {
         tags: ["Forward Auth"],
         summary: "Set forward auth access list for a proxy host",
         operationId: "setForwardAuthAccess",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        parameters: [{ $ref: "#/components/parameters/HostPath" }],
         requestBody: {
           required: true,
           content: {
@@ -2521,6 +2521,13 @@ const spec = {
         schema: { type: "array", items: { type: "string" } },
         style: "form",
         explode: true,
+      },
+      HostPath: {
+        name: "id",
+        in: "path",
+        required: true,
+        schema: { type: "string" },
+        description: "The host's `uuid`. The numeric `id` is not accepted.",
       },
       IdPath: {
         name: "id",
@@ -3707,6 +3714,11 @@ const spec = {
         type: "object",
         properties: {
           id: { type: "integer" },
+          uuid: {
+            type: "string",
+            format: "uuid",
+            description: "What URLs and paths name the host by",
+          },
           name: { type: "string" },
           description: { type: ["string", "null"], description: "Free-text notes" },
           tags: {
@@ -3945,6 +3957,11 @@ const spec = {
         type: "object",
         properties: {
           id: { type: "integer" },
+          uuid: {
+            type: "string",
+            format: "uuid",
+            description: "What URLs and paths name the host by",
+          },
           name: { type: "string" },
           description: { type: ["string", "null"], description: "Free-text notes" },
           tags: {

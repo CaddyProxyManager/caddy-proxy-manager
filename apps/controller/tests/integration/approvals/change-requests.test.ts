@@ -493,12 +493,12 @@ describe('API tokens', () => {
     const { PUT } = await import('../../../src/app/api/v1/proxy-hosts/[id]/route');
     const { NextRequest } = await import('next/server');
     const response = await PUT(
-      new NextRequest(`http://localhost:3000/api/v1/proxy-hosts/${made.id}`, {
+      new NextRequest(`http://localhost:3000/api/v1/proxy-hosts/${made.uuid}`, {
         method: 'PUT',
         headers: { authorization: `Bearer ${raw}`, 'content-type': 'application/json' },
         body: JSON.stringify({ name: 'store' }),
       }),
-      { params: Promise.resolve({ id: String(made.id) }) },
+      { params: Promise.resolve({ id: made.uuid }) },
     );
     expect(response.status).toBe(202);
     const body = (await response.json()) as { changeRequestId: number; status: string };

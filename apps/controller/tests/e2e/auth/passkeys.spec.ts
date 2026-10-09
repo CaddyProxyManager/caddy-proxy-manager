@@ -26,7 +26,7 @@ test.describe.configure({ mode: 'serial' });
 
 let context: BrowserContext;
 let page: Page;
-let proxyHostId: number | null = null;
+let proxyHostId: string | null = null;
 
 /**
  * A platform authenticator holding discoverable credentials, which verifies the user (a PIN or a
@@ -186,7 +186,7 @@ test.describe('Passkeys', () => {
       headers: { 'Content-Type': 'application/json', Origin: BASE },
     });
     expect(created.status()).toBe(201);
-    proxyHostId = (await created.json()).id;
+    proxyHostId = (await created.json()).uuid;
     const access = await request.put(`${API}/proxy-hosts/${proxyHostId}/forward-auth-access`, {
       data: { userIds: [seed.getUserId(EMAIL)], groupIds: [] },
       headers: { 'Content-Type': 'application/json', Origin: BASE },

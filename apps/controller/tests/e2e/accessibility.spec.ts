@@ -106,11 +106,12 @@ test.afterAll(async ({ browser }) => {
     ['l4-proxy-hosts', SEEDED.l4],
   ]) {
     const rows = (await (await page.request.get(`${API}/${collection}`)).json()) as {
+      uuid?: string;
       id: number;
       name: string;
     }[];
     for (const row of rows.filter((r) => r.name === name))
-      await page.request.delete(`${API}/${collection}/${row.id}`, { headers: ORIGIN });
+      await page.request.delete(`${API}/${collection}/${row.uuid ?? row.id}`, { headers: ORIGIN });
   }
   await page.context().close();
 });

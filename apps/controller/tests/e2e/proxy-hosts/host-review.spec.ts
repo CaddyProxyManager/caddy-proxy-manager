@@ -9,13 +9,13 @@ import { waitForHydration } from '../../helpers/hydration';
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const ORIGIN = 'http://localhost:3000';
 
-async function createHost(page: Page, name: string, domain: string): Promise<number> {
+async function createHost(page: Page, name: string, domain: string): Promise<string> {
   const response = await page.request.post(API_PROXY_HOSTS, {
     headers: { Origin: ORIGIN },
     data: { name, domains: [domain], upstreams: ['localhost:9977'] },
   });
   expect(response.ok(), `create failed: ${response.status()}`).toBe(true);
-  return ((await response.json()) as { id: number }).id;
+  return ((await response.json()) as { uuid: string }).uuid;
 }
 
 test.describe('Proxy host review before save', () => {

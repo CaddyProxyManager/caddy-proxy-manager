@@ -12,6 +12,7 @@ import { pruneHostRevisions } from "../host-history/retention";
 import { hostAuditChanges } from "../host-review/audit";
 import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
+import { parseHostUuid } from "../hosts/ref";
 import {
   type GeoBlockSettings,
   type WafSettings,
@@ -975,6 +976,8 @@ type ProxyHostMeta = {
 
 export type ProxyHost = {
   id: number;
+  /** What URLs and the REST API name the host by. */
+  uuid: string;
   name: string;
   description: string | null;
   /** Lowercase, sorted; for finding hosts only. */
@@ -3378,6 +3381,8 @@ async function assertHostWafLoads(
 function parseProxyHost(row: ProxyHostRow): ProxyHost {
   return {
     id: row.id,
+    // Nullable only for a row inserted by raw SQL; the migration and the column default fill the rest.
+    uuid: row.uuid ?? "",
     name: row.name,
     description: row.description ?? null,
     tags: parseStoredTags(row.tags),
@@ -3679,6 +3684,7 @@ export function blankProxyHost(): ProxyHost {
   const now = nowIso();
   return parseProxyHost({
     id: 0,
+    uuid: null,
     name: "",
     description: null,
     tags: "[]",
@@ -3803,6 +3809,18 @@ export async function getProxyHost(id: number): Promise<ProxyHost | null> {
     where: (table, { eq }) => eq(table.id, id),
   });
   return host ? parseProxyHost(host) : null;
+}
+
+/** The serial id of the host a URL or REST path names by uuid; null when there is no such host. */
+export async function resolveProxyHostId(raw: string): Promise<number | null> {
+  const uuid = parseHostUuid(raw);
+  if (!uuid) return null;
+  const [row] = await db
+    .select({ id: proxyHosts.id })
+    .from(proxyHosts)
+    .where(eq(proxyHosts.uuid, uuid))
+    .limit(1);
+  return row?.id ?? null;
 }
 
 /** Every check an update runs, and the columns it would set; nothing is written. */

@@ -111,7 +111,7 @@ export function WafHostModesPanel({
           {row.dashboard ? (
             <Link href={settingsHref("dashboard")}>{tSettings("dashboardHostTitle")}</Link>
           ) : (
-            <Link href={editorSectionHref(row.id, "protection")}>{row.name}</Link>
+            <Link href={editorSectionHref(row.uuid, "protection")}>{row.name}</Link>
           )}
           <Text type="body" size="sm" color="secondary" maxLines={1}>
             {row.domains.join(", ")}

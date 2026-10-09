@@ -9,7 +9,7 @@ test.describe('Proxy host tags and duplicate', () => {
   test('tag two hosts in bulk, then filter the list by that tag', async ({ page }) => {
     await page.goto('/proxy-hosts');
     const origin = new URL(page.url()).origin;
-    const ids: number[] = [];
+    const ids: string[] = [];
     for (const [index, name] of NAMES.entries()) {
       const response = await page.request.post(API_PROXY_HOSTS, {
         headers: { Origin: origin },
@@ -21,7 +21,7 @@ test.describe('Proxy host tags and duplicate', () => {
         },
       });
       expect(response.ok()).toBeTruthy();
-      ids.push(((await response.json()) as { id: number }).id);
+      ids.push(((await response.json()) as { uuid: string }).uuid);
     }
 
     try {
@@ -44,7 +44,7 @@ test.describe('Proxy host tags and duplicate', () => {
       await dialog.getByRole('button', { name: 'Apply' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-      const tagsOf = async (id: number) =>
+      const tagsOf = async (id: string) =>
         ((await (await page.request.get(`${API_PROXY_HOSTS}/${id}`)).json()) as { tags: string[] })
           .tags;
       expect(await tagsOf(ids[0])).toEqual(['e2e-batch', 'e2e-first']);
@@ -74,7 +74,7 @@ test.describe('Proxy host tags and duplicate', () => {
       },
     });
     expect(response.ok()).toBeTruthy();
-    const { id } = (await response.json()) as { id: number };
+    const { uuid: id } = (await response.json()) as { uuid: string };
 
     try {
       await page.goto('/proxy-hosts?search=duplicate-e2e');

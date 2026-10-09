@@ -11,7 +11,7 @@ const ORIGIN = 'http://localhost:3000';
 
 type Revision = { id: number; operation: string; detail: { revision?: number } | null };
 
-async function revisions(page: Page, id: number): Promise<Revision[]> {
+async function revisions(page: Page, id: string): Promise<Revision[]> {
   const response = await page.request.get(`${API_PROXY_HOSTS}/${id}/revisions`);
   expect(response.ok()).toBe(true);
   return ((await response.json()) as { items: Revision[] }).items;
@@ -24,7 +24,7 @@ test.describe('Proxy host history', () => {
       data: { name: 'History E2E', domains: ['history-e2e.local'], upstreams: ['localhost:9977'] },
     });
     expect(created.ok()).toBe(true);
-    const id = ((await created.json()) as { id: number }).id;
+    const id = ((await created.json()) as { uuid: string }).uuid;
     try {
       for (const data of [{ name: 'History E2E v2' }, { upstreams: ['localhost:9978'] }]) {
         const response = await page.request.put(`${API_PROXY_HOSTS}/${id}`, {

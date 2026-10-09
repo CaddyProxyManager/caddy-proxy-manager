@@ -65,7 +65,7 @@ test.describe('Certificates', () => {
       const acmeTab = page.getByRole('main');
       await expect(acmeTab.getByText(`sub.${domain}`)).not.toBeVisible({ timeout: 5_000 });
     } finally {
-      await page.request.delete(`${API}/proxy-hosts/${host.id}`, { headers });
+      await page.request.delete(`${API}/proxy-hosts/${host.uuid}`, { headers });
       await page.request.delete(`${API}/certificates/${cert.id}`, { headers });
     }
   });
@@ -84,8 +84,8 @@ test.describe('Certificates', () => {
     });
     expect(setDnsRes.ok()).toBeTruthy();
 
-    let wcHostId: number | undefined;
-    let subHostId: number | undefined;
+    let wcHostId: string | undefined;
+    let subHostId: string | undefined;
     try {
       const wcHostRes = await page.request.post(`${API}/proxy-hosts`, {
         data: {
@@ -96,7 +96,7 @@ test.describe('Certificates', () => {
         headers,
       });
       expect(wcHostRes.status()).toBe(201);
-      wcHostId = (await wcHostRes.json()).id;
+      wcHostId = (await wcHostRes.json()).uuid;
 
       const subHostRes = await page.request.post(`${API}/proxy-hosts`, {
         data: {
@@ -107,7 +107,7 @@ test.describe('Certificates', () => {
         headers,
       });
       expect(subHostRes.status()).toBe(201);
-      subHostId = (await subHostRes.json()).id;
+      subHostId = (await subHostRes.json()).uuid;
 
       await page.goto('/certificates');
       await expect(

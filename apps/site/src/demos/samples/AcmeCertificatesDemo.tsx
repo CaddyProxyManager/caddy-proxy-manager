@@ -6,16 +6,38 @@ const DAY = 24 * 60 * 60 * 1000;
 const LETS_ENCRYPT = "acme-v02.api.letsencrypt.org-directory";
 
 const HOSTS = [
-  { id: 1, name: "App", domains: ["app.example.com"], sslForced: true, enabled: true },
+  {
+    id: 1,
+    uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f01",
+    name: "App",
+    domains: ["app.example.com"],
+    sslForced: true,
+    enabled: true,
+  },
   {
     id: 2,
+    uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f02",
     name: "Grafana",
     domains: ["grafana.example.com", "metrics.example.com"],
     sslForced: true,
     enabled: true,
   },
-  { id: 3, name: "Status page", domains: ["status.example.com"], sslForced: true, enabled: true },
-  { id: 4, name: "Staging", domains: ["staging.example.com"], sslForced: true, enabled: false },
+  {
+    id: 3,
+    uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f03",
+    name: "Status page",
+    domains: ["status.example.com"],
+    sslForced: true,
+    enabled: true,
+  },
+  {
+    id: 4,
+    uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f04",
+    name: "Staging",
+    domains: ["staging.example.com"],
+    sslForced: true,
+    enabled: false,
+  },
 ];
 
 /** Relative to the reader's today, so "soon" stays soon; status.example.com has none yet. */

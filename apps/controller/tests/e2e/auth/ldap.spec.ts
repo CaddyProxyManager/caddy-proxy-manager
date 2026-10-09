@@ -23,7 +23,7 @@ const ADMIN_STATE = resolve(dirname(fileURLToPath(import.meta.url)), '../../.aut
 
 test.describe.configure({ mode: 'serial' });
 
-let proxyHostId: number | null = null;
+let proxyHostId: string | null = null;
 
 async function signedOut(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -122,7 +122,7 @@ test.describe('LDAP directories', () => {
       headers: { 'Content-Type': 'application/json', Origin: BASE },
     });
     expect(created.status()).toBe(201);
-    proxyHostId = (await created.json()).id;
+    proxyHostId = (await created.json()).uuid;
     const access = await admin.request.put(
       `${API}/proxy-hosts/${proxyHostId}/forward-auth-access`,
       {

@@ -11,7 +11,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import type { DomainReachability } from "@/src/lib/reachability/domain";
 import type { LetsDebugResult } from "@/src/lib/reachability/letsdebug";
 
-type Props = { hostId: number; hostName: string; open: boolean; onClose: () => void };
+type Props = { hostUuid: string; hostName: string; open: boolean; onClose: () => void };
 
 const VARIANT = {
   reached: "success",
@@ -22,7 +22,7 @@ const VARIANT = {
 } as const;
 
 /** Each of a host's domains, checked the way an HTTP-01 challenge would reach it. */
-export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
+export function ReachabilityDialog({ hostUuid, hostName, open, onClose }: Props) {
   const t = useTranslations("certificates.reachability");
   const tCommon = useTranslations("common");
   const [results, setResults] = useState<DomainReachability[] | null>(null);
@@ -34,7 +34,7 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
     setResults(null);
     setError(null);
     setOutside({});
-    fetch(`/api/proxy-hosts/${hostId}/reachability`, {
+    fetch(`/api/proxy-hosts/${hostUuid}/reachability`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
@@ -45,12 +45,12 @@ export function ReachabilityDialog({ hostId, hostName, open, onClose }: Props) {
         else setResults(body.results);
       })
       .catch(() => setError(t("failed")));
-  }, [open, hostId, t]);
+  }, [open, hostUuid, t]);
 
   const askOutside = async (domain: string) => {
     setOutside((current) => ({ ...current, [domain]: "pending" }));
     try {
-      const response = await fetch(`/api/proxy-hosts/${hostId}/reachability`, {
+      const response = await fetch(`/api/proxy-hosts/${hostUuid}/reachability`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ letsDebug: domain }),

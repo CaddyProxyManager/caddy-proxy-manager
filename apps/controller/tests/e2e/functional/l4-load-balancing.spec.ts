@@ -80,10 +80,10 @@ test.describe
 
     test('cleanup: delete the load-balanced L4 host', async ({ page }) => {
       const res = await page.request.get('/api/v1/l4-proxy-hosts');
-      const hosts = (await res.json()) as Array<{ id: number; name: string }>;
+      const hosts = (await res.json()) as Array<{ uuid: string; name: string }>;
       const host = hosts.find((h) => h.name === HOST_NAME);
       expect(host).toBeDefined();
-      const del = await page.request.delete(`/api/v1/l4-proxy-hosts/${host!.id}`, {
+      const del = await page.request.delete(`/api/v1/l4-proxy-hosts/${host!.uuid}`, {
         headers: SESSION_HEADERS,
       });
       expect(del.ok()).toBe(true);

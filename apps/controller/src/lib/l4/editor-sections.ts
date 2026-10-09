@@ -14,11 +14,11 @@ export function l4EditorSectionAnchor(section: L4EditorSection): string {
   return `l4-section-${section}`;
 }
 
-export function l4EditorSectionHref(hostId: number, section?: L4EditorSection): string {
-  return `/l4-proxy-hosts?edit=${hostId}${section ? `#${section}` : ""}`;
+export function l4EditorSectionHref(hostRef: string | number, section?: L4EditorSection): string {
+  return `/l4-proxy-hosts?edit=${hostRef}${section ? `#${section}` : ""}`;
 }
 
 /** Optionally opened on one revision, compared with the one before it. */
-export function l4ProxyHostHistoryHref(hostId: number, revisionId?: number): string {
-  return `/l4-proxy-hosts/${hostId}/history${revisionId ? `?to=${revisionId}` : ""}`;
+export function l4ProxyHostHistoryHref(hostRef: string | number, revisionId?: number): string {
+  return `/l4-proxy-hosts/${hostRef}/history${revisionId ? `?to=${revisionId}` : ""}`;
 }

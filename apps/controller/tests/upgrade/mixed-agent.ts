@@ -460,8 +460,8 @@ async function restartsQuietly(): Promise<void> {
   check(!withPorts.recreated, 'with L4 ports published, Caddy is not recreated', withPorts.log);
   check(await until('the range to echo', () => rangeEchoes(RANGE), 60_000), 'every port relays');
 
-  const hosts = JSON.parse((await api('GET', '/api/v1/l4-proxy-hosts')).text) as { id: number }[];
-  for (const host of hosts) await api('DELETE', `/api/v1/l4-proxy-hosts/${host.id}`);
+  const hosts = JSON.parse((await api('GET', '/api/v1/l4-proxy-hosts')).text) as { uuid: string }[];
+  for (const host of hosts) await api('DELETE', `/api/v1/l4-proxy-hosts/${host.uuid}`);
   await applyL4Ports();
   await until('the empty port set to apply', () => {
     const file = l4Override();

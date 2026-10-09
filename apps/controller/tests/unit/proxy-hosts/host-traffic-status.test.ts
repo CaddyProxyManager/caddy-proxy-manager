@@ -30,13 +30,28 @@ const burst = (host: string, ongoing: boolean): TrafficSignal => ({
 const HOSTS = [
   {
     id: 1,
+    uuid: '00000000-0000-4000-8000-000000000001',
     name: 'App',
     domains: ['app.example.com', '*.app.example.com'],
     enabled: true,
     certificateId: null,
   },
-  { id: 2, name: 'Git', domains: ['Git.Example.com'], enabled: true, certificateId: null },
-  { id: 3, name: 'Off', domains: ['off.example.com'], enabled: false, certificateId: null },
+  {
+    id: 2,
+    uuid: '00000000-0000-4000-8000-000000000002',
+    name: 'Git',
+    domains: ['Git.Example.com'],
+    enabled: true,
+    certificateId: null,
+  },
+  {
+    id: 3,
+    uuid: '00000000-0000-4000-8000-000000000003',
+    name: 'Off',
+    domains: ['off.example.com'],
+    enabled: false,
+    certificateId: null,
+  },
 ];
 
 describe('hostProblems', () => {
@@ -163,7 +178,7 @@ describe('signalItems', () => {
     expect(found).toMatchObject({
       code: 'serverErrorBurst',
       severity: 'critical',
-      href: '/proxy-hosts/1',
+      href: '/proxy-hosts/00000000-0000-4000-8000-000000000001',
       scope: { proxyHosts: [1] },
       values: { ongoing: 'yes', host: 'app.example.com:443' },
     });

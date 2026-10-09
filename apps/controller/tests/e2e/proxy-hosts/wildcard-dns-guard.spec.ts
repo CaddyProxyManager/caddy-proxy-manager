@@ -12,7 +12,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
     const origin = new URL(page.url()).origin;
     const headers = { Origin: origin };
 
-    const createdIds: number[] = [];
+    const createdIds: string[] = [];
     try {
       // ── No DNS provider configured ──────────────────────────────────────
       const clearResp = await page.request.put(API_DNS_PROVIDER, {
@@ -42,7 +42,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
         },
       });
       expect(okExact.ok()).toBeTruthy();
-      createdIds.push((await okExact.json()).id);
+      createdIds.push((await okExact.json()).uuid);
 
       // ── DNS provider configured ─────────────────────────────────────────
       const setResp = await page.request.put(API_DNS_PROVIDER, {
@@ -71,7 +71,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
         },
       });
       expect(allowed.ok()).toBeTruthy();
-      createdIds.push((await allowed.json()).id);
+      createdIds.push((await allowed.json()).uuid);
     } finally {
       for (const id of createdIds) {
         await page.request.delete(`${API_PROXY_HOSTS}/${id}`, { headers });

@@ -358,7 +358,7 @@ export function EditHostDialog({
       isPending={isPending}
       preview={(data) => previewProxyHostAction(host.id, data)}
       sections={sectionLinks("")}
-      onSectionLink={(section) => linkEditorSection(host.id, section)}
+      onSectionLink={(section) => linkEditorSection(host.uuid, section)}
     >
       <form id="edit-host-form" action={formAction}>
         {/* Grouped by the sections the host's page links to (lib/proxy-hosts/editor-sections). */}
@@ -417,7 +417,7 @@ export function EditHostDialog({
             <MtlsFields
               value={host.mtls}
               caCertificates={caCertificates}
-              proxyHostId={host.id}
+              proxyHostUuid={host.uuid}
               mtlsRoles={mtlsRoles}
               issuedClientCerts={issuedClientCerts}
             />

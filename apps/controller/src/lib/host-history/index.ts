@@ -5,13 +5,14 @@
  * host's own query already answers.
  */
 
-import { and, asc, count, desc, eq, inArray, lt, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, lt, max } from "drizzle-orm";
 import { auditEventRow } from "../audit";
 import type { AuditChange } from "../audit/changes";
 import { chainedAuditSteps } from "../audit/chain";
 import { applyCaddyConfig } from "../caddy";
 import db, { nowIso } from "../db";
 import { hostRevisions, proxyHosts, users } from "../db/schema";
+import { parseHostUuid } from "../hosts/ref";
 import { domainError } from "../errors/domain-error";
 import { hostAuditChanges } from "../host-review/audit";
 import { assertL4PortPlan } from "../l4/port-plan";
@@ -330,6 +331,23 @@ export async function auditChangesFor(
  * domain (or, at layer 4, a listener) now taken elsewhere is a conflict. Missing references are
  * refused unless the caller chose to drop them.
  */
+/**
+ * The serial id a deleted host had, found by the uuid its last snapshot carries. A live host is
+ * resolved by its row instead; hosts deleted before uuids existed cannot be found this way.
+ */
+export async function deletedHostIdForUuid(kind: HostKind, raw: string): Promise<number | null> {
+  const uuid = parseHostUuid(raw);
+  if (!uuid) return null;
+  const [row] = await db
+    .select({ hostId: hostRevisions.hostId })
+    .from(hostRevisions)
+    .where(
+      and(eq(hostRevisions.hostKind, kind), like(hostRevisions.snapshot, `%"uuid":"${uuid}"%`)),
+    )
+    .limit(1);
+  return row?.hostId ?? null;
+}
+
 export async function restoreHost(
   revisionId: number,
   actorUserId: number,

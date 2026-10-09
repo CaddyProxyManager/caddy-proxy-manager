@@ -29,6 +29,7 @@ export type CertExpiryStatus = "ok" | "expiring_soon" | "expired";
 
 export type AcmeHost = {
   id: number;
+  uuid: string;
   name: string;
   domains: string[];
   sslForced: boolean;
@@ -121,6 +122,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       db
         .select({
           id: proxyHosts.id,
+          uuid: proxyHosts.uuid,
           name: proxyHosts.name,
           domains: proxyHosts.domains,
           sslForced: proxyHosts.sslForced,
@@ -145,6 +147,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
 
   const allAcmeHosts: AcmeHost[] = allAcmeRows.map((r) => ({
     id: r.id,
+    uuid: r.uuid ?? "",
     name: r.name,
     domains: JSON.parse(r.domains) as string[],
     sslForced: r.sslForced,

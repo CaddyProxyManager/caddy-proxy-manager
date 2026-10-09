@@ -10,7 +10,7 @@ const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const NAME = 'Host Page E2E';
 
 test.describe('Proxy host page', () => {
-  let id: number;
+  let id: string;
   let origin: string;
 
   test.beforeEach(async ({ page }) => {
@@ -21,7 +21,7 @@ test.describe('Proxy host page', () => {
       data: { name: NAME, domains: ['host-page-e2e.local'], upstreams: ['localhost:9978'] },
     });
     expect(response.ok()).toBeTruthy();
-    id = ((await response.json()) as { id: number }).id;
+    id = ((await response.json()) as { uuid: string }).uuid;
   });
 
   test.afterEach(async ({ page }) => {
@@ -68,7 +68,7 @@ test.describe('Proxy host page', () => {
   });
 
   test('an unknown host is not found', async ({ page }) => {
-    const response = await page.goto('/proxy-hosts/999999999');
+    const response = await page.goto('/proxy-hosts/00000000-0000-4000-8000-000000000000');
     expect(response?.status()).toBe(404);
   });
 });

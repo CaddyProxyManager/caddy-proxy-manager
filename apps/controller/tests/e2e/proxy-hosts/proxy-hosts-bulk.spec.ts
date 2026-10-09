@@ -11,14 +11,14 @@ test.describe('Proxy host bulk actions', () => {
   test('select two hosts and disable them together', async ({ page }) => {
     await page.goto(PROXY_HOSTS_NEWEST_FIRST);
     const origin = new URL(page.url()).origin;
-    const ids: number[] = [];
+    const ids: string[] = [];
     for (const [index, name] of NAMES.entries()) {
       const response = await page.request.post(API_PROXY_HOSTS, {
         headers: { Origin: origin },
         data: { name, domains: [`bulk-e2e-${index}.local`], upstreams: ['localhost:9977'] },
       });
       expect(response.ok()).toBeTruthy();
-      ids.push(((await response.json()) as { id: number }).id);
+      ids.push(((await response.json()) as { uuid: string }).uuid);
     }
 
     try {
@@ -44,7 +44,7 @@ test.describe('Proxy host bulk actions', () => {
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
       await expect(bar).not.toBeVisible();
 
-      const enabled = async (id: number) =>
+      const enabled = async (id: string) =>
         (
           (await (await page.request.get(`${API_PROXY_HOSTS}/${id}`)).json()) as {
             enabled: boolean;

@@ -16,7 +16,7 @@ const API = `${BASE_URL}/api/v1`;
 const ALICE = { email: 'alice@test.local', username: 'alice', password: 'password' };
 const BOB = { email: 'bob@test.local', username: 'bob', password: 'password' };
 
-let proxyHostId: number;
+let proxyHostId: string;
 let aliceUserId: number;
 let bobUserId: number;
 let testGroupId: number;
@@ -192,8 +192,8 @@ test.describe
       });
       expect(res.status()).toBe(201);
       const host = await res.json();
-      proxyHostId = host.id;
-      expect(proxyHostId).toBeGreaterThan(0);
+      proxyHostId = host.uuid;
+      expect(proxyHostId).toBeTruthy();
     });
 
     test('setup: trigger OAuth login for alice to create her user account', async ({ page }) => {

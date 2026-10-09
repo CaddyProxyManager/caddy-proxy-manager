@@ -21,7 +21,7 @@ async function createHost(
   domain: string,
   upstream: string,
   errorPages?: ErrorPageRule[],
-): Promise<number> {
+): Promise<string> {
   const res = await page.request.post(`${API}/proxy-hosts`, {
     data: {
       name,
@@ -33,10 +33,10 @@ async function createHost(
     headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
   });
   expect(res.status()).toBe(201);
-  return (await res.json()).id as number;
+  return (await res.json()).uuid as string;
 }
 
-async function deleteHosts(page: Page, ids: number[]): Promise<void> {
+async function deleteHosts(page: Page, ids: string[]): Promise<void> {
   for (const id of ids) {
     const res = await page.request.delete(`${API}/proxy-hosts/${id}`, {
       headers: { Origin: BASE_URL },
@@ -55,7 +55,7 @@ async function setGlobalErrorPages(page: Page, rules: ErrorPageRule[]): Promise<
 
 test.describe
   .serial('Custom error pages - per host', () => {
-    const hostIds: number[] = [];
+    const hostIds: string[] = [];
 
     test.beforeAll(async ({ browser }) => {
       // Ensure no global error pages bleed in from another spec or block.
@@ -146,7 +146,7 @@ test.describe
 
 test.describe
   .serial('Custom error pages - global + precedence', () => {
-    const hostIds: number[] = [];
+    const hostIds: string[] = [];
 
     test.beforeAll(async ({ browser }) => {
       const page = await browser.newPage();

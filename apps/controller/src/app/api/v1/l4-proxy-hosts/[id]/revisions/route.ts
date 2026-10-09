@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { resolveL4ProxyHostId } from "@/src/lib/models/l4-proxy-hosts";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
 import { countHostRevisions, listHostRevisions } from "@/src/lib/host-history";
 
@@ -7,12 +8,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     await requireApiUser(request);
     const { id } = await params;
+    const hostId = await resolveL4ProxyHostId(id);
+    if (hostId === null) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const search = request.nextUrl.searchParams;
     const limit = Math.min(Math.max(Number(search.get("limit") ?? 20) || 20, 1), 200);
     const offset = Math.max(Number(search.get("offset") ?? 0) || 0, 0);
     const [items, total] = await Promise.all([
-      listHostRevisions("l4", Number(id), limit, offset),
-      countHostRevisions("l4", Number(id)),
+      listHostRevisions("l4", hostId, limit, offset),
+      countHostRevisions("l4", hostId),
     ]);
     return NextResponse.json({ items, total });
   } catch (error) {

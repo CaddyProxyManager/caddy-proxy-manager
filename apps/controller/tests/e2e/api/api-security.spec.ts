@@ -19,7 +19,8 @@ type Endpoint = {
   body?: Record<string, unknown>;
 };
 
-// 999 404s after auth passes, which is fine - only auth is tested.
+// An unknown host 404s after auth passes, which is fine - only auth is tested.
+const UNKNOWN_HOST = '00000000-0000-4000-8000-000000000000';
 const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/proxy-hosts', auth: 'admin' },
   {
@@ -28,31 +29,31 @@ const ENDPOINTS: Endpoint[] = [
     auth: 'admin',
     body: { name: 'x', domains: ['x.test'], upstreams: ['127.0.0.1:80'] },
   },
-  { method: 'GET', path: '/proxy-hosts/999', auth: 'admin' },
-  { method: 'PUT', path: '/proxy-hosts/999', auth: 'admin', body: { name: 'x' } },
-  { method: 'DELETE', path: '/proxy-hosts/999', auth: 'admin' },
-  { method: 'GET', path: '/proxy-hosts/999/forward-auth-access', auth: 'admin' },
+  { method: 'GET', path: `/proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin' },
+  { method: 'PUT', path: `/proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin', body: { name: 'x' } },
+  { method: 'DELETE', path: `/proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin' },
+  { method: 'GET', path: `/proxy-hosts/${UNKNOWN_HOST}/forward-auth-access`, auth: 'admin' },
   {
     method: 'PUT',
-    path: '/proxy-hosts/999/forward-auth-access',
+    path: `/proxy-hosts/${UNKNOWN_HOST}/forward-auth-access`,
     auth: 'admin',
     body: { userIds: [], groupIds: [] },
   },
-  { method: 'GET', path: '/proxy-hosts/999/mtls-access-rules', auth: 'admin' },
+  { method: 'GET', path: `/proxy-hosts/${UNKNOWN_HOST}/mtls-access-rules`, auth: 'admin' },
   {
     method: 'POST',
-    path: '/proxy-hosts/999/mtls-access-rules',
+    path: `/proxy-hosts/${UNKNOWN_HOST}/mtls-access-rules`,
     auth: 'admin',
     body: { pathPattern: '/', allowedRoleIds: [] },
   },
-  { method: 'GET', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin' },
+  { method: 'GET', path: `/proxy-hosts/${UNKNOWN_HOST}/mtls-access-rules/999`, auth: 'admin' },
   {
     method: 'PUT',
-    path: '/proxy-hosts/999/mtls-access-rules/999',
+    path: `/proxy-hosts/${UNKNOWN_HOST}/mtls-access-rules/999`,
     auth: 'admin',
     body: { pathPattern: '/' },
   },
-  { method: 'DELETE', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin' },
+  { method: 'DELETE', path: `/proxy-hosts/${UNKNOWN_HOST}/mtls-access-rules/999`, auth: 'admin' },
 
   { method: 'GET', path: '/l4-proxy-hosts', auth: 'admin' },
   {
@@ -61,9 +62,9 @@ const ENDPOINTS: Endpoint[] = [
     auth: 'admin',
     body: { name: 'x', protocol: 'tcp', listenAddress: ':9999', upstreams: ['127.0.0.1:80'] },
   },
-  { method: 'GET', path: '/l4-proxy-hosts/999', auth: 'admin' },
-  { method: 'PUT', path: '/l4-proxy-hosts/999', auth: 'admin', body: { name: 'x' } },
-  { method: 'DELETE', path: '/l4-proxy-hosts/999', auth: 'admin' },
+  { method: 'GET', path: `/l4-proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin' },
+  { method: 'PUT', path: `/l4-proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin', body: { name: 'x' } },
+  { method: 'DELETE', path: `/l4-proxy-hosts/${UNKNOWN_HOST}`, auth: 'admin' },
 
   { method: 'GET', path: '/certificates', auth: 'admin' },
   {

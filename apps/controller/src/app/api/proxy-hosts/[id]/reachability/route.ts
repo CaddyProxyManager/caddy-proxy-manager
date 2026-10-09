@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { checkSameOrigin } from "@/src/lib/auth";
 import { checkDomainReachability, isCheckableDomain } from "@/src/lib/reachability/domain";
 import { askLetsDebug } from "@/src/lib/reachability/letsdebug";
-import { getProxyHost } from "@/src/lib/models/proxy-hosts";
+import { getProxyHost, resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
 
 /**
  * Whether each of a host's domains reaches this Caddy over plain HTTP. `letsDebug` also sends one
@@ -17,7 +17,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   await requireCan("hosts:read");
   const t = await getTranslations("certificates");
   const { id } = await params;
-  const host = await getProxyHost(Number(id));
+  const hostId = await resolveProxyHostId(id);
+  if (hostId === null) return NextResponse.json({ error: t("downloadNotFound") }, { status: 404 });
+  const host = await getProxyHost(hostId);
   if (!host) return NextResponse.json({ error: t("downloadNotFound") }, { status: 404 });
   const body = await request.json().catch(() => ({}));
 

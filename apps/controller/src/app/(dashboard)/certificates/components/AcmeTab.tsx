@@ -277,7 +277,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       {checking && (
         <ReachabilityDialog
           open
-          hostId={checking.id}
+          hostUuid={checking.uuid}
           hostName={checking.name}
           onClose={() => setChecking(null)}
         />

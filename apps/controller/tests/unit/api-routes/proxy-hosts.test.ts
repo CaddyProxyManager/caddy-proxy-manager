@@ -7,6 +7,8 @@ import { approvalsOffMock } from '@/tests/helpers/approvals';
 vi.mock('@/src/lib/approvals/kinds', await approvalsOffMock());
 
 vi.mock('@/src/lib/models/proxy-hosts', () => ({
+  // A path param here is the id itself; the uuid lookup has its own tests.
+  resolveProxyHostId: vi.fn(async (raw: string) => Number(raw)),
   listProxyHosts: vi.fn(),
   createProxyHost: vi.fn(),
   getProxyHost: vi.fn(),

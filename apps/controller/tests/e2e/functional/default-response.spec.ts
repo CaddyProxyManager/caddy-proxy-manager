@@ -72,7 +72,7 @@ async function waitForAbort(timeoutMs = 20_000) {
 
 test.describe
   .serial('Default response - live Caddy', () => {
-    let hostId: number | null = null;
+    let hostId: string | null = null;
     let originalSettings: DefaultResponseSettings = { mode: 'caddy' };
     let nativeResponse: HttpResponse | null = null;
 
@@ -98,7 +98,7 @@ test.describe
         headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
       });
       expect(created.status()).toBe(201);
-      hostId = (await created.json()).id as number;
+      hostId = (await created.json()).uuid as string;
       await waitForBody(KNOWN_DOMAIN, 'echo-ok');
       nativeResponse = await httpGet(UNKNOWN_DOMAIN);
       await request.dispose();

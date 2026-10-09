@@ -13,7 +13,7 @@ const ECHO_BODY = 'echo-ok';
 const BASE_URL = 'http://localhost:3000';
 const API = `${BASE_URL}/api/v1`;
 
-let proxyHostId: number;
+let proxyHostId: string;
 
 test.describe
   .serial('Forward auth', () => {
@@ -30,7 +30,7 @@ test.describe
       });
       expect(res.status()).toBe(201);
       const host = await res.json();
-      proxyHostId = host.id;
+      proxyHostId = host.uuid;
 
       const accessRes = await page.request.put(
         `${API}/proxy-hosts/${proxyHostId}/forward-auth-access`,

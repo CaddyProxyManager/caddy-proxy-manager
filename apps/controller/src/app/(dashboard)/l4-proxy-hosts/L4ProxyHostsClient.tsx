@@ -161,7 +161,7 @@ function HostActions({
           ...(canCreate ? [{ label: tCommon("duplicate"), onClick: onDuplicate }] : []),
           {
             label: tSettings("history.navLabel"),
-            onClick: () => router.push(l4ProxyHostHistoryHref(host.id)),
+            onClick: () => router.push(l4ProxyHostHistoryHref(host.uuid)),
           },
           { type: "divider" },
           { label: tCommon("delete"), variant: "destructive", onClick: onDelete },

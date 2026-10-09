@@ -6,6 +6,7 @@ import {
   countL4ProxyHostsByProtocol,
   listL4ProxyHostTags,
   getL4ProxyHost,
+  resolveL4ProxyHostId,
   l4ProxyHostFromRow,
 } from "@/src/lib/models/l4-proxy-hosts";
 import { revisionForEditor } from "@/src/lib/host-history";
@@ -77,9 +78,9 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   ]);
 
   // The editor opened from a link, on a host that may sit on another page of the list.
-  const editId = Number.parseInt(editParam ?? "", 10);
+  const editId = editParam ? await resolveL4ProxyHostId(editParam) : null;
   const editHost =
-    Number.isInteger(editId) && canManage(access, "l4ProxyHost", editId)
+    editId !== null && canManage(access, "l4ProxyHost", editId)
       ? (hosts.find((h) => h.id === editId) ?? (await getL4ProxyHost(editId)))
       : null;
 

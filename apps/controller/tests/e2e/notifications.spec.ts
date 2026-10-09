@@ -337,7 +337,7 @@ test.describe('Admin notifications', () => {
   test('a host whose upstream is dead is reported from the access log', async ({ page }) => {
     test.setTimeout(300_000);
     const previousLogging = await (await page.request.get(LOGGING)).json();
-    let hostId: number | undefined;
+    let hostId: string | undefined;
     try {
       const logging = await page.request.put(LOGGING, {
         headers: { Origin: BASE },
@@ -356,7 +356,7 @@ test.describe('Admin notifications', () => {
         },
       });
       expect(created.status(), await created.text()).toBe(201);
-      hostId = (await created.json()).id;
+      hostId = (await created.json()).uuid;
       await waitForStatus(DEAD_DOMAIN, 502, 30_000);
       await deleteAllMail();
 

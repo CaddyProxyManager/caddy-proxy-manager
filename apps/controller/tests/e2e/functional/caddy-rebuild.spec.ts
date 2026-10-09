@@ -90,7 +90,7 @@ async function selectInSettings(page: Page, include: boolean) {
 test.describe
   .serial('Caddy rebuild by the agent', () => {
     test.setTimeout(BUILD_TIMEOUT_MS + 5 * 60_000);
-    let hostId: number | undefined;
+    let hostId: string | undefined;
 
     test.beforeAll(async ({ request }) => {
       test.setTimeout(BUILD_TIMEOUT_MS + 5 * 60_000);
@@ -110,7 +110,7 @@ test.describe
         },
       });
       expect(created.status(), await created.text()).toBe(201);
-      hostId = (await created.json()).id;
+      hostId = (await created.json()).uuid;
       await waitForStatus(DOMAIN, 200, 20_000);
     });
 

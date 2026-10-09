@@ -34,7 +34,7 @@ async function setGlobalFromSettings(page: Page, enabled: boolean) {
 test.describe
   .serial('Compression', () => {
     test.setTimeout(90_000);
-    let hostId: number;
+    let hostId: string;
 
     test.beforeAll(async ({ request }) => {
       const created = await request.post(`${ORIGIN}/api/v1/proxy-hosts`, {
@@ -47,7 +47,7 @@ test.describe
         },
       });
       expect(created.status(), await created.text()).toBe(201);
-      hostId = (await created.json()).id;
+      hostId = (await created.json()).uuid;
       await waitForStatus(DOMAIN, 200, 20_000);
     });
 

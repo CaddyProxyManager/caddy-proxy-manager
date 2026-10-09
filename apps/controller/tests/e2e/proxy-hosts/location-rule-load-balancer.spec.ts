@@ -46,14 +46,14 @@ test.describe('Location rule load balancer', () => {
       ],
     };
 
-    let createdId: number | undefined;
+    let createdId: string | undefined;
     try {
       const createResp = await page.request.post(API_PROXY_HOSTS, { headers, data: payload });
       expect(createResp.ok()).toBeTruthy();
       const created = await createResp.json();
-      createdId = created.id;
+      createdId = created.uuid;
 
-      const getResp = await page.request.get(`${API_PROXY_HOSTS}/${created.id}`);
+      const getResp = await page.request.get(`${API_PROXY_HOSTS}/${created.uuid}`);
       expect(getResp.ok()).toBeTruthy();
       const host = await getResp.json();
 

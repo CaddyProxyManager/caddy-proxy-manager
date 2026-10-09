@@ -418,6 +418,7 @@ export async function getWafHostModes(now = Math.floor(Date.now() / 1000)) {
         [
           {
             id: DASHBOARD_HOST_ID,
+            uuid: "",
             name: DASHBOARD_HOST_NAME,
             domains: [domain],
             enabled: true,

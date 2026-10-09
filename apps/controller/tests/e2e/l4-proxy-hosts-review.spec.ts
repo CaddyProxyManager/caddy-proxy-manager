@@ -16,7 +16,7 @@ test('L4 review shows the listen change and the port apply it needs', async ({ p
     },
   });
   expect(response.ok(), `create failed: ${response.status()}`).toBe(true);
-  const id = ((await response.json()) as { id: number }).id;
+  const id = ((await response.json()) as { uuid: string }).uuid;
   try {
     await page.goto(`/l4-proxy-hosts?edit=${id}#listener`);
     await waitForHydration(page);
@@ -49,7 +49,7 @@ test('a deep-linked L4 editor closes after saving', async ({ page }) => {
     },
   });
   expect(response.ok(), `create failed: ${response.status()}`).toBe(true);
-  const id = ((await response.json()) as { id: number }).id;
+  const id = ((await response.json()) as { uuid: string }).uuid;
   try {
     await page.goto(`/l4-proxy-hosts?edit=${id}`);
     await waitForHydration(page);

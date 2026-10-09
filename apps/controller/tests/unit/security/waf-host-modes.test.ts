@@ -50,8 +50,15 @@ describe('wafHostModes', () => {
     const modes = wafHostModes(
       global,
       [
-        { id: 1, name: 'a', domains: ['a.test', 'www.a.test'], enabled: true },
-        { id: 2, name: 'b', domains: ['b.test'], enabled: false, waf: { enabled: false } },
+        { id: 1, uuid: 'u1', name: 'a', domains: ['a.test', 'www.a.test'], enabled: true },
+        {
+          id: 2,
+          uuid: 'u2',
+          name: 'b',
+          domains: ['b.test'],
+          enabled: false,
+          waf: { enabled: false },
+        },
       ],
       new Map([
         ['a.test', 3],
@@ -61,7 +68,8 @@ describe('wafHostModes', () => {
     expect(modes.map((m) => m.events7d)).toEqual([5, 0]);
     expect(countModes(modes)).toEqual({ On: 1, DetectionOnly: 0, Off: 0 });
     expect(
-      wafHostModes(global, [{ id: 1, name: 'a', domains: [], enabled: true }], null)[0]?.events7d,
+      wafHostModes(global, [{ id: 1, uuid: 'u1', name: 'a', domains: [], enabled: true }], null)[0]
+        ?.events7d,
     ).toBeNull();
   });
 });

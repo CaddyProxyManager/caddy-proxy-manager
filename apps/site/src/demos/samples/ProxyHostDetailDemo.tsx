@@ -17,6 +17,7 @@ import { DemoSurface } from "../DemoSurface";
 
 const HOST: ProxyHost = {
   id: 1,
+  uuid: "0198c2a4-1b2c-7d3e-8f4a-5b6c7d8e9f01",
   name: "App",
   description: null,
   tags: ["prod", "team:web"],

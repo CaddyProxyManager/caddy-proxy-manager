@@ -543,11 +543,11 @@ describe('the API previews', () => {
     } as never);
     const { POST } = await import('../../../src/app/api/v1/proxy-hosts/[id]/preview/route');
     const response = await POST(
-      new NextRequest(`http://localhost/api/v1/proxy-hosts/${row.id}/preview?revert=domains`, {
+      new NextRequest(`http://localhost/api/v1/proxy-hosts/${row.uuid}/preview?revert=domains`, {
         method: 'POST',
         body: JSON.stringify({ name: 'renamed', domains: ['x.example.com'] }),
       }),
-      { params: Promise.resolve({ id: String(row.id) }) },
+      { params: Promise.resolve({ id: String(row.uuid) }) },
     );
     expect(response.status).toBe(200);
     const preview = (await response.json()) as HostChangePreview;

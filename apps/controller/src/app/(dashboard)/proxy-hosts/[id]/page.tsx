@@ -6,7 +6,7 @@ import db from "@/src/lib/db";
 import { users } from "@/src/lib/db/schema";
 import { auditSummaryText } from "@/src/lib/audit/summary";
 import { DEFAULT_EXPLORE_STATE, serializeExploreState } from "@/src/lib/analytics/explore-state";
-import { getProxyHost } from "@/src/lib/models/proxy-hosts";
+import { getProxyHost, resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
 import { getProxyHostDetail } from "@/src/lib/proxy-hosts/detail";
 import { proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { hostTrafficNames } from "@/src/lib/proxy-hosts/traffic-status";
@@ -16,14 +16,9 @@ import { requestMemo } from "@/src/lib/request-memo";
 
 type PageProps = { params: Promise<{ id: string }> };
 
-/** Digits only, so `12abc` is not host 12. */
-function parseId(raw: string): number | null {
-  return /^\d{1,9}$/.test(raw) ? Number(raw) : null;
-}
-
 /** Once for the metadata and the page both. */
 async function viewableHost(raw: string) {
-  const id = parseId(raw);
+  const id = await resolveProxyHostId(raw);
   if (id === null) return null;
   return requestMemo(`proxy-host-view:${id}`, async () => {
     const access = await requireReach("hosts:read");
@@ -71,7 +66,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
     <ProxyHostDetailView
       detail={detail}
       canManage={canManage(access, "proxyHost", host.id)}
-      historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.id) : null}
+      historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.uuid) : null}
       analyticsHref={analyticsHref}
       logsHref={
         can(access, "logs:read") && primaryName
