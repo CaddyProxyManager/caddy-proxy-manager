@@ -309,24 +309,24 @@ describe("compose invocation", () => {
     expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 
-  it("builds without --project-directory, even a detected one", async () => {
+  it("builds against the mounted project, even with a detected host one", async () => {
     // The CLI in this container reads the build context, so a host path fails with "unable to
     // prepare context".
     hostDirLabel = "C:\\deploy\\cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).buildCaddy();
     const argv = lastCompose();
-    expect(argv).not.toContain("--project-directory");
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe(dir);
     expect(argv.slice(-2)).toEqual(["build", "caddy"]);
     expect(spawned.some((a) => a.some((s) => s.includes("working_dir")))).toBe(false);
   });
 
-  it("builds without --project-directory when COMPOSE_HOST_DIR is pinned", async () => {
+  it("builds against the mounted project when COMPOSE_HOST_DIR is pinned", async () => {
     process.env.COMPOSE_HOST_DIR = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(loadConfig()).buildCaddy();
     const argv = lastCompose();
-    expect(argv).not.toContain("--project-directory");
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe(dir);
     expect(argv[argv.indexOf("-p") + 1]).toBe("proj");
     expect(argv[argv.indexOf("--env-file") + 1]).toBe("/dev/null");
     expect(argv[argv.indexOf("-f") + 1]).toBe(join(dir, "docker-compose.yml"));
@@ -467,7 +467,7 @@ describe("operations", () => {
     const composeCalls = spawned.filter((a) => a[0] === "docker" && a[1] === "compose");
     const build = composeCalls.find((a) => a.includes("build"));
     const up = composeCalls.find((a) => a.includes("up"));
-    expect(build).not.toContain("--project-directory");
+    expect(build?.[build.indexOf("--project-directory") + 1]).toBe(dir);
     expect(up?.[up.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 

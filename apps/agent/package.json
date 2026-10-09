@@ -1,6 +1,6 @@
 {
   "name": "@cpm/agent",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "description": "Caddy Proxy Manager agent - manages the Caddy container on its host",
   "type": "module",
   "private": true,

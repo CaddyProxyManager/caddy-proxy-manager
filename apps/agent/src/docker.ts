@@ -221,8 +221,8 @@ export class DockerHost {
 
   /**
    * Both overrides always: omitting either lets a rebuild drop the L4 ports, or vice versa.
-   * `readsBuildContext` drops `--project-directory`: this CLI reads `context: .`, and the host path
-   * does not exist here ("unable to prepare context").
+   * `readsBuildContext` swaps the host `--project-directory` for COMPOSE_DIR: this CLI reads
+   * `context: .`, and the host path does not exist here ("unable to prepare context").
    */
   private async composeArgs(readsBuildContext = false): Promise<string[]> {
     const { composeExtraFile, dataDir } = this.config;
@@ -233,7 +233,10 @@ export class DockerHost {
     ]);
     const args = ["-p", project];
 
+    // A build reads its context here, so it gets this container's path; left to compose, the
+    // directory follows the first -f file, which a symlinked override moves somewhere else.
     if (hostDir) args.push("--project-directory", hostDir);
+    else if (readsBuildContext) args.push("--project-directory", this.config.composeDir);
     // Never the project's .env, which holds SESSION_SECRET and POSTGRES_PASSWORD; services get
     // their values through the agent's own environment instead.
     args.push("--env-file", "/dev/null");
