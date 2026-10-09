@@ -22,7 +22,7 @@ import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   CADDY_MODULES,
   type CaddyCustomModule,
@@ -123,6 +123,14 @@ export function CaddyBuildFields({
   const tCommon = useTranslations("common");
   // Custom module problems are domain error codes, which live at the catalog root.
   const tRoot = useTranslations();
+  const locale = useLocale();
+  // Providers are a long list looked up by name; the other groups keep their deliberate order.
+  const ordered = (category: CaddyModuleCategory, group: CaddyModuleDefinition[]) =>
+    category === "dns"
+      ? group.toSorted((a, b) =>
+          caddyModuleName(tRoot, a).localeCompare(caddyModuleName(tRoot, b), locale),
+        )
+      : group;
   const [target, setTarget] = useState<number>(FLEET);
   // Saving with this on clears the agent's row rather than freezing a copy of today's fleet.
   const [follows, setFollows] = useState(false);
@@ -394,7 +402,7 @@ export function CaddyBuildFields({
                 <Heading level={3}>{t(CATEGORY_LABEL_KEYS[category])}</Heading>
                 <Badge label={`${group.filter((m) => modules[m.id]).length}/${group.length}`} />
               </HStack>
-              {group.map((module) => (
+              {ordered(category, group).map((module) => (
                 <ModuleToggle
                   key={module.id}
                   module={module}
