@@ -4,7 +4,7 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -191,6 +191,21 @@ export class DockerHost {
     return usable;
   }
 
+  /** A symlink whose target is outside the mount looks absent here; skipping it quietly drops its networks. */
+  private warnDanglingOverride(path: string): void {
+    if (this.warnedComposeFiles.has(path)) return;
+    try {
+      if (!lstatSync(path).isSymbolicLink()) return;
+    } catch {
+      return;
+    }
+    this.warnedComposeFiles.add(path);
+    console.warn(
+      `[docker] ${path} is a symlink whose target this container cannot see, so it is skipped. ` +
+        "Mount the target's directory at the same path, or point COMPOSE_FILE at a mounted copy.",
+    );
+  }
+
   /**
    * What the operator's own compose reads, so a recreate keeps their changes: `COMPOSE_FILE` when
    * set, resolved against the mounted project, else the base file and the override beside it.
@@ -200,6 +215,7 @@ export class DockerHost {
     const base = join(composeDir, "docker-compose.yml");
     const override = join(composeDir, "docker-compose.override.yml");
     const fallback = !composeSkipOverride && existsSync(override) ? [base, override] : [base];
+    if (!composeSkipOverride && !existsSync(override)) this.warnDanglingOverride(override);
     if (!composeFiles) return fallback;
 
     const found: string[] = [];
