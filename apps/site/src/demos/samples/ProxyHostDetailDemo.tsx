@@ -78,6 +78,7 @@ const HOST: ProxyHost = {
   cache: null,
   compression: "inherit",
   discourageIndexing: false,
+  skipAccessLog: false,
   maintenance: null,
   upstreamTimeouts: null,
   rateLimit: { enabled: true, zones: [] },

@@ -3792,6 +3792,10 @@ const spec = {
             description:
               "Send X-Robots-Tag: noindex, nofollow and a robots.txt disallowing everything",
           },
+          skipAccessLog: {
+            type: "boolean",
+            description: "Leave this host's requests out of the access log",
+          },
           maintenance: {
             oneOf: [{ $ref: "#/components/schemas/HostMaintenanceConfig" }, { type: "null" }],
           },

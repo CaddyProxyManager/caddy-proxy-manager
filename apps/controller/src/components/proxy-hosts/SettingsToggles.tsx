@@ -18,7 +18,8 @@ type ToggleKey =
   | "allowWebsocket"
   | "preserveHostHeader"
   | "skipHttpsHostnameValidation"
-  | "discourageIndexing";
+  | "discourageIndexing"
+  | "skipAccessLog";
 
 type ToggleSetting = {
   key: ToggleKey;
@@ -29,7 +30,8 @@ type ToggleSetting = {
     | "websocketSupport"
     | "preserveHostHeader"
     | "skipHttpsValidation"
-    | "discourageIndexing";
+    | "discourageIndexing"
+    | "skipAccessLog";
   descriptionKey:
     | "forceHttpsHelp"
     | "hstsHelp"
@@ -37,7 +39,8 @@ type ToggleSetting = {
     | "websocketSupportHelp"
     | "preserveHostHeaderHelp"
     | "skipHttpsValidationHelp"
-    | "discourageIndexingHelp";
+    | "discourageIndexingHelp"
+    | "skipAccessLogHelp";
   /** Only meaningful while this other toggle is on; disabled (and so submitted off) otherwise. */
   requires?: ToggleKey;
   /** Hidden on the managed dashboard host, which derives these from its own settings. */
@@ -52,6 +55,7 @@ type SettingsTogglesProps = {
   preserveHostHeader?: boolean;
   skipHttpsValidation?: boolean;
   discourageIndexing?: boolean;
+  skipAccessLog?: boolean;
   enabled?: boolean;
   compression?: HostCompressionMode;
   /** Off for the dashboard host, whose form already posts its own `enabled` field. */
@@ -99,6 +103,7 @@ const SETTINGS: ToggleSetting[] = [
     descriptionKey: "discourageIndexingHelp",
     hostOnly: true,
   },
+  { key: "skipAccessLog", labelKey: "skipAccessLog", descriptionKey: "skipAccessLogHelp" },
 ];
 
 export function SettingsToggles({
@@ -109,6 +114,7 @@ export function SettingsToggles({
   preserveHostHeader = true,
   skipHttpsValidation = false,
   discourageIndexing = false,
+  skipAccessLog = false,
   enabled = true,
   compression: initialCompression = "inherit",
   showEnabled = true,
@@ -124,6 +130,7 @@ export function SettingsToggles({
     preserveHostHeader,
     skipHttpsHostnameValidation: skipHttpsValidation,
     discourageIndexing,
+    skipAccessLog,
     enabled,
   });
   const settings = showEnabled ? SETTINGS : SETTINGS.filter((setting) => !setting.hostOnly);

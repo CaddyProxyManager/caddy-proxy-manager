@@ -379,6 +379,7 @@ type ProxyHostMeta = {
   cache?: HostCacheMeta;
   compression?: HostCompressionMode;
   discourage_indexing?: boolean;
+  skip_access_log?: boolean;
   maintenance?: HostMaintenanceMeta;
   path_allows?: PathAllowRule[];
   path_blocks?: PathBlockRule[];
@@ -1673,6 +1674,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     // costs a Coraza transaction: blocked sources, ws-refuse, maintenance, encode, crowdsec,
     // rate_limit, geoblock, appsec, WAF, headers (HSTS, X-Robots-Tag), robots.txt, Anubis, path
     // rules, redirects, access list.
+    // First, so a request refused by anything below is still left out of the log.
+    if (meta.skip_access_log) handlers.push({ handler: "vars", log_skip: true });
     if (context.blockedSources?.length) {
       handlers.push(
         ...buildBlockedSourceHandlers(context.blockedSources, {

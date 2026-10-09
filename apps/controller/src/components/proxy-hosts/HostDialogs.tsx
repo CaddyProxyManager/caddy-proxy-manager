@@ -198,6 +198,7 @@ export function CreateHostDialog({
               }
               compression={initialData?.compression ?? preset?.compression}
               discourageIndexing={initialData?.discourageIndexing ?? preset?.discourageIndexing}
+              skipAccessLog={initialData?.skipAccessLog}
             />
             <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
             <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
@@ -397,6 +398,7 @@ export function EditHostDialog({
               skipHttpsValidation={host.skipHttpsHostnameValidation}
               compression={host.compression}
               discourageIndexing={host.discourageIndexing}
+              skipAccessLog={host.skipAccessLog}
             />
             <UpstreamHealthPanel hostId={host.id} />
             <LoadBalancerFields loadBalancer={host.loadBalancer} />

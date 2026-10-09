@@ -59,6 +59,7 @@ function host(overrides: Partial<ProxyHost> = {}): ProxyHost {
     cache: null,
     compression: 'inherit',
     discourageIndexing: false,
+    skipAccessLog: false,
     maintenance: null,
     upstreamTimeouts: null,
     rateLimit: null,

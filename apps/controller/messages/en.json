@@ -2174,6 +2174,7 @@
       "skipHttpsHostnameValidation": "Skip upstream certificate name check",
       "compression": "Compression",
       "discourageIndexing": "Discourage search indexing",
+      "skipAccessLog": "Access log skipped",
       "upstreams": "Upstreams",
       "loadBalancer": "Load balancing",
       "dnsResolver": "DNS resolvers",
@@ -3350,6 +3351,8 @@
       }
     },
     "discourageIndexing": "Discourage search engines",
+    "skipAccessLog": "Leave out of the access log",
+    "skipAccessLogHelp": "Caddy writes no access-log line for this host, so it does not appear in the log viewer or analytics. Useful for a dashboard or health-check host that would otherwise fill the log",
     "discourageIndexingHelp": "Ask search engines not to index this host: every response gets X-Robots-Tag: noindex, nofollow, and /robots.txt disallows everything, even behind a sign-in. Well-behaved crawlers honour it; it doesn't keep anyone out",
     "compression": "Compression",
     "compressionHelp": "Compress text responses with zstd or gzip. Default follows Settings → Network → Compression",

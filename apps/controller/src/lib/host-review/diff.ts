@@ -38,6 +38,7 @@ export const HTTP_FIELDS: Record<string, FieldSpec<EditorSection>> = {
   skipHttpsHostnameValidation: { section: "upstreams" },
   compression: { section: "upstreams" },
   discourageIndexing: { section: "upstreams" },
+  skipAccessLog: { section: "upstreams" },
   loadBalancer: { section: "upstreams" },
   dnsResolver: { section: "upstreams" },
   upstreamTimeouts: { section: "upstreams" },

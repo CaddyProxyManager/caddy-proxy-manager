@@ -875,6 +875,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     preserveHostHeader: boolField("preserveHostHeader"),
     skipHttpsHostnameValidation: boolField("skipHttpsHostnameValidation"),
     discourageIndexing: boolField("discourageIndexing"),
+    skipAccessLog: boolField("skipAccessLog"),
     customPreHandlersJson: formData.has("customPreHandlersJson")
       ? parseOptionalText(formData.get("customPreHandlersJson"))
       : undefined,
@@ -962,6 +963,7 @@ export async function parseProxyHostCreateForm(
     preserveHostHeader: boolField("preserveHostHeader"),
     skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
     discourageIndexing: boolField("discourageIndexing"),
+    skipAccessLog: boolField("skipAccessLog"),
     enabled: parseCheckbox(formData.get("enabled")),
     customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
     customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),

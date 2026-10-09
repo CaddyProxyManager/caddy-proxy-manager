@@ -965,6 +965,7 @@ type ProxyHostMeta = {
   /** Absent follows the global setting. */
   compression?: "on" | "off";
   discourage_indexing?: boolean;
+  skip_access_log?: boolean;
   maintenance?: HostMaintenanceMeta;
   upstream_timeouts?: HostUpstreamTimeoutsMeta;
   rate_limit?: HostRateLimitMeta;
@@ -1017,6 +1018,8 @@ export type ProxyHost = {
   compression: HostCompressionMode;
   /** X-Robots-Tag on every response, and a robots.txt that disallows everything. */
   discourageIndexing: boolean;
+  /** Caddy writes no access-log line for this host. */
+  skipAccessLog: boolean;
   /** Null when never configured; kept while off so turning it back on restores the rest. */
   maintenance: HostMaintenanceConfig | null;
   /** Null keeps Caddy's defaults. Location rules inherit them. */
@@ -1077,6 +1080,7 @@ export type ProxyHostInput = {
   /** Null follows the global setting, as "inherit" does. */
   compression?: HostCompressionMode | null;
   discourageIndexing?: boolean;
+  skipAccessLog?: boolean;
   /** Null forgets it; a bad bypass range is refused. */
   maintenance?: Partial<HostMaintenanceConfig> | null;
   /** The whole set: a field left out keeps Caddy's default. Null clears them all. */
@@ -1633,6 +1637,7 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
   if (compression !== "inherit") normalized.compression = compression;
 
   if (meta.discourage_indexing === true) normalized.discourage_indexing = true;
+  if (meta.skip_access_log === true) normalized.skip_access_log = true;
 
   const maintenance = sanitizeHostMaintenance(meta.maintenance);
   if (maintenance) normalized.maintenance = maintenance;
@@ -1927,6 +1932,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
       cache: sanitizeHostCache(parsed.cache),
       compression: storedCompression(parsed.compression),
       discourage_indexing: parsed.discourage_indexing === true || undefined,
+      skip_access_log: parsed.skip_access_log === true || undefined,
       maintenance: sanitizeHostMaintenance(parsed.maintenance),
       upstream_timeouts: sanitizeHostUpstreamTimeouts(parsed.upstream_timeouts),
       rate_limit: sanitizeHostRateLimit(parsed.rate_limit),
@@ -2785,6 +2791,11 @@ function buildMeta(
     else delete next.discourage_indexing;
   }
 
+  if (input.skipAccessLog !== undefined) {
+    if (input.skipAccessLog) next.skip_access_log = true;
+    else delete next.skip_access_log;
+  }
+
   if (input.maintenance !== undefined) {
     const maintenance = input.maintenance
       ? normalizeHostMaintenanceInput(input.maintenance)
@@ -3204,6 +3215,7 @@ export type ProxyHostMetaView = Pick<
   | "cache"
   | "compression"
   | "discourageIndexing"
+  | "skipAccessLog"
   | "maintenance"
   | "upstreamTimeouts"
   | "rateLimit"
@@ -3250,6 +3262,7 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
     cache: hydrateHostCache(meta.cache),
     compression: sanitizeHostCompression(meta.compression),
     discourageIndexing: meta.discourage_indexing === true,
+    skipAccessLog: meta.skip_access_log === true,
     maintenance: hydrateHostMaintenance(meta.maintenance),
     upstreamTimeouts: hydrateHostUpstreamTimeouts(meta.upstream_timeouts),
     rateLimit: hydrateHostRateLimit(meta.rate_limit),
@@ -3884,6 +3897,7 @@ async function prepareProxyHostUpdate(
     ...(existing.cache ? { cache: sanitizeHostCache(existing.cache) } : {}),
     compression: storedCompression(existing.compression),
     ...(existing.discourageIndexing ? { discourage_indexing: true } : {}),
+    ...(existing.skipAccessLog ? { skip_access_log: true } : {}),
     maintenance: sanitizeHostMaintenance(existing.maintenance),
     upstream_timeouts: sanitizeHostUpstreamTimeouts(existing.upstreamTimeouts),
     rate_limit: sanitizeHostRateLimit(existing.rateLimit),

@@ -73,6 +73,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
         showEnabled={false}
         hstsSubdomains={view.hstsSubdomains}
         skipHttpsValidation={view.skipHttpsHostnameValidation}
+        skipAccessLog={view.skipAccessLog}
       />
       <Selector
         label={t("certificate")}
