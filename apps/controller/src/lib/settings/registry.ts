@@ -330,7 +330,7 @@ export const updateCheckEnabled = booleanSetting({
   group: "application",
   label: "Check for updates",
   description:
-    "Ask the registry below, a few times a day, whether a newer release has been published.",
+    "Check the registry below a few times a day for a newer release.",
   default: true,
 });
 
@@ -340,8 +340,8 @@ export const updateCheckPrereleases = booleanSetting({
   group: "application",
   label: "Check for prereleases",
   description:
-    "Also look for betas and release candidates, and say here when one is newer than this " +
-    "install. A stable install is still only offered stable releases.",
+    "Also watch for betas and release candidates, and show a notice here when one is newer than " +
+    "what's running. Stable installs are still only offered stable releases.",
   default: false,
 });
 

@@ -148,10 +148,10 @@ jobs:
             fi
             echo
             # Flag both differences from the repository so nobody diffs the two and files a bug.
-            echo "\`caddy-proxy-manager-${TAG}-deploy.tar.gz\` deploys as it unpacks - extract it into"
-            echo "one directory and \`docker compose up -d\` needs nothing moved. Only Caddy's build"
-            echo "context keeps its \`docker/caddy/\` path, for Settings -> Caddy build to rebuild"
-            echo "from. It includes the managed CrowdSec container, which stays off"
+            echo "\`caddy-proxy-manager-${TAG}-deploy.tar.gz\` is ready to run as it unpacks: extract it"
+            echo "into one directory and \`docker compose up -d\` works without moving anything. Its one"
+            echo "subdirectory, \`docker/caddy/\`, is Caddy's build context, which Settings -> Caddy build"
+            echo "rebuilds from. It includes the managed CrowdSec container, which stays off"
             echo "until Settings -> CrowdSec turns it on. Its \`docker-compose.yml\` differs from the"
             echo "copy in the repository in exactly two ways: it mounts its files from beside itself"
             echo "rather than from \`./docker/\`, and it pins the three images to \`${VERSION}\` rather"
@@ -161,7 +161,7 @@ jobs:
             echo
             echo "## Installing without internet access"
             echo
-            echo "The image build attaches an air-gap bundle per architecture before publishing this:"
+            echo "The image build attaches an air-gap bundle per architecture before this release is published:"
             echo "\`-airgap-<web|caddy|agent>.tar.gz\` hold our images, \`-airgap-deploy.tar.gz\` the"
             echo "deployment files and a load script, and the signed \`-airgap-manifest.txt\` their"
             echo "checksums and the third-party images to bring in by digest. See"

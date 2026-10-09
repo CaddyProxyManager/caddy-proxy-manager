@@ -447,7 +447,7 @@ it win even then.
 | Non-default ports CPM forward-auth sites are served on, comma-separated. A sign-in on any other port is refused | `FORWARD_AUTH_ALLOWED_PORTS` | None |
 | Send `X-CPM-User-Id` as the sequential account number rather than a UUID. On for installs upgraded from before the UUID | `FORWARD_AUTH_SEQUENTIAL_USER_IDS` | `false` |
 | Check the registry for a newer release | `UPDATE_CHECK_ENABLED` | `true` |
-| Also look for betas and release candidates, and mention a newer one in Settings. A stable install is still only offered stable releases | `UPDATE_CHECK_PRERELEASES` | `false` |
+| Watch for betas and release candidates too, and show a notice in Settings when one is newer. Stable installs are still only offered stable releases | `UPDATE_CHECK_PRERELEASES` | `false` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/caddyproxymanager` |
 | Offline mode: stop every call to the internet this app makes on its own, and keep agents from building Caddy | `OFFLINE_MODE` | `false` |
 | Revisions each host keeps at least, however old | `HOST_HISTORY_KEEP_REVISIONS` | `100` |
