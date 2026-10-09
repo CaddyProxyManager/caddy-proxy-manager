@@ -148,6 +148,21 @@ describe('the dashboard reachability check', () => {
     expect((await checkDashboardDns('  ', deps(['203.0.113.10'], true))).reason).toBe('noDomain');
   });
 
+  it('reaches a domain that already forces HTTPS', async () => {
+    // The plain probe meets a redirect it does not follow, so only the HTTPS one can answer.
+    const schemes: string[] = [];
+    const result = await checkDashboardDns('cpm.example.com', {
+      resolveAddresses: async () => ['203.0.113.10'],
+      probe: async (_name, scheme) => {
+        schemes.push(scheme);
+        return scheme === 'https';
+      },
+    });
+
+    expect(result.reason).toBe('reached');
+    expect(schemes).toEqual(['http', 'https']);
+  });
+
   it('answers rather than throwing when the lookup fails', async () => {
     // Rendering a warning is not a place to handle an exception, and a broken resolver must not
     // become an error the operator has to deal with.

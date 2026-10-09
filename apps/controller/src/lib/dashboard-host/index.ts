@@ -210,7 +210,7 @@ export async function checkDashboardDns(
   // Test seam; real callers pass nothing.
   deps: {
     resolveAddresses?: (name: string) => Promise<string[]>;
-    probe?: (name: string) => Promise<boolean>;
+    probe?: (name: string, scheme: "http" | "https") => Promise<boolean>;
   } = {},
 ): Promise<DashboardDnsCheck> {
   const name = domain.trim().toLowerCase();
@@ -220,7 +220,11 @@ export async function checkDashboardDns(
     withTimeout(async () =>
       deps.resolveAddresses ? await deps.resolveAddresses(name) : await resolveAddresses(name),
     ),
-    (deps.probe ?? probeSelf)(name),
+    // A domain already forcing HTTPS redirects the plain probe, which is not followed.
+    (async () => {
+      const probe = deps.probe ?? probeSelf;
+      return (await probe(name, "http")) || (await probe(name, "https"));
+    })(),
   ]);
 
   const addresses = resolved ?? [];
