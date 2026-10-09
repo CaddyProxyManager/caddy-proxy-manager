@@ -16,9 +16,11 @@ import {
   type GeoBlockSettings,
   type WafSettings,
   getDnsProviderSettings,
+  getHostDefaults,
   getTailscaleSettings,
   getWafSettings,
 } from "../settings";
+import { applyProxyHostDefaults } from "../proxy-hosts/host-defaults";
 import { normalizeProxyHostDomains } from "../proxy-hosts/domains";
 import { isPlainObject, stripCaddyPlaceholders } from "../caddy/utils";
 import { assertNoNewAdminDialTargets, mayReachInstance } from "./admin-dial-targets";
@@ -3613,9 +3615,10 @@ type ProxyHostInsert = typeof proxyHosts.$inferInsert;
 
 /** Every check a create runs, and the row it would insert; nothing is written. */
 async function prepareProxyHostCreate(
-  input: ProxyHostInput,
+  body: ProxyHostInput,
   actorUserId: number,
 ): Promise<Omit<ProxyHostInsert, "createdAt" | "updatedAt">> {
+  const input = applyProxyHostDefaults(body, (await getHostDefaults()).proxyHost);
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
   if (!input.upstreams || input.upstreams.length === 0) {

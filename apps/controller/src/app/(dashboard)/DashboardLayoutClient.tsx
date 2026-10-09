@@ -9,13 +9,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 import { useTheme } from "@astryxdesign/core";
-import { LogOut, Sun, Moon } from "lucide-react";
+import { LogOut, ServerCog, Sun, Moon } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import SettingsSideNav from "./settings/SettingsSideNav";
 import { RailStagedBlock } from "./settings/StagedChanges";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
+import { Icon } from "@astryxdesign/core/Icon";
 import { NavIcon } from "@astryxdesign/core/NavIcon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -33,7 +34,7 @@ import { MoreDrawer } from "@/src/components/mobile/MoreDrawer";
 import { DESTINATION_HUES, DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
 import { ACCENTS } from "@/src/components/ui/accent";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
-import { formatAppVersion } from "@/src/lib/runtime/app-version";
+import { APP_VERSION, appVersionLabel } from "@/src/lib/runtime/app-version";
 import {
   SQLITE_NOTICE_COOKIE,
   SQLITE_NOTICE_DISMISS_SECONDS,
@@ -370,15 +371,13 @@ export default function DashboardLayoutClient({
               <SideNavHeading
                 heading={appName}
                 headingHref="/"
-                subheading={formatAppVersion()}
+                subheading={appVersionLabel(
+                  appName,
+                  tCommon("versionNumber", { version: APP_VERSION }),
+                )}
                 icon={
-                  <NavIcon
-                    icon={
-                      <Text type="body" size="xsm" weight="bold">
-                        C
-                      </Text>
-                    }
-                  />
+                  // Inherits NavIcon's dark ink; Text would paint white on the light accent.
+                  <NavIcon icon={<Icon icon={ServerCog} />} />
                 }
               />
             }

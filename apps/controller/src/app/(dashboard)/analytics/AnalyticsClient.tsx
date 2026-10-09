@@ -38,6 +38,7 @@ import { useTableDensity } from "@/components/ui/TableDensity";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 import { regionName } from "@/src/lib/locale/region-names";
+import { ANALYTICS_STARTING } from "@/src/lib/analytics/starting";
 import {
   ANALYTICS_RANGES,
   AUTO_REFRESH_MS,
@@ -117,11 +118,17 @@ class UnexplainedStatusError extends Error {
   }
 }
 
+/** ClickHouse is not up yet after a restart: a wait, shown as a warning rather than an error. */
+class AnalyticsStartingError extends Error {}
+
 /** An unchecked `{ error }` body lands in state, and the first `.map()` blanks the page. */
 async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   const response = await fetch(url, { signal });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
+    if (body && typeof body === "object" && "code" in body && body.code === ANALYTICS_STARTING) {
+      throw new AnalyticsStartingError();
+    }
     const reported =
       body && typeof body === "object" && "error" in body
         ? String((body as { error: unknown }).error).trim()
@@ -331,6 +338,7 @@ export default function AnalyticsClient() {
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [hosts, setHosts] = useState<string[]>([]);
   const [viewAll, setViewAll] = useState<TopDimension | null>(null);
@@ -361,12 +369,21 @@ export default function AnalyticsClient() {
       fetchJson(`/api/analytics/explore${query ? `?${query}` : ""}`, signal)
         .then((body) => {
           setLoadError(null);
+          setStarting(false);
           setReport(asReport(body));
           setLoadedAt(Date.now());
           shownQuery.current = query;
         })
         .catch((err: unknown) => {
           if (signal.aborted) return;
+          // Reset to empty rather than leaving stale data next to a banner.
+          setReport(null);
+          if (err instanceof AnalyticsStartingError) {
+            setStarting(true);
+            setLoadError(null);
+            return;
+          }
+          setStarting(false);
           setLoadError(
             err instanceof UnexplainedStatusError
               ? t("requestFailedWithStatus", { path: err.path, status: err.status })
@@ -374,8 +391,6 @@ export default function AnalyticsClient() {
                 ? err.message
                 : t("loadErrorTitle"),
           );
-          // Reset to empty rather than leaving stale data next to an error banner.
-          setReport(null);
           if (!quiet) toast.error(t("loadErrorTitle"));
         })
         .finally(() => {
@@ -633,6 +648,16 @@ export default function AnalyticsClient() {
           </Text>
         )}
       </HStack>
+
+      {starting && (
+        <div data-testid="analytics-starting">
+          <Banner
+            status="warning"
+            title={t("startingTitle")}
+            description={t("startingDescription")}
+          />
+        </div>
+      )}
 
       {loadError && (
         <div data-testid="analytics-load-error">

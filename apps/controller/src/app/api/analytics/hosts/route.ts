@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser } from "@/src/lib/api/auth";
+import { analyticsErrorResponse } from "@/src/lib/analytics/api-error";
 import { getAnalyticsHosts } from "@/src/lib/analytics/db";
 
 export async function GET(request: NextRequest) {
@@ -8,6 +9,6 @@ export async function GET(request: NextRequest) {
     const hosts = await getAnalyticsHosts();
     return NextResponse.json(hosts);
   } catch (error) {
-    return apiErrorResponse(error);
+    return analyticsErrorResponse(error);
   }
 }

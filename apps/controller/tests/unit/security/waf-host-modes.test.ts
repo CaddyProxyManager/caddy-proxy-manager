@@ -18,6 +18,13 @@ describe('effectiveWafMode', () => {
     });
   });
 
+  it('names the host when it runs the WAF while the global one is off', () => {
+    expect(effectiveWafMode({ ...global, enabled: false }, { enabled: true })).toEqual({
+      mode: 'On',
+      source: 'host',
+    });
+  });
+
   it('names a host that sets its own mode, opts out, or overrides', () => {
     expect(effectiveWafMode(global, { enabled: true, mode: 'DetectionOnly' })).toEqual({
       mode: 'DetectionOnly',

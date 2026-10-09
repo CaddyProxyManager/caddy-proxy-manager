@@ -18,6 +18,8 @@ import { normalizeDefaultResponseSettings } from "../caddy/default-response";
 import { normalizeTailscaleSettings } from "../caddy/tailscale";
 import { normalizeCrowdSecSettings } from "../caddy/crowdsec";
 import { normalizeGlobalRateLimitInput } from "../proxy-hosts/rate-limit-global";
+import { DEFAULT_HOST_DEFAULTS } from "../proxy-hosts/host-defaults";
+import { HOST_COMPRESSION_MODES } from "../proxy-hosts/compression";
 import { getProviderDefinition, isValidDnsDuration } from "../dns/providers";
 import {
   ACMEDNS_PROVIDER,
@@ -699,6 +701,33 @@ function validateDefaultResponse(value: Record<string, unknown>): void {
   normalizeDefaultResponseSettings(value);
 }
 
+/** A kind or field left out is saved as shipped: a PUT replaces the whole row. */
+function validateHostDefaults(value: Record<string, unknown>): void {
+  onlyKeys(value, ["proxyHost", "l4ProxyHost"], "host defaults");
+  for (const kind of ["proxyHost", "l4ProxyHost"] as const) {
+    if (value[kind] === undefined) continue;
+    const fields = record(value[kind], kind);
+    onlyKeys(fields, Object.keys(DEFAULT_HOST_DEFAULTS[kind]), kind);
+    for (const [key, shipped] of Object.entries(DEFAULT_HOST_DEFAULTS[kind])) {
+      if (typeof shipped === "boolean") optionalBoolean(fields, key, kind);
+    }
+  }
+  if (value.proxyHost !== undefined) {
+    optionalOneOf(
+      record(value.proxyHost, "proxyHost").compression,
+      HOST_COMPRESSION_MODES,
+      "proxyHost.compression",
+    );
+  }
+  if (value.l4ProxyHost !== undefined) {
+    optionalOneOf(
+      record(value.l4ProxyHost, "l4ProxyHost").protocol,
+      ["tcp", "udp"],
+      "l4ProxyHost.protocol",
+    );
+  }
+}
+
 /** The GET shape round-trips: `hasPassword` and `hasApiKey` are accepted and ignored. */
 /** `{ mode, graceDays }`, or the older `{ requireForAdmins }` API clients still send. */
 function validateTwoFactorPolicy(value: Record<string, unknown>): void {
@@ -897,6 +926,9 @@ export function validateSettingsGroup(
       break;
     case "two-factor":
       validateTwoFactorPolicy(value);
+      break;
+    case "host-defaults":
+      validateHostDefaults(value);
       break;
     case "http-cache":
       validateHttpCache(value);

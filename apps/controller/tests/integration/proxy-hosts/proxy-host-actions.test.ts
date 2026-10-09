@@ -37,6 +37,7 @@ const {
   toggleProxyHostAction,
   updateProxyHostAction,
 } = await import('../../../src/app/(dashboard)/proxy-hosts/actions');
+const { setHostWafEnabledAction } = await import('../../../src/app/(dashboard)/waf/actions');
 
 vi.mocked(auth).mockImplementation(async () => {
   if (sessionUserId === null) return null;
@@ -646,6 +647,52 @@ describe('toggleProxyHostAction', () => {
     sessionUserId = users.operator;
     expect((await toggleProxyHostAction(host.id, false)).status).toBe('error');
     expect((await getProxyHost(host.id))?.enabled).toBe(true);
+  });
+});
+
+describe('setHostWafEnabledAction', () => {
+  /** A host with its own WAF tuning, as the editor would have saved it. */
+  async function tunedHost(waf: Record<string, unknown>) {
+    const host = await seedHost();
+    const meta = JSON.parse(host.meta ?? '{}');
+    await db
+      .update(schema.proxyHosts)
+      .set({ meta: JSON.stringify({ ...meta, waf }) })
+      .where(eq(schema.proxyHosts.id, host.id));
+    return host;
+  }
+
+  it('switches the WAF off and on, keeping the host tuning', async () => {
+    const host = await tunedHost({ enabled: true, waf_mode: 'merge', excluded_rule_ids: [942100] });
+
+    expect((await setHostWafEnabledAction(host.id, false)).status).toBe('success');
+    expect((await getProxyHost(host.id))?.waf).toMatchObject({
+      enabled: false,
+      excluded_rule_ids: [942100],
+    });
+
+    expect((await setHostWafEnabledAction(host.id, true)).status).toBe('success');
+    expect((await getProxyHost(host.id))?.waf).toMatchObject({
+      enabled: true,
+      excluded_rule_ids: [942100],
+    });
+    expect((await auditCalls()).map((event) => event.action)).toEqual(['update', 'update']);
+  });
+
+  it('drops an explicit Off mode when switching on, or nothing would run', async () => {
+    const host = await tunedHost({ enabled: false, mode: 'Off' });
+    await setHostWafEnabledAction(host.id, true);
+    const waf = (await getProxyHost(host.id))?.waf;
+    expect(waf?.enabled).toBe(true);
+    expect(waf?.mode).toBeUndefined();
+  });
+
+  it('refuses an operator without a manage grant', async () => {
+    const host = await tunedHost({ enabled: true });
+    await grant(host.id, 'view');
+    sessionUserId = users.operator;
+    expect((await setHostWafEnabledAction(host.id, false)).status).toBe('error');
+    expect((await getProxyHost(host.id))?.waf?.enabled).toBe(true);
   });
 });
 

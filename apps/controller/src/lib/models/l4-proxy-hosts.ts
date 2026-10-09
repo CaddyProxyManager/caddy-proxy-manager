@@ -7,7 +7,8 @@ import {
   splitL4UpstreamHost,
 } from "../caddy/utils";
 import { applyCaddyConfig } from "../caddy";
-import { getMetricsSettings } from "../settings";
+import { getHostDefaults, getMetricsSettings } from "../settings";
+import { applyL4ProxyHostDefaults } from "../proxy-hosts/host-defaults";
 import {
   type HostWriteOptions,
   auditedRevision,
@@ -728,9 +729,10 @@ type L4ProxyHostInsert = typeof l4ProxyHosts.$inferInsert;
 
 /** Every check a create runs, and the row it would insert; nothing is written. */
 async function prepareL4ProxyHostCreate(
-  input: L4ProxyHostInput,
+  body: L4ProxyHostInput,
   actorUserId: number,
 ): Promise<Omit<L4ProxyHostInsert, "createdAt" | "updatedAt">> {
+  const input = applyL4ProxyHostDefaults(body, (await getHostDefaults()).l4ProxyHost);
   validateL4Input(input, true);
   validateL4Upstreams(
     input.upstreams,

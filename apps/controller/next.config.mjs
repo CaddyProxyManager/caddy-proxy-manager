@@ -9,6 +9,24 @@ const nextConfig = {
   },
   output: "standalone",
   poweredByHeader: false,
+  // A page's tab is a path segment (useTabRoute). Rewritten to the page itself rather than a
+  // route of its own: a server action refreshes the tree of the route it was posted to, and a
+  // second route there remounts the page, dropping an open dialog and a form's result.
+  async rewrites() {
+    const tabs = {
+      waf: ["events", "exclusions", "hosts", "presets", "plugins", "settings"],
+      alerts: ["rules", "channels", "history", "digests"],
+      certificates: ["acme", "imported", "ca", "roles"],
+      approvals: ["requests", "policy"],
+    };
+    // Before the file system, or the [tab] route beside each page would answer first.
+    return {
+      beforeFiles: Object.entries(tabs).map(([page, names]) => ({
+        source: `/${page}/:tab(${names.join("|")})`,
+        destination: `/${page}`,
+      })),
+    };
+  },
   // Metadata in <head> for every request: otherwise vinext streams it into a hidden <div> where
   // `<title>` is text getByText matches. Each generateMetadata is a catalog lookup, so it is free.
   htmlLimitedBots: /.*/,

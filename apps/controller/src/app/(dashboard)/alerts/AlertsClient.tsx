@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useState } from "react";
+import { useTabRoute } from "@/components/ui/useTabRoute";
 import { useTranslations } from "next-intl";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
@@ -24,7 +25,7 @@ export default function AlertsClient({ initial }: { initial: AlertsOverview }) {
   const t = useTranslations("alerts");
   const tNav = useTranslations("nav");
   const [overview, setOverview] = useState(initial);
-  const [tab, setTab] = useState<TabId>("rules");
+  const [tab, setTab] = useTabRoute("/alerts", TABS, "rules");
   const reload = useCallback(() => {
     loadAlertsOverviewAction()
       .then(unwrap)

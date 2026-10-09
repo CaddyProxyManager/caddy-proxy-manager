@@ -139,7 +139,7 @@ export default function AuditLogClient({
     {
       id: "created_at",
       label: tCommon("time"),
-      width: 180,
+      width: 200,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
           <Timestamp value={r.createdAt} />

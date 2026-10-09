@@ -143,6 +143,10 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
       wafMode: config.wafMode ?? 'override',
       wafCustomDirectives: config.wafCustomDirectives ?? '',
     });
+  } else {
+    // The dialog now starts with the WAF on while the global one is; a host that asked for none
+    // opts out, as it did when the dialog started off.
+    Object.assign(extraFields, { wafPresent: 'on', wafEnabled: '' });
   }
 
   await injectFormFields(page, extraFields);

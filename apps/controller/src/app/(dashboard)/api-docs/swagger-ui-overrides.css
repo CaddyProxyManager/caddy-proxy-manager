@@ -1,10 +1,123 @@
-.dark .swagger-ui {
-  filter: invert(88%) hue-rotate(180deg);
+/* Off pure white in dark mode: white on black smears while scrolling (the phone palette does the same). */
+.swagger-ui {
+  --cpm-swagger-ink: light-dark(var(--color-text-primary), #ebebeb);
 }
 
-.dark .swagger-ui .highlight-code,
-.dark .swagger-ui pre {
-  filter: invert(100%) hue-rotate(180deg);
+/* Swagger UI hard-codes #3b4151 and Open Sans; point both at the app's tokens so it follows the
+   theme, light or dark, instead of inverting the whole panel. */
+.swagger-ui,
+.swagger-ui .info .title,
+.swagger-ui .info li,
+.swagger-ui .info p,
+.swagger-ui .info table,
+.swagger-ui .info a,
+.swagger-ui .opblock-tag,
+.swagger-ui .opblock-tag small,
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock .opblock-section-header h4,
+.swagger-ui .opblock .opblock-section-header label,
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui .opblock-external-docs-wrapper p,
+.swagger-ui .opblock-title_normal p,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__in,
+.swagger-ui .parameter__deprecated,
+.swagger-ui .response-col_status,
+.swagger-ui .response-col_description,
+.swagger-ui .response-col_links,
+.swagger-ui .responses-inner h4,
+.swagger-ui .responses-inner h5,
+.swagger-ui .tab li,
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th,
+.swagger-ui table tbody tr td,
+.swagger-ui .model,
+.swagger-ui .model-title,
+.swagger-ui .model-box,
+.swagger-ui section.models h4,
+.swagger-ui section.models h5,
+.swagger-ui .prop-type,
+.swagger-ui .prop-format,
+.swagger-ui .markdown p,
+.swagger-ui .markdown li,
+.swagger-ui .renderedMarkdown p,
+.swagger-ui .renderedMarkdown li,
+.swagger-ui .scheme-container .schemes > label,
+.swagger-ui .servers > label,
+.swagger-ui label,
+.swagger-ui .btn,
+.swagger-ui select,
+.swagger-ui input[type="text"],
+.swagger-ui input[type="password"],
+.swagger-ui input[type="search"],
+.swagger-ui input[type="email"],
+.swagger-ui textarea,
+.swagger-ui .dialog-ux .modal-ux-header h3,
+.swagger-ui .dialog-ux .modal-ux-content h4,
+.swagger-ui .dialog-ux .modal-ux-content p {
+  color: var(--cpm-swagger-ink);
+  font-family: inherit;
+}
+
+.swagger-ui .opblock-tag small,
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__in,
+.swagger-ui .prop-type,
+.swagger-ui .prop-format {
+  color: var(--color-text-secondary);
+}
+
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-path__deprecated,
+.swagger-ui .opblock .opblock-summary-path a,
+.swagger-ui .opblock .opblock-summary-path span {
+  color: var(--cpm-swagger-ink);
+}
+
+.swagger-ui .opblock-summary-path,
+.swagger-ui .opblock-summary-path__deprecated,
+.swagger-ui .parameter__name.required::after {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.swagger-ui .scheme-container,
+.swagger-ui .dialog-ux .modal-ux {
+  background: var(--color-background-card);
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+}
+
+.swagger-ui .opblock-tag,
+.swagger-ui .opblock .opblock-section-header,
+.swagger-ui section.models,
+.swagger-ui section.models .model-container,
+.swagger-ui table tbody tr td {
+  border-color: var(--color-border);
+}
+
+.swagger-ui .opblock .opblock-section-header,
+.swagger-ui .model-box,
+.swagger-ui section.models .model-container {
+  background: transparent;
+}
+
+.swagger-ui select,
+.swagger-ui input[type="text"],
+.swagger-ui input[type="password"],
+.swagger-ui input[type="search"],
+.swagger-ui input[type="email"],
+.swagger-ui textarea {
+  background: var(--color-background-card);
+  border-color: var(--color-border);
+}
+
+.swagger-ui svg:not(:root),
+.swagger-ui .expand-methods svg,
+.swagger-ui .expand-operation svg,
+.swagger-ui .model-toggle::after {
+  fill: var(--color-text-secondary);
 }
 
 .swagger-ui .topbar {
@@ -13,4 +126,16 @@
 
 .swagger-ui .information-container {
   padding: 1rem 0;
+}
+
+.swagger-ui .opblock .opblock-summary-method,
+.swagger-ui .opblock-summary .opblock-summary-method,
+.swagger-ui .info .title span.version,
+.swagger-ui .info .title small pre.version,
+.swagger-ui .info .title small .version,
+.swagger-ui .version,
+.swagger-ui .info .title span.version-stamp,
+.swagger-ui .btn.authorize span,
+.swagger-ui .btn.execute {
+  color: var(--cpm-swagger-ink);
 }

@@ -96,7 +96,10 @@ type DataTableProps<T> = {
   /** The empty state heading sits under the page h1 unless the table is in a titled section. */
   emptyHeadingLevel?: 2 | 3 | 4;
   loading?: boolean;
-  /** Renders a trailing "open" control on each row, rather than a bare row click. */
+  /**
+   * Opens a row's detail. The trailing "open" control is the keyboard's way in; a click anywhere
+   * else on the row does the same.
+   */
   onRowClick?: (row: T) => void;
   /**
    * A click on the row's background opens this page. Give the row a link of its own too (its
@@ -113,7 +116,7 @@ type DataTableProps<T> = {
   mobileCard?: (row: T) => ReactNode;
   /** Detail panel below an expanded row; adds the chevron column. The open set is owned here. */
   expandedRow?: (row: T) => ReactNode;
-  /** With expandedRow: a click anywhere on the row toggles it, not only the chevron. */
+  /** With expandedRow: a click anywhere on the row toggles it, not only the chevron. Default on. */
   expandOnRowClick?: boolean;
   /** Adds the checkbox column. Desktop only: the phone cards have no selection. */
   selection?: RowSelection<T>;
@@ -226,7 +229,7 @@ export function DataTable<T>({
   sort,
   mobileCard,
   expandedRow,
-  expandOnRowClick = false,
+  expandOnRowClick = true,
   selection,
 }: DataTableProps<T>) {
   const t = useTranslations("ui");
@@ -271,8 +274,10 @@ export function DataTable<T>({
           col.key === EXPANSION_COLUMN ? { ...col, width: EXPANSION_COLUMN_WIDTH } : col,
         ),
       transformBodyCell: (props, column, ...rest) => {
+        // Its right-click "expand" menu moves a cell's padding onto a wrapper Astryx pads less than
+        // our 16px, skewing every column off its header; the chevron and a row click remain.
+        if (column.key !== EXPANSION_COLUMN) return props;
         const next = astryxExpansion.transformBodyCell?.(props, column, ...rest) ?? props;
-        if (column.key !== EXPANSION_COLUMN) return next;
         return {
           ...next,
           htmlProps: { ...next.htmlProps, style: { ...next.htmlProps.style, paddingInline: 0 } },
@@ -301,7 +306,7 @@ export function DataTable<T>({
   const rowLinkPlugin = useMemo(
     (): TablePlugin<TableRow> => ({
       transformBodyRow: (props, row) => {
-        if (!rowHref) return props;
+        if (!rowHref && !onRowClick) return props;
         return {
           ...props,
           htmlProps: {
@@ -312,13 +317,14 @@ export function DataTable<T>({
               if (isInteractiveTarget(event)) return;
               // Selecting text in a cell is not a request to leave the page.
               if (window.getSelection()?.toString()) return;
-              router.push(rowHref(row as T));
+              if (rowHref) router.push(rowHref(row as T));
+              else onRowClick?.(row as T);
             },
           },
         };
       },
     }),
-    [rowHref, router],
+    [rowHref, onRowClick, router],
   );
 
   // Hooks run unconditionally; without a `selection` prop the fallback set is simply never shown.
@@ -339,7 +345,7 @@ export function DataTable<T>({
     ...(selection ? { selection: selectionPlugin } : {}),
     ...(rowStatus ? { rowStatus: statusPlugin } : {}),
     ...(expandedRow ? { expansion: expansionPlugin } : {}),
-    ...(rowHref && !expandedRow ? { rowLink: rowLinkPlugin } : {}),
+    ...((rowHref || onRowClick) && !expandedRow ? { rowLink: rowLinkPlugin } : {}),
   };
 
   const tableColumns: TableColumn<TableRow>[] = columns.map((col) => ({

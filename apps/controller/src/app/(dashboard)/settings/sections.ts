@@ -17,6 +17,7 @@ import {
   Server,
   Settings2,
   ShieldBan,
+  SlidersHorizontal,
   Unplug,
   UserCheck,
   Waypoints,
@@ -119,6 +120,16 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             id: "error-pages",
             name: "Error pages",
           },
+        ],
+      },
+      {
+        id: "host-defaults",
+        name: "Host defaults",
+        desc: "What a new proxy host or L4 host starts with",
+        icon: SlidersHorizontal,
+        blocks: [
+          { id: "host-defaults", name: "New proxy hosts" },
+          { id: "l4-host-defaults", name: "New L4 proxy hosts" },
         ],
       },
       {
@@ -507,6 +518,7 @@ export const SETTINGS_HUES: Record<string, Hue> = {
   dns: "cyan",
   network: "green",
   authentication: "yellow",
+  "host-defaults": "green",
   "forward-auth": "purple",
   geo: "teal",
   "rate-limit": "orange",

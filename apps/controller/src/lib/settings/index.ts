@@ -44,6 +44,12 @@ import {
 } from "../proxy-hosts/rate-limit-global";
 import { type CompressionSettings, normalizeCompressionSettings } from "../proxy-hosts/compression";
 import {
+  type HostDefaults,
+  normalizeHostDefaults,
+  sanitizeHostDefaults,
+  wafOnByDefault,
+} from "../proxy-hosts/host-defaults";
+import {
   assertCrowdSecComplete,
   type CrowdSecSettings,
   DEFAULT_CROWDSEC_SETTINGS,
@@ -55,6 +61,7 @@ import {
 export type { DefaultResponseSettings } from "../caddy/default-response";
 export type { TailscaleSettings } from "../caddy/tailscale";
 export type { CompressionSettings } from "../proxy-hosts/compression";
+export type { HostDefaults } from "../proxy-hosts/host-defaults";
 export type { CrowdSecSettings } from "../caddy/crowdsec";
 
 export type SettingValue<T> = T | null;
@@ -398,6 +405,17 @@ export async function getCompressionSettings(): Promise<CompressionSettings> {
 
 export async function saveCompressionSettings(settings: unknown): Promise<void> {
   await setSetting("compression", normalizeCompressionSettings(settings));
+}
+
+/** Never null: an unset row reads as the values new hosts got before this was a setting. */
+export async function getHostDefaults(): Promise<HostDefaults> {
+  const [stored, waf] = await Promise.all([getSetting<unknown>("host_defaults"), getWafSettings()]);
+  const defaults = sanitizeHostDefaults(stored);
+  return { ...defaults, proxyHost: { ...defaults.proxyHost, wafEnabled: wafOnByDefault(waf) } };
+}
+
+export async function saveHostDefaults(settings: unknown): Promise<void> {
+  await setSetting("host_defaults", normalizeHostDefaults(settings));
 }
 
 /** The key stays encrypted, as Tailscale's does; config generation decrypts it. */

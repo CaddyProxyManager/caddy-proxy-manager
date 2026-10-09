@@ -18,6 +18,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import type { L4AccessListOption } from "@/src/lib/models/access-lists";
+import type { L4ProxyHostDefaults } from "@/src/lib/proxy-hosts/host-defaults";
 import { toggleL4ProxyHostAction } from "./actions";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
@@ -57,6 +58,8 @@ type Props = {
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
+  /** What a new host's form starts with. */
+  hostDefaults?: L4ProxyHostDefaults | null;
   /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
@@ -179,6 +182,7 @@ export default function L4ProxyHostsClient({
   initialSort,
   agents,
   accessLists = [],
+  hostDefaults = null,
   agentAssignments,
   canCreate = true,
   manageableIds = [],
@@ -516,6 +520,7 @@ export default function L4ProxyHostsClient({
           router.refresh();
         }}
         initialData={duplicateHost}
+        defaults={hostDefaults}
         agents={agents ?? []}
         accessLists={accessLists}
       />

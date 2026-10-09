@@ -59,6 +59,8 @@ import {
   saveTailscaleSettings,
   getCrowdSecSettings,
   saveCrowdSecSettings,
+  getHostDefaults,
+  saveHostDefaults,
   defaultTailscaleSettings,
   getSetting,
   setSetting,
@@ -206,6 +208,13 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     storageKey: "http_cache",
     applyCaddy: true,
     redact: (value: HttpCacheSettings) => redactHttpCacheSettings(value),
+  },
+  "host-defaults": {
+    get: getHostDefaults,
+    save: saveHostDefaults as (data: never) => Promise<void>,
+    storageKey: "host_defaults",
+    // Read only when a host is created; nothing in the config follows it.
+    applyCaddy: false,
   },
   "two-factor": {
     get: getTwoFactorPolicySettings,

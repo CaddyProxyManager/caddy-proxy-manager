@@ -49,10 +49,13 @@ test.describe('Branding - custom favicon', () => {
     await removeIfPresent(page);
   });
 
-  test('serves 404 until one is uploaded, without redirecting to login', async ({ page }) => {
+  test('serves the default logo until one is uploaded, without redirecting to login', async ({
+    page,
+  }) => {
     // Public: login, portal and setup declare the icon before there is a session.
     const response = await page.request.get(FAVICON_URL);
-    expect(response.status()).toBe(404);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toBe('image/svg+xml');
   });
 
   test('every page declares the icon, signed in or not', async ({ page }) => {
@@ -72,7 +75,7 @@ test.describe('Branding - custom favicon', () => {
     expect(response.headers().etag).toMatch(/^"[0-9a-f]{32}"$/);
   });
 
-  test('removing it goes back to 404', async ({ page }) => {
+  test('removing it goes back to the default logo', async ({ page }) => {
     await goToBranding(page);
     await uploadPng(page);
     expect((await page.request.get(FAVICON_URL)).status()).toBe(200);
@@ -80,7 +83,7 @@ test.describe('Branding - custom favicon', () => {
     await page.getByRole('button', { name: /^Remove .*favicon/i }).click();
     await expect(page.getByText('is removed when you save')).toBeVisible();
     await saveAndApply(page);
-    expect((await page.request.get(FAVICON_URL)).status()).toBe(404);
+    expect((await page.request.get(FAVICON_URL)).headers()['content-type']).toBe('image/svg+xml');
   });
 
   test('a file that only claims to be an image is refused', async ({ page }) => {
@@ -94,6 +97,8 @@ test.describe('Branding - custom favicon', () => {
     await savePage(page);
 
     await expect(page.getByText(/does not look like an image/i)).toBeVisible({ timeout: 15_000 });
-    expect((await page.request.get(FAVICON_URL)).status()).toBe(404);
+    const served = await page.request.get(FAVICON_URL);
+    expect(served.headers()['content-type']).toBe('image/svg+xml');
+    expect(await served.text()).not.toContain('alert(');
   });
 });

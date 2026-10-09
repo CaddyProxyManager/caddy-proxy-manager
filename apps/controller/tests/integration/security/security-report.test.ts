@@ -264,6 +264,34 @@ describe('security report', () => {
       }),
     ]);
   });
+
+  it('lists the dashboard host first while it is enabled, with its own WAF', async () => {
+    await setSetting('dashboard', {
+      enabled: true,
+      domain: 'cpm.example.com',
+      tls: true,
+      options: {
+        certificateId: null,
+        accessListId: null,
+        hstsSubdomains: false,
+        skipHttpsHostnameValidation: false,
+        agentIds: [],
+        meta: JSON.stringify({ waf: { enabled: false } }),
+      },
+    });
+    try {
+      const [dashboard, ...rest] = await getWafHostModes(NOW);
+      expect(dashboard).toMatchObject({
+        dashboard: true,
+        domains: ['cpm.example.com'],
+        mode: 'Off',
+        source: 'hostOff',
+      });
+      expect(rest.map((mode) => mode.id)).toEqual([hostId]);
+    } finally {
+      await setSetting('dashboard', null);
+    }
+  });
 });
 
 describe('WAF event detail', () => {
@@ -271,6 +299,12 @@ describe('WAF event detail', () => {
     const { events } = await report('range=1h&f=rule:is:942100');
     return events.items[0]?.key as string;
   }
+
+  it("carries the blocked request's user agent from the access log", async () => {
+    const detail = await getWafEventDetail(await sqliKey());
+    // Matched on address, host and path: the WAF's copy of the query string is redacted.
+    expect(detail.userAgent).toBe('curl/8.0');
+  });
 
   it('explains the score and suggests the narrowest exclusion', async () => {
     const detail = await getWafEventDetail(await sqliKey());

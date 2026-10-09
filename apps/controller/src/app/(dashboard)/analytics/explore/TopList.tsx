@@ -107,7 +107,8 @@ export function TopListTable({
     {
       key: "key",
       header: t(`topColumn.${TOP_TITLE_KEY[dimension]}`),
-      width: proportional(1),
+      // A full eight-group IPv6 address; a narrower card scrolls rather than cutting it.
+      width: proportional(1, { minWidth: dimension === "ip" ? 340 : 0 }),
       renderCell: (row) => {
         const text = (
           <Tooltip content={label(row)}>

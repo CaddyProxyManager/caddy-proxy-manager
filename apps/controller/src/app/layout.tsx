@@ -31,8 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${appName}`,
     },
     description: t("metaDescription"),
-    // Unconditional: a database read here would run on every request. The route 404s with no
-    // upload, which the browser treats like a missing /favicon.ico.
+    // Unconditional: a database read here would run on every request. The route answers with the
+    // default logo when nothing is uploaded.
     icons: { icon: "/api/branding/favicon" },
   };
 }

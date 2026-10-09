@@ -128,7 +128,20 @@ function busyness(date: Date): number {
   return daily * weekend;
 }
 
+const IPV6_PREFIXES = ["2a02:8070", "2a01:4f8", "2600:1700", "2001:41d0", "2406:da14", "2c0f:f248"];
+
+function randomIpv6(): string {
+  const group = () => Math.floor(Math.random() * 0x10000).toString(16);
+  const prefix = pick(IPV6_PREFIXES);
+  // Privacy addresses fill all eight groups, the widest an address gets; servers sit at ::n.
+  return Math.random() < 0.7
+    ? `${prefix}:${group()}:${group()}:${group()}:${group()}:${group()}:${group()}`
+    : `${prefix}:${group()}::${group()}`;
+}
+
+/** About a third IPv6, so the tables are seen with the widest addresses they hold. */
 function randomIp(): string {
+  if (Math.random() < 0.35) return randomIpv6();
   const octet = () => Math.floor(Math.random() * 254) + 1;
   return `${Math.floor(Math.random() * 180) + 20}.${octet()}.${octet()}.${octet()}`;
 }

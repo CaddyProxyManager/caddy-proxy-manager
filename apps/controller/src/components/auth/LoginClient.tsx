@@ -33,7 +33,7 @@ import {
   NO_SPELLCHECK,
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth/client";
-import { formatAppVersion } from "@/src/lib/runtime/app-version";
+import { APP_VERSION, appVersionLabel, PRODUCT_NAME } from "@/src/lib/runtime/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import {
   SSO_REQUIRED,
@@ -68,7 +68,7 @@ interface LoginClientProps {
 export default function LoginClient({
   enabledProviders = [],
   localLoginEnabled = true,
-  appName = "Caddy Proxy Manager",
+  appName = PRODUCT_NAME,
   initialError = null,
   captcha = null,
   cspNonce,
@@ -414,7 +414,7 @@ export default function LoginClient({
 
           <VStack hAlign="center">
             <Text type="body" size="sm" color="secondary">
-              {formatAppVersion()}
+              {appVersionLabel(appName, tCommon("versionNumber", { version: APP_VERSION }))}
             </Text>
           </VStack>
         </VStack>

@@ -39,6 +39,39 @@ export async function queryWafEventsAt(ts: number): Promise<(WafEvent & { relaye
   }));
 }
 
+/**
+ * The user agent of the request a WAF event blocked. The WAF record has none; the access log
+ * keeps one per request, so it is matched on the second either side, address and host, then on
+ * the path (the WAF's copy of the query string is redacted, the log's is not). Null when that
+ * request was not logged (access logging off, or relayed late).
+ */
+export async function queryUserAgentOfWafEvent(event: {
+  ts: number;
+  clientIp: string;
+  host: string;
+  uri: string;
+}): Promise<string | null> {
+  const rows = await queryRows<{ ts: unknown; uri: string; user_agent: string }>(
+    `SELECT toUInt32(ts) AS ts, uri, user_agent FROM traffic_events
+     WHERE ${timeFilter()} AND client_ip = {p_ip:String} AND host IN ({p_host:String}, {p_bare:String})
+       AND user_agent != '' LIMIT 50`,
+    {
+      ...timeParams(event.ts - 2, event.ts + 2),
+      p_ip: event.clientIp,
+      p_host: event.host,
+      // The WAF names the host as the request did, port and all; the access log may not.
+      p_bare: event.host.replace(/:\d+$/, ""),
+    },
+  );
+  const path = (uri: string) => uri.split("?")[0];
+  const nearest = (candidates: typeof rows) =>
+    candidates.sort((a, b) => Math.abs(num(a.ts) - event.ts) - Math.abs(num(b.ts) - event.ts))[0];
+  const match =
+    nearest(rows.filter((row) => row.uri === event.uri)) ??
+    nearest(rows.filter((row) => path(row.uri) === path(event.uri)));
+  return match?.user_agent || null;
+}
+
 export async function queryWafEventPage(
   window: TimeWindow,
   filters: readonly AnalyticsFilter[],

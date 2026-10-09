@@ -19,6 +19,7 @@ import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
+import type { ProxyHostDefaults } from "@/lib/proxy-hosts/host-defaults";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AuthentikFields } from "./forward-auth/AuthentikFields";
 import { ForwardAuthFields } from "./forward-auth/ForwardAuthFields";
@@ -92,6 +93,7 @@ export function CreateHostDialog({
   authentikDefaults,
   forwardAuthDefaults,
   defaultDomain,
+  hostDefaults,
   initialData,
   caCertificates = [],
   mtlsRoles = [],
@@ -110,6 +112,8 @@ export function CreateHostDialog({
   tailscaleDefaults?: TailscaleHostDefaults | null;
   /** Prefilled for a new host only; a duplicate starts with none, as two hosts cannot share one. */
   defaultDomain?: string;
+  /** Settings' host defaults, for a new host only: a duplicate keeps its source's values. */
+  hostDefaults?: ProxyHostDefaults | null;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];
   mtlsRoles?: MtlsRole[];
@@ -134,6 +138,7 @@ export function CreateHostDialog({
     String(initialData?.certificateId ?? NONE_VALUE),
   );
   const [accessListId, setAccessListId] = useState(String(initialData?.accessListId ?? NONE_VALUE));
+  const preset = initialData ? null : hostDefaults;
 
   useCloseOnSuccess(state, onClose);
   const anchor = (section: EditorSection) => `create-${editorSectionAnchor(section)}`;
@@ -183,14 +188,16 @@ export function CreateHostDialog({
             <UpstreamInput defaultUpstreams={initialData?.upstreams} />
             <SettingsToggles
               part="options"
-              sslForced={initialData?.sslForced}
-              hstsEnabled={initialData?.hstsEnabled}
-              hstsSubdomains={initialData?.hstsSubdomains}
-              allowWebsocket={initialData?.allowWebsocket}
-              preserveHostHeader={initialData?.preserveHostHeader}
-              skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
-              compression={initialData?.compression}
-              discourageIndexing={initialData?.discourageIndexing}
+              sslForced={initialData?.sslForced ?? preset?.sslForced}
+              hstsEnabled={initialData?.hstsEnabled ?? preset?.hstsEnabled}
+              hstsSubdomains={initialData?.hstsSubdomains ?? preset?.hstsSubdomains}
+              allowWebsocket={initialData?.allowWebsocket ?? preset?.allowWebsocket}
+              preserveHostHeader={initialData?.preserveHostHeader ?? preset?.preserveHostHeader}
+              skipHttpsValidation={
+                initialData?.skipHttpsHostnameValidation ?? preset?.skipHttpsValidation
+              }
+              compression={initialData?.compression ?? preset?.compression}
+              discourageIndexing={initialData?.discourageIndexing ?? preset?.discourageIndexing}
             />
             <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
             <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
@@ -238,9 +245,9 @@ export function CreateHostDialog({
           <VStack gap={5} id={anchor("protection")}>
             <RateLimitFields rateLimit={initialData?.rateLimit} />
             <GeoBlockFields />
-            <CrowdSecFields enabled={initialData?.crowdsec} />
+            <CrowdSecFields enabled={initialData?.crowdsec ?? preset?.crowdsecEnabled} />
             <AnubisFields anubis={initialData?.anubis} />
-            <WafFields value={initialData?.waf} />
+            <WafFields value={preset?.wafEnabled ? { enabled: true } : initialData?.waf} />
           </VStack>
           <VStack gap={5} id={anchor("routing")}>
             <RedirectsFields initialData={initialData?.redirects} />

@@ -1,7 +1,7 @@
 "use server";
 
 import { unstable_rethrow } from "next/navigation";
-import { requireCan } from "@/src/lib/users/permissions";
+import { assertCanManage, requireCan, requireReach } from "@/src/lib/users/permissions";
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
 import {
@@ -11,6 +11,8 @@ import {
   type ActionState,
 } from "@/src/lib/errors/action-error";
 import type { WafExclusionInput } from "@/src/lib/models/waf-exclusions";
+import { getProxyHost } from "@/src/lib/models/proxy-hosts";
+import { wafWithEnabled } from "@/src/lib/security/waf-hosts";
 import { submitOrApply } from "@/src/lib/approvals";
 import { ChangeSubmitted } from "@/src/lib/approvals/submitted";
 import {
@@ -52,7 +54,8 @@ type FallbackKey =
   | "exclusionSaveFailed"
   | "exclusionDeleteFailed"
   | "eventDetailFailed"
-  | "reviewFailed";
+  | "reviewFailed"
+  | "hostWafFailed";
 
 async function failure(error: unknown, fallbackKey: FallbackKey) {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
@@ -61,6 +64,28 @@ async function failure(error: unknown, fallbackKey: FallbackKey) {
     status: error instanceof ChangeSubmitted ? "success" : "error",
     message: extractErrorMessage(t, error, t(`waf.${fallbackKey}`), format),
   } satisfies ActionState;
+}
+
+/** The Hosts tab's switch for a proxy host; the dashboard host's is a settings action. */
+export async function setHostWafEnabledAction(id: number, enabled: boolean): Promise<ActionState> {
+  try {
+    const access = await requireReach("hosts:write");
+    assertCanManage(access, "proxyHost", id);
+    const host = await getProxyHost(id);
+    if (!host) throw new Error("Proxy host not found");
+    const waf = wafWithEnabled(host.waf, enabled);
+    await submitOrApply(
+      { userId: access.userId },
+      { kind: "proxyHostUpdate", payload: { id, input: { waf } } },
+    );
+    revalidatePath("/waf");
+    revalidatePath("/proxy-hosts");
+    const t = await getTranslations("waf");
+    return actionSuccess(t(enabled ? "hostWafOnResult" : "hostWafOffResult", { name: host.name }));
+  } catch (error) {
+    unstable_rethrow(error);
+    return failure(error, "hostWafFailed");
+  }
 }
 
 /** Creates when the form carries no id, updates otherwise. */

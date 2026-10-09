@@ -39,6 +39,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 import { UrlPowerSearch, type UrlSearchField } from "@/components/ui/UrlPowerSearch";
+import { useTabRoute } from "@/components/ui/useTabRoute";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import {
   bytesToMib,
@@ -92,6 +93,9 @@ type Props = {
   globalWafEnabled: boolean;
   hosts: HostOption[];
   hostModes: WafHostMode[];
+  /** Hosts whose WAF switch this user may flip. */
+  manageableHostIds: number[];
+  canEditDashboard: boolean;
   globalWaf: WafSettings | null;
   presets: WafPresetRow[];
   plugins: WafPluginRow[];
@@ -101,14 +105,7 @@ type Props = {
 
 type RangeOption = Props["initialRange"];
 
-const WAF_TABS: readonly string[] = [
-  "events",
-  "exclusions",
-  "hosts",
-  "presets",
-  "plugins",
-  "settings",
-];
+const WAF_TABS = ["events", "exclusions", "hosts", "presets", "plugins", "settings"] as const;
 
 const MODE_HELP_KEY = {
   Off: "globalModeHelpOff",
@@ -783,6 +780,8 @@ export default function WafEventsClient({
   globalWafEnabled,
   hosts,
   hostModes,
+  manageableHostIds,
+  canEditDashboard,
   globalWaf,
   presets,
   plugins,
@@ -800,10 +799,7 @@ export default function WafEventsClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // ?tab= opens one directly, as settings search does for the tuning and per-host tabs.
-  const [tab, setTab] = useState(() => {
-    const requested = searchParams.get("tab");
-    return requested && WAF_TABS.includes(requested) ? requested : "events";
-  });
+  const [tab, setTab] = useTabRoute("/waf", WAF_TABS, "events");
   const [range, setRange] = useState<RangeOption>(initialRange);
   const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
   const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));
@@ -1032,7 +1028,8 @@ export default function WafEventsClient({
     {
       id: "clientIp",
       label: tCommon("clientIp"),
-      width: 200,
+      // A full eight-group IPv6 address beside its flag.
+      width: 380,
       render: (r) => (
         <HStack gap={1} vAlign="center">
           <Text type="code" size="sm">
@@ -1071,7 +1068,7 @@ export default function WafEventsClient({
   ];
 
   const changeTab = (next: string) => {
-    setTab(next);
+    setTab(next as (typeof WAF_TABS)[number]);
     if (next !== "events") setSelected(null);
   };
 
@@ -1262,7 +1259,13 @@ export default function WafEventsClient({
         />
       )}
 
-      {tab === "hosts" && <WafHostModesPanel hosts={hostModes} />}
+      {tab === "hosts" && (
+        <WafHostModesPanel
+          hosts={hostModes}
+          manageableHostIds={manageableHostIds}
+          canEditDashboard={canEditDashboard}
+        />
+      )}
 
       {tab === "presets" && <WafPresetsPanel presets={presets} />}
 

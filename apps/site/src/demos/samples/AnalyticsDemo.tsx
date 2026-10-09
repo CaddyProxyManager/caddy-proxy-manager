@@ -104,7 +104,11 @@ function samples(seed: number, scale: number): Sample[] {
                     : 200,
         method: next() > 0.85 ? "POST" : "GET",
         proto: next() > 0.3 ? "HTTP/2.0" : "HTTP/3.0",
-        ip: `198.51.100.${Math.floor(next() * 60) + 1}`,
+        // A third over IPv6, so the request log is seen with the widest addresses.
+        ip:
+          next() > 0.66
+            ? `2001:db8:${Math.floor(next() * 0xffff).toString(16)}::${Math.floor(next() * 60) + 1}`
+            : `198.51.100.${Math.floor(next() * 60) + 1}`,
         ua: pick(["Chrome", "Chrome", "Safari", "Firefox", "curl"]),
         outcome,
         rule: null,

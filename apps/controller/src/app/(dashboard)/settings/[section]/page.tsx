@@ -33,6 +33,7 @@ import {
   getTailscaleSettings,
   defaultTailscaleSettings,
   getCrowdSecSettings,
+  getHostDefaults,
 } from "@/src/lib/settings";
 import { redactCrowdSecSettings } from "@/src/lib/caddy/crowdsec";
 import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
@@ -160,6 +161,7 @@ export default async function SettingsSectionPage({
       favicon,
       updates,
       globalRateLimit,
+      hostDefaults,
     ],
     pairedAgents,
     agentStatuses,
@@ -205,6 +207,7 @@ export default async function SettingsSectionPage({
         getFavicon(),
         getUpdateStatus(),
         getRateLimitSettings(),
+        getHostDefaults(),
       ]),
     ),
     listAgents(),
@@ -301,6 +304,7 @@ export default async function SettingsSectionPage({
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalRateLimit={globalRateLimit}
+      hostDefaults={hostDefaults}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       ldapDirectories={ldapDirectories}

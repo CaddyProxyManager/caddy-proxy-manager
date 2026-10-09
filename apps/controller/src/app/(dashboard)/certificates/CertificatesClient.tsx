@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTabRoute } from "@/components/ui/useTabRoute";
 import { Badge } from "@astryxdesign/core/Badge";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { VStack } from "@astryxdesign/core/Stack";
@@ -25,7 +26,8 @@ import { MtlsRolesTab } from "@/components/mtls-roles/MtlsRolesTab";
 import { countExpiry } from "./certificate-summary";
 import { useTranslations } from "next-intl";
 
-type TabId = "acme" | "imported" | "ca" | "roles";
+const CERTIFICATE_TABS = ["acme", "imported", "ca", "roles"] as const;
+type TabId = (typeof CERTIFICATE_TABS)[number];
 
 type Props = {
   acmeHosts: AcmeHost[];
@@ -51,7 +53,7 @@ export default function CertificatesClient({
   fileAgents,
 }: Props) {
   const t = useTranslations("certificates");
-  const [activeTab, setActiveTab] = useState<TabId>("acme");
+  const [activeTab, setActiveTab] = useTabRoute("/certificates", CERTIFICATE_TABS, "acme");
   const [searchAcme, setSearchAcme] = useState("");
   const [searchImported, setSearchImported] = useState("");
   const [searchCa, setSearchCa] = useState("");

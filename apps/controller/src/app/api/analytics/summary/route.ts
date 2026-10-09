@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser } from "@/src/lib/api/auth";
+import { analyticsErrorResponse } from "@/src/lib/analytics/api-error";
 import { getAnalyticsSummary, resolveAnalyticsRange } from "@/src/lib/analytics/db";
 
 export async function GET(req: NextRequest) {
@@ -12,6 +13,6 @@ export async function GET(req: NextRequest) {
     const data = await getAnalyticsSummary(from, to, hosts);
     return NextResponse.json(data);
   } catch (error) {
-    return apiErrorResponse(error);
+    return analyticsErrorResponse(error);
   }
 }

@@ -5,6 +5,7 @@
  * policy itself. Approvers decide, the requester may withdraw, and an administrator may bypass.
  */
 import { useState } from "react";
+import { useTabRoute } from "@/components/ui/useTabRoute";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -96,6 +97,8 @@ export function useChangeTitle() {
     });
 }
 
+const APPROVAL_TABS = ["requests", "policy"] as const;
+
 export default function ApprovalsClient({
   me,
   requests,
@@ -118,7 +121,7 @@ export default function ApprovalsClient({
 }) {
   const t = useTranslations("changeApprovals");
   const tNav = useTranslations("nav");
-  const [tab, setTab] = useState<"requests" | "policy">("requests");
+  const [tab, setTab] = useTabRoute("/approvals", APPROVAL_TABS, "requests");
 
   if (detail) return <RequestView me={me} request={detail} />;
 

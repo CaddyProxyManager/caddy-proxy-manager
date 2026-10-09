@@ -5,15 +5,17 @@
  * Shared by the overview and the host page. Item text comes from `attention.items.<code>`.
  */
 
-import { CircleCheck } from "lucide-react";
+import { Check, CircleCheck } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Button } from "@astryxdesign/core/Button";
 import { List, ListItem } from "@astryxdesign/core/List";
-import { VStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import {
+  type AttentionItem,
   type AttentionList as AttentionListData,
   type AttentionSeverity,
   attentionMessageValues,
@@ -38,9 +40,12 @@ export function AttentionList({
   list,
   /** Shown when there is nothing; omit to render nothing at all. */
   emptyTitle,
+  /** Offers to hide each item; the overview's, not the host page's. */
+  onAcknowledge,
 }: {
   list: AttentionListData;
   emptyTitle?: string;
+  onAcknowledge?: (item: AttentionItem) => void;
 }) {
   const t = useTranslations("attention");
   // For an error stored with its code, said in the reader's language rather than the English.
@@ -70,17 +75,35 @@ export function AttentionList({
             ...attentionMessageValues(item),
             ...(item.errors?.length && { error: attentionErrorText(tRoot, item.errors) }),
           };
+          const title = tItem(`items.${item.code}.title`, values);
+          const badge = (
+            <Badge variant={BADGE[item.severity]} label={t(`severity.${item.severity}`)} />
+          );
           return (
             <ListItem
               key={item.id}
-              label={tItem(`items.${item.code}.title`, values)}
+              label={title}
               description={tItem(`items.${item.code}.detail`, values)}
               href={item.href ?? undefined}
               startContent={
                 <StatusDot variant={DOT[item.severity]} label={t(`severity.${item.severity}`)} />
               }
               endContent={
-                <Badge variant={BADGE[item.severity]} label={t(`severity.${item.severity}`)} />
+                onAcknowledge ? (
+                  <HStack gap={2} vAlign="center">
+                    {badge}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Check />}
+                      label={t("acknowledge")}
+                      aria-label={t("acknowledgeItem", { title })}
+                      onClick={() => onAcknowledge(item)}
+                    />
+                  </HStack>
+                ) : (
+                  badge
+                )
               }
             />
           );

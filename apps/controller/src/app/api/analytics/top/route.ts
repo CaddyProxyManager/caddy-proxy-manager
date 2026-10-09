@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser } from "@/src/lib/api/auth";
+import { analyticsErrorResponse } from "@/src/lib/analytics/api-error";
 import { getAnalyticsTopList } from "@/src/lib/analytics/explore";
 import {
   TOP_DIMENSIONS,
@@ -22,6 +23,6 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(rows);
   } catch (error) {
-    return apiErrorResponse(error);
+    return analyticsErrorResponse(error);
   }
 }

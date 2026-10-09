@@ -586,7 +586,7 @@ function UserDetail({
 
       <Card>
         <VStack gap={3}>
-          <Heading level={3}>{t("details")}</Heading>
+          <Heading level={3}>{tCommon("details")}</Heading>
           <MetadataList>
             <MetadataListItem label={tCommon("email")}>{user.email}</MetadataListItem>
             <MetadataListItem label={t("signInUsername")}>

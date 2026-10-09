@@ -22,6 +22,8 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { PowerSearch, type PowerSearchFilter } from "@astryxdesign/core/PowerSearch";
 import { type useFormatter, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
@@ -37,6 +39,8 @@ import { NeedsAttentionCard } from "@/components/overview/NeedsAttentionCard";
 import { SetupChecklistCard } from "@/components/overview/SetupChecklistCard";
 import type { AttentionList } from "@/lib/attention/types";
 import type { SetupChecklist } from "@/lib/setup-checklist/steps";
+import { ANALYTICS_STARTING } from "@/src/lib/analytics/starting";
+import { filterServerLog, serverLogSearchConfig } from "./server-log-search";
 
 // Client only: v7's server entry is an async Server Component (see AnalyticsClient).
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -313,6 +317,9 @@ export default function OverviewClient({
 }) {
   const t = useTranslations("overview");
   const tCommon = useTranslations("common");
+  const tAnalytics = useTranslations("analytics");
+  const tAuditLog = useTranslations("auditLog");
+  const tWaf = useTranslations("waf");
   const density = useTableDensity();
   const format = useAppFormatter();
   const emptyValue = useEmptyValue();
@@ -324,6 +331,7 @@ export default function OverviewClient({
   const [payload, setPayload] = useState<OverviewPayload | null>(previewPayload ?? null);
   const [isLoading, setIsLoading] = useState(isAdmin && !previewPayload);
   const [hasFailed, setHasFailed] = useState(false);
+  const [analyticsStarting, setAnalyticsStarting] = useState(false);
 
   const metric = metricKey === null ? null : (METRICS.find((m) => m.key === metricKey) ?? null);
   const filter = metric?.filter ?? "all";
@@ -363,16 +371,25 @@ export default function OverviewClient({
     setIsLoading(true);
     const params = new URLSearchParams({ interval, filter, limit: "40" });
     fetch(`/api/analytics/overview?${params.toString()}`, { signal: abort.signal })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then(async (res) => {
+        if (res.ok) return res.json();
+        const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+        throw new Error(
+          body?.code === ANALYTICS_STARTING ? ANALYTICS_STARTING : String(res.status),
+        );
+      })
       .then((json: OverviewPayload) => {
         setPayload(json);
         setHasFailed(false);
+        setAnalyticsStarting(false);
         setIsLoading(false);
       })
       .catch((error: unknown) => {
         // Superseded, not failed: the old window stays up so the page does not flash.
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setHasFailed(true);
+        const starting = error instanceof Error && error.message === ANALYTICS_STARTING;
+        setAnalyticsStarting(starting);
+        setHasFailed(!starting);
         setIsLoading(false);
       });
     return () => abort.abort();
@@ -471,15 +488,46 @@ export default function OverviewClient({
         summary: string;
       };
 
-  const logColumns: TableColumn<LogRow>[] = useMemo(
-    () => [
+  // A log row's two lines: stacked in one column, or side by side where the screen has room.
+  const isWide = useMediaQuery("(min-width: 1440px)");
+  const logColumns: TableColumn<LogRow>[] = useMemo(() => {
+    const logHeadline = (row: LogRow) =>
+      row.kind === "traffic" ? (
+        <Text type="code" size="sm" maxLines={1}>
+          {row.method} {row.host}
+          {row.uri}
+        </Text>
+      ) : (
+        <Text type="body" size="sm" maxLines={1}>
+          {row.summary}
+        </Text>
+      );
+    const logContext = (row: LogRow) =>
+      row.kind === "traffic" ? (
+        // One line: nine columns will not fit a table that also carries audit rows.
+        <HStack gap={1} vAlign="center">
+          <Text type="body" size="sm" color="secondary" maxLines={1}>
+            {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;
+          </Text>
+          {row.countryCode && <CountryFlag code={row.countryCode} />}
+          <Text type="body" size="sm" color="secondary" maxLines={1} className="min-w-0">
+            {row.clientIp}
+          </Text>
+        </HStack>
+      ) : (
+        <Text type="body" size="sm" color="secondary" maxLines={1}>
+          {row.actor ?? t("actorSystem")} &middot; {row.entityType}
+        </Text>
+      );
+
+    return [
       {
         key: "ts",
         header: tCommon("time"),
-        // Fits a 12-hour clock with seconds, the longest locale; narrower wraps the "AM".
-        width: pixel(116),
+        // A 12-hour clock with seconds, the longest locale, on one line in the table's 14px code.
+        width: pixel(140),
         renderCell: (row) => (
-          <Text type="code" size="sm" color="secondary">
+          <Text type="code" size="sm" color="secondary" className="whitespace-nowrap">
             <Timestamp value={row.ts * 1000} style="time" />
           </Text>
         ),
@@ -502,42 +550,36 @@ export default function OverviewClient({
             <Badge variant={AUDIT_VARIANT[row.action] ?? "info"} label={row.action} />
           ),
       },
-      {
-        key: "detail",
-        header: t("logDetail"),
-        width: proportional(3),
-        renderCell: (row) =>
-          row.kind === "traffic" ? (
-            <VStack gap={0} className="cpm-cell-lines">
-              <Text type="code" size="sm" maxLines={1}>
-                {row.method} {row.host}
-                {row.uri}
-              </Text>
-              {/* One line: nine columns will not fit a table that also carries audit rows. */}
-              <HStack gap={1} vAlign="center">
-                <Text type="body" size="sm" color="secondary" maxLines={1}>
-                  {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;
-                </Text>
-                {row.countryCode && <CountryFlag code={row.countryCode} />}
-                <Text type="body" size="sm" color="secondary" maxLines={1} className="min-w-0">
-                  {row.clientIp}
-                </Text>
-              </HStack>
-            </VStack>
-          ) : (
-            <VStack gap={0} className="cpm-cell-lines">
-              <Text type="body" size="sm" maxLines={1}>
-                {row.summary}
-              </Text>
-              <Text type="body" size="sm" color="secondary" maxLines={1}>
-                {row.actor ?? t("actorSystem")} &middot; {row.entityType}
-              </Text>
-            </VStack>
-          ),
-      },
-    ],
-    [t, emptyValue, format, tCommon],
-  );
+      ...(isWide
+        ? [
+            {
+              key: "detail",
+              header: tCommon("description"),
+              width: proportional(2),
+              renderCell: (row: LogRow) => logHeadline(row),
+            },
+            {
+              key: "context",
+              header: tCommon("details"),
+              width: proportional(2),
+              renderCell: (row: LogRow) => logContext(row),
+            },
+          ]
+        : [
+            {
+              key: "detail",
+              header: tCommon("description"),
+              width: proportional(3),
+              renderCell: (row: LogRow) => (
+                <VStack gap={0} className="cpm-cell-lines">
+                  {logHeadline(row)}
+                  {logContext(row)}
+                </VStack>
+              ),
+            },
+          ]),
+    ];
+  }, [t, emptyValue, format, tCommon, isWide]);
 
   const logRows = useMemo<LogRow[]>(() => {
     let traffic = isEventsOnly ? [] : (payload?.events ?? []);
@@ -570,6 +612,31 @@ export default function OverviewClient({
     // The largest-first tile never blends, so newest first is safe here.
     return [...trafficRows, ...eventRows].sort((a, b) => b.ts - a.ts);
   }, [payload, previewPayload, filter, isEventsOnly, blendsEvents, recentEvents]);
+
+  const [logFilters, setLogFilters] = useState<ReadonlyArray<PowerSearchFilter>>([]);
+  const logSearchConfig = useMemo(
+    () =>
+      serverLogSearchConfig({
+        text: tWaf("filterText"),
+        type: t("logSearchType"),
+        types: {
+          requests: tCommon("requests"),
+          errors: t("logTypeErrors"),
+          serverErrors: t("metricServerErrors"),
+          clientErrors: t("metricClientErrors"),
+          blocked: t("metricBlocked"),
+          serverEvents: t("metricServerEvents"),
+        },
+        time: tCommon("time"),
+        status: tCommon("status"),
+        host: tAnalytics("filterFields.host"),
+        method: tCommon("method"),
+        clientIp: tCommon("clientIp"),
+        user: tAuditLog("user"),
+      }),
+    [t, tCommon, tAnalytics, tAuditLog, tWaf],
+  );
+  const shownLogRows = useMemo(() => filterServerLog(logRows, logFilters), [logRows, logFilters]);
 
   const tileValue = (key: MetricKey): string => {
     // The range's own count once loaded, so the tile and its line agree; the 24h figure before.
@@ -640,6 +707,13 @@ export default function OverviewClient({
         />
       )}
       {hasFailed && <Banner status="error" title={t("loadFailedTitle")} />}
+      {analyticsStarting && (
+        <Banner
+          status="warning"
+          title={tAnalytics("startingTitle")}
+          description={tAnalytics("startingDescription")}
+        />
+      )}
 
       <NeedsAttentionCard preview={previewAttention} />
       <SetupChecklistCard preview={previewChecklist} />
@@ -740,15 +814,30 @@ export default function OverviewClient({
             </HStack>
             <Badge variant="neutral" label={metricKey ? metricLabel(metricKey) : t("metricAll")} />
           </HStack>
-          {logRows.length === 0 ? (
+          <PowerSearch
+            config={logSearchConfig}
+            filters={logFilters}
+            onChange={setLogFilters}
+            label={t("logSearchLabel")}
+            placeholder={t("logSearchPlaceholder")}
+            size="sm"
+            resultCount={logFilters.length > 0 ? shownLogRows.length : undefined}
+          />
+          {shownLogRows.length === 0 ? (
             <EmptyState
-              title={isEventsOnly ? t("activityEmptyMessage") : t("requestLogEmptyTitle")}
+              title={
+                logRows.length > 0
+                  ? t("logSearchEmpty")
+                  : isEventsOnly
+                    ? t("activityEmptyMessage")
+                    : t("requestLogEmptyTitle")
+              }
               isCompact
             />
           ) : (
             // No overflow-x wrapper: Table scrolls itself, and overflow-x:auto forces
             // overflow-y to auto too, which added a stray vertical scrollbar.
-            <Table data={logRows} columns={logColumns} idKey="id" density={density} />
+            <Table data={shownLogRows} columns={logColumns} idKey="id" density={density} />
           )}
           <Text type="supporting">
             {isEventsOnly

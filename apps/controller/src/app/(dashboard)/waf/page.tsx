@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { requireCan } from "@/src/lib/users/permissions";
+import { can, canManage, currentAccess, requireCan } from "@/src/lib/users/permissions";
 import WafEventsClient from "./WafEventsClient";
 import {
   listWafEvents,
@@ -130,6 +130,11 @@ export default async function WafPage({ searchParams }: PageProps) {
     withStagedReads(overlay, () => getWafHostModes()),
   ]);
 
+  const { access } = await currentAccess();
+  const manageableHostIds = hosts
+    .filter((host) => canManage(access, "proxyHost", host.id))
+    .map((host) => host.id);
+
   const ruleMessages = await getWafRuleMessages([
     ...new Set(exclusions.map((exclusion) => exclusion.ruleId)),
   ]);
@@ -154,6 +159,8 @@ export default async function WafPage({ searchParams }: PageProps) {
           .map((host) => ({ id: host.id, name: host.name }))
           .sort((a, b) => a.name.localeCompare(b.name))}
         hostModes={hostModes}
+        manageableHostIds={manageableHostIds}
+        canEditDashboard={can(access, "settings:write")}
         globalWaf={globalWaf ?? null}
         presets={presets.map((preset) => {
           const usage = presetUsage.get(preset.id);

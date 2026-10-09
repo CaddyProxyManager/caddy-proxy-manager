@@ -14,6 +14,7 @@ import { listAgents } from "@/src/lib/models/agents";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { needsAttention, sectionHealth } from "@/src/lib/settings/health";
+import { isStockHostDefaults } from "@/src/lib/proxy-hosts/host-defaults";
 import { stagedKeys, stagedView } from "@/src/lib/settings/staged-view";
 import SettingsHome from "./SettingsHome";
 import type { Metadata } from "next";
@@ -91,6 +92,7 @@ async function remainingBlocks() {
     crowdsec,
     logging,
     rateLimit,
+    hostDefaults,
   ] = await Promise.all([
     stored.getGeneralSettings(),
     getUpdateStatus().catch(() => null),
@@ -123,6 +125,7 @@ async function remainingBlocks() {
     stored.getCrowdSecSettings(),
     stored.getLoggingSettings(),
     stored.getRateLimitSettings(),
+    stored.getHostDefaults(),
   ]);
   const caddyfile = globalCaddy.caddyfile.trim();
   return {
@@ -181,6 +184,10 @@ async function remainingBlocks() {
       allowlist: rateLimit?.allowlist.length ?? 0,
     },
     logging: { enabled: logging?.enabled ?? false, format: logging?.format ?? "json" },
+    hostDefaults: {
+      proxyHostStock: isStockHostDefaults(hostDefaults, "proxyHost"),
+      l4ProxyHostStock: isStockHostDefaults(hostDefaults, "l4ProxyHost"),
+    },
   };
 }
 

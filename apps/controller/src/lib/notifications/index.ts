@@ -418,6 +418,7 @@ export function startNotifications(): void {
     import("../alerts/watch"),
     import("../alerts/history"),
     import("../access-reviews/reminders"),
+    import("../attention/server-log"),
   ])
     .then(
       ([
@@ -427,6 +428,7 @@ export function startNotifications(): void {
         { watchRuleSources },
         { pruneHistoryHourly },
         { watchAccessReviews },
+        { watchAttentionLog },
       ]) => {
         addNotificationWatcher(watchAgents);
         addNotificationWatcher(watchReleases);
@@ -434,6 +436,7 @@ export function startNotifications(): void {
         addNotificationWatcher(watchRuleSources);
         addNotificationWatcher(pruneHistoryHourly);
         addNotificationWatcher(watchAccessReviews);
+        addNotificationWatcher(watchAttentionLog);
       },
     )
     .catch((error: unknown) => {

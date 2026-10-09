@@ -90,6 +90,8 @@ export type HealthInput = {
   requireChangeOnLegacyHash: boolean;
   authentikOutpost: string;
   forwardAuth: { provider: "authelia" | "custom"; upstream: string } | null;
+  /** Whether each kind still has the shipped defaults. Absent, both read as shipped. */
+  hostDefaults?: { proxyHostStock: boolean; l4ProxyHostStock: boolean };
   crowdsec: { enabled: boolean; mode: "external" | "managed" };
   /** Counts only. Optional for callers that predate it. */
   rateLimit?: { enabled: boolean; zones: number; allowlist: number };
@@ -589,6 +591,16 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
           upstream: input.forwardAuth.upstream,
         })
       : t("health.notSet"),
+  );
+
+  const defaultsValue = (stock = true) =>
+    stock ? t("health.hostDefaults.valueStock") : t("health.hostDefaults.valueCustom");
+  push("host-defaults", "hostDefaults", "ok", defaultsValue(input.hostDefaults?.proxyHostStock));
+  push(
+    "l4-host-defaults",
+    "l4HostDefaults",
+    "ok",
+    defaultsValue(input.hostDefaults?.l4ProxyHostStock),
   );
 
   push(

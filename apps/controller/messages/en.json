@@ -6,6 +6,9 @@
     "loadFailed": "Could not check what needs attention.",
     "skipped": "{count, plural, one {One check took} other {# checks took}} too long and {count, plural, one {was} other {were}} skipped, so items may be missing.",
     "truncated": "{count, plural, one {# more item is} other {# more items are}} not shown.",
+    "acknowledge": "Acknowledge",
+    "acknowledgeItem": "Acknowledge: {title}",
+    "acknowledgedHidden": "{count, plural, one {# acknowledged item is} other {# acknowledged items are}} hidden until {count, plural, one {it clears} other {they clear}} or {count, plural, one {gets} other {get}} worse.",
     "severity": {
       "critical": "Critical",
       "warning": "Warning",
@@ -356,6 +359,8 @@
     "high": "High",
     "intervalCustom": "Custom",
     "loadErrorTitle": "Failed to load analytics data",
+    "startingTitle": "Analytics is still starting",
+    "startingDescription": "ClickHouse comes back a few moments after the stack restarts. Refresh shortly to see traffic.",
     "loadingAnalytics": "Loading analytics",
     "loadingBreakdown": "Loading breakdown",
     "loadingMap": "Loading map",
@@ -1270,6 +1275,7 @@
     "actionsFor": "Actions for {name}",
     "name": "Name",
     "description": "Description",
+    "details": "Details",
     "noDescription": "No description",
     "actions": "Actions",
     "status": "Status",
@@ -1278,6 +1284,7 @@
     "email": "Email",
     "role": "Role",
     "version": "Version",
+    "versionNumber": "Version {version}",
     "time": "Time",
     "method": "Method",
     "timeRange": "Time range",
@@ -1326,6 +1333,7 @@
   "errors": {
     "setupStepUnknown": "That is not a setup checklist step",
     "setupChecklistFailed": "Could not update the setup checklist",
+    "attentionAcknowledgeFailed": "Could not acknowledge that item",
     "analyticsViewLimit": "You can save at most {max} analytics views",
     "analyticsViewNameRequired": "A saved view needs a name",
     "analyticsViewNameTooLong": "A saved view's name can be at most {max} characters",
@@ -2469,7 +2477,11 @@
     "loadFailedTitle": "Could not load traffic for this range.",
     "loading": "Loading",
     "logBlocked": "Blocked",
-    "logDetail": "What happened",
+    "logSearchLabel": "Search the server log",
+    "logSearchPlaceholder": "Filter by type, time, status, host or IP",
+    "logSearchType": "Type",
+    "logSearchEmpty": "No log entries match these filters",
+    "logTypeErrors": "Errors (4xx and 5xx)",
     "logSourceBoth": "Requests from traffic_events in ClickHouse, changes from the audit log. Only the requests need access logging.",
     "logSourceEvents": "From the audit log. Recorded whether or not access logging is on.",
     "logSourceTraffic": "Requests from traffic_events in ClickHouse. Needs access logging switched on.",
@@ -4450,6 +4462,10 @@
         "name": "Authentication",
         "desc": "How people sign in to this dashboard"
       },
+      "hostDefaults": {
+        "name": "Host defaults",
+        "desc": "What a new proxy host or L4 host starts with"
+      },
       "forwardAuth": {
         "name": "Forward auth",
         "desc": "Defaults a new proxy host inherits for an external authenticator"
@@ -4563,6 +4579,12 @@
       },
       "forwardAuth": {
         "name": "Forward auth defaults"
+      },
+      "hostDefaults": {
+        "name": "New proxy hosts"
+      },
+      "l4HostDefaults": {
+        "name": "New L4 proxy hosts"
       },
       "geoip": {
         "name": "GeoIP databases"
@@ -5017,6 +5039,10 @@
       "forwardAuth": {
         "valueProvider": "{provider, select, authelia {Authelia} other {Custom}} at {upstream}"
       },
+      "hostDefaults": {
+        "valueStock": "As shipped",
+        "valueCustom": "Customized"
+      },
       "crowdsec": {
         "valueMode": "{mode, select, managed {Managed} other {External}} bouncer"
       },
@@ -5124,6 +5150,8 @@
       "errorPages": "Error pages",
       "authentik": "Authentik",
       "forwardAuth": "Forward auth",
+      "hostDefaults": "Host defaults",
+      "l4HostDefaults": "Host defaults",
       "passwordPolicy": "Password policy",
       "metrics": "Metrics",
       "logging": "Logging",
@@ -5169,6 +5197,8 @@
       "forwardAuthRequired": "The auth server URL is required",
       "forwardAuthSaved": "Forward auth defaults saved",
       "forwardAuthFailed": "Failed to save forward auth defaults",
+      "hostDefaultsSaved": "Host defaults saved",
+      "hostDefaultsFailed": "Failed to save host defaults",
       "authentikSaved": "Authentik defaults saved",
       "authentikFailed": "Failed to save Authentik settings",
       "tailscaleKeyRejected": "Tailscale did not accept this key. {reason}",
@@ -5203,6 +5233,7 @@
       "loggingSaved": "Logging settings saved and applied",
       "loggingFailed": "Failed to save logging settings",
       "dashboardSaved": "Dashboard host saved and applied",
+      "dashboardWafFailed": "The dashboard host is not set up, so it has no WAF to change",
       "dashboardApplyFailed": "Saved, but could not apply to Caddy: {error}",
       "dashboardFailed": "Failed to save dashboard settings",
       "trustedProxiesSaved": "Trusted proxies settings saved and applied",
@@ -5364,6 +5395,11 @@
       "capInstanceUrlHelp": "Where your Cap Standalone server is reached by browsers and by this server, without the site key.",
       "oidcOnlyTitle": "Not shown in OIDC-only mode",
       "oidcOnlyBody": "There is no username step while local accounts are disabled, so the CAPTCHA only applies once they are enabled again."
+    },
+    "hostDefaults": {
+      "help": "What the create dialog starts with, and what a proxy host created through the API gets for a field it leaves out. Hosts that already exist keep their own settings.",
+      "l4Help": "What the create dialog starts with, and what an L4 host created through the API gets for a field it leaves out. Hosts that already exist keep their own settings.",
+      "wafFollowsGlobal": "Follows the global WAF: on for a new host while it logs or blocks, off while it is off."
     },
     "rateLimit": {
       "help": "Zones here apply to every proxy host left to inherit them, and to hosts that merge them with their own. Each host keeps its own count, so a zone of 100 requests a minute allows 100 on every host. The dashboard host never takes them.",
@@ -5601,6 +5637,8 @@
         "accessReviews": "access review, recertification, attestation, revoke, reviewer",
         "authentik": "forward auth, outpost",
         "forwardAuth": "auth proxy, sso gate",
+        "hostDefaults": "new host, template, preset, force https, hsts, websocket, waf, crowdsec",
+        "l4HostDefaults": "new l4 host, tcp, udp, tls termination, proxy protocol, crowdsec",
         "geoip": "maxmind, geolite, country database, city database",
         "geoblock": "geo blocking, country block, region",
         "rateLimit": "throttle, rate limiting, requests per second, 429, allowlist",
@@ -6195,7 +6233,6 @@
     "backToUsers": "All users",
     "chooseGroup": "Choose a group",
     "created": "Created",
-    "details": "Details",
     "disabledBannerDescription": "This account cannot sign in, and its sessions and API tokens are refused. Enable it to restore access.",
     "disabledBannerTitle": "This account is disabled",
     "disabledByFailedSignInsDescription": "It was disabled automatically after too many failed sign-ins (Settings → Authentication → Sign-in). It cannot sign in, and its sessions and API tokens are refused. Enable it to restore access; its count of failed sign-ins starts over.",
@@ -6495,6 +6532,10 @@
     "showRawRecord": "Show raw record",
     "hostModesDescription": "Each proxy host's WAF mode, where it comes from, and its WAF events in the last 7 days.",
     "hostModesEmpty": "No proxy hosts yet",
+    "hostWafToggle": "WAF for {name}",
+    "hostWafOnResult": "Turned the WAF on for {name}",
+    "hostWafOffResult": "Turned the WAF off for {name}",
+    "hostWafFailed": "Could not change the WAF for that host",
     "hostMode": "Mode",
     "hostDisabled": "Host disabled",
     "hostModeSource": "Set by",
@@ -6759,7 +6800,6 @@
     "ruleSet": "Rule set",
     "globalMode": "Global mode",
     "coreRuleSet": "Core Rule Set",
-    "crsVersion": "Version {version}",
     "crsOff": "Not loaded",
     "paranoia": "Paranoia",
     "paranoiaLevel": "Level {level}",

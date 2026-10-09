@@ -31,11 +31,13 @@ import {
   queryWafTotals,
 } from "../clickhouse/security";
 import { listActiveBlockedSources } from "../models/blocked-sources";
-import { listProxyHosts } from "../models/proxy-hosts";
+import { listProxyHosts, proxyHostMetaView } from "../models/proxy-hosts";
+import { DASHBOARD_HOST_ID, DASHBOARD_HOST_NAME } from "../dashboard-host";
 import { type WafEvent, redactStoredWafEvent } from "../models/waf-events";
 import { listWafExclusionRules } from "../models/waf-exclusions";
 import { isConnectionError } from "../errors/net-errors";
-import { getWafSettings } from "../settings";
+import { analyticsStarting } from "../analytics/starting";
+import { getDashboardSettings, getWafSettings } from "../settings";
 import { CRS_VERSION, effectiveTuning } from "../waf/tuning";
 import { getWafEventReviews, type WafEventReview } from "./waf-event";
 import { countModes, type WafEngineMode, wafHostModes } from "./waf-hosts";
@@ -78,9 +80,10 @@ export type SecurityRule = {
 export type SecurityReport = {
   /**
    * `traffic`: access-log outcomes; `waf`: WAF events only; `none`: analytics are off;
-   * `unavailable`: they are on, but ClickHouse could not be reached.
+   * `unavailable`: they are on, but ClickHouse could not be reached; `starting`: not yet, after a
+   * restart.
    */
-  source: "traffic" | "waf" | "none" | "unavailable";
+  source: "traffic" | "waf" | "none" | "unavailable" | "starting";
   window: TimeWindow;
   previousWindow: TimeWindow;
   bucketSeconds: number;
@@ -157,7 +160,7 @@ function emptyReport(
   bucketSeconds: number,
   ruleSet: SecurityRuleSet,
   page: number,
-  source: "none" | "unavailable" = "none",
+  source: "none" | "unavailable" | "starting" = "none",
 ): SecurityReport {
   return {
     source,
@@ -246,8 +249,15 @@ export async function getSecurityReport(
     );
   } catch (error) {
     if (!isConnectionError(error)) throw error;
-    console.warn("[security] ClickHouse unavailable; showing the rule set only.");
-    return emptyReport(window, bucketSeconds, await ruleSetPromise, safePage, "unavailable");
+    const starting = analyticsStarting(error);
+    if (!starting) console.warn("[security] ClickHouse unavailable; showing the rule set only.");
+    return emptyReport(
+      window,
+      bucketSeconds,
+      await ruleSetPromise,
+      safePage,
+      starting ? "starting" : "unavailable",
+    );
   }
 }
 
@@ -392,13 +402,30 @@ async function analyticsReport(
 
 /** Per-host WAF modes with the last seven days' events, for the WAF page's host table. */
 export async function getWafHostModes(now = Math.floor(Date.now() / 1000)) {
-  const [settings, hosts, analytics] = await Promise.all([
+  const [settings, hosts, dashboard, analytics] = await Promise.all([
     getWafSettings(),
     listProxyHosts(),
+    getDashboardSettings(),
     isAnalyticsEnabled(),
   ]);
   const events = analytics
     ? await queryWafEventsByHost(now - 7 * 86_400, now).catch(() => null)
     : null;
-  return wafHostModes(settings, hosts, events);
+  const domain = dashboard?.enabled ? dashboard.domain.trim().toLowerCase() : "";
+  const dashboardRow = domain
+    ? wafHostModes(
+        settings,
+        [
+          {
+            id: DASHBOARD_HOST_ID,
+            name: DASHBOARD_HOST_NAME,
+            domains: [domain],
+            enabled: true,
+            waf: proxyHostMetaView(dashboard?.options?.meta ?? null).waf,
+          },
+        ],
+        events,
+      ).map((row) => ({ ...row, dashboard: true }))
+    : [];
+  return [...dashboardRow, ...wafHostModes(settings, hosts, events)];
 }

@@ -33,6 +33,9 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   "error-pages": { label: "Error pages", keys: ["error_pages"] },
   authentik: { label: "Authentik", keys: ["authentik"] },
   "forward-auth": { label: "Forward auth", keys: ["forward_auth"] },
+  // Both blocks write the one row.
+  "host-defaults": { label: "Host defaults", keys: ["host_defaults"] },
+  "l4-host-defaults": { label: "Host defaults", keys: ["host_defaults"] },
   "password-policy": { label: "Password policy", keys: ["password_policy"] },
   "two-factor": { label: "Two-factor sign-in", keys: ["two_factor_policy"] },
   "sso-enforcement": { label: "Single sign-on enforcement", keys: ["sso_enforcement"] },

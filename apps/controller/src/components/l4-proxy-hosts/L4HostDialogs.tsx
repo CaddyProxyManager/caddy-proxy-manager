@@ -18,6 +18,7 @@ import {
 } from "@/lib/l4/editor-sections";
 import { INITIAL_ACTION_STATE } from "@/lib/errors/action-error";
 import type { L4ProxyHost } from "@/lib/models/l4-proxy-hosts";
+import type { L4ProxyHostDefaults } from "@/lib/proxy-hosts/host-defaults";
 import type { L4AccessListOption } from "@/lib/models/access-lists";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -226,6 +227,7 @@ function L4HostForm({
   formAction,
   state,
   initialData,
+  defaults,
   agents = [],
   accessLists = [],
   assignedAgentIds = [],
@@ -237,6 +239,8 @@ function L4HostForm({
   formAction: (formData: FormData) => void;
   state: { status: string; message?: string };
   initialData?: L4ProxyHost | null;
+  /** Read only without initialData. */
+  defaults?: L4ProxyHostDefaults | null;
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
   assignedAgentIds?: number[];
@@ -247,7 +251,8 @@ function L4HostForm({
   const tCommon = useTranslations("common");
   const anchor = (section: L4EditorSection) => `${anchorPrefix}${l4EditorSectionAnchor(section)}`;
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
-  const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
+  const preset = initialData ? null : defaults;
+  const [protocol, setProtocol] = useState(initialData?.protocol ?? preset?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
   const [samePort, setSamePort] = useState(initialData?.upstreamPortMode === "same");
 
@@ -258,9 +263,11 @@ function L4HostForm({
     (value: string) =>
       setText((prev) => ({ ...prev, [key]: value }));
 
-  const [tlsTermination, setTlsTermination] = useState(initialData?.tlsTermination ?? false);
+  const [tlsTermination, setTlsTermination] = useState(
+    initialData?.tlsTermination ?? preset?.tlsTermination ?? false,
+  );
   const [proxyProtocolReceive, setProxyProtocolReceive] = useState(
-    initialData?.proxyProtocolReceive ?? false,
+    initialData?.proxyProtocolReceive ?? preset?.proxyProtocolReceive ?? false,
   );
   const [proxyProtocolVersion, setProxyProtocolVersion] = useState<string>(
     initialData?.proxyProtocolVersion ?? "__none__",
@@ -278,7 +285,9 @@ function L4HostForm({
   );
   const [dnsEnabled, setDnsEnabled] = useState(initialData?.dnsResolver?.enabled ?? false);
   const [geoblockEnabled, setGeoblockEnabled] = useState(initialData?.geoblock?.enabled ?? false);
-  const [crowdsecEnabled, setCrowdsecEnabled] = useState(initialData?.crowdsec ?? true);
+  const [crowdsecEnabled, setCrowdsecEnabled] = useState(
+    initialData?.crowdsec ?? preset?.crowdsecEnabled ?? true,
+  );
   const [geoblockMode, setGeoblockMode] = useState<string>(initialData?.geoblockMode ?? "merge");
   const [upstreamDnsMode, setUpstreamDnsMode] = useState(
     initialData?.upstreamDnsResolution?.enabled === true
@@ -789,12 +798,15 @@ export function CreateL4HostDialog({
   open,
   onClose,
   initialData,
+  defaults,
   agents = [],
   accessLists = [],
 }: {
   open: boolean;
   onClose: () => void;
   initialData?: L4ProxyHost | null;
+  /** Settings' host defaults, for a new host only: a duplicate keeps its source's values. */
+  defaults?: L4ProxyHostDefaults | null;
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
 }) {
@@ -831,6 +843,7 @@ export function CreateL4HostDialog({
             ? { ...initialData, name: tCommon("copyName", { name: initialData.name }) }
             : null
         }
+        defaults={defaults}
         agents={agents}
         accessLists={accessLists}
       />

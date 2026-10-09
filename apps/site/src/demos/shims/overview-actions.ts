@@ -4,7 +4,7 @@
  * fails as one with no controller would.
  */
 import type { ActionState } from "@cpm/controller/src/lib/errors/action-error";
-import type { AttentionList } from "@cpm/controller/src/lib/attention/types";
+import type { OverviewAttention } from "@cpm/controller/src/lib/attention/types";
 import type { SetupChecklist } from "@cpm/controller/src/lib/setup-checklist/steps";
 
 const refused: ActionState = {
@@ -12,8 +12,12 @@ const refused: ActionState = {
   message: "There is no controller behind the documentation site.",
 };
 
-export async function loadAttentionAction(): Promise<AttentionList | null> {
-  return { items: [], skipped: [], truncated: 0 };
+export async function loadAttentionAction(): Promise<OverviewAttention | null> {
+  return { list: { items: [], skipped: [], truncated: 0 }, acknowledged: 0, canAcknowledge: false };
+}
+
+export async function acknowledgeAttentionAction(_id: string, _code: string): Promise<ActionState> {
+  return refused;
 }
 
 export async function loadSetupChecklistAction(): Promise<SetupChecklist | null> {

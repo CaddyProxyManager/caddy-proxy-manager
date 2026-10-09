@@ -433,11 +433,14 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={managedCerts}
-      keyField="id"
-      emptyMessage={t("noLegacyManagedCertificates")}
-    />
+    // The table bleeds out of its container by the container's padding, so it needs a card's.
+    <Card>
+      <DataTable
+        columns={columns}
+        data={managedCerts}
+        keyField="id"
+        emptyMessage={t("noLegacyManagedCertificates")}
+      />
+    </Card>
   );
 }

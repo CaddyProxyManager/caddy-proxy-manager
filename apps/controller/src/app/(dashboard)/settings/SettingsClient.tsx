@@ -119,6 +119,8 @@ import {
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
   updateCompressionSettingsAction,
+  updateHostDefaultsAction,
+  updateL4HostDefaultsAction,
   updateGlobalCaddyConfigAction,
   updateHttpCacheSettingsAction,
   updateTwoFactorPolicySettingsAction,
@@ -153,6 +155,8 @@ import type { SsoEnforcement } from "@/src/lib/auth/sso-enforcement";
 import type { SamlProvider } from "@/src/lib/models/saml-providers";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { RateLimitSection } from "./RateLimitSection";
+import { L4ProxyHostDefaultsSection, ProxyHostDefaultsSection } from "./HostDefaultsSection";
+import { DEFAULT_HOST_DEFAULTS, type HostDefaults } from "@/src/lib/proxy-hosts/host-defaults";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
@@ -191,6 +195,8 @@ type Props = {
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalRateLimit?: GlobalRateLimitSettings | null;
+  /** What new hosts start with; absent, the shipped values. */
+  hostDefaults?: HostDefaults;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProviderView[];
   ldapDirectories: LdapDirectoryView[];
@@ -279,6 +285,7 @@ export default function SettingsClient({
   defaultResponse,
   globalGeoBlock,
   globalRateLimit = null,
+  hostDefaults = DEFAULT_HOST_DEFAULTS,
   globalErrorPages,
   oauthProviders,
   ldapDirectories,
@@ -385,6 +392,14 @@ export default function SettingsClient({
   );
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [rateLimitState, rateLimitFormAction] = useActionState(updateRateLimitSettingsAction, null);
+  const [hostDefaultsState, hostDefaultsFormAction] = useActionState(
+    updateHostDefaultsAction,
+    null,
+  );
+  const [l4HostDefaultsState, l4HostDefaultsFormAction] = useActionState(
+    updateL4HostDefaultsAction,
+    null,
+  );
   const [errorPagesState, errorPagesFormAction] = useActionState(
     updateErrorPagesSettingsAction,
     null,
@@ -725,6 +740,20 @@ export default function SettingsClient({
         globalGeoBlock={globalGeoBlock}
         geoBlockState={geoBlockState}
         geoBlockFormAction={geoBlockFormAction}
+      />
+    ),
+    "host-defaults": (
+      <ProxyHostDefaultsSection
+        defaults={hostDefaults.proxyHost}
+        state={hostDefaultsState}
+        formAction={hostDefaultsFormAction}
+      />
+    ),
+    "l4-host-defaults": (
+      <L4ProxyHostDefaultsSection
+        defaults={hostDefaults.l4ProxyHost}
+        state={l4HostDefaultsState}
+        formAction={l4HostDefaultsFormAction}
       />
     ),
     "rate-limit": (

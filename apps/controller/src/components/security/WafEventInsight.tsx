@@ -50,6 +50,7 @@ export function WafEventInsight({
 }) {
   const t = useTranslations("waf");
   const tCommon = useTranslations("common");
+  const tAnalytics = useTranslations("analytics");
   const [detail, setDetail] = useState<WafEventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exclusion, setExclusion] = useState<ExclusionDraft | null>(null);
@@ -85,7 +86,7 @@ export function WafEventInsight({
     );
   }
 
-  const { explanation, suggestedExclusion, review, event, relayedBy } = detail;
+  const { explanation, suggestedExclusion, review, event, relayedBy, userAgent } = detail;
   const reached = explanation.totalScore >= explanation.threshold;
 
   function saveReview(verdict: "intended" | "false_positive" | null) {
@@ -102,6 +103,16 @@ export function WafEventInsight({
 
   return (
     <VStack gap={4}>
+      {userAgent && (
+        <VStack gap={1}>
+          <Text type="label" size="sm" weight="bold" color="secondary">
+            {tAnalytics("filterFields.ua")}
+          </Text>
+          <Text type="code" size="sm">
+            {userAgent}
+          </Text>
+        </VStack>
+      )}
       <VStack gap={2}>
         <HStack gap={2} vAlign="center" wrap="wrap">
           <Text type="label" weight="bold">

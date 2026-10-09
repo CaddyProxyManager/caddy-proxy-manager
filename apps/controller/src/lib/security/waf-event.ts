@@ -6,7 +6,7 @@ import { agents, users, wafEventReviews } from "../db/schema";
 import { logAuditEvent } from "../audit";
 import { domainError } from "../errors/domain-error";
 import { isAnalyticsEnabled } from "../clickhouse/client";
-import { queryWafEventsAt } from "../clickhouse/security";
+import { queryUserAgentOfWafEvent, queryWafEventsAt } from "../clickhouse/security";
 import { type WafEvent, redactStoredWafEvent } from "../models/waf-events";
 import { listProxyHosts } from "../models/proxy-hosts";
 import { getWafSettings } from "../settings";
@@ -39,6 +39,8 @@ export type WafEventRelay = { agentId: string; name: string | null };
 export type WafEventDetail = {
   event: WafEvent;
   relayedBy: WafEventRelay | null;
+  /** From the access log; null when the request was not logged. */
+  userAgent: string | null;
   explanation: WafEventExplanation;
   suggestedExclusion: SuggestedExclusion | null;
   curl: string;
@@ -63,7 +65,7 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
   const { relayedBy: relayAgentId, ...storedEvent } = stored;
   const event = redactStoredWafEvent(storedEvent);
 
-  const [settings, hosts, reviews, relay] = await Promise.all([
+  const [settings, hosts, reviews, relay, userAgent] = await Promise.all([
     getWafSettings(),
     listProxyHosts(),
     getWafEventReviews([key]),
@@ -74,6 +76,7 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
           .where(eq(agents.agentId, relayAgentId))
           .limit(1)
       : Promise.resolve([]),
+    queryUserAgentOfWafEvent(event).catch(() => null),
   ]);
   const explanation = explainWafEvent(event.rawData, {
     threshold: effectiveTuning(settings).inboundThreshold,
@@ -104,6 +107,7 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
   return {
     event,
     relayedBy: relayAgentId ? { agentId: relayAgentId, name: relay[0]?.name ?? null } : null,
+    userAgent,
     explanation,
     suggestedExclusion,
     curl: wafEventCurl(event.rawData, event),

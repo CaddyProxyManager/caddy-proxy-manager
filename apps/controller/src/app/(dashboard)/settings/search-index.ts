@@ -39,9 +39,9 @@ export const EXTRA_SEARCH_PAGES = [
   { id: "portable-config", href: "/settings/backup#portable-config" },
   { id: "audit-streaming", href: "/settings/audit-streaming" },
   { id: "settings-history", href: "/settings/history" },
-  { id: "waf-tuning", href: "/waf?tab=settings" },
-  { id: "waf-host-modes", href: "/waf?tab=hosts" },
-  { id: "waf-exclusions", href: "/waf?tab=exclusions" },
+  { id: "waf-tuning", href: "/waf/settings" },
+  { id: "waf-host-modes", href: "/waf/hosts" },
+  { id: "waf-exclusions", href: "/waf/exclusions" },
   { id: "blocked-sources", href: "/security/blocked-sources" },
   { id: "sign-in-overview", href: "/users/sign-in" },
 ] as const;

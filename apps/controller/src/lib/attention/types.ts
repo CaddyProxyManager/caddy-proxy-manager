@@ -84,6 +84,13 @@ export type AttentionList = {
   truncated: number;
 };
 
+/** The overview's list: acknowledged items left out, and counted. */
+export type OverviewAttention = {
+  list: AttentionList;
+  acknowledged: number;
+  canAcknowledge: boolean;
+};
+
 /**
  * Whether a list has anything to say. A check that ran out of time does: its items may be
  * missing, so the list cannot claim that nothing needs attention.

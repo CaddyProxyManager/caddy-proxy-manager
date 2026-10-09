@@ -176,6 +176,13 @@
       min-width: 0;
     }
 
+    /* A table pulls its top and bottom edges out by its container's padding, whatever sits beside
+       it: onto the heading over it in a card, onto a banner above or below. Bleeds sideways only. */
+    .astryx-table-scroll-wrapper {
+      --container-padding-block-start: 0px;
+      --container-padding-block-end: 0px;
+    }
+
     /* Wider than the theme's, so neighbouring values never read as one. */
     .astryx-table-cell,
     .astryx-table-header-cell {

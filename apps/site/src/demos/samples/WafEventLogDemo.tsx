@@ -79,7 +79,7 @@ const EVENTS: Event[] = [
     blocked: true,
     severity: "WARNING",
     host: "grafana.example.com",
-    clientIp: "185.220.101.77",
+    clientIp: "2001:db8:3f1a::77",
     countryCode: "DE",
     method: "GET",
     uri: "/.env",
@@ -93,7 +93,7 @@ const EVENTS: Event[] = [
     blocked: true,
     severity: "WARNING",
     host: "grafana.example.com",
-    clientIp: "185.220.101.77",
+    clientIp: "2001:db8:3f1a::77",
     countryCode: "DE",
     method: "GET",
     uri: "/wp-admin/setup-config.php",
@@ -121,7 +121,7 @@ const EVENTS: Event[] = [
     blocked: true,
     severity: "CRITICAL",
     host: "app.example.com",
-    clientIp: "103.152.220.9",
+    clientIp: "2001:db8:85a3:4c1e:9d2f:3b7a:61e4:c802",
     countryCode: "SG",
     method: "POST",
     uri: "/api/import",
@@ -400,7 +400,7 @@ function WafEventLogDemoContent() {
     {
       id: "clientIp",
       label: tCommon("clientIp"),
-      width: 150,
+      width: 380,
       render: (r) => (
         <HStack gap={1} vAlign="center">
           <Text type="code" size="sm">

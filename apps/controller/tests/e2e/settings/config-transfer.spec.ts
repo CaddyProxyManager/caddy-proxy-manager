@@ -17,6 +17,7 @@ test('exports a readable configuration with its secrets sealed, and previews imp
   page,
 }) => {
   await page.goto('/login');
+  await waitForHydration(page);
   await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15_000 });
   await page.goto('/settings/backup');

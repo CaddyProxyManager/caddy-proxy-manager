@@ -49,7 +49,7 @@ export function RequestLog({
     {
       key: "ts",
       header: tCommon("time"),
-      width: pixel(170),
+      width: pixel(200),
       renderCell: (row) => (
         <Text type="body" size="sm" color="secondary">
           <Timestamp value={row.ts * 1000} />
@@ -59,7 +59,8 @@ export function RequestLog({
     {
       key: "clientIp",
       header: tCommon("client"),
-      width: pixel(170),
+      // A full eight-group IPv6 address beside its flag.
+      width: pixel(380),
       renderCell: (row) => (
         <HStack gap={1} vAlign="center">
           {row.countryCode && <CountryFlag code={row.countryCode} />}

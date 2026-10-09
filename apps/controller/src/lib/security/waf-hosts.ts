@@ -21,7 +21,21 @@ export type WafHostMode = {
   source: WafModeSource;
   /** Null when analytics are off. */
   events7d: number | null;
+  /** The managed dashboard host, whose WAF lives in its settings rather than a proxy host. */
+  dashboard?: boolean;
 };
+
+/**
+ * A host's WAF with only the switch changed, so its own tuning survives. An explicit Off mode is
+ * dropped on the way on, or the switch would turn on a WAF that runs nothing.
+ */
+export function wafWithEnabled(
+  waf: WafHostConfig | null | undefined,
+  enabled: boolean,
+): WafHostConfig {
+  const { mode, ...rest } = waf ?? {};
+  return { ...rest, enabled, ...(mode && !(enabled && mode === "Off") && { mode }) };
+}
 
 export function effectiveWafMode(
   global: WafSettings | null,
@@ -36,7 +50,8 @@ export function effectiveWafMode(
         : "On";
   if (host?.enabled === false) return { mode, source: "hostOff" };
   if (host?.enabled && host.waf_mode === "override") return { mode, source: "override" };
-  if (host?.enabled && host.mode) return { mode, source: "host" };
+  // With the global WAF off, a host that switched it on is the reason it runs, whatever its mode.
+  if (host?.enabled && (host.mode || !global?.enabled)) return { mode, source: "host" };
   return { mode, source: "global" };
 }
 

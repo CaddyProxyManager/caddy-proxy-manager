@@ -17,7 +17,9 @@ import {
   type DashboardDnsCheck,
   type DashboardHostSettings,
   checkDashboardDns,
+  EMPTY_DASHBOARD_HOST_OPTIONS,
 } from "@/src/lib/dashboard-host";
+import { wafWithEnabled } from "@/src/lib/security/waf-hosts";
 import {
   customDirectivesError,
   normalizeWafPluginIds,
@@ -57,6 +59,8 @@ import {
   saveTrustedProxiesSettings,
   saveHttpProtocolsSettings,
   saveCompressionSettings,
+  getHostDefaults,
+  saveHostDefaults,
   saveGlobalCaddyConfigSettings,
   saveHttpCacheSettings,
   saveTwoFactorPolicySettings,
@@ -74,7 +78,11 @@ import {
 } from "@/src/lib/settings";
 import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/caddy/crowdsec";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
-import { sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
+import {
+  mergeProxyHostMeta,
+  proxyHostMetaView,
+  sanitizeErrorPageRules,
+} from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
 import { assertCrsPluginIdsExist } from "@/src/lib/models/crs-plugins";
@@ -1570,6 +1578,64 @@ async function updateCompressionSettingsActionUnlocked(
   }
 }
 
+/** One row holds both kinds, so each block rewrites only its own and keeps the other's. */
+async function saveHostDefaultsBlock(
+  kind: "proxyHost" | "l4ProxyHost",
+  formData: FormData,
+): Promise<SettingsResult> {
+  const t = await getTranslations("settings");
+  const on = (name: string) => formData.get(name) === "on";
+  try {
+    await requireCan("settings:write");
+    const current = await getHostDefaults();
+    await saveHostDefaults({
+      ...current,
+      [kind]:
+        kind === "proxyHost"
+          ? {
+              sslForced: on("sslForced"),
+              hstsEnabled: on("hstsEnabled"),
+              hstsSubdomains: on("hstsSubdomains"),
+              allowWebsocket: on("allowWebsocket"),
+              preserveHostHeader: on("preserveHostHeader"),
+              skipHttpsValidation: on("skipHttpsValidation"),
+              discourageIndexing: on("discourageIndexing"),
+              compression: formData.get("compression"),
+              crowdsecEnabled: on("crowdsecEnabled"),
+            }
+          : {
+              protocol: formData.get("l4Protocol"),
+              tlsTermination: on("l4TlsTermination"),
+              proxyProtocolReceive: on("l4ProxyProtocolReceive"),
+              crowdsecEnabled: on("l4CrowdsecEnabled"),
+            },
+    });
+    revalidatePath("/settings");
+    return { success: true, message: t("results.hostDefaultsSaved") };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("Failed to save host defaults:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.hostDefaultsFailed")),
+    };
+  }
+}
+
+async function updateHostDefaultsActionUnlocked(
+  _prevState: SettingsResult | null,
+  formData: FormData,
+): Promise<SettingsResult> {
+  return saveHostDefaultsBlock("proxyHost", formData);
+}
+
+async function updateL4HostDefaultsActionUnlocked(
+  _prevState: SettingsResult | null,
+  formData: FormData,
+): Promise<SettingsResult> {
+  return saveHostDefaultsBlock("l4ProxyHost", formData);
+}
+
 async function updateCrowdSecSettingsActionUnlocked(
   _prevState: SettingsResult | null,
   formData: FormData,
@@ -2641,6 +2707,8 @@ export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
 export const updateCompressionSettingsAction = stagedSettingsAction(
   updateCompressionSettingsActionUnlocked,
 );
+export const updateHostDefaultsAction = stagedSettingsAction(updateHostDefaultsActionUnlocked);
+export const updateL4HostDefaultsAction = stagedSettingsAction(updateL4HostDefaultsActionUnlocked);
 export const updateGlobalCaddyConfigAction = stagedSettingsAction(
   updateGlobalCaddyConfigActionUnlocked,
 );
@@ -2655,6 +2723,20 @@ export const updateSsoEnforcementSettingsAction = stagedSettingsAction(
 );
 export const updateDashboardSettingsAction = stagedSettingsAction(
   updateDashboardSettingsActionUnlocked,
+);
+
+/** The WAF page's switch for the dashboard host: its WAF is a setting, so this stages too. */
+export const setDashboardWafEnabledAction = stagedSettingsAction(
+  async (enabled: boolean): Promise<SettingsResult> => {
+    const t = await getTranslations("settings");
+    const current = await getDashboardSettings();
+    if (!current?.enabled) return { success: false, message: t("results.dashboardWafFailed") };
+    const options = current.options ?? EMPTY_DASHBOARD_HOST_OPTIONS;
+    const waf = wafWithEnabled(proxyHostMetaView(options.meta).waf, enabled);
+    const meta = mergeProxyHostMeta(options.meta, { waf }, await getWafSettings());
+    await saveDashboardSettings({ ...current, options: { ...options, meta } });
+    return { success: true, message: t("results.dashboardSaved") };
+  },
 );
 export const updateDnsSettingsAction = stagedSettingsAction(updateDnsSettingsActionUnlocked);
 export const updateUpstreamDnsResolutionSettingsAction = stagedSettingsAction(

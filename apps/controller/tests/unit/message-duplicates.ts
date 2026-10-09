@@ -377,6 +377,14 @@ export const SEPARATE_DUPLICATES: readonly {
   {
     reason: 'composed',
     keys: [
+      'settings.sections.hostDefaults.name',
+      'settings.stagedLabels.hostDefaults',
+      'settings.stagedLabels.l4HostDefaults',
+    ],
+  },
+  {
+    reason: 'composed',
+    keys: [
       'hostReview.fields.rateLimit',
       'hostReview.protections.rateLimit',
       'proxyHosts.rateLimit',
@@ -1106,7 +1114,13 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   {
     reason: 'sense',
-    keys: ['settings.type', 'waf.pluginType', 'security.sourceKind', 'alerts.history.type'],
+    keys: [
+      'settings.type',
+      'waf.pluginType',
+      'security.sourceKind',
+      'alerts.history.type',
+      'overview.logSearchType',
+    ],
   },
   { reason: 'sense', keys: ['ui.codeEditor.plaintextLabel', 'waf.filterText'] },
   { reason: 'family', keys: ['analytics.total', 'analytics.groupNone'] },

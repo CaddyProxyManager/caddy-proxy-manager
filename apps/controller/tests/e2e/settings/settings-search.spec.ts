@@ -22,7 +22,7 @@ test('searching "smtp" leads to the email settings', async ({ page }) => {
 test('a page outside the settings sections is found too', async ({ page }) => {
   await search(page, 'paranoia');
   await page.getByRole('option', { name: /WAF tuning/ }).click();
-  await expect(page).toHaveURL(/\/waf\?tab=settings$/);
+  await expect(page).toHaveURL(/\/waf\/settings$/);
 });
 
 test('the Settings overview has no search of its own', async ({ page }) => {

@@ -56,7 +56,7 @@ const EVENTS: OverviewPayload["events"] = [
   },
   {
     ts: 1770811198,
-    clientIp: "198.51.100.7",
+    clientIp: "2001:db8:6e21:9a40:d1c3:57fe:2b08:4419",
     countryCode: "GB",
     host: "git.example.com",
     method: "POST",
@@ -80,7 +80,7 @@ const EVENTS: OverviewPayload["events"] = [
   },
   {
     ts: 1770811191,
-    clientIp: "45.148.10.62",
+    clientIp: "2001:db8:a0b::62",
     countryCode: "NL",
     host: "status.example.com",
     method: "GET",

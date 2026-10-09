@@ -13,6 +13,7 @@ import { strictId } from "@/src/lib/http/strict-id";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
+import { getHostDefaults } from "@/src/lib/settings";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { canCreate, canManage, requireReach, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
@@ -65,13 +66,14 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 
-  const [hosts, total, counts, tags, agents, accessLists] = await Promise.all([
+  const [hosts, total, counts, tags, agents, accessLists, hostDefaults] = await Promise.all([
     listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol, tag),
     countL4ProxyHosts(search, visibleIds, protocol, tag),
     countL4ProxyHostsByProtocol(search, visibleIds, tag),
     listL4ProxyHostTags(visibleIds),
     listAgentOptions().catch(() => []),
     listL4AccessListOptions(),
+    getHostDefaults(),
   ]);
 
   // The editor opened from a link, on a host that may sit on another page of the list.
@@ -106,6 +108,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
         initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
         agents={agents}
         accessLists={accessLists}
+        hostDefaults={hostDefaults.l4ProxyHost}
         agentAssignments={Object.fromEntries(assignments)}
         canCreate={canCreate(access, "l4ProxyHost")}
         manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}

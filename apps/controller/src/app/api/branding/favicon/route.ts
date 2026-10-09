@@ -1,18 +1,29 @@
 /**
- * Serves the uploaded favicon, or 404. Deliberately public (see the allowlist in src/proxy.ts):
+ * Serves the uploaded favicon, or the default logo. Deliberately public (see the allowlist in src/proxy.ts):
  * login, portal and setup render before there is a session, and a favicon is not secret.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getFavicon } from "@/src/lib/branding";
+import { DEFAULT_FAVICON_SVG } from "@/src/lib/branding/default-favicon";
+
+// An SVG opened directly is a document, and a document can carry script. This makes the
+// response inert whatever is inside it, which is what lets SVG be an accepted format at all.
+const INERT = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 export async function GET(request: NextRequest) {
   const favicon = await getFavicon();
 
-  // No custom icon is the normal case, and the browser treats it exactly as it treats the missing
-  // /favicon.ico this app has always had. Not cached, so setting one takes effect immediately.
+  // The normal case. Not cached for long, so an upload takes effect at once.
   if (!favicon) {
-    return new NextResponse(null, { status: 404, headers: { "cache-control": "no-store" } });
+    return new NextResponse(DEFAULT_FAVICON_SVG, {
+      headers: {
+        "content-type": "image/svg+xml",
+        "cache-control": "no-cache, must-revalidate",
+        "x-content-type-options": "nosniff",
+        "content-security-policy": INERT,
+      },
+    });
   }
 
   const etag = `"${favicon.hash}"`;
@@ -23,9 +34,7 @@ export async function GET(request: NextRequest) {
     // makes the usual answer a bodiless 304.
     "cache-control": "no-cache, must-revalidate",
     "x-content-type-options": "nosniff",
-    // An SVG opened directly is a document, and a document can carry script. This makes the
-    // response inert whatever is inside it, which is what lets SVG be an accepted format at all.
-    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    "content-security-policy": INERT,
   };
 
   if (request.headers.get("if-none-match") === etag) {

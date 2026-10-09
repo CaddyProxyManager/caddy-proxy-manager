@@ -28,6 +28,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { CountryFlag } from "@/components/ui/CountryFlag";
+import { proportional } from "@astryxdesign/core/Table";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -170,6 +171,7 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
   const t = useTranslations("security");
   const tNav = useTranslations("nav");
   const tWaf = useTranslations("waf");
+  const tCommon = useTranslations("common");
   const rules = report.ruleSet;
   return (
     <Card padding={4}>
@@ -183,7 +185,9 @@ function RuleSetCard({ report }: { report: SecurityReport }) {
           </MetadataListItem>
           <MetadataListItem label={t("coreRuleSet")}>
             <Text type="body" size="sm">
-              {rules.crsLoaded ? t("crsVersion", { version: rules.crsVersion }) : t("crsOff")}
+              {rules.crsLoaded
+                ? tCommon("versionNumber", { version: rules.crsVersion })
+                : t("crsOff")}
             </Text>
           </MetadataListItem>
           {rules.crsLoaded && (
@@ -325,6 +329,7 @@ export default function SecurityClient({
   const tCommon = useTranslations("common");
   const tWaf = useTranslations("waf");
   const tProxyHosts = useTranslations("proxyHosts");
+  const tAnalytics = useTranslations("analytics");
   const format = useAppFormatter();
   const timeZone = useTimeZone() ?? "UTC";
   const emptyValue = useEmptyValue();
@@ -352,7 +357,8 @@ export default function SecurityClient({
   const addFilter = (filter: AnalyticsFilter) => navigate(withFilter(state, filter));
 
   const rangeValue = showCustom ? "custom" : state.range;
-  const noAnalytics = report.source === "none" || report.source === "unavailable";
+  const noAnalytics =
+    report.source === "none" || report.source === "unavailable" || report.source === "starting";
 
   const ruleColumns: Column<SecurityRule>[] = [
     {
@@ -435,6 +441,8 @@ export default function SecurityClient({
     {
       id: "ip",
       label: t("source"),
+      // A full eight-group IPv6 address beside its filter button.
+      width: proportional(1, { minWidth: 380 }),
       render: (row) => (
         <VStack gap={0}>
           <HStack gap={1} vAlign="center">
@@ -498,7 +506,7 @@ export default function SecurityClient({
     {
       id: "lastSeen",
       label: tCommon("lastSeen"),
-      width: 180,
+      width: 200,
       render: (row) => (
         <Text type="body" size="sm" color="secondary">
           <Timestamp value={row.lastSeen * 1000} />
@@ -529,7 +537,8 @@ export default function SecurityClient({
     {
       id: "ts",
       label: tCommon("time"),
-      width: 200,
+      // A full timestamp in the code face, which is wider than the body's.
+      width: 232,
       render: (row) => (
         <Text type="code" size="sm" color="secondary">
           <Timestamp value={row.ts * 1000} />
@@ -559,7 +568,8 @@ export default function SecurityClient({
     {
       id: "clientIp",
       label: tCommon("clientIp"),
-      width: 170,
+      // A full eight-group IPv6 address.
+      width: 370,
       render: (row) => (
         <Text type="code" size="sm">
           {row.clientIp}
@@ -703,6 +713,13 @@ export default function SecurityClient({
           description={t("analyticsUnavailableDescription")}
         />
       )}
+      {report.source === "starting" && (
+        <Banner
+          status="warning"
+          title={tAnalytics("startingTitle")}
+          description={tAnalytics("startingDescription")}
+        />
+      )}
       {report.source === "waf" && (
         <Banner status="info" title={t("wafOnlyTitle")} description={t("wafOnlyDescription")} />
       )}
@@ -760,7 +777,6 @@ export default function SecurityClient({
                 page: report.events.page,
                 perPage: report.events.perPage,
               }}
-              expandOnRowClick
               expandedRow={(row) => (
                 <WafEventInsight
                   eventKey={row.key}

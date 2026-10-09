@@ -384,7 +384,6 @@ export function WafPluginsPanel({
               columns={installedColumns}
               data={plugins}
               keyField="id"
-              expandOnRowClick
               expandedRow={(row) => (
                 <WafPluginFiles
                   plugin={row}

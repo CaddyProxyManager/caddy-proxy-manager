@@ -22,8 +22,10 @@ import {
   getAuthentikSettings,
   getForwardAuthSettings,
   getGeneralSettings,
+  getHostDefaults,
   getTailscaleSettings,
 } from "../settings";
+import type { ProxyHostDefaults } from "./host-defaults";
 
 /** WafPresetOptions' option shape, for presets and installed CRS plugins alike. */
 type PickerOption = { id: number; name: string; description: string | null };
@@ -51,6 +53,8 @@ export type HostEditorOptions = {
   tailscaleDefaults: { enabled: boolean; hasAuthKey: boolean; defaultNode: string };
   /** Prefilled into a new host's domains; empty for none. */
   defaultDomain: string;
+  /** Prefilled into a new host; a duplicate keeps its source's values. */
+  hostDefaults: ProxyHostDefaults;
   mtlsRoles: MtlsRole[];
   issuedClientCerts: IssuedClientCertificate[];
   forwardAuthUsers: ForwardAuthUserOption[];
@@ -68,6 +72,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
     forwardAuthDefaults,
     tailscale,
     general,
+    hostDefaults,
     // Safe to fail before the RBAC migration has run.
     mtlsRoles,
     issuedClientCerts,
@@ -83,6 +88,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
     getForwardAuthSettings(),
     getTailscaleSettings(),
     getGeneralSettings(),
+    getHostDefaults(),
     listMtlsRoles().catch(() => []),
     listIssuedClientCertificates().catch(() => []),
     listUsers().catch(() => []),
@@ -103,6 +109,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
       defaultNode: tailscale?.defaultNode ?? "",
     },
     defaultDomain: general?.defaultDomain ?? "",
+    hostDefaults: hostDefaults.proxyHost,
     mtlsRoles,
     issuedClientCerts,
     forwardAuthUsers: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role })),

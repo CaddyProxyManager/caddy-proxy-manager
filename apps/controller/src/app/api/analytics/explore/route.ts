@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser } from "@/src/lib/api/auth";
+import { analyticsErrorResponse } from "@/src/lib/analytics/api-error";
 import { getAnalyticsReport } from "@/src/lib/analytics/explore";
 import { parseExploreState } from "@/src/lib/analytics/explore-state";
 
@@ -10,6 +11,6 @@ export async function GET(req: NextRequest) {
     const report = await getAnalyticsReport(parseExploreState(req.nextUrl.searchParams));
     return NextResponse.json(report);
   } catch (error) {
-    return apiErrorResponse(error);
+    return analyticsErrorResponse(error);
   }
 }

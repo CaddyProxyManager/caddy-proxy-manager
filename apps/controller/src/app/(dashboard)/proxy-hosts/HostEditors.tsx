@@ -93,6 +93,7 @@ export default function HostEditors({
         <WafPresetOptionsProvider presets={options.wafPresets} plugins={options.wafPlugins}>
           <CreateHostDialog
             defaultDomain={options.defaultDomain}
+            hostDefaults={options.hostDefaults}
             key={createKey}
             open={createOpen}
             onClose={onCloseCreate}
