@@ -142,9 +142,9 @@ export class AgentLifecycle {
     this.deps.store.setCaddyStoppedForShutdown(false);
     const restoreServices = this.deps.store.servicesStoppedForShutdown();
     this.deps.store.setServicesStoppedForShutdown([]);
-    if (restoreServices.length > 0) {
-      this.servicesRestore = this.restoreServices(restoreServices);
-    }
+    this.servicesRestore = (
+      restoreServices.length > 0 ? this.restoreServices(restoreServices) : Promise.resolve()
+    ).then(() => this.forgetMissingServices());
 
     if (storedUrl && storedController) {
       // Also on resume, so a pairing stored before public plain http was refused stops using it.
@@ -384,6 +384,27 @@ export class AgentLifecycle {
         ...applied,
         ...Object.fromEntries(marked.map((name) => [name, false])),
       });
+    }
+  }
+
+  /**
+   * A container removed by hand stays "applied", and `compose start` of nothing succeeds, so it
+   * was never recreated. Marked unapplied, the first frame's `up` recreates it with its env.
+   */
+  private async forgetMissingServices(): Promise<void> {
+    try {
+      const applied = this.deps.store.appliedManagedServices();
+      if (!applied || !MANAGED_SERVICES.some((name) => applied[name])) return;
+      const running = await this.deps.docker.runningServices();
+      const missing = MANAGED_SERVICES.filter((name) => applied[name] && !running.includes(name));
+      if (missing.length === 0) return;
+      console.log(`[agent] ${missing.join(" and ")} not running; starting on the next frame`);
+      this.deps.store.setAppliedManagedServices({
+        ...applied,
+        ...Object.fromEntries(missing.map((name) => [name, false])),
+      });
+    } catch (error) {
+      console.warn("[agent] could not compare the managed services with Docker:", error);
     }
   }
 
@@ -909,7 +930,24 @@ export class AgentLifecycle {
       if (list.state === "unreadable") {
         console.warn(`[agent] could not read Caddy's module list: ${list.reason}`);
       }
+    } else {
+      await this.adoptImageModules();
     }
+  }
+
+  /**
+   * A release bump pulls the stock image under the tag a rebuild had replaced, dropping its
+   * modules while the store still lists them; nothing rebuilt, and Caddy's autosave then failed to
+   * load. Recording what the image carries makes the next diff rebuild.
+   */
+  private async adoptImageModules(): Promise<void> {
+    if (this.deps.operations.isRunning("caddy-build")) return;
+    const list = await this.deps.docker.readCaddyModuleList().catch(() => null);
+    if (list?.state !== "found") return;
+    const store = this.deps.store;
+    if (sameList(list.modules, store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES])) return;
+    console.log("[agent] Caddy's image carries other modules than were built; rebuilding");
+    store.setAppliedCaddyModules(list.modules);
   }
 
   private async stopCaddy(reason: string): Promise<void> {

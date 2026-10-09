@@ -127,6 +127,10 @@ export class Operations {
     this.applyL4Ports(recorded);
   }
 
+  isRunning(kind: OperationKind): boolean {
+    return this.running === kind;
+  }
+
   private begin(kind: OperationKind): void {
     if (this.running) throw new OperationBusyError(this.running);
     this.running = kind;

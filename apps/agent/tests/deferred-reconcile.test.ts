@@ -263,3 +263,47 @@ describe("a port change", () => {
     lifecycle.stop();
   });
 });
+
+// State the store holds about containers Docker may since have lost.
+describe("what the agent recorded against what Docker has", () => {
+  function lifecycleWith(docker: Partial<DockerHost>, running = false) {
+    const lifecycle = new AgentLifecycle({
+      config: loadConfig(),
+      store,
+      docker: docker as DockerHost,
+      operations: { isRunning: () => running } as unknown as Operations,
+    });
+    return lifecycle as unknown as {
+      forgetMissingServices(): Promise<void>;
+      adoptImageModules(): Promise<void>;
+    };
+  }
+
+  it("marks a service removed by hand unapplied, so the next frame recreates it", async () => {
+    store.setAppliedManagedServices({ clickhouse: true, crowdsec: true }, "env");
+    const inner = lifecycleWith({ runningServices: async () => ["crowdsec"] });
+
+    await inner.forgetMissingServices();
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: true });
+  });
+
+  const BOUNCER = "github.com/hslatman/caddy-crowdsec-bouncer";
+  const stock = {
+    readCaddyModuleList: async () => ({
+      state: "found" as const,
+      modules: [...SHIPPED_CADDY_MODULES],
+    }),
+  };
+
+  it("records the modules of a stock image a release bump put back, so they are rebuilt", async () => {
+    store.setAppliedCaddyModules([...SHIPPED_CADDY_MODULES, BOUNCER]);
+    await lifecycleWith(stock).adoptImageModules();
+    expect(store.appliedCaddyModules()).toEqual([...SHIPPED_CADDY_MODULES]);
+  });
+
+  it("leaves the record alone while a rebuild is replacing the image", async () => {
+    store.setAppliedCaddyModules([...SHIPPED_CADDY_MODULES, BOUNCER]);
+    await lifecycleWith(stock, true).adoptImageModules();
+    expect(store.appliedCaddyModules()).toEqual([...SHIPPED_CADDY_MODULES, BOUNCER]);
+  });
+});
