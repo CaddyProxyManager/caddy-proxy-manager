@@ -10,7 +10,7 @@ import { httpGet, waitForStatus } from '../../helpers/http';
 const ORIGIN = 'http://localhost:3000';
 const DOMAIN = 'func-traffic-ingest.test';
 const REQUESTS = 6;
-// The agent parses every 30s; allow a few cycles.
+// The agent parses every few seconds (30s on an older controller); allow a few cycles.
 const INGEST_TIMEOUT_MS = 120_000;
 
 function clickhouse() {

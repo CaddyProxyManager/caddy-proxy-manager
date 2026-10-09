@@ -4,7 +4,12 @@
  * serves both; the WAF log only analytics.
  */
 
-import type { FleetConfig } from "@cpm/shared";
+import {
+  DEFAULT_ANALYTICS_INTERVAL_SECONDS,
+  type FleetConfig,
+  MAX_ANALYTICS_INTERVAL_SECONDS,
+  MIN_ANALYTICS_INTERVAL_SECONDS,
+} from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { ControllerClient } from "../controller-client";
 import {
@@ -27,7 +32,20 @@ import {
   bindStore as bindWafStore,
 } from "./waf-log-parser";
 
-const PARSE_INTERVAL_MS = 30_000;
+/** Applied by the next `applyFleetConfig`; a restart of the timers keeps their parsers' offsets. */
+let parseIntervalMs = DEFAULT_ANALYTICS_INTERVAL_SECONDS * 1000;
+
+/** Clamped: a pushed value this agent cannot honour falls back to the slow, safe cadence. */
+export function parseIntervalFor(seconds: unknown): number {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) {
+    return DEFAULT_ANALYTICS_INTERVAL_SECONDS * 1000;
+  }
+  const clamped = Math.min(
+    MAX_ANALYTICS_INTERVAL_SECONDS,
+    Math.max(MIN_ANALYTICS_INTERVAL_SECONDS, seconds),
+  );
+  return Math.round(clamped * 1000);
+}
 
 let accessTimer: NodeJS.Timeout | null = null;
 let wafTimer: NodeJS.Timeout | null = null;
@@ -55,6 +73,7 @@ export async function applyFleetConfig(
     analytics,
     upstreamErrors,
   });
+  parseIntervalMs = parseIntervalFor(config.analyticsIntervalSeconds);
   await syncParsers(analyticsEnabled() || upstreamErrorsEnabled(), analyticsEnabled());
 
   scheduleGeoipSync(store, config, controllerId);
@@ -109,10 +128,22 @@ function parseEvery(label: string, parse: () => Promise<void>): NodeJS.Timeout {
       .finally(() => {
         running = false;
       });
-  }, PARSE_INTERVAL_MS);
+  }, parseIntervalMs);
 }
 
+/** The interval the running timers were made with, to notice a pushed change. */
+let timersMs = 0;
+
 async function syncParsers(access: boolean, waf: boolean): Promise<void> {
+  if (timersMs !== parseIntervalMs && (accessTimer || wafTimer)) {
+    // Same parsers and offsets, a new cadence.
+    if (accessTimer) clearInterval(accessTimer);
+    if (wafTimer) clearInterval(wafTimer);
+    accessTimer = accessTimer ? parseEvery("access", parseNewLogEntries) : null;
+    wafTimer = wafTimer ? parseEvery("WAF", parseNewWafLogEntries) : null;
+    console.log(`[analytics] parsing every ${parseIntervalMs / 1000}s`);
+  }
+  timersMs = parseIntervalMs;
   if (access && !accessTimer) {
     await initLogParser();
     accessTimer = parseEvery("access", parseNewLogEntries);

@@ -365,6 +365,12 @@ export type FleetConfig = {
   upstreamErrors?: boolean;
 
   /**
+   * How often the agent parses its logs and relays the rows, which is how soon the dashboard sees a
+   * request. Absent from an older controller, and an older agent ignores it: both keep 30 seconds.
+   */
+  analyticsIntervalSeconds?: number;
+
+  /**
    * Offline mode: the agent acts as if `CADDY_BUILD_MODE=external`, since a build downloads Go
    * modules. Absent from an older controller; an older agent ignores it and still builds.
    */
@@ -380,6 +386,13 @@ export type FleetConfig = {
     editions: string[];
   } | null;
 };
+
+/** What an agent does without `analyticsIntervalSeconds`, and what the controller pushes by default. */
+export const DEFAULT_ANALYTICS_INTERVAL_SECONDS = 30;
+export const LIVE_ANALYTICS_INTERVAL_SECONDS = 5;
+/** Clamped on the agent, so a bad value neither spins the parser nor starves the dashboard. */
+export const MIN_ANALYTICS_INTERVAL_SECONDS = 2;
+export const MAX_ANALYTICS_INTERVAL_SECONDS = 300;
 
 // ─── Analytics rows ──────────────────────────────────────────────────────────
 

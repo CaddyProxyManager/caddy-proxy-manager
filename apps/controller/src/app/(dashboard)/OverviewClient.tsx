@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApexOptions } from "apexcharts";
 import { ArrowLeftRight, BarChart2, Gauge, History, KeyRound, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
@@ -26,6 +26,7 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { PowerSearch, type PowerSearchFilter } from "@astryxdesign/core/PowerSearch";
 import { type useFormatter, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
+import { useLive } from "@/src/lib/live/useLive";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -332,6 +333,17 @@ export default function OverviewClient({
   const [isLoading, setIsLoading] = useState(isAdmin && !previewPayload);
   const [hasFailed, setHasFailed] = useState(false);
   const [analyticsStarting, setAnalyticsStarting] = useState(false);
+  // Bumped when the server says new traffic landed; that re-read keeps the numbers up, no spinner.
+  const [liveTick, setLiveTick] = useState(0);
+  const quietReload = useRef(false);
+  useLive(
+    "analytics",
+    () => {
+      quietReload.current = true;
+      setLiveTick((tick) => tick + 1);
+    },
+    isAdmin && !previewPayload,
+  );
 
   const metric = metricKey === null ? null : (METRICS.find((m) => m.key === metricKey) ?? null);
   const filter = metric?.filter ?? "all";
@@ -360,6 +372,7 @@ export default function OverviewClient({
     [t, tCommon],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: liveTick only asks for another read
   useEffect(() => {
     if (!isAdmin) return;
     if (previewPayload) {
@@ -368,7 +381,9 @@ export default function OverviewClient({
       return;
     }
     const abort = new AbortController();
-    setIsLoading(true);
+    const quiet = quietReload.current;
+    quietReload.current = false;
+    if (!quiet) setIsLoading(true);
     const params = new URLSearchParams({ interval, filter, limit: "40" });
     fetch(`/api/analytics/overview?${params.toString()}`, { signal: abort.signal })
       .then(async (res) => {
@@ -393,7 +408,7 @@ export default function OverviewClient({
         setIsLoading(false);
       });
     return () => abort.abort();
-  }, [isAdmin, interval, filter, previewPayload]);
+  }, [isAdmin, interval, filter, previewPayload, liveTick]);
 
   const rangeSeconds = RANGE_SECONDS[interval];
   const timeline = payload?.timeline ?? [];

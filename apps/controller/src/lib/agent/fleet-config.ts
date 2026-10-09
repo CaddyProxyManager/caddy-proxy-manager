@@ -1,6 +1,6 @@
 /** Desired state: sent on attach and on every change, so no agent sits on stale settings. */
 
-import type { FleetConfig } from "@cpm/shared";
+import { type FleetConfig, LIVE_ANALYTICS_INTERVAL_SECONDS } from "@cpm/shared";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import { offlineModeEnabled } from "../offline";
 import { geoipFleetConfig } from "./geoip";
@@ -15,7 +15,14 @@ export async function currentFleetConfig(): Promise<FleetConfig> {
     offlineModeEnabled(),
   ]);
   // Agents relay analytics rather than writing to ClickHouse, so no credential goes out here.
-  return { clickhouse: null, analytics, geoip, upstreamErrors, offline };
+  return {
+    clickhouse: null,
+    analytics,
+    geoip,
+    upstreamErrors,
+    offline,
+    analyticsIntervalSeconds: LIVE_ANALYTICS_INTERVAL_SECONDS,
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
  * Relayed through the controller so no agent holds a ClickHouse credential or needs to reach it,
- * and each row records its agent. One request per 30-second parser batch.
+ * and each row records its agent. One request per parser batch.
  */
 
 import {

@@ -453,6 +453,13 @@ export interface WafEventRow {
 }
 
 /** `agentId` is the agent that relayed the rows, recorded so a false event is attributable. */
+/**
+ * The ingest path waits for the flush: the dashboard re-reads the moment rows are announced, and
+ * an unflushed row would be missed until the next batch. It also lets a failed flush fail the
+ * request, so the agent resends instead of dropping the batch.
+ */
+const FLUSHED_INSERT = { async_insert: 1, wait_for_async_insert: 1 } as const;
+
 export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = ""): Promise<void> {
   if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
   if ((await chConfig()).sqlite) {
@@ -468,7 +475,14 @@ export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = "")
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     is_blocked: r.is_blocked ? 1 : 0,
   }));
-  await withSchema((ch) => ch.insert({ table: "traffic_events", values, format: "JSONEachRow" }));
+  await withSchema((ch) =>
+    ch.insert({
+      table: "traffic_events",
+      values,
+      format: "JSONEachRow",
+      clickhouse_settings: FLUSHED_INSERT,
+    }),
+  );
 }
 
 export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promise<void> {
@@ -487,7 +501,14 @@ export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promis
     blocked: r.blocked ? 1 : 0,
     agent_id: agentId,
   }));
-  await withSchema((ch) => ch.insert({ table: "waf_events", values, format: "JSONEachRow" }));
+  await withSchema((ch) =>
+    ch.insert({
+      table: "waf_events",
+      values,
+      format: "JSONEachRow",
+      clickhouse_settings: FLUSHED_INSERT,
+    }),
+  );
 }
 
 // ── Parameterized query helpers ─────────────────────────────────────────────

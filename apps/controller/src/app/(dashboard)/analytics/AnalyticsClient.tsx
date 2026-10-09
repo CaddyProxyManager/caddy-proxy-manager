@@ -32,6 +32,7 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Download, ListFilter, ListX } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
+import { useLive } from "@/src/lib/live/useLive";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { useTableDensity } from "@/components/ui/TableDensity";
@@ -407,8 +408,22 @@ export default function AnalyticsClient() {
   }, [load]);
 
   const refreshes = autoRefreshes(state);
+  // The server says when rows landed; the timer below only covers a stream that is down.
+  const liveReload = useRef<AbortController | null>(null);
+  const streaming = useLive(
+    "analytics",
+    () => {
+      if (document.visibilityState !== "visible") return;
+      liveReload.current?.abort();
+      liveReload.current = new AbortController();
+      load(liveReload.current.signal);
+    },
+    refreshes,
+  );
+  useEffect(() => () => liveReload.current?.abort(), []);
+
   useEffect(() => {
-    if (!refreshes) return;
+    if (!refreshes || streaming) return;
     let controller: AbortController | null = null;
     const timer = setInterval(() => {
       // A hidden tab skips its refreshes; the first one after it is shown again catches up.
@@ -421,7 +436,7 @@ export default function AnalyticsClient() {
       clearInterval(timer);
       controller?.abort();
     };
-  }, [refreshes, load]);
+  }, [refreshes, streaming, load]);
 
   const addFilter = useCallback(
     (dimension: TopDimension, value: string, op: FilterOp) => {

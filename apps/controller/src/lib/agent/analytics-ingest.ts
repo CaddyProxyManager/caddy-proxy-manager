@@ -23,6 +23,7 @@ import db from "../db";
 import { proxyHosts } from "../db/schema";
 import { listHostAssignments, servedByAgent } from "../models/host-agents";
 import { onAnnouncement } from "../cluster/announcements";
+import { publishLive } from "../live/bus";
 import { dropProcessMemo, processMemo } from "../settings/process-memo";
 
 /** A URI or user agent past this is noise, not a request. */
@@ -245,6 +246,7 @@ export async function ingestAnalytics(
       .filter(ours)
       .map((row) => ({ ...row, host: bareHost(row.host) }));
     await insertTrafficEvents(valid, agentId);
+    if (valid.length > 0) publishLive("analytics");
     await queueSecurity(valid.map(trafficSecurityBody).filter((body) => body !== null));
     return { accepted: valid.length, rejected: rows.length - valid.length };
   }
@@ -254,6 +256,7 @@ export async function ingestAnalytics(
     .filter(ours)
     .map((row) => ({ ...row, host: bareHost(row.host) }));
   await insertWafEvents(valid, agentId);
+  if (valid.length > 0) publishLive("waf");
   await queueSecurity(valid.map(wafSecurityBody));
   return { accepted: valid.length, rejected: rows.length - valid.length };
 }

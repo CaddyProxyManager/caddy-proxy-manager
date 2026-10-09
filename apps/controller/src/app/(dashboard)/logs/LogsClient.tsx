@@ -19,7 +19,6 @@ type Agent = { agentId: string; name: string; canReadLogs: boolean };
 
 /** Enough to scroll back through without the page growing without bound. */
 const KEPT_LINES = 2000;
-const POLL_MS = 2000;
 const SOURCES: LogView[] = ["access", "waf", "caddy", "acme"];
 
 /** The source the agent reads; ACME is Caddy's own output, filtered here. */
@@ -67,35 +66,41 @@ export default function LogsClient({
 
   useEffect(() => {
     if (!agentId || !following) return;
-    let stopped = false;
     const run = generation.current;
-    const poll = async () => {
-      const params = new URLSearchParams({ agent: agentId, source: agentSource(view) });
-      if (cursor.current) params.set("cursor", cursor.current);
+    const params = new URLSearchParams({ agent: agentId, source: agentSource(view) });
+    // Resumes after Pause from where it stopped; the stream's own reconnects send Last-Event-ID.
+    if (cursor.current) params.set("cursor", cursor.current);
+    const stream = new EventSource(`/api/logs/stream?${params}`);
+
+    const parse = <T,>(raw: string): T | null => {
       try {
-        const response = await fetch(`/api/logs?${params}`);
-        const body = await response.json();
-        if (stopped || run !== generation.current) return;
-        if (!response.ok) {
-          setError(body.error ?? t("readFailed"));
-          return;
-        }
-        setError(null);
-        setMissing(Boolean(body.missing));
-        cursor.current = body.cursor ?? cursor.current;
-        if (body.lines.length > 0) {
-          setLines((current) => [...current, ...body.lines].slice(-KEPT_LINES));
-        }
+        return JSON.parse(raw) as T;
       } catch {
-        if (!stopped) setError(t("readFailed"));
+        return null;
       }
     };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
+    stream.addEventListener("lines", (event) => {
+      const body = parse<{ lines?: string[]; cursor?: string | null; missing?: boolean }>(
+        (event as MessageEvent<string>).data,
+      );
+      if (!body || run !== generation.current) return;
+      setError(null);
+      setMissing(Boolean(body.missing));
+      cursor.current = body.cursor ?? cursor.current;
+      const fresh = body.lines ?? [];
+      if (fresh.length > 0) setLines((current) => [...current, ...fresh].slice(-KEPT_LINES));
+    });
+    stream.addEventListener("problem", (event) => {
+      const body = parse<{ error?: string }>((event as MessageEvent<string>).data);
+      if (run === generation.current) setError(body?.error ?? t("readFailed"));
+    });
+    // A drop reconnects by itself; a refusal (signed out, no permission) closes it for good.
+    stream.addEventListener("error", () => {
+      if (run === generation.current && stream.readyState === EventSource.CLOSED) {
+        setError(t("readFailed"));
+      }
+    });
+    return () => stream.close();
   }, [agentId, view, following, t]);
 
   const shown = useMemo(() => {

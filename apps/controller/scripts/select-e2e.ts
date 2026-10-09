@@ -60,6 +60,7 @@ const ANALYTICS: Specs = [
   "analytics/",
   "functional/analytics-traffic-ingestion",
   "functional/waf-event-ingestion",
+  "functional/live-updates",
 ];
 const LOGS: Specs = ["analytics/logs"];
 const GEOIP: Specs = [
@@ -303,7 +304,10 @@ export const RULES: readonly Rule[] = [
       `${LIB}agent/analytics-ingest.ts`,
       `${DASH}analytics/`,
       `${APP}api/analytics/`,
+      `${APP}api/live/`,
+      `${LIB}live/`,
       `${AGENT}analytics/`,
+      `${DASH}OverviewClient.tsx`,
     ],
     specs: ANALYTICS,
   },

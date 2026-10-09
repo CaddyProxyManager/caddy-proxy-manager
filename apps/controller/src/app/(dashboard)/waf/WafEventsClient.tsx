@@ -55,6 +55,7 @@ import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/forms/row-id";
 import { useTimeZone, useTranslations } from "next-intl";
+import { useLive } from "@/src/lib/live/useLive";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { ACCENTS, type Hue } from "@/components/ui/accent";
 import { CARD_TITLE_CLASS } from "@/components/ui/card-title";
@@ -800,6 +801,15 @@ export default function WafEventsClient({
   const searchParams = useSearchParams();
   // ?tab= opens one directly, as settings search does for the tuning and per-host tabs.
   const [tab, setTab] = useTabRoute("/waf", WAF_TABS, "events");
+  // New events re-render the page's server data; spaced, since each one is a full page read.
+  useLive(
+    "waf",
+    () => {
+      if (document.visibilityState === "visible") router.refresh();
+    },
+    true,
+    3000,
+  );
   const [range, setRange] = useState<RangeOption>(initialRange);
   const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
   const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));
