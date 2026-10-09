@@ -15,6 +15,10 @@ on:
         description: Publish every stable release to the deploy repository, and release nothing
         type: boolean
         default: false
+      deploy_tag:
+        description: Publish this released tag to the deploy repository, and release nothing
+        type: string
+        default: ""
 
 # Queue rather than cancel: the loser would abandon a version bump with no release.
 concurrency:
@@ -24,7 +28,7 @@ concurrency:
 jobs:
   release:
     name: Tag and release
-    if: ${{ !inputs.backfill }}
+    if: ${{ !inputs.backfill && !inputs.deploy_tag }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -102,7 +106,7 @@ jobs:
           image_base="ghcr.io/$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
 
           # On disk, so `docker compose pull` cannot deliver a change to them.
-          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy docker/crowdsec)
+          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy docker/crowdsec docker/caddy)
 
           deploy_changed=""
           if [ -n "$PREVIOUS" ]; then
@@ -157,7 +161,7 @@ jobs:
             echo
             echo "## Installing without internet access"
             echo
-            echo "The image build attaches an air-gap bundle per architecture once it finishes:"
+            echo "The image build attaches an air-gap bundle per architecture before publishing this:"
             echo "\`-airgap-<web|caddy|agent>.tar.gz\` hold our images, \`-airgap-deploy.tar.gz\` the"
             echo "deployment files and a load script, and the signed \`-airgap-manifest.txt\` their"
             echo "checksums and the third-party images to bring in by digest. See"
@@ -206,12 +210,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          # The checked-out commit, not wherever the branch moved while the run queued. Tagged
+          # first: a draft creates no tag, and the image build runs at it.
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
+
+          # A draft: releases are immutable once published, and the image build still has the
+          # air-gap bundles to attach. It publishes the release once they are.
           args=(
             "$TAG"
             --title "$TAG"
             --notes-file release-notes.md
-            # The checked-out commit, not wherever the branch moved while the run queued.
-            --target "$GITHUB_SHA"
+            --verify-tag
+            --draft
           )
           if [ "$PRERELEASE" = "true" ]; then
             args+=(--prerelease)
@@ -236,15 +246,13 @@ jobs:
           gh workflow run site.yml --ref main
           echo "Dispatched site"
 
-  # Its own job, so "Re-run failed jobs" retries just this: inside the release job the tag would
-  # already exist and the rerun would skip it. Needs the DEPLOY_APP_* credentials of an app
-  # installed on the deploy repository with contents: write.
+  # Dispatched with deploy_tag by the image build once it has published the release; a draft's
+  # archive cannot be downloaded. Needs the DEPLOY_APP_* credentials of an app installed on the
+  # deploy repository with contents: write.
   deploy-repo:
     name: Publish to the deploy repository
     needs: release
-    if: >-
-      !cancelled() &&
-      (inputs.backfill || (needs.release.result == 'success' && needs.release.outputs.release == 'true'))
+    if: ${{ !cancelled() && (inputs.backfill || inputs.deploy_tag != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -271,7 +279,7 @@ jobs:
           DEPLOY_REPO: ${{ github.repository_owner }}/deploy
           SOURCE_REPO: ${{ github.repository }}
           BACKFILL: ${{ inputs.backfill }}
-          TAG: ${{ needs.release.outputs.tag }}
+          TAG: ${{ inputs.deploy_tag }}
         run: |
           set -euo pipefail
           if [ "$BACKFILL" = true ]; then
