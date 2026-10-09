@@ -1,6 +1,6 @@
 {
   "name": "@cpm/shared",
-  "version": "3.7.5",
+  "version": "3.7.6",
   "description": "Contracts shared between the controller and the agent",
   "type": "module",
   "private": true,
