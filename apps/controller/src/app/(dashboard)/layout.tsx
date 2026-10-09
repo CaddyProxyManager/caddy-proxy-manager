@@ -17,7 +17,7 @@ import DashboardLayoutClient from "./DashboardLayoutClient";
 import { inArray } from "drizzle-orm";
 import db from "@/src/lib/db";
 import { groups } from "@/src/lib/db/schema";
-import { stagedKeys } from "@/src/lib/settings/staged-view";
+import { stagedView } from "@/src/lib/settings/staged-view";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 import { getRole } from "@/src/lib/roles/store";
 import { getTableDensity } from "@/src/lib/models/table-density";
@@ -49,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     gravatar,
     moduleGate,
     updates,
-    stagedSet,
+    staged,
     morePins,
     tableDensity,
     mfaStanding,
@@ -63,8 +63,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getModuleGateState((module) => caddyModuleName(t, module)),
     // A cache read that refreshes in the background, never a network call on render.
     getUpdateStatus(),
-    // Only whoever reaches Settings pays for this read.
-    can(access, "settings:read") ? stagedKeys(userId) : null,
+    // Only whoever reaches Settings pays for this read; a settings page reuses it (requestMemo).
+    can(access, "settings:read") ? stagedView(userId) : null,
     // Null means never chosen, which keeps the phone's More drawer offering to be customized.
     getMoreDrawerPins(userId),
     getTableDensity(userId),
@@ -87,7 +87,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     64,
     { gravatar },
   );
-  const staged = stagedSet ? [...stagedSet] : [];
   const sqliteNotice = sqliteNoticeApplies() && !(await cookies()).get(SQLITE_NOTICE_COOKIE);
   return (
     <ModuleGateProvider value={moduleGate}>
@@ -99,7 +98,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           demoMode={isDemoMode()}
           sqliteNotice={sqliteNotice}
           updateAvailable={updates.updateAvailable}
-          stagedKeys={staged}
+          staged={staged}
           morePins={morePins}
           capabilities={access.capabilities}
           mfaDeadline={mfaStanding.status === "grace" ? mfaStanding.deadline : null}

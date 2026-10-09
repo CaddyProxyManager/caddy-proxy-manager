@@ -93,6 +93,22 @@ export function RevisionPill({ staged, inRail = false }: { staged: StagedView; i
   );
 }
 
+/** The revision and the staged controls atop a rail's footer, in Settings and on the dashboard. */
+export function RailStagedBlock({ staged }: { staged: StagedView }) {
+  // A shade above the user footer below it, so the two read as separate blocks. The negative
+  // margins cancel the side nav footer's padding, so the shade reaches its edges.
+  return (
+    <VStack className="-mx-2 -mt-2 bg-muted border-t border-border">
+      <RevisionPill staged={staged} inRail />
+      {staged.changes.length > 0 && (
+        <VStack paddingInline={2} paddingBlockEnd={2}>
+          <StagedControls view={staged} fill />
+        </VStack>
+      )}
+    </VStack>
+  );
+}
+
 /** In the rail: shaped like its entries, so it reads as one of them rather than a caption. */
 function RailRevision({ staged }: { staged: StagedView }) {
   const t = useTranslations("settings");

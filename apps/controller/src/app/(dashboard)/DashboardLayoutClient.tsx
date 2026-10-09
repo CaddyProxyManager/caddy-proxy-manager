@@ -13,6 +13,8 @@ import { LogOut, Sun, Moon } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import SettingsSideNav from "./settings/SettingsSideNav";
+import { RailStagedBlock } from "./settings/StagedChanges";
+import type { StagedView } from "@/src/lib/settings/staged-view";
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { NavIcon } from "@astryxdesign/core/NavIcon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -139,7 +141,7 @@ export default function DashboardLayoutClient({
   demoMode = false,
   sqliteNotice = false,
   updateAvailable,
-  stagedKeys,
+  staged,
   morePins,
   capabilities,
   viewAs = null,
@@ -155,8 +157,8 @@ export default function DashboardLayoutClient({
   /** A real instance on SQLite, and this browser has not dismissed the warning lately. */
   sqliteNotice?: boolean;
   updateAvailable: boolean;
-  /** So the settings rail can mark their sections. */
-  stagedKeys: readonly string[];
+  /** Null without settings:read. The rails show its revision; Settings marks staged sections. */
+  staged: StagedView | null;
   /** Null if the user never customized the More drawer. */
   morePins: readonly DestinationId[] | null;
   /** What the viewer may do, which decides the pages the nav offers. */
@@ -345,7 +347,7 @@ export default function DashboardLayoutClient({
           sideNav={
             <SettingsSideNav
               footer={<UserFooter user={user} avatar={avatar} />}
-              stagedKeys={stagedKeys}
+              stagedKeys={staged?.changes.map((change) => change.key) ?? []}
             />
           }
         >
@@ -380,7 +382,17 @@ export default function DashboardLayoutClient({
                 }
               />
             }
-            footer={<UserFooter user={user} avatar={avatar} />}
+            footer={
+              // As in Settings: some settings live on pages of their own, which apply them too.
+              staged ? (
+                <VStack gap={2}>
+                  <RailStagedBlock staged={staged} />
+                  <UserFooter user={user} avatar={avatar} />
+                </VStack>
+              ) : (
+                <UserFooter user={user} avatar={avatar} />
+              )
+            }
           >
             {/* No shortcut to advertise on a phone, where the tab bar navigates. */}
             <div className="cpm-desktop-only">

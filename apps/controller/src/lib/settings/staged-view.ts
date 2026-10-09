@@ -1,6 +1,7 @@
 /** One source for the staged bar and review sheet, so no two pages disagree on what is pending. */
 
 import { isDemoMode } from "../demo/mode";
+import { requestMemo } from "../request-memo";
 import db from "../db";
 import { listStagedSettings } from "./staging";
 import { recentRevisions } from "./apply";
@@ -52,7 +53,12 @@ function changedFields(storedValue: string | null, stagedValue: string): string[
     .sort();
 }
 
-export async function stagedView(userId: number): Promise<StagedView> {
+/** Memoised: the dashboard layout's rail and a settings page both read it in one render. */
+export function stagedView(userId: number): Promise<StagedView> {
+  return requestMemo(`staged-view:${userId}`, () => loadStagedView(userId));
+}
+
+async function loadStagedView(userId: number): Promise<StagedView> {
   const [staged, revisions] = await Promise.all([listStagedSettings(userId), recentRevisions(3)]);
 
   // Straight from the table: the read path would hand back the staged values.
