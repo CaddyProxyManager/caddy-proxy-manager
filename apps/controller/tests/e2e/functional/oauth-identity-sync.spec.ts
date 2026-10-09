@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../../helpers/hydration';
 
 /**
  * #261: Better Auth's `accounts` rows must be projected onto `users.provider`/`subject`, which the
@@ -187,6 +188,8 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     await page.goto('/profile');
     const unlinkButton = page.getByRole('button', { name: /^unlink$/i });
     await expect(unlinkButton).toBeVisible({ timeout: 15_000 });
+    // Visible from the server render; a click before hydration opens nothing.
+    await waitForHydration(page);
     await unlinkButton.click();
     // Scoped: the password forms carry a current-password field too.
     const unlinkDialog = page.getByRole('dialog', { name: /unlink oauth account/i });
