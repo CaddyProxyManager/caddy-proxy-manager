@@ -9,7 +9,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { saveWafExclusionAction } from "@/src/app/(dashboard)/waf/actions";
-import { PROTECTED_RULE_IDS } from "@/src/lib/waf/exclusions";
+import { DASHBOARD_EXCLUSION_HOST_ID, PROTECTED_RULE_IDS } from "@/src/lib/waf/exclusions";
 
 /** What the dialog edits; `id` set edits a stored exclusion, unset creates one. */
 export type ExclusionDraft = {
@@ -24,6 +24,7 @@ export type ExclusionDraft = {
 export type HostOption = { id: number; name: string };
 
 const ALL_HOSTS = "all";
+const DASHBOARD = "dashboard";
 
 export function ExclusionDialog({
   draft,
@@ -51,7 +52,13 @@ export function ExclusionDialog({
   useEffect(() => {
     if (!draft) return;
     setRuleId(draft.ruleId);
-    setScope(draft.proxyHostId === null ? ALL_HOSTS : String(draft.proxyHostId));
+    setScope(
+      draft.proxyHostId === null
+        ? ALL_HOSTS
+        : draft.proxyHostId === DASHBOARD_EXCLUSION_HOST_ID
+          ? DASHBOARD
+          : String(draft.proxyHostId),
+    );
     setPath(draft.path);
     setTarget(draft.target);
     setReason(draft.reason);
@@ -66,7 +73,12 @@ export function ExclusionDialog({
     setError(null);
     const result = await saveWafExclusionAction(draft?.id ?? null, {
       ruleId,
-      proxyHostId: scope === ALL_HOSTS ? null : Number(scope),
+      proxyHostId:
+        scope === ALL_HOSTS
+          ? null
+          : scope === DASHBOARD
+            ? DASHBOARD_EXCLUSION_HOST_ID
+            : Number(scope),
       path: path.trim() || null,
       target: target.trim() || null,
       reason: reason.trim(),
@@ -109,6 +121,7 @@ export function ExclusionDialog({
           hasSearch={hosts.length > 8}
           options={[
             { value: ALL_HOSTS, label: t("exclusionAllHosts") },
+            { value: DASHBOARD, label: t("exclusionDashboard") },
             ...hosts.map((host) => ({ value: String(host.id), label: host.name })),
           ]}
         />

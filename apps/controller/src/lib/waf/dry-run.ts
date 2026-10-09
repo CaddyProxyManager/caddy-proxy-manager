@@ -7,7 +7,7 @@
 import { CADDY_VALIDATE_REFUSED_STATUS } from "@cpm/shared";
 import { type CrsPluginRules, buildWafHandler, resolveEffectiveWaf } from "./caddy";
 import { domainError } from "../errors/domain-error";
-import { type WafExclusionRule, exclusionsFor } from "./exclusions";
+import { type WafExclusionRule, dashboardExclusions, exclusionsFor } from "./exclusions";
 import type { WafHostConfig } from "../models/proxy-hosts";
 import type { WafSettings } from "../settings";
 
@@ -192,11 +192,14 @@ export function withExclusions(
 ): WafSettings | null {
   if (!waf) return null;
   // A new host has no id, and gets the global ones only.
-  const own = exclusionsFor(
-    exclusions,
-    target.kind === "host" ? (target.id ?? null) : null,
-    host?.waf_mode === "override",
-  );
+  const own =
+    target.kind === "dashboard"
+      ? dashboardExclusions(exclusions, host?.waf_mode === "override")
+      : exclusionsFor(
+          exclusions,
+          target.kind === "host" ? (target.id ?? null) : null,
+          host?.waf_mode === "override",
+        );
   return own.length > 0 ? { ...waf, exclusions: own } : waf;
 }
 

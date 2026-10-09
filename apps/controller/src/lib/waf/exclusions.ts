@@ -9,6 +9,39 @@ export const PROTECTED_RULE_IDS: readonly number[] = [949110, 949111, 959100, 95
 /** Far above every range a rule set registers, so a generated id never meets a real rule. */
 export const WAF_EXCLUSION_RULE_ID_BASE = 1_900_000_000;
 
+/** The dashboard host's id in a rule's proxyHostId; the same value as DASHBOARD_HOST_ID. */
+export const DASHBOARD_EXCLUSION_HOST_ID = -1;
+
+/**
+ * What the dashboard cannot work without, so no one can remove it and it is not stored. 920420
+ * refuses the content types the app's own POSTs (server actions, uploads) are sent with. The ids
+ * sit apart from the stored serial, which the generated rule ids are built from.
+ */
+export const DASHBOARD_MANDATORY_EXCLUSIONS: readonly WafExclusionRule[] = [
+  {
+    id: 200_000_001,
+    ruleId: 920420,
+    proxyHostId: DASHBOARD_EXCLUSION_HOST_ID,
+    path: null,
+    target: null,
+  },
+];
+
+export function isMandatoryExclusion(id: number): boolean {
+  return DASHBOARD_MANDATORY_EXCLUSIONS.some((exclusion) => exclusion.id === id);
+}
+
+/** The exclusions a dashboard handler applies: its own and the global ones, plus the mandatory. */
+export function dashboardExclusions(
+  exclusions: readonly WafExclusionRule[],
+  overridesGlobal = false,
+): WafExclusionRule[] {
+  return [
+    ...exclusionsFor(exclusions, DASHBOARD_EXCLUSION_HOST_ID, overridesGlobal),
+    ...DASHBOARD_MANDATORY_EXCLUSIONS,
+  ];
+}
+
 export const MAX_RULE_ID = 2_147_483_647;
 export const MAX_EXCLUSION_PATH = 512;
 export const MAX_EXCLUSION_REASON = 500;

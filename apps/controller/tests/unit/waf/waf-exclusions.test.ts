@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  DASHBOARD_EXCLUSION_HOST_ID,
+  DASHBOARD_MANDATORY_EXCLUSIONS,
   ExclusionInputError,
+  dashboardExclusions,
   WAF_EXCLUSION_RULE_ID_BASE,
   type WafExclusionRule,
   exclusionDirectives,
@@ -175,5 +178,47 @@ describe('buildWafHandler with exclusions', () => {
 
   it('emits exactly what it did before when there are no exclusions', () => {
     expect(buildWafHandler({ ...base, exclusions: [] })).toEqual(buildWafHandler(base));
+  });
+});
+
+describe('dashboard exclusions', () => {
+  const stored = (id: number, proxyHostId: number | null): WafExclusionRule => ({
+    id,
+    ruleId: 942100,
+    proxyHostId,
+    path: null,
+    target: null,
+  });
+
+  it('always carry 920420, even when it overrides the global WAF', () => {
+    for (const overrides of [false, true]) {
+      const rules = dashboardExclusions([], overrides);
+      expect(rules.map((rule) => rule.ruleId)).toEqual([920420]);
+      expect(exclusionDirectives(rules).removeIds).toEqual([920420]);
+    }
+  });
+
+  it('add the stored ones for the dashboard and, unless it overrides, the global ones', () => {
+    const all = [stored(1, null), stored(2, DASHBOARD_EXCLUSION_HOST_ID), stored(3, 7)];
+    expect(dashboardExclusions(all).map((rule) => rule.id)).toEqual([
+      1,
+      2,
+      ...DASHBOARD_MANDATORY_EXCLUSIONS.map((rule) => rule.id),
+    ]);
+    expect(dashboardExclusions(all, true).map((rule) => rule.id)).toEqual([
+      2,
+      ...DASHBOARD_MANDATORY_EXCLUSIONS.map((rule) => rule.id),
+    ]);
+  });
+
+  it('keep a generated rule id inside the range a rule set can take', () => {
+    for (const rule of DASHBOARD_MANDATORY_EXCLUSIONS) {
+      expect(WAF_EXCLUSION_RULE_ID_BASE + rule.id).toBeLessThanOrEqual(2_147_483_647);
+    }
+  });
+
+  it('use the same host id as the dashboard row', async () => {
+    const { DASHBOARD_HOST_ID } = await import('@/src/lib/dashboard-host');
+    expect(DASHBOARD_EXCLUSION_HOST_ID).toBe(DASHBOARD_HOST_ID);
   });
 });

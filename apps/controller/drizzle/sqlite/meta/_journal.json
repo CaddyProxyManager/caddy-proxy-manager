@@ -267,6 +267,13 @@
       "when": 1791360930044,
       "tag": "0037_change_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1791540117407,
+      "tag": "0038_waf_exclusion_dashboard",
+      "breakpoints": true
     }
   ]
 }

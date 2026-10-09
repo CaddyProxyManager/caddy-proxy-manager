@@ -23,6 +23,7 @@ import {
   type HostOption,
 } from "@/components/security/ExclusionDialog";
 import type { WafExclusion } from "@/src/lib/models/waf-exclusions";
+import { DASHBOARD_EXCLUSION_HOST_ID } from "@/src/lib/waf/exclusions";
 import { deleteWafExclusionAction } from "./actions";
 
 const NEW_EXCLUSION: ExclusionDraft = {
@@ -73,6 +74,8 @@ export function WafExclusionsPanel({
       render: (row) =>
         row.proxyHostId === null ? (
           <Badge label={t("exclusionAllHosts")} />
+        ) : row.proxyHostId === DASHBOARD_EXCLUSION_HOST_ID ? (
+          <Badge label={t("exclusionDashboard")} />
         ) : (
           <Text type="body" size="sm">
             {row.hostName ?? emptyValue}
@@ -108,50 +111,57 @@ export function WafExclusionsPanel({
       render: (row) => (
         <VStack gap={0}>
           <Text type="body" size="sm" maxLines={2}>
-            {row.reason || emptyValue}
+            {row.mandatory ? t("exclusionBuiltInReason") : row.reason || emptyValue}
           </Text>
-          <Text type="body" size="sm" color="secondary">
-            {row.createdBy ? t("exclusionBy", { name: row.createdBy }) : t("exclusionMigrated")}
-          </Text>
-          <Text type="body" size="sm" color="secondary">
-            <Timestamp value={row.updatedAt} />
-          </Text>
+          {!row.mandatory && (
+            <>
+              <Text type="body" size="sm" color="secondary">
+                {row.createdBy ? t("exclusionBy", { name: row.createdBy }) : t("exclusionMigrated")}
+              </Text>
+              <Text type="body" size="sm" color="secondary">
+                <Timestamp value={row.updatedAt} />
+              </Text>
+            </>
+          )}
         </VStack>
       ),
     },
     {
       id: "actions",
       label: tCommon("actions"),
-      width: 64,
+      width: 96,
       align: "right",
-      render: (row) => (
-        <DropdownMenu
-          hasChevron={false}
-          alignment="end"
-          button={{
-            variant: "ghost",
-            icon: <MoreHorizontal />,
-            label: t("exclusionActions", { id: String(row.ruleId) }),
-            isIconOnly: true,
-          }}
-          items={[
-            {
-              id: "edit",
-              label: tCommon("edit"),
-              onClick: () =>
-                setEditing({
-                  id: row.id,
-                  ruleId: row.ruleId,
-                  proxyHostId: row.proxyHostId,
-                  path: row.path ?? "",
-                  target: row.target ?? "",
-                  reason: row.reason,
-                }),
-            },
-            { id: "delete", label: tCommon("remove"), onClick: () => setDeleting(row) },
-          ]}
-        />
-      ),
+      render: (row) =>
+        row.mandatory ? (
+          <Badge label={t("exclusionBuiltIn")} />
+        ) : (
+          <DropdownMenu
+            hasChevron={false}
+            alignment="end"
+            button={{
+              variant: "ghost",
+              icon: <MoreHorizontal />,
+              label: t("exclusionActions", { id: String(row.ruleId) }),
+              isIconOnly: true,
+            }}
+            items={[
+              {
+                id: "edit",
+                label: tCommon("edit"),
+                onClick: () =>
+                  setEditing({
+                    id: row.id,
+                    ruleId: row.ruleId,
+                    proxyHostId: row.proxyHostId,
+                    path: row.path ?? "",
+                    target: row.target ?? "",
+                    reason: row.reason,
+                  }),
+              },
+              { id: "delete", label: tCommon("remove"), onClick: () => setDeleting(row) },
+            ]}
+          />
+        ),
     },
   ];
 

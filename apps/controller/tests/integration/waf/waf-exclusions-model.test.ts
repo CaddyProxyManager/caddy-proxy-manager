@@ -259,4 +259,31 @@ describe('migrateLegacyWafSuppressions', () => {
     expect(await migrateLegacyWafSuppressions()).toBe(0);
     expect(await listWafExclusionRules()).toHaveLength(1);
   });
+
+  it('stores a dashboard exclusion as a flag, not a host', async () => {
+    validator({ status: 200, text: '' });
+    const created = await createWafExclusion({ ruleId: 942100, proxyHostId: -1 }, userId);
+    expect(created.proxyHostId).toBe(-1);
+    expect(created.hostName).toBeNull();
+    const [row] = await ctx.db.select().from(wafExclusions);
+    expect(row.proxyHostId).toBeNull();
+    expect(row.dashboard).toBe(true);
+    expect((await listWafExclusionRules()).map((rule) => rule.proxyHostId)).toEqual([-1]);
+
+    const moved = await updateWafExclusion(
+      created.id,
+      { ruleId: 942100, proxyHostId: hostId },
+      userId,
+    );
+    expect(moved.proxyHostId).toBe(hostId);
+    const [after] = await ctx.db.select().from(wafExclusions);
+    expect(after.dashboard).toBe(false);
+  });
+
+  it('lists the built-in dashboard exclusion ahead of the stored ones', async () => {
+    const { listWafExclusionsWithBuiltIn } = await import('../../../src/lib/models/waf-exclusions');
+    const rows = await listWafExclusionsWithBuiltIn();
+    expect(rows[0]).toMatchObject({ ruleId: 920420, proxyHostId: -1, mandatory: true });
+    expect((await listWafExclusions()).length).toBe(0);
+  });
 });

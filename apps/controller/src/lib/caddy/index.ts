@@ -130,7 +130,7 @@ import { getWafPresetDirectives } from "../models/waf-presets";
 import { getCrsPluginRules } from "../models/crs-plugins";
 import { listWafExclusionRules } from "../models/waf-exclusions";
 import { listActiveBlockedSources } from "../models/blocked-sources";
-import { type WafExclusionRule, exclusionsFor } from "../waf/exclusions";
+import { type WafExclusionRule, dashboardExclusions, exclusionsFor } from "../waf/exclusions";
 import { type ActiveBlockedSource, buildBlockedSourceHandlers } from "./blocked-sources";
 import { loadWithCrsPluginRecovery } from "../waf/crs-plugins/recovery";
 import {
@@ -1745,11 +1745,10 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     if (crowdsecOn && context.crowdsec?.appsec) handlers.push(buildAppSecHandler());
 
     const resolvedWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
-    const hostExclusions = exclusionsFor(
-      context.wafExclusions ?? [],
-      row.id,
-      meta.waf?.waf_mode === "override",
-    );
+    const hostExclusions =
+      row.id === DASHBOARD_HOST_ID
+        ? dashboardExclusions(context.wafExclusions ?? [], meta.waf?.waf_mode === "override")
+        : exclusionsFor(context.wafExclusions ?? [], row.id, meta.waf?.waf_mode === "override");
     const effectiveWaf =
       resolvedWaf && hostExclusions.length > 0
         ? { ...resolvedWaf, exclusions: hostExclusions }

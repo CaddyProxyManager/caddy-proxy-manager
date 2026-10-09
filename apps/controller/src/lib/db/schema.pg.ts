@@ -632,6 +632,8 @@ export const wafExclusions = pgTable(
     ruleId: integer("ruleId").notNull(),
     /** Null is every host. */
     proxyHostId: integer("proxyHostId").references(() => proxyHosts.id, { onDelete: "cascade" }),
+    /** The dashboard host, which has no `proxy_hosts` row for proxyHostId to name. */
+    dashboard: boolean("dashboard").notNull().default(false),
     /** Decoded and normalised; a trailing `*` is a prefix. */
     path: text("path"),
     /** A rule target such as `ARGS:content`, which the rule then skips. */

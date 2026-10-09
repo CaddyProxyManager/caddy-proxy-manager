@@ -23,7 +23,7 @@ import {
   toCrsPluginOption,
 } from "@/src/lib/models/crs-plugins";
 import { listDroppedWafDirectives } from "@/src/lib/waf/caddy";
-import { listWafExclusions } from "@/src/lib/models/waf-exclusions";
+import { listWafExclusionsWithBuiltIn } from "@/src/lib/models/waf-exclusions";
 import { getWafHostModes } from "@/src/lib/security/report";
 import { strictId } from "@/src/lib/http/strict-id";
 import type { Metadata } from "next";
@@ -126,7 +126,7 @@ export default async function WafPage({ searchParams }: PageProps) {
     withStagedReads(overlay, () => getCrsPluginUsage()),
     storedCrsPluginUpdates(),
     crsPluginLoadFailures(),
-    listWafExclusions(),
+    listWafExclusionsWithBuiltIn(),
     withStagedReads(overlay, () => getWafHostModes()),
   ]);
 

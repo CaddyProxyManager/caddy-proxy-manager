@@ -82,6 +82,10 @@ through - that rule, on that host, for that path and the variable it matched in.
 Rules 949110, 949111, 959100 and 959101 cannot be excluded: they are where the CRS compares the
 anomaly score with the threshold, and excluding one would switch its blocking off altogether.
 
+The scope can be the **CPM dashboard**, which has no host row of its own. Its list always starts
+with rule 920420, marked **Built in**: the dashboard's own POST requests carry content types that
+rule refuses, so it is excluded there whatever else is configured and cannot be removed.
+
 An exclusion is checked like any other WAF change (see
 [Before anything is saved](#before-anything-is-saved)) and saved only if Coraza compiles it. If
 Caddy still refuses the configuration it produces, the change is undone and the previous

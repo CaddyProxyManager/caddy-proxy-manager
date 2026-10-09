@@ -1,0 +1,1 @@
+ALTER TABLE `waf_exclusions` ADD `dashboard` integer DEFAULT false NOT NULL;

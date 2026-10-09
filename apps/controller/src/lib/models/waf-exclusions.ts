@@ -12,6 +12,8 @@ import { applyCaddyConfig } from "../caddy";
 import { CaddyApplyError } from "../caddy/apply-error";
 import { domainError } from "../errors/domain-error";
 import {
+  DASHBOARD_EXCLUSION_HOST_ID,
+  DASHBOARD_MANDATORY_EXCLUSIONS,
   ExclusionInputError,
   type WafExclusionRule,
   normalizeExclusionPath,
@@ -24,6 +26,8 @@ import { assertWafLoads, wafCandidatesForExclusions } from "../waf/dry-run";
 export type WafExclusion = WafExclusionRule & {
   /** Null for a global exclusion. */
   hostName: string | null;
+  /** Built in: shown, never stored or removable. */
+  mandatory?: boolean;
   reason: string;
   createdBy: string | null;
   createdAt: string;
@@ -44,10 +48,20 @@ function toRule(row: Row): WafExclusionRule {
   return {
     id: row.id,
     ruleId: row.ruleId,
-    proxyHostId: row.proxyHostId ?? null,
+    proxyHostId: row.dashboard ? DASHBOARD_EXCLUSION_HOST_ID : (row.proxyHostId ?? null),
     path: row.path ?? null,
     target: row.target ?? null,
   };
+}
+
+/** A rule's scope as the table stores it: the dashboard has a flag, not a host row. */
+function scopeColumns(proxyHostId: number | null): {
+  proxyHostId: number | null;
+  dashboard: boolean;
+} {
+  return proxyHostId === DASHBOARD_EXCLUSION_HOST_ID
+    ? { proxyHostId: null, dashboard: true }
+    : { proxyHostId, dashboard: false };
 }
 
 export async function listWafExclusionRules(): Promise<WafExclusionRule[]> {
@@ -77,6 +91,22 @@ export async function listWafExclusions(): Promise<WafExclusion[]> {
   }));
 }
 
+/** For the WAF page: the stored exclusions after the built-in ones, which it shows but never edits. */
+export async function listWafExclusionsWithBuiltIn(): Promise<WafExclusion[]> {
+  return [
+    ...DASHBOARD_MANDATORY_EXCLUSIONS.map((rule) => ({
+      ...rule,
+      hostName: null,
+      mandatory: true,
+      reason: "",
+      createdBy: null,
+      createdAt: "",
+      updatedAt: "",
+    })),
+    ...(await listWafExclusions()),
+  ];
+}
+
 type Normalized = Omit<WafExclusionRule, "id"> & { reason: string };
 
 async function normalizeInput(input: WafExclusionInput): Promise<Normalized> {
@@ -95,7 +125,7 @@ async function normalizeInput(input: WafExclusionInput): Promise<Normalized> {
     }
     throw error;
   }
-  if (normalized.proxyHostId !== null) {
+  if (normalized.proxyHostId !== null && normalized.proxyHostId !== DASHBOARD_EXCLUSION_HOST_ID) {
     const host = await db.query.proxyHosts.findFirst({
       where: (table, { eq: same }) => same(table.id, normalized.proxyHostId as number),
     });
@@ -149,7 +179,13 @@ export async function createWafExclusion(
   const now = nowIso();
   const [record] = await db
     .insert(wafExclusions)
-    .values({ ...next, createdBy: actorUserId, createdAt: now, updatedAt: now })
+    .values({
+      ...next,
+      ...scopeColumns(next.proxyHostId),
+      createdBy: actorUserId,
+      createdAt: now,
+      updatedAt: now,
+    })
     .returning();
   await applyOrRollBack(async () => {
     await db.delete(wafExclusions).where(eq(wafExclusions.id, record.id));
@@ -186,7 +222,7 @@ export async function updateWafExclusion(
   );
   await db
     .update(wafExclusions)
-    .set({ ...next, updatedAt: nowIso() })
+    .set({ ...next, ...scopeColumns(next.proxyHostId), updatedAt: nowIso() })
     .where(eq(wafExclusions.id, id));
   await applyOrRollBack(async () => {
     const { id: _id, ...previous } = existingRow;
