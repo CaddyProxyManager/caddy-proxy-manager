@@ -4111,7 +4111,7 @@
         "label": "Check for updates"
       },
       "update_check_prereleases": {
-        "description": "Also watch for betas and release candidates, and show a notice here when one is newer than what's running. Stable installs are still only offered stable releases.",
+        "description": "Also watch for betas and release candidates, and show a notice here when one is newer than what's running. Stable installs still only receive stable releases.",
         "label": "Check for prereleases"
       },
       "update_image_repository": {
@@ -4911,7 +4911,7 @@
     "updateNoCheckYet": "No check has completed yet. Save or check now to run one.",
     "updateChecksOff": "Update checks are off, so nothing is known about newer releases.",
     "updatePrereleaseTitle": "Prerelease {version} is out",
-    "updatePrereleaseBody": "This install is on stable releases, so the update check won't offer it. To try it, check out the deploy repository's next branch and pull the images. That branch gets every stable release too, so you can go back to main once a stable release passes this one.",
+    "updatePrereleaseBody": "This install is on stable releases, so the update check won't offer it. To try it, check out the deploy repository's next branch and pull the images. That branch gets every stable release too, so you can go back to main once a stable release catches up.",
     "updateNotChecking": "Not checking.",
     "updateLastChecked": "Last checked {when}.",
     "updateNeverChecked": "Never checked.",
