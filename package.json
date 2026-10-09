@@ -1,6 +1,6 @@
 {
   "name": "caddy-proxy-manager",
-  "version": "3.7.5-beta.1",
+  "version": "3.7.5-beta.2",
   "description": "Web UI for managing Caddy reverse proxies",
   "type": "module",
   "private": true,
