@@ -872,7 +872,6 @@ export function EditL4HostDialog({
   assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
-  const tCommon = useTranslations("common");
   const [state, formAction, isPending] = useActionState(
     updateL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,

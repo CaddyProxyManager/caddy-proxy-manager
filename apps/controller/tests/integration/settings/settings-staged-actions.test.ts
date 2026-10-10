@@ -590,7 +590,11 @@ describe('WAF settings', () => {
     // Only the strict setting refuses it; otherwise it is sent with a warning.
     const result = await actions.updateWafSettingsAction(
       null,
-      form({ wafEnabled: 'on', wafStrictDirectives: 'on', wafCustomDirectives: 'SecRuleEngine Off' }),
+      form({
+        wafEnabled: 'on',
+        wafStrictDirectives: 'on',
+        wafCustomDirectives: 'SecRuleEngine Off',
+      }),
     );
 
     expect(result.success).toBe(false);
