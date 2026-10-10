@@ -324,7 +324,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
   const ips = prefix === "block" ? (initial?.block_ips ?? []) : (initial?.allow_ips ?? []);
   const continentOptions = CONTINENTS.map((c) => ({
     value: c.code,
-    label: `${c.emoji}  ${t(c.nameKey)} (${c.code})`,
+    label: t("continentOption", { emoji: c.emoji, name: t(c.nameKey), code: c.code }),
   }));
 
   return (

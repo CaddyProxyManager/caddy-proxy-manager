@@ -132,10 +132,8 @@ export async function POST(request: NextRequest) {
       summary: currentHash ? "User changed their password" : "User set a password",
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Password updated successfully",
-    });
+    // No message: both clients word the outcome themselves.
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Password change error:", error);
     return NextResponse.json({ error: t("auth.passwordChange.failed") }, { status: 500 });

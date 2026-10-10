@@ -815,7 +815,7 @@
     "login": {
       "accountNotLinked": "An account with this email already exists. Sign in with your password, then link this provider from your Profile.",
       "continueWith": "Continue with {provider}",
-      "failed": "Login failed.",
+      "failed": "Sign-in failed.",
       "metaTitle": "Sign in",
       "noMethodDescription": "Single sign-on is the only way to sign in, but no provider is configured. Configure one with the OAUTH_* environment variables.",
       "oauthFailed": "Failed to sign in with OAuth",
@@ -1352,9 +1352,9 @@
     "acmeDnsServerUrlInvalid": "The acme-dns server URL must be an http(s) URL without credentials, query or fragment",
     "acmeDnsServerUrlHttps": "The acme-dns server URL must use HTTPS unless the server is on a private address",
     "crowdsecApiUrlRequired": "Enter the address of the CrowdSec Local API to switch CrowdSec on",
-    "crowdsecApiUrlInvalid": "The CrowdSec Local API address must be an http or https URL without a user name, query or fragment",
+    "crowdsecApiUrlInvalid": "The CrowdSec Local API address must be an http or https URL without a username, query or fragment",
     "crowdsecApiUrlHttps": "The CrowdSec Local API address must use HTTPS unless the server is on a private address, since the bouncer key is sent to it",
-    "crowdsecAppsecUrlInvalid": "The CrowdSec AppSec address must be an http or https URL without a user name, query or fragment",
+    "crowdsecAppsecUrlInvalid": "The CrowdSec AppSec address must be an http or https URL without a username, query or fragment",
     "crowdsecAppsecUrlHttps": "The CrowdSec AppSec address must use HTTPS unless the server is on a private address, since the bouncer key is sent to it",
     "outboundUrlMetadata": "That address belongs to a cloud metadata service, which holds this server's cloud credentials. CPM never sends requests there.",
     "crowdsecApiKeyRequired": "Enter the bouncer key from cscli bouncers add to switch CrowdSec on",
@@ -1535,7 +1535,7 @@
     "alertChannelNameRequired": "Give the channel a name of up to 100 characters",
     "alertChannelNameTaken": "A channel named {name} already exists",
     "alertChannelKindInvalid": "A channel is a webhook, Discord, Slack, Teams or ntfy, and its kind cannot change",
-    "alertChannelUrlInvalid": "Enter the full http or https address to post to, without a user name or #fragment",
+    "alertChannelUrlInvalid": "Enter the full http or https address to post to, without a username or #fragment",
     "alertChannelUrlHttps": "Use https. Plain http is allowed only to an address on this network",
     "alertChannelUrlMetadata": "That address belongs to a cloud metadata service and cannot be posted to",
     "alertChannelSecretInvalid": "A signing secret is whsec_ followed by at least 24 bytes of base64, and a token has no spaces",
@@ -1560,11 +1560,11 @@
     "auditSinkNameRequired": "Give the sink a name of up to 100 characters",
     "auditSinkNameTaken": "A sink named {name} already exists",
     "auditSinkKindInvalid": "A sink is syslog over UDP, TCP or TLS, an HTTP receiver, or a file",
-    "auditSinkHostInvalid": "Enter the receiver's host name or IP address",
+    "auditSinkHostInvalid": "Enter the receiver's hostname or IP address",
     "auditSinkPortInvalid": "The port is a whole number from 1 to 65535",
     "auditSinkMaxBytesInvalid": "The largest datagram is {min} to {max} bytes",
     "auditSinkCaInvalid": "The CA certificate must be one PEM certificate",
-    "auditSinkUrlInvalid": "Enter the receiver's full http or https address, without a user name or #fragment",
+    "auditSinkUrlInvalid": "Enter the receiver's full http or https address, without a username or #fragment",
     "auditSinkUrlHttps": "Use https. Plain http is allowed only to an address on this network, since the audit log travels in the body",
     "auditSinkMetadata": "That address belongs to a cloud metadata service or the link-local range, and is never contacted",
     "auditSinkEncodingInvalid": "The encoding is none, gzip or zstd",
@@ -1662,7 +1662,7 @@
     "hostRateLimitTooManyPaths": "A rate limit zone takes at most {max} paths",
     "hostRateLimitTooManyZones": "A proxy host takes at most {max} rate limit zones",
     "hostAnubisUpstreamRequired": "Enter the Anubis URL to switch the bot challenge on",
-    "hostAnubisUpstreamInvalid": "Anubis URL \"{value}\" must be an http or https URL without a user name, such as http://anubis:8923",
+    "hostAnubisUpstreamInvalid": "Anubis URL \"{value}\" must be an http or https URL without a username, such as http://anubis:8923",
     "hostAnubisExemptPathInvalid": "Exempt path \"{value}\" must start with / and cannot contain spaces or braces",
     "hostAnubisExemptPathsTooMany": "The bot challenge takes at most {max} exempt paths",
     "hostUpstreamTimeoutInvalid": "Upstream timeout \"{value}\" is not a duration such as 30s, 1m30s or 2h",
@@ -2003,7 +2003,7 @@
     "capabilityView": "View only",
     "capabilityViewShort": "View only",
     "deleteGroup": "Delete group",
-    "emptyDescription": "Create one to organize user access.",
+    "emptyDescription": "Create one to organise user access.",
     "grants": "Managed resources",
     "grantsHelp": "What members of this group may reach when their role is Operator. Admins are unaffected; users and viewers gain nothing.",
     "idpGroupNames": "IdP group names",
@@ -2407,10 +2407,10 @@
       "allPages": "All pages",
       "allPagesCount": "{count} in total",
       "chosenCount": "{count} of {total} chosen, up to {max}",
-      "customize": "Customize this drawer",
+      "customize": "Customise this drawer",
       "customizeDescription": "Choose which {max} appear here",
       "customizeMoreDescription": "Choose which {max} appear in the More drawer",
-      "customizeTitle": "Customize drawer",
+      "customizeTitle": "Customise drawer",
       "errorSaveFailed": "Your choice could not be saved. Try again.",
       "errorTooMany": "Choose up to {max} pages.",
       "errorUnknownPage": "One of those pages is not available to you.",
@@ -3134,6 +3134,7 @@
     "overrideUpstreamPort": "Override upstream port",
     "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE and hundreds of other attack patterns",
     "owaspCrsLabel": "Load OWASP Core Rule Set",
+    "continentOption": "{emoji} {name} ({code})",
     "partial": "Partial",
     "passiveHealthChecks": "Passive health checks",
     "passiveHealthChecksHelp": "Mark upstreams unhealthy based on response failures",
@@ -3260,7 +3261,7 @@
     "preserveHostHeaderHelp": "Send the original Host header to the upstream instead of the upstream's own address",
     "hstsSubdomainsHelp": "Include subdomains in the Strict-Transport-Security header",
     "skipHttpsValidation": "Skip HTTPS validation",
-    "skipHttpsValidationHelp": "Skip SSL certificate hostname verification for backend connections",
+    "skipHttpsValidationHelp": "Skip TLS certificate hostname verification for backend connections",
     "maintenance": "Maintenance mode",
     "maintenanceDescription": "Answer every request with a 503 while the upstream is being worked on. The domain keeps its certificate, and addresses in the bypass list still reach the upstream",
     "maintenanceActiveTitle": "Visitors get a 503",
@@ -3418,7 +3419,7 @@
     "pathPatternRequired": "Path pattern is required",
     "upstreamDialledThrough": "Upstreams are dialled through <code>{node}</code>. Use a MagicDNS name or a tailnet IP in the Upstreams field above.",
     "dnsPinningSummaryInherit": "Using global upstream DNS pinning defaults",
-    "dnsPinningSummaryOverride": "Override: {mode, select, inherit {inherit mode} enabled {enabled} disabled {disabled} other {{mode}}}, {family, select, inherit {inherit family} both {both} ipv6 {ipv6} ipv4 {ipv4} other {{family}}}",
+    "dnsPinningSummaryOverride": "Override: {mode, select, inherit {inherit mode} enabled {enabled} disabled {disabled} other {{mode}}}, {family, select, inherit {inherit family} both {both} ipv6 {IPv6} ipv4 {IPv4} other {{family}}}",
     "hostCreated": "Proxy host created and queued for Caddy reload.",
     "hostCreatedAutoCert": "Proxy host created. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
     "hostCreatedAutoCertNoCloudflare": "Proxy host created. Certificate ID {id} was not found, so the host uses 'Managed by Caddy (Auto)'. Without Cloudflare DNS integration, wildcard certificates need port 80 reachable for HTTP-01 challenges. Configure Cloudflare in Settings to use DNS-01 challenges.",
@@ -3465,7 +3466,7 @@
       "kindHelp": {
         "syslogUdp": "RFC 5424 messages, one per datagram. Nothing confirms delivery, so prefer TCP or TLS where the server offers it.",
         "syslogTcp": "RFC 5424 messages with octet-counting framing. Unencrypted: use it only on a network you trust.",
-        "syslogTls": "RFC 5424 messages with octet-counting framing over TLS. Nothing is sent until the server's certificate checks out for the host name.",
+        "syslogTls": "RFC 5424 messages with octet-counting framing over TLS. Nothing is sent until the server's certificate checks out for the hostname.",
         "http": "Batches of records POSTed as newline-delimited JSON.",
         "file": "Appended to a file on the data volume, one JSON record per line, for a local shipper to pick up."
       },
@@ -3570,7 +3571,7 @@
       "accessKeyId": "Access key ID",
       "secretAccessKey": "Secret access key",
       "secretStored": "A secret is stored. Leave empty to keep it, unless the endpoint, bucket or key ID changes.",
-      "virtualHostedStyle": "Bucket in the host name",
+      "virtualHostedStyle": "Bucket in the hostname",
       "virtualHostedStyleHelp": "Address the bucket as bucket.endpoint rather than endpoint/bucket. Some providers require one or the other.",
       "folder": "Folder",
       "folderHelp": "Under backups/ on the controller's data volume. Copy it somewhere else as well: a backup on the same disk does not survive losing that disk.",
@@ -3738,7 +3739,7 @@
     "backChannelLogoutHelp": "Optional. Set this as the provider's back-channel logout URL and CPM will end a user's sessions when the identity provider ends theirs.",
     "backChannelLogoutUrl": "Back-channel logout URL",
     "backToDashboard": "Back to dashboard",
-    "behavior": "Behavior",
+    "behavior": "Behaviour",
     "caRootCertificatePem": "CA root certificate (PEM)",
     "callbackUrl": "Callback URL",
     "checkForUpdates": "Check for updates",
@@ -3855,7 +3856,7 @@
     "geoipSavedNeedsCredentials": "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
     "geoipUpdateDisabled": "Turn GeoIP on and save to download the databases.",
     "geoipUpdateInterval": "Check for updates every",
-    "geoipUpdateIntervalHelp": "MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check only downloads what changed.",
+    "geoipUpdateIntervalHelp": "MaxMind rebuilds GeoLite2 ASN daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
     "geoipUpdateUnconfigured": "Add a MaxMind account ID and licence key to download the databases.",
     "globalErrorPagesHelp": "These error pages apply to every proxy host as a fallback. A per-host error page for the same status code takes precedence.",
     "gravatarEnvironmentOverrideTitle": "Gravatar is set by the AVATAR_GRAVATAR environment variable",
@@ -4102,7 +4103,7 @@
         "label": "Enable GeoIP"
       },
       "geoip_update_interval_hours": {
-        "description": "How often the controller asks MaxMind for newer databases. MaxMind rebuilds GeoLite ASN daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
+        "description": "How often the controller asks MaxMind for newer databases. MaxMind rebuilds GeoLite2 ASN daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
         "fieldLabel": "Update check interval",
         "label": "Update check interval (hours)"
       },
@@ -4125,8 +4126,8 @@
       },
       "login_window_ms": {
         "description": "The period over which failed sign-ins are counted.",
-        "fieldLabel": "Login window",
-        "label": "Login window (milliseconds)"
+        "fieldLabel": "Sign-in window",
+        "label": "Sign-in window (milliseconds)"
       },
       "update_check_enabled": {
         "description": "Check the registry below a few times a day for a newer release.",
@@ -4145,7 +4146,7 @@
         "label": "Send email"
       },
       "smtp_host": {
-        "description": "The host name or address of the mail server to relay through.",
+        "description": "The hostname or address of the mail server to relay through.",
         "label": "SMTP server"
       },
       "smtp_port": {
@@ -4375,7 +4376,7 @@
       "wholeNumber": "{label} must be a whole number"
     },
     "viewerGroups": "Viewer groups",
-    "defaultResponseModeCaddy": "Caddy native behavior",
+    "defaultResponseModeCaddy": "Caddy native behaviour",
     "defaultResponseModeRespond": "Custom HTTP response",
     "defaultResponseModeRedirect": "Redirect",
     "defaultResponseModeAbort": "No response (abort connection)",
@@ -4875,7 +4876,7 @@
             "label": "Password"
           },
           "sharedSecret": {
-            "label": "2FA shared secret"
+            "label": "Two-factor shared secret"
           },
           "endpointUrl": {
             "label": "Endpoint URL"
@@ -5055,7 +5056,7 @@
       },
       "hostDefaults": {
         "valueStock": "As shipped",
-        "valueCustom": "Customized"
+        "valueCustom": "Customised"
       },
       "crowdsec": {
         "valueMode": "{mode, select, managed {Managed} other {External}} bouncer"
@@ -6066,7 +6067,7 @@
     "restartStopping": "Stopping the application…",
     "restartQueued": "Waiting for the last restart to settle…",
     "restartWaiting": "Waiting for it to come back…",
-    "restartReady": "Back up. Taking you to the next step…",
+    "restartReady": "Back online. Taking you to the next step…",
     "restartSignInMigrated": "You will be asked to sign in with one of the accounts that came across, using the password you already had.",
     "restartSignInFresh": "No accounts came across, so the next step is creating the first administrator or configuring single sign-on.",
     "setupCompleteHeading": "Setup complete",
@@ -6460,7 +6461,7 @@
       "draft": "Draft"
     },
     "pluginRuleIds": "Rule IDs",
-    "pluginLicense": "License",
+    "pluginLicense": "Licence",
     "pluginRuleIdRange": "{start, number} - {end, number}",
     "pluginInstall": "Install",
     "pluginInstalledBadge": "Installed",

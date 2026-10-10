@@ -330,7 +330,12 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     fields: [
       { key: "username", label: "Username", type: "string", required: true },
       { key: "password", label: "Password", type: "password", required: true },
-      { key: "shared_secret", label: "2FA shared secret", type: "password", required: false },
+      {
+        key: "shared_secret",
+        label: "Two-factor shared secret",
+        type: "password",
+        required: false,
+      },
       { key: "endpoint_url", label: "Endpoint URL", type: "string", required: false },
     ],
   },

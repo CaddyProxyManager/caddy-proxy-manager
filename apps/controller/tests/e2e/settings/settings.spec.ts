@@ -296,7 +296,7 @@ test.describe('Settings - General', () => {
 test.describe('Settings - Default Response', () => {
   test('shows all supported behaviors and conditional custom fields', async ({ page }) => {
     await goToSection(page, 'Default response');
-    const behavior = page.getByRole('combobox', { name: 'Behavior' });
+    const behavior = page.getByRole('combobox', { name: 'Behaviour' });
     await expect(behavior).toBeVisible();
     await behavior.click();
     await expect(page.getByRole('option', { name: 'Caddy native behavior' })).toBeVisible();
@@ -314,7 +314,7 @@ test.describe('Settings - Default Response', () => {
 
   test('saves and reloads a custom response through the settings form', async ({ page }) => {
     await goToSection(page, 'Default response');
-    let behavior = page.getByRole('combobox', { name: 'Behavior' });
+    let behavior = page.getByRole('combobox', { name: 'Behaviour' });
     await behavior.click();
     await page.getByRole('option', { name: 'Custom HTTP response' }).click();
     await page.locator('input[name="status"]').fill('451');
@@ -330,7 +330,7 @@ test.describe('Settings - Default Response', () => {
     });
 
     await goToSection(page, 'Default response');
-    behavior = page.getByRole('combobox', { name: 'Behavior' });
+    behavior = page.getByRole('combobox', { name: 'Behaviour' });
     await expect(behavior).toContainText('Custom HTTP response');
     await expect(page.locator('input[name="status"]')).toHaveValue('451');
     await expect(page.locator('textarea[name="body"]')).toHaveValue(body);
