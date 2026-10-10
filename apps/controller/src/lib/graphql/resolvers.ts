@@ -59,6 +59,7 @@ import { identityMutationResolvers, identityQueryResolvers, projectUser } from "
 import { dnsProviderMutationResolvers } from "./dns-providers";
 import { wafConfigMutationResolvers, wafConfigQueryResolvers } from "./waf-config";
 import { oauthProviderFieldResolvers, oauthProviderMutationResolvers } from "./oauth-providers";
+import { agentLifecycleMutationResolvers } from "./agent-lifecycle";
 import type { GraphQLContext } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -500,5 +501,6 @@ export const resolvers = {
     ...dnsProviderMutationResolvers,
     ...wafConfigMutationResolvers,
     ...oauthProviderMutationResolvers,
+    ...agentLifecycleMutationResolvers,
   },
 };

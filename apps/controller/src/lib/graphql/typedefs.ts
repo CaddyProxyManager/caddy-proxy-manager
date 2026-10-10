@@ -434,6 +434,16 @@ export const typeDefs = /* GraphQL */ `
     error: String!
   }
 
+  """A one-time pairing credential, readable here only: the store holds it encrypted or hashed."""
+  type PairingCode {
+    """The six-letter code to give the agent; null when a bootstrap token was written instead."""
+    code: String
+    """When the credential stops redeeming."""
+    expiresAt: DateTime!
+    """The bundled agent reads a token from the shared data volume rather than taking a code."""
+    bootstrap: Boolean!
+  }
+
   """An OIDC provider. The client secret never leaves the server; clientId keeps its last four."""
   type OAuthProvider {
     id: String!
@@ -1947,6 +1957,18 @@ export const typeDefs = /* GraphQL */ `
     updateOAuthProvider(id: String!, input: JSON!): OAuthProvider!
     """Refused for an env-sourced provider."""
     deleteOAuthProvider(id: String!): Boolean!
+
+    """
+    The live code that pairs a new agent, minted when none is live. With agentId, a credential
+    that re-pairs that one agent and nothing else: the bundled agent gets a bootstrap token.
+    """
+    mintAgentPairingCode(agentId: Int): PairingCode!
+    """Forgets the agent, which goes idle and stops Caddy; the bundled one stops pairing itself."""
+    unpairAgent(id: Int!): Boolean!
+    """The operator-facing name only; the agent is routed by its own id."""
+    renameAgent(id: Int!, name: String!): Agent!
+    """Re-applies the config, then has the agent rebuild Caddy's image. Needs a connected agent."""
+    rebuildAgentCaddy(id: Int!): Boolean!
 
     createBackupDestination(input: BackupDestinationInput!): BackupDestination!
     updateBackupDestination(id: Int!, input: BackupDestinationInput!): BackupDestination!

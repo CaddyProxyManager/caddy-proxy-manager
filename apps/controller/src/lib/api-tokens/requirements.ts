@@ -220,6 +220,10 @@ export const GRAPHQL_REQUIREMENTS: Readonly<Record<string, TokenRequirement>> = 
   "Mutation.removeDnsProvider": write("settings"),
   "Mutation.setDefaultDnsProvider": write("settings"),
   "Mutation.applyCaddyConfig": write("settings"),
+  "Mutation.mintAgentPairingCode": write("agents"),
+  "Mutation.unpairAgent": write("agents"),
+  "Mutation.renameAgent": write("agents"),
+  "Mutation.rebuildAgentCaddy": write("agents"),
   // Every private key out, and groups and grants in.
   "Mutation.exportConfig": full("backups"),
   "Mutation.previewConfigImport": full("backups"),
