@@ -659,7 +659,7 @@ export default function AnalyticsClient() {
         )}
         {refreshes && loadedAt !== null && (
           <Text type="body" size="sm" color="secondary">
-            {t("autoRefreshing")}
+            {streaming ? t("liveUpdating") : t("autoRefreshing")}
           </Text>
         )}
       </HStack>

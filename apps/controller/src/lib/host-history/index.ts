@@ -539,6 +539,17 @@ export async function rollbackRevisionFrom(
   return revision.id;
 }
 
+async function hostUuidFor(
+  kind: HostKind,
+  hostId: number,
+  snapshotRow: Record<string, unknown>,
+): Promise<string | null> {
+  if (typeof snapshotRow.uuid === "string" && snapshotRow.uuid) return snapshotRow.uuid;
+  const { table } = HOST_TABLES[kind];
+  const [row] = await db.select({ uuid: table.uuid }).from(table).where(eq(table.id, hostId));
+  return row?.uuid ?? null;
+}
+
 /**
  * Where a host event's revision is gone back from: the history comparing it with the revision
  * before, ready to roll back to that one; for a deletion, the history ready to restore.
@@ -559,7 +570,11 @@ export async function auditRevisionLinks(
     if (!kind) continue;
     const revision = await getHostRevision(event.revisionId);
     if (!revision || revision.hostKind !== kind || revision.hostId !== event.entityId) continue;
-    const base = `${paths[kind]}/${event.entityId}/history`;
+    // By uuid, as every host URL is: from the snapshot, else the live row. A host deleted before
+    // uuids existed has neither, and no address that would resolve.
+    const uuid = await hostUuidFor(kind, event.entityId, revision.snapshot.row);
+    if (!uuid) continue;
+    const base = `${paths[kind]}/${uuid}/history`;
     if (revision.operation === "delete") {
       links.set(event.id, { kind: "restore", href: `${base}?to=${revision.id}` });
       continue;

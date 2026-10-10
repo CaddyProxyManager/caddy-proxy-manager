@@ -17,7 +17,9 @@ import {
   queryExploreTopLists,
   TOP_MAX_LIMIT,
 } from "../clickhouse/explore";
-import { processMemo } from "../settings/process-memo";
+import { onAnnouncement } from "../cluster/announcements";
+import { liveAnnouncement } from "../live/topics";
+import { dropProcessMemo, processMemo } from "../settings/process-memo";
 import {
   type ExploreState,
   type TimeWindow,
@@ -75,6 +77,10 @@ function emptyTop(): Record<TopDimension, TopRow[]> {
 
 /** Under the page's 30s auto-refresh, so two tabs or a quick reload share one set of scans. */
 const REPORT_MEMO_MS = 10_000;
+
+// New rows are what the memo cannot know about. Every replica hears it, and a page told "new
+// traffic" would otherwise re-read the report it just loaded.
+onAnnouncement(liveAnnouncement("analytics"), () => dropProcessMemo("analytics-report"));
 
 /** `now` is for tests, and bypasses the memo: production reads the clock. */
 export async function getAnalyticsReport(

@@ -245,11 +245,11 @@ describe('audit events', () => {
     expect(byRevision(created.id)).toBeUndefined();
     expect(byRevision(updated.id)).toEqual({
       kind: 'rollback',
-      href: `/proxy-hosts/${host.id}/history?from=${updated.id}&to=${created.id}`,
+      href: `/proxy-hosts/${host.uuid}/history?from=${updated.id}&to=${created.id}`,
     });
     expect(byRevision(deleted.id)).toEqual({
       kind: 'restore',
-      href: `/proxy-hosts/${host.id}/history?to=${deleted.id}`,
+      href: `/proxy-hosts/${host.uuid}/history?to=${deleted.id}`,
     });
   });
 });

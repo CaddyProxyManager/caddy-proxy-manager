@@ -392,6 +392,7 @@
     "requestFailedWithStatus": "{path} failed with status {status}",
     "territory": "Territory",
     "autoRefreshing": "Refreshing every 30 seconds",
+    "liveUpdating": "Updating as requests arrive",
     "compare": "Compare with previous period",
     "customRangeBackwards": "The start has to come before the end",
     "customRangeTooLong": "A custom range can be at most {days} days long",
