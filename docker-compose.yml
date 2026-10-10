@@ -291,38 +291,49 @@ services:
       retries: 3
       start_period: 10s
 
-  # Not a security boundary: it matches URL prefixes and never sees a body, so whatever drives the
-  # agent is root on this host. The real control is the agent validating input. See SECURITY.md.
+  # Not a security boundary: it checks each request's method and path, never what the body asks
+  # for, so whatever drives the agent is root on this host. The real control is the agent
+  # validating input. See SECURITY.md.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
     restart: unless-stopped
+    # Root, since the socket's group differs between hosts: one static binary, no shell, nothing
+    # writable, no capability. `user: "65534:<docker group id>"` in an override drops it.
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
-      # All used by the agent's compose: networks are inspected on every up, and a managed
-      # service's first start creates its volume and pulls its image.
-      CONTAINERS: 1
-      POST: 1
-      NETWORKS: 1
-      VOLUMES: 1
-      IMAGES: 1
-      SECRETS: 0
-      # BuildKit, for "Rebuild Caddy"; piped unfiltered once matched (see the mounted config).
-      # Both 0 disables only that button: pair it with the agent's CADDY_BUILD_MODE=external.
-      GRPC: 1
-      SESSION: 1
-      # On in the image's defaults; nothing the agent runs reads the event stream.
-      EVENTS: 0
-      # BUILD is the legacy builder, which cannot build Caddy's image.
-      BUILD: 0
-      EXEC: 0
-      SWARM: 0
-      AUTH: 0
+      SP_LISTENIP: 0.0.0.0
+      # The agent alone, by name; nothing else is on the network.
+      SP_ALLOWFROM: agent
+      SP_ALLOWHEALTHCHECK: "true"
+      # Go regexps, anchored, on the path alone; a method with no entry is refused. What the agent's
+      # compose and `docker` calls use: networks inspected on every up, a managed service's first
+      # start pulling its image, a throwaway container created, copied into, started, waited on.
+      SP_ALLOW_HEAD: '(/v1\.[0-9]+)?/(_ping|containers/[a-zA-Z0-9_.-]+/archive)'
+      SP_ALLOW_GET: '(/v1\.[0-9]+)?/(_ping|version|info)'
+      SP_ALLOW_GET_CONTAINERS: '(/v1\.[0-9]+)?/containers/(json|[a-zA-Z0-9_.-]+/(json|archive|logs))'
+      SP_ALLOW_GET_IMAGES: '(/v1\.[0-9]+)?/images/(.+/)?json'
+      SP_ALLOW_GET_NETWORKS: '(/v1\.[0-9]+)?/(networks|volumes)(/[a-zA-Z0-9_.-]+)?'
+      SP_ALLOW_POST: '(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|stop|restart|wait|rename)|images/create|(networks|volumes)/create|networks/[a-zA-Z0-9_.-]+/(connect|disconnect))'
+      SP_ALLOW_PUT: '(/v1\.[0-9]+)?/containers/[a-zA-Z0-9_.-]+/archive'
+      SP_ALLOW_DELETE: '(/v1\.[0-9]+)?/(containers|networks)/[a-zA-Z0-9_.-]+'
+      # BuildKit, for "Rebuild Caddy": once allowed, the connection upgrades to h2c and is piped
+      # unfiltered. Empty disables only that button; set CADDY_BUILD_MODE=external on the agent too.
+      SP_ALLOW_POST_BUILDKIT: '(/v1\.[0-9]+)?/(grpc|session)'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Upstream's config plus a TCP route for GRPC and SESSION, which its HTTP mode cannot pass.
-      - ./docker/socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
     networks:
       - socket-proxy
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   agent:
     container_name: caddy-proxy-manager-agent

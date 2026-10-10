@@ -747,8 +747,7 @@ export class DockerHost {
       );
       if (!create.ok) return { state: "unavailable", reason: tail(create.output, 3) };
 
-      // Started and waited on rather than `docker run`: attaching is a hijacked connection, which
-      // the socket proxy's HTTP mode is not trusted to pass.
+      // Started and waited on rather than `docker run`: the socket proxy does not open attach.
       for (const argv of [
         ["docker", "cp", local, `${name}:${VALIDATE_CONFIG_PATH}`],
         ["docker", "start", name],

@@ -201,7 +201,7 @@ Test files are ordinary bash. Editing one on the host takes effect immediately -
 ### The agent phase
 
 The main suite runs with no agent, so it is followed by a second phase that starts one:
-`agent` and a `docker-socket-proxy` with `GRPC` and `SESSION` at `0`, so BuildKit is out of
+`agent` and a `docker-socket-proxy` with its BuildKit entry emptied, so BuildKit is out of
 reach. The agent pairs itself with the bootstrap token `web` leaves on its volume, as the bundled
 agent does, and runs in external build mode (`CADDY_BUILD_MODE=external`). `run.sh` builds
 `cpm-test/caddy:external` beforehand from the same Dockerfile with a single DNS module, standing

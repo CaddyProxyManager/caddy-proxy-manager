@@ -106,7 +106,7 @@ jobs:
           image_base="ghcr.io/$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
 
           # On disk, so `docker compose pull` cannot deliver a change to them.
-          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy docker/crowdsec docker/caddy)
+          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/crowdsec docker/caddy)
 
           deploy_changed=""
           if [ -n "$PREVIOUS" ]; then

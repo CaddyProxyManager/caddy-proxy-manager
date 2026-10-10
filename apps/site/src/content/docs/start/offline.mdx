@@ -84,7 +84,7 @@ services:
   postgres:
     image: registry.example.internal/postgres:18-alpine@sha256:<the digest above>
   docker-socket-proxy:
-    image: registry.example.internal/docker-socket-proxy:v0.5.0@sha256:<the digest above>
+    image: registry.example.internal/socket-proxy:1.13.1@sha256:<the digest above>
 ```
 
 Keep the digest. The load script and Compose both refuse a reference whose digest differs from the
@@ -98,7 +98,7 @@ On a connected machine, pull each image by its reference above and save them to 
 ```bash
 docker save -o third-party.tar \
   postgres:18-alpine@sha256:<digest> \
-  tecnativa/docker-socket-proxy:v0.5.0@sha256:<digest>
+  wollomatic/socket-proxy:1.13.1@sha256:<digest>
 ```
 
 Then `docker load -i third-party.tar` on the target host. Only Docker's containerd image store

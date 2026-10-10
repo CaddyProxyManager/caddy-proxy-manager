@@ -72,7 +72,7 @@ reporting progress as it goes. The running Caddy keeps serving until the new bin
 ## Building the image yourself
 
 Building needs BuildKit access through the Docker socket proxy. To keep that away from the agent,
-set `CADDY_BUILD_MODE=external` on it and `GRPC: 0` and `SESSION: 0` on `docker-socket-proxy`. The
+set `CADDY_BUILD_MODE=external` on it and `SP_ALLOW_POST_BUILDKIT: ""` on `docker-socket-proxy`. The
 agent then never builds: the page's **Build command** is a `docker build` for your selection, and
 **Load built image** takes the Rebuild button's place. The command builds from this release's tag
 on GitHub, so it runs anywhere Docker can build, without a checkout. In a fleet where only some

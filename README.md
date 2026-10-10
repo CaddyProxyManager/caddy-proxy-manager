@@ -154,6 +154,15 @@ with 403 on every host. Hosts keep the value they had, which is on unless someon
 
 ---
 
+### Upgrading to the Go socket proxy
+
+`docker-socket-proxy` now runs [wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy)
+in place of Tecnativa's HAProxy image, with the endpoints the agent uses allowed per method and
+nothing else. Pull the new `docker-compose.yml` and `docker compose up -d` as usual; the HAProxy
+template it mounted is gone. If an override set `GRPC: 0` and `SESSION: 0` to keep builds away
+from the agent, replace them with `SP_ALLOW_POST_BUILDKIT: ""`: the old names mean nothing to the
+new proxy, which would allow builds again.
+
 ## First run
 
 A fresh install has no accounts and nothing configured. The first request lands on `/setup`, and
@@ -550,7 +559,7 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `CADDY_ADMIN_LISTEN` | Pinned as `admin.listen` in every config the agent forwards to Caddy, replacing the controller's bind-every-interface default. `docker-compose.yml` sets `caddy-admin:2019` here and on the `caddy` service, whose Caddyfile binds the same address until the first config arrives - a name only the internal `caddy-admin` network resolves | Unset (forwarded as sent) |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
-| `CADDY_BUILD_MODE` | `agent` builds Caddy's image when the module selection changes. `external` never builds: you build the image and **Settings → Caddy build** loads it, so the socket proxy's `GRPC` and `SESSION` can be `0`. See [Building the Caddy image yourself](#building-the-caddy-image-yourself). Startup fails on any other value | `agent` |
+| `CADDY_BUILD_MODE` | `agent` builds Caddy's image when the module selection changes. `external` never builds: you build the image and **Settings → Caddy build** loads it, so the socket proxy's BuildKit entry can be emptied. See [Building the Caddy image yourself](#building-the-caddy-image-yourself). Startup fails on any other value | `agent` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
 | `CERT_FILES_HOST_DIR` | A directory on the agent's host, as the Docker daemon sees it, that certificates may be read from (**Certificates → Import → From a file on an agent**). Read-only, in a throwaway container that mounts only this directory; the controller can name paths inside it and nothing else. Keys travel to the controller and are stored encrypted, like a pasted key. Startup fails on a relative path or one with a comma | Unset (off) |
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `crowdsec`) is abandoned. Generous because the first start pulls the image | `900` |
@@ -1634,13 +1643,13 @@ selection and save it, or click Rebuild to retry it as it is. If the agent is
 restarted mid-build (a host reboot, say), it clears the stale "building" state on
 startup and the button becomes available again.
 
-Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
-default in `docker-compose.yml`), which BuildKit builds through. To keep build access
+Rebuilding needs the `docker-socket-proxy` service's `SP_ALLOW_POST_BUILDKIT` entry (set in
+`docker-compose.yml`), the BuildKit endpoints a build goes through. To keep build access
 away from the agent, build the image yourself instead.
 
 #### Building the Caddy image yourself
 
-Set `CADDY_BUILD_MODE=external` for the agent, and `GRPC: 0` and `SESSION: 0` on
+Set `CADDY_BUILD_MODE=external` for the agent, and `SP_ALLOW_POST_BUILDKIT: ""` on
 `docker-socket-proxy`. The agent then never builds. **Settings → Caddy build** shows the
 `docker build` command for your selection in place of the Rebuild button. It builds from
 this release's tag on GitHub, so it needs no checkout and runs anywhere Docker can

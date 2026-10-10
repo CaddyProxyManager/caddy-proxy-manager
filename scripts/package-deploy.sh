@@ -15,7 +15,7 @@ shift 2
 extras=("$@")
 
 # CrowdSec is in it but behind its Compose profile, so it starts only once turned on.
-dirs=(clickhouse socket-proxy crowdsec)
+dirs=(clickhouse crowdsec)
 
 # An archive, as GitHub renames a dotfile asset (`.env.example`); tar.gz opens on Windows too.
 entries=(docker-compose.yml .env.example)
@@ -98,7 +98,7 @@ tar -czf "$name" -C "$staging" "${entries[@]}"
 # Asserted: a misnamed `.env.example` would look fine until someone deployed. Listed once: under
 # pipefail, `tar | grep -q` fails whenever grep exits before tar has written everything.
 listing="$(tar -tzf "$name")"
-for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template "${build_files[@]}"; do
+for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml "${build_files[@]}"; do
   if ! grep -qxF "$want" <<<"$listing"; then
     echo "::error::${name} is missing ${want}"
     echo "$listing"

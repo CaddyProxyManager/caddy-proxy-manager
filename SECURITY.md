@@ -73,18 +73,20 @@ Our CI/CD pipeline implements multiple security layers:
 ### The Agent Is Root on Its Host
 
 The agent recreates Caddy and starts ClickHouse through the Docker API, which it
-reaches only through `docker-socket-proxy`. That proxy allows containers, images, volumes, networks
-and BuildKit's `/grpc` and `/session`, with `POST`, and denies exec, the legacy `/build`, swarm,
+reaches only through `docker-socket-proxy`, a
+[wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy). That proxy allows, per
+method, the container, image, volume and network endpoints the agent's Compose and `docker` calls
+use, plus BuildKit's `/grpc` and `/session`, and denies exec, attach, the legacy `/build`, swarm,
 secrets, auth, events and everything else.
 
-**Treat the proxy as narrowing the API, not as a boundary.** It matches URL prefixes and never sees
-a request body, so the same `POST /containers/create` that recreates Caddy could ask for a
-privileged container, the host's PID namespace or `/` bind-mounted, and `PUT
+**Treat the proxy as narrowing the API, not as a boundary.** It matches the method and path of a
+request and never sees its body, so the same `POST /containers/create` that recreates Caddy could
+ask for a privileged container, the host's PID namespace or `/` bind-mounted, and `PUT
 /containers/{id}/archive` could write files into any container. The two BuildKit endpoints are
-looser still: they upgrade to h2c, which HAProxy's HTTP mode cannot carry, so
-`docker/socket-proxy/haproxy.cfg.template` matches their request line and headers and pipes the
-connection to the socket unfiltered from then on. Whatever controls the agent, or can reach the
-proxy, is root on that host.
+looser still: once allowed, the connection upgrades to h2c and is piped to the socket unfiltered
+from then on. Whatever controls the agent, or can reach the proxy, is root on that host. The
+proxy's `-allowbindmountfrom` can refuse bind mounts from outside listed directories; the stack
+does not set it, since what Caddy mounts from differs per host, but an override can.
 
 The controls that matter are therefore:
 
@@ -117,9 +119,9 @@ with, and add their own. Two consequences are worth stating plainly:
   a path cannot inject shell into the Dockerfile - but a *valid* path to a
   malicious repository is still malicious.
 
-- **Rebuilding needs `GRPC: 1` and `SESSION: 1`** on `docker-socket-proxy`, the
+- **Rebuilding needs `SP_ALLOW_POST_BUILDKIT`** on `docker-socket-proxy`, set by
   default. Image builds add little to an API that is already root-equivalent
-  (see above), but set both to `0` to opt out, with `CADDY_BUILD_MODE=external`
+  (see above), but set it to `""` to opt out, with `CADDY_BUILD_MODE=external`
   on the agent: you build the image, and the agent only loads it. A custom
   module is then compiled by you, not by whoever controls the agent.
 
