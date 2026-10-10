@@ -112,3 +112,36 @@ describe("an agent that has rebuilt Caddy", () => {
     expect(builds).toEqual([[...SHIPPED_CADDY_MODULES]]);
   });
 });
+
+describe("the Caddy build timeout the controller pushes", () => {
+  it("follows the setting while a frame carries it, and the agent's own otherwise", async () => {
+    const config = loadConfig();
+    const fromEnv = config.buildTimeoutSeconds;
+    lifecycle.stop();
+    lifecycle = new AgentLifecycle({
+      config,
+      store,
+      docker: { caddyRunning: async () => false } as unknown as DockerHost,
+      operations: {
+        applyL4Ports: () => {},
+        whenIdle: (listener: () => void) => listener(),
+        applyManagedServices: () => {},
+        applyCaddyBuild: (modules: string[]) => builds.push(modules),
+      } as unknown as Operations,
+    });
+    const shipped = [...SHIPPED_CADDY_MODULES];
+
+    const pushed = desired(shipped);
+    pushed.fleetConfig = { caddyBuildTimeoutSeconds: 42 } as AgentDesiredState["fleetConfig"];
+    await push(pushed);
+    expect(config.buildTimeoutSeconds).toBe(42);
+
+    // An older controller sends none, and a bad value is no setting at all.
+    const bad = desired(shipped);
+    bad.fleetConfig = { caddyBuildTimeoutSeconds: -5 } as AgentDesiredState["fleetConfig"];
+    await push(bad);
+    expect(config.buildTimeoutSeconds).toBe(fromEnv);
+    await push(desired(shipped));
+    expect(config.buildTimeoutSeconds).toBe(fromEnv);
+  });
+});

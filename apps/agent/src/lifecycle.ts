@@ -116,7 +116,11 @@ export class AgentLifecycle {
   private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
   private readonly certificateFiles: CertificateFilePoller;
 
+  /** CADDY_BUILD_TIMEOUT as the agent started: what a controller that sends no timeout gets. */
+  private readonly envBuildTimeoutSeconds: number;
+
   constructor(private readonly deps: LifecycleDeps) {
+    this.envBuildTimeoutSeconds = deps.config.buildTimeoutSeconds;
     this.certificateFiles = new CertificateFilePoller(deps.config, deps.docker, (results) => {
       const client = this.client;
       const secret = this.secret;
@@ -626,6 +630,13 @@ export class AgentLifecycle {
     const { store, operations } = this.deps;
     // Before the build decision below, which reads it.
     store.setControllerOffline(state.fleetConfig.offline === true);
+    // Settings -> Caddy build, on the controller; the docker and operations objects share this
+    // config, so a build started after this frame waits as the admin set.
+    const pushedTimeout = state.fleetConfig.caddyBuildTimeoutSeconds;
+    this.deps.config.buildTimeoutSeconds =
+      typeof pushedTimeout === "number" && Number.isInteger(pushedTimeout) && pushedTimeout > 0
+        ? pushedTimeout
+        : this.envBuildTimeoutSeconds;
 
     if (!state.caddyEnabled) {
       await this.stopCaddy("the controller has it switched off");

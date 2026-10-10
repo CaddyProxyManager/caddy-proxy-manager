@@ -3,16 +3,19 @@
 import { type FleetConfig, LIVE_ANALYTICS_INTERVAL_SECONDS } from "@cpm/shared";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import { offlineModeEnabled } from "../offline";
+import { caddyBuildTimeout } from "../settings/registry";
+import { getSetting } from "../settings/resolve";
 import { geoipFleetConfig } from "./geoip";
 import { pushDesiredState } from "./desired-state";
 
 export async function currentFleetConfig(): Promise<FleetConfig> {
   const { upstreamErrorsWanted } = await import("../notifications/upstream-errors");
-  const [analytics, geoip, upstreamErrors, offline] = await Promise.all([
+  const [analytics, geoip, upstreamErrors, offline, buildTimeout] = await Promise.all([
     isAnalyticsEnabled(),
     geoipFleetConfig(),
     upstreamErrorsWanted().catch(() => false),
     offlineModeEnabled(),
+    getSetting(caddyBuildTimeout),
   ]);
   // Agents relay analytics rather than writing to ClickHouse, so no credential goes out here.
   return {
@@ -22,6 +25,7 @@ export async function currentFleetConfig(): Promise<FleetConfig> {
     upstreamErrors,
     offline,
     analyticsIntervalSeconds: LIVE_ANALYTICS_INTERVAL_SECONDS,
+    caddyBuildTimeoutSeconds: buildTimeout,
   };
 }
 

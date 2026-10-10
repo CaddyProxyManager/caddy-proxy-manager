@@ -371,6 +371,13 @@ export type FleetConfig = {
   analyticsIntervalSeconds?: number;
 
   /**
+   * How long a `docker compose build caddy` may take before the agent abandons it: Settings ->
+   * Caddy build. Absent from an older controller, and an older agent ignores it: both keep the
+   * agent's own CADDY_BUILD_TIMEOUT.
+   */
+  caddyBuildTimeoutSeconds?: number;
+
+  /**
    * Offline mode: the agent acts as if `CADDY_BUILD_MODE=external`, since a build downloads Go
    * modules. Absent from an older controller; an older agent ignores it and still builds.
    */
