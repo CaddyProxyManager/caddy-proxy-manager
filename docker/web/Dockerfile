@@ -93,4 +93,9 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
 
 EXPOSE 3000
 USER cpm
+
+# No curl in the image: the binary probes itself. Compose repeats it so an override can tune it.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD ["/app/cpm-server", "--healthcheck"]
+
 ENTRYPOINT ["/entrypoint.sh"]
