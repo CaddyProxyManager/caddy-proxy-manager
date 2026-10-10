@@ -31,13 +31,38 @@ export function countChangedFields(baseline: Snapshot, current: Snapshot): numbe
   return count;
 }
 
+export type UnsavedChanges = {
+  /** Fields that differ from what the form opened with. */
+  changed: number;
+  /** Fields the browser would refuse to submit, once the user has touched the form. */
+  invalid: number;
+};
+
+/** The controls the browser checks on submit; a hidden input never validates. */
+function countInvalidFields(form: HTMLFormElement): number {
+  let count = 0;
+  for (const element of form.elements) {
+    if (
+      (element instanceof HTMLInputElement ||
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLSelectElement) &&
+      element.willValidate &&
+      !element.validity.valid
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 /**
- * Counts the form's fields that differ from what it opened with. The editors are mostly
- * uncontrolled, so this reads the form itself. Until the user first touches it, every reading
- * becomes the baseline: fields that fill themselves in after mount are not edits.
+ * Counts the form's fields that differ from what it opened with, and the ones the browser would
+ * refuse. The editors are mostly uncontrolled, so this reads the form itself. Until the user first
+ * touches it, every reading becomes the baseline: fields that fill themselves in after mount are
+ * not edits, and a required field still empty is not yet a mistake.
  */
-export function useUnsavedChanges(formId: string, active: boolean): number {
-  const [count, setCount] = useState(0);
+export function useUnsavedChanges(formId: string, active: boolean): UnsavedChanges {
+  const [count, setCount] = useState<UnsavedChanges>({ changed: 0, invalid: 0 });
   const baseline = useRef<Snapshot | null>(null);
   const touched = useRef(false);
 
@@ -45,7 +70,7 @@ export function useUnsavedChanges(formId: string, active: boolean): number {
     if (!active) return;
     baseline.current = null;
     touched.current = false;
-    setCount(0);
+    setCount({ changed: 0, invalid: 0 });
 
     let form: HTMLFormElement | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,10 +82,14 @@ export function useUnsavedChanges(formId: string, active: boolean): number {
       const now = snapshot(form);
       if (!touched.current || baseline.current === null) {
         baseline.current = now;
-        setCount(0);
+        setCount({ changed: 0, invalid: 0 });
         return;
       }
-      setCount(countChangedFields(baseline.current, now));
+      const changed = countChangedFields(baseline.current, now);
+      const invalid = countInvalidFields(form);
+      setCount((prev) =>
+        prev.changed === changed && prev.invalid === invalid ? prev : { changed, invalid },
+      );
     };
     // After React has re-rendered whatever the event changed.
     const schedule = () => {

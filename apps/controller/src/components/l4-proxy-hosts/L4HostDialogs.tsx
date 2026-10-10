@@ -827,7 +827,6 @@ export function CreateL4HostDialog({
       kind="l4"
       isCreate
       formId="create-l4-host-form"
-      submitLabel={tCommon("create")}
       state={state}
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(null, data)}
@@ -899,7 +898,6 @@ export function EditL4HostDialog({
       kind="l4"
       isCreate={false}
       formId="edit-l4-host-form"
-      submitLabel={tCommon("save")}
       state={state}
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(host.id, data)}

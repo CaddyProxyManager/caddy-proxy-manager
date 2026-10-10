@@ -14,5 +14,10 @@ declare module "@astryxdesign/core/Button" {
      * is taken - the primary SSO provider beside a form whose submit is the accent.
      */
     tonal: true;
+    /**
+     * Pink whatever the chosen accent: the host editor's Review button while there is something
+     * to save, which is its only way out.
+     */
+    pink: true;
   }
 }

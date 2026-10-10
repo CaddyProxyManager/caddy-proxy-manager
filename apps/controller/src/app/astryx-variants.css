@@ -107,6 +107,16 @@
     .astryx-button[data-variant="tonal"]:focus-visible {
       outline-color: var(--cpm-accent-border);
     }
+    /* `pink`: `tonal` in the pink hue whatever the accent, for the editor's pending review. */
+    .astryx-button[data-variant="pink"] {
+      background-color: var(--color-background-pink);
+      color: var(--color-text-pink);
+      --color-overlay-hover: color-mix(in srgb, var(--color-text-pink) 5%, transparent);
+      --color-overlay-pressed: color-mix(in srgb, var(--color-text-pink) 10%, transparent);
+    }
+    .astryx-button[data-variant="pink"]:focus-visible {
+      outline-color: var(--color-border-pink);
+    }
   }
 }
 

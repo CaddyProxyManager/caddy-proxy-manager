@@ -13,7 +13,8 @@ type AppDialogProps = {
   title: string;
   children: ReactNode;
   maxWidth?: "xs" | "sm" | "md" | "lg" | "xl";
-  actions?: ReactNode;
+  /** Null leaves the footer out: the editor that reviews before it saves has no buttons there. */
+  actions?: ReactNode | null;
   submitLabel?: string;
   onSubmit?: () => void;
   isSubmitting?: boolean;
@@ -73,21 +74,24 @@ export function AppDialog({
 }: AppDialogProps) {
   const tCommon = useTranslations("common");
   useReturnFocus(open);
-  const buttons = actions ?? (
-    <>
-      <Button variant="secondary" label={tCommon("cancel")} onClick={onClose} />
-      {onSubmit && (
-        <Button
-          // Astryx defaults to secondary, the same grey as Cancel beside it.
-          variant="primary"
-          label={submitLabel ?? tCommon("save")}
-          onClick={onSubmit}
-          isLoading={isSubmitting}
-          isDisabled={isSubmitting || isSubmitDisabled}
-        />
-      )}
-    </>
-  );
+  const buttons =
+    actions === null
+      ? null
+      : (actions ?? (
+          <>
+            <Button variant="secondary" label={tCommon("cancel")} onClick={onClose} />
+            {onSubmit && (
+              <Button
+                // Astryx defaults to secondary, the same grey as Cancel beside it.
+                variant="primary"
+                label={submitLabel ?? tCommon("save")}
+                onClick={onSubmit}
+                isLoading={isSubmitting}
+                isDisabled={isSubmitting || isSubmitDisabled}
+              />
+            )}
+          </>
+        ));
   return (
     <Dialog
       isOpen={open}
@@ -109,11 +113,13 @@ export function AppDialog({
         }
         content={<LayoutContent>{children}</LayoutContent>}
         footer={
-          <LayoutFooter>
-            <HStack gap={2} justify="end">
-              {buttons}
-            </HStack>
-          </LayoutFooter>
+          buttons === null ? undefined : (
+            <LayoutFooter>
+              <HStack gap={2} justify="end">
+                {buttons}
+              </HStack>
+            </LayoutFooter>
+          )
         }
       />
     </Dialog>

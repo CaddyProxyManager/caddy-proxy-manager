@@ -151,7 +151,6 @@ export function CreateHostDialog({
       kind="http"
       isCreate
       formId="create-host-form"
-      submitLabel={tCommon("create")}
       state={state}
       isPending={isPending}
       preview={(data) => previewProxyHostAction(null, data)}
@@ -353,7 +352,6 @@ export function EditHostDialog({
       kind="http"
       isCreate={false}
       formId="edit-host-form"
-      submitLabel={tCommon("save")}
       state={state}
       isPending={isPending}
       preview={(data) => previewProxyHostAction(host.id, data)}

@@ -2112,6 +2112,8 @@
     "reviewCreateTitle": "Review the new host",
     "shortcutHint": "Ctrl+S or Cmd+S opens this review",
     "noUnsaved": "No unsaved changes",
+    "errorsFound": "{count, plural, one {# error} other {# errors}}",
+    "warningsFound": "{count, plural, one {# warning} other {# warnings}}",
     "loading": "Working out what this save changes",
     "noChanges": "Nothing to save: the host already looks like this.",
     "impactHeading": "What saving does",

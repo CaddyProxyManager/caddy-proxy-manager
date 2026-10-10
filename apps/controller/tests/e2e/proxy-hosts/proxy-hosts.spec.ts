@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { goToSetting } from '../../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../../helpers/staged-settings';
 import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
@@ -114,7 +115,7 @@ test.describe('Proxy hosts', () => {
       await expect(hstsSwitch).toBeChecked();
       await expect(skipSwitch).toBeChecked();
 
-      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await saveThroughReview(page, dialog);
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
       const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.uuid}`);
@@ -497,7 +498,7 @@ test.describe('Proxy hosts', () => {
     await expect(editGeoCard.getByRole('radio', { name: 'Override global' })).toBeChecked();
 
     await editGeoCard.getByRole('radio', { name: 'Merge with global' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await saveThroughReview(page, page.getByRole('dialog', { name: 'Edit proxy host' }));
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
     const listResp2 = await page.request.get(API_PROXY_HOSTS);

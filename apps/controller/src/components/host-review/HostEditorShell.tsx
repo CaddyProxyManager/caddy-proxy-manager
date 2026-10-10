@@ -14,11 +14,13 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ActionState } from "@/lib/errors/action-error";
 import type { HostChangePreview, HostKind, HostPreviewResult } from "@/lib/host-review/types";
+import { EditorIssuesProvider, useEditorIssueTotals } from "./editor-issues";
 import { ReviewChangesDialog } from "./ReviewChangesDialog";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
@@ -115,34 +117,13 @@ function isSaveShortcut(event: KeyboardEvent): boolean {
   );
 }
 
-/**
- * The frame every host editor shares: one toolbar with the section jumps, the unsaved-changes count
- * and Review changes (also Ctrl/Cmd+S while the editor is open), plus a confirmation before closing
- * over unsaved edits. Saving straight from the footer still works; the review is one step
- * away, never in the way.
- */
-export function HostEditorShell({
-  open,
-  onClose,
-  title,
-  kind,
-  isCreate,
-  formId,
-  submitLabel,
-  state,
-  isPending,
-  preview,
-  sections,
-  onSectionLink,
-  children,
-}: {
+type HostEditorShellProps = {
   open: boolean;
   onClose: () => void;
   title: string;
   kind: HostKind;
   isCreate: boolean;
   formId: string;
-  submitLabel: string;
   state: ActionState;
   isPending: boolean;
   preview: (formData: FormData) => Promise<HostPreviewResult>;
@@ -150,11 +131,44 @@ export function HostEditorShell({
   /** Puts a jumped-to section in the URL, where the editor can be opened on it again. */
   onSectionLink?: (section: string) => void;
   children: ReactNode;
-}) {
+};
+
+/**
+ * The frame every host editor shares: one toolbar with the section jumps, the unsaved-changes
+ * count, what the editor's own validators found, and Review changes (also Ctrl/Cmd+S while the
+ * editor is open), plus a confirmation before closing over unsaved edits. The review is the only
+ * way to save: there is no footer, so every change is read back before it is sent.
+ */
+export function HostEditorShell(props: HostEditorShellProps) {
+  // The provider sits above the frame, since the toolbar reads what the fields report.
+  return (
+    <EditorIssuesProvider>
+      <HostEditorFrame {...props} />
+    </EditorIssuesProvider>
+  );
+}
+
+function HostEditorFrame({
+  open,
+  onClose,
+  title,
+  kind,
+  isCreate,
+  formId,
+  state,
+  isPending,
+  preview,
+  sections,
+  onSectionLink,
+  children,
+}: HostEditorShellProps) {
   const t = useTranslations("hostReview");
   const tCommon = useTranslations("common");
   const sectionKey = (id: string) => `sections.${kind}.${id}` as Parameters<typeof t>[0];
-  const unsaved = useUnsavedChanges(formId, open);
+  const { changed: unsaved, invalid } = useUnsavedChanges(formId, open);
+  const issues = useEditorIssueTotals();
+  const errors = issues.errors + invalid;
+  const warnings = issues.warnings;
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [result, setResult] = useState<HostChangePreview | null>(null);
@@ -313,12 +327,25 @@ export function HostEditorShell({
                     {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
                   </Text>
                 )}
+                {/* Each count is its own sentence, so no language has to join them. */}
+                {!isNarrow && errors > 0 && (
+                  <Token size="sm" color="red" label={t("errorsFound", { count: errors })} />
+                )}
+                {!isNarrow && warnings > 0 && (
+                  <Token size="sm" color="yellow" label={t("warningsFound", { count: warnings })} />
+                )}
                 <Button
-                  variant="secondary"
+                  // Pink while there is something to save, so the one way out is the one that
+                  // stands out.
+                  variant={unsaved > 0 ? "pink" : "secondary"}
                   label={tCommon("review")}
                   tooltip={t("shortcutHint")}
-                  // A phone has no room for the count beside the tabs, so it rides on the button.
-                  endContent={isNarrow && unsaved > 0 ? <Badge label={unsaved} /> : undefined}
+                  // A phone has no room for the counts beside the tabs, so they ride on the button.
+                  endContent={
+                    isNarrow && unsaved + errors + warnings > 0 ? (
+                      <Badge label={unsaved + errors + warnings} />
+                    ) : undefined
+                  }
                   aria-label={
                     isNarrow && unsaved > 0 ? t("reviewUnsaved", { count: unsaved }) : undefined
                   }
@@ -329,18 +356,8 @@ export function HostEditorShell({
             }
           />
         }
-        actions={
-          <>
-            <Button variant="secondary" label={tCommon("cancel")} onClick={requestClose} />
-            <Button
-              variant="primary"
-              label={submitLabel}
-              onClick={() => form()?.requestSubmit()}
-              isLoading={isPending && !reviewOpen}
-              isDisabled={isPending}
-            />
-          </>
-        }
+        // No footer: the review is the only way to save, and closing is the header's X.
+        actions={null}
       >
         <VStack gap={4}>
           {children}

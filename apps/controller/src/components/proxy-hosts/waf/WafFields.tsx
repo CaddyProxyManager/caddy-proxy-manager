@@ -21,6 +21,8 @@ import { HOST_TEMPLATE_ID_OFFSET } from "@/lib/waf/templates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
+import { useReportEditorIssues } from "@/components/host-review/editor-issues";
+import { useWafPolicy } from "./waf-policy";
 import { useTranslations } from "next-intl";
 
 type WafMode = "merge" | "override";
@@ -52,7 +54,12 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   );
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");
-  const directiveIssues = useSeclangIssues(customDirectives, { crsLoaded: loadCrs });
+  const { strictDirectives } = useWafPolicy();
+  const directiveIssues = useSeclangIssues(customDirectives, {
+    crsLoaded: loadCrs,
+    strictDirectives,
+  });
+  useReportEditorIssues("waf-directives", directiveIssues);
   const [presetIds, setPresetIds] = useState<number[]>(value?.preset_ids ?? []);
   const [pluginIds, setPluginIds] = useState<number[]>(value?.plugin_ids ?? []);
   const [bodyLimitMb, setBodyLimitMb] = useState(bodyLimitMib(value?.request_body_limit));

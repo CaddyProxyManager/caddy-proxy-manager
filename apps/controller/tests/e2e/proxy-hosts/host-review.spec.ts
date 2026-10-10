@@ -27,8 +27,13 @@ test.describe('Proxy host review before save', () => {
       const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
       await expect(editor.getByText('No unsaved changes')).toBeVisible();
+      // No footer: the review is the only way to save, and it stays plain until something changes.
+      await expect(editor.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+      const reviewButton = editor.getByRole('button', { name: 'Review', exact: true });
+      await expect(reviewButton).toHaveAttribute('data-variant', 'secondary');
 
       await editor.getByLabel('Name').fill('Review E2E renamed');
+      await expect(reviewButton).toHaveAttribute('data-variant', 'pink');
       await editor.getByLabel(/^domains/i).fill('review-e2e.local\nreview-e2e-2.local');
       await expect(editor.getByText('2 unsaved changes')).toBeVisible({ timeout: 5_000 });
 
