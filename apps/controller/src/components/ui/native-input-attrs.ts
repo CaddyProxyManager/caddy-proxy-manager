@@ -14,6 +14,7 @@ export const AUTOFILL_CURRENT_PASSWORD = autofill("current-password");
 export const AUTOFILL_NEW_PASSWORD = autofill("new-password");
 export const AUTOFILL_ONE_TIME_CODE = autofill("one-time-code");
 export const AUTOFILL_EMAIL = autofill("email");
+export const AUTOFILL_NAME = autofill("name");
 export const AUTOFILL_OFF = autofill("off");
 
 /** Restores the browser's empty-field gate. Pair with `isRequired` for the visible indicator. */

@@ -854,7 +854,8 @@
       "forgotPassword": "Forgot your password?",
       "localAccount": "Account on this instance",
       "signInWith": "Sign in with",
-      "ssoEnforcedNotice": "This instance requires single sign-on. Passwords work only for break-glass accounts."
+      "ssoEnforcedNotice": "This instance requires single sign-on. Passwords work only for break-glass accounts.",
+      "createAccount": "Create an account"
     },
     "missingDestinationDescription": "No redirect destination specified.",
     "missingProviderDescription": "Single sign-on is the only way to sign in, but no provider is configured.",
@@ -894,12 +895,26 @@
     "errors": {
       "accountLocked": "Too many login attempts for this account. Try again {retry}.",
       "emailNotVerified": "Email not verified",
+      "emailTaken": "An account with this email address already exists. Use another one.",
+      "invalidEmail": "Enter a valid email address.",
       "invalidUsername": "Username is invalid",
       "invalidUsernameOrPassword": "Invalid username or password",
+      "passwordTooLong": "Password is too long",
+      "signUpDisabled": "Creating an account is turned off on this instance.",
+      "signUpFailed": "The account could not be created. Try again.",
       "tooManyRequests": "Too many requests. Please try again later.",
       "unknown": "Sign-in did not complete. Try again.",
       "usernameTooLong": "Username is too long",
       "usernameTooShort": "Username is too short"
+    },
+    "signUp": {
+      "metaTitle": "Sign up",
+      "subtitle": "Create your account on this instance",
+      "nameRequired": "Enter your name.",
+      "emailRequired": "Enter your email address.",
+      "submit": "Create account",
+      "submitPending": "Creating account…",
+      "failedTitle": "Could not create the account"
     },
     "passwordReset": {
       "requestMetaTitle": "Reset your password",
@@ -1334,7 +1349,9 @@
     "twoFactorSignIn": "Two-factor sign-in",
     "currentPassword": "Current password",
     "newPassword": "New password",
-    "confirmNewPassword": "Confirm new password"
+    "confirmNewPassword": "Confirm new password",
+    "confirmPassword": "Confirm password",
+    "passwordsDoNotMatch": "Passwords do not match"
   },
   "errors": {
     "setupStepUnknown": "That is not a setup checklist step",
@@ -2700,7 +2717,6 @@
     "passwordIsSet": "Password is set",
     "passwordManagement": "Password management",
     "passwordManagementDescription": "Change the password you sign in with",
-    "passwordsDoNotMatch": "Passwords do not match",
     "profilePicture": "Profile picture",
     "reauthRequiredToSetPassword": "To set a password, sign out and sign in again with your single sign-on provider, then set it within {minutes} minutes.",
     "providerCredentials": "Username/password",
@@ -5918,7 +5934,6 @@
       "agentDescription": "Agents do not use this setup screen. Finish the controller first, then pair the agent to it from Settings.",
       "agentDocsLink": "Agent setup instructions",
       "agentTitle": "Agents are set up separately",
-      "confirmPassword": "Confirm password",
       "displayNameHelp": "Shown on the sign-in button, e.g. Authentik or Keycloak.",
       "heading": "Set up Caddy Proxy Manager",
       "issuerHelp": "The OIDC discovery URL.",

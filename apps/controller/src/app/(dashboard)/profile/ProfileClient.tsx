@@ -180,7 +180,7 @@ export default function ProfileClient({
     setSuccess(null);
 
     if (newPassword !== confirmPassword) {
-      setError(t("passwordsDoNotMatch"));
+      setError(tCommon("passwordsDoNotMatch"));
       return;
     }
 

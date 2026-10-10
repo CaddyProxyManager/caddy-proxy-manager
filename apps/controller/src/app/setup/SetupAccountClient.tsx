@@ -155,7 +155,7 @@ export default function SetupAccountClient({
                     <TextInput
                       startIcon={KeyRound}
                       {...AUTOFILL_NEW_PASSWORD}
-                      label={ta("confirmPassword")}
+                      label={tCommon("confirmPassword")}
                       htmlName="passwordConfirmation"
                       type="password"
                       value={passwordConfirmation}

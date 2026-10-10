@@ -95,6 +95,44 @@ test.describe('Authentication', () => {
     await expect(res.json()).resolves.toMatchObject({
       code: 'EMAIL_PASSWORD_SIGN_UP_DISABLED',
     });
+
+    // Nor is the form offered: the page sends a visitor back, and /login has no link to it.
+    await page.goto('/login/sign-up');
+    await expect(page).toHaveURL(/\/login$/);
+    await waitForHydration(page);
+    await expect(page.getByRole('link', { name: /create an account/i })).toHaveCount(0);
+  });
+
+  test('/login/sign-up creates an account and signs it in when self-registration is on', async ({
+    browser,
+  }) => {
+    const ctx = await browser.newContext({
+      baseURL: 'http://localhost:3001',
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await ctx.newPage();
+    const email = `self-registration-form-${Date.now()}@test.invalid`;
+
+    try {
+      await page.goto('/login');
+      await waitForHydration(page);
+      await page.getByRole('link', { name: /create an account/i }).click();
+      await expect(page).toHaveURL(/\/login\/sign-up$/);
+      await waitForHydration(page);
+
+      await page.getByRole('textbox', { name: /^name/i }).fill('Form Self Registration Test');
+      await page.getByRole('textbox', { name: /email/i }).fill(email);
+      await page.getByRole('textbox', { name: /^password/i }).fill('SelfRegistration2026!');
+      await page.getByRole('textbox', { name: /confirm password/i }).fill('SelfRegistration2026!');
+      await page.getByRole('button', { name: /^create account$/i }).click();
+
+      await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
+      const session = await page.request.get('/api/auth/get-session');
+      expect(session.status()).toBe(200);
+      await expect(session.json()).resolves.toMatchObject({ user: { email, role: 'user' } });
+    } finally {
+      await ctx.close();
+    }
   });
 
   test('email self-registration can be enabled with AUTH_ALLOW_SELF_REGISTRATION', async ({

@@ -30,7 +30,7 @@ import { passkey } from "@better-auth/passkey";
 import { APIError as PluginAPIError } from "@better-auth/core/error";
 import { hashPassword, verifyPassword } from "./password";
 import { MIN_PASSWORD_LENGTH } from "./password/policy";
-import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./signup-policy";
+import { PASSWORD_POLICY_CODE, SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./signup-policy";
 import { DISABLED_AUTH_PATHS } from "./disabled-paths";
 import { getAppName } from "../branding/app-name";
 import { DomainError } from "../errors/domain-error";
@@ -471,7 +471,7 @@ async function createAuth(baseURL: string): Promise<any> {
         }
         const { getTranslations } = await import("next-intl/server");
         const message = signUpPasswordError(ctx.path, ctx.body, await getTranslations());
-        if (message) throw new APIError("BAD_REQUEST", { message });
+        if (message) throw new APIError("BAD_REQUEST", { message, code: PASSWORD_POLICY_CODE });
       }),
     },
     databaseHooks: {

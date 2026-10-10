@@ -57,6 +57,8 @@ interface LoginClientProps {
   cspNonce?: string;
   /** Email is set up, so a forgotten password can be reset from here. */
   passwordResetEnabled?: boolean;
+  /** Self-registration is on, so /login/sign-up is offered. */
+  signUpEnabled?: boolean;
   /** Enabled LDAP directories: one is a silent fallback, several get a selector. */
   directories?: DirectoryChoice[];
   /** Passwords and passkeys then work only for break-glass accounts. */
@@ -73,6 +75,7 @@ export default function LoginClient({
   captcha = null,
   cspNonce,
   passwordResetEnabled = false,
+  signUpEnabled = false,
   directories = [],
   ssoEnforced = false,
   passkeyAutofill = false,
@@ -387,6 +390,14 @@ export default function LoginClient({
                   />
                 </VStack>
               </form>
+
+              {signUpEnabled && (
+                <VStack hAlign="center">
+                  <Link href="/login/sign-up" size="sm">
+                    {t("createAccount")}
+                  </Link>
+                </VStack>
+              )}
 
               {passkey.supported && (
                 <Button

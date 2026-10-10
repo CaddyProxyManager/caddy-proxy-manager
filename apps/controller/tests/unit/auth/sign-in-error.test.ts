@@ -14,6 +14,7 @@ import {
   lockLiftsIn,
   signInErrorMessage,
 } from '@/src/lib/auth/sign-in-error';
+import { SIGN_UP_ERROR_KEYS } from '@/src/lib/auth/sign-up-error';
 
 const errors = messages.auth.errors as Record<string, string | undefined>;
 const t = (key: string) => key;
@@ -76,9 +77,12 @@ describe('auth.errors messages', () => {
   });
 
   it('has no message nothing maps to', () => {
+    // The sign-up form reads the same namespace (sign-up-error.ts).
     const used = new Set<string>([
       ...Object.values(SIGN_IN_ERROR_KEYS),
+      ...Object.values(SIGN_UP_ERROR_KEYS),
       'accountLocked',
+      'signUpFailed',
       'tooManyRequests',
       'unknown',
     ]);

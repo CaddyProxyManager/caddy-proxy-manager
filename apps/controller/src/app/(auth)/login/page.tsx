@@ -1,4 +1,4 @@
-import { localUsersDisabled } from "@/src/lib/auth/policy";
+import { localUsersDisabled, selfRegistrationOpen } from "@/src/lib/auth/policy";
 import { getAppName } from "@/src/lib/branding/app-name";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -51,6 +51,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       initialError={oauthError}
       captcha={captcha}
       passwordResetEnabled={localLoginEnabled && (await emailReady())}
+      signUpEnabled={await selfRegistrationOpen()}
       directories={directories}
       ssoEnforced={(await getSsoEnforcement()).enforced}
       passkeyAutofill={await getSetting(passkeyAutofill)}

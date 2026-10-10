@@ -82,3 +82,8 @@ export async function authPolicy(): Promise<AuthPolicy> {
 export async function localUsersDisabled(): Promise<boolean> {
   return (await authPolicy()).disableLocalUsers;
 }
+
+/** Whether /login/sign-up is offered; already false while local users are off. */
+export async function selfRegistrationOpen(): Promise<boolean> {
+  return (await authPolicy()).allowSelfRegistration;
+}
