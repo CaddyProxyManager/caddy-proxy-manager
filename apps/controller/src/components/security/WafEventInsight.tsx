@@ -14,6 +14,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -22,6 +23,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useTranslations } from "next-intl";
 import { getWafEventDetailAction, reviewWafEventAction } from "@/src/app/(dashboard)/waf/actions";
 import { withRowIds } from "@/lib/forms/row-id";
+import type { AutonomousSystem } from "@/src/lib/geoip/lookup";
 import type { WafEventDetail } from "@/src/lib/security/waf-event";
 import { BlockSourceDialog, type BlockDraft } from "./BlockSourceDialog";
 import { ExclusionDialog, type ExclusionDraft, type HostOption } from "./ExclusionDialog";
@@ -35,11 +37,41 @@ function prettyRecord(raw: string | null): string {
   }
 }
 
+export type WafEventNetwork = { userAgent: string | null; asn: AutonomousSystem | null };
+
+export function asnLabel(asn: AutonomousSystem): string {
+  return asn.organization ? `AS${asn.number} ${asn.organization}` : `AS${asn.number}`;
+}
+
+/** The two rows for a page that has no metadata list of its own. */
+function WafEventNetworkMetadata({ userAgent, asn }: WafEventNetwork) {
+  const tAnalytics = useTranslations("analytics");
+  return (
+    <MetadataList columns="multi">
+      {asn && (
+        <MetadataListItem label={tAnalytics("filterFields.asn")}>
+          <Text type="code" size="sm">
+            {asnLabel(asn)}
+          </Text>
+        </MetadataListItem>
+      )}
+      {userAgent && (
+        <MetadataListItem label={tAnalytics("filterFields.ua")}>
+          <Text type="code" size="sm">
+            {userAgent}
+          </Text>
+        </MetadataListItem>
+      )}
+    </MetadataList>
+  );
+}
+
 export function WafEventInsight({
   eventKey,
   hosts,
   showRawRecord = true,
   onChanged,
+  onMetadata,
 }: {
   eventKey: string;
   hosts: readonly HostOption[];
@@ -47,10 +79,11 @@ export function WafEventInsight({
   showRawRecord?: boolean;
   /** After a review, exclusion or block, so the page can refresh its lists. */
   onChanged?: () => void;
+  /** When set, the page shows the user agent and ASN in its own metadata list. */
+  onMetadata?: (network: WafEventNetwork | null) => void;
 }) {
   const t = useTranslations("waf");
   const tCommon = useTranslations("common");
-  const tAnalytics = useTranslations("analytics");
   const [detail, setDetail] = useState<WafEventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exclusion, setExclusion] = useState<ExclusionDraft | null>(null);
@@ -65,14 +98,17 @@ export function WafEventInsight({
     } else {
       setError(null);
       setDetail(result.detail);
+      onMetadata?.({ userAgent: result.detail.userAgent, asn: result.detail.asn });
     }
-  }, [eventKey]);
+  }, [eventKey, onMetadata]);
 
   useEffect(() => {
     setDetail(null);
     setError(null);
+    // Another event's user agent must not show while this one loads.
+    onMetadata?.(null);
     void load();
-  }, [load]);
+  }, [load, onMetadata]);
 
   // Once per load, so a re-render does not re-key the list.
   const rules = useMemo(() => withRowIds(detail?.explanation.rules ?? []), [detail]);
@@ -86,7 +122,7 @@ export function WafEventInsight({
     );
   }
 
-  const { explanation, suggestedExclusion, review, event, relayedBy, userAgent } = detail;
+  const { explanation, suggestedExclusion, review, event, relayedBy, userAgent, asn } = detail;
   const reached = explanation.totalScore >= explanation.threshold;
 
   function saveReview(verdict: "intended" | "false_positive" | null) {
@@ -103,15 +139,8 @@ export function WafEventInsight({
 
   return (
     <VStack gap={4}>
-      {userAgent && (
-        <VStack gap={1}>
-          <Text type="label" size="sm" weight="bold" color="secondary">
-            {tAnalytics("filterFields.ua")}
-          </Text>
-          <Text type="code" size="sm">
-            {userAgent}
-          </Text>
-        </VStack>
+      {!onMetadata && (userAgent || asn) && (
+        <WafEventNetworkMetadata userAgent={userAgent} asn={asn} />
       )}
       <VStack gap={2}>
         <HStack gap={2} vAlign="center" wrap="wrap">

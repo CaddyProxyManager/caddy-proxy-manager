@@ -4,7 +4,7 @@
  */
 import { readFileSync, statSync } from "node:fs";
 import { isIP } from "node:net";
-import { type CityResponse, type CountryResponse, Reader } from "maxmind";
+import { type AsnResponse, type CityResponse, type CountryResponse, Reader } from "maxmind";
 import { geoipDatabasePath } from "../agent/geoip";
 
 export type ApproximatePlace = {
@@ -14,19 +14,23 @@ export type ApproximatePlace = {
   countryCode: string | null;
 };
 
-type Cached<T extends CityResponse | CountryResponse> = { mtimeMs: number; reader: Reader<T> };
+export type AutonomousSystem = { number: number; organization: string | null };
 
-const readers = new Map<string, Cached<CityResponse>>();
+type Cached = { mtimeMs: number; reader: Reader<CityResponse | CountryResponse | AsnResponse> };
+
+const readers = new Map<string, Cached>();
 
 /** Re-read when the updater swaps the file in; a missing or unreadable file is no reader. */
-function readerFor(edition: "GeoLite2-City" | "GeoLite2-Country"): Reader<CityResponse> | null {
+function readerFor<T extends CityResponse | CountryResponse | AsnResponse>(
+  edition: "GeoLite2-City" | "GeoLite2-Country" | "GeoLite2-ASN",
+): Reader<T> | null {
   const path = geoipDatabasePath(edition);
   try {
     const { mtimeMs } = statSync(path);
     const cached = readers.get(path);
-    if (cached?.mtimeMs === mtimeMs) return cached.reader;
-    const reader = new Reader<CityResponse>(readFileSync(path));
-    readers.set(path, { mtimeMs, reader });
+    if (cached?.mtimeMs === mtimeMs) return cached.reader as Reader<T>;
+    const reader = new Reader<T>(readFileSync(path));
+    readers.set(path, { mtimeMs, reader: reader as Cached["reader"] });
     return reader;
   } catch {
     readers.delete(path);
@@ -44,7 +48,8 @@ export function approximatePlace(address: string | null, locale = "en"): Approxi
   if (!address) return null;
   const ip = address.replace(/^::ffff:/i, "");
   if (!isIP(ip)) return null;
-  const reader = readerFor("GeoLite2-City") ?? readerFor("GeoLite2-Country");
+  const reader =
+    readerFor<CityResponse>("GeoLite2-City") ?? readerFor<CityResponse>("GeoLite2-Country");
   if (!reader) return null;
   let found: CityResponse | null = null;
   try {
@@ -56,4 +61,23 @@ export function approximatePlace(address: string | null, locale = "en"): Approxi
   const names = found?.city?.names as Record<string, string> | undefined;
   const city = names ? (names[nameKey(locale)] ?? names.en ?? null) : null;
   return city || countryCode ? { city, countryCode } : null;
+}
+
+/** From the ASN database on the data volume; offline mode leaves it as stale as the last refresh. */
+export function autonomousSystemOf(address: string | null): AutonomousSystem | null {
+  if (!address) return null;
+  const ip = address.replace(/^::ffff:/i, "");
+  if (!isIP(ip)) return null;
+  const reader = readerFor<AsnResponse>("GeoLite2-ASN");
+  if (!reader) return null;
+  try {
+    const found = reader.get(ip);
+    if (!found?.autonomous_system_number) return null;
+    return {
+      number: found.autonomous_system_number,
+      organization: found.autonomous_system_organization ?? null,
+    };
+  } catch {
+    return null;
+  }
 }

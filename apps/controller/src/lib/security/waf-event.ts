@@ -9,6 +9,7 @@ import { isAnalyticsEnabled } from "../clickhouse/client";
 import { queryUserAgentOfWafEvent, queryWafEventsAt } from "../clickhouse/security";
 import { type WafEvent, redactStoredWafEvent } from "../models/waf-events";
 import { listProxyHosts } from "../models/proxy-hosts";
+import { type AutonomousSystem, autonomousSystemOf } from "../geoip/lookup";
 import { getWafSettings } from "../settings";
 import { type WafEventExplanation, explainWafEvent, wafEventCurl } from "../waf/event-detail";
 import { wafEventKeyTs } from "../waf/event-key";
@@ -41,6 +42,8 @@ export type WafEventDetail = {
   relayedBy: WafEventRelay | null;
   /** From the access log; null when the request was not logged. */
   userAgent: string | null;
+  /** From the local GeoLite2-ASN database; null without it. */
+  asn: AutonomousSystem | null;
   explanation: WafEventExplanation;
   suggestedExclusion: SuggestedExclusion | null;
   curl: string;
@@ -108,6 +111,7 @@ export async function getWafEventDetail(key: string): Promise<WafEventDetail> {
     event,
     relayedBy: relayAgentId ? { agentId: relayAgentId, name: relay[0]?.name ?? null } : null,
     userAgent,
+    asn: autonomousSystemOf(event.clientIp),
     explanation,
     suggestedExclusion,
     curl: wafEventCurl(event.rawData, event),

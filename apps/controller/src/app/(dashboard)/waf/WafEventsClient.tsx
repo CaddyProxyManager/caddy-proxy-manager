@@ -66,7 +66,11 @@ import { WafQuickTemplates } from "@/components/proxy-hosts/waf/WafQuickTemplate
 import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import { WafPluginsPanel, type WafPluginRow } from "./WafPluginsPanel";
 import { updateWafSettingsAction } from "../settings/actions";
-import { WafEventInsight } from "@/components/security/WafEventInsight";
+import {
+  WafEventInsight,
+  type WafEventNetwork,
+  asnLabel,
+} from "@/components/security/WafEventInsight";
 import type { HostOption } from "@/components/security/ExclusionDialog";
 import type { WafExclusion } from "@/lib/models/waf-exclusions";
 import type { WafHostMode } from "@/lib/security/waf-hosts";
@@ -632,7 +636,9 @@ function EventDetailPanel({
   const tProxyHosts = useTranslations("proxyHosts");
   const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
+  const tAnalytics = useTranslations("analytics");
   const router = useRouter();
+  const [network, setNetwork] = useState<WafEventNetwork | null>(null);
 
   return (
     // Beside the list, not a modal: triage reads several events in a row without dismissing each.
@@ -686,6 +692,20 @@ function EventDetailPanel({
                 {event.uri || emptyValue}
               </Text>
             </MetadataListItem>
+            {network?.asn && (
+              <MetadataListItem label={tAnalytics("filterFields.asn")}>
+                <Text type="code" size="sm">
+                  {asnLabel(network.asn)}
+                </Text>
+              </MetadataListItem>
+            )}
+            {network?.userAgent && (
+              <MetadataListItem label={tAnalytics("filterFields.ua")}>
+                <Text type="code" size="sm">
+                  {network.userAgent}
+                </Text>
+              </MetadataListItem>
+            )}
             <MetadataListItem label={tProxyHosts("ruleId")}>
               <Text type="code" size="sm" weight="semibold">
                 {event.ruleId ?? emptyValue}
@@ -703,6 +723,7 @@ function EventDetailPanel({
           eventKey={event.key}
           hosts={hosts}
           showRawRecord={false}
+          onMetadata={setNetwork}
           onChanged={() => router.refresh()}
         />
 
