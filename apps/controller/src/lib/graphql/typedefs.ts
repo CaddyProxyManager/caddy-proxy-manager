@@ -434,11 +434,34 @@ export const typeDefs = /* GraphQL */ `
     error: String!
   }
 
+  """An OIDC provider. The client secret never leaves the server; clientId keeps its last four."""
   type OAuthProvider {
-    id: Int!
+    id: String!
     name: String!
-    enabled: Boolean!
+    type: String!
+    clientId: String!
+    hasClientSecret: Boolean!
+    """What to register as the redirect URI at the IdP."""
+    callbackUrl: String!
     issuer: String
+    authorizationUrl: String
+    tokenUrl: String
+    userinfoUrl: String
+    scopes: String!
+    autoLink: Boolean!
+    enabled: Boolean!
+    """ui, or env for one the environment configures, which can only be switched on or off."""
+    source: String!
+    groupsClaim: String!
+    rolesClaim: String
+    groupPrefix: String
+    roleMappingEnabled: Boolean!
+    """Role key -> the IdP groups that grant it."""
+    roleGroups: JSON!
+    defaultRole: String!
+    syncGroups: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
   }
 
   type DnsProvider {
@@ -812,6 +835,81 @@ export const typeDefs = /* GraphQL */ `
     path: String
     target: String
     reason: String
+  }
+
+  """A block of SecLang directives a host, the dashboard or the global WAF can select."""
+  type WafPreset {
+    id: Int!
+    name: String!
+    description: String
+    directives: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  """An installed CRS plugin: the release as fetched, plus the operator's -config override."""
+  type CrsPlugin {
+    id: Int!
+    name: String!
+    repository: String!
+    version: String!
+    description: String
+    ruleIdStart: Int!
+    ruleIdEnd: Int!
+    configRules: String!
+    beforeRules: String!
+    afterRules: String!
+    """The operator's -config file, or null while the upstream one runs."""
+    configOverride: String
+    fileNames: [String!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  """A plugin a configured registry lists, with what the last check found out about it."""
+  type CrsPluginRegistryEntry {
+    name: String!
+    repository: String!
+    type: String!
+    status: String!
+    license: String!
+    ruleIdStart: Int!
+    ruleIdEnd: Int!
+    registryId: String!
+    registryName: String!
+    """The installed plugin's id, or null."""
+    installedId: Int
+    """Why it cannot be installed here, or null when it can or no check has reached a verdict."""
+    unsupported: String
+    checkedVersion: String
+  }
+
+  type CrsRegistrySource {
+    id: String!
+    name: String!
+    url: String!
+  }
+
+  """The registries read and how often; the GitHub token is write-only."""
+  type CrsPluginRegistrySettings {
+    registries: [CrsRegistrySource!]!
+    """0 turns the scheduled refresh off."""
+    refreshIntervalHours: Int!
+    hasGithubToken: Boolean!
+  }
+
+  type CrsPluginRegistry {
+    plugins: [CrsPluginRegistryEntry!]!
+    settings: CrsPluginRegistrySettings!
+  }
+
+  """One registry pass: when it finished, why it stopped short, and each source's last read."""
+  type CrsPluginRegistryCheck {
+    checkedAt: DateTime
+    error: String
+    """By registry id: { url, fetchedAt, error }."""
+    sources: JSON!
+    plugins: [CrsPluginRegistryEntry!]!
   }
 
   """An entry of the global deny list, checked before every other handler on HTTP hosts."""
@@ -1587,6 +1685,12 @@ export const typeDefs = /* GraphQL */ `
     securityReport(query: AnalyticsQueryInput, page: Int): SecurityReport!
     """The global deny list, expired entries included until the expiry pass removes them."""
     blockedSources: [BlockedSource!]!
+    """Every WAF preset, by name."""
+    wafPresets: [WafPreset!]!
+    """Every installed CRS plugin, by name."""
+    crsPlugins: [CrsPlugin!]!
+    """What the configured registries list, from the last read, and the registry settings."""
+    crsPluginRegistry: CrsPluginRegistry!
     backupDestinations: [BackupDestination!]!
     backupSchedules: [BackupSchedule!]!
     """Newest first; limit defaults to 50, at most 500."""
@@ -1800,8 +1904,49 @@ export const typeDefs = /* GraphQL */ `
     createBlockedSource(input: BlockedSourceInput!): BlockedSource!
     deleteBlockedSource(id: Int!): Boolean!
 
+    """input: { name, description?, directives }. Compiled by Coraza on an agent before it is stored."""
+    createWafPreset(input: JSON!): WafPreset!
+    """Any of name, description and directives; a changed preset in use is re-applied to Caddy."""
+    updateWafPreset(id: Int!, input: JSON!): WafPreset!
+    """Refused while a host, the dashboard or the global WAF selects it."""
+    deleteWafPreset(id: Int!): Boolean!
+    """
+    Installs input.name from the registry input.registry names, which may be left out while only one
+    registry lists the name. Fetches the latest release and checks Coraza loads it first.
+    """
+    createCrsPlugin(input: JSON!): CrsPlugin!
+    """input: { config }: the operator's -config file, or null to run the upstream one again."""
+    updateCrsPlugin(id: Int!, input: JSON!): CrsPlugin!
+    """Refused while a host, the dashboard or the global WAF selects it."""
+    deleteCrsPlugin(id: Int!): Boolean!
+    """Fetches the plugin's latest release and installs it over the current one."""
+    updateCrsPluginFromRegistry(id: Int!): CrsPlugin!
+    """Re-reads every registry and checks each plugin, answering once the pass is done."""
+    checkCrsPluginRegistry: CrsPluginRegistryCheck!
+    """
+    input: { registries?: [{ id?, name, url }], refreshIntervalHours?, githubToken? }. Fields left
+    out keep their value; an empty githubToken removes the stored one.
+    """
+    setCrsPluginRegistrySettings(input: JSON!): CrsPluginRegistrySettings!
+
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!
+    """
+    input: { modules: { id: enabled }, customModules }, as PUT /api/v1/caddy/modules. Refused while
+    a module in use would be disabled; otherwise an agent that builds its own image starts a rebuild.
+    Answers { selection, diff }.
+    """
+    setCaddyModules(input: JSON!): JSON!
+
+    """
+    input as POST /api/v1/oauth-providers: name, clientId and clientSecret, then type, issuer, the
+    endpoint URLs, scopes, autoLink and the group-to-role mapping. Only roles the caller could give.
+    """
+    createOAuthProvider(input: JSON!): OAuthProvider!
+    """A blank clientSecret keeps the stored one. An env-sourced provider takes enabled alone."""
+    updateOAuthProvider(id: String!, input: JSON!): OAuthProvider!
+    """Refused for an env-sourced provider."""
+    deleteOAuthProvider(id: String!): Boolean!
 
     createBackupDestination(input: BackupDestinationInput!): BackupDestination!
     updateBackupDestination(id: Int!, input: BackupDestinationInput!): BackupDestination!

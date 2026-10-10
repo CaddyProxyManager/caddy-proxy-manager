@@ -57,6 +57,8 @@ import { approvalMutationResolvers, approvalQueryResolvers } from "./approvals";
 import { hostHistoryMutationResolvers, hostHistoryQueryResolvers } from "./host-history";
 import { identityMutationResolvers, identityQueryResolvers, projectUser } from "./identity";
 import { dnsProviderMutationResolvers } from "./dns-providers";
+import { wafConfigMutationResolvers, wafConfigQueryResolvers } from "./waf-config";
+import { oauthProviderFieldResolvers, oauthProviderMutationResolvers } from "./oauth-providers";
 import type { GraphQLContext } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -121,6 +123,7 @@ export const resolvers = {
     rules: (list: { ipRules: unknown[] }) => list.ipRules,
   },
   ...certificateTypeResolvers,
+  OAuthProvider: oauthProviderFieldResolvers,
   Agent: {
     // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
     connected: (agent: PairedAgent) => isConnected(agent.agentId),
@@ -233,6 +236,7 @@ export const resolvers = {
     ...hostHistoryQueryResolvers,
     ...approvalQueryResolvers,
     ...identityQueryResolvers,
+    ...wafConfigQueryResolvers,
   },
 
   Mutation: {
@@ -494,5 +498,7 @@ export const resolvers = {
     ...approvalMutationResolvers,
     ...identityMutationResolvers,
     ...dnsProviderMutationResolvers,
+    ...wafConfigMutationResolvers,
+    ...oauthProviderMutationResolvers,
   },
 };

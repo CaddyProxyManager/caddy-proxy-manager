@@ -64,8 +64,8 @@ commit. It is compiled from source at build time.
 
 ## Rebuilding
 
-Saving a changed selection starts the rebuild, whether in Settings or over
-`PUT /api/v1/caddy/modules`. The [agent](../agent/) runs the build and recreates the Caddy container when it finishes,
+Saving a changed selection starts the rebuild, whether in Settings or over the API (the
+`setCaddyModules` mutation, or `PUT /api/v1/caddy/modules`). The [agent](../agent/) runs the build and recreates the Caddy container when it finishes,
 reporting progress as it goes. The running Caddy keeps serving until the new binary is ready.
 **Rebuild** retries a build that failed; an agent that was offline builds when it next connects.
 

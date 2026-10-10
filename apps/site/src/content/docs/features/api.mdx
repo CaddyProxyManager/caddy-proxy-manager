@@ -186,6 +186,23 @@ answers with Coraza's reason. `reviewWafEvent(key, verdict)` marks an event `int
 `false_positive`, and null clears it. `blockedSources` and `deleteBlockedSource` manage the
 deny list.
 
+`wafPresets`, `createWafPreset`, `updateWafPreset` and `deleteWafPreset` manage the WAF presets
+hosts select; a preset is compiled by Coraza on an agent before it is stored, and one still
+selected cannot be deleted. `crsPlugins` lists the installed CRS plugins and `crsPluginRegistry`
+what the configured registries offer, with the registry settings. `createCrsPlugin(input: { name,
+registry? })` installs one, `updateCrsPlugin(id, input: { config })` replaces its `-config` file
+(null runs the upstream one again), `updateCrsPluginFromRegistry(id)` moves it to the latest
+release and `deleteCrsPlugin` uninstalls it. `checkCrsPluginRegistry` re-reads every registry now,
+and `setCrsPluginRegistrySettings` takes `registries`, `refreshIntervalHours` and a write-only
+`githubToken`.
+
+```graphql
+mutation {
+  createWafPreset(input: { name: "Nextcloud", directives: "SecRule ARGS \"@rx x\" \"id:9700,phase:1,pass,nolog,ctl:ruleRemoveById=942100\"" }) { id }
+  createCrsPlugin(input: { name: "wordpress-rule-exclusions" }) { id version }
+}
+```
+
 ## Access lists
 
 An `AccessList` carries its `rules` in order (each with one of `cidr`, `hostname`, `country`,
@@ -206,6 +223,21 @@ mutation {
 
 Global rate-limit zones and the never-limited list are the `rate-limit` settings group:
 `{ enabled, zones, allowlist }`.
+
+## Sign-in providers and Caddy modules
+
+`oauthProviders` lists the OIDC providers as the Settings page shows them: `clientId` keeps its
+last four characters, `hasClientSecret` says whether one is stored, and `callbackUrl` is the
+redirect URI to register at the IdP. The secret itself has no field. `createOAuthProvider` takes
+the REST body (`name`, `clientId`, `clientSecret`, then `issuer`, the endpoint URLs, `scopes`,
+`autoLink` and the group-to-role mapping); `updateOAuthProvider` keeps the stored secret when the
+body leaves it blank, and a provider the environment configures takes `enabled` alone.
+`deleteOAuthProvider` refuses that provider.
+
+`caddyModules` answers which modules the running binary holds, and `setCaddyModules(input:
+{ modules, customModules })` stores the selection as `PUT /api/v1/caddy/modules` does: refused
+while a module in use would be disabled, and otherwise the start of a rebuild on every agent that
+builds its own image.
 
 ## Authentication
 
