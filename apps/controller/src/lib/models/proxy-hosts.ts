@@ -11,7 +11,7 @@ import {
 import { pruneHostRevisions } from "../host-history/retention";
 import { hostAuditChanges } from "../host-review/audit";
 import { accessLists, proxyHosts } from "../db/schema";
-import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, count, inArray, or, sql } from "drizzle-orm";
 import { parseHostUuid } from "../hosts/ref";
 import {
   type GeoBlockSettings,
@@ -36,6 +36,7 @@ import {
   wafDirectiveSource,
 } from "../waf/caddy";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy/tailscale";
+import { likeContains } from "../db/like";
 import { domainError } from "../errors/domain-error";
 import { SettingsValidationError, validateHostGeoBlock } from "../settings/validation";
 import { assertCertificateServable } from "../certificates/placement";
@@ -3441,13 +3442,14 @@ function proxyHostListFilter(
     clauses.push(hasTagClause(proxyHosts.tags, tag));
   }
   if (search) {
+    // Escaped: a "%" typed into the search box matched every host.
     clauses.push(
       or(
-        like(proxyHosts.name, `%${search}%`),
-        like(proxyHosts.description, `%${search}%`),
-        like(proxyHosts.tags, `%${search}%`),
-        like(proxyHosts.domains, `%${search}%`),
-        like(proxyHosts.upstreams, `%${search}%`),
+        likeContains(proxyHosts.name, search),
+        likeContains(proxyHosts.description, search),
+        likeContains(proxyHosts.tags, search),
+        likeContains(proxyHosts.domains, search),
+        likeContains(proxyHosts.upstreams, search),
       ),
     );
   }

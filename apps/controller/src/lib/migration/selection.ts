@@ -39,7 +39,6 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "verifications",
       "two_factors",
       "passkeys",
-      "pending_oauth_links",
       "api_tokens",
       "push_subscriptions",
       "analytics_views",
@@ -130,7 +129,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     description:
       "Configured identity providers, including their client secrets. Bringing an enabled " +
       "provider across is a way in on its own, even without the old user accounts.",
-    tables: ["oauth_providers", "oauth_states", "role_mappings", "sso_providers"],
+    tables: ["oauth_providers", "role_mappings", "sso_providers"],
     requires: [],
   },
   {

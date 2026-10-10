@@ -68,6 +68,8 @@ export const sessions = sqliteTable(
     tokenUnique: uniqueIndex("sessions_token_unique").on(table.token),
     userIdx: index("sessions_user_idx").on(table.userId),
     oidcSessionIdx: index("sessions_oidc_session_idx").on(table.oidcProviderId, table.oidcSid),
+    // The hourly sweep of expired sessions (lib/security/housekeeping).
+    expiresIdx: index("sessions_expires_idx").on(table.expiresAt),
   }),
 );
 
@@ -216,41 +218,6 @@ export const ssoProviders = sqliteTable(
   },
   (table) => ({
     providerUnique: uniqueIndex("sso_providers_provider_unique").on(table.providerId),
-  }),
-);
-
-export const oauthStates = sqliteTable(
-  "oauth_states",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    state: text("state").notNull(),
-    codeVerifier: text("codeVerifier").notNull(),
-    redirectTo: text("redirectTo"),
-    createdAt: text("createdAt").notNull(),
-    expiresAt: text("expiresAt").notNull(),
-  },
-  (table) => ({
-    stateUnique: uniqueIndex("oauth_state_unique").on(table.state),
-  }),
-);
-
-export const pendingOAuthLinks = sqliteTable(
-  "pending_oauth_links",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    provider: text("provider", { length: 50 }).notNull(),
-    userEmail: text("userEmail").notNull(), // Email of the user who initiated linking
-    createdAt: text("createdAt").notNull(),
-    expiresAt: text("expiresAt").notNull(),
-  },
-  (table) => ({
-    userProviderUnique: uniqueIndex("pending_oauth_user_provider_unique").on(
-      table.userId,
-      table.provider,
-    ),
   }),
 );
 
@@ -540,6 +507,9 @@ export const auditEvents = sqliteTable(
   (table) => ({
     createdAtIdx: index("audit_events_created_at_idx").on(table.createdAt),
     seqIdx: uniqueIndex("audit_events_seq_idx").on(table.seq),
+    // The audit page's actor and action filters, newest first; without these each is a scan.
+    userIdx: index("audit_events_user_idx").on(table.userId, table.createdAt),
+    actionIdx: index("audit_events_action_idx").on(table.action, table.createdAt),
     // One entity's history, newest first: a host's page.
     entityIdx: index("audit_events_entity_idx").on(
       table.entityType,

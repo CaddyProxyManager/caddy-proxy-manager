@@ -21,8 +21,6 @@ import { exportRow, importRow } from "./secrets";
 export const BACKUP_NEVER = [
   "sessions",
   "verifications",
-  "oauth_states",
-  "pending_oauth_links",
   "forward_auth_sessions",
   "forward_auth_exchanges",
   "forward_auth_redirect_intents",

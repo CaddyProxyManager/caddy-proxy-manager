@@ -337,6 +337,13 @@
       "when": 1793400000000,
       "tag": "0047_oidc_roles_claim",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793403600000,
+      "tag": "0048_audit_indexes_drop_oauth_scratch",
+      "breakpoints": true
     }
   ]
 }

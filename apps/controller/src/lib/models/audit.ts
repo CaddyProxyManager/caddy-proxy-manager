@@ -2,7 +2,8 @@ import db, { toIso, nowIso } from "../db";
 import { auditEvents } from "../db/schema";
 import { insertAuditRows } from "../audit";
 import { type AuditChange, parseAuditChanges, parseAuditRevisionId } from "../audit/changes";
-import { and, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, or, count, sql } from "drizzle-orm";
+import { likeContains } from "../db/like";
 import { processMemo } from "../settings/process-memo";
 import { AUDIT_FILTER_OPTIONS } from "../audit/filter-options";
 
@@ -20,10 +21,6 @@ export type AuditEvent = {
   revisionId: number | null;
 };
 
-function escapeLikePattern(input: string): string {
-  return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
-}
-
 /** A bare string is the free-text search alone, which is all the REST and GraphQL APIs pass. */
 export type AuditEventFilter = {
   search?: string;
@@ -40,12 +37,11 @@ function auditWhere(filter?: string | AuditEventFilter) {
     typeof filter === "string" ? { search: filter } : (filter ?? {});
   const clauses = [];
   if (search) {
-    const escaped = escapeLikePattern(search);
     clauses.push(
       or(
-        like(auditEvents.summary, `%${escaped}%`),
-        like(auditEvents.action, `%${escaped}%`),
-        like(auditEvents.entityType, `%${escaped}%`),
+        likeContains(auditEvents.summary, search),
+        likeContains(auditEvents.action, search),
+        likeContains(auditEvents.entityType, search),
       ),
     );
   }
@@ -57,9 +53,19 @@ function auditWhere(filter?: string | AuditEventFilter) {
   return clauses.length > 0 ? and(...clauses) : undefined;
 }
 
+/** Held for a few seconds per filter: every page view counts, and the log only grows. */
+const COUNT_TTL_MS = 10_000;
+
 export async function countAuditEvents(filter?: string | AuditEventFilter): Promise<number> {
-  const [row] = await db.select({ value: count() }).from(auditEvents).where(auditWhere(filter));
-  return row?.value ?? 0;
+  const key = `audit-count:${JSON.stringify(filter ?? null)}`;
+  return await processMemo(
+    key,
+    async () => {
+      const [row] = await db.select({ value: count() }).from(auditEvents).where(auditWhere(filter));
+      return row?.value ?? 0;
+    },
+    { ttlMs: COUNT_TTL_MS },
+  );
 }
 
 /**

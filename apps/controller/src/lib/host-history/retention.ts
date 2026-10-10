@@ -4,7 +4,7 @@
  * writes, and a host left alone never has more than N to prune.
  */
 
-import { and, desc, eq, lt } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import db from "../db";
 import { hostRevisions } from "../db/schema";
 import { hostHistoryKeepDays, hostHistoryKeepRevisions } from "../settings/registry";
@@ -21,21 +21,12 @@ export async function pruneHostRevisions(kind: HostKind, hostIds: readonly numbe
       resolveSetting(hostHistoryKeepDays),
     ]);
     const cutoff = new Date(Date.now() - days * DAY_MS).toISOString();
-    for (const hostId of new Set(hostIds)) {
-      const host = and(eq(hostRevisions.hostKind, kind), eq(hostRevisions.hostId, hostId));
-      // The keep-th newest; nothing older than it and the cutoff both survives.
-      const [boundary] = await db
-        .select({ id: hostRevisions.id })
-        .from(hostRevisions)
-        .where(host)
-        .orderBy(desc(hostRevisions.id))
-        .limit(1)
-        .offset(keep - 1);
-      if (!boundary) continue;
-      await db
-        .delete(hostRevisions)
-        .where(and(host, lt(hostRevisions.id, boundary.id), lt(hostRevisions.createdAt, cutoff)));
-    }
+    const ids = [...new Set(hostIds)];
+    if (ids.length === 0) return;
+    // One statement for every host: a bulk save names hundreds. Past the keep-th newest and older
+    // than the cutoff goes; window functions and this subquery read the same on both dialects.
+    const ranked = sql`(select "id" from (select "id", "createdAt", row_number() over (partition by "hostKind", "hostId" order by "id" desc) as "rank" from "host_revisions" where "hostKind" = ${kind} and "hostId" in ${ids}) as "ranked" where "rank" > ${keep} and "createdAt" < ${cutoff})`;
+    await db.delete(hostRevisions).where(inArray(hostRevisions.id, ranked));
   } catch (error) {
     console.error("Failed to prune host revisions:", error);
   }

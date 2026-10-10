@@ -26,8 +26,6 @@ export const {
   accessListDnsCache,
   oauthProviders,
   ssoProviders,
-  oauthStates,
-  pendingOAuthLinks,
   settings,
   settingsStaged,
   settingsRevisions,
