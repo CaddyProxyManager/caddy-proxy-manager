@@ -282,14 +282,16 @@ function shutdown(signal: string, options: { stopCaddy: boolean } = { stopCaddy:
   lifecycle.stop();
   // Caddy goes down with its agent rather than serving a config nothing here can change, and the
   // managed services with it, in parallel to fit the grace period.
-  void (
+  void Promise.all([
     options.stopCaddy
       ? Promise.all([
           lifecycle.stopCaddyForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS),
           lifecycle.stopServicesForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS),
         ])
-      : Promise.resolve()
-  )
+      : Promise.resolve(),
+    // A command caught mid-flight still answers; the controller would otherwise wait it out.
+    lifecycle.drainCommands(),
+  ])
     .then(() => stopAnalytics())
     .catch(() => {
       // Regardless: a stuck parser must not keep the socket from being released.

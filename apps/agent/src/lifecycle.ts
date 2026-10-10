@@ -413,6 +413,19 @@ export class AgentLifecycle {
   }
 
   /** Tear the stream down and stop reconnecting. Leaves Caddy exactly as it is. */
+  /** Commands still running, so `stop` can let them post their results before the process ends. */
+  private readonly inFlight = new Set<Promise<void>>();
+
+  private track(run: Promise<void>): void {
+    this.inFlight.add(run);
+    run.finally(() => this.inFlight.delete(run)).catch(() => {});
+  }
+
+  /** Resolves once every command started before the call has answered or failed. */
+  async drainCommands(): Promise<void> {
+    await Promise.allSettled([...this.inFlight]);
+  }
+
   stop(): void {
     this.stopped = true;
     this.connection?.abort();
@@ -559,7 +572,9 @@ export class AgentLifecycle {
         await this.queueReconcile(() => event.state);
         return;
       case "command":
-        await this.execute(event.command);
+        // Not awaited: a validate or a log read in a throwaway container would otherwise hold up
+        // every later frame and every other caller's admin call. Results carry the command id.
+        this.track(this.execute(event.command));
         return;
       case "restart":
         await this.restart(event.reason);
