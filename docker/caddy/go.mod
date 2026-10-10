@@ -132,6 +132,7 @@ require (
 	github.com/dunglas/httpsfv v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/expr-lang/expr v1.17.7 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
@@ -354,6 +355,8 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20260224225140-573d5e7127a8 // indirect
 	howett.net/plist v1.0.1 // indirect
@@ -372,6 +375,12 @@ replace cel.dev/cel-go => cel.dev/cel-go v0.32.0
 // build.sh passes xcaddy the plugins and these lines, never an indirect requirement. Drop it once
 // coraza-caddy requires v3.8.1 or later.
 replace github.com/corazawaf/coraza/v3 => github.com/corazawaf/coraza/v3 v3.8.1
+
+// Held at what caddy-crowdsec-bouncer v0.14.1 was written against: crowdsec v1.7 changed the
+// bouncer models (internal/bouncer/live.go takes a *string where v1.7 has a string), so the indirect
+// require Dependabot keeps lifting breaks `go build ./...` and with it CodeQL. Drop it once the
+// bouncer builds against a newer crowdsec.
+replace github.com/crowdsecurity/crowdsec => github.com/crowdsecurity/crowdsec v1.6.3
 
 // Temporarily a fork, for a crash upstream has not merged. caddy-tailscale releases a tsnet node
 // without checking whether it was ever started, and tsnet.Server.Close panics there - so a host
