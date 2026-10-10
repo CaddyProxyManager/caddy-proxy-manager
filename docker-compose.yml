@@ -370,6 +370,13 @@ services:
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       # A host directory certificates may be read from, as the daemon sees it; unset is off.
       CERT_FILES_HOST_DIR: ${CERT_FILES_HOST_DIR:-}
+      # Documented in .env.example and honoured by the agent; Compose forwards nothing implicitly.
+      CADDY_CONTAINER_NAME: ${CADDY_CONTAINER_NAME:-}
+      CADDY_HEALTH_TIMEOUT: ${CADDY_HEALTH_TIMEOUT:-}
+      # A one-off pairing code for a remote agent; the bundled one reads its token from the volume.
+      PAIRING_CODE: ${PAIRING_CODE:-}
+      # A private CA for a controller behind TLS; the bundle is mounted by an override file.
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
       # The files your own compose reads, so a recreate keeps an override kept elsewhere.
       COMPOSE_FILE: ${COMPOSE_FILE:-}
       COMPOSE_PATH_SEPARATOR: ${COMPOSE_PATH_SEPARATOR:-}

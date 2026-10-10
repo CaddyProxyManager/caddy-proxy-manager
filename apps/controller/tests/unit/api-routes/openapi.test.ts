@@ -69,6 +69,9 @@ describe('GET /api/v1/openapi.json', () => {
     expect(paths).toContain('/api/v1/users');
     expect(paths).toContain('/api/v1/audit-log');
     expect(paths).toContain('/api/v1/caddy/apply');
+    expect(paths).toContain('/api/v1/dns-providers');
+    expect(paths).toContain('/api/v1/proxy-hosts/{id}/mtls-access-rules/{ruleId}');
+    expect(paths).toContain('/api/v1/client-certificates/{id}/roles');
   });
 
   it('has Cache-Control header', async () => {

@@ -997,6 +997,161 @@ const spec = {
       },
     },
 
+    "/api/v1/client-certificates/{id}/roles": {
+      get: {
+        tags: ["Client Certificates"],
+        summary: "List the mTLS roles a client certificate holds",
+        operationId: "listClientCertificateRoles",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "Roles",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/MtlsRole" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+
+    // ── mTLS access rules ───────────────────────────────────────────
+    "/api/v1/proxy-hosts/{id}/mtls-access-rules": {
+      get: {
+        tags: ["Proxy Hosts"],
+        summary: "List a host's mTLS access rules",
+        operationId: "listMtlsAccessRules",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "Rules, in priority order",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/MtlsAccessRule" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      post: {
+        tags: ["Proxy Hosts"],
+        summary: "Add an mTLS access rule to a host",
+        operationId: "createMtlsAccessRule",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/MtlsAccessRuleInput" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "The rule",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/MtlsAccessRule" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/api/v1/proxy-hosts/{id}/mtls-access-rules/{ruleId}": {
+      get: {
+        tags: ["Proxy Hosts"],
+        summary: "Get an mTLS access rule",
+        operationId: "getMtlsAccessRule",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/RuleIdPath" },
+        ],
+        responses: {
+          "200": {
+            description: "The rule",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/MtlsAccessRule" } },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Proxy Hosts"],
+        summary: "Update an mTLS access rule",
+        operationId: "updateMtlsAccessRule",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/RuleIdPath" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/MtlsAccessRuleInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "The rule",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/MtlsAccessRule" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        tags: ["Proxy Hosts"],
+        summary: "Delete an mTLS access rule",
+        operationId: "deleteMtlsAccessRule",
+        parameters: [
+          { $ref: "#/components/parameters/IdPath" },
+          { $ref: "#/components/parameters/RuleIdPath" },
+        ],
+        responses: {
+          "200": { $ref: "#/components/responses/Ok" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
+    // ── DNS providers ───────────────────────────────────────────────
+    "/api/v1/dns-providers": {
+      get: {
+        tags: ["Settings"],
+        summary: "List the DNS providers the controller knows",
+        description:
+          "The catalog of DNS-01 providers with the fields each takes. Credentials are saved through the dns-provider settings group and never returned.",
+        operationId: "listDnsProviders",
+        responses: {
+          "200": {
+            description: "Provider definitions",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/DnsProviderDefinition" },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+
     // ── Access Lists ────────────────────────────────────────────────
     "/api/v1/access-lists": {
       get: {
@@ -2535,6 +2690,13 @@ const spec = {
         required: true,
         schema: { type: "integer" },
         description: "Resource ID",
+      },
+      RuleIdPath: {
+        name: "ruleId",
+        in: "path",
+        required: true,
+        schema: { type: "integer" },
+        description: "The rule's ID",
       },
     },
     responses: {
@@ -4809,6 +4971,57 @@ const spec = {
           updatedAt: { type: "string", format: "date-time" },
         },
         required: ["id", "name", "repository", "version", "createdAt", "updatedAt"],
+      },
+      MtlsAccessRule: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          proxyHostId: { type: "integer" },
+          pathPattern: { type: "string", description: "The request path, or a prefix ending in *" },
+          allowedRoleIds: { type: "array", items: { type: "integer" } },
+          allowedCertIds: { type: "array", items: { type: "integer" } },
+          denyAll: { type: "boolean" },
+          priority: { type: "integer" },
+          description: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      MtlsAccessRuleInput: {
+        type: "object",
+        required: ["pathPattern"],
+        properties: {
+          pathPattern: { type: "string" },
+          allowedRoleIds: { type: "array", items: { type: "integer" } },
+          allowedCertIds: { type: "array", items: { type: "integer" } },
+          denyAll: { type: "boolean" },
+          priority: { type: "integer" },
+          description: { type: "string", nullable: true },
+        },
+      },
+      DnsProviderDefinition: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The Caddy module name, e.g. cloudflare" },
+          displayName: { type: "string" },
+          description: { type: "string" },
+          docsUrl: { type: "string" },
+          modulePath: { type: "string" },
+          fields: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                key: { type: "string" },
+                label: { type: "string" },
+                type: { type: "string", enum: ["string", "password", "duration"] },
+                placeholder: { type: "string" },
+                description: { type: "string" },
+                required: { type: "boolean" },
+              },
+            },
+          },
+        },
       },
       MtlsRole: {
         type: "object",

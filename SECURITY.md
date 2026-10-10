@@ -293,8 +293,10 @@ which is sent the ClickHouse password because Compose needs it to start the cont
 
 **`SESSION_SECRET` is the root of all of it.** It derives the key that encrypts DNS provider
 credentials, imported and mTLS CA private keys, agent secrets, two-factor secrets and the secret
-settings, the HTTP cache's Redis password and CDN API key among them. Rotating it makes every one
-of them unreadable; only a [backup](#backups) carries them across.
+settings, the HTTP cache's Redis password and CDN API key among them. Rotate it by setting the
+new value as `SESSION_SECRET` and the old one as `SESSION_SECRET_PREVIOUS`: the next start
+re-encrypts every secret under the new key, after which the previous one can go. Without the
+previous value every one of them is unreadable, and only a [backup](#backups) carries them across.
 
 ### Dependency Management
 
