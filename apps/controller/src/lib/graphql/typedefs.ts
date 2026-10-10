@@ -127,6 +127,16 @@ export const typeDefs = /* GraphQL */ `
     sourceReadAt: DateTime
     """Why the last read failed, as a code; the last good certificate keeps serving."""
     sourceError: String
+    """
+    A managed certificate's own DNS-01 settings, or null when it uses the default provider.
+    Credentials are not here: a provider is named, and its credentials live in Settings → DNS.
+    """
+    providerOptions: CertificateProviderOptions
+  }
+
+  type CertificateProviderOptions {
+    """A DNS provider id, as dnsProviders lists them. It counts only once its credentials are saved."""
+    provider: String!
   }
 
   """A CA that issues client certificates. Its private key, when stored, is never answered."""

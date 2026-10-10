@@ -15,6 +15,7 @@ import {
 } from "@/src/lib/models/certificate-files";
 import type { CertificateFileEntry } from "@cpm/shared";
 import { parseCsv } from "@/src/lib/forms/form-parse";
+import { providerOptionsFromForm } from "@/src/lib/certificates/provider-options";
 import type { ActionResult } from "@/src/lib/errors/action-result";
 import { runAction } from "@/src/lib/errors/run-action";
 import { getTranslations } from "next-intl/server";
@@ -30,6 +31,8 @@ export async function createCertificateAction(formData: FormData): Promise<Actio
         type,
         domainNames: parseCsv(formData.get("domain_names")),
         autoRenew: type === "managed" ? formData.get("auto_renew") === "on" : false,
+        providerOptions:
+          type === "managed" ? providerOptionsFromForm(formData.get("dns_provider")) : null,
         certificatePem: type === "imported" ? String(formData.get("certificate_pem") ?? "") : null,
         privateKeyPem: type === "imported" ? String(formData.get("private_key_pem") ?? "") : null,
       },
@@ -59,6 +62,10 @@ export async function updateCertificateAction(
           : undefined,
         autoRenew: formData.has("auto_renew_present")
           ? formData.get("auto_renew") === "on"
+          : undefined,
+        // The marker says the field was shown, so an empty choice clears the override.
+        providerOptions: formData.has("dns_provider_present")
+          ? providerOptionsFromForm(formData.get("dns_provider"))
           : undefined,
         certificatePem: formData.get("certificate_pem")
           ? String(formData.get("certificate_pem"))

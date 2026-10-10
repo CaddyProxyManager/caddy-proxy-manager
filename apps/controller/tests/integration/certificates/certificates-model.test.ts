@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { createTestDb, type TestDb } from '../../helpers/db';
+import { eq } from 'drizzle-orm';
 import { certificates, proxyHosts, users } from '../../../src/lib/db/schema';
 import { DomainError } from '../../../src/lib/errors/domain-error';
 
@@ -180,5 +181,31 @@ describe('importing a certificate', () => {
     expect(error.code).toBe('importedCertificateKeyMismatch');
     const [row] = await db.select().from(certificates);
     expect(row.certificatePem).toBe(certificatePem);
+  });
+});
+
+// The editor sends null to take an override away; a request that leaves the field out keeps it.
+describe('the DNS provider override', () => {
+  const managed = { name: 'Managed', type: 'managed' as const, domainNames: ['*.example.com'] };
+
+  async function storedOptions(id: number) {
+    const [row] = await db.select().from(certificates).where(eq(certificates.id, id));
+    return row.providerOptions;
+  }
+
+  it('stores only the provider name, and clears on null but not on an omitted field', async () => {
+    const created = await createCertificate(
+      { ...managed, providerOptions: { provider: ' cloudflare ', api_token: 'secret' } },
+      userId,
+    );
+    expect(await storedOptions(created.id)).toBe('{"provider":"cloudflare"}');
+    expect(created.providerOptions).toEqual({ provider: 'cloudflare' });
+
+    const kept = await updateCertificate(created.id, { name: 'Renamed' }, userId);
+    expect(kept.providerOptions).toEqual({ provider: 'cloudflare' });
+
+    const cleared = await updateCertificate(created.id, { providerOptions: null }, userId);
+    expect(cleared.providerOptions).toBeNull();
+    expect(await storedOptions(created.id)).toBeNull();
   });
 });

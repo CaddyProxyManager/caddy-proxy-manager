@@ -288,6 +288,39 @@ describe('certificates', () => {
     expect(field.errors?.[0]?.message).toContain('privateKeyPem');
   });
 
+  it('names a certificate’s own DNS provider, and nothing else stored beside it', async () => {
+    const [cert] = await ctx.db
+      .insert(db.certificates)
+      .values({
+        name: 'managed',
+        type: 'managed',
+        domainNames: JSON.stringify(['*.example.com']),
+        providerOptions: JSON.stringify({ provider: 'cloudflare', api_token: 'leaked-token' }),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+    const [plain] = await ctx.db
+      .insert(db.certificates)
+      .values({
+        name: 'default',
+        type: 'managed',
+        domainNames: JSON.stringify(['example.org']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .returning();
+
+    const data = await ok<{ certificates: { id: number; providerOptions: unknown }[] }>(
+      '{ certificates { id providerOptions { provider } } }',
+    );
+    expect(data.certificates.sort((a, b) => a.id - b.id)).toEqual([
+      { id: cert.id, providerOptions: { provider: 'cloudflare' } },
+      { id: plain.id, providerOptions: null },
+    ]);
+    expect(JSON.stringify(data)).not.toContain('leaked-token');
+  });
+
   it('lists CA certificates, the client certificates they issued and mTLS roles', async () => {
     const [ca] = await ctx.db
       .insert(db.caCertificates)

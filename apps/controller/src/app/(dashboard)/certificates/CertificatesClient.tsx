@@ -13,6 +13,7 @@ import type {
   CaCertificateView,
   CertificateFileAgent,
   CertExpiryStatus,
+  DnsProviderChoice,
   ImportedCertView,
   ManagedCertView,
   MtlsRole,
@@ -39,6 +40,7 @@ type Props = {
   mtlsRoles: MtlsRole[];
   issuedClientCerts: IssuedClientCertificate[];
   fileAgents: CertificateFileAgent[];
+  dnsProviders: DnsProviderChoice[];
 };
 
 export default function CertificatesClient({
@@ -51,6 +53,7 @@ export default function CertificatesClient({
   mtlsRoles,
   issuedClientCerts,
   fileAgents,
+  dnsProviders,
 }: Props) {
   const t = useTranslations("certificates");
   const [activeTab, setActiveTab] = useTabRoute("/certificates", CERTIFICATE_TABS, "acme");
@@ -203,6 +206,7 @@ export default function CertificatesClient({
             search={searchImported}
             statusFilter={statusFilter}
             fileAgents={fileAgents}
+            dnsProviders={dnsProviders}
           />
         )}
         {activeTab === "ca" && (

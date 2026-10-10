@@ -28,3 +28,12 @@ export function sanitizeStoredCertificateProviderOptions(value: string | null): 
   const normalized = parseStoredCertificateProviderOptions(value);
   return normalized ? JSON.stringify(normalized) : null;
 }
+
+/** The editor's DNS provider field: a provider name, or empty for the default provider. */
+export function providerOptionsFromForm(
+  value: FormDataEntryValue | null,
+): CertificateProviderOptions | null {
+  return typeof value === "string"
+    ? normalizeCertificateProviderOptions({ provider: value })
+    : null;
+}

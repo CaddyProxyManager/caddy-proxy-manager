@@ -28,6 +28,7 @@ import { BulkConfirmDialog } from "@/components/ui/BulkActionBar";
 import type {
   CertExpiryStatus,
   CertificateFileAgent,
+  DnsProviderChoice,
   ImportedCertView,
   ManagedCertView,
 } from "../page";
@@ -42,6 +43,7 @@ type Props = {
   search: string;
   statusFilter: string | null;
   fileAgents: CertificateFileAgent[];
+  dnsProviders: DnsProviderChoice[];
 };
 
 /** Icon tint tracks expiry, matching the badge shown in the Expires column. */
@@ -225,11 +227,14 @@ export function ImportedTab({
   search,
   statusFilter,
   fileAgents,
+  dnsProviders,
 }: Props) {
   const t = useTranslations("certificates");
   const tCommon = useTranslations("common");
   const emptyValue = useEmptyValue();
-  const [drawerCert, setDrawerCert] = useState<ImportedCertView | null | false>(false);
+  const [drawerCert, setDrawerCert] = useState<ImportedCertView | ManagedCertView | null | false>(
+    false,
+  );
   const mobileCardRenderer = (c: ImportedCertView) => importedMobileCard(c, () => setDrawerCert(c));
 
   const filtered = importedCerts.filter((c) => {
@@ -360,7 +365,11 @@ export function ImportedTab({
             title={t("legacyCertificatesTitle")}
             description={t("legacyCertificatesDescription")}
           />
-          <LegacyManagedTable managedCerts={managedCerts} />
+          <LegacyManagedTable
+            managedCerts={managedCerts}
+            dnsProviders={dnsProviders}
+            onEdit={setDrawerCert}
+          />
         </VStack>
       )}
 
@@ -381,16 +390,28 @@ export function ImportedTab({
         open={drawerCert !== false}
         cert={drawerCert || null}
         fileAgents={fileAgents}
+        dnsProviders={dnsProviders}
         onClose={() => setDrawerCert(false)}
       />
     </VStack>
   );
 }
 
-function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] }) {
+function LegacyManagedTable({
+  managedCerts,
+  dnsProviders,
+  onEdit,
+}: {
+  managedCerts: ManagedCertView[];
+  dnsProviders: DnsProviderChoice[];
+  onEdit: (cert: ManagedCertView) => void;
+}) {
   const t = useTranslations("certificates");
   const tCommon = useTranslations("common");
+  const emptyValue = useEmptyValue();
   const [isPending, startTransition] = useTransition();
+  const providerName = (name: string) =>
+    dnsProviders.find((provider) => provider.name === name)?.displayName ?? name;
 
   const columns = [
     {
@@ -407,26 +428,45 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
       label: tCommon("domains"),
       render: (c: ManagedCertView) => (
         <Text type="code" size="sm" color="secondary">
-          {c.domainNames.join(", ")}
+          {c.domains.join(", ")}
         </Text>
       ),
+    },
+    {
+      id: "dnsProvider",
+      label: t("dnsProvider"),
+      render: (c: ManagedCertView) =>
+        c.dnsProvider ? (
+          <Badge variant="info" label={providerName(c.dnsProvider)} />
+        ) : (
+          <Text type="body" size="sm" color="secondary">
+            {emptyValue}
+          </Text>
+        ),
     },
     {
       id: "actions",
       label: "",
       align: "right" as const,
       render: (c: ManagedCertView) => (
-        <Button
+        <MoreMenu
+          label={t("actionsForCertificate", { name: c.name })}
           size="sm"
-          variant="destructive"
-          label={tCommon("delete")}
-          isDisabled={isPending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await deleteCertificateAction(c.id);
-              if (!result.ok) toast.error(result.error);
-            })
-          }
+          alignment="end"
+          items={[
+            { label: tCommon("edit"), onClick: () => onEdit(c) },
+            { type: "divider" },
+            {
+              label: tCommon("delete"),
+              variant: "destructive",
+              isDisabled: isPending,
+              onClick: () =>
+                startTransition(async () => {
+                  const result = await deleteCertificateAction(c.id);
+                  if (!result.ok) toast.error(result.error);
+                }),
+            },
+          ]}
         />
       ),
     },

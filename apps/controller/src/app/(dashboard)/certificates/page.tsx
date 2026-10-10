@@ -14,6 +14,9 @@ import { isDomainCoveredByCert } from "@/src/lib/certificates/domain-match";
 import { countHealthyAcmeHosts } from "./certificate-summary";
 import { listAgents } from "@/src/lib/models/agents";
 import { certificateFileAgentOptions } from "@/src/lib/models/certificate-files";
+import { getDnsProviderSettings } from "@/src/lib/settings";
+import { configuredDnsProviderChoices, type DnsProviderChoice } from "@/src/lib/dns/providers";
+import { parseStoredCertificateProviderOptions } from "@/src/lib/certificates/provider-options";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -37,6 +40,7 @@ export type AcmeHost = {
 };
 
 export type ImportedCertView = {
+  type: "imported";
   id: number;
   name: string;
   domains: string[];
@@ -61,7 +65,16 @@ export type ImportedCertView = {
 /** Connected agents with a certificate directory, for "From a file on an agent". */
 export type CertificateFileAgent = { id: number; name: string };
 
-export type ManagedCertView = { id: number; name: string; domainNames: string[] };
+/** `dnsProvider`: the DNS-01 provider chosen for this certificate alone; null means the default. */
+export type ManagedCertView = {
+  type: "managed";
+  id: number;
+  name: string;
+  domains: string[];
+  dnsProvider: string | null;
+};
+
+export type { DnsProviderChoice };
 
 const PER_PAGE = 25;
 
@@ -114,36 +127,47 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PER_PAGE;
-  const [caCerts, issuedClientCerts, mtlsRoles, allAcmeRows, certRows, usageRows, agentRows] =
-    await Promise.all([
-      listCaCertificates(),
-      listIssuedClientCertificates(),
-      listMtlsRoles().catch(() => []),
-      db
-        .select({
-          id: proxyHosts.id,
-          uuid: proxyHosts.uuid,
-          name: proxyHosts.name,
-          domains: proxyHosts.domains,
-          sslForced: proxyHosts.sslForced,
-          enabled: proxyHosts.enabled,
-        })
-        .from(proxyHosts)
-        .where(isNull(proxyHosts.certificateId))
-        .orderBy(proxyHosts.name),
-      db.select().from(certificates),
-      db
-        .select({
-          certId: proxyHosts.certificateId,
-          hostId: proxyHosts.id,
-          hostName: proxyHosts.name,
-          hostDomains: proxyHosts.domains,
-        })
-        .from(proxyHosts)
-        .where(isNotNull(proxyHosts.certificateId)),
-      listAgents(),
-    ]);
+  const [
+    caCerts,
+    issuedClientCerts,
+    mtlsRoles,
+    allAcmeRows,
+    certRows,
+    usageRows,
+    agentRows,
+    dnsProviderSettings,
+  ] = await Promise.all([
+    listCaCertificates(),
+    listIssuedClientCertificates(),
+    listMtlsRoles().catch(() => []),
+    db
+      .select({
+        id: proxyHosts.id,
+        uuid: proxyHosts.uuid,
+        name: proxyHosts.name,
+        domains: proxyHosts.domains,
+        sslForced: proxyHosts.sslForced,
+        enabled: proxyHosts.enabled,
+      })
+      .from(proxyHosts)
+      .where(isNull(proxyHosts.certificateId))
+      .orderBy(proxyHosts.name),
+    db.select().from(certificates),
+    db
+      .select({
+        certId: proxyHosts.certificateId,
+        hostId: proxyHosts.id,
+        hostName: proxyHosts.name,
+        hostDomains: proxyHosts.domains,
+      })
+      .from(proxyHosts)
+      .where(isNotNull(proxyHosts.certificateId)),
+    listAgents(),
+    getDnsProviderSettings(),
+  ]);
   const agentNames = new Map(agentRows.map((agent) => [agent.id, agent.name]));
+  // Names only: the credentials stay on the server.
+  const dnsProviders = configuredDnsProviderChoices(dnsProviderSettings);
 
   const allAcmeHosts: AcmeHost[] = allAcmeRows.map((r) => ({
     id: r.id,
@@ -246,6 +270,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
     if (cert.type === "imported") {
       const pemInfo = cert.certificatePem ? parsePemInfo(cert.certificatePem) : null;
       importedCerts.push({
+        type: "imported",
         id: cert.id,
         name: cert.name,
         domains: pemInfo?.sanDomains.length ? pemInfo.sanDomains : domainNames,
@@ -268,7 +293,13 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
             : null,
       });
     } else {
-      managedCerts.push({ id: cert.id, name: cert.name, domainNames: domainNames });
+      managedCerts.push({
+        type: "managed",
+        id: cert.id,
+        name: cert.name,
+        domains: domainNames,
+        dnsProvider: parseStoredCertificateProviderOptions(cert.providerOptions)?.provider ?? null,
+      });
     }
   }
 
@@ -283,6 +314,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       mtlsRoles={mtlsRoles}
       issuedClientCerts={issuedClientCerts}
       fileAgents={certificateFileAgentOptions()}
+      dnsProviders={dnsProviders}
     />
   );
 }

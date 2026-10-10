@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   DNS_PROVIDERS,
   challengeOptionFields,
+  configuredDnsProviderChoices,
   getProviderDefinition,
   isValidDnsDuration,
   redactDnsProviderSettingsForApi,
@@ -13,6 +14,7 @@ import {
   encryptProviderCredentials,
 } from '@/src/lib/dns/provider-credentials';
 import { isEncryptedSecret } from '@/src/lib/secrets';
+import { providerOptionsFromForm } from '@/src/lib/certificates/provider-options';
 
 const NETCUP_CHALLENGE_DEFAULTS = { propagation_delay: '600s', propagation_timeout: '900s' };
 
@@ -608,5 +610,31 @@ describe('DNS provider registry', () => {
     expect(isValidDnsDuration('600')).toBe(false);
     expect(isValidDnsDuration('900 sec')).toBe(false);
     expect(isValidDnsDuration('soon')).toBe(false);
+  });
+
+  it('lists the configured providers for the certificate editor by display name, names only', () => {
+    const choices = configuredDnsProviderChoices({
+      providers: {
+        route53: { access_key_id: 'id', secret_access_key: 'credential-secret' },
+        cloudflare: { api_token: 'credential-token' },
+        unknown_module: { token: 'credential-token' },
+      },
+    });
+    expect(choices).toEqual([
+      { name: 'route53', displayName: 'Amazon Route 53' },
+      { name: 'cloudflare', displayName: 'Cloudflare' },
+      { name: 'unknown_module', displayName: 'unknown_module' },
+    ]);
+    expect(JSON.stringify(choices)).not.toContain('credential');
+    expect(configuredDnsProviderChoices(null)).toEqual([]);
+  });
+});
+
+describe('the certificate editor’s DNS provider field', () => {
+  it('reads a provider name, and the empty default as no override', () => {
+    expect(providerOptionsFromForm('cloudflare')).toEqual({ provider: 'cloudflare' });
+    expect(providerOptionsFromForm(' route53 ')).toEqual({ provider: 'route53' });
+    expect(providerOptionsFromForm('')).toBeNull();
+    expect(providerOptionsFromForm(null)).toBeNull();
   });
 });

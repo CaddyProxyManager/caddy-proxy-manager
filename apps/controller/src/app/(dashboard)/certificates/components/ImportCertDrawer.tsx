@@ -22,19 +22,28 @@ import {
   listCertificateFilesAction,
   updateCertificateAction,
 } from "../actions";
-import type { CertificateFileAgent, ImportedCertView } from "../page";
+import type {
+  CertificateFileAgent,
+  DnsProviderChoice,
+  ImportedCertView,
+  ManagedCertView,
+} from "../page";
 import { useFormatter, useTranslations } from "next-intl";
 
 type Props = {
   open: boolean;
-  cert: ImportedCertView | null;
+  /** A managed certificate is only ever edited here; the dialog imports. */
+  cert: ImportedCertView | ManagedCertView | null;
   fileAgents: CertificateFileAgent[];
+  dnsProviders: DnsProviderChoice[];
   onClose: () => void;
 };
 
 type Source = "upload" | "agent-file";
 
 const FORM_ID = "import-cert-form";
+/** The select's value for "no override"; no Caddy DNS module is named this. */
+const DEFAULT_DNS_PROVIDER = "default";
 
 /** certbot's pair first, then the usual names beside the certificate. Empty when unsure. */
 export function pairedKeyPath(certPath: string, entries: CertificateFileEntry[]): string {
@@ -61,18 +70,21 @@ export function defaultCertificatePath(entries: CertificateFileEntry[]): string 
   return preferred?.path ?? "";
 }
 
-export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
+export function ImportCertDrawer({ open, cert, fileAgents, dnsProviders, onClose }: Props) {
   const t = useTranslations("certificates");
   const tCommon = useTranslations("common");
   const format = useFormatter();
   const isEdit = cert !== null;
-  const isFileCert = cert?.file != null;
+  const isManaged = cert?.type === "managed";
+  const file = cert?.type === "imported" ? cert.file : null;
+  const isFileCert = file != null;
   const [isPending, startTransition] = useTransition();
   const [source, setSource] = useState<Source>("upload");
   const [error, setError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [name, setName] = useState("");
   const [domains, setDomains] = useState("");
+  const [dnsProvider, setDnsProvider] = useState(DEFAULT_DNS_PROVIDER);
   const [certPem, setCertPem] = useState("");
   const [keyPem, setKeyPem] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -87,6 +99,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
     if (!open) return;
     setName(cert?.name ?? "");
     setDomains(cert?.domains.join("\n") ?? "");
+    setDnsProvider((cert?.type === "managed" && cert.dnsProvider) || DEFAULT_DNS_PROVIDER);
     setCertPem("");
     setKeyPem("");
     setShowKey(false);
@@ -182,17 +195,52 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
   const fromFiles = !isEdit && source === "agent-file";
   const canSubmit = !fromFiles || (agentId !== "" && certPath !== "" && keyPath !== "");
 
+  const domainsField = (
+    <TextArea
+      {...NO_SPELLCHECK}
+      label={t("domainsOnePerLine")}
+      htmlName="domain_names"
+      value={domains}
+      onChange={setDomains}
+      rows={3}
+      description={t("certificateDomainsHelp")}
+    />
+  );
+
+  // An override whose credentials were since removed stays listed, so it can be seen and cleared.
+  const stored = cert?.type === "managed" ? cert.dnsProvider : null;
+  const dnsProviderOptions = [
+    { value: DEFAULT_DNS_PROVIDER, label: t("dnsProviderDefault") },
+    ...dnsProviders.map((provider) => ({ value: provider.name, label: provider.displayName })),
+    ...(stored && !dnsProviders.some((provider) => provider.name === stored)
+      ? [{ value: stored, label: t("dnsProviderMissing", { name: stored }) }]
+      : []),
+  ];
+
+  const managedFields = (
+    <>
+      {domainsField}
+      <Selector
+        label={t("dnsProvider")}
+        description={t("dnsProviderHelp")}
+        options={dnsProviderOptions}
+        value={dnsProvider}
+        onChange={setDnsProvider}
+        hasSearch={dnsProviderOptions.length > 8}
+      />
+      {/* The marker tells the action the field was shown, so the default choice clears. */}
+      <input type="hidden" name="dns_provider_present" value="1" />
+      <input
+        type="hidden"
+        name="dns_provider"
+        value={dnsProvider === DEFAULT_DNS_PROVIDER ? "" : dnsProvider}
+      />
+    </>
+  );
+
   const uploadFields = (
     <>
-      <TextArea
-        {...NO_SPELLCHECK}
-        label={t("domainsOnePerLine")}
-        htmlName="domain_names"
-        value={domains}
-        onChange={setDomains}
-        rows={3}
-        description={t("certificateDomainsHelp")}
-      />
+      {domainsField}
 
       <VStack gap={2}>
         <TextArea
@@ -332,7 +380,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
     >
       <form id={FORM_ID} ref={formRef} onSubmit={handleSubmit}>
         <VStack gap={4}>
-          <input type="hidden" name="type" value="imported" />
+          <input type="hidden" name="type" value={isManaged ? "managed" : "imported"} />
 
           {!isEdit && (
             <SegmentedControl
@@ -364,17 +412,17 @@ export function ImportCertDrawer({ open, cert, fileAgents, onClose }: Props) {
             description={t("importedCertificateNameHelp")}
           />
 
-          {isFileCert && cert.file && (
+          {file && (
             <Text type="body" size="sm" color="secondary">
               {t("fileSourcePaths", {
-                agent: cert.file.agentName ?? t("sourceDeletedAgent"),
-                certPath: cert.file.certPath ?? "",
-                keyPath: cert.file.keyPath ?? "",
+                agent: file.agentName ?? t("sourceDeletedAgent"),
+                certPath: file.certPath ?? "",
+                keyPath: file.keyPath ?? "",
               })}
             </Text>
           )}
 
-          {!fromFiles && !isFileCert && uploadFields}
+          {isManaged ? managedFields : !fromFiles && !isFileCert && uploadFields}
         </VStack>
       </form>
     </AppDialog>

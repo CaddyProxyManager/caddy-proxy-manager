@@ -209,7 +209,9 @@ export async function updateCertificate(
     type: input.type ?? existing.type,
     domainNames: input.domainNames ?? existing.domainNames,
     autoRenew: input.autoRenew ?? existing.autoRenew,
-    providerOptions: input.providerOptions ?? existing.providerOptions,
+    // Null clears the override, so the editor can take one away again.
+    providerOptions:
+      input.providerOptions === undefined ? existing.providerOptions : input.providerOptions,
     certificatePem: input.certificatePem ?? existing.certificatePem,
     privateKeyPem: input.privateKeyPem ?? existing.privateKeyPem,
   };

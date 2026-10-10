@@ -45,6 +45,7 @@ import {
   updateMtlsRole,
 } from "../models/mtls-roles";
 import { getProxyHost } from "../models/proxy-hosts";
+import { normalizeCertificateProviderOptions } from "../certificates/provider-options";
 import type { GraphQLContext } from "./context";
 
 /** The row carries a private key. */
@@ -63,6 +64,8 @@ export function projectCertificate(row: Certificate) {
     sourceKeyPath: row.sourceKeyPath,
     sourceReadAt: row.sourceReadAt,
     sourceError: row.sourceError,
+    // The provider name alone: a row written before the shape was fixed may carry more.
+    providerOptions: normalizeCertificateProviderOptions(row.providerOptions),
   };
 }
 

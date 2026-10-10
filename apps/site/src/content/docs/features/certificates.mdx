@@ -61,9 +61,11 @@ Hetzner uses the Cloud DNS API, so it needs a Hetzner Cloud API token and zones 
 Hetzner Console. A token from the retired DNS Console no longer works: move the zones and create a
 Cloud token. Caddy keeps the old module until its image is rebuilt.
 
-A provider can be overridden per certificate when one domain lives somewhere else, but only through
-the REST [API](../api/) (`providerOptions.provider`); the dashboard uses the global provider. The
-override needs that provider's credentials saved in Settings, or the global provider is used.
+A provider can be overridden per certificate when one domain lives somewhere else: edit the
+certificate under **Certificates → Imported** and pick one under **DNS provider**. The list holds
+the providers with credentials saved in Settings, and the table shows the choice beside the
+certificate. The same field is `providerOptions.provider` over the [API](../api/); a provider named
+there without saved credentials falls back to the default provider.
 
 ### Challenge delegation
 

@@ -446,6 +446,17 @@ export function getProviderDefinition(name: string): DnsProviderDefinition | und
   return DNS_PROVIDERS.find((p) => p.name === name);
 }
 
+/** A provider with saved credentials, as the certificate editor offers it. Names only. */
+export type DnsProviderChoice = { name: string; displayName: string };
+
+export function configuredDnsProviderChoices(
+  settings: { providers: Record<string, Record<string, string>> } | null,
+): DnsProviderChoice[] {
+  return Object.keys(settings?.providers ?? {})
+    .map((name) => ({ name, displayName: getProviderDefinition(name)?.displayName ?? name }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 /** Redacts every value, not just `password` fields, so a new credential field starts safe. */
 export function redactDnsProviderSettingsForApi(settings: {
   providers: Record<string, Record<string, string>>;
