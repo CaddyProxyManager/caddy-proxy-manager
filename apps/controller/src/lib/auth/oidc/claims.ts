@@ -120,13 +120,14 @@ async function fetchUserinfoClaims(
 export async function fetchOidcClaims(
   cfg: ClaimSourceConfig,
   tokens: OidcTokens,
-  groupsClaim: string,
+  claimPaths: string | readonly string[],
 ): Promise<Record<string, unknown> | null> {
   const idTokenClaims = decodeJwtPayload(tokens.idToken) ?? {};
   let claims: Record<string, unknown> = { ...idTokenClaims };
 
-  const hasGroups = readClaim(claims, groupsClaim) !== undefined;
-  const needsUserinfo = !hasGroups || !claims.sub || !claims.email;
+  const paths = typeof claimPaths === "string" ? [claimPaths] : claimPaths;
+  const hasClaims = paths.every((path) => readClaim(claims, path) !== undefined);
+  const needsUserinfo = !hasClaims || !claims.sub || !claims.email;
   if (needsUserinfo && tokens.accessToken) {
     const userinfo = await fetchUserinfoClaims(cfg, tokens.accessToken);
     if (userinfo) claims = { ...claims, ...userinfo };

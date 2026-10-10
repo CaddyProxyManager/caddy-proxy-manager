@@ -113,6 +113,44 @@ describe('mapOAuthProvider - group mapping hooks', () => {
     expect(pending!.providerName).toBe('Authentik');
   });
 
+  it('reads the role from its own claim when there is one, and groups from the groups claim', async () => {
+    const cfg = mapOAuthProvider(
+      provider({
+        roleMappingEnabled: true,
+        syncGroups: true,
+        rolesClaim: 'realm_access.roles',
+        adminGroup: 'cpm-admin',
+      }),
+    );
+
+    await cfg.mapProfileToUser!(
+      profile({
+        sub: 'user-roles',
+        email: 'ops@example.com',
+        // Admin by role; the groups carry nothing that would make it so.
+        realm_access: { roles: ['cpm-admin'] },
+        groups: ['CPM_Devs'],
+      }),
+    );
+
+    const pending = consumePendingOidcSync('authentik', 'user-roles');
+    expect(pending!.role).toBe('admin');
+    expect(pending!.claimedGroups).toEqual(['CPM_Devs']);
+  });
+
+  it('ignores a role name that only appears in the groups claim once a roles claim is set', async () => {
+    const cfg = mapOAuthProvider(
+      provider({ roleMappingEnabled: true, rolesClaim: 'roles', adminGroup: 'cpm-admin' }),
+    );
+
+    await cfg.mapProfileToUser!(
+      profile({ sub: 'user-groups', email: 'dev@example.com', groups: ['cpm-admin'], roles: [] }),
+    );
+
+    // Not an admin: the roles claim says so, whatever the groups claim holds.
+    expect(consumePendingOidcSync('authentik', 'user-groups')!.role).toBe('user');
+  });
+
   it('records the mirrored group names when group sync is on', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, syncGroups: true }));
 

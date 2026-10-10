@@ -17,6 +17,8 @@ export function isAppRole(value: unknown): value is AppRole {
 
 export type GroupMappingConfig = {
   groupsClaim: string;
+  /** Where role mapping reads its values; null reads them from `groupsClaim`, as it always did. */
+  rolesClaim: string | null;
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
   /**
@@ -40,6 +42,7 @@ type LegacyRoleLists = {
 export function toGroupMappingConfig(
   provider: LegacyRoleLists & {
     groupsClaim?: string | null;
+    rolesClaim?: string | null;
     groupPrefix?: string | null;
     roleMappingEnabled?: boolean | null;
     roleGroups?: Readonly<Record<string, readonly string[]>> | null;
@@ -59,6 +62,7 @@ export function toGroupMappingConfig(
   }
   return {
     groupsClaim: provider.groupsClaim?.trim() || "groups",
+    rolesClaim: provider.rolesClaim?.trim() || null,
     groupPrefix: provider.groupPrefix?.trim() || null,
     roleMappingEnabled: provider.roleMappingEnabled === true,
     roleGroups: { ...lists, ...(provider.roleGroups ?? {}) },
@@ -94,6 +98,17 @@ export function envGroupMapping(oauth: {
 
 export function needsGroupClaims(cfg: GroupMappingConfig): boolean {
   return cfg.roleMappingEnabled || cfg.syncGroups;
+}
+
+/**
+ * The claims a sign-in has to see, so a missing one sends the lookup on to userinfo: the groups
+ * claim for syncing (or for roles when there is no roles claim), and the roles claim for roles.
+ */
+export function claimsNeeded(cfg: GroupMappingConfig): string[] {
+  const claims: string[] = [];
+  if (cfg.syncGroups || (cfg.roleMappingEnabled && !cfg.rolesClaim)) claims.push(cfg.groupsClaim);
+  if (cfg.roleMappingEnabled && cfg.rolesClaim) claims.push(cfg.rolesClaim);
+  return claims;
 }
 
 /** Strips a Keycloak path prefix ("/Parent/X" to "X"); callers compare case-insensitively. */

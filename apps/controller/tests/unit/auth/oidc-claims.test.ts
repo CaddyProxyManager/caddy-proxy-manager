@@ -95,6 +95,23 @@ describe('fetchOidcClaims', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('goes to userinfo when any claim it was asked for is missing from the ID token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ roles: ['cpm-admin'] }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const claims = await fetchOidcClaims(
+      cfg,
+      {
+        idToken: makeIdToken({ sub: 'u1', email: 'u1@example.com', groups: ['Devs'] }),
+        accessToken: 'token-123',
+      },
+      ['groups', 'roles'],
+    );
+
+    expect(claims).toMatchObject({ groups: ['Devs'], roles: ['cpm-admin'] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to userinfo when the ID token has no group claim', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ groups: ['CPM_Admin'] }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;

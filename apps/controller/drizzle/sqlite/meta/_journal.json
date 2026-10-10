@@ -281,6 +281,13 @@
       "when": 1791549594459,
       "tag": "0039_proxy_host_uuid",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1791598902642,
+      "tag": "0040_oidc_roles_claim",
+      "breakpoints": true
     }
   ]
 }

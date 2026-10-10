@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'bun:test';
 import {
+  claimsNeeded,
   envGroupMapping,
   extractGroups,
   mapGroupsToLocalGroups,
@@ -22,11 +23,34 @@ const base = toGroupMappingConfig({
   roleMappingEnabled: true,
 });
 
+describe('claimsNeeded', () => {
+  const cfg = (patch: Parameters<typeof toGroupMappingConfig>[0]) => toGroupMappingConfig(patch);
+
+  it('is the groups claim when roles come from groups', () => {
+    expect(claimsNeeded(cfg({ roleMappingEnabled: true }))).toEqual(['groups']);
+  });
+
+  it('is the roles claim alone when roles have their own and groups are not synced', () => {
+    expect(claimsNeeded(cfg({ roleMappingEnabled: true, rolesClaim: 'roles' }))).toEqual(['roles']);
+  });
+
+  it('is both when roles have their own claim and groups are synced', () => {
+    expect(
+      claimsNeeded(cfg({ roleMappingEnabled: true, rolesClaim: 'roles', syncGroups: true })),
+    ).toEqual(['groups', 'roles']);
+  });
+
+  it('is nothing when neither is on', () => {
+    expect(claimsNeeded(cfg({ rolesClaim: 'roles' }))).toEqual([]);
+  });
+});
+
 describe('toGroupMappingConfig', () => {
   it('applies safe defaults for an unconfigured provider', () => {
     const cfg = toGroupMappingConfig({});
     expect(cfg).toEqual({
       groupsClaim: 'groups',
+      rolesClaim: null,
       groupPrefix: null,
       roleMappingEnabled: false,
       roleGroups: {},

@@ -2244,6 +2244,7 @@ export async function createOAuthProviderAction(data: {
   scopes?: string;
   autoLink?: boolean;
   groupsClaim?: string;
+  rolesClaim?: string | null;
   groupPrefix?: string | null;
   roleMappingEnabled?: boolean;
   adminGroup?: string | null;
@@ -2312,6 +2313,7 @@ export async function updateOAuthProviderAction(
     autoLink: boolean;
     enabled: boolean;
     groupsClaim: string;
+    rolesClaim: string | null;
     groupPrefix: string | null;
     roleMappingEnabled: boolean;
     adminGroup: string | null;

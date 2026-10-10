@@ -23,6 +23,7 @@ export function toOAuthProviderView(provider: OAuthProvider): OAuthProviderView 
   return {
     // The OIDC group mapping drives the provider form, so it crosses the boundary in full.
     groupsClaim: provider.groupsClaim,
+    rolesClaim: provider.rolesClaim ?? null,
     groupPrefix: provider.groupPrefix,
     roleMappingEnabled: provider.roleMappingEnabled,
     adminGroup: provider.adminGroup,

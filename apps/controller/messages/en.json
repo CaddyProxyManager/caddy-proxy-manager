@@ -3872,6 +3872,8 @@
       "email": "Email"
     },
     "groupsClaim": "Groups claim",
+    "rolesClaim": "Roles claim",
+    "rolesClaimHelp": "Claim holding the roles that decide a user's role here, when your provider keeps them apart from groups (Keycloak's realm_access.roles, Entra's roles). Empty reads them from the groups claim above. The names below match against it.",
     "groupsClaimHelp": "Claim holding the user's groups. Use dots for nested claims, e.g. resource_access.cpm.roles. Remember to request a matching scope above.",
     "homeAttentionCount": "{count, plural, one {# setting is} other {# settings are}} configured but not working as intended",
     "homeEnvBadge": "env",

@@ -184,6 +184,8 @@ export const oauthProviders = pgTable(
     // Claim holding the user's groups. Dot-separated paths address nested claims (e.g.
     // "resource_access.cpm.roles").
     groupsClaim: text("groupsClaim").notNull().default("groups"),
+    // OIDC only: a claim of its own for role mapping. Null reads roles from `groupsClaim`.
+    rolesClaim: text("rolesClaim"),
     // Convention prefix: with "CPM_", membership of "CPM_Admin" grants admin.
     groupPrefix: text("groupPrefix"),
     roleMappingEnabled: boolean("roleMappingEnabled").notNull().default(false),

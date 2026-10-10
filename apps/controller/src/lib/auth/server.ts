@@ -17,6 +17,7 @@ import {
   extractGroups,
   mapGroupsToLocalGroups,
   mapGroupsToRole,
+  claimsNeeded,
   needsGroupClaims,
   toGroupMappingConfig,
 } from "./oidc/groups";
@@ -116,7 +117,7 @@ export function mapOAuthProvider(
       const claims = await fetchOidcClaims(
         { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
         { idToken: tokens.idToken, accessToken: tokens.accessToken },
-        mapping.groupsClaim,
+        claimsNeeded(mapping),
       );
       if (!claims) return null;
       // Raw claims ride along for the group claim; OAuth2UserInfo declares only standard fields.
@@ -130,11 +131,15 @@ export function mapOAuthProvider(
       const subject = profile.sub ?? profile.id;
       if (subject !== undefined && subject !== null) {
         const claimedGroups = extractGroups(profile, mapping.groupsClaim);
+        // Roles come from their own claim when there is one; groups still come from the groups claim.
+        const claimedRoles = mapping.rolesClaim
+          ? extractGroups(profile, mapping.rolesClaim)
+          : claimedGroups;
         recordPendingOidcSync({
           providerId: p.id,
           subject: String(subject),
           providerName: p.name,
-          role: mapGroupsToRole(claimedGroups, mapping),
+          role: mapGroupsToRole(claimedRoles, mapping),
           localGroups: mapGroupsToLocalGroups(claimedGroups, mapping),
           claimedGroups,
           syncGroups: mapping.syncGroups,
@@ -200,6 +205,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       enabled: row.enabled,
       source: row.source,
       groupsClaim: row.groupsClaim,
+      rolesClaim: row.rolesClaim,
       groupPrefix: row.groupPrefix,
       roleMappingEnabled: row.roleMappingEnabled,
       adminGroup: row.adminGroup,

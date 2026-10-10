@@ -17,6 +17,8 @@ export const MadeRolesContext = createContext<readonly MadeRole[]>([]);
 
 export type GroupMappingForm = {
   groupsClaim: string;
+  /** OIDC only; empty reads roles from the groups claim. */
+  rolesClaim?: string;
   groupPrefix: string;
   roleMappingEnabled: boolean;
   adminGroup: string;
@@ -59,6 +61,8 @@ export function GroupMappingFields({
   onChange,
   claimLabel,
   claimHelp,
+  rolesClaimLabel,
+  rolesClaimHelp,
   description,
 }: {
   value: GroupMappingForm;
@@ -66,6 +70,9 @@ export function GroupMappingFields({
   /** Omitted, the groups-claim field is not shown. */
   claimLabel?: string;
   claimHelp?: string;
+  /** Omitted, the roles-claim field is not shown. */
+  rolesClaimLabel?: string;
+  rolesClaimHelp?: string;
   description?: string;
 }) {
   const t = useTranslations("settings");
@@ -113,6 +120,17 @@ export function GroupMappingFields({
 
         {value.roleMappingEnabled && (
           <>
+            {rolesClaimLabel && (
+              <TextInput
+                label={rolesClaimLabel}
+                isOptional
+                size="sm"
+                value={value.rolesClaim ?? ""}
+                onChange={(v) => onChange({ rolesClaim: v })}
+                placeholder={value.groupsClaim || "groups"}
+                description={rolesClaimHelp}
+              />
+            )}
             <Grid columns={{ minWidth: 160, max: 3 }} gap={2}>
               <TextInput
                 label={t("adminGroups")}

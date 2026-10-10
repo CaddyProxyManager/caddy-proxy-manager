@@ -294,6 +294,10 @@ Two provider options change how accounts are handled:
   than here. When several match, admin wins, then operator, then custom roles in the order they
   were made, then user and viewer. **Role when no group matches**, per provider, sets the role
   for anyone in none of them; it defaults to user.
+
+  **Roles claim.** Some providers keep roles apart from groups (Keycloak's `realm_access.roles`,
+  Entra's `roles`). Name that claim and the role names are matched against it, while **Sync
+  groups** keeps reading the groups claim. Left empty, roles come from the groups claim as before.
 - **OIDC-only mode.** Disables local accounts entirely. There is no bootstrap admin and no
   credential sign-in: every identity comes from the provider.
 

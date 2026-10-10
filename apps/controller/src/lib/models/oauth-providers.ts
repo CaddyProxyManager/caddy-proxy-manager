@@ -36,6 +36,8 @@ function assertOidcType(type: string | undefined): void {
  */
 export type OAuthGroupMapping = LegacyRoleColumns & {
   groupsClaim: string;
+  /** OIDC only. Role mapping reads this claim when set, and `groupsClaim` when null. */
+  rolesClaim?: string | null;
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
   /** Absent on an object built without the table, where the comma lists say it all. */
@@ -87,6 +89,7 @@ function parseDbProvider(row: DbProvider): OAuthProvider {
     enabled: row.enabled,
     source: row.source,
     groupsClaim: row.groupsClaim,
+    rolesClaim: row.rolesClaim,
     groupPrefix: row.groupPrefix,
     roleMappingEnabled: row.roleMappingEnabled,
     adminGroup: row.adminGroup,
@@ -138,6 +141,7 @@ export async function createOAuthProvider(
       enabled: data.enabled ?? true,
       source: data.source ?? "ui",
       groupsClaim: data.groupsClaim?.trim() || "groups",
+      rolesClaim: data.rolesClaim?.trim() || null,
       groupPrefix: data.groupPrefix?.trim() || null,
       roleMappingEnabled: data.roleMappingEnabled ?? false,
       defaultRole: await knownRoleOr(data.defaultRole, "user"),
@@ -224,6 +228,7 @@ export async function updateOAuthProvider(
   if (data.autoLink !== undefined) updates.autoLink = data.autoLink;
   if (data.enabled !== undefined) updates.enabled = data.enabled;
   if (data.groupsClaim !== undefined) updates.groupsClaim = data.groupsClaim.trim() || "groups";
+  if (data.rolesClaim !== undefined) updates.rolesClaim = data.rolesClaim?.trim() || null;
   if (data.groupPrefix !== undefined) updates.groupPrefix = data.groupPrefix?.trim() || null;
   if (data.roleMappingEnabled !== undefined) updates.roleMappingEnabled = data.roleMappingEnabled;
   if (data.defaultRole !== undefined)

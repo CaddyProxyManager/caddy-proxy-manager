@@ -74,6 +74,7 @@ type FormData = {
   scopes: string;
   autoLink: boolean;
   groupsClaim: string;
+  rolesClaim: string;
   groupPrefix: string;
   roleMappingEnabled: boolean;
   adminGroup: string;
@@ -97,6 +98,7 @@ const emptyForm: FormData = {
   scopes: "openid email profile",
   autoLink: false,
   groupsClaim: "groups",
+  rolesClaim: "",
   groupPrefix: "",
   roleMappingEnabled: false,
   adminGroup: "",
@@ -234,6 +236,7 @@ export default function OAuthProvidersSection({
       scopes: provider.scopes,
       autoLink: provider.autoLink,
       groupsClaim: provider.groupsClaim,
+      rolesClaim: provider.rolesClaim ?? "",
       groupPrefix: provider.groupPrefix ?? "",
       roleMappingEnabled: provider.roleMappingEnabled,
       adminGroup: provider.adminGroup ?? "",
@@ -281,6 +284,7 @@ export default function OAuthProvidersSection({
             scopes: form.scopes.trim() || "openid email profile",
             autoLink: form.autoLink,
             groupsClaim: form.groupsClaim.trim() || "groups",
+            rolesClaim: form.rolesClaim.trim() || null,
             groupPrefix: form.groupPrefix.trim() || null,
             roleMappingEnabled: form.roleMappingEnabled,
             adminGroup: form.adminGroup.trim() || null,
@@ -311,6 +315,7 @@ export default function OAuthProvidersSection({
             scopes: form.scopes.trim() || undefined,
             autoLink: form.autoLink,
             groupsClaim: form.groupsClaim.trim() || undefined,
+            rolesClaim: form.rolesClaim.trim() || null,
             groupPrefix: form.groupPrefix.trim() || null,
             roleMappingEnabled: form.roleMappingEnabled,
             adminGroup: form.adminGroup.trim() || null,
@@ -740,6 +745,8 @@ export default function OAuthProvidersSection({
                 onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
                 claimLabel={t("groupsClaim")}
                 claimHelp={t("groupsClaimHelp")}
+                rolesClaimLabel={t("rolesClaim")}
+                rolesClaimHelp={t("rolesClaimHelp")}
               />
 
               {editingProvider && (

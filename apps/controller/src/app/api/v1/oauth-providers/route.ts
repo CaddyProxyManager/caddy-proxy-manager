@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       scopes: body.scopes ?? "openid email profile",
       autoLink: body.autoLink ?? false,
       groupsClaim: body.groupsClaim ?? undefined,
+      rolesClaim: body.rolesClaim ?? null,
       groupPrefix: body.groupPrefix ?? null,
       roleMappingEnabled: body.roleMappingEnabled ?? false,
       adminGroup: body.adminGroup ?? null,

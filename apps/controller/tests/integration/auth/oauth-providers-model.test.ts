@@ -165,6 +165,20 @@ describe('updateOAuthProvider', () => {
     });
   });
 
+  it('keeps a roles claim apart from the groups claim, and clears it when blanked', async () => {
+    const created = await provider('Keycloak');
+    expect(created.rolesClaim).toBeNull();
+
+    const set = await updateOAuthProvider(created.id, { rolesClaim: ' realm_access.roles ' });
+    expect(set).toMatchObject({ rolesClaim: 'realm_access.roles', groupsClaim: 'groups' });
+
+    const cleared = await updateOAuthProvider(created.id, { rolesClaim: '  ' });
+    expect(cleared?.rolesClaim).toBeNull();
+
+    const born = await provider('Entra', { rolesClaim: 'roles' });
+    expect(born.rolesClaim).toBe('roles');
+  });
+
   it('falls back on an unknown role and a blank groups claim', async () => {
     const created = await provider('Keycloak', { defaultRole: 'operator' });
     const updated = await updateOAuthProvider(created.id, {
