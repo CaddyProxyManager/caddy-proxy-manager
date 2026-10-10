@@ -1,8 +1,8 @@
 /**
  * Every resolver calls the model function its `/api/v1/` route calls, so GraphQL and REST cannot
- * disagree - the parity tests assert it. Users and certificates (`./certificates.ts`) are projected
- * to named fields, so a future secret column cannot leak; the rest is returned whole, extras
- * gathered into `config`.
+ * disagree - the parity tests assert it. Users (`./identity.ts`) and certificates
+ * (`./certificates.ts`) are projected to named fields, so a future secret column cannot leak; the
+ * rest is returned whole, extras gathered into `config`. DNS credentials are in ./dns-providers.ts.
  */
 
 import { applyCaddyConfig as applyCaddy } from "../caddy";
@@ -32,6 +32,7 @@ import { parseL4HostBulkRequest, parseProxyHostBulkRequest } from "../models/bul
 import { getProxyHostUpstreamHealth } from "../proxy-hosts/upstream-health";
 import { previewL4HostChange, previewProxyHostChange } from "../host-review";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
+import { can } from "../users/permissions";
 import { ApiAuthError, NotFoundError } from "../api/auth";
 import { domainErrorMessage } from "../errors/domain-error";
 import { isSettingsGroup, readSettingsGroup } from "../settings/api";
@@ -54,6 +55,8 @@ import { accessReviewMutationResolvers, accessReviewQueryResolvers } from "./acc
 import { backupMutationResolvers, backupQueryResolvers } from "./backup";
 import { approvalMutationResolvers, approvalQueryResolvers } from "./approvals";
 import { hostHistoryMutationResolvers, hostHistoryQueryResolvers } from "./host-history";
+import { identityMutationResolvers, identityQueryResolvers, projectUser } from "./identity";
+import { dnsProviderMutationResolvers } from "./dns-providers";
 import type { GraphQLContext } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -102,25 +105,6 @@ const MAX_AUDIT_LOG_LIMIT = 200;
 
 function remainder(row: Record<string, unknown>, promoted: Set<string>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([key]) => !promoted.has(key)));
-}
-
-type UserRow = Awaited<ReturnType<typeof listUsers>>[number];
-
-/** The row carries a password hash and the OAuth subject. */
-function projectUser(row: UserRow) {
-  return {
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    role: row.role,
-    status: row.status,
-    provider: row.provider,
-    avatarUrl: row.avatarUrl,
-    lastSignInAt: row.lastSignInAt,
-    lastSignInMethod: row.lastSignInMethod,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
 }
 
 export const resolvers = {
@@ -248,6 +232,7 @@ export const resolvers = {
     ...accessReviewQueryResolvers,
     ...hostHistoryQueryResolvers,
     ...approvalQueryResolvers,
+    ...identityQueryResolvers,
   },
 
   Mutation: {
@@ -469,7 +454,8 @@ export const resolvers = {
     },
     deleteApiToken: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
       const viewer = await context.viewer();
-      await deleteApiToken(args.id, viewer.userId);
+      // As DELETE /api/v1/tokens/{id}: a holder of tokens:write may revoke anyone's.
+      await deleteApiToken(args.id, viewer.userId, can(await context.access(), "tokens:write"));
       return true;
     },
 
@@ -506,5 +492,7 @@ export const resolvers = {
     ...accessReviewMutationResolvers,
     ...hostHistoryMutationResolvers,
     ...approvalMutationResolvers,
+    ...identityMutationResolvers,
+    ...dnsProviderMutationResolvers,
   },
 };

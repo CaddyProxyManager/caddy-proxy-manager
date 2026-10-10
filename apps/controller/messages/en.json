@@ -1677,6 +1677,7 @@
     "hostWafBodyLimitActionInvalid": "waf.request_body_limit_action must be Reject or ProcessPartial",
     "hostGeoBlockInvalid": "The geo-blocking rules are invalid: {detail}",
     "pairingCodeNotStored": "The pairing code could not be stored.",
+    "dnsProviderStillDelegated": "{provider} is still used by the delegations for {domains}",
     "backupDestinationMissing": "The destination no longer exists",
     "wafPresetNotFound": "WAF preset not found",
     "wafPresetUnknownIds": "Unknown WAF preset id(s): {ids}",

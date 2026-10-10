@@ -257,6 +257,38 @@ export const typeDefs = /* GraphQL */ `
     updatedAt: DateTime!
   }
 
+  """A dashboard sign-in. The token is not here; a forward-auth session is a ForwardAuthSession."""
+  type Session {
+    id: Int!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    expiresAt: DateTime!
+    ipAddress: String
+    userAgent: String
+    """The session making this request; false for a token."""
+    current: Boolean!
+  }
+
+  """A sign-in through the portal to one protected host, kept apart from dashboard sessions."""
+  type ForwardAuthSession {
+    id: Int!
+    userId: Int!
+    proxyHostId: Int!
+    """Scheme, host and non-default port, exactly as visited."""
+    audienceOrigin: String!
+    expiresAt: DateTime!
+    createdAt: DateTime!
+  }
+
+  """One grant to sign in through the portal to a host: a user or a group, never both."""
+  type ForwardAuthAccessEntry {
+    id: Int!
+    proxyHostId: Int!
+    userId: Int
+    groupId: Int
+    createdAt: DateTime!
+  }
+
   type Group {
     id: Int!
     name: String!
@@ -1492,6 +1524,12 @@ export const typeDefs = /* GraphQL */ `
     accessListStats(id: Int!): AccessListStats!
     users: [User!]!
     user(id: Int!): User
+    """The caller's live dashboard sessions, newest first; another user's with users:read."""
+    sessions(userId: Int): [Session!]!
+    """Every live forward-auth session, or one user's."""
+    forwardAuthSessions(userId: Int): [ForwardAuthSession!]!
+    """Who may sign in through the portal to a host, as GET /api/v1/proxy-hosts/{id}/forward-auth-access."""
+    forwardAuthAccess(proxyHostId: Int!): [ForwardAuthAccessEntry!]!
     groups: [Group!]!
     group(id: Int!): Group
     """Built-in first, then the ones made here, oldest first."""
@@ -1703,8 +1741,22 @@ export const typeDefs = /* GraphQL */ `
     """Refused while a user, group, mapping or provider default still names it."""
     deleteRole(key: String!): Boolean!
 
+    """
+    As POST /api/v1/users: input { email, password, name?, role?, username? }. A local account with
+    a password; refused while sign-in is left to the identity provider. Only a role the caller holds all of.
+    """
+    createUser(input: JSON!): User!
     updateUser(id: Int!, input: JSON!): User!
     deleteUser(id: Int!): Boolean!
+    """One of the caller's own sessions; anyone else's is not found."""
+    revokeSession(id: Int!): Boolean!
+    """Signs that portal session out of its host."""
+    revokeForwardAuthSession(id: Int!): Boolean!
+    """
+    As PUT /api/v1/proxy-hosts/{id}/forward-auth-access: input { userIds, groupIds }, the whole set,
+    replacing what was there.
+    """
+    setForwardAuthAccess(proxyHostId: Int!, input: JSON!): [ForwardAuthAccessEntry!]!
 
     """
     input: name, expiresAt, scope (full, read or custom) and permissions (area:read or
@@ -1714,6 +1766,15 @@ export const typeDefs = /* GraphQL */ `
     deleteApiToken(id: Int!): Boolean!
 
     saveSettings(group: String!, input: JSON!): JSON!
+    """
+    Stores one provider's credentials, keyed as its fields are named; a blank field keeps the stored
+    value. The first provider saved becomes the default. Answers the dns-provider group, redacted.
+    """
+    saveDnsProviderCredentials(provider: String!, credentials: JSON!): JSON!
+    """Forgets a provider's credentials. Refused while a delegation names it."""
+    removeDnsProvider(provider: String!): JSON!
+    """A configured provider for DNS-01 challenges, or null for none."""
+    setDefaultDnsProvider(provider: String): JSON!
 
     """At most 100 per user. query is the page's URL query; it is stored sanitised."""
     createAnalyticsView(name: String!, query: String!, shared: Boolean): AnalyticsView!

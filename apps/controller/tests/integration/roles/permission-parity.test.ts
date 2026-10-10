@@ -429,6 +429,9 @@ const GRAPHQL_SIGNED_IN_ONLY = [
   'Mutation.rejectChangeRequest',
   'Mutation.withdrawChangeRequest',
   'Mutation.bypassChangeRequest',
+  // Own sessions: any signed-in role may list and revoke its own.
+  'Query.sessions',
+  'Mutation.revokeSession',
 ];
 
 describe('every GraphQL resolver', () => {
