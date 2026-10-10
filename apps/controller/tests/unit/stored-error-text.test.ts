@@ -66,3 +66,21 @@ describe('attention errors', () => {
     expect(text).toBe('[GeoLite2-City: HTTP 401]');
   });
 });
+
+describe('domainErrorMessage plurals', () => {
+  it('renders the ICU plural forms the catalog uses, in English', () => {
+    expect(
+      domainErrorMessage('wafDirectivesInvalid', { count: 1, details: ['line 1: x'] }),
+    ).toContain('has 1 problem Coraza');
+    expect(
+      domainErrorMessage('wafDirectivesInvalid', { count: 3, details: ['a', 'b', 'c'] }),
+    ).toContain('has 3 problems Coraza');
+    // What the real formatter would also say, so a translator can use either form.
+    expect(domainErrorMessage('crsPluginRejected', { count: 1, details: ['x'] })).toContain(
+      '1 directive is refused',
+    );
+    expect(domainErrorMessage('crsPluginRejected', { count: 2, details: ['x'] })).toContain(
+      '2 directives are refused',
+    );
+  });
+});

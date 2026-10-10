@@ -129,7 +129,7 @@ describe('stored WAF custom directives on update', () => {
       1,
     );
     await expect(update).rejects.toThrow(/pmFromFile reads files/);
-    await expect(update).rejects.toThrow(/has 1 line\(s\)/);
+    await expect(update).rejects.toThrow(/has 1 line /);
     expect((await getProxyHost(host.id))?.waf?.custom_directives).toBe(withKeptRule);
   });
 

@@ -61,13 +61,48 @@ export class DomainError extends Error {
   }
 }
 
+/**
+ * The ICU plural forms next-intl renders, in English: `{count, plural, one {# line} other {# lines}}`,
+ * with `=N` exact matches, so a catalog sentence can count without a `(s)`. Nothing else of ICU:
+ * a selects or nesting is for the real formatter, which every reader with a language gets.
+ */
+function renderPlural(count: number, forms: string): string {
+  const options = new Map<string, string>();
+  let i = 0;
+  while (i < forms.length) {
+    const open = forms.indexOf("{", i);
+    if (open < 0) break;
+    const key = forms.slice(i, open).trim();
+    let depth = 0;
+    let close = open;
+    for (; close < forms.length; close++) {
+      if (forms[close] === "{") depth++;
+      else if (forms[close] === "}" && --depth === 0) break;
+    }
+    options.set(key, forms.slice(open + 1, close));
+    i = close + 1;
+  }
+  const chosen =
+    options.get(`=${count}`) ??
+    (count === 1 ? options.get("one") : undefined) ??
+    options.get("other");
+  return (chosen ?? "").replaceAll("#", String(count));
+}
+
+const PLURAL_PATTERN = /\{(\w+),\s*plural,\s*((?:[^{}]|\{[^{}]*\})*)\}/g;
+
 export function domainErrorMessage(code: DomainErrorCode, params: DomainErrorParams = {}): string {
-  return englishErrors[code].replace(/\{(\w+)\}/g, (whole, name: string) => {
-    if (!(name in params)) return whole;
-    const value = params[name];
-    if (isDetailList(value)) return renderDetails(value, domainErrorMessage).join(", ");
-    return typeof value === "object" ? value.join(", ") : String(value);
-  });
+  return englishErrors[code]
+    .replace(PLURAL_PATTERN, (whole, name: string, forms: string) => {
+      const value = params[name];
+      return typeof value === "number" ? renderPlural(value, forms) : whole;
+    })
+    .replace(/\{(\w+)\}/g, (whole, name: string) => {
+      if (!(name in params)) return whole;
+      const value = params[name];
+      if (isDetailList(value)) return renderDetails(value, domainErrorMessage).join(", ");
+      return typeof value === "object" ? value.join(", ") : String(value);
+    });
 }
 
 /** English from the catalog, so API clients and browsers can never drift apart. */

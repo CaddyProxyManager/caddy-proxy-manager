@@ -145,7 +145,7 @@ describe('updateWafSettingsAction custom directives', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain(added);
-    expect(result.message).toMatch(/has 1 line\(s\)/);
+    expect(result.message).toMatch(/has 1 line /);
     expect(saveWafSettingsMock).not.toHaveBeenCalled();
   });
 

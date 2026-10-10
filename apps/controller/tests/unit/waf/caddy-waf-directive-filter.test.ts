@@ -577,7 +577,7 @@ describe('customDirectivesError - against the stored directives', () => {
       {},
       { directives: legacy },
     )?.message;
-    expect(message).toMatch(/has 1 line\(s\) that would be dropped/);
+    expect(message).toMatch(/has 1 line that would be dropped/);
     expect(message).toContain(added);
     expect(message).not.toContain('id:9601');
   });

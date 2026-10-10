@@ -2,7 +2,11 @@
  * `getTranslations` throws without a request scope. Mocked with the real English catalog, not an
  * identity function, so a test still fails if its expected message is renamed or deleted.
  */
+import { createTranslator } from 'next-intl';
 import messages from '../../messages/en.json';
+
+// The real formatter, so an ICU plural or select in the catalog renders as it does for a reader.
+const english = createTranslator({ locale: 'en', messages });
 
 function lookup(key: string): string {
   const value = key.split('.').reduce<unknown>((node, part) => {
@@ -13,16 +17,14 @@ function lookup(key: string): string {
   return value;
 }
 
-function interpolate(template: string, values: Record<string, unknown>): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name) =>
-    name in values ? String(values[name]) : whole,
-  );
-}
-
 /** Mirrors `getTranslations(namespace?)`: keys resolve relative to the namespace when given. */
 export function testTranslator(namespace?: string) {
-  const t = (key: string, values: Record<string, unknown> = {}) =>
-    interpolate(lookup(namespace ? `${namespace}.${key}` : key), values);
+  const t = (key: string, values: Record<string, unknown> = {}) => {
+    const full = namespace ? `${namespace}.${key}` : key;
+    // Checked here: the formatter would log and hand the key back rather than throw.
+    lookup(full);
+    return (english as unknown as (k: string, v?: Record<string, unknown>) => string)(full, values);
+  };
   return Object.assign(t, {
     rich: t,
     markup: t,
