@@ -131,6 +131,21 @@ consequences worth knowing before touching either side:
   controller's direct transport, used with no agent attached, pins the same way from its own
   `CADDY_ADMIN_LISTEN`.
 
+## Branches
+
+`{type}/{slug}`: the type of change, a slash, then a short kebab-case slug naming the subject of the
+work. The types are `feat`, `fix`, `update`, `docs`, `ci`, `deps`, `test` and `chore`. The type
+comes from what the branch carries, not from the ticket or release; the slug from the subject, never
+a date or release number - `deps/` is the one exception, since a dependency refresh has no other
+subject (`deps/refresh-2026-10`). A bare slug is wrong even when it describes the work well.
+`feat/mobile-ui`, `fix/agent-reconnect-loop` and `docs/certificates-page` are the shape.
+
+A branch that grows a second subject is renamed with `git branch -m` so the name still covers
+everything on it; the type usually survives and the slug widens. Check `git branch --show-current`
+against the pattern before the first push or a pull request. Never a tool- or session-derived name
+(`claude/...`, `claude-...`): an environment that checked you out on one gets renamed before
+anything is pushed.
+
 ## Commits
 
 Never add a `Co-Authored-By` trailer to a commit message, nor any other line crediting an AI tool
