@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'bun:test';
+import { DomainError } from '@/src/lib/errors/domain-error';
 import { SettingsValidationError, validateSettingsGroup } from '@/src/lib/settings/validation';
+
+function thrownBy(run: () => unknown): SettingsValidationError {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof SettingsValidationError) return error;
+    throw error;
+  }
+  throw new Error('expected a SettingsValidationError');
+}
 
 const geoblock = {
   enabled: true,
@@ -72,6 +83,46 @@ describe('REST settings runtime validation', () => {
     });
   }
 
+  // The setup screen and the dashboard render the code in the reader's language; the English
+  // sentence is what /api/v1 answers with, so both travel on one error.
+  it('carries a code and params beside the English sentence', () => {
+    const unknownField = thrownBy(() =>
+      validateSettingsGroup('metrics', { enabled: true, injected: 1 }),
+    );
+    expect(unknownField).toBeInstanceOf(DomainError);
+    expect(unknownField.status).toBe(400);
+    expect(unknownField.code).toBe('settingsUnknownField');
+    expect(unknownField.params).toEqual({ field: 'metrics settings', key: 'injected' });
+    expect(unknownField.message).toBe('metrics settings contains unknown field: injected');
+
+    const tooShort = thrownBy(() =>
+      validateSettingsGroup('dashboard', { enabled: true, domain: '', tls: true }),
+    );
+    expect(tooShort.code).toBe('settingsFieldLength');
+    expect(tooShort.params).toEqual({ field: 'dashboard.domain', min: 1, max: 253 });
+    expect(tooShort.message).toBe('dashboard.domain must contain between 1 and 253 characters');
+
+    const oneOf = thrownBy(() => validateSettingsGroup('waf', { ...validGroups.waf, mode: 'x' }));
+    expect(oneOf.code).toBe('settingsFieldOneOf');
+    expect(oneOf.params).toEqual({ field: 'waf.mode', allowed: ['Off', 'On', 'DetectionOnly'] });
+
+    const unknownGroup = thrownBy(() => validateSettingsGroup('nope', {}));
+    expect(unknownGroup.code).toBe('settingsGroupUnknown');
+    expect(unknownGroup.message).toBe('Unknown settings group');
+  });
+
+  it("keeps a normalizer's own code rather than wrapping its sentence", () => {
+    const error = thrownBy(() =>
+      validateSettingsGroup('rate-limit', {
+        enabled: true,
+        zones: [{ maxEvents: 60, window: '1m', key: 'header', header: '{http.request.host}' }],
+        allowlist: [],
+      }),
+    );
+    expect(error.code).toBe('hostRateLimitHeaderInvalid');
+    expect(error.status).toBe(400);
+  });
+
   it('refuses IPv6 zone ids in trusted proxies and geoblock lists', () => {
     expect(() =>
       validateSettingsGroup('trusted-proxies', {
@@ -134,7 +185,7 @@ describe('REST settings runtime validation', () => {
         ...validGroups.waf,
         request_body_limit_action: 'Drop',
       }),
-    ).toThrow(/Reject or ProcessPartial/);
+    ).toThrow(/request_body_limit_action must be one of: Reject, ProcessPartial/);
     expect(() =>
       validateSettingsGroup('waf', {
         ...validGroups.waf,

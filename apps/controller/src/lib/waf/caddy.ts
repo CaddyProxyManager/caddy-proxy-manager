@@ -51,10 +51,6 @@ export function isValidBodyLimit(value: unknown): value is number {
   );
 }
 
-export function bodyLimitRangeMessage(label: string): string {
-  return `${label} must be an integer between ${CORAZA_MIN_BODY_LIMIT} and ${CORAZA_MAX_BODY_LIMIT} bytes (1 GiB is Coraza's hard maximum)`;
-}
-
 /** Stored in bytes (what SecLang takes), asked for in MiB; finer values go in custom directives. */
 export const BYTES_PER_MIB = 1_048_576;
 export const MIN_BODY_LIMIT_MIB = 1;

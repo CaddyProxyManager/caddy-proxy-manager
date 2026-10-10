@@ -280,7 +280,7 @@ export async function readSettingsGroup(
 /** Rolls the stored value back if Caddy refuses it. Callers answer an unknown group first. */
 export async function saveSettingsGroup(group: string, input: unknown): Promise<void> {
   if (!isSettingsGroup(group)) {
-    throw new SettingsValidationError("Unknown settings group");
+    throw new SettingsValidationError("settingsGroupUnknown");
   }
   const handler = SETTINGS_HANDLERS[group];
   const validated = validateSettingsGroup(group, input, {
@@ -335,7 +335,7 @@ export async function captureSettingsGroupWrites(
   group: string,
   input: unknown,
 ): Promise<Map<string, string>> {
-  if (!isSettingsGroup(group)) throw new SettingsValidationError("Unknown settings group");
+  if (!isSettingsGroup(group)) throw new SettingsValidationError("settingsGroupUnknown");
   const handler = SETTINGS_HANDLERS[group];
   const validated = validateSettingsGroup(group, input, {
     previousWaf: group === "waf" ? await getWafSettings() : null,

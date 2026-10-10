@@ -1,7 +1,8 @@
 import { sessionCan } from "@/src/lib/users/permissions";
 import type { NextRequest } from "next/server";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
+import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { createOAuthProvider, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { isAppRole } from "@/src/lib/auth/oidc/groups";
 import {
@@ -149,7 +150,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     }) as GeneralSettings;
   } catch (error) {
     if (error instanceof SettingsValidationError) {
-      return json({ ok: false, error: error.message }, 400);
+      // Rendered from its code: the English it carries is the REST API's, not this reader's.
+      const message = extractErrorMessage(
+        await getTranslations(),
+        error,
+        error.message,
+        await getFormatter(),
+      );
+      return json({ ok: false, error: message }, 400);
     }
     throw error;
   }

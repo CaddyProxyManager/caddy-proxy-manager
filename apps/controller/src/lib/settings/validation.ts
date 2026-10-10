@@ -1,12 +1,18 @@
 import { isHostname } from "../dashboard-host";
 import { ipVersion } from "../http/ip-version";
 import {
-  bodyLimitRangeMessage,
+  CORAZA_MAX_BODY_LIMIT,
+  CORAZA_MIN_BODY_LIMIT,
   customDirectivesError,
   isValidBodyLimit,
   seclangErrorDetails,
 } from "../waf/caddy";
-import { DomainError, domainErrorMessage } from "../errors/domain-error";
+import {
+  DomainError,
+  type DomainErrorCode,
+  type DomainErrorParams,
+  domainErrorMessage,
+} from "../errors/domain-error";
 import {
   CACHE_STORAGES,
   CDN_PROVIDERS,
@@ -29,9 +35,13 @@ import {
 import { isEmailAddress } from "../email/address";
 import { MAX_MFA_GRACE_DAYS, MFA_POLICY_MODES } from "../auth/two-factor/mfa-policy";
 
-export class SettingsValidationError extends Error {
-  constructor(message: string) {
-    super(message);
+/**
+ * A `DomainError`, so the setup screen and the dashboard translate it; `/api/v1` keeps the English.
+ * A field path stays a `{field}` param: "general.acmeEmail" is a name a translator keeps verbatim.
+ */
+export class SettingsValidationError extends DomainError {
+  constructor(code: DomainErrorCode, params: DomainErrorParams = {}) {
+    super(code, params, domainErrorMessage(code, params), 400);
     this.name = "SettingsValidationError";
   }
 }
@@ -43,13 +53,19 @@ const MAX_LIST_ITEMS = 1024;
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const CONTINENTS = new Set(["AF", "AN", "AS", "EU", "NA", "OC", "SA"]);
 
-function invalid(message: string): never {
-  throw new SettingsValidationError(message);
+function invalid(code: DomainErrorCode, params: DomainErrorParams = {}): never {
+  throw new SettingsValidationError(code, params);
+}
+
+/** A normalizer's own refusal, re-raised as this group's so the REST route still answers 400. */
+function invalidFrom(error: unknown): never {
+  if (error instanceof DomainError) invalid(error.code, error.params);
+  throw error;
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    invalid(`${label} must be an object`);
+    invalid("settingsFieldNotObject", { field: label });
   }
   return value as Record<string, unknown>;
 }
@@ -58,13 +74,13 @@ function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], la
   const allowedSet = new Set(allowed);
   const unexpected = Object.keys(value).filter((key) => !allowedSet.has(key));
   if (unexpected.length > 0) {
-    invalid(`${label} contains unknown field: ${unexpected[0]}`);
+    invalid("settingsUnknownField", { field: label, key: unexpected[0] });
   }
 }
 
 function required(value: Record<string, unknown>, key: string, label: string): unknown {
   if (!Object.hasOwn(value, key)) {
-    invalid(`${label}.${key} is required`);
+    invalid("settingsFieldRequired", { field: `${label}.${key}` });
   }
   return value[key];
 }
@@ -82,34 +98,36 @@ function stringValue(
   label: string,
   options: { min?: number; max?: number; controls?: boolean } = {},
 ): string {
-  if (typeof value !== "string") invalid(`${label} must be a string`);
+  if (typeof value !== "string") invalid("settingsFieldNotString", { field: label });
   const min = options.min ?? 0;
   const max = options.max ?? MAX_SHORT_STRING;
   if (value.length < min || value.length > max) {
-    invalid(`${label} must contain between ${min} and ${max} characters`);
+    invalid("settingsFieldLength", { field: label, min, max });
   }
   if (options.controls !== true && hasForbiddenControlCharacter(value)) {
-    invalid(`${label} must not contain control characters`);
+    invalid("settingsFieldControlCharacters", { field: label });
   }
   return value;
 }
 
 function booleanValue(value: unknown, label: string): boolean {
-  if (typeof value !== "boolean") invalid(`${label} must be a boolean`);
+  if (typeof value !== "boolean") invalid("settingsFieldNotBoolean", { field: label });
   return value;
 }
 
 function integerValue(value: unknown, label: string, min: number, max: number): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
-    invalid(`${label} must be an integer from ${min} to ${max}`);
+    invalid("settingsFieldIntegerRange", { field: label, min, max });
   }
   return value;
 }
 
+function oneOf(value: unknown, allowed: readonly string[], label: string): void {
+  if (!allowed.includes(value as string)) invalid("settingsFieldOneOf", { field: label, allowed });
+}
+
 function optionalOneOf(value: unknown, allowed: readonly string[], label: string): void {
-  if (value !== undefined && !allowed.includes(value as string)) {
-    invalid(`${label} must be one of: ${allowed.join(", ")}`);
-  }
+  if (value !== undefined) oneOf(value, allowed, label);
 }
 
 function stringList(
@@ -118,7 +136,7 @@ function stringList(
   validate?: (item: string, itemLabel: string) => void,
 ): string[] {
   if (!Array.isArray(value) || value.length > MAX_LIST_ITEMS) {
-    invalid(`${label} must be an array with at most ${MAX_LIST_ITEMS} entries`);
+    invalid("settingsFieldArrayMax", { field: label, max: MAX_LIST_ITEMS });
   }
   return value.map((item, index) => {
     const itemLabel = `${label}[${index}]`;
@@ -148,7 +166,7 @@ function optionalMultilineString(
   for (let index = 0; index < parsed.length; index += 1) {
     const code = parsed.charCodeAt(index);
     if ((code < 32 && code !== 10 && code !== 13) || code === 127) {
-      invalid(`${label}.${key} must not contain control characters other than line breaks`);
+      invalid("settingsFieldControlCharactersMultiline", { field: `${label}.${key}` });
     }
   }
 }
@@ -163,10 +181,10 @@ function httpUrl(value: string, label: string, allowEmpty = false): void {
   try {
     parsed = new URL(value);
   } catch {
-    invalid(`${label} must be a valid HTTP or HTTPS URL`);
+    invalid("settingsFieldNotHttpUrl", { field: label });
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    invalid(`${label} must use HTTP or HTTPS`);
+    invalid("settingsFieldUrlScheme", { field: label });
   }
 }
 
@@ -174,7 +192,7 @@ function ipOrCidr(value: string, label: string, allowPrivateRanges = false): voi
   if (allowPrivateRanges && value === "private_ranges") return;
   const separator = value.lastIndexOf("/");
   if (separator === -1) {
-    if (ipVersion(value) === 0) invalid(`${label} must be an IP address or CIDR range`);
+    if (ipVersion(value) === 0) invalid("settingsFieldNotIpOrCidr", { field: label });
     return;
   }
   const address = value.slice(0, separator);
@@ -182,16 +200,17 @@ function ipOrCidr(value: string, label: string, allowPrivateRanges = false): voi
   const prefix = Number(value.slice(separator + 1));
   const maxPrefix = version === 4 ? 32 : version === 6 ? 128 : -1;
   if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
-    invalid(`${label} must be an IP address or CIDR range`);
+    invalid("settingsFieldNotIpOrCidr", { field: label });
   }
 }
 
 function headerMap(value: unknown, label: string): void {
   const headers = record(value, label);
-  if (Object.keys(headers).length > 100) invalid(`${label} must contain at most 100 headers`);
+  if (Object.keys(headers).length > 100)
+    invalid("settingsFieldTooMany", { field: label, max: 100 });
   for (const [name, rawValue] of Object.entries(headers)) {
     if (!HEADER_NAME.test(name) || name.length > 128)
-      invalid(`${label} contains an invalid header name`);
+      invalid("settingsHeaderNameInvalid", { field: label });
     stringValue(rawValue, `${label}.${name}`, { max: 8192 });
   }
 }
@@ -205,7 +224,7 @@ function validateGeneral(value: Record<string, unknown>): void {
   if (value.acmeEmail !== undefined) {
     const email = stringValue(value.acmeEmail, "general.acmeEmail", { max: 320 });
     if (email.length > 0 && !isEmailAddress(email, "public"))
-      invalid("general.acmeEmail must be a valid email address");
+      invalid("settingsFieldNotEmail", { field: "general.acmeEmail" });
   }
 }
 
@@ -243,10 +262,11 @@ function validateAuthentik(value: Record<string, unknown>): void {
 
 function validateForwardAuth(value: Record<string, unknown>): void {
   onlyKeys(value, ["provider", "authUpstream", "authEndpoint"], "Forward Auth settings");
-  const provider = required(value, "provider", "Forward Auth settings");
-  if (provider !== "authelia" && provider !== "custom") {
-    invalid("forward_auth.provider must be authelia or custom");
-  }
+  oneOf(
+    required(value, "provider", "Forward Auth settings"),
+    ["authelia", "custom"],
+    "forward_auth.provider",
+  );
   const upstream = stringValue(
     required(value, "authUpstream", "Forward Auth settings"),
     "forward_auth.authUpstream",
@@ -266,9 +286,7 @@ function validateDashboard(value: Record<string, unknown>): void {
     max: 253,
   });
   // Interpolated into a Caddy host matcher and the reachability check's URL (which CodeQL flagged).
-  if (!isHostname(domain)) {
-    invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
-  }
+  if (!isHostname(domain)) invalid("settingsFieldNotHostname", { field: "dashboard.domain" });
   if (value.options !== undefined) validateDashboardOptions(value.options);
 }
 
@@ -301,7 +319,7 @@ function validateDashboardOptions(input: unknown): void {
   );
   const agentIds = required(options, "agentIds", "dashboard.options");
   if (!Array.isArray(agentIds) || agentIds.length > MAX_LIST_ITEMS) {
-    invalid(`dashboard.options.agentIds must be an array with at most ${MAX_LIST_ITEMS} entries`);
+    invalid("settingsFieldArrayMax", { field: "dashboard.options.agentIds", max: MAX_LIST_ITEMS });
   }
   agentIds.forEach((id, index) => {
     integerValue(id, `dashboard.options.agentIds[${index}]`, 1, 2_147_483_647);
@@ -316,7 +334,7 @@ function validateDashboardOptions(input: unknown): void {
     try {
       parsed = JSON.parse(text);
     } catch {
-      invalid("dashboard.options.meta must be a JSON object");
+      invalid("settingsFieldNotJsonObject", { field: "dashboard.options.meta" });
     }
     record(parsed, "dashboard.options.meta");
   }
@@ -331,9 +349,7 @@ function validateMetrics(value: Record<string, unknown>): void {
 function validateLogging(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "format"], "logging settings");
   booleanValue(required(value, "enabled", "logging settings"), "logging.enabled");
-  if (value.format !== undefined && value.format !== "json" && value.format !== "console") {
-    invalid("logging.format must be json or console");
-  }
+  optionalOneOf(value.format, ["json", "console"], "logging.format");
 }
 
 function validateTrustedProxies(value: Record<string, unknown>): void {
@@ -349,7 +365,7 @@ function validateTrustedProxies(value: Record<string, unknown>): void {
   );
   if (value.client_ip_headers !== undefined) {
     stringList(value.client_ip_headers, "trusted-proxies.client_ip_headers", (item, label) => {
-      if (!HEADER_NAME.test(item)) invalid(`${label} must be a valid HTTP header name`);
+      if (!HEADER_NAME.test(item)) invalid("settingsFieldNotHeaderName", { field: label });
     });
   }
   optionalBoolean(value, "strict", "trusted-proxies");
@@ -360,8 +376,7 @@ function validateDns(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "resolvers", "fallbacks", "timeout"], "DNS settings");
   const enabled = booleanValue(required(value, "enabled", "DNS settings"), "dns.enabled");
   const resolvers = stringList(required(value, "resolvers", "DNS settings"), "dns.resolvers");
-  if (enabled && resolvers.length === 0)
-    invalid("dns.resolvers must not be empty when DNS is enabled");
+  if (enabled && resolvers.length === 0) invalid("settingsDnsResolversRequired");
   if (value.fallbacks !== undefined) stringList(value.fallbacks, "dns.fallbacks");
   optionalString(value, "timeout", "dns", 64);
 }
@@ -370,7 +385,7 @@ function validateDns(value: Record<string, unknown>): void {
 function dnsName(value: unknown, label: string): string {
   const name = stringValue(value, label, { min: 1, max: 253 });
   if (normalizeDnsName(name) !== name.toLowerCase()) {
-    invalid(`${label} must be a domain name without a wildcard or trailing dot`);
+    invalid("settingsFieldNotDnsName", { field: label });
   }
   return name.toLowerCase();
 }
@@ -379,9 +394,10 @@ const ACMEDNS_ACCOUNT_KEYS = ["username", "password", "subdomain", "server_url"]
 
 function validateDnsDelegations(value: unknown, providers: Record<string, unknown>): void {
   if (!Array.isArray(value) || value.length > MAX_DNS_DELEGATIONS) {
-    invalid(
-      `dns-provider.delegations must be an array with at most ${MAX_DNS_DELEGATIONS} entries`,
-    );
+    invalid("settingsFieldArrayMax", {
+      field: "dns-provider.delegations",
+      max: MAX_DNS_DELEGATIONS,
+    });
   }
   const seen = new Set<string>();
   value.forEach((entry, index) => {
@@ -389,18 +405,18 @@ function validateDnsDelegations(value: unknown, providers: Record<string, unknow
     const delegation = record(entry, label);
     onlyKeys(delegation, ["domain", "target", "provider"], label);
     const domain = dnsName(required(delegation, "domain", label), `${label}.domain`);
-    if (seen.has(domain)) invalid(`${label}.domain is listed twice`);
+    if (seen.has(domain)) invalid("settingsFieldListedTwice", { field: `${label}.domain` });
     seen.add(domain);
     const target = delegation.target ?? null;
     const provider = delegation.provider ?? null;
     if (target !== null) dnsName(target, `${label}.target`);
     if (provider !== null) {
       if (typeof provider !== "string" || !Object.hasOwn(providers, provider)) {
-        invalid(`${label}.provider must identify a configured provider`);
+        invalid("settingsFieldNotConfiguredProvider", { field: `${label}.provider` });
       }
     }
     if (target === null && provider === null) {
-      invalid(`${label} needs a target, a provider or both`);
+      invalid("settingsDnsDelegationNeedsTarget", { field: label });
     }
   });
 }
@@ -409,13 +425,16 @@ function validateAcmeDnsAccounts(value: unknown): void {
   const accounts = record(value, "dns-provider.acmeDnsAccounts");
   const domains = Object.keys(accounts);
   if (domains.length > MAX_DNS_DELEGATIONS) {
-    invalid(`dns-provider.acmeDnsAccounts must contain at most ${MAX_DNS_DELEGATIONS} accounts`);
+    invalid("settingsFieldTooMany", {
+      field: "dns-provider.acmeDnsAccounts",
+      max: MAX_DNS_DELEGATIONS,
+    });
   }
   for (const domain of domains) {
     const label = `dns-provider.acmeDnsAccounts.${domain}`;
     // The builder looks accounts up by lowercase name.
     if (dnsName(domain, `${label} key`) !== domain) {
-      invalid(`${label} key must be a lowercase domain name`);
+      invalid("settingsAcmeDnsAccountKeyNotLowercase", { field: label });
     }
     const account = record(accounts[domain], label);
     onlyKeys(account, [...ACMEDNS_ACCOUNT_KEYS, "fulldomain"], label);
@@ -444,11 +463,12 @@ function validateDnsProvider(value: Record<string, unknown>): void {
     "dns-provider.providers",
   );
   const providerNames = Object.keys(providers);
-  if (providerNames.length > 32)
-    invalid("dns-provider.providers must contain at most 32 providers");
+  if (providerNames.length > 32) {
+    invalid("settingsFieldTooMany", { field: "dns-provider.providers", max: 32 });
+  }
   for (const providerName of providerNames) {
     const definition = getProviderDefinition(providerName);
-    if (!definition) invalid(`Unsupported DNS provider: ${providerName}`);
+    if (!definition) invalid("settingsDnsProviderUnsupported", { provider: providerName });
     const credentials = record(providers[providerName], `dns-provider.providers.${providerName}`);
     onlyKeys(
       credentials,
@@ -469,27 +489,28 @@ function validateDnsProvider(value: Record<string, unknown>): void {
           { max: MAX_SECRET_LENGTH },
         );
         if (field.type === "duration" && !isValidDnsDuration(stored)) {
-          invalid(
-            `dns-provider.providers.${providerName}.${field.key} must be a duration like "600s" or "10m" (or -1 to disable)`,
-          );
+          invalid("settingsFieldNotDuration", {
+            field: `dns-provider.providers.${providerName}.${field.key}`,
+          });
         }
       }
     }
   }
   if (value.default !== null && typeof value.default !== "string") {
-    invalid("dns-provider.default must be a provider name or null");
+    invalid("settingsDnsDefaultNotName");
   }
   if (typeof value.default === "string" && !Object.hasOwn(providers, value.default)) {
-    invalid("dns-provider.default must identify a configured provider");
+    invalid("settingsFieldNotConfiguredProvider", { field: "dns-provider.default" });
   }
   const acmeDns = providers[ACMEDNS_PROVIDER] as Record<string, unknown> | undefined;
   if (acmeDns) {
     // The single account is all or nothing: the module refuses one with a field missing.
     const set = ACMEDNS_ACCOUNT_KEYS.filter((key) => acmeDns[key]);
     if (set.length > 0 && set.length < ACMEDNS_ACCOUNT_KEYS.length) {
-      invalid(
-        `dns-provider.providers.${ACMEDNS_PROVIDER} needs all of ${ACMEDNS_ACCOUNT_KEYS.join(", ")}, or none`,
-      );
+      invalid("settingsAcmeDnsAccountIncomplete", {
+        field: `dns-provider.providers.${ACMEDNS_PROVIDER}`,
+        keys: ACMEDNS_ACCOUNT_KEYS,
+      });
     }
   }
   if (value.delegations !== undefined) validateDnsDelegations(value.delegations, providers);
@@ -499,14 +520,17 @@ function validateDnsProvider(value: Record<string, unknown>): void {
 function validateUpstreamDns(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "family"], "upstream DNS settings");
   booleanValue(required(value, "enabled", "upstream DNS settings"), "upstream-dns.enabled");
-  const family = required(value, "family", "upstream DNS settings");
-  if (family !== "ipv4" && family !== "ipv6" && family !== "both") {
-    invalid("upstream-dns.family must be ipv4, ipv6, or both");
-  }
+  oneOf(
+    required(value, "family", "upstream DNS settings"),
+    ["ipv4", "ipv6", "both"],
+    "upstream-dns.family",
+  );
 }
 
 function validateNumberList(value: unknown, label: string): void {
-  if (!Array.isArray(value) || value.length > MAX_LIST_ITEMS) invalid(`${label} must be an array`);
+  if (!Array.isArray(value) || value.length > MAX_LIST_ITEMS) {
+    invalid("settingsFieldArrayMax", { field: label, max: MAX_LIST_ITEMS });
+  }
   value.forEach((item, index) => {
     integerValue(item, `${label}[${index}]`, 1, 4_294_967_295);
   });
@@ -538,12 +562,12 @@ function validateGeoBlock(value: Record<string, unknown>): void {
   booleanValue(value.fail_closed, "geoblock.fail_closed");
   for (const key of ["block_countries", "allow_countries"]) {
     stringList(value[key], `geoblock.${key}`, (item, label) => {
-      if (!/^[A-Z]{2}$/.test(item)) invalid(`${label} must be an uppercase ISO country code`);
+      if (!/^[A-Z]{2}$/.test(item)) invalid("settingsFieldNotCountryCode", { field: label });
     });
   }
   for (const key of ["block_continents", "allow_continents"]) {
     stringList(value[key], `geoblock.${key}`, (item, label) => {
-      if (!CONTINENTS.has(item)) invalid(`${label} must be a valid continent code`);
+      if (!CONTINENTS.has(item)) invalid("settingsFieldNotContinentCode", { field: label });
     });
   }
   validateNumberList(value.block_asns, "geoblock.block_asns");
@@ -553,7 +577,7 @@ function validateGeoBlock(value: Record<string, unknown>): void {
   }
   for (const key of ["block_ips", "allow_ips"]) {
     stringList(value[key], `geoblock.${key}`, (item, label) => {
-      if (ipVersion(item) === 0) invalid(`${label} must be an IP address`);
+      if (ipVersion(item) === 0) invalid("settingsFieldNotIpAddress", { field: label });
     });
   }
   stringList(value.trusted_proxies, "geoblock.trusted_proxies", (item, label) =>
@@ -606,10 +630,7 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
     "WAF settings",
   );
   booleanValue(required(value, "enabled", "WAF settings"), "waf.enabled");
-  const mode = required(value, "mode", "WAF settings");
-  if (mode !== "Off" && mode !== "On" && mode !== "DetectionOnly") {
-    invalid("waf.mode must be Off, On, or DetectionOnly");
-  }
+  oneOf(required(value, "mode", "WAF settings"), ["Off", "On", "DetectionOnly"], "waf.mode");
   booleanValue(required(value, "load_owasp_crs", "WAF settings"), "waf.load_owasp_crs");
   if (value.strict_directives !== undefined) {
     booleanValue(value.strict_directives, "waf.strict_directives");
@@ -635,16 +656,14 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
         }
       : undefined,
   );
-  if (directiveError) invalid(directiveError.message);
+  if (directiveError) invalidFrom(directiveError);
   // Past the allowlist, a line can still be one Coraza refuses, and that fails every host's config.
   const lintErrors = seclangErrors(directives, { crsLoaded: value.load_owasp_crs === true });
   if (lintErrors.length > 0) {
-    invalid(
-      domainErrorMessage("wafDirectivesInvalid", {
-        count: lintErrors.length,
-        details: seclangErrorDetails(lintErrors),
-      }),
-    );
+    invalid("wafDirectivesInvalid", {
+      count: lintErrors.length,
+      details: seclangErrorDetails(lintErrors),
+    });
   }
   if (value.excluded_rule_ids !== undefined)
     validateNumberList(value.excluded_rule_ids, "waf.excluded_rule_ids");
@@ -669,36 +688,42 @@ export function validateBodyLimits(value: Record<string, unknown>, prefix: strin
   for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
     const raw = value[key];
     if (raw === undefined || raw === null) continue;
-    if (!isValidBodyLimit(raw)) invalid(bodyLimitRangeMessage(`${prefix}.${key}`));
+    if (!isValidBodyLimit(raw)) {
+      invalid("settingsBodyLimitRange", {
+        field: `${prefix}.${key}`,
+        min: CORAZA_MIN_BODY_LIMIT,
+        max: CORAZA_MAX_BODY_LIMIT,
+      });
+    }
   }
   const action = value.request_body_limit_action;
-  if (
-    action !== undefined &&
-    action !== null &&
-    action !== "Reject" &&
-    action !== "ProcessPartial"
-  ) {
-    invalid(`${prefix}.request_body_limit_action must be Reject or ProcessPartial`);
+  if (action !== undefined && action !== null) {
+    oneOf(action, ["Reject", "ProcessPartial"], `${prefix}.request_body_limit_action`);
   }
   const limit = value.request_body_limit;
   const inMemory = value.request_body_in_memory_limit;
   if (typeof limit === "number" && typeof inMemory === "number" && inMemory > limit) {
-    invalid(`${prefix}.request_body_in_memory_limit must not exceed ${prefix}.request_body_limit`);
+    invalid("settingsBodyLimitInMemoryExceeds", {
+      field: `${prefix}.request_body_in_memory_limit`,
+      limitField: `${prefix}.request_body_limit`,
+    });
   }
 }
 
 function validateErrorPages(value: Record<string, unknown>): void {
   onlyKeys(value, ["rules"], "error page settings");
   const rules = required(value, "rules", "error page settings");
-  if (!Array.isArray(rules) || rules.length > 100)
-    invalid("error-pages.rules must be an array with at most 100 entries");
+  if (!Array.isArray(rules) || rules.length > 100) {
+    invalid("settingsFieldArrayMax", { field: "error-pages.rules", max: 100 });
+  }
   rules.forEach((rawRule, index) => {
     const label = `error-pages.rules[${index}]`;
     const rule = record(rawRule, label);
     onlyKeys(rule, ["statuses", "body", "contentType"], label);
     const statuses = required(rule, "statuses", label);
-    if (!Array.isArray(statuses) || statuses.length > 200)
-      invalid(`${label}.statuses must be an array`);
+    if (!Array.isArray(statuses) || statuses.length > 200) {
+      invalid("settingsFieldArrayMax", { field: `${label}.statuses`, max: 200 });
+    }
     statuses.forEach((status, statusIndex) => {
       integerValue(status, `${label}.statuses[${statusIndex}]`, 400, 599);
     });
@@ -783,8 +808,7 @@ function validateHttpCache(value: Record<string, unknown>): void {
   try {
     normalizeHttpCacheSettings(value, { secretsPending: true });
   } catch (error) {
-    if (error instanceof DomainError) invalid(error.message);
-    throw error;
+    invalidFrom(error);
   }
 }
 
@@ -812,7 +836,7 @@ function validateTailscale(value: Record<string, unknown>): void {
     // The normalizer also runs on every read; duplicated rules could accept what a read then drops.
     normalizeTailscaleSettings(value);
   } catch (error) {
-    invalid(error instanceof Error ? error.message : "Invalid Tailscale settings");
+    invalidFrom(error);
   }
 }
 
@@ -844,8 +868,7 @@ function validateCrowdSec(value: Record<string, unknown>): void {
     // Whether a key is present is only known once the stored one is merged, on save.
     normalizeCrowdSecSettings(value);
   } catch (error) {
-    if (error instanceof DomainError) invalid(error.message);
-    throw error;
+    invalidFrom(error);
   }
 }
 
@@ -854,10 +877,10 @@ export function assertSettingsPayloadSize(input: unknown): void {
   try {
     serialized = JSON.stringify(input);
   } catch {
-    invalid("Settings payload must be valid JSON data");
+    invalid("settingsPayloadNotJson");
   }
   if (Buffer.byteLength(serialized, "utf8") > MAX_SETTINGS_BYTES) {
-    invalid(`Settings payload must not exceed ${MAX_SETTINGS_BYTES} bytes`);
+    invalid("settingsPayloadTooLarge", { max: MAX_SETTINGS_BYTES });
   }
 }
 
@@ -919,7 +942,7 @@ export function validateSettingsGroup(
       try {
         normalizeGlobalRateLimitInput(value);
       } catch (error) {
-        invalid(error instanceof Error ? error.message : "Invalid rate limit settings");
+        invalidFrom(error);
       }
       break;
     case "error-pages":
@@ -956,11 +979,11 @@ export function validateSettingsGroup(
       // Length, characters and whether Caddy takes it are checked on save, against a real Caddy.
       onlyKeys(value, ["caddyfile"], "global Caddyfile settings");
       if (typeof required(value, "caddyfile", "global Caddyfile settings") !== "string") {
-        invalid("caddyfile must be a string");
+        invalid("settingsFieldNotString", { field: "caddyfile" });
       }
       break;
     default:
-      invalid("Unknown settings group");
+      invalid("settingsGroupUnknown");
   }
   return input;
 }

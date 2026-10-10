@@ -1139,6 +1139,10 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'code', keys: ['errors.viewAsStartFailed', 'users.viewAs.errorTitle'] },
   { reason: 'code', keys: ['errors.hostTooManyTags', 'ui.hostTags.tooMany'] },
   {
+    reason: 'code',
+    keys: ['errors.settingsFieldNotDuration', 'settings.results.dnsProviderFieldDuration'],
+  },
+  {
     reason: 'casing',
     keys: [
       'auditLog.systemActor',
