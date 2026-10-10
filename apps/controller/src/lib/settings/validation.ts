@@ -566,6 +566,16 @@ function validateGeoBlock(value: Record<string, unknown>): void {
   httpUrl(redirect, "geoblock.redirect_url", true);
 }
 
+/**
+ * A host's own geo-block rules, which `/api/v1` and GraphQL take as raw JSON. The host form fills
+ * every key; the API may leave the response fields to inherit, so those get the global defaults
+ * before the same check the global settings get.
+ */
+export function validateHostGeoBlock(input: unknown): void {
+  const value = record(input, "geoblock settings");
+  validateGeoBlock({ response_status: 403, response_body: "", ...value });
+}
+
 /** The stored global WAF settings an update replaces. */
 export type PreviousWafSettings = {
   custom_directives?: string | null;

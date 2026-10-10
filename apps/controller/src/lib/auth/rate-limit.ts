@@ -304,18 +304,21 @@ export async function reserveAccountAttempt(
 const WINDOWS = new Map<string, { count: number; resetAt: number }>();
 const MAX_TRACKED_WINDOWS = 10_000;
 
-/** False once that window is spent. */
+/**
+ * False once that window is spent. Fails closed when the table is full of live windows: evicting
+ * the oldest would let a flood of fresh keys (reset requests for made-up identifiers, say) wipe
+ * the budgets of everyone else.
+ */
 export function takeFromWindow(key: string, limit: number, windowMs: number, now = Date.now()) {
   let entry = WINDOWS.get(key);
   if (!entry || entry.resetAt <= now) {
-    entry = { count: 0, resetAt: now + windowMs };
-    WINDOWS.delete(key);
-    WINDOWS.set(key, entry);
-    if (WINDOWS.size > MAX_TRACKED_WINDOWS) {
+    if (entry) WINDOWS.delete(key);
+    if (WINDOWS.size >= MAX_TRACKED_WINDOWS) {
       for (const [k, v] of WINDOWS) if (v.resetAt <= now) WINDOWS.delete(k);
-      const oldest = WINDOWS.keys().next().value;
-      if (WINDOWS.size > MAX_TRACKED_WINDOWS && oldest !== undefined) WINDOWS.delete(oldest);
+      if (WINDOWS.size >= MAX_TRACKED_WINDOWS) return false;
     }
+    entry = { count: 0, resetAt: now + windowMs };
+    WINDOWS.set(key, entry);
   }
   if (entry.count >= limit) return false;
   entry.count += 1;

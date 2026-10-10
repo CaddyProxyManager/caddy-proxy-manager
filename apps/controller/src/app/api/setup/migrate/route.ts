@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
+import { checkSameOrigin } from "@/src/lib/auth";
 import { importLegacyDatabase } from "@/src/lib/migration/import";
 import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import {
@@ -34,6 +35,11 @@ function json(body: MigrateResponse, status: number): Response {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
+  // Unauthenticated by necessity, so the origin check is all that keeps a cross-site page from
+  // starting an import on an empty controller.
+  const originCheck = checkSameOrigin(request);
+  if (originCheck) return originCheck;
+
   // The setup page shows `error` as it arrives, so every one is said in the reader's language.
   const t = await getTranslations("setup");
   const tErrors = await getTranslations("errors");

@@ -87,6 +87,21 @@ describe('proxy host geoblockMode persistence', () => {
     expect(JSON.parse(row!.meta!).geoblock_mode).toBe('override');
   });
 
+  it('refuses host rules the global validator would refuse', async () => {
+    // The API hands the object to the model as-is; the form never sends a bad one.
+    await expect(
+      createProxyHost(
+        {
+          name: 'bad-host',
+          domains: ['bad.example.com'],
+          upstreams: ['10.0.0.5:8080'],
+          geoblock: { ...baseGeoblock, trusted_proxies: ['not-a-cidr'] },
+        },
+        1,
+      ),
+    ).rejects.toMatchObject({ code: 'hostGeoBlockInvalid' });
+  });
+
   it('defaults geoblockMode=merge when not provided', async () => {
     const host = await createProxyHost(
       {

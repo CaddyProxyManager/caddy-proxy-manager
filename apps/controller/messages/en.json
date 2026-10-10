@@ -1670,6 +1670,7 @@
     "hostForwardAuthEndpointRequired": "forwardAuth.authEndpoint is required when the provider is custom",
     "hostForwardAuthProviderConflict": "A host can have one authenticator, and this one would have {providers}. Turn one of them off first.",
     "hostWafBodyLimitActionInvalid": "waf.request_body_limit_action must be Reject or ProcessPartial",
+    "hostGeoBlockInvalid": "The geo-blocking rules are invalid: {detail}",
     "wafPresetNotFound": "WAF preset not found",
     "wafPresetUnknownIds": "Unknown WAF preset id(s): {ids}",
     "wafPresetNameRequired": "A WAF preset needs a name",

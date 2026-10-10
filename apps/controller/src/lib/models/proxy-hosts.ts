@@ -37,6 +37,7 @@ import {
 } from "../waf/caddy";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy/tailscale";
 import { domainError } from "../errors/domain-error";
+import { SettingsValidationError, validateHostGeoBlock } from "../settings/validation";
 import { assertCertificateServable } from "../certificates/placement";
 import { seclangErrors } from "../waf/seclang";
 import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf/dry-run";
@@ -2641,6 +2642,7 @@ function buildMeta(
   }
 
   if (input.geoblock !== undefined) {
+    if (input.geoblock) validateGeoBlockMeta(input.geoblock);
     const geoblockMeta = dehydrateGeoBlock(input.geoblock ?? null);
     if (geoblockMeta) {
       next.geoblock = geoblockMeta;
@@ -3184,6 +3186,16 @@ function dehydrateUpstreamDnsResolution(
 
 function hydrateGeoBlock(meta: GeoBlockSettings | undefined): GeoBlockSettings | null {
   return meta ?? null;
+}
+
+/** The global validator's rules; the host form never sends a bad value, the API can. */
+function validateGeoBlockMeta(geoblock: GeoBlockSettings): void {
+  try {
+    validateHostGeoBlock(geoblock);
+  } catch (error) {
+    if (!(error instanceof SettingsValidationError)) throw error;
+    throw domainError("hostGeoBlockInvalid", { detail: error.message }, { status: 400 });
+  }
 }
 
 function dehydrateGeoBlock(geoblock: GeoBlockSettings | null): GeoBlockSettings | undefined {
